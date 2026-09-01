@@ -131,7 +131,7 @@ simd-adler32 = "0.3.10"
 similar = "2.6"
 sonic-rs = "0.5.8"
 spdx = "0.13.5"
-syn = { version = "2", features = ["full", "fold"] }
+syn = { version = "3", features = ["full", "fold"] }
 tar = { version = "0.4.46", default-features = false }
 target-guard = { package = "whim-support", path = "crates/support", version = "0.1.2" }
 thiserror = "2.0.19"
