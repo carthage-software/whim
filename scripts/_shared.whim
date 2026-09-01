@@ -191,7 +191,7 @@ function set_cargo_version((int, int, int) $next): void {
   }
 
   run_git($root, vec['add', '--', 'Cargo.toml', 'Cargo.lock']);
-  run_git($root, vec['commit', '-m', 'bump version to ' . $replacement]);
+  run_git($root, vec['commit', '-m', 'bump version to ' . $replacement, '-s', '-S']);
 }
 
 function verify_lock(NonEmptyString $root): void {
