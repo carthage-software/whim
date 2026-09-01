@@ -34,7 +34,7 @@ language server, and manages Git dependencies. The standard library is written
 mainly in Whim. It covers async I/O, files, processes, networking, TLS, HTTP,
 WebSockets, SQLite, PostgreSQL, dates, encodings, and common data formats.
 
-We also maintain packages in the [Trifle group on Codeberg](https://codeberg.org/trifle).
+We also maintain [Trifle packages on Codeberg](https://codeberg.org/trifle).
 
 ## Install
 
