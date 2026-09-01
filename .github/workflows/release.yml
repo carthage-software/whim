@@ -204,7 +204,7 @@ jobs:
           test -x "${context}/riscv64/whim"
           echo "path=${context}" >> "$GITHUB_OUTPUT"
       - id: metadata
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/carthage-software/whim
           tags: |
