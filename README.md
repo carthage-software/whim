@@ -34,11 +34,17 @@ language server, and manages Git dependencies. The standard library is written
 mainly in Whim. It covers async I/O, files, processes, networking, TLS, HTTP,
 WebSockets, SQLite, PostgreSQL, dates, encodings, and common data formats.
 
-We also maintains packages in the [Trifle group on Codeberg](https://codeberg.org/trifle).
+We also maintain packages in the [Trifle group on Codeberg](https://codeberg.org/trifle).
 
 ## Install
 
-Download a build from [GitHub Releases], place `whim` on your `PATH`, then run:
+Install the latest release on macOS or Linux:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/whim.sh | bash
+```
+
+You can also download an archive from [GitHub Releases]. After installation, run:
 
 ```console
 whim --version

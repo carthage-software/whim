@@ -3,10 +3,29 @@
 Whim supports macOS on x86-64 and Arm64. It also supports glibc-based Linux on
 x86-64, Arm64, and RISC-V 64. Run it through the `whim` command.
 
-## Install a release
+## Shell installer
 
-Download the archive for your system. Put the `whim` file in a directory on
-your `PATH`. Then check it:
+Install the latest release on macOS or Linux:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/whim.sh | bash
+```
+
+Pass a version to install a specific release:
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/whim.sh | bash -s -- --version=0.1.0
+```
+
+The installer verifies build attestations when a compatible
+[GitHub CLI](https://cli.github.com/) is available.
+
+> Note: Release `0.1.0` has no attestation.
+
+## Manual installation
+
+Download the archive for your system from [GitHub Releases](https://github.com/carthage-software/whim/releases). Put the
+`whim` file in a directory on your `PATH`. Then check it:
 
 ```console
 whim --version
