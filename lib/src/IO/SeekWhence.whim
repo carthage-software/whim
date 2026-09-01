@@ -1,0 +1,15 @@
+namespace Whim\IO;
+
+use Whim\_Private;
+
+/** Selects the origin from which a seek offset is measured. */
+enum SeekWhence: int {
+  /** Measures from the start of the data source. */
+  case Set = _Private\SEEK_ORIGIN_START;
+
+  /** Measures from the current cursor. */
+  case Current = _Private\SEEK_ORIGIN_CURRENT;
+
+  /** Measures from the end of the data source. */
+  case End = _Private\SEEK_ORIGIN_END;
+}

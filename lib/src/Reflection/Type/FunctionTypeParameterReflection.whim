@@ -1,0 +1,22 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Describes one positional parameter in a structural callable type. */
+#[Stub]
+final class FunctionTypeParameterReflection {
+  private function __construct() {}
+
+  /** Returns the zero-based position. */
+  #[MustUse]
+  public function getPosition(): 0.. {}
+
+  /** Returns the accepted argument type. */
+  #[MustUse]
+  public function getType(): TypeReflection {}
+
+  /** Reports whether a caller may omit this argument. */
+  #[MustUse]
+  public function isOptional(): bool {}
+}

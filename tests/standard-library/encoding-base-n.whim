@@ -1,0 +1,131 @@
+use Whim\Encoding\Base32;
+use Whim\Encoding\Base64;
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\Hex;
+
+assert!(Base64\encode('') == '');
+assert!(Base64\encode('f') == 'Zg==');
+assert!(Base64\encode('fo') == 'Zm8=');
+assert!(Base64\encode('foo') == 'Zm9v');
+assert!(Base64\encode('foob') == 'Zm9vYg==');
+assert!(Base64\encode('fooba') == 'Zm9vYmE=');
+assert!(Base64\encode('foobar') == 'Zm9vYmFy');
+assert!(Base64\decode('Zm9vYg==') == 'foob');
+assert!(Base64\decode('Zm9vYg', padding: false) == 'foob');
+
+$bytes = "\xfb\xff\xfe";
+assert!(Base64\encode($bytes) == '+//+');
+assert!(Base64\encode($bytes, Base64\Alphabet::UrlSafe) == '-__-');
+assert!(Base64\decode('-__-', Base64\Alphabet::UrlSafe) == $bytes);
+assert!(
+  Base64\encode(
+    $bytes,
+    Base64\Alphabet::DotSlash,
+    padding: false,
+  ) != Base64\encode($bytes, Base64\Alphabet::DotSlashOrdered, padding: false),
+);
+
+assert!(
+  Base64\decode(
+    Base64\encode($bytes, Base64\Alphabet::DotSlash),
+    Base64\Alphabet::DotSlash,
+  )
+  == $bytes,
+);
+
+assert!(
+  Base64\decode(
+    Base64\encode($bytes, Base64\Alphabet::DotSlashOrdered, padding: false),
+    Base64\Alphabet::DotSlashOrdered,
+    padding: false,
+  )
+  == $bytes,
+);
+
+$junk = null;
+$assertion_callable_16 = fn(): string => Base64\decode('not base64!');
+try {
+  $assertion_callable_16();
+} catch (DecodingException $assertion_caught_16) {
+  $junk = $assertion_caught_16;
+}
+
+assert!($junk is DecodingException);
+
+assert!(
+  $junk->getMessage()
+  == 'the input is not base64 in the chosen alphabet and padding mode',
+);
+
+$assertion_value_18 = fn(): string => Base64\decode('Zm9vYg==', padding: false);
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (DecodingException $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is DecodingException);
+
+$assertion_value_19 = fn(): string => Base64\decode('Zm9vYg');
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (DecodingException $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is DecodingException);
+
+assert!(Base32\encode('foobar') == 'MZXW6YTBOI======');
+assert!(Base32\decode('MZXW6YTBOI======') == 'foobar');
+assert!(Base32\decode('mzxw6ytboi======') == 'foobar');
+assert!(Base32\encode('foobar', padding: false) == 'MZXW6YTBOI');
+assert!(Base32\encode('foobar', Base32\Alphabet::Hex) == 'CPNMUOJ1E8======');
+
+assert!(Base32\decode('CPNMUOJ1E8======', Base32\Alphabet::Hex) == 'foobar');
+
+assert!(Base32\decode('cpnmuoj1e8======', Base32\Alphabet::Hex) == 'foobar');
+assert!(
+  Base32\decode('cpnmuoj1e8', Base32\Alphabet::Hex, padding: false) == 'foobar',
+);
+
+$assertion_value_28 = fn(): string => (
+  Base32\decode('MZXW6YTBOI======', Base32\Alphabet::Hex)
+);
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (DecodingException $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is DecodingException);
+
+assert!(Hex\encode('foobar') == '666f6f626172');
+assert!(Hex\decode('666f6f626172') == 'foobar');
+assert!(Hex\decode('666F6F626172') == 'foobar');
+
+$odd = null;
+$assertion_callable_32 = fn(): string => Hex\decode('abc');
+try {
+  $assertion_callable_32();
+} catch (DecodingException $assertion_caught_32) {
+  $odd = $assertion_caught_32;
+}
+
+assert!($odd is DecodingException);
+
+assert!($odd->getMessage() == 'the input is not hexadecimal');
+$nonHex = null;
+$assertion_callable_34 = fn(): string => Hex\decode('zz');
+try {
+  $assertion_callable_34();
+} catch (DecodingException $assertion_caught_34) {
+  $nonHex = $assertion_caught_34;
+}
+
+assert!($nonHex is DecodingException);
+
+assert!($nonHex->getMessage() == 'the input is not hexadecimal');

@@ -1,0 +1,6 @@
+namespace Whim\SMTP;
+
+use Whim\Unwind\RuntimeException;
+
+/** Thrown when an SMTP peer violates the protocol. */
+final class ProtocolException extends RuntimeException {}

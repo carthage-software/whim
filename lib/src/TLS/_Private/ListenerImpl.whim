@@ -1,0 +1,56 @@
+namespace Whim\TLS\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\Endpoint;
+use Whim\Network\Listener as NetworkListener;
+use Whim\TLS\Acceptor;
+use Whim\TLS\Listener;
+use Whim\TLS\ServerConfiguration;
+use Whim\TLS\Stream;
+
+/** Implements a TLS listener over another listener. */
+final class ListenerImpl<TEndpoint: Endpoint> implements Listener<TEndpoint> {
+  private Acceptor<TEndpoint> $acceptor;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private NetworkListener<TEndpoint> $listener,
+    ServerConfiguration $configuration,
+  ) {
+    $this->acceptor = new Acceptor::<TEndpoint>($configuration);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLocalEndpoint(): TEndpoint {
+    return $this->listener->getLocalEndpoint();
+  }
+
+  #[AlwaysInline]
+  public function isClosed(): bool {
+    return $this->listener->isClosed();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    $this->listener->close();
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function accept(
+    null|CancellationToken $cancellation = null,
+  ): Stream<TEndpoint> {
+    return $this->acceptor->accept(
+      $this->listener->accept($cancellation),
+      $cancellation,
+    );
+  }
+}

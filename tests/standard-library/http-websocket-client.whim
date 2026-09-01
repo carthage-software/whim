@@ -1,0 +1,193 @@
+use Whim\Async;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\WebSocket\BinaryMessage;
+use Whim\HTTP\WebSocket\CloseMessage;
+use Whim\HTTP\WebSocket\Client;
+use Whim\HTTP\WebSocket\TextMessage;
+use Whim\IP\Address;
+use Whim\IO\Reader;
+use Whim\Network\InternetEndpoint;
+use Whim\SecureRandom;
+use Whim\Str;
+use Whim\TCP;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\URL\URL;
+use Whim\_Private\WebSocketCodec;
+use Whim\_Private\http1_parse_request_head;
+use Whim\_Private\websocket_accept_key;
+
+function receive_client_frame(
+  TCP\Stream $stream,
+  WebSocketCodec $codec,
+): null|(int, string, int) {
+  while (true) {
+    $event = $codec->nextEvent();
+    if ($event != null) {
+      return $event;
+    }
+
+    $bytes = $stream->read();
+    if ($bytes == '') {
+      $codec->finishInput();
+      return $codec->nextEvent();
+    }
+
+    $codec->push($bytes);
+  }
+}
+
+$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$endpoint = $listener->getLocalEndpoint();
+$server = Async\spawn::<(string, string)>(
+  function() use ($listener): (string, string) {
+    $stream = $listener->accept();
+    $reader = new Reader($stream);
+    $head = $reader->readUntilBounded("\r\n\r\n", 8192) as string;
+    $parsed = http1_parse_request_head($head);
+    assert!($parsed is (_, _, _, _, _, _, _, _, _, _, _, _));
+
+    $headers = FieldMap::fromPartsUnsafe($parsed[3], $parsed[4]);
+    $key = $headers->get('sec-websocket-key') as string;
+    $accept = websocket_accept_key($key) as string;
+    $stream->writeAll(
+      "HTTP/1.1 101 Switching Protocols\r\n"
+      . "Upgrade: websocket\r\n"
+      . "Connection: keep-alive, Upgrade\r\n"
+      . 'Sec-WebSocket-Accept: '
+      . $accept
+      . "\r\n"
+      . "Sec-WebSocket-Protocol: chat\r\n"
+      . "X-Server: Whim\r\n\r\n"
+      . "\x89\x01p"
+      . "\x81\x05hello",
+    );
+
+    $codec = WebSocketCodec::server(1024, 1024);
+    $codec->push($reader->tryRead());
+    $event = receive_client_frame($stream, $codec);
+    assert!($event == (2, "\x00\xff", 0));
+
+    $codec->close(1000, 'done');
+    $stream->writeAll($codec->takeOutput());
+    return ($head, $event[1]);
+  },
+);
+
+$url = URL::from('ws://127.0.0.1:' . $endpoint->port . '/chat?room=whim');
+$configuration = new Client\Configuration(
+  maximumMessageSize: 1024,
+  maximumFrameSize: 1024,
+  subprotocols: vec['chat', 'fallback'],
+  headers: FieldMap::from(vec[('Authorization', 'Bearer test')]),
+  origin: 'https://example.test',
+);
+
+$connection = new Client\DefaultConnector()->connect($url, $configuration);
+
+assert!($connection->getURL() == $url);
+assert!($connection->getSubprotocol() == 'chat');
+assert!($connection->getResponseHeaders()->get('x-server') == 'Whim');
+
+assert!($connection->getTLSState() == null);
+assert!($connection->getLocalEndpoint()->port != 0);
+assert!($connection->getPeerEndpoint()->port == $endpoint->port);
+
+$message = $connection->receive();
+assert!($message is TextMessage);
+assert!($message as string == 'hello');
+$connection->sendBinary("\x00\xff");
+
+$close = $connection->receive();
+assert!($close is CloseMessage);
+assert!($close[0] == 1000);
+assert!($close[1] == 'done');
+assert!($connection->getCloseCode() == 1000);
+assert!($connection->getCloseReason() == 'done');
+assert!($connection->isClosed());
+
+($head, $binary) = $server->await();
+$listener->close();
+assert!($binary == "\x00\xff");
+assert!(Str\starts_with($head, "GET /chat?room=whim HTTP/1.1\r\n"));
+assert!(
+  Str\search($head, 'Host: 127.0.0.1:' . $endpoint->port . "\r\n") != null,
+);
+
+assert!(Str\search($head, "Authorization: Bearer test\r\n") != null);
+assert!(Str\search($head, "Origin: https://example.test\r\n") != null);
+assert!(
+  Str\search($head, "Sec-WebSocket-Protocol: chat, fallback\r\n") != null,
+);
+
+$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$endpoint = $listener->getLocalEndpoint();
+$invalidServer = Async\spawn::<null>(function() use ($listener): null {
+  $stream = $listener->accept();
+  discard!(new Reader($stream)->readUntilBounded("\r\n\r\n", 8192));
+  $stream->writeAll(
+    "HTTP/1.1 101 Switching Protocols\r\n"
+    . "Upgrade: websocket\r\n"
+    . "Connection: Upgrade\r\n"
+    . "Sec-WebSocket-Accept: wrong\r\n\r\n",
+  );
+
+  $stream->close();
+  return null;
+});
+
+$invalidFailed = false;
+try {
+  discard!(
+    new Client\DefaultConnector()->connect(
+      URL::from('ws://127.0.0.1:' . $endpoint->port . '/'),
+    ),
+  );
+} catch (Client\HandshakeException $_) {
+  $invalidFailed = true;
+}
+
+assert!($invalidFailed);
+
+$invalidServer->await();
+$listener->close();
+
+$assertion_value_13 = fn(): Client\Configuration => (
+  new Client\Configuration(subprotocols: vec['chat', 'chat'])
+);
+
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (InvalidArgumentException $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is InvalidArgumentException);
+
+$assertion_value_14 = fn(): Client\Configuration => (
+  new Client\Configuration(
+    headers: FieldMap::from(vec[('Sec-WebSocket-Key', SecureRandom\bytes(16))]),
+  )
+);
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (InvalidArgumentException $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is InvalidArgumentException);
+
+$assertion_value_15 = fn(): Client\Connection => (
+  Client\connect(URL::from('https://example.com/'))
+);
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (Client\HandshakeException $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is Client\HandshakeException);

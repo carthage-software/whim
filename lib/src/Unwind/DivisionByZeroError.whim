@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports division or modulo by zero. */
+#[Stub]
+class DivisionByZeroError extends ArithmeticError {}

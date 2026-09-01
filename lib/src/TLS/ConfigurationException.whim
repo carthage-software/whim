@@ -1,0 +1,4 @@
+namespace Whim\TLS;
+
+/** Reports an invalid TLS configuration. */
+final class ConfigurationException extends Exception {}

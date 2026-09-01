@@ -1,0 +1,17 @@
+namespace Whim\TLS;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonEmptyString;
+
+/** An immutable snapshot of a completed TLS handshake. */
+final readonly class ConnectionState {
+  #[AlwaysInline]
+  public function __construct(
+    public Version $version,
+    public NonEmptyString $cipherSuite,
+    public null|NonEmptyString $alpnProtocol,
+    public HandshakeKind $handshakeKind,
+    public vec<Certificate> $peerCertificates,
+    public null|NonEmptyString $serverName,
+  ) {}
+}

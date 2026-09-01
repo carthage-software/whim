@@ -1,0 +1,4 @@
+namespace Whim\HTTP\Client;
+
+/** Reports a failure to establish a usable HTTP connection. */
+final class ConnectionException extends Exception {}

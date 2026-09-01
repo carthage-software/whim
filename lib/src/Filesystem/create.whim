@@ -1,0 +1,214 @@
+namespace Whim\Filesystem;
+
+use Whim;
+use Whim\Filesystem\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\Uint32;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/**
+ * Replaces the process-wide file creation mask and returns the previous mask.
+ *
+ * The mask affects every task and blocking worker. Applications should
+ * normally set it once during startup, not use it as temporary scoped state.
+ */
+#[AlwaysInline]
+#[MustUse]
+function exchange_creation_mask(0..=0o777 $mask): 0..=0o777 {
+  return Whim\_Private\exchange_file_mode_mask($mask);
+}
+
+/**
+ * Creates a directory; permissions default to `0o755` before the umask applies.
+ *
+ * @throws AlreadyCreatedException when the path is already created.
+ * @throws NotFoundException when a parent does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function create_directory(
+  NonEmptyString $path,
+  Uint32 $permissions = 0o755,
+  bool $recursive = false,
+): void {
+  if ($recursive) {
+    _Private\create_directory_recursively($path, $permissions);
+    return;
+  }
+
+  try {
+    Whim\_Private\create_directory($path, $permissions);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'create directory');
+  }
+}
+
+/**
+ * Creates a new empty file and refuses to replace an existing node.
+ *
+ * @throws AlreadyCreatedException when the path is already created.
+ * @throws NotFoundException when a parent does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws NotFileException when the path points to a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function create_file(NonEmptyString $path, Uint32 $permissions = 0o666): void {
+  try {
+    $descriptor = _Private\open_descriptor(
+      $path,
+      Whim\_Private\OPEN_FLAG_WRITE_ONLY
+      | Whim\_Private\OPEN_FLAG_CREATE
+      | Whim\_Private\OPEN_FLAG_EXCLUSIVE
+      | Whim\_Private\OPEN_FLAG_CLOSE_ON_EXEC,
+      $permissions,
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'create file');
+  }
+
+  $descriptor->close();
+}
+
+/**
+ * Creates a hard link at a path pointing to the node at a target.
+ *
+ * @throws AlreadyCreatedException when the path is already created.
+ * @throws NotFoundException when the target or a parent does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function create_hard_link(NonEmptyString $target, NonEmptyString $link): void {
+  try {
+    Whim\_Private\create_link($target, $link);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $link, 'create hard link');
+  }
+}
+
+/**
+ * Creates a symbolic link at a path pointing to a target.
+ *
+ * @throws AlreadyCreatedException when the path is already created.
+ * @throws NotFoundException when a parent does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function create_symbolic_link(
+  NonEmptyString $target,
+  NonEmptyString $link,
+): void {
+  try {
+    Whim\_Private\create_symbolic_link($target, $link);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $link, 'create symbolic link');
+  }
+}
+
+/**
+ * Creates a named pipe; permissions default to `0o666` before the umask applies.
+ *
+ * @throws AlreadyCreatedException when the path is already created.
+ * @throws NotFoundException when a parent does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function create_named_pipe(
+  NonEmptyString $path,
+  Uint32 $permissions = 0o666,
+): void {
+  try {
+    Whim\_Private\create_named_pipe($path, $permissions);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'create named pipe');
+  }
+}
+
+/**
+ * Creates a uniquely named file readable and writable only by its owner, returning its path.
+ *
+ * @throws Whim\Unwind\InvalidArgumentException when the prefix contains a path separator.
+ * @throws NotFoundException when the directory does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function create_temporary_file(
+  null|NonEmptyString $directory = null,
+  string $prefix = '',
+): NonEmptyString {
+  if (Str\search($prefix, '/') != null) {
+    throw new InvalidArgumentException(
+      'a temporary file prefix must not contain a path separator',
+    );
+  }
+
+  if ($directory == null) {
+    $directory = Whim\_Private\temporary_directory();
+  }
+
+  try {
+    $result = Whim\_Private\create_temporary_file($directory, $prefix, 0o600);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $directory, 'create temporary file');
+  }
+
+  $result[0]->close();
+
+  return $result[1];
+}
+
+/**
+ * Creates a uniquely named directory and returns its path.
+ *
+ * @throws Whim\Unwind\InvalidArgumentException when the prefix contains a path separator.
+ * @throws NotFoundException when the directory does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function create_temporary_directory(
+  null|NonEmptyString $directory = null,
+  string $prefix = '',
+): NonEmptyString {
+  if (Str\search($prefix, '/') != null) {
+    throw new InvalidArgumentException(
+      'a temporary directory prefix must not contain a path separator',
+    );
+  }
+
+  if ($directory == null) {
+    $directory = Whim\_Private\temporary_directory();
+  }
+
+  try {
+    return Whim\_Private\create_temporary_directory($directory, $prefix);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $directory, 'create temporary directory');
+  }
+}

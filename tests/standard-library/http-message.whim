@@ -1,0 +1,395 @@
+use Whim\Async\Deferred;
+use Whim\HTTP\Cookie;
+use Whim\HTTP\Cookie\Collection;
+use Whim\HTTP\Cookie\SameSite;
+use Whim\HTTP\Cookie\SetCookie;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Exchange;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Transaction;
+use Whim\IO\MemoryHandle;
+use Whim\Json;
+use Whim\Json\ToJson;
+use Whim\Json\Value as JsonValue;
+use Whim\Convert\ToString;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\TypeError;
+use Whim\URI\URI;
+use Whim\URL\URL;
+
+final readonly class PrintableResponseBody implements ToString {
+  public function toString(): string {
+    return 'converted';
+  }
+}
+
+final readonly class JsonResponseBody implements ToJson {
+  public function toJson(): JsonValue {
+    return dict['converted' => true];
+  }
+}
+
+assert!(ProtocolVersion::V10->value == 'HTTP/1.0');
+assert!(ProtocolVersion::V11->value == 'HTTP/1.1');
+assert!(ProtocolVersion::V2->value == 'HTTP/2');
+assert!(ProtocolVersion::V3->value == 'HTTP/3');
+
+$fields = FieldMap::from(vec[
+  ('Content-Type', 'text/plain'),
+  ('Set-Cookie', 'session=one'),
+  ('set-cookie', 'theme=dark'),
+]);
+
+assert!($fields->count() == 3);
+assert!(!($fields->isEmpty()));
+assert!($fields->has('content-type'));
+assert!($fields->has('CONTENT-TYPE'));
+assert!($fields->get('Content-Type') == 'text/plain');
+assert!($fields->get('missing') == null);
+assert!($fields->getAll('SET-COOKIE') == vec['session=one', 'theme=dark']);
+
+assert!(
+  $fields->toVec() == vec[
+    ('Content-Type', 'text/plain'),
+    ('Set-Cookie', 'session=one'),
+    ('set-cookie', 'theme=dark'),
+  ],
+);
+
+$iterated = vec[];
+foreach ($fields as $index => $field) {
+  $iterated[] = ($index, $field);
+}
+
+assert!(
+  $iterated == vec[
+    (0, ('Content-Type', 'text/plain')),
+    (1, ('Set-Cookie', 'session=one')),
+    (2, ('set-cookie', 'theme=dark')),
+  ],
+);
+
+$replaced = $fields->with('SET-cookie', 'only=one');
+assert!(
+  $replaced->toVec() == vec[
+    ('Content-Type', 'text/plain'),
+    ('SET-cookie', 'only=one'),
+  ],
+);
+
+$added = $replaced->withAdded('Set-Cookie', 'second=two');
+assert!($added->getAll('set-cookie') == vec['only=one', 'second=two']);
+
+assert!(
+  $added->without('SET-COOKIE')->toVec() == vec[('Content-Type', 'text/plain')],
+);
+
+$cookies = Collection::fromHeaders(
+  FieldMap::from(vec[
+    ('Cookie', 'SID=first; theme=dark'),
+    ('cookie', 'SID=second; ignored; sid=lower'),
+  ]),
+);
+
+assert!($cookies->has('SID'));
+assert!($cookies->has('sid'));
+assert!($cookies->get('SID') == 'first');
+assert!($cookies->getAll('SID') == vec['first', 'second']);
+assert!($cookies->get('missing') == null);
+assert!($cookies->toString() == 'SID=first; theme=dark; SID=second; sid=lower');
+
+$sessionCookie = SetCookie::fromParts(
+  'session',
+  'abc123',
+  expires: Whim\Time\SystemTime::fromUnixTimestamp(784_111_777),
+  maxAge: 3_600,
+  path: '/',
+  secure: true,
+  httpOnly: true,
+  sameSite: SameSite::Lax,
+);
+
+assert!(
+  $sessionCookie->toString()
+  == 'session=abc123; Expires=Sun, 06 Nov 1994 08:49:37 GMT; Max-Age=3600; Path=/; Secure; HttpOnly; SameSite=Lax',
+);
+
+$parsedCookie = SetCookie::parse(
+  'session=parsed; Expires=Sun, 06 Nov 1994 08:49:37 GMT; Max-Age=120; '
+  . 'Domain=.Example.COM; Path=/account; Secure; HttpOnly; SameSite=Strict',
+);
+
+assert!($parsedCookie is SetCookie);
+assert!($parsedCookie?->name == 'session');
+assert!($parsedCookie?->value == 'parsed');
+assert!($parsedCookie?->expires?->seconds == 784_111_777);
+assert!($parsedCookie?->maxAge == 120);
+assert!($parsedCookie?->domain == 'example.com');
+assert!($parsedCookie?->path == '/account');
+assert!($parsedCookie?->secure);
+assert!($parsedCookie?->httpOnly);
+assert!($parsedCookie?->sameSite == SameSite::Strict);
+assert!(SetCookie::parse('broken') == null);
+assert!(SetCookie::parse('session=x; SameSite=None') == null);
+
+$cookieResponse = Cookie\add(new Response(Message\STATUS_OK), $sessionCookie);
+assert!(
+  $cookieResponse->headers->getAll('Set-Cookie') == vec[
+    $sessionCookie->toString(),
+  ],
+);
+
+$assertion_value_37 = fn(): SetCookie => (
+  SetCookie::fromParts('session', 'value', sameSite: SameSite::None)
+);
+
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (InvalidArgumentException $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is InvalidArgumentException);
+
+$assertion_value_38 = fn(): SetCookie => (
+  SetCookie::fromParts('__Host-session', 'value')
+);
+
+$assertion_error_38 = null;
+try {
+  $assertion_value_38();
+} catch (InvalidArgumentException $assertion_caught_38) {
+  $assertion_error_38 = $assertion_caught_38;
+}
+
+assert!($assertion_error_38 is InvalidArgumentException);
+
+$assertion_value_39 = fn(): FieldMap => (
+  FieldMap::from(vec[('Bad Name', 'value')])
+);
+
+$assertion_error_39 = null;
+try {
+  $assertion_value_39();
+} catch (InvalidArgumentException $assertion_caught_39) {
+  $assertion_error_39 = $assertion_caught_39;
+}
+
+assert!($assertion_error_39 is InvalidArgumentException);
+
+$assertion_value_40 = fn(): FieldMap => (
+  FieldMap::from(vec[('Good-Name', "value\r\ninjected")])
+);
+
+$assertion_error_40 = null;
+try {
+  $assertion_value_40();
+} catch (InvalidArgumentException $assertion_caught_40) {
+  $assertion_error_40 = $assertion_caught_40;
+}
+
+assert!($assertion_error_40 is InvalidArgumentException);
+
+$url = URL::from('https://example.com/search?q=whim#section');
+$request = Request::fromURL(Message\METHOD_GET, $url, headers: $fields);
+assert!($request->method == 'GET');
+assert!($request->requestTarget == '/search?q=whim');
+assert!($request->url == $url);
+assert!($request->protocolVersion == ProtocolVersion::V11);
+assert!($request->body == null);
+assert!($request->trailers == null);
+
+$parsedRequest = Request::fromPartsUnsafe(
+  Message\METHOD_GET,
+  '/parsed',
+  URL::from('https://example.com/parsed'),
+  ProtocolVersion::V11,
+  $fields,
+);
+
+assert!($parsedRequest->requestTarget == '/parsed');
+assert!($parsedRequest->headers == $fields);
+
+$custom = $request->withMethod('CUSTOM')->withRequestTarget('*');
+assert!($custom->method == 'CUSTOM');
+assert!($custom->requestTarget == '*');
+
+$withoutURL = $custom->withURL(null);
+assert!($withoutURL->url == null);
+assert!($withoutURL->requestTarget == '*');
+
+$changedURL = $custom->withURL(URL::from('https://example.net/new'));
+assert!($changedURL->requestTarget == '/new');
+
+$body = new MemoryHandle('body');
+$withBody = $request->withBody($body);
+assert!($withBody->body is MemoryHandle);
+assert!($request->body == null);
+
+$changedRequest = $request
+  ->withHeader('Content-Type', 'application/json')
+  ->withAddedHeader('X-Test', 'one')
+  ->withProtocolVersion(ProtocolVersion::V2);
+
+assert!($changedRequest->headers->get('content-type') == 'application/json');
+
+assert!($changedRequest->headers->get('x-test') == 'one');
+assert!($changedRequest->protocolVersion == ProtocolVersion::V2);
+
+$assertion_value_59 = fn(): Request => $request->withMethod('bad method');
+$assertion_error_59 = null;
+try {
+  $assertion_value_59();
+} catch (InvalidArgumentException $assertion_caught_59) {
+  $assertion_error_59 = $assertion_caught_59;
+}
+
+assert!($assertion_error_59 is InvalidArgumentException);
+
+$assertion_value_60 = fn(): Request => (
+  $request->withRequestTarget('/bad#fragment')
+);
+
+$assertion_error_60 = null;
+try {
+  $assertion_value_60();
+} catch (InvalidArgumentException $assertion_caught_60) {
+  $assertion_error_60 = $assertion_caught_60;
+}
+
+assert!($assertion_error_60 is InvalidArgumentException);
+
+$response = new Response(Message\STATUS_CREATED, headers: $fields);
+assert!($response->status == 201);
+assert!($response->headers == $fields);
+
+$changedResponse = $response
+  ->withStatus(Message\STATUS_NO_CONTENT)
+  ->withProtocolVersion(ProtocolVersion::V2)
+  ->withoutHeader('Set-Cookie');
+
+assert!($changedResponse->status == 204);
+assert!($changedResponse->protocolVersion == ProtocolVersion::V2);
+assert!(!($changedResponse->headers->has('set-cookie')));
+assert!($response->status == 201);
+
+$assertion_value_67 = fn(): Response => new Response(99);
+$assertion_error_67 = null;
+try {
+  $assertion_value_67();
+} catch (TypeError $assertion_caught_67) {
+  $assertion_error_67 = $assertion_caught_67;
+}
+
+assert!($assertion_error_67 is TypeError);
+assert!(Message\reason_phrase(Message\STATUS_OK) == 'OK');
+assert!(Message\reason_phrase(Message\STATUS_IM_A_TEAPOT) == "I'm a Teapot");
+
+assert!(Message\reason_phrase(599) == null);
+
+$jsonResponse = Message\Response\json(new JsonResponseBody());
+assert!($jsonResponse->status == Message\STATUS_OK);
+assert!($jsonResponse->headers->get('Content-Type') == 'application/json');
+
+assert!($jsonResponse->headers->get('Content-Length') == '18');
+assert!($jsonResponse->body != null);
+assert!($jsonResponse->body->readAll() == '{"converted":true}');
+
+$textResponse = Message\Response\text(
+  new PrintableResponseBody(),
+  Message\STATUS_CREATED,
+  FieldMap::from(vec[('X-Test', 'present')]),
+);
+
+assert!($textResponse->status == Message\STATUS_CREATED);
+assert!(
+  $textResponse->headers->get('Content-Type') == 'text/plain; charset=utf-8',
+);
+
+assert!($textResponse->headers->get('Content-Length') == '9');
+assert!($textResponse->headers->get('X-Test') == 'present');
+assert!($textResponse->body != null);
+assert!($textResponse->body->readAll() == 'converted');
+
+$htmlResponse = Message\Response\html('<strong>Whim</strong>');
+assert!(
+  $htmlResponse->headers->get('Content-Type') == 'text/html; charset=utf-8',
+);
+
+$emptyResponse = Message\Response\empty(Message\STATUS_NOT_FOUND);
+assert!($emptyResponse->status == Message\STATUS_NOT_FOUND);
+assert!($emptyResponse->body == null);
+
+$redirectResponse = Message\Response\redirect('/next');
+assert!($redirectResponse->status == Message\STATUS_FOUND);
+assert!($redirectResponse->headers->get('Location') == '/next');
+
+$seeOtherResponse = Message\Response\see_other(
+  URI::from('/complete?source=form'),
+);
+
+assert!($seeOtherResponse->status == Message\STATUS_SEE_OTHER);
+assert!($seeOtherResponse->headers->get('Location') == '/complete?source=form');
+
+$temporaryRedirect = Message\Response\temporary_redirect(
+  URL::from('https://example.com/temporary'),
+);
+
+assert!($temporaryRedirect->status == Message\STATUS_TEMPORARY_REDIRECT);
+
+$permanentRedirect = Message\Response\permanent_redirect('/permanent');
+assert!($permanentRedirect->status == Message\STATUS_PERMANENT_REDIRECT);
+
+$assertion_value_89 = fn(): Response => (
+  Message\Response\redirect("/bad\r\nLocation: /injected")
+);
+
+$assertion_error_89 = null;
+try {
+  $assertion_value_89();
+} catch (InvalidArgumentException $assertion_caught_89) {
+  $assertion_error_89 = $assertion_caught_89;
+}
+
+assert!($assertion_error_89 is InvalidArgumentException);
+
+$informational = new Response(
+  Message\STATUS_EARLY_HINTS,
+  headers: FieldMap::from(vec[('Link', '</style.css>; rel=preload')]),
+);
+
+$pushedRequest = Request::fromURL(
+  Message\METHOD_GET,
+  URL::from('https://example.com/style.css'),
+  protocolVersion: ProtocolVersion::V2,
+);
+
+$pushedResponse = new Response(
+  Message\STATUS_OK,
+  protocolVersion: ProtocolVersion::V2,
+);
+
+$pushed = new Deferred::<vec<Exchange>>();
+$pushed->complete(vec[new Exchange($pushedRequest, $pushedResponse)]);
+
+$transaction = new Transaction(
+  vec[$informational],
+  $pushed->getFuture(),
+  $response,
+);
+
+assert!($transaction->informational == vec[$informational]);
+assert!($transaction->response == $response);
+$pushes = $transaction->pushed;
+assert!($pushes != null);
+$pushes = $pushes->await();
+assert!(length!($pushes) == 1);
+assert!($pushes[0]->request == $pushedRequest);
+assert!($pushes[0]->response == $pushedResponse);
+
+$simpleTransaction = new Transaction(vec[], null, $response);
+assert!($simpleTransaction->pushed == null);

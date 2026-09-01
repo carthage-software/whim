@@ -1,0 +1,3 @@
+class Pair<K, V> {}
+
+function take(Pair<int> $p): void {}

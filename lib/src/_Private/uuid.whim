@@ -1,0 +1,41 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Generates the 16 bytes of a random UUID version 4. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function uuid_v4(): string {}
+
+/** Generates the 16 bytes of a time-ordered UUID version 7. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function uuid_v7(): string {}
+
+/** Parses canonical UUID text into its 16 bytes. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function uuid_parse(string $value): null|string {}
+
+/** Formats 16 UUID bytes as canonical text. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function uuid_format(string $bytes): null|string {}
+
+/** Returns the recognized UUID version encoded in 16 bytes. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function uuid_version(string $bytes): null|1..=8 {}

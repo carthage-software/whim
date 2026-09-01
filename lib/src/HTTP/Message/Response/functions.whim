@@ -1,0 +1,98 @@
+namespace Whim\HTTP\Message\Response;
+
+use Whim\Convert\ToString;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Response\_Private\body;
+use Whim\HTTP\Message\Response\_Private\redirect_response;
+use Whim\HTTP\Message\StatusCode;
+use Whim\Json;
+use Whim\Json\ToJson;
+use Whim\Json\Value as JsonValue;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\URI\URI;
+use Whim\URL\URL;
+
+/** Creates a JSON response. */
+#[MustUse]
+#[TrackCaller]
+function json(
+  JsonValue|ToJson $value,
+  StatusCode $status = Message\STATUS_OK,
+  FieldMap $headers = FieldMap::default(),
+): Response {
+  return body(Json\encode($value), 'application/json', $status, $headers);
+}
+
+/** Creates a plain-text response. */
+#[MustUse]
+#[TrackCaller]
+function text(
+  string|ToString $value,
+  StatusCode $status = Message\STATUS_OK,
+  FieldMap $headers = FieldMap::default(),
+): Response {
+  $value = match ($value) {
+    $text @ string => $text,
+    $convertible @ ToString => $convertible->toString(),
+  };
+
+  return body($value, 'text/plain; charset=utf-8', $status, $headers);
+}
+
+/** Creates an HTML response. */
+#[MustUse]
+#[TrackCaller]
+function html(
+  string|ToString $value,
+  StatusCode $status = Message\STATUS_OK,
+  FieldMap $headers = FieldMap::default(),
+): Response {
+  $value = match ($value) {
+    $text @ string => $text,
+    $convertible @ ToString => $convertible->toString(),
+  };
+
+  return body($value, 'text/html; charset=utf-8', $status, $headers);
+}
+
+/** Creates a response without a body. */
+#[AlwaysInline]
+#[MustUse]
+function empty(
+  StatusCode $status = Message\STATUS_NO_CONTENT,
+  FieldMap $headers = FieldMap::default(),
+): Response {
+  return new Response($status, headers: $headers);
+}
+
+/** Creates a 302 Found response. */
+#[MustUse]
+#[TrackCaller]
+function redirect(string|URI|URL $to): Response {
+  return redirect_response(Message\STATUS_FOUND, $to);
+}
+
+/** Creates a 303 See Other response. */
+#[MustUse]
+#[TrackCaller]
+function see_other(string|URI|URL $to): Response {
+  return redirect_response(Message\STATUS_SEE_OTHER, $to);
+}
+
+/** Creates a 307 Temporary Redirect response. */
+#[MustUse]
+#[TrackCaller]
+function temporary_redirect(string|URI|URL $to): Response {
+  return redirect_response(Message\STATUS_TEMPORARY_REDIRECT, $to);
+}
+
+/** Creates a 308 Permanent Redirect response. */
+#[MustUse]
+#[TrackCaller]
+function permanent_redirect(string|URI|URL $to): Response {
+  return redirect_response(Message\STATUS_PERMANENT_REDIRECT, $to);
+}

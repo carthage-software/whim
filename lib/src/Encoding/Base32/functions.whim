@@ -1,0 +1,55 @@
+namespace Whim\Encoding\Base32;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Encodes bytes as uppercase base32 text. */
+#[AlwaysInline]
+#[MustUse]
+function encode(
+  string $bytes,
+  Alphabet $alphabet = Alphabet::Standard,
+  bool $padding = true,
+): string {
+  return match ($alphabet) {
+    Alphabet::Standard => Whim\_Private\base32_encode_standard(
+      $bytes,
+      $padding,
+    ),
+    Alphabet::Hex => Whim\_Private\base32_encode_hex($bytes, $padding),
+  };
+}
+
+/**
+ * Decodes base32 text of either case, in the exact padding mode asked for.
+ *
+ * @throws DecodingException when the input is not valid base32 text.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(
+  string $encoded,
+  Alphabet $alphabet = Alphabet::Standard,
+  bool $padding = true,
+): string {
+  $decoded = match ($alphabet) {
+    Alphabet::Standard => Whim\_Private\base32_decode_standard(
+      $encoded,
+      $padding,
+    ),
+    Alphabet::Hex => Whim\_Private\base32_decode_hex($encoded, $padding),
+  };
+
+  if ($decoded == null) {
+    throw new DecodingException(
+      'the input is not base32 in the chosen alphabet and padding mode',
+    );
+  }
+
+  return $decoded;
+}

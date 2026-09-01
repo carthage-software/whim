@@ -1,0 +1,75 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Convert\ToString;
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Type\TypeId;
+
+/**
+ * Describes one semantic Whim type expression, not its source syntax.
+ * Equivalent source spellings may produce the same reflected type.
+ */
+#[Stub]
+interface TypeReflection extends
+  ToString for
+  PrimitiveTypeReflection,
+  LiteralTypeReflection,
+  IntegerRangeTypeReflection,
+  NamedTypeReflection,
+  ClassTypeReflection,
+  SymbolTypeReflection,
+  MemberTypeReflection,
+  TypeParameterTypeReflection,
+  StaticTypeReflection,
+  UnionTypeReflection,
+  IntersectionTypeReflection,
+  NegatedTypeReflection,
+  FunctionTypeReflection,
+  ArrayTypeReflection,
+  VecTypeReflection,
+  VecShapeTypeReflection,
+  DictTypeReflection,
+  DictShapeTypeReflection,
+  ClassnameTypeReflection,
+  TupleTypeReflection,
+  WildcardTypeReflection {
+  /** Returns the structural kind of this type. */
+  #[MustUse]
+  public function getKind(): TypeKind;
+
+  /** Reports whether this type has no unbound parameter or `static` leaf. */
+  #[MustUse]
+  public function isResolved(): bool;
+
+  /** Returns this closed type's engine-local identity. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getId(): TypeId;
+
+  /** Returns a diagnostic spelling that must not be used as an identity. */
+  #[MustUse]
+  public function toString(): string;
+
+  /** Resolves generic parameters and an optional late-bound class. */
+  #[MustUse]
+  public function resolve(
+    null|TypeEnvironmentReflection $environment = null,
+    null|ClassTypeReflection $calledType = null,
+  ): TypeReflection;
+
+  /** Reports whether a value satisfies this closed type. */
+  #[MustUse]
+  #[TrackCaller]
+  public function accepts(mixed $value): bool;
+
+  /** Reports whether this type and another have the same meaning. */
+  #[MustUse]
+  public function equals(TypeReflection $other): bool;
+
+  /** Reports whether every value of this closed type satisfies another. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isSubtypeOf(TypeReflection $other): bool;
+}

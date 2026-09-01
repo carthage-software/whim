@@ -1,0 +1,26 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** A named route parameter with an optional constraint. */
+final readonly class ParameterNode implements Node {
+  #[AlwaysInline]
+  public function __construct(
+    public NonEmptyString $name,
+    public null|NonEmptyString $constraint,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function expression(): string {
+    return '(?P<' . $this->name . '>' . ($this->constraint ?? '[^/]+') . ')';
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function parameterNames(): vec<string> {
+    return vec[$this->name];
+  }
+}

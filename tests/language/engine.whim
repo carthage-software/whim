@@ -1,0 +1,291 @@
+use Whim\Attribute;
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Float;
+use Whim\Unwind\Error;
+use Whim\Unwind\TraceFrame;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedSymbolError;
+
+class NotATask {}
+
+$assertion_value_1 = function(): void {
+  Whim\_Private\cancel_task(new NotATask());
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (TypeError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_1->getMessage(),
+      'argument 1 ($task) must be Whim\_Private\TaskId, object given',
+    ),
+  );
+}
+
+assert!($assertion_error_1 is TypeError);
+
+$assertion_value_2 = fn(): bool => Float\is_nan('x');
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (TypeError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_2->getMessage(),
+      'argument $value passed to Whim\Float\is_nan must be of type float, string given',
+    ),
+  );
+}
+
+assert!($assertion_error_2 is TypeError);
+
+$assertion_value_3 = fn(): int => Whim\_Private\get_symbol_kind(42);
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (TypeError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_3->getMessage(),
+      'argument 1 ($name) must be string, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_3 is TypeError);
+
+$assertion_value_4 = fn(): mixed => Attribute\get_attribute::<NotATask>(42);
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (TypeError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_4->getMessage(),
+      'argument 1 ($object) must be object, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_4 is TypeError);
+
+$assertion_value_5 = fn(): TraceFrame => (
+  new TraceFrame('f', 'x', 'NOPE', vec[])
+);
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_5->getMessage(),
+      'argument 3 ($line) must be int, string given',
+    ),
+  );
+}
+
+assert!($assertion_error_5 is TypeError);
+
+assert!(length!(Autoload\get_autoloaders()) == 0);
+
+$frame = new TraceFrame('render', '/tmp/x.whim', 3, vec[1]);
+assert!($frame->function == 'render');
+assert!($frame->file == '/tmp/x.whim');
+assert!($frame->line == 3);
+
+$assertion_value_10 = fn(): TraceFrame => (
+  new TraceFrame(1, '/tmp/x.whim', 3, vec[])
+);
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (TypeError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_10->getMessage(),
+      'argument 1 ($function) must be string, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_10 is TypeError);
+
+$assertion_value_11 = fn(): TraceFrame => new TraceFrame('f', 2, 3, vec[]);
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (TypeError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_11->getMessage(),
+      'argument 2 ($file) must be string, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_11 is TypeError);
+
+$assertion_value_12 = fn(): TraceFrame => (
+  new TraceFrame('f', '/tmp/x.whim', 'three', vec[])
+);
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (TypeError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_12->getMessage(),
+      'argument 3 ($line) must be int, string given',
+    ),
+  );
+}
+
+assert!($assertion_error_12 is TypeError);
+
+$assertion_value_13 = fn(): TraceFrame => (
+  new TraceFrame('f', '/tmp/x.whim', 3, 'not a vec')
+);
+
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (TypeError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_13->getMessage(),
+      'argument 4 ($arguments) must be vec<mixed>, string given',
+    ),
+  );
+}
+
+assert!($assertion_error_13 is TypeError);
+
+assert!(Whim\_Private\cancel_task(...) is fn(Whim\_Private\TaskId): void);
+
+assert!(Whim\_Private\run_symbol_autoload(...) is fn(int, string): void);
+
+$assertion_value_16 = function(): void {
+  Whim\_Private\cancel_task(42);
+};
+
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (TypeError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_16->getMessage(),
+      'argument 1 ($task) must be Whim\_Private\TaskId, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_16 is TypeError);
+
+$assertion_value_17 = function(): void {
+  Whim\_Private\run_symbol_autoload(new NotATask(), 'X');
+};
+
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (TypeError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_17->getMessage(),
+      'argument 1 ($kind) must be int, object given',
+    ),
+  );
+}
+
+assert!($assertion_error_17 is TypeError);
+
+$root = new Error('root', 0);
+$chained = new Error('chained', 0, $root);
+assert!($chained->getPrevious() == $root);
+$assertion_value_19 = fn(): Error => new Error('m', 0, new NotATask());
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_19->getMessage(),
+      'argument 3 ($previous) must be null|Whim\Unwind\Throwable, object given',
+    ),
+  );
+}
+
+assert!($assertion_error_19 is TypeError);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$broken = $work . '/broken.whim';
+File\write(
+  $broken,
+  'function ghost(): string { return \'ghost ran\'; }'
+  . "\n"
+  . 'class Broken extends MissingParent {}'
+  . "\n",
+);
+
+$assertion_value_20 = function() use ($broken): void {
+  require!($broken);
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (Error $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is Error);
+
+$assertion_value_21 = fn(): string => ghost();
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (UndefinedSymbolError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is UndefinedSymbolError);
+$assertion_value_22 = function() use ($broken): void {
+  require!($broken);
+};
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (Error $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_22->getMessage(),
+      'the class MissingParent is not defined',
+    ),
+  );
+}
+
+assert!($assertion_error_22 is Error);
+
+Filesystem\delete_directory($work, true);

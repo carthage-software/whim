@@ -1,0 +1,15 @@
+namespace Whim\Database;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Opens database connections. */
+interface Connector {
+  /** Opens one connection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    null|CancellationToken $cancellation = null,
+  ): Connection;
+}

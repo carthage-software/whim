@@ -1,0 +1,5 @@
+error: a built-in handler parameter must be `&mut Context` or `Arguments`
+ --> tests/ui/function_bad_parameter.rs:6:23
+  |
+6 | fn unsupported(value: char) -> i64 {
+  |                       ^^^^

@@ -1,0 +1,40 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Stores values in a circular queue. */
+#[Stub]
+final class RingBuffer<T> {
+  public function __construct() {}
+
+  #[MustUse]
+  public function count(): (0..) {}
+
+  #[MustUse]
+  public function isEmpty(): bool {}
+
+  public function pushFront(T $value): void {}
+
+  public function pushBack(T $value): void {}
+
+  #[MustUse]
+  public function popFront(): null|(T,) {}
+
+  #[MustUse]
+  public function popFrontUnsafe(): T {}
+
+  #[MustUse]
+  public function popBack(): null|(T,) {}
+
+  #[MustUse]
+  public function peekFront(): null|(T,) {}
+
+  #[MustUse]
+  public function peekBack(): null|(T,) {}
+
+  public function clear(): void {}
+
+  #[MustUse]
+  public function toVec(): vec<T> {}
+}

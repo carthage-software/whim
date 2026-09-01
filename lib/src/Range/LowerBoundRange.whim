@@ -1,0 +1,17 @@
+namespace Whim\Range;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Defines the behavior of lower bound range values. */
+interface LowerBoundRange extends Range {
+  /** Removes the lower bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withoutLowerBound(): Range;
+
+  /** Returns the lower bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getLowerBound(): int;
+}

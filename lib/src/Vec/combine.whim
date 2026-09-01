@@ -1,0 +1,58 @@
+namespace Whim\Vec;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+
+/** Concatenates iterable values in order. */
+#[MustUse]
+#[TrackCaller]
+function concat<T>(
+  Iterable<_, T> $first,
+  Iterable<_, Iterable<_, T>> $rest = vec[],
+): vec<T> {
+  $result = values::<T>($first);
+  foreach ($rest as $collection) {
+    foreach ($collection as $value) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Flattens one level of nested iterables. */
+#[MustUse]
+#[TrackCaller]
+function flatten<T>(Iterable<_, Iterable<_, T>> $collections): vec<T> {
+  $result = vec[];
+  foreach ($collections as $collection) {
+    foreach ($collection as $value) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Pairs values at corresponding positions. */
+#[MustUse]
+#[TrackCaller]
+function zip<A, B>(Iterable<_, A> $first, Iterable<_, B> $second): vec<(A, B)> {
+  $first = values::<A>($first);
+  $second = values::<B>($second);
+  $result = vec[];
+  $count = length!($first);
+  if (length!($second) < $count) {
+    $count = length!($second);
+  }
+
+  $index = 0;
+  while ($index < $count) {
+    $result[] = ($first[$index], $second[$index]);
+    $index++;
+  }
+
+  return $result;
+}

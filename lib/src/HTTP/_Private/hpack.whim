@@ -1,0 +1,55 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private\ErrorCode;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\Unwind\Throwable;
+
+function decode_headers(State $state, string $bytes): vec<Header> {
+  try {
+    $decoded = $state->headerDecoder->decode($bytes);
+  } catch (Throwable $error) {
+    throw new ProtocolException(
+      $error->getMessage(),
+      ErrorCode::CompressionError->value,
+    );
+  }
+
+  $size = 0;
+  foreach ($decoded as ($name, $value, $sensitive)) {
+    if ($name == '') {
+      throw new ProtocolException(
+        'field names must not be empty',
+        ErrorCode::CompressionError->value,
+      );
+    }
+
+    $size += length!($name) + length!($value) + 32;
+    if ($size > $state->maximumDecodedHeaderListSize) {
+      throw new ProtocolException(
+        'the field list exceeds the configured size limit',
+        ErrorCode::CompressionError->value,
+      );
+    }
+  }
+
+  return $decoded;
+}
+
+function encode_headers(State $state, vec<Header> $headers): string {
+  $size = 0;
+  foreach ($headers as $header) {
+    $size += length!($header[0]) + length!($header[1]) + 32;
+    if ($size > $state->maximumEncodedHeaderListSize) {
+      throw new ProtocolException(
+        'the field list exceeds the configured size limit',
+      );
+    }
+  }
+
+  try {
+    return $state->headerEncoder->encode($headers);
+  } catch (Throwable $error) {
+    throw new ProtocolException($error->getMessage());
+  }
+}

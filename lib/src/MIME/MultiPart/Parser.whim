@@ -1,0 +1,54 @@
+namespace Whim\MIME\MultiPart;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\Iterate\Iterator;
+use Whim\MIME\MultiPartException;
+use Whim\MIME\Part\Part;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Parses multipart bodies into independently readable parts. */
+final readonly class Parser {
+  private string $delimiter;
+
+  /** Configures multipart parsing and resource limits. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    string $boundary,
+    private NonNegativeInt $spoolThreshold = 2_097_152,
+    private NonNegativeInt $maximumParts = 0,
+    private NonNegativeInt $maximumPartSize = 0,
+    private NonNegativeInt $maximumHeaderSize = 65_536,
+  ) {
+    if ($boundary == '' || length!($boundary) > 70) {
+      throw new MultiPartException(
+        'a MIME multipart boundary must contain between 1 and 70 bytes',
+      );
+    }
+
+    $this->delimiter = '--' . $boundary;
+  }
+
+  /** Returns a lazy iterator over the parsed parts. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function parse(
+    ReadHandle $source,
+    null|CancellationToken $cancellation = null,
+  ): Iterator<int, Part> {
+    return new _Private\ParserIterator(
+      $source,
+      $this->delimiter,
+      $this->spoolThreshold,
+      $this->maximumParts,
+      $this->maximumPartSize,
+      $this->maximumHeaderSize,
+      $cancellation,
+    );
+  }
+}

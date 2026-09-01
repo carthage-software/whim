@@ -1,0 +1,10 @@
+namespace Whim\GC;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+
+/** Runs cycle collection and returns the number of reclaimed values. */
+#[AlwaysInline]
+function collect_cycles(): int {
+  return Whim\_Private\collect_cycles();
+}

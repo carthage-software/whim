@@ -1,0 +1,6 @@
+namespace Whim\Range;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports an invalid range definition. */
+final class InvalidRangeException extends InvalidArgumentException {}

@@ -1,0 +1,2675 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\CIDR\Block;
+use Whim\File;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Client;
+use Whim\HTTP\Client\Middleware\CookieJar;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Transaction;
+use Whim\IP\Address;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\ShutdownDirection;
+use Whim\Network\Stream;
+use Whim\Network\NetworkException;
+use Whim\Network\UnixEndpoint;
+use Whim\Str;
+use Whim\TCP;
+use Whim\TLS;
+use Whim\Time\Duration;
+use Whim\URL\URL;
+
+final class FakeConnection implements Client\Connection {
+  private bool $closed = false;
+  public null|Request $request = null;
+
+  public function __construct(
+    private Client\ConnectionMetadata $metadata,
+    private Response $response,
+  ) {}
+
+  public function getMetadata(): Client\ConnectionMetadata {
+    return $this->metadata;
+  }
+
+  public function isReusable(): bool {
+    return !$this->closed;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+
+  public function exchange(
+    Request $request,
+    Client\Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $this->request = $request;
+    return new Transaction(vec[], null, $this->response);
+  }
+}
+
+final class MetadataRecorder {
+  public null|Client\ConnectionMetadata $value = null;
+}
+
+final class FakeConnector implements Client\Connector {
+  public null|Client\Origin $origin = null;
+  public null|Request $request = null;
+
+  public function __construct(private FakeConnection $connection) {}
+
+  public function connect(
+    Client\Origin $origin,
+    Request $request,
+    Client\Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Client\Connection {
+    $this->origin = $origin;
+    $this->request = $request;
+    return $this->connection;
+  }
+}
+
+class ReusableConnection implements Client\Connection {
+  private bool $closed = false;
+  public int $exchanges = 0;
+  public bool $failNext = false;
+
+  public function __construct(private Client\ConnectionMetadata $metadata) {}
+
+  public function getMetadata(): Client\ConnectionMetadata {
+    return $this->metadata;
+  }
+
+  public function isReusable(): bool {
+    return !$this->closed;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+
+  public function exchange(
+    Request $request,
+    Client\Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $this->exchanges++;
+    if ($this->failNext) {
+      $this->failNext = false;
+      throw new Client\ProtocolException('one exchange failed');
+    }
+
+    return new Transaction(
+      vec[],
+      null,
+      new Response(
+        Message\STATUS_OK,
+        body: new Whim\IO\MemoryHandle('response-' . $this->exchanges),
+      ),
+    );
+  }
+}
+
+final class ReusableMultiplexedConnection extends ReusableConnection implements
+  Client\MultiplexedConnection {}
+
+final class CountingConnector implements Client\Connector {
+  public int $connections = 0;
+  public vec<ReusableConnection> $opened = vec[];
+
+  public function __construct(
+    private Client\ConnectionMetadata $metadata,
+    private bool $multiplexed = false,
+  ) {}
+
+  public function connect(
+    Client\Origin $origin,
+    Request $request,
+    Client\Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Client\Connection {
+    $this->connections++;
+    $connection = match ($this->multiplexed) {
+      true => new ReusableMultiplexedConnection($this->metadata),
+      false => new ReusableConnection($this->metadata),
+    };
+
+    $this->opened[] = $connection;
+    return $connection;
+  }
+}
+
+final class GatedMultiplexedConnector implements Client\Connector {
+  public int $connections = 0;
+  private Async\Deferred<null> $gate;
+
+  public function __construct(
+    private Client\ConnectionMetadata $metadata,
+    private bool $multiplexed = true,
+  ) {
+    $this->gate = new Async\Deferred::<null>();
+  }
+
+  public function connect(
+    Client\Origin $origin,
+    Request $request,
+    Client\Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Client\Connection {
+    $this->connections++;
+    $this->gate->getFuture()->await($cancellation);
+    return match ($this->multiplexed) {
+      true => new ReusableMultiplexedConnection($this->metadata),
+      false => new ReusableConnection($this->metadata),
+    };
+  }
+
+  public function release(): void {
+    $this->gate->complete(null);
+  }
+}
+
+function abandon_response(Client\Client $client): void {
+  $transaction = $client->send(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/one')),
+  );
+}
+
+function abandon_h1_response(Client\_Private\H1Connection $connection): void {
+  discard!(
+    $connection->exchange(
+      Request::fromURL(
+        Message\METHOD_GET,
+        URL::from('http://example.com/abandoned'),
+      ),
+      new Client\Configuration(),
+    ),
+  );
+}
+
+final class ScriptedClient implements Client\Client {
+  public vec<Request> $requests = vec[];
+  public vec<string> $requestBodies = vec[];
+  private int $responseIndex = 0;
+
+  public function __construct(private vec<Response> $responses) {}
+
+  public function send(
+    Request $request,
+    Client\SendConfiguration $configuration = new Client\SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $this->requests[] = $request;
+    if ($request->body != null) {
+      $this->requestBodies[] = $request->body->readAll(
+        cancellation: $cancellation,
+      );
+    }
+
+    $response = $this->responses[$this->responseIndex];
+    $this->responseIndex++;
+    return new Transaction(vec[], null, $response);
+  }
+}
+
+final class FlakyClient implements Client\Client {
+  public int $attempts = 0;
+  public vec<string> $requestBodies = vec[];
+
+  public function __construct(private int $failures) {}
+
+  public function send(
+    Request $request,
+    Client\SendConfiguration $configuration = new Client\SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $this->attempts++;
+    if ($request->body != null) {
+      $this->requestBodies[] = $request->body->readAll(
+        cancellation: $cancellation,
+      );
+    }
+
+    if ($this->attempts <= $this->failures) {
+      throw new NetworkException('temporary transport failure');
+    }
+
+    return new Transaction(vec[], null, new Response(Message\STATUS_OK));
+  }
+}
+
+final class IOFlakyClient implements Client\Client {
+  public int $attempts = 0;
+
+  public function __construct(
+    private int $failures,
+    private bool $transport = true,
+  ) {}
+
+  public function send(
+    Request $request,
+    Client\SendConfiguration $configuration = new Client\SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $this->attempts++;
+    if ($this->attempts <= $this->failures) {
+      if ($this->transport) {
+        throw new Whim\IO\TransportException('temporary IO failure');
+      }
+
+      throw new Whim\IO\Exception('non-transport IO failure');
+    }
+
+    return new Transaction(vec[], null, new Response(Message\STATUS_OK));
+  }
+}
+
+final class FailingResponseBody implements Whim\IO\ReadHandle {
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  public function reachedEndOfDataSource(): bool {
+    return false;
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    throw new Whim\IO\TransportException('the response transport failed');
+  }
+}
+
+final class HeaderMiddleware implements Client\Middleware {
+  public function process(
+    Client\Connection $connection,
+    Request $request,
+    Client\Configuration $configuration,
+    Client\Handler $next,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    return $next->handle(
+      $connection,
+      $request->withHeader('X-Middleware', 'yes'),
+      $configuration,
+      $cancellation,
+    );
+  }
+}
+
+final class CookieHandler implements Client\Handler {
+  public vec<Request> $requests = vec[];
+  private int $index = 0;
+
+  public function __construct(private vec<Response> $responses) {}
+
+  public function handle(
+    Client\Connection $connection,
+    Request $request,
+    Client\Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $this->requests[] = $request;
+    $response = $this->responses[$this->index];
+    $this->index++;
+    return new Transaction(vec[], null, $response);
+  }
+}
+
+final class ScriptedStream implements Stream<InternetEndpoint> {
+  private int $chunk = 0;
+  private int $offset = 0;
+  private bool $closed = false;
+  public string $written = '';
+
+  public function __construct(
+    private vec<string> $chunks,
+    private InternetEndpoint $local,
+    private InternetEndpoint $peer,
+  ) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->local;
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peer;
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->chunk >= length!($this->chunks);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->reachedEndOfDataSource()) {
+      return '';
+    }
+
+    $data = $this->chunks[$this->chunk];
+    $available = length!($data) - $this->offset;
+    $length = $available;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $result = Str\slice($data, $this->offset, $length);
+    $this->offset += $length;
+    if ($this->offset == length!($data)) {
+      $this->chunk++;
+      $this->offset = 0;
+    }
+
+    return $result;
+  }
+
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    return $this->tryRead($maxBytes);
+  }
+
+  public function tryWrite(string $bytes): int {
+    $this->written .= $bytes;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return $this->tryWrite($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+$local = new InternetEndpoint(Address::v4('127.0.0.1'), 40000);
+$peer = new InternetEndpoint(Address::v4('203.0.113.10'), 443);
+$metadata = new Client\ConnectionMetadata(
+  $local,
+  $peer,
+  Message\ProtocolVersion::V2,
+);
+
+$connection = new FakeConnection($metadata, new Response(Message\STATUS_OK));
+$connector = new FakeConnector($connection);
+$client = new Client\DefaultClient(
+  $connector,
+  new Client\Configuration(baseURL: URL::from('https://example.com/api/')),
+  vec[new HeaderMiddleware()],
+);
+
+$observed = new MetadataRecorder();
+$transaction = $client->send(
+  Request::fromParts(Message\METHOD_GET, 'users?id=1'),
+  new Client\SendConfiguration(
+    onConnection: function(
+      Client\ConnectionMetadata $value,
+    ) use ($observed): void {
+      $observed->value = $value;
+    },
+  ),
+);
+
+assert!($transaction->response->status == Message\STATUS_OK);
+assert!($observed->value == $metadata);
+assert!($connection->request?->headers->get('X-Middleware') == 'yes');
+
+$cookieJar = new CookieJar();
+$cookieHandler = new CookieHandler(vec[
+  new Response(
+    Message\STATUS_OK,
+    headers: Message\FieldMap::from(vec[
+      ('Set-Cookie', 'sid=one; Path=/; HttpOnly'),
+      ('Set-Cookie', 'theme=dark; Domain=.example.com; Path=/'),
+      ('Set-Cookie', 'scoped=deep; Path=/account'),
+      ('Set-Cookie', 'secret=value; Path=/; Secure'),
+      ('Set-Cookie', 'ignored=value; Domain=invalid.example'),
+    ]),
+  ),
+  new Response(Message\STATUS_OK),
+  new Response(Message\STATUS_OK),
+  new Response(Message\STATUS_OK),
+  new Response(
+    Message\STATUS_OK,
+    headers: Message\FieldMap::from(vec[
+      ('Set-Cookie', 'sid=gone; Path=/; Max-Age=0'),
+    ]),
+  ),
+  new Response(Message\STATUS_OK),
+]);
+
+$cookieConfiguration = new Client\Configuration();
+discard!(
+  $cookieJar->process(
+    $connection,
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('https://example.com/login'),
+    ),
+    $cookieConfiguration,
+    $cookieHandler,
+  ),
+);
+
+assert!($cookieJar->count() == 4);
+
+discard!(
+  $cookieJar->process(
+    $connection,
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('https://example.com/account/settings'),
+    ),
+    $cookieConfiguration,
+    $cookieHandler,
+  ),
+);
+
+assert!(
+  $cookieHandler->requests[1]->headers->get('Cookie')
+  == 'scoped=deep; sid=one; theme=dark; secret=value',
+);
+
+discard!(
+  $cookieJar->process(
+    $connection,
+    Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+    $cookieConfiguration,
+    $cookieHandler,
+  ),
+);
+
+assert!(
+  $cookieHandler->requests[2]->headers->get('Cookie') == 'sid=one; theme=dark',
+);
+
+discard!(
+  $cookieJar->process(
+    $connection,
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('https://sub.example.com/'),
+      headers: Message\FieldMap::from(vec[
+        ('Cookie', 'manual=yes; theme=manual'),
+      ]),
+    ),
+    $cookieConfiguration,
+    $cookieHandler,
+  ),
+);
+
+assert!(
+  $cookieHandler->requests[3]->headers->get('Cookie')
+  == 'manual=yes; theme=manual',
+);
+
+discard!(
+  $cookieJar->process(
+    $connection,
+    Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/')),
+    $cookieConfiguration,
+    $cookieHandler,
+  ),
+);
+
+assert!($cookieJar->count() == 3);
+
+discard!(
+  $cookieJar->process(
+    $connection,
+    Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/')),
+    $cookieConfiguration,
+    $cookieHandler,
+  ),
+);
+
+assert!(
+  $cookieHandler->requests[5]->headers->get('Cookie')
+  == 'theme=dark; secret=value',
+);
+
+$cookieJar->clear();
+assert!($cookieJar->count() == 0);
+
+assert!($connector->origin?->scheme == 'https');
+assert!($connector->origin?->port == 443);
+assert!(
+  $connector->request?->url?->toString()
+  == 'https://example.com/api/users?id=1',
+);
+
+$configuration = new Client\Configuration();
+$overridden = $configuration->withOverrides(
+  new Client\SendConfiguration(maximumResponseBodySize: 1234),
+);
+
+assert!($overridden->maximumResponseBodySize == 1234);
+assert!($overridden->maximumResponseHeaderSize == 8192);
+assert!($overridden->maximumInformationalResponses == 16);
+assert!($overridden->h2 is H2\Configuration);
+assert!($overridden->tls is TLS\ClientConfiguration);
+
+$informationalOverride = $configuration->withOverrides(
+  new Client\SendConfiguration(maximumInformationalResponses: 2),
+);
+
+assert!($informationalOverride->maximumInformationalResponses == 2);
+
+$protocolURL = URL::from('https://example.com/');
+$protocolConfiguration = new Client\Configuration(
+  protocolVersions: vec[
+    Message\ProtocolVersion::V2,
+    Message\ProtocolVersion::V11,
+  ],
+);
+
+assert!(
+  Client\_Private\resolve_protocol_versions(
+    Request::fromURL(Message\METHOD_GET, $protocolURL),
+    $protocolConfiguration,
+  ) == vec[Message\ProtocolVersion::V2, Message\ProtocolVersion::V11],
+);
+
+assert!(
+  Client\_Private\resolve_protocol_versions(
+    Request::fromURL(
+      Message\METHOD_GET,
+      $protocolURL,
+      Message\ProtocolVersion::V2,
+    ),
+    $protocolConfiguration,
+  ) == vec[Message\ProtocolVersion::V2],
+);
+
+$assertion_value_22 = fn(): vec<Message\ProtocolVersion> => (
+  Client\_Private\resolve_protocol_versions(
+    Request::fromURL(
+      Message\METHOD_GET,
+      $protocolURL,
+      Message\ProtocolVersion::V10,
+    ),
+    $protocolConfiguration,
+  )
+);
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (Client\ProtocolException $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is Client\ProtocolException);
+
+$assertion_value_23 = fn(): vec<Message\ProtocolVersion> => (
+  Client\_Private\resolve_protocol_versions(
+    Request::fromURL(Message\METHOD_GET, $protocolURL),
+    new Client\Configuration(protocolVersions: vec[]),
+  )
+);
+
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (Client\ProtocolException $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is Client\ProtocolException);
+
+assert!(
+  Client\_Private\alpn_protocols(vec[
+    Message\ProtocolVersion::V11,
+    Message\ProtocolVersion::V2,
+  ]) == vec['http/1.1', 'h2'],
+);
+
+assert!(
+  Client\_Private\alpn_protocols(vec[
+    Message\ProtocolVersion::V2,
+    Message\ProtocolVersion::V10,
+    Message\ProtocolVersion::V11,
+  ]) == vec['h2'],
+);
+
+$wrongProtocolConnection = new FakeConnection(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+  new Response(Message\STATUS_OK),
+);
+
+$protocolClient = new Client\DefaultClient(
+  new FakeConnector($wrongProtocolConnection),
+  $protocolConfiguration,
+);
+
+$assertion_value_26 = fn(): Transaction => (
+  $protocolClient->send(
+    Request::fromURL(
+      Message\METHOD_GET,
+      $protocolURL,
+      Message\ProtocolVersion::V2,
+    ),
+  )
+);
+
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (Client\ProtocolException $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is Client\ProtocolException);
+
+assert!($wrongProtocolConnection->isClosed());
+
+$bodylessTrailers = new Async\Deferred::<Message\FieldMap>();
+$bodylessTrailers->complete(
+  Message\FieldMap::from(vec[('X-Checksum', 'abc123')]),
+);
+
+$bodylessConnector = new FakeConnector(
+  new FakeConnection($metadata, new Response(Message\STATUS_OK)),
+);
+
+$assertion_value_28 = fn(): Transaction => (
+  new Client\DefaultClient($bodylessConnector)->send(
+    Request::fromURL(
+      Message\METHOD_POST,
+      $protocolURL,
+      trailers: $bodylessTrailers->getFuture(),
+    ),
+  )
+);
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (Client\RequestException $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is Client\RequestException);
+
+assert!($bodylessConnector->origin == null);
+
+$assertion_value_30 = fn(): Transaction => (
+  $client->send(
+    Request::fromParts(
+      Message\METHOD_TRACE,
+      '/',
+      URL::from('https://example.com/'),
+      body: new Whim\IO\MemoryHandle('body'),
+    ),
+  )
+);
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (Client\RequestException $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is Client\RequestException);
+
+$assertion_value_31 = fn(): Transaction => (
+  $client->send(
+    Request::fromURL(Message\METHOD_CONNECT, URL::from('https://example.com/')),
+  )
+);
+
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (Client\RequestException $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is Client\RequestException);
+
+$stream = new ScriptedStream(
+  vec[
+    "HTTP/1.1 103 Early Hints\r\nLink: </style.css>; rel=preload\r\n\r\n",
+    "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nX-Test: yes\r\n\r\nhello",
+  ],
+  $local,
+  $peer,
+);
+
+$h1 = new Client\_Private\H1Connection(
+  $stream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$result = $h1->exchange(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from('http://example.com/path?q=1'),
+  ),
+  new Client\Configuration(),
+);
+
+assert!(length!($result->informational) == 1);
+assert!($result->informational[0]->status == Message\STATUS_EARLY_HINTS);
+
+assert!($result->response->headers->get('x-test') == 'yes');
+$responseBody = $result->response->body;
+assert!($responseBody != null);
+assert!($responseBody->readAll() == 'hello');
+assert!(!($stream->isClosed()));
+assert!(
+  $stream->written
+  == "GET /path?q=1 HTTP/1.1\r\nHost: example.com\r\nContent-Length: 0\r\n\r\n",
+);
+
+$informationalFlood = new ScriptedStream(
+  vec[
+    "HTTP/1.1 103 Early Hints\r\n\r\n",
+    "HTTP/1.1 102 Processing\r\n\r\n",
+    "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+  ],
+  $local,
+  $peer,
+);
+
+$assertion_value_38 = fn(): Transaction => (
+  new Client\_Private\H1Connection(
+    $informationalFlood,
+    new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+  )->exchange(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+    new Client\Configuration(maximumInformationalResponses: 1),
+  )
+);
+
+$assertion_error_38 = null;
+try {
+  $assertion_value_38();
+} catch (Client\ProtocolException $assertion_caught_38) {
+  $assertion_error_38 = $assertion_caught_38;
+}
+
+assert!($assertion_error_38 is Client\ProtocolException);
+
+assert!($informationalFlood->isClosed());
+
+$oversizedHead = new ScriptedStream(
+  vec["HTTP/1.1 200 OK\r\nX-Test: too-long\r\n\r\n"],
+  $local,
+  $peer,
+);
+
+$assertion_value_40 = fn(): Transaction => (
+  new Client\_Private\H1Connection(
+    $oversizedHead,
+    new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+  )->exchange(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+    new Client\Configuration(maximumResponseHeaderSize: 24),
+  )
+);
+
+$assertion_error_40 = null;
+try {
+  $assertion_value_40();
+} catch (Client\ProtocolException $assertion_caught_40) {
+  $assertion_error_40 = $assertion_caught_40;
+}
+
+assert!($assertion_error_40 is Client\ProtocolException);
+
+assert!($oversizedHead->isClosed());
+
+foreach (vec[
+  "HTTP/1.1 103 Early Hints\r\nTransfer-Encoding: chunked\r\n\r\n",
+  "HTTP/1.1 204 No Content\r\nContent-Length: 1\r\n\r\nx",
+  "HTTP/1.1 205 Reset Content\r\nContent-Length: 1\r\n\r\nx",
+] as $invalidFraming) {
+  $invalidFramingStream = new ScriptedStream(
+    vec[$invalidFraming],
+    $local,
+    $peer,
+  );
+
+  $assertion_value_42 = fn(): Transaction => (
+    new Client\_Private\H1Connection(
+      $invalidFramingStream,
+      new Client\ConnectionMetadata(
+        $local,
+        $peer,
+        Message\ProtocolVersion::V11,
+      ),
+    )->exchange(
+      Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+      new Client\Configuration(),
+    )
+  );
+
+  $assertion_error_42 = null;
+  try {
+    $assertion_value_42();
+  } catch (Client\ProtocolException $assertion_caught_42) {
+    $assertion_error_42 = $assertion_caught_42;
+  }
+
+  assert!($assertion_error_42 is Client\ProtocolException);
+
+  assert!($invalidFramingStream->isClosed());
+}
+
+$reuseStream = new ScriptedStream(
+  vec[
+    "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nfirst"
+    . "HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nsecond",
+  ],
+  $local,
+  $peer,
+);
+
+$reusedH1 = new Client\_Private\H1Connection(
+  $reuseStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$firstReuse = $reusedH1->exchange(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/first')),
+  new Client\Configuration(),
+);
+
+assert!(!($reusedH1->isReusable()));
+$assertion_value_45 = fn(): Transaction => (
+  $reusedH1->exchange(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('http://example.com/too-early'),
+    ),
+    new Client\Configuration(),
+  )
+);
+
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (Client\ProtocolException $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is Client\ProtocolException);
+
+$firstReuseBody = $firstReuse->response->body;
+assert!($firstReuseBody != null);
+assert!($firstReuseBody->readAll() == 'first');
+assert!($reusedH1->isReusable());
+
+$secondReuse = $reusedH1->exchange(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/second')),
+  new Client\Configuration(),
+);
+
+$secondReuseBody = $secondReuse->response->body;
+assert!($secondReuseBody != null);
+assert!($secondReuseBody->readAll() == 'second');
+assert!($reusedH1->isReusable());
+
+$abandonedStream = new ScriptedStream(
+  vec["HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nlost"],
+  $local,
+  $peer,
+);
+
+$abandonedH1 = new Client\_Private\H1Connection(
+  $abandonedStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+abandon_h1_response($abandonedH1);
+assert!($abandonedStream->isClosed());
+assert!(!($abandonedH1->isReusable()));
+
+$expectStream = new ScriptedStream(
+  vec[
+    "HTTP/1.1 103 Early Hints\r\nLink: </upload.css>; rel=preload\r\n\r\n",
+    "HTTP/1.1 100 Continue\r\n\r\n",
+    "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok",
+  ],
+  $local,
+  $peer,
+);
+
+$expectTrailers = new Async\Deferred::<Message\FieldMap>();
+$expectTrailers->complete(
+  Message\FieldMap::from(vec[('X-Checksum', 'abc123')]),
+);
+
+$expectResult = new Client\_Private\H1Connection(
+  $expectStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+)->exchange(
+  Request::fromURL(
+    Message\METHOD_POST,
+    URL::from('http://example.com/expect'),
+    headers: Message\FieldMap::from(vec[('Expect', '100-continue')]),
+    body: new Whim\IO\MemoryHandle('payload'),
+    trailers: $expectTrailers->getFuture(),
+  ),
+  new Client\Configuration(),
+);
+
+assert!(length!($expectResult->informational) == 2);
+assert!($expectResult->informational[0]->status == Message\STATUS_EARLY_HINTS);
+
+assert!($expectResult->informational[1]->status == Message\STATUS_CONTINUE);
+
+assert!($expectResult->response->status == Message\STATUS_OK);
+assert!(Str\contains($expectStream->written, "Transfer-Encoding: chunked\r\n"));
+assert!(Str\contains($expectStream->written, "7\r\npayload\r\n"));
+assert!(Str\contains($expectStream->written, "X-Checksum: abc123\r\n"));
+
+$rejectedBody = new Whim\IO\MemoryHandle('payload');
+$rejectedStream = new ScriptedStream(
+  vec["HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\n\r\n"],
+  $local,
+  $peer,
+);
+
+$rejectedResult = new Client\_Private\H1Connection(
+  $rejectedStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+)->exchange(
+  Request::fromURL(
+    Message\METHOD_POST,
+    URL::from('http://example.com/expect'),
+    headers: Message\FieldMap::from(vec[
+      ('Expect', '100-continue'),
+      ('Content-Length', '7'),
+    ]),
+    body: $rejectedBody,
+  ),
+  new Client\Configuration(),
+);
+
+assert!($rejectedResult->response->status == 417);
+assert!(!($rejectedBody->reachedEndOfDataSource()));
+assert!(!Str\contains($rejectedStream->written, 'payload'));
+
+$stream = new ScriptedStream(
+  vec[
+    "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n",
+    "4;kind=test\r\nWi",
+    "ki\r\n5\r\npedia\r\n0\r\nX-Trailer: done\r\n\r\n",
+  ],
+  $local,
+  $peer,
+);
+
+$h1 = new Client\_Private\H1Connection(
+  $stream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$result = $h1->exchange(
+  Request::fromURL(
+    Message\METHOD_POST,
+    URL::from('http://example.com/upload'),
+    body: new Whim\IO\MemoryHandle('payload'),
+  ),
+  new Client\Configuration(),
+);
+
+$responseBody = $result->response->body;
+assert!($responseBody != null);
+assert!($responseBody->readAll() == 'Wikipedia');
+$trailers = $result->response->trailers;
+assert!($trailers != null);
+assert!($trailers->await()->get('x-trailer') == 'done');
+assert!(
+  $stream->written
+  == "POST /upload HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked\r\n\r\n"
+  . "7\r\npayload\r\n0\r\n\r\n",
+);
+
+$emptyChunkedStream = new ScriptedStream(
+  vec["HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n"],
+  $local,
+  $peer,
+);
+
+$emptyChunkedResult = new Client\_Private\H1Connection(
+  $emptyChunkedStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+)->exchange(
+  Request::fromURL(
+    Message\METHOD_POST,
+    URL::from('http://example.com/empty'),
+    headers: Message\FieldMap::from(vec[('Transfer-Encoding', 'chunked')]),
+  ),
+  new Client\Configuration(),
+);
+
+assert!($emptyChunkedResult->response->status == Message\STATUS_OK);
+
+assert!(
+  $emptyChunkedStream->written
+  == "POST /empty HTTP/1.1\r\nTransfer-Encoding: chunked\r\nHost: example.com\r\n\r\n0\r\n\r\n",
+);
+
+$invalid = new ScriptedStream(
+  vec[
+    "HTTP/1.1 200 OK\r\nContent-Length: 1\r\nTransfer-Encoding: chunked\r\n\r\n",
+  ],
+  $local,
+  $peer,
+);
+
+$assertion_value_63 = fn(): Transaction => (
+  new Client\_Private\H1Connection(
+    $invalid,
+    new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+  )->exchange(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+    new Client\Configuration(),
+  )
+);
+
+$assertion_error_63 = null;
+try {
+  $assertion_value_63();
+} catch (Client\ProtocolException $assertion_caught_63) {
+  $assertion_error_63 = $assertion_caught_63;
+}
+
+assert!($assertion_error_63 is Client\ProtocolException);
+
+assert!($invalid->isClosed());
+
+$invalidStatus = new ScriptedStream(
+  vec["HTTP/1.1 600 Invalid\r\nContent-Length: 0\r\n\r\n"],
+  $local,
+  $peer,
+);
+
+$invalidStatusConnection = new Client\_Private\H1Connection(
+  $invalidStatus,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$assertion_value_65 = fn(): Transaction => (
+  $invalidStatusConnection->exchange(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+    new Client\Configuration(),
+  )
+);
+
+$assertion_error_65 = null;
+try {
+  $assertion_value_65();
+} catch (Client\ProtocolException $assertion_caught_65) {
+  $assertion_error_65 = $assertion_caught_65;
+}
+
+assert!($assertion_error_65 is Client\ProtocolException);
+
+assert!(!($invalidStatusConnection->isReusable()));
+assert!($invalidStatus->isClosed());
+
+$oversizedRequestLengthStream = new ScriptedStream(vec[], $local, $peer);
+$oversizedRequestLengthConnection = new Client\_Private\H1Connection(
+  $oversizedRequestLengthStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$assertion_value_68 = fn(): Transaction => (
+  $oversizedRequestLengthConnection->exchange(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('http://example.com/'),
+      headers: Message\FieldMap::from(vec[
+        ('Content-Length', '9223372036854775808'),
+      ]),
+    ),
+    new Client\Configuration(),
+  )
+);
+
+$assertion_error_68 = null;
+try {
+  $assertion_value_68();
+} catch (Client\RequestException $assertion_caught_68) {
+  $assertion_error_68 = $assertion_caught_68;
+}
+
+assert!($assertion_error_68 is Client\RequestException);
+
+assert!($oversizedRequestLengthStream->written == '');
+assert!($oversizedRequestLengthConnection->isReusable());
+
+$oversizedResponseLengthStream = new ScriptedStream(
+  vec["HTTP/1.1 200 OK\r\nContent-Length: 9223372036854775808\r\n\r\n"],
+  $local,
+  $peer,
+);
+
+$assertion_value_71 = fn(): Transaction => (
+  new Client\_Private\H1Connection(
+    $oversizedResponseLengthStream,
+    new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+  )->exchange(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+    new Client\Configuration(),
+  )
+);
+
+$assertion_error_71 = null;
+try {
+  $assertion_value_71();
+} catch (Client\ProtocolException $assertion_caught_71) {
+  $assertion_error_71 = $assertion_caught_71;
+}
+
+assert!($assertion_error_71 is Client\ProtocolException);
+
+assert!($oversizedResponseLengthStream->isClosed());
+
+$oversizedChunkStream = new ScriptedStream(
+  vec[
+    "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n8000000000000000\r\n",
+  ],
+  $local,
+  $peer,
+);
+
+$oversizedChunkResult = new Client\_Private\H1Connection(
+  $oversizedChunkStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+)->exchange(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
+  new Client\Configuration(),
+);
+
+$oversizedChunkBody = $oversizedChunkResult->response->body;
+assert!($oversizedChunkBody != null);
+$assertion_value_73 = fn(): string => $oversizedChunkBody->readAll();
+$assertion_error_73 = null;
+try {
+  $assertion_value_73();
+} catch (Client\ProtocolException $assertion_caught_73) {
+  $assertion_error_73 = $assertion_caught_73;
+}
+
+assert!($assertion_error_73 is Client\ProtocolException);
+
+assert!($oversizedChunkStream->isClosed());
+
+$wireClient = new H2\ClientConnection();
+$wireStreamId = $wireClient->nextStreamId();
+$wireClient->sendHeaders(
+  $wireStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/h2', false),
+  ],
+  true,
+);
+
+$wireServer = new H2\ServerConnection();
+$_ = $wireServer->receive($wireClient->takeOutboundBytes());
+$wireServer->sendHeaders(
+  $wireStreamId,
+  vec[(':status', '103', false), ('link', '</a>', false)],
+);
+
+$wireServer->sendHeaders(
+  $wireStreamId,
+  vec[(':status', '200', false), ('x-h2', 'yes', false)],
+);
+
+$wireServer->sendData($wireStreamId, 'hello over h2', true);
+$h2Stream = new ScriptedStream(
+  vec[$wireServer->takeOutboundBytes()],
+  $local,
+  $peer,
+);
+
+$h2 = new Client\_Private\H2Connection(
+  $h2Stream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+  new H2\Configuration(),
+);
+
+$result = $h2->exchange(
+  Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/h2')),
+  new Client\Configuration(),
+);
+
+assert!(length!($result->informational) == 1);
+assert!($result->response->headers->get('x-h2') == 'yes');
+$responseBody = $result->response->body;
+assert!($responseBody != null);
+assert!($responseBody->readAll() == 'hello over h2');
+assert!($h2->isReusable());
+
+$resetContentWireClient = new H2\ClientConnection();
+assert!(
+  !Client\_Private\response_has_body(
+    Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/')),
+    205,
+  ),
+);
+
+$resetContentStreamId = $resetContentWireClient->nextStreamId();
+$resetContentWireClient->sendHeaders(
+  $resetContentStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/reset-content', false),
+  ],
+  true,
+);
+
+$resetContentWireServer = new H2\ServerConnection();
+discard!(
+  $resetContentWireServer->receive(
+    $resetContentWireClient->takeOutboundBytes(),
+  ),
+);
+
+$resetContentWireServer->sendHeaders(
+  $resetContentStreamId,
+  vec[(':status', '205', false)],
+);
+
+$resetContentWireServer->sendData($resetContentStreamId, '', true);
+$resetContentStream = new ScriptedStream(
+  vec[$resetContentWireServer->takeOutboundBytes()],
+  $local,
+  $peer,
+);
+
+$resetContentResult = new Client\_Private\H2Connection(
+  $resetContentStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+  new H2\Configuration(),
+)->exchange(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from('https://example.com/reset-content'),
+  ),
+  new Client\Configuration(),
+);
+
+assert!($resetContentResult->response->body == null);
+
+$informationalWireClient = new H2\ClientConnection();
+$informationalStreamId = $informationalWireClient->nextStreamId();
+$informationalWireClient->sendHeaders(
+  $informationalStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/informational', false),
+  ],
+  true,
+);
+
+$informationalWireServer = new H2\ServerConnection();
+discard!(
+  $informationalWireServer->receive(
+    $informationalWireClient->takeOutboundBytes(),
+  ),
+);
+
+$informationalWireServer->sendHeaders(
+  $informationalStreamId,
+  vec[(':status', '103', false)],
+);
+
+$informationalWireServer->sendHeaders(
+  $informationalStreamId,
+  vec[(':status', '102', false)],
+);
+
+$informationalWireServer->sendHeaders(
+  $informationalStreamId,
+  vec[(':status', '200', false)],
+  true,
+);
+
+$informationalH2Stream = new ScriptedStream(
+  vec[$informationalWireServer->takeOutboundBytes()],
+  $local,
+  $peer,
+);
+
+$assertion_value_80 = fn(): Transaction => (
+  new Client\_Private\H2Connection(
+    $informationalH2Stream,
+    new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+    new H2\Configuration(),
+  )->exchange(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('https://example.com/informational'),
+    ),
+    new Client\Configuration(maximumInformationalResponses: 1),
+  )
+);
+
+$assertion_error_80 = null;
+try {
+  $assertion_value_80();
+} catch (Client\ProtocolException $assertion_caught_80) {
+  $assertion_error_80 = $assertion_caught_80;
+}
+
+assert!($assertion_error_80 is Client\ProtocolException);
+
+$pushWireClient = new H2\ClientConnection();
+$pushParentId = $pushWireClient->nextStreamId();
+$pushWireClient->sendHeaders(
+  $pushParentId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/document', false),
+  ],
+  true,
+);
+
+$pushWireServer = new H2\ServerConnection();
+discard!($pushWireServer->receive($pushWireClient->takeOutboundBytes()));
+$pushWireServer->sendPushPromise(
+  $pushParentId,
+  2,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/style.css', false),
+    ('accept', 'text/css', false),
+  ],
+);
+
+$pushWireServer->sendHeaders(
+  2,
+  vec[(':status', '200', false), ('content-type', 'text/css', false)],
+);
+
+$pushWireServer->sendData(2, 'body{}', true);
+$pushWireServer->sendHeaders(
+  $pushParentId,
+  vec[(':status', '204', false)],
+  true,
+);
+
+$pushStream = new ScriptedStream(
+  vec[$pushWireServer->takeOutboundBytes()],
+  $local,
+  $peer,
+);
+
+$pushResult = new Client\_Private\H2Connection(
+  $pushStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+  new H2\Configuration(),
+)->exchange(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from('https://example.com/document'),
+  ),
+  new Client\Configuration(),
+);
+
+$pushedFuture = $pushResult->pushed;
+assert!($pushedFuture != null);
+$pushed = $pushedFuture->await();
+assert!(length!($pushed) == 1);
+assert!(
+  $pushed[0]->request->url?->toString() == 'https://example.com/style.css',
+);
+
+assert!($pushed[0]->request->headers->get('accept') == 'text/css');
+assert!($pushed[0]->response->headers->get('content-type') == 'text/css');
+
+$pushedBody = $pushed[0]->response->body;
+assert!($pushedBody != null);
+assert!($pushedBody->readAll() == 'body{}');
+
+$limitedWireClient = new H2\ClientConnection();
+$limitedStreamId = $limitedWireClient->nextStreamId();
+$limitedWireClient->sendHeaders(
+  $limitedStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/limited', false),
+  ],
+  true,
+);
+
+$limitedWireServer = new H2\ServerConnection();
+$_ = $limitedWireServer->receive($limitedWireClient->takeOutboundBytes());
+$limitedWireServer->sendHeaders(
+  $limitedStreamId,
+  vec[(':status', '200', false)],
+);
+
+$limitedWireServer->sendData($limitedStreamId, '12345', true);
+$limitedStream = new ScriptedStream(
+  vec[$limitedWireServer->takeOutboundBytes()],
+  $local,
+  $peer,
+);
+
+$limitedH2 = new Client\_Private\H2Connection(
+  $limitedStream,
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+  new H2\Configuration(),
+);
+
+$limitedResult = $limitedH2->exchange(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from('https://example.com/limited'),
+  ),
+  new Client\Configuration(maximumResponseBodySize: 4),
+);
+
+$limitedBody = $limitedResult->response->body;
+assert!($limitedBody != null);
+$assertion_value_86 = fn(): string => $limitedBody->readAll();
+$assertion_error_86 = null;
+try {
+  $assertion_value_86();
+} catch (Client\ProtocolException $assertion_caught_86) {
+  $assertion_error_86 = $assertion_caught_86;
+}
+
+assert!($assertion_error_86 is Client\ProtocolException);
+
+$headWireClient = new H2\ClientConnection();
+$headStreamId = $headWireClient->nextStreamId();
+$headWireClient->sendHeaders(
+  $headStreamId,
+  vec[
+    (':method', 'HEAD', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/head', false),
+  ],
+  true,
+);
+
+$headWireServer = new H2\ServerConnection();
+$_ = $headWireServer->receive($headWireClient->takeOutboundBytes());
+$headWireServer->sendHeaders($headStreamId, vec[(':status', '200', false)]);
+
+$headWire =
+  $headWireServer->takeOutboundBytes()
+  . H2\Frame\encode((0, $headStreamId, 'must be rejected', true, 0));
+
+$headStream = new ScriptedStream(vec[$headWire], $local, $peer);
+
+$assertion_value_87 = fn(): Transaction => (
+  new Client\_Private\H2Connection(
+    $headStream,
+    new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+    new H2\Configuration(),
+  )->exchange(
+    Request::fromURL(
+      Message\METHOD_HEAD,
+      URL::from('https://example.com/head'),
+    ),
+    new Client\Configuration(),
+  )
+);
+
+$assertion_error_87 = null;
+try {
+  $assertion_value_87();
+} catch (Client\ProtocolException $assertion_caught_87) {
+  $assertion_error_87 = $assertion_caught_87;
+}
+
+assert!($assertion_error_87 is Client\ProtocolException);
+
+$plainServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+
+$plainServerTask = Async\spawn::<null>(function() use ($plainServer): null {
+  $stream = $plainServer->accept();
+  $requestBytes = $stream->read(8192);
+  assert!(Str\contains($requestBytes, "GET /direct HTTP/1.1\r\n"));
+  $stream->writeAll(
+    "HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\ndirect",
+  );
+
+  $stream->close();
+  return null;
+});
+
+$plainClient = new Client\DefaultClient();
+$plainResult = $plainClient->send(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from(
+      'http://127.0.0.1:' . $plainServer->getLocalEndpoint()->port . '/direct',
+    ),
+  ),
+);
+
+assert!(
+  $plainResult->response->protocolVersion == Message\ProtocolVersion::V11,
+);
+
+$plainBody = $plainResult->response->body;
+assert!($plainBody != null);
+assert!($plainBody->readAll() == 'direct');
+$plainServerTask->await();
+$plainServer->close();
+
+$resolutionTimeout = null;
+try {
+  $plainClient->send(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://localhost:1/')),
+    new Client\SendConfiguration(connectionTimeout: Duration::zero()),
+  );
+} catch (Async\CancelledException $error) {
+  $resolutionTimeout = $error;
+}
+
+assert!($resolutionTimeout is Async\CancelledException);
+assert!($resolutionTimeout->getPrevious() is Async\TimeoutException);
+
+$resetServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$resetServerTask = Async\spawn::<null>(function() use ($resetServer): null {
+  $stream = $resetServer->accept();
+  $protocol = new H2\ServerConnection(
+    new H2\Configuration(
+      settings: dict[H2\Setting::InitialWindowSize->value => 0],
+    ),
+  );
+
+  $streamId = null;
+  while ($streamId == null) {
+    foreach ($protocol->receive($stream->read(16384)) as $event) {
+      if ($event is H2\Event\RequestHeadersReceived) {
+        $streamId = $event[1];
+      }
+    }
+
+    $outbound = $protocol->takeOutboundBytes();
+    if ($outbound != '') {
+      $stream->writeAll($outbound);
+    }
+  }
+
+  $protocol->resetStream($streamId, H2\ErrorCode::Cancel->value);
+  $stream->writeAll($protocol->takeOutboundBytes());
+  Async\sleep(Duration::fromMilliseconds(100));
+  $stream->close();
+  return null;
+});
+
+$resetClient = new Client\DefaultClient(
+  configuration: new Client\Configuration(
+    protocolVersions: vec[Message\ProtocolVersion::V2],
+  ),
+);
+
+$resetBody = Str\join('', vec['0123456789abcdef'; 8192]);
+$resetFailure = null;
+try {
+  discard!(
+    $resetClient->send(
+      Request::fromURL(
+        Message\METHOD_POST,
+        URL::from(
+          'http://127.0.0.1:'
+          . $resetServer->getLocalEndpoint()->port
+          . '/reset',
+        ),
+        body: new Whim\IO\MemoryHandle($resetBody),
+      ),
+      cancellation: new Async\TimeoutCancellationToken(
+        Duration::fromSeconds(2),
+      ),
+    ),
+  );
+} catch (Whim\Unwind\Throwable $error) {
+  $resetFailure = $error;
+}
+
+$resetServerTask->await();
+$resetServer->close();
+assert!($resetFailure is Client\ProtocolException);
+
+$earlyH2Server = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+
+$earlyH2ServerTask = Async\spawn::<null>(function() use ($earlyH2Server): null {
+  $stream = $earlyH2Server->accept();
+  $protocol = new H2\ServerConnection(
+    new H2\Configuration(
+      settings: dict[H2\Setting::InitialWindowSize->value => 0],
+    ),
+  );
+
+  $streamId = null;
+  while ($streamId == null) {
+    foreach ($protocol->receive($stream->read(16384)) as $event) {
+      if ($event is H2\Event\RequestHeadersReceived) {
+        $streamId = $event[1];
+      }
+    }
+
+    $outbound = $protocol->takeOutboundBytes();
+    if ($outbound != '') {
+      $stream->writeAll($outbound);
+    }
+  }
+
+  $protocol->sendHeaders($streamId, vec[(':status', '413', false)]);
+
+  $protocol->sendData($streamId, 'rejected', true);
+  $protocol->resetStream($streamId, H2\ErrorCode::NoError->value);
+  $stream->writeAll($protocol->takeOutboundBytes());
+  Async\sleep(Duration::fromMilliseconds(100));
+  $stream->close();
+  return null;
+});
+
+$earlyH2Client = new Client\DefaultClient(
+  configuration: new Client\Configuration(
+    protocolVersions: vec[Message\ProtocolVersion::V2],
+  ),
+);
+
+$earlyH2Result = $earlyH2Client->send(
+  Request::fromURL(
+    Message\METHOD_POST,
+    URL::from(
+      'http://127.0.0.1:' . $earlyH2Server->getLocalEndpoint()->port . '/early',
+    ),
+    body: new Whim\IO\MemoryHandle(Str\join('', vec['0123456789abcdef'; 8192])),
+  ),
+  cancellation: new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+);
+
+assert!($earlyH2Result->response->status == 413);
+$earlyH2Body = $earlyH2Result->response->body;
+assert!($earlyH2Body != null);
+assert!($earlyH2Body->readAll() == 'rejected');
+$earlyH2ServerTask->await();
+$earlyH2Server->close();
+
+$certificatePem = File\read(directory!() . '/fixtures/tls/certificate.pem');
+$privateKeyPem = File\read(directory!() . '/fixtures/tls/private-key.pem');
+$certificate = TLS\Certificate::from($certificatePem);
+$identity = TLS\Identity::from($certificatePem, $privateKeyPem);
+$h2TcpServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+
+$h2TlsServer = TLS\listen::<InternetEndpoint>(
+  $h2TcpServer,
+  new TLS\ServerConfiguration($identity, alpnProtocols: vec['h2']),
+);
+
+$h2ResponseConsumed = new Async\Deferred::<null>();
+$h2ServerTask = Async\spawn::<null>(
+  function() use ($h2TlsServer, $h2ResponseConsumed): null {
+    $stream = $h2TlsServer->accept();
+    $protocol = new H2\ServerConnection();
+    $streamId = null;
+    while ($streamId == null) {
+      foreach ($protocol->receive($stream->read(16384)) as $event) {
+        if ($event is H2\Event\RequestHeadersReceived) {
+          $streamId = $event[1];
+        }
+      }
+
+      $outbound = $protocol->takeOutboundBytes();
+      if ($outbound != '') {
+        $stream->writeAll($outbound);
+      }
+    }
+
+    $protocol->sendHeaders(
+      $streamId,
+      vec[(':status', '200', false), ('x-negotiated', 'h2', false)],
+    );
+
+    $protocol->sendData($streamId, 'negotiated h2', true);
+    $stream->writeAll($protocol->takeOutboundBytes());
+    $h2ResponseConsumed->getFuture()->await(
+      new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+    );
+
+    return null;
+  },
+);
+
+$h2Client = new Client\DefaultClient(
+  configuration: new Client\Configuration(
+    tls: new TLS\ClientConfiguration(
+      useSystemRoots: false,
+      trustedRoots: vec[$certificate],
+    ),
+    protocolVersions: vec[
+      Message\ProtocolVersion::V2,
+      Message\ProtocolVersion::V11,
+    ],
+  ),
+);
+
+$h2Result = $h2Client->send(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from(
+      'https://localhost:' . $h2TcpServer->getLocalEndpoint()->port . '/h2',
+    ),
+  ),
+);
+
+assert!($h2Result->response->protocolVersion == Message\ProtocolVersion::V2);
+
+assert!($h2Result->response->headers->get('x-negotiated') == 'h2');
+$h2NegotiatedBody = $h2Result->response->body;
+assert!($h2NegotiatedBody != null);
+assert!($h2NegotiatedBody->readAll() == 'negotiated h2');
+$h2ResponseConsumed->complete(null);
+$h2ServerTask->await();
+$h2TlsServer->close();
+
+$streamingTcpServer = TCP\listen(
+  new InternetEndpoint(Address::v4('127.0.0.1'), 0),
+);
+
+$streamingTlsServer = TLS\listen::<InternetEndpoint>(
+  $streamingTcpServer,
+  new TLS\ServerConfiguration($identity, alpnProtocols: vec['h2']),
+);
+
+$streamingHeadersSent = new Async\Deferred::<null>();
+$streamingBodyAllowed = new Async\Deferred::<null>();
+$streamingResponseConsumed = new Async\Deferred::<null>();
+$streamingServerTask = Async\spawn::<null>(
+  function() use (
+    $streamingTlsServer,
+    $streamingHeadersSent,
+    $streamingBodyAllowed,
+    $streamingResponseConsumed,
+  ): null {
+    $stream = $streamingTlsServer->accept();
+    $protocol = new H2\ServerConnection();
+    $streamId = null;
+    while ($streamId == null) {
+      foreach ($protocol->receive($stream->read(16384)) as $event) {
+        if ($event is H2\Event\RequestHeadersReceived) {
+          $streamId = $event[1];
+        }
+      }
+
+      $outbound = $protocol->takeOutboundBytes();
+      if ($outbound != '') {
+        $stream->writeAll($outbound);
+      }
+    }
+
+    $protocol->sendHeaders($streamId, vec[(':status', '200', false)]);
+
+    $stream->writeAll($protocol->takeOutboundBytes());
+    $streamingHeadersSent->complete(null);
+    $streamingBodyAllowed->getFuture()->await();
+    $protocol->sendData($streamId, 'streamed h2');
+    $protocol->sendHeaders(
+      $streamId,
+      vec[('x-stream-trailer', 'h2', false)],
+      true,
+    );
+
+    $stream->writeAll($protocol->takeOutboundBytes());
+    $streamingResponseConsumed->getFuture()->await(
+      new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+    );
+
+    return null;
+  },
+);
+
+$streamingClient = new Client\DefaultClient(
+  configuration: new Client\Configuration(
+    tls: new TLS\ClientConfiguration(
+      useSystemRoots: false,
+      trustedRoots: vec[$certificate],
+    ),
+    protocolVersions: vec[Message\ProtocolVersion::V2],
+  ),
+);
+
+$streamingResponse = new Async\Deferred::<Transaction>();
+$streamingClientTask = Async\spawn::<null>(
+  function() use (
+    $streamingClient,
+    $streamingTcpServer,
+    $streamingResponse,
+  ): null {
+    $streamingResponse->complete(
+      $streamingClient->send(
+        Request::fromURL(
+          Message\METHOD_GET,
+          URL::from(
+            'https://localhost:'
+            . $streamingTcpServer->getLocalEndpoint()->port
+            . '/stream',
+          ),
+        ),
+      ),
+    );
+
+    return null;
+  },
+);
+
+$streamingHeadersSent->getFuture()->await();
+Async\sleep(Duration::fromMilliseconds(10));
+assert!($streamingResponse->isComplete());
+$streamingTransaction = $streamingResponse->getFuture()->await();
+$streamingBodyAllowed->complete(null);
+$streamingBody = $streamingTransaction->response->body;
+assert!($streamingBody != null);
+assert!($streamingBody->readAll() == 'streamed h2');
+$streamingTrailers = $streamingTransaction->response->trailers;
+assert!($streamingTrailers != null);
+assert!($streamingTrailers->await()->get('x-stream-trailer') == 'h2');
+$streamingResponseConsumed->complete(null);
+
+$streamingClientTask->await();
+$streamingServerTask->await();
+$streamingTlsServer->close();
+
+$multiplexTcpServer = TCP\listen(
+  new InternetEndpoint(Address::v4('127.0.0.1'), 0),
+);
+
+$multiplexTlsServer = TLS\listen::<InternetEndpoint>(
+  $multiplexTcpServer,
+  new TLS\ServerConfiguration($identity, alpnProtocols: vec['h2']),
+);
+
+$firstRequestReceived = new Async\Deferred::<null>();
+$multiplexResponsesConsumed = new Async\Deferred::<null>();
+$multiplexServerTask = Async\spawn::<null>(
+  function() use (
+    $multiplexTlsServer,
+    $firstRequestReceived,
+    $multiplexResponsesConsumed,
+  ): null {
+    $stream = $multiplexTlsServer->accept();
+    $protocol = new H2\ServerConnection();
+    $streams = vec[];
+    while (length!($streams) < 2) {
+      foreach ($protocol->receive($stream->read(16384)) as $event) {
+        if ($event is H2\Event\RequestHeadersReceived) {
+          $streams[] = $event[1];
+          if (length!($streams) == 1) {
+            $firstRequestReceived->complete(null);
+          }
+        }
+      }
+
+      $outbound = $protocol->takeOutboundBytes();
+      if ($outbound != '') {
+        $stream->writeAll($outbound);
+      }
+    }
+
+    $protocol->sendHeaders($streams[1], vec[(':status', '200', false)]);
+
+    $protocol->sendData($streams[1], 'second', true);
+    $protocol->sendHeaders($streams[0], vec[(':status', '200', false)]);
+
+    $protocol->sendData($streams[0], 'first', true);
+    $stream->writeAll($protocol->takeOutboundBytes());
+    $multiplexResponsesConsumed->getFuture()->await(
+      new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+    );
+
+    return null;
+  },
+);
+
+$multiplexClient = new Client\DefaultClient(
+  configuration: new Client\Configuration(
+    tls: new TLS\ClientConfiguration(
+      useSystemRoots: false,
+      trustedRoots: vec[$certificate],
+    ),
+    protocolVersions: vec[Message\ProtocolVersion::V2],
+  ),
+);
+
+$multiplexURL =
+  'https://localhost:' . $multiplexTcpServer->getLocalEndpoint()->port;
+
+$firstMultiplexed = Async\spawn::<Transaction>(
+  fn(): Transaction => (
+    $multiplexClient->send(
+      Request::fromURL(Message\METHOD_GET, URL::from($multiplexURL . '/first')),
+    )
+  ),
+);
+
+$firstRequestReceived->getFuture()->await();
+$secondMultiplexed = Async\spawn::<Transaction>(
+  fn(): Transaction => (
+    $multiplexClient->send(
+      Request::fromURL(
+        Message\METHOD_GET,
+        URL::from($multiplexURL . '/second'),
+      ),
+    )
+  ),
+);
+
+$firstMultiplexedBody = $firstMultiplexed->await()->response->body;
+$secondMultiplexedBody = $secondMultiplexed->await()->response->body;
+assert!($firstMultiplexedBody != null);
+assert!($secondMultiplexedBody != null);
+assert!($firstMultiplexedBody->readAll() == 'first');
+assert!($secondMultiplexedBody->readAll() == 'second');
+$multiplexResponsesConsumed->complete(null);
+$multiplexServerTask->await();
+$multiplexTlsServer->close();
+$assertion_value_100 = fn(): Client\Origin => (
+  Client\Origin::fromURL(URL::from('ftp://example.com/file'))
+);
+
+$assertion_error_100 = null;
+try {
+  $assertion_value_100();
+} catch (Client\RequestException $assertion_caught_100) {
+  $assertion_error_100 = $assertion_caught_100;
+}
+
+assert!($assertion_error_100 is Client\RequestException);
+
+$redirectBody = new Whim\IO\MemoryHandle('discard me');
+$redirectTarget = new ScriptedClient(vec[
+  new Response(
+    Message\STATUS_FOUND,
+    headers: Message\FieldMap::from(vec[('location', '../next?ok=1')]),
+    body: $redirectBody,
+  ),
+  new Response(Message\STATUS_OK),
+]);
+
+$redirect = new Client\RedirectClient($redirectTarget);
+$redirected = $redirect->send(
+  Request::fromURL(
+    Message\METHOD_POST,
+    URL::from('https://example.com/old/path'),
+    headers: Message\FieldMap::from(vec[
+      ('authorization', 'Bearer secret'),
+      ('content-length', '7'),
+      ('content-type', 'text/plain'),
+    ]),
+    body: new Whim\IO\MemoryHandle('payload'),
+  ),
+);
+
+assert!($redirected->response->status == Message\STATUS_OK);
+assert!($redirectBody->reachedEndOfDataSource());
+assert!(length!($redirectTarget->requests) == 2);
+assert!($redirectTarget->requests[1]->method == Message\METHOD_GET);
+assert!($redirectTarget->requests[1]->body == null);
+assert!($redirectTarget->requests[1]->headers->get('content-length') == null);
+
+assert!(
+  $redirectTarget->requests[1]->headers->get('authorization')
+  == 'Bearer secret',
+);
+
+assert!(
+  $redirectTarget->requests[1]->headers->get('referer')
+  == 'https://example.com/old/path',
+);
+
+assert!(
+  $redirectTarget->requests[1]->url?->toString()
+  == 'https://example.com/next?ok=1',
+);
+
+foreach (vec[
+  Message\STATUS_MOVED_PERMANENTLY,
+  Message\STATUS_FOUND,
+] as $status) {
+  $preserved = new ScriptedClient(vec[
+    new Response(
+      $status,
+      headers: Message\FieldMap::from(vec[
+        ('location', 'https://example.com/next'),
+      ]),
+    ),
+    new Response(Message\STATUS_OK),
+  ]);
+
+  $result = new Client\RedirectClient($preserved)->send(
+    Request::fromURL(
+      Message\METHOD_PUT,
+      URL::from('https://example.com/start'),
+      body: new Whim\IO\MemoryHandle('preserved'),
+    ),
+  );
+
+  assert!($result->response->status == Message\STATUS_OK);
+  assert!($preserved->requests[1]->method == Message\METHOD_PUT);
+  assert!($preserved->requestBodies == vec['preserved', 'preserved']);
+}
+
+$crossOrigin = new ScriptedClient(vec[
+  new Response(
+    Message\STATUS_TEMPORARY_REDIRECT,
+    headers: Message\FieldMap::from(vec[
+      ('location', 'https://other.example/next'),
+    ]),
+  ),
+  new Response(Message\STATUS_OK),
+]);
+
+$replayed = new Client\RedirectClient($crossOrigin)->send(
+  Request::fromURL(
+    Message\METHOD_PUT,
+    URL::from('https://example.com/start'),
+    headers: Message\FieldMap::from(vec[
+      ('authorization', 'Bearer secret'),
+      ('cookie', 'session=yes'),
+      ('host', 'example.com'),
+      ('proxy-authorization', 'Proxy secret'),
+    ]),
+    body: new Whim\IO\MemoryHandle('repeatable'),
+  ),
+);
+
+assert!($replayed->response->status == Message\STATUS_OK);
+assert!($crossOrigin->requestBodies == vec['repeatable', 'repeatable']);
+
+assert!($crossOrigin->requests[1]->method == Message\METHOD_PUT);
+assert!($crossOrigin->requests[1]->headers->get('authorization') == null);
+
+assert!($crossOrigin->requests[1]->headers->get('cookie') == null);
+assert!($crossOrigin->requests[1]->headers->get('host') == null);
+assert!($crossOrigin->requests[1]->headers->get('proxy-authorization') == null);
+
+$failedRedirectDrain = new ScriptedClient(vec[
+  new Response(
+    Message\STATUS_FOUND,
+    headers: Message\FieldMap::from(vec[('location', '/after-failure')]),
+    body: new FailingResponseBody(),
+  ),
+  new Response(Message\STATUS_OK),
+]);
+
+$afterFailedDrain = new Client\RedirectClient($failedRedirectDrain)->send(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from('https://example.com/before-failure'),
+  ),
+);
+
+assert!($afterFailedDrain->response->status == Message\STATUS_OK);
+assert!(length!($failedRedirectDrain->requests) == 2);
+
+$flaky = new FlakyClient(2);
+$retried = new Client\RetryClient($flaky, backoff: Duration::zero())->send(
+  Request::fromURL(
+    Message\METHOD_PUT,
+    URL::from('https://example.com/resource'),
+    body: new Whim\IO\MemoryHandle('repeat me'),
+  ),
+);
+
+assert!($retried->response->status == Message\STATUS_OK);
+assert!($flaky->attempts == 3);
+assert!($flaky->requestBodies == vec['repeat me', 'repeat me', 'repeat me']);
+
+$ioFlaky = new IOFlakyClient(2);
+$ioRetried = new Client\RetryClient($ioFlaky, backoff: Duration::zero())->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/io')),
+);
+
+assert!($ioRetried->response->status == Message\STATUS_OK);
+assert!($ioFlaky->attempts == 3);
+
+$nonTransportIO = new IOFlakyClient(2, false);
+$assertion_value_127 = fn(): Transaction => (
+  new Client\RetryClient($nonTransportIO, backoff: Duration::zero())->send(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('https://example.com/io-limit'),
+    ),
+  )
+);
+
+$assertion_error_127 = null;
+try {
+  $assertion_value_127();
+} catch (Whim\IO\Exception $assertion_caught_127) {
+  $assertion_error_127 = $assertion_caught_127;
+}
+
+assert!($assertion_error_127 is Whim\IO\Exception);
+
+assert!($nonTransportIO->attempts == 1);
+
+$post = new FlakyClient(2);
+$assertion_value_129 = fn(): Transaction => (
+  new Client\RetryClient($post, backoff: Duration::zero())->send(
+    Request::fromURL(
+      Message\METHOD_POST,
+      URL::from('https://example.com/resource'),
+    ),
+  )
+);
+
+$assertion_error_129 = null;
+try {
+  $assertion_value_129();
+} catch (NetworkException $assertion_caught_129) {
+  $assertion_error_129 = $assertion_caught_129;
+}
+
+assert!($assertion_error_129 is NetworkException);
+
+assert!($post->attempts == 1);
+
+$deniedConnection = new FakeConnection(
+  new Client\ConnectionMetadata(
+    $local,
+    new InternetEndpoint(Address::v4('127.0.0.1'), 80),
+    Message\ProtocolVersion::V11,
+  ),
+  new Response(Message\STATUS_OK),
+);
+
+$privateOnly = new Client\DefaultClient(
+  new FakeConnector($deniedConnection),
+  middleware: vec[Client\DeniedDestinationsMiddleware::publicOnly()],
+);
+
+$assertion_value_131 = fn(): Transaction => (
+  $privateOnly->send(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://localhost/private')),
+  )
+);
+
+$assertion_error_131 = null;
+try {
+  $assertion_value_131();
+} catch (Client\DestinationDeniedException $assertion_caught_131) {
+  $assertion_error_131 = $assertion_caught_131;
+}
+
+assert!($assertion_error_131 is Client\DestinationDeniedException);
+
+assert!($deniedConnection->request == null);
+
+$mappedConnection = new FakeConnection(
+  new Client\ConnectionMetadata(
+    $local,
+    new InternetEndpoint(Address::v6('::ffff:203.0.113.10'), 80),
+    Message\ProtocolVersion::V11,
+  ),
+  new Response(Message\STATUS_OK),
+);
+
+$explicitDeny = new Client\DefaultClient(
+  new FakeConnector($mappedConnection),
+  middleware: vec[
+    new Client\DeniedDestinationsMiddleware(vec[Block::from('203.0.113.0/24')]),
+  ],
+);
+
+$assertion_value_133 = fn(): Transaction => (
+  $explicitDeny->send(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('http://example.test/denied'),
+    ),
+  )
+);
+
+$assertion_error_133 = null;
+try {
+  $assertion_value_133();
+} catch (Client\DestinationDeniedException $assertion_caught_133) {
+  $assertion_error_133 = $assertion_caught_133;
+}
+
+assert!($assertion_error_133 is Client\DestinationDeniedException);
+
+$allowedConnection = new FakeConnection(
+  new Client\ConnectionMetadata(
+    $local,
+    new InternetEndpoint(Address::v4('8.8.8.8'), 443),
+    Message\ProtocolVersion::V2,
+  ),
+  new Response(Message\STATUS_OK),
+);
+
+$allowedClient = new Client\DefaultClient(
+  new FakeConnector($allowedConnection),
+  middleware: vec[Client\DeniedDestinationsMiddleware::publicOnly()],
+);
+
+assert!(
+  $allowedClient->send(
+    Request::fromURL(Message\METHOD_GET, URL::from('https://dns.google/')),
+  )->response->status
+  == Message\STATUS_OK,
+);
+
+$unixDeniedConnection = new FakeConnection(
+  new Client\ConnectionMetadata(
+    new UnixEndpoint(null),
+    new UnixEndpoint('/tmp/http.sock'),
+    Message\ProtocolVersion::V11,
+  ),
+  new Response(Message\STATUS_OK),
+);
+
+$unixDeniedClient = new Client\DefaultClient(
+  new FakeConnector($unixDeniedConnection),
+  middleware: vec[Client\DeniedDestinationsMiddleware::publicOnly()],
+);
+
+$assertion_value_135 = fn(): Transaction => (
+  $unixDeniedClient->send(
+    Request::fromURL(Message\METHOD_GET, URL::from('http://localhost/private')),
+  )
+);
+
+$assertion_error_135 = null;
+try {
+  $assertion_value_135();
+} catch (Client\DestinationDeniedException $assertion_caught_135) {
+  $assertion_error_135 = $assertion_caught_135;
+}
+
+assert!($assertion_error_135 is Client\DestinationDeniedException);
+
+assert!($unixDeniedConnection->request == null);
+
+$counting = new CountingConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$pooled = new Client\DefaultClient(new Client\PooledConnector($counting));
+$firstPooled = $pooled->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/one')),
+);
+
+$firstPooledBody = $firstPooled->response->body;
+assert!($firstPooledBody != null);
+assert!(!($firstPooledBody->reachedEndOfDataSource()));
+
+$secondPooled = $pooled->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/two')),
+);
+
+assert!($counting->connections == 2);
+assert!($firstPooledBody->readAll() == 'response-1');
+
+$thirdPooled = $pooled->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/three')),
+);
+
+assert!($counting->connections == 2);
+assert!($counting->opened[0]->exchanges == 2);
+$secondPooledBody = $secondPooled->response->body;
+assert!($secondPooledBody != null);
+$_ = $secondPooledBody->readAll();
+$thirdPooledBody = $thirdPooled->response->body;
+assert!($thirdPooledBody != null);
+$_ = $thirdPooledBody->readAll();
+
+$multiplexFailure = new CountingConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+  true,
+);
+
+$multiplexFailureClient = new Client\DefaultClient(
+  new Client\PooledConnector($multiplexFailure),
+);
+
+discard!(
+  $multiplexFailureClient->send(
+    Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/one')),
+  ),
+);
+
+$multiplexFailure->opened[0]->failNext = true;
+$assertion_value_142 = fn(): Transaction => (
+  $multiplexFailureClient->send(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('https://example.com/failure'),
+    ),
+  )
+);
+
+$assertion_error_142 = null;
+try {
+  $assertion_value_142();
+} catch (Client\ProtocolException $assertion_caught_142) {
+  $assertion_error_142 = $assertion_caught_142;
+}
+
+assert!($assertion_error_142 is Client\ProtocolException);
+
+$recoveredMultiplex = $multiplexFailureClient->send(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from('https://example.com/recovered'),
+  ),
+);
+
+assert!($recoveredMultiplex->response->status == Message\STATUS_OK);
+assert!($multiplexFailure->connections == 1);
+assert!($multiplexFailure->opened[0]->exchanges == 3);
+
+$protocolCounting = new CountingConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$protocolPool = new Client\DefaultClient(
+  new Client\PooledConnector($protocolCounting),
+  $protocolConfiguration,
+);
+
+$pooledH1 = $protocolPool->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/one')),
+);
+
+$pooledH1Body = $pooledH1->response->body;
+assert!($pooledH1Body != null);
+$_ = $pooledH1Body->readAll();
+
+$assertion_value_146 = fn(): Transaction => (
+  $protocolPool->send(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('http://example.com/two'),
+      Message\ProtocolVersion::V2,
+    ),
+  )
+);
+
+$assertion_error_146 = null;
+try {
+  $assertion_value_146();
+} catch (Client\ProtocolException $assertion_caught_146) {
+  $assertion_error_146 = $assertion_caught_146;
+}
+
+assert!($assertion_error_146 is Client\ProtocolException);
+
+assert!($protocolCounting->connections == 2);
+assert!($protocolCounting->opened[0]->exchanges == 1);
+assert!($protocolCounting->opened[1]->isClosed());
+
+$closing = new CountingConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$closingPool = new Client\DefaultClient(new Client\PooledConnector($closing));
+abandon_response($closingPool);
+assert!($closing->opened[0]->isClosed());
+$replacement = $closingPool->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/two')),
+);
+
+assert!($closing->connections == 2);
+$replacementBody = $replacement->response->body;
+assert!($replacementBody != null);
+$_ = $replacementBody->readAll();
+
+$gated = new GatedMultiplexedConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+);
+
+$coalesced = new Client\DefaultClient(
+  new Client\PooledConnector($gated),
+  new Client\Configuration(protocolVersions: vec[Message\ProtocolVersion::V2]),
+);
+
+$coalescedFirst = Async\spawn::<Transaction>(
+  fn(): Transaction => (
+    $coalesced->send(
+      Request::fromURL(
+        Message\METHOD_GET,
+        URL::from('https://example.com/one'),
+      ),
+    )
+  ),
+);
+
+$coalescedSecond = Async\spawn::<Transaction>(
+  fn(): Transaction => (
+    $coalesced->send(
+      Request::fromURL(
+        Message\METHOD_GET,
+        URL::from('https://example.com/two'),
+      ),
+    )
+  ),
+);
+
+Async\later();
+assert!($gated->connections == 1);
+$gated->release();
+$coalescedFirstBody = $coalescedFirst->await()->response->body;
+$coalescedSecondBody = $coalescedSecond->await()->response->body;
+assert!($coalescedFirstBody != null);
+assert!($coalescedSecondBody != null);
+discard!($coalescedFirstBody->readAll());
+discard!($coalescedSecondBody->readAll());
+assert!($gated->connections == 1);
+
+$gatedH1 = new GatedMultiplexedConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+  false,
+);
+
+$coalescedH1 = new Client\DefaultClient(
+  new Client\PooledConnector($gatedH1),
+  new Client\Configuration(protocolVersions: vec[Message\ProtocolVersion::V11]),
+);
+
+$coalescedH1First = Async\spawn::<Transaction>(
+  fn(): Transaction => (
+    $coalescedH1->send(
+      Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/one')),
+    )
+  ),
+);
+
+$coalescedH1Second = Async\spawn::<Transaction>(
+  fn(): Transaction => (
+    $coalescedH1->send(
+      Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/two')),
+    )
+  ),
+);
+
+Async\later();
+assert!($gatedH1->connections == 1);
+$gatedH1->release();
+$coalescedH1FirstBody = $coalescedH1First->await()->response->body;
+$coalescedH1SecondBody = $coalescedH1Second->await()->response->body;
+assert!($coalescedH1FirstBody != null);
+assert!($coalescedH1SecondBody != null);
+discard!($coalescedH1FirstBody->readAll());
+discard!($coalescedH1SecondBody->readAll());
+assert!($gatedH1->connections == 2);
+
+$uncappedMultiplexed = new CountingConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V2),
+  true,
+);
+
+$uncappedMultiplexedClient = new Client\DefaultClient(
+  new Client\PooledConnector($uncappedMultiplexed, 0, 0),
+  new Client\Configuration(protocolVersions: vec[Message\ProtocolVersion::V2]),
+);
+
+$uncappedMultiplexedFirst = $uncappedMultiplexedClient->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/one')),
+);
+
+$uncappedMultiplexedSecond = $uncappedMultiplexedClient->send(
+  Request::fromURL(Message\METHOD_GET, URL::from('https://example.com/two')),
+);
+
+assert!($uncappedMultiplexed->connections == 1);
+$uncappedMultiplexedFirstBody = $uncappedMultiplexedFirst->response->body;
+$uncappedMultiplexedSecondBody = $uncappedMultiplexedSecond->response->body;
+assert!($uncappedMultiplexedFirstBody != null);
+assert!($uncappedMultiplexedSecondBody != null);
+discard!($uncappedMultiplexedFirstBody->readAll());
+discard!($uncappedMultiplexedSecondBody->readAll());
+
+$originLimited = new CountingConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$originLimitedPool = new Client\PooledConnector($originLimited, 10, 1);
+$originLimitedConfiguration = new Client\Configuration(
+  protocolVersions: vec[Message\ProtocolVersion::V11],
+);
+
+$originLimitedRequests = vec[
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/one')),
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/two')),
+  Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/three')),
+];
+
+$originLimitedTransactions = vec[];
+foreach ($originLimitedRequests as $request) {
+  $connection = $originLimitedPool->connect(
+    Client\Origin::fromURL($request->url),
+    $request,
+    $originLimitedConfiguration,
+  );
+
+  $originLimitedTransactions[] = $connection->exchange(
+    $request,
+    $originLimitedConfiguration,
+  );
+}
+
+assert!($originLimited->connections == 3);
+foreach ($originLimitedTransactions as $transaction) {
+  $body = $transaction->response->body;
+  assert!($body != null);
+  discard!($body->readAll());
+}
+
+assert!($originLimited->opened[0]->isClosed());
+assert!($originLimited->opened[1]->isClosed());
+assert!(!($originLimited->opened[2]->isClosed()));
+
+$originLimitedRequest = Request::fromURL(
+  Message\METHOD_GET,
+  URL::from('http://example.com/four'),
+);
+
+$originLimitedConnection = $originLimitedPool->connect(
+  Client\Origin::fromURL($originLimitedRequest->url),
+  $originLimitedRequest,
+  $originLimitedConfiguration,
+);
+
+$originLimitedTransaction = $originLimitedConnection->exchange(
+  $originLimitedRequest,
+  $originLimitedConfiguration,
+);
+
+$originLimitedBody = $originLimitedTransaction->response->body;
+assert!($originLimitedBody != null);
+discard!($originLimitedBody->readAll());
+assert!($originLimited->connections == 3);
+
+$globallyLimited = new CountingConnector(
+  new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
+);
+
+$globallyLimitedPool = new Client\PooledConnector($globallyLimited, 2, 2);
+$globallyLimitedConfiguration = new Client\Configuration(
+  protocolVersions: vec[Message\ProtocolVersion::V11],
+);
+
+$globallyLimitedRequests = vec[
+  Request::fromURL(Message\METHOD_GET, URL::from('http://one.example/a')),
+  Request::fromURL(Message\METHOD_GET, URL::from('http://two.example/b')),
+  Request::fromURL(Message\METHOD_GET, URL::from('http://three.example/c')),
+];
+
+$globallyLimitedTransactions = vec[];
+foreach ($globallyLimitedRequests as $request) {
+  $connection = $globallyLimitedPool->connect(
+    Client\Origin::fromURL($request->url),
+    $request,
+    $globallyLimitedConfiguration,
+  );
+
+  $globallyLimitedTransactions[] = $connection->exchange(
+    $request,
+    $globallyLimitedConfiguration,
+  );
+}
+
+foreach ($globallyLimitedTransactions as $transaction) {
+  $body = $transaction->response->body;
+  assert!($body != null);
+  discard!($body->readAll());
+}
+
+assert!($globallyLimited->opened[0]->isClosed());
+assert!(!($globallyLimited->opened[1]->isClosed()));
+assert!(!($globallyLimited->opened[2]->isClosed()));

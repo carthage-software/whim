@@ -1,0 +1,161 @@
+namespace Whim\Database\PostgreSQL\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\ConnectionException;
+use Whim\Database\QueryException;
+use Whim\Database\TransactionException;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\_Private\PostgreSQLError;
+use Whim\_Private\PostgreSQLOperation;
+use Whim\_Private\PostgreSQLResult;
+
+/** Waits for one PostgreSQL operation with cancellation. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_operation(
+  PostgreSQLOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  $cancellation?->throwIfCancellationRequested();
+  $registration = $cancellation?->register(fn(): void {
+    $operation->cancel();
+  });
+
+  try {
+    $operation->wait();
+    $cancellation?->throwIfCancellationRequested();
+  } finally {
+    $cancellation?->unregister($registration);
+  }
+}
+
+/** Waits for connection work and maps its failure. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_connection(
+  PostgreSQLOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  try {
+    await_operation($operation, $cancellation);
+  } catch (PostgreSQLError $error) {
+    $cancellation?->throwIfCancellationRequested();
+    throw new ConnectionException(
+      $error->getMessage(),
+      $error->getCode(),
+      $error,
+      $error->getSQLState(),
+    );
+  }
+}
+
+/** Waits for query work and maps its failure. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_query(
+  PostgreSQLOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  try {
+    await_operation($operation, $cancellation);
+  } catch (PostgreSQLError $error) {
+    $cancellation?->throwIfCancellationRequested();
+    throw new QueryException(
+      $error->getMessage(),
+      $error->getCode(),
+      $error,
+      $error->getSQLState(),
+    );
+  }
+}
+
+/** Waits for transaction work and maps its failure. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_transaction(
+  PostgreSQLOperation $operation,
+  null|CancellationToken $cancellation = null,
+): void {
+  try {
+    await_operation($operation, $cancellation);
+  } catch (PostgreSQLError $error) {
+    $cancellation?->throwIfCancellationRequested();
+    throw new TransactionException(
+      $error->getMessage(),
+      $error->getCode(),
+      $error,
+      $error->getSQLState(),
+    );
+  }
+}
+
+/** Fetches one row with cancellation and maps query failures. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function fetch(
+  PostgreSQLResult $result,
+  null|CancellationToken $cancellation,
+): null|vec<mixed> {
+  $cancellation?->throwIfCancellationRequested();
+  $ready = $result->poll();
+  if (!($ready is false)) {
+    return $ready;
+  }
+
+  $registration = $cancellation?->register(fn(): void {
+    $result->interrupt();
+  });
+
+  try {
+    try {
+      return $result->fetch();
+    } catch (PostgreSQLError $error) {
+      $cancellation?->throwIfCancellationRequested();
+      throw new QueryException(
+        $error->getMessage(),
+        $error->getCode(),
+        $error,
+        $error->getSQLState(),
+      );
+    }
+  } finally {
+    $cancellation?->unregister($registration);
+  }
+}
+
+/** Fetches every remaining row with one cancellation registration. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function fetch_all(
+  PostgreSQLResult $result,
+  null|CancellationToken $cancellation,
+): vec<vec<mixed>> {
+  $cancellation?->throwIfCancellationRequested();
+  $registration = $cancellation?->register(fn(): void {
+    $result->interrupt();
+  });
+
+  try {
+    try {
+      return $result->fetchAll();
+    } catch (PostgreSQLError $error) {
+      $cancellation?->throwIfCancellationRequested();
+      throw new QueryException(
+        $error->getMessage(),
+        $error->getCode(),
+        $error,
+        $error->getSQLState(),
+      );
+    }
+  } finally {
+    $cancellation?->unregister($registration);
+  }
+}

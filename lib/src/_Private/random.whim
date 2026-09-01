@@ -1,0 +1,11 @@
+namespace Whim\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\Stub;
+
+/** Produces secure random bytes, or null when entropy is unavailable. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function random_bytes(int $length): null|string {}

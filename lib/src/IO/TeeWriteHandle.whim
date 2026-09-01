@@ -1,0 +1,188 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\Str;
+
+/** Mirrors every accepted byte to two writable handles. */
+final class TeeWriteHandle implements WriteHandle {
+  private string $pending = '';
+  private int $firstCursor = 0;
+  private int $secondCursor = 0;
+
+  /** Creates a mirrored destination over two writable handles. */
+  #[TrackCaller]
+  public function __construct(
+    private WriteHandle $first,
+    private WriteHandle $second,
+  ) {}
+
+  /** Waits for both destinations or finishes retained bytes. */
+  #[TrackCaller]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->pending != '') {
+      $this->flushPending($cancellation);
+      return;
+    }
+
+    $this->first->waitUntilWritable($cancellation);
+    $this->second->waitUntilWritable($cancellation);
+  }
+
+  /** Attempts to offer one byte sequence to both destinations. */
+  #[TrackCaller]
+  public function tryWrite(string $bytes): int {
+    if ($this->pending != '') {
+      $this->tryFlushPending();
+      return 0;
+    }
+
+    if ($bytes == '') {
+      return 0;
+    }
+
+    $this->retain($bytes);
+    $this->tryFlushPending();
+    return length!($bytes);
+  }
+
+  /** Writes one byte sequence completely to both destinations. */
+  #[TrackCaller]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $this->flushPending($cancellation);
+    if ($bytes == '') {
+      return 0;
+    }
+
+    $this->retain($bytes);
+    $this->flushPending($cancellation);
+    return length!($bytes);
+  }
+
+  /** Retains a new chunk and resets both destination cursors. */
+  #[TrackCaller]
+  private function retain(string $bytes): void {
+    $this->pending = $bytes;
+    $this->firstCursor = 0;
+    $this->secondCursor = 0;
+  }
+
+  /** Attempts to advance one destination through the retained chunk. */
+  #[TrackCaller]
+  private function tryAdvance(bool $first): int {
+    $cursor = match ($first) {
+      true => $this->firstCursor,
+      false => $this->secondCursor,
+    };
+
+    if ($cursor >= length!($this->pending)) {
+      return length!($this->pending);
+    }
+
+    $handle = match ($first) {
+      true => $this->first,
+      false => $this->second,
+    };
+
+    $remaining = length!($this->pending) - $cursor;
+    $written = $handle->tryWrite(Str\slice($this->pending, $cursor));
+    if ($written < 0) {
+      $written = 0;
+    } else if ($written > $remaining) {
+      $written = $remaining;
+    }
+
+    $cursor += $written;
+    if ($first) {
+      $this->firstCursor = $cursor;
+    } else {
+      $this->secondCursor = $cursor;
+    }
+
+    return $cursor;
+  }
+
+  /** Makes one non-blocking attempt to advance both destinations. */
+  #[TrackCaller]
+  private function tryFlushPending(): bool {
+    if ($this->pending == '') {
+      return true;
+    }
+
+    $first = $this->tryAdvance(true);
+    $second = $this->tryAdvance(false);
+    $complete =
+      $first == length!($this->pending)
+      && $second == length!($this->pending);
+
+    if ($complete) {
+      $this->retain('');
+    }
+
+    return $complete;
+  }
+
+  /**
+   * Drives one destination through every remaining retained byte.
+   *
+   * @throws Exception when the destination stalls with bytes remaining.
+   * @throws Whim\Async\CancelledException when the cancellation token is cancelled.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  private function flushDestination(
+    bool $first,
+    null|CancellationToken $cancellation,
+  ): void {
+    $handle = match ($first) {
+      true => $this->first,
+      false => $this->second,
+    };
+
+    $cursor = match ($first) {
+      true => $this->firstCursor,
+      false => $this->secondCursor,
+    };
+
+    while ($cursor < length!($this->pending)) {
+      $remaining = length!($this->pending) - $cursor;
+      $written = $handle->write(
+        Str\slice($this->pending, $cursor),
+        $cancellation,
+      );
+
+      if ($written <= 0) {
+        throw new Exception('a tee destination stalled with bytes remaining');
+      }
+
+      if ($written > $remaining) {
+        $written = $remaining;
+      }
+
+      $cursor += $written;
+      if ($first) {
+        $this->firstCursor = $cursor;
+      } else {
+        $this->secondCursor = $cursor;
+      }
+    }
+  }
+
+  /** Finishes retained bytes on both destinations. */
+  #[TrackCaller]
+  private function flushPending(null|CancellationToken $cancellation): void {
+    if ($this->pending == '') {
+      return;
+    }
+
+    $this->flushDestination(true, $cancellation);
+    $this->flushDestination(false, $cancellation);
+    $this->retain('');
+  }
+}

@@ -1,0 +1,6 @@
+namespace Whim\Encoding;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports input that cannot be represented in the requested encoding. */
+final class EncodingException extends InvalidArgumentException {}

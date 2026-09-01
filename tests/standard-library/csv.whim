@@ -1,0 +1,80 @@
+use Whim\CSV\MalformedCSVException;
+use Whim\CSV\Reader;
+use Whim\CSV\Writer;
+use Whim\IO\MemoryHandle;
+
+$input = new MemoryHandle(
+  "name,note\r\n"
+  . "Alice,\"hello, \"\"world\"\"\"\r\n"
+  . "Bob,\"line\nbreak\"\r\n",
+);
+
+$reader = new Reader($input);
+assert!($reader->next() == (0, vec['name', 'note']));
+assert!($reader->next() == (1, vec['Alice', 'hello, "world"']));
+assert!($reader->next() == (2, vec['Bob', "line\nbreak"]));
+assert!($reader->next() == null);
+
+$output = new MemoryHandle();
+$writer = new Writer($output);
+$writer->write(vec['name', 'note']);
+$writer->write(vec['Alice', 'hello, "world"']);
+$writer->write(vec['Bob', "line\nbreak"]);
+assert!(
+  $output->toString()
+  == "name,note\r\n"
+  . "Alice,\"hello, \"\"world\"\"\"\r\n"
+  . "Bob,\"line\nbreak\"\r\n",
+);
+
+$custom = new MemoryHandle("one;two\n");
+$reader = new Reader($custom, ';');
+assert!($reader->next() == (0, vec['one', 'two']));
+
+$empty = new Reader(new MemoryHandle("\r\n"));
+assert!($empty->next() == (0, vec['']));
+assert!($empty->next() == null);
+
+$output = new MemoryHandle();
+$writer = new Writer($output);
+$writer->write(vec['']);
+assert!($output->toString() == "\r\n");
+
+$assertion_value_10 = fn(): null|(int, vec<string>) => (
+  new Reader(new MemoryHandle('"unterminated'))->next()
+);
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (MalformedCSVException $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is MalformedCSVException);
+
+$assertion_value_11 = fn(): null|(int, vec<string>) => (
+  new Reader(new MemoryHandle('"closed"x'))->next()
+);
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (MalformedCSVException $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is MalformedCSVException);
+
+$assertion_value_12 = fn(): null|(int, vec<string>) => (
+  new Reader(new MemoryHandle('not"start'))->next()
+);
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (MalformedCSVException $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is MalformedCSVException);

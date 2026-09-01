@@ -1,0 +1,128 @@
+namespace Whim\SMTP\Client\Authentication\_Private;
+
+use Whim\Encoding\Base64;
+use Whim\Encoding\DecodingException;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\AuthenticationException;
+use Whim\SMTP\Capability;
+use Whim\SMTP\Client\Connection;
+use Whim\SMTP\Reply;
+use Whim\SMTP\_Private\parse_decimal;
+use Whim\Str;
+
+/** Requires the server to advertise a SASL mechanism. */
+function require_mechanism(
+  Connection $connection,
+  NonEmptyString $mechanism,
+): void {
+  $available = $connection->capability(Capability::Authentication);
+  if (
+    $available == null
+    || !Str\contains(
+      ' ' . Str\uppercase($available) . ' ',
+      ' ' . $mechanism . ' ',
+    )
+  ) {
+    throw new AuthenticationException(
+      'the SMTP server does not support ' . $mechanism . ' authentication',
+    );
+  }
+}
+
+/** Builds a rejected-authentication exception. */
+function rejected(
+  NonEmptyString $mechanism,
+  Reply $reply,
+): AuthenticationException {
+  return new AuthenticationException(
+    $mechanism
+    . ' authentication was rejected with '
+    . $reply->code
+    . ': '
+    . $reply->message,
+  );
+}
+
+/** Requires a successful authentication reply. */
+function require_authentication_success(
+  NonEmptyString $mechanism,
+  Reply $reply,
+): void {
+  if (!$reply->isPositiveCompletion()) {
+    throw rejected($mechanism, $reply);
+  }
+}
+
+/** Parses comma-separated SCRAM attributes. */
+function parse_scram_attributes(string $message): dict<string, string> {
+  $attributes = dict[];
+  foreach (Str\split($message, ',') as $attribute) {
+    if (length!($attribute) < 3 || $attribute[1] != '=') {
+      throw new AuthenticationException(
+        'the SMTP server sent malformed SCRAM data',
+      );
+    }
+
+    $name = $attribute[0];
+    if (contains_key!($attributes, $name)) {
+      throw new AuthenticationException(
+        'the SMTP server repeated a SCRAM attribute',
+      );
+    }
+
+    $attributes[$name] = Str\slice($attribute, 2);
+  }
+
+  return $attributes;
+}
+
+/** Parses and checks the SCRAM server-first message. */
+function parse_server_first(
+  string $message,
+  string $clientNonce,
+): (string, string, int) {
+  $attributes = parse_scram_attributes($message);
+  if (
+    !contains_key!($attributes, 'r')
+    || !contains_key!($attributes, 's')
+    || !contains_key!($attributes, 'i')
+  ) {
+    throw new AuthenticationException(
+      'the SMTP server sent an invalid SCRAM challenge',
+    );
+  }
+
+  $nonce = $attributes['r'];
+  if (!Str\starts_with($nonce, $clientNonce)) {
+    throw new AuthenticationException(
+      'the SMTP server sent an invalid SCRAM challenge',
+    );
+  }
+
+  $encodedSalt = $attributes['s'];
+  try {
+    $salt = Base64\decode($encodedSalt);
+  } catch (DecodingException $_) {
+    throw new AuthenticationException('the SCRAM salt is not valid base64');
+  }
+
+  $iterationText = $attributes['i'];
+  $iterations = parse_decimal($iterationText);
+  if ($iterations == null || $iterations < 1 || $iterations > 1000000) {
+    throw new AuthenticationException('the SCRAM iteration count is invalid');
+  }
+
+  return ($nonce, $salt, $iterations);
+}
+
+/** Parses the SCRAM server verification value. */
+function parse_server_verification(string $message): string {
+  $attributes = parse_scram_attributes($message);
+  if (!contains_key!($attributes, 'v')) {
+    throw new AuthenticationException(
+      'the SCRAM-SHA-256 server verification is missing',
+    );
+  }
+
+  return $attributes['v'];
+}

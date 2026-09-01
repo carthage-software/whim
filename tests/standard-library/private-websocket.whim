@@ -1,0 +1,164 @@
+use Whim\HTTP\WebSocket\Exception as WebSocketException;
+use Whim\_Private\WebSocketCodec;
+
+assert!(
+  Whim\_Private\websocket_accept_key('dGhlIHNhbXBsZSBub25jZQ==')
+  == 's3pPLMBiTxaQ9kYGzzhZRbK+xOo=',
+);
+
+assert!(Whim\_Private\websocket_accept_key('invalid') == null);
+assert!(Whim\_Private\websocket_accept_key('YQ==') == null);
+
+$codec = WebSocketCodec::server(1024, 1024);
+assert!($codec->nextEvent() == null);
+$codec->push("\x81\x85");
+assert!($codec->nextEvent() == null);
+$codec->push("\x01\x02\x03\x04\x69\x67\x6f\x68\x6e");
+assert!($codec->nextEvent() == (1, 'hello', 0));
+assert!($codec->takeOutput() == '');
+
+$codec->push("\x82\x82\x01\x02\x03\x04\x01\xfd");
+assert!($codec->nextEvent() == (2, "\x00\xff", 0));
+
+$codec->push(
+  "\x01\x83\x01\x02\x03\x04\x69\x67\x6f" . "\x80\x82\x05\x06\x07\x08\x69\x69",
+);
+
+assert!($codec->nextEvent() == (1, 'hello', 0));
+
+$codec->push("\x89\x81\x01\x02\x03\x04\x79");
+assert!($codec->nextEvent() == null);
+assert!($codec->takeOutput() == "\x8a\x01x");
+
+$outgoing = WebSocketCodec::server(1024, 1024);
+$outgoing->sendText('hello');
+$outgoing->sendBinary("\x00\xff");
+$outgoing->ping('x');
+assert!($outgoing->takeOutput() == "\x81\x05hello\x82\x02\x00\xff\x89\x01x");
+
+$client = WebSocketCodec::client(1024, 1024);
+$client->push("\x81\x05hello");
+assert!($client->nextEvent() == (1, 'hello', 0));
+$client->sendText('masked');
+$masked = $client->takeOutput();
+$server = WebSocketCodec::server(1024, 1024);
+$server->push($masked);
+assert!($server->nextEvent() == (1, 'masked', 0));
+
+$maskedServer = WebSocketCodec::client(1024, 1024);
+$maskedServer->push("\x81\x82\x01\x02\x03\x04\x69\x6b");
+$failed = false;
+try {
+  $maskedServer->nextEvent();
+} catch (WebSocketException $error) {
+  assert!($error->getCode() == 1002);
+  $failed = true;
+}
+
+assert!($failed);
+
+$localClose = WebSocketCodec::server(1024, 1024);
+$localClose->close(1000, 'bye');
+assert!($localClose->takeOutput() == "\x88\x05\x03\xe8bye");
+assert!(!$localClose->isClosed());
+
+$defaultClose = WebSocketCodec::server(1024, 1024);
+$closeDefault = function() use ($defaultClose): void {
+  $defaultClose->close();
+};
+
+$closeDefault();
+assert!($defaultClose->takeOutput() == "\x88\x00");
+
+$defaultReason = WebSocketCodec::server(1024, 1024);
+$closeDefaultReason = function() use ($defaultReason): void {
+  $defaultReason->close(1000);
+};
+
+$closeDefaultReason();
+assert!($defaultReason->takeOutput() == "\x88\x02\x03\xe8");
+
+$defaultPing = WebSocketCodec::server(1024, 1024);
+$defaultPing->ping();
+assert!($defaultPing->takeOutput() == "\x89\x00");
+
+$closing = WebSocketCodec::server(1024, 1024);
+$closing->push("\x88\x85\x01\x02\x03\x04\x02\xea\x61\x7d\x64");
+assert!($closing->nextEvent() == (8, 'bye', 1000));
+assert!($closing->takeOutput() == "\x88\x05\x03\xe8bye");
+assert!($closing->isClosed());
+
+$invalidMask = WebSocketCodec::server(1024, 1024);
+$invalidMask->push("\x81\x05hello");
+$failed = false;
+try {
+  $invalidMask->nextEvent();
+} catch (WebSocketException $error) {
+  assert!($error->getCode() == 1002);
+  $failed = true;
+}
+
+assert!($failed);
+assert!($invalidMask->takeOutput() != '');
+
+$invalidText = WebSocketCodec::server(1024, 1024);
+$invalidText->push("\x81\x81\x01\x02\x03\x04\xfe");
+$failed = false;
+try {
+  $invalidText->nextEvent();
+} catch (WebSocketException $error) {
+  assert!($error->getCode() == 1007);
+  $failed = true;
+}
+
+assert!($failed);
+
+$oversized = WebSocketCodec::server(4, 4);
+$oversized->push("\x81\x85\x01\x02\x03\x04\x69\x67\x6f\x68\x6e");
+$failed = false;
+try {
+  $oversized->nextEvent();
+} catch (WebSocketException $error) {
+  assert!($error->getCode() == 1009);
+  $failed = true;
+}
+
+assert!($failed);
+
+$oversizedMessage = WebSocketCodec::server(4, 4);
+$oversizedMessage->push(
+  "\x01\x83\x01\x02\x03\x04\x69\x67\x6f" . "\x80\x82\x05\x06\x07\x08\x69\x69",
+);
+
+$failed = false;
+try {
+  $oversizedMessage->nextEvent();
+} catch (WebSocketException $error) {
+  assert!($error->getCode() == 1009);
+  $failed = true;
+}
+
+assert!($failed);
+
+$invalidClose = WebSocketCodec::server(1024, 1024);
+$failed = false;
+try {
+  $invalidClose->close(1010, 'client only');
+} catch (WebSocketException $error) {
+  assert!($error->getCode() == 1002);
+  $failed = true;
+}
+
+assert!($failed);
+
+$truncated = WebSocketCodec::server(1024, 1024);
+$truncated->finishInput();
+$failed = false;
+try {
+  $truncated->nextEvent();
+} catch (WebSocketException $error) {
+  assert!($error->getCode() == 1002);
+  $failed = true;
+}
+
+assert!($failed);

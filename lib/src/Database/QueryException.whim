@@ -1,0 +1,4 @@
+namespace Whim\Database;
+
+/** Reports a database query failure. */
+class QueryException extends Exception {}

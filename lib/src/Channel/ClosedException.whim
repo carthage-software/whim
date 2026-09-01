@@ -1,0 +1,4 @@
+namespace Whim\Channel;
+
+/** Thrown when an operation requires an open channel. */
+final class ClosedException extends Exception {}

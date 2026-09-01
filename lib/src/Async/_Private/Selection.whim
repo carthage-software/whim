@@ -1,0 +1,6 @@
+namespace Whim\Async\_Private;
+
+/** Keeps simultaneous future selection fair across calls. */
+final abstract class Selection {
+  public static int $offset = 0;
+}

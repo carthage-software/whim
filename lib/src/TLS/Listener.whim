@@ -1,0 +1,16 @@
+namespace Whim\TLS;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Endpoint;
+use Whim\Network\Listener as NetworkListener;
+
+/** A listener that completes TLS before yielding each stream. */
+interface Listener<out TEndpoint: Endpoint> extends NetworkListener<TEndpoint> {
+  #[MustUse]
+  #[TrackCaller]
+  public function accept(
+    null|CancellationToken $cancellation = null,
+  ): Stream<TEndpoint>;
+}

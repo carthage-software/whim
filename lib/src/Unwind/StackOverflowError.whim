@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports exhaustion of the virtual machine call stack. */
+#[Stub]
+class StackOverflowError extends Error {}

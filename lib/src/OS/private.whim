@@ -1,0 +1,92 @@
+namespace Whim\OS\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\Group;
+use Whim\OS\User;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\RuntimeException;
+use Whim\_Private\OSOperation;
+use Whim\_Private\SystemError;
+
+/** Returns the operating-system family used by the running engine. */
+#[AlwaysInline]
+function family(): string {
+  return match (Whim\_Private\OS) {
+    'macos' => 'Darwin',
+    'linux' => 'Linux',
+    'freebsd' | 'netbsd' | 'openbsd' | 'dragonfly' => 'BSD',
+    'solaris' | 'illumos' => 'Solaris',
+    $_ => 'Unknown',
+  };
+}
+
+/** Waits for one operating-system lookup with cancellation. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_operation(
+  OSOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  $cancellation?->throwIfCancellationRequested();
+  $registration = $cancellation?->register(fn(): void {
+    $operation->cancel();
+  });
+
+  try {
+    $operation->wait();
+    $cancellation?->throwIfCancellationRequested();
+  } finally {
+    $cancellation?->unregister($registration);
+  }
+}
+
+/** Converts an operating-system failure into public API context. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function failure(SystemError $error, string $action): never {
+  throw new RuntimeException(
+    'failed to ' . $action . ': ' . $error->getMessage(),
+    previous: $error,
+  );
+}
+
+/** Builds a public user from a trusted operating-system record. */
+#[AlwaysInline]
+function user_from_record(
+  ((string&!''), (0..), (0..), string, string) $record,
+): User {
+  ($name, $id, $primaryGroupId, $homeDirectory, $shell) = $record;
+  return new User(
+    $id,
+    $name,
+    $primaryGroupId,
+    non_empty($homeDirectory),
+    non_empty($shell),
+  );
+}
+
+/** Builds a public group from a trusted operating-system record. */
+#[AlwaysInline]
+function group_from_record(
+  ((string&!''), (0..), vec<(string&!'')>) $record,
+): Group {
+  ($name, $id, $memberNames) = $record;
+  return new Group($id, $name, $memberNames);
+}
+
+/** Converts an optional operating-system text field. */
+#[AlwaysInline]
+function non_empty(string $value): null|NonEmptyString {
+  if ($value == '') {
+    return null;
+  }
+
+  return $value as NonEmptyString;
+}

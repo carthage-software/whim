@@ -1,0 +1,495 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Str;
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\ArithmeticError;
+use Whim\Unwind\DivisionByZeroError;
+use Whim\Unwind\Error;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\TypeError;
+
+require!('_reject.whim');
+require!('_process.whim');
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$work = Filesystem\canonicalize(
+  Filesystem\create_temporary_directory(null, 'whim-test-'),
+);
+
+prints('hello-world', 'hello' . "\n");
+
+assert!(1 + 2 * 3 == 7);
+$assertion_value_3 = 10 / 2;
+assert!($assertion_value_3 == 5.0);
+assert!($assertion_value_3 is float);
+assert!(7 % 3 == 1);
+assert!(-7 % 3 == -1);
+assert!(2 ** 10 == 1024);
+assert!(2 ** -1 == 0.5);
+assert!(1.5 + 1 == 2.5);
+
+/** Accumulates a loop-invariant length across a counted loop. */
+function repeated_length(string $value): int {
+  $sum = 0;
+  for ($index = 0; $index < 7; $index++) {
+    $sum += length!($value);
+  }
+
+  return $sum;
+}
+
+assert!(repeated_length('hello') == 35);
+
+/** Updates its own counter inside the loop body before the loop step. */
+function advance(int $step): int {
+  for ($index = 0; $index < 10; $index++) {
+    $index += $step;
+  }
+
+  return $index;
+}
+
+assert!(advance(2) == 12);
+
+/** Samples a fused numeric loop that must keep float inputs live. */
+function sample(): string {
+  $output = '';
+  for ($row = 3; $row > 0; $row--) {
+    $imaginaryCoordinate = $row * 0.5 - 1.0;
+    for ($column = 0; $column < 5; $column++) {
+      $realCoordinate = $column * 0.5 - 2.0;
+      $real = $realCoordinate;
+      $imaginary = $imaginaryCoordinate;
+      $z = 0.0;
+      $upperZ = 0.0;
+      $iteration = 0;
+      while ($iteration < 50) {
+        $temporary = $z * $z - $upperZ * $upperZ + $real;
+        $upperZ = 2.0 * $z * $upperZ + $imaginary;
+        $z = $temporary;
+        if ($z * $z + $upperZ * $upperZ > 4.0) {
+          break;
+        }
+
+        $iteration++;
+      }
+
+      $output .= $iteration . ',';
+    }
+
+    $output .= ';';
+  }
+
+  return $output;
+}
+
+assert!(sample() == '0,2,4,50,50,;50,50,50,50,50,;0,2,4,50,50,;');
+
+$assertion_value_12 = fn(): int => 9223372036854775807 + 1;
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (OverflowError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_12->getMessage(),
+      'the integer result overflows the 64-bit range',
+    ),
+  );
+}
+
+assert!($assertion_error_12 is OverflowError);
+
+$assertion_value_13 = fn(): mixed => '5' + 5;
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (TypeError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_13->getMessage(),
+      'the + operator is not defined for string and int',
+    ),
+  );
+}
+
+assert!($assertion_error_13 is TypeError);
+
+rejects(
+  $work,
+  'non-bool-condition',
+  'if (1) { $x = 1; }' . "\n",
+  'a condition must be bool, int given',
+);
+
+function fib(int $n): int {
+  if ($n < 2) {
+    return $n;
+  }
+
+  return fib($n - 1) + fib($n - 2);
+}
+
+assert!(fib(10) == 55);
+
+$diving = $work . '/depth-limited.whim';
+File\write(
+  $diving,
+  'function dive(int $n): int { return dive($n + 1); }'
+  . "\n"
+  . 'try {'
+  . "\n"
+  . '    dive(0);'
+  . "\n"
+  . '} catch (Whim\Unwind\StackOverflowError $e) {'
+  . "\n"
+  . '    write_line!(\'too deep\');'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$limited = Command\Command::create($binary)
+  ->withArgument($diving)
+  ->withVariable('WHIM_CALL_DEPTH', '64')
+  ->run();
+
+assert!($limited->status is Command\Exited);
+assert!(($limited->status as Command\Exited)->code == 0);
+assert!(length!($limited->standardError) == 0);
+assert!($limited->standardOutput == 'too deep' . "\n");
+
+/** Pads text with a defaulted suffix filled by the prologue. */
+function pad(string $text, string $suffix = '!'): string {
+  return $text . $suffix;
+}
+
+assert!(pad('a') == 'a!');
+assert!(pad('b', '?') == 'b?');
+
+/** Requires two arguments so a one-argument call must raise. */
+function need(int $left, int $right): int {
+  return $left + $right;
+}
+
+$assertion_value_21 = fn(): int => need(1);
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (ArgumentCountError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_21->getMessage(),
+      'too few arguments to need: 1 given, at least 2 expected',
+    ),
+  );
+}
+
+assert!($assertion_error_21 is ArgumentCountError);
+
+$seed = 1;
+$closure = function(int $value) use ($seed): int {
+  return $value + $seed;
+};
+
+$seed = 100;
+assert!($closure(5) == 6);
+
+rejects(
+  $work,
+  'unassigned-variable',
+  'write_line!($ghost);' . "\n",
+  'the variable $ghost has not been assigned',
+);
+
+$log = '';
+try {
+  $log .= 'try;';
+} finally {
+  $log .= 'finally;';
+}
+
+try {
+  $x = 1 / 0;
+} catch (ArithmeticError $error) {
+  $log .= 'caught:' . $error->getMessage() . ';';
+} finally {
+  $log .= 'cleanup;';
+}
+
+assert!($log == 'try;finally;caught:division by zero;cleanup;');
+
+$log = '';
+try {
+  try {
+    $x = 1 % 0;
+  } finally {
+    $log .= 'inner finally;';
+  }
+} catch (DivisionByZeroError $_) {
+  $log .= 'outer caught;';
+}
+
+assert!($log == 'inner finally;outer caught;');
+
+$log = '';
+try {
+  try {
+    $x = 1 / 0;
+  } catch (DivisionByZeroError $error) {
+    throw $error;
+  }
+} catch (ArithmeticError $_) {
+  $log .= 'rethrown and caught;';
+}
+
+assert!($log == 'rethrown and caught;');
+
+/** Records observable events for function-scoped expectations. */
+final class Journal {
+  public string $entries = '';
+}
+
+/** Returns through a finally block that must record running first. */
+function tagged(Journal $journal): string {
+  try {
+    return 'value';
+  } finally {
+    $journal->entries .= 'finally first;';
+  }
+}
+
+$journal = new Journal();
+$result = tagged($journal);
+$journal->entries .= 'returned:' . $result . ';';
+assert!($journal->entries == 'finally first;returned:value;');
+
+$trace = $work . '/uncaught-trace.whim';
+File\write(
+  $trace,
+  'function boom(): int {'
+  . "\n"
+  . '    return 1 / 0;'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'boom();'
+  . "\n",
+);
+
+$run = Command\run($binary, vec[$trace]);
+assert!($run->status is Command\Exited);
+assert!(($run->status as Command\Exited)->code == 255);
+assert!(length!($run->standardOutput) == 0);
+$assertion_value_30 = $run->standardError;
+assert!(Whim\Str\contains($assertion_value_30, 'division by zero'));
+assert!(
+  Whim\Str\contains(
+    $assertion_value_30,
+    "\n" . ' 0  boom' . "\n" . '    ' . $trace . ':2',
+  ),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_30,
+    "\n" . ' 1  {main}' . "\n" . '    ' . $trace . ':4',
+  ),
+);
+
+$literal = $work . '/literal-frame.whim';
+File\write(
+  $literal,
+  'function boom(string $message): void {'
+  . "\n"
+  . '    throw new Whim\Unwind\Error($message);'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'boom(\'literal argument\');'
+  . "\n",
+);
+
+$run = Command\run($binary, vec[$literal]);
+assert!($run->status is Command\Exited);
+assert!(($run->status as Command\Exited)->code == 255);
+assert!(length!($run->standardOutput) == 0);
+$assertion_value_34 = $run->standardError;
+assert!(Whim\Str\contains($assertion_value_34, 'literal argument'));
+assert!(
+  Whim\Str\contains(
+    $assertion_value_34,
+    "\n"
+    . ' 0  boom called with (\'literal argument\')'
+    . "\n"
+    . '    '
+    . $literal
+    . ':2',
+  ),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_34,
+    "\n" . ' 1  {main}' . "\n" . '    ' . $literal . ':4',
+  ),
+);
+
+/** Hands its borrowed receiver back to the caller. */
+final class Box {
+  /** Returns the receiver itself. */
+  public function identity(): self {
+    return $this;
+  }
+}
+
+$box = new Box();
+$same = $box->identity();
+assert!($same == $box);
+
+try {
+  $divided = 1 / 0;
+} catch (Whim\Unwind\Error $error) {
+  assert!(Str\ends_with($error->getFile(), '/execute.whim'));
+  assert!($error->getLine() == 357);
+  assert!($error->getCode() == 0);
+}
+
+$exiting = $work . '/exit-without-finally.whim';
+File\write(
+  $exiting,
+  'try {'
+  . "\n"
+  . '    exit!(3);'
+  . "\n"
+  . '} finally {'
+  . "\n"
+  . '    write_line!(\'never\');'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$run = Command\run($binary, vec[$exiting]);
+assert!($run->status is Command\Exited);
+assert!(($run->status as Command\Exited)->code == 3);
+assert!(length!($run->standardOutput) == 0);
+assert!(length!($run->standardError) == 0);
+
+$asserting = $work . '/failed-assert.whim';
+File\write($asserting, 'assert!(false, \'boom\');' . "\n");
+$run = Command\run($binary, vec[$asserting]);
+assert!($run->status is Command\Exited);
+assert!(($run->status as Command\Exited)->code == 255);
+assert!(length!($run->standardOutput) == 0);
+$assertion_value_46 = $run->standardError;
+assert!(Whim\Str\contains($assertion_value_46, 'assertion failed: false'));
+assert!(Whim\Str\contains($assertion_value_46, 'message: boom'));
+
+$handmade = null;
+$assertion_callable_47 = function(): void {
+  throw new Error('handmade', 7);
+};
+
+try {
+  $assertion_callable_47();
+} catch (Error $assertion_caught_47) {
+  $handmade = $assertion_caught_47;
+  assert!(Whim\Str\contains($assertion_caught_47->getMessage(), 'handmade'));
+}
+
+assert!($handmade is Error);
+
+assert!($handmade->getCode() == 7);
+
+const GREETING = 'hi ' . 'there';
+
+assert!(GREETING == 'hi there');
+
+rejects(
+  $work,
+  'redeclared-name',
+  'function twice(): void {}' . "\n" . 'const twice = 1;' . "\n",
+  'the name twice is already declared',
+);
+
+/** Regression: a conditionally assigned addend must not hoist out of the loop. */
+function conditional_sum(int $count): int {
+  $total = 0;
+  $i = 0;
+  while ($i < $count) {
+    if ($i > 0) {
+      $x = 10;
+    } else {
+      $x = 20;
+    }
+
+    $total = $total + $x;
+    $i = $i + 1;
+  }
+
+  return $total;
+}
+
+assert!(conditional_sum(1) == 20);
+assert!(conditional_sum(2) == 30);
+assert!(conditional_sum(3) == 40);
+assert!(conditional_sum(4) == 50);
+
+/** Accumulates through a method whose inlining once dropped the write. */
+final class Accumulator {
+  public int $value = 0;
+
+  /** Adds an amount to the accumulated value. */
+  public function add(int $amount): void {
+    $this->value = $this->value + $amount;
+  }
+}
+
+/** Drives the accumulator through a branching loop. */
+function accumulate(int $count): int {
+  $accumulator = new Accumulator();
+  $i = 0;
+  while ($i < $count) {
+    if ($i > 0) {
+      $accumulator->add(2);
+    } else {
+      $accumulator->add(5);
+    }
+
+    $i = $i + 1;
+  }
+
+  return $accumulator->value;
+}
+
+assert!(accumulate(5) == 13);
+
+$never = $work . '/never-frame.whim';
+File\write($never, 'function stop(): never {}' . "\n" . 'stop();' . "\n");
+$run = Command\run($binary, vec[$never]);
+assert!($run->status is Command\Exited);
+assert!(($run->status as Command\Exited)->code == 255);
+assert!(length!($run->standardOutput) == 0);
+$assertion_value_58 = $run->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_58,
+    "\n" . ' 0  stop' . "\n" . '    ' . $never . ':1',
+  ),
+);
+
+assert!(
+  !Whim\Str\contains(
+    $assertion_value_58,
+    "\n" . ' 0  stop' . "\n" . '    ' . $never . ':0',
+  ),
+);
+
+Filesystem\delete_directory($work, true);

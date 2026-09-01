@@ -1,0 +1,21 @@
+namespace Whim\Command;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Everything a finished child produced. */
+final readonly class Output {
+  #[AlwaysInline]
+  public function __construct(
+    public readonly ExitStatus $status,
+    public readonly string $standardOutput,
+    public readonly string $standardError,
+  ) {}
+
+  /** Whether the child ended the way a successful program does. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isSuccess(): bool {
+    return $this->status->isSuccess();
+  }
+}

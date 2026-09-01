@@ -1,0 +1,99 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\InformationalStatusCode;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Context\Informational;
+use Whim\HTTP\Server\Context\Upgrade;
+use Whim\HTTP\Session\Session;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Endpoint;
+use Whim\Network\Stream;
+use Whim\Str;
+
+/** Implements the capabilities of one HTTP/1 request. */
+final class H1Context implements Context, Informational, Upgrade {
+  public dict<string, string> $parameters = dict[];
+  private vec<fn(): void> $responseCallbacks = vec[];
+  private null|Session $httpSession = null;
+  private null
+  | (fn(
+    Stream<_>,
+    ReadHandle,
+    WriteHandle,
+    CancellationToken,
+  ): void) $upgradeHandler = null;
+
+  public function __construct(
+    public readonly ProtocolVersion $protocolVersion,
+    public readonly Endpoint $localEndpoint,
+    public readonly Endpoint $peerEndpoint,
+    private Stream<_> $stream,
+    private CancellationToken $cancellation,
+  ) {}
+
+  public function getSession(): null|Session {
+    return $this->httpSession;
+  }
+
+  public function setSession(Session $session): void {
+    $this->httpSession = $session;
+  }
+
+  public function onResponseComplete(fn(): void $callback): void {
+    $this->responseCallbacks[] = $callback;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendInformationalResponse(
+    InformationalStatusCode $status,
+    FieldMap $headers = FieldMap::default(),
+  ): void {
+    if ($this->protocolVersion != ProtocolVersion::V11) {
+      return;
+    }
+
+    $head =
+      'HTTP/1.1 '
+      . $status
+      . ' '
+      . (Message\reason_phrase($status) ?? '')
+      . "\r\n";
+
+    foreach ($headers as ($name, $value)) {
+      $head .= Str\lowercase($name) . ': ' . $value . "\r\n";
+    }
+
+    $this->stream->writeAll($head . "\r\n", $this->cancellation);
+  }
+
+  public function upgrade(
+    fn(Stream<_>, ReadHandle, WriteHandle, CancellationToken): void $handler,
+  ): void {
+    $this->upgradeHandler = $handler;
+  }
+
+  public function takeUpgrade(
+  ): null|(fn(Stream<_>, ReadHandle, WriteHandle, CancellationToken): void) {
+    $handler = $this->upgradeHandler;
+    $this->upgradeHandler = null;
+    return $handler;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function completeResponse(): void {
+    $callbacks = $this->responseCallbacks;
+    $this->responseCallbacks = vec[];
+    foreach ($callbacks as $callback) {
+      $callback();
+    }
+  }
+}

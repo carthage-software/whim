@@ -1,0 +1,19 @@
+namespace Whim\SMTP;
+
+/** A standardized ESMTP capability. */
+enum Capability: string {
+  case Authentication = 'AUTH';
+  case BinaryMime = 'BINARYMIME';
+  case Chunking = 'CHUNKING';
+  case DeliverBy = 'DELIVERBY';
+  case DeliveryStatusNotification = 'DSN';
+  case EightBitMime = '8BITMIME';
+  case EnhancedStatusCodes = 'ENHANCEDSTATUSCODES';
+  case FutureRelease = 'FUTURERELEASE';
+  case MessageTransferPriority = 'MT-PRIORITY';
+  case Pipelining = 'PIPELINING';
+  case RequireTls = 'REQUIRETLS';
+  case Size = 'SIZE';
+  case SmtpUtf8 = 'SMTPUTF8';
+  case StartTls = 'STARTTLS';
+}

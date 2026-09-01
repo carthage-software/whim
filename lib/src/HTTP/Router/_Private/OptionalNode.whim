@@ -1,0 +1,22 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** An optional sequence within a route pattern. */
+final readonly class OptionalNode implements Node {
+  #[AlwaysInline]
+  public function __construct(public Pattern $pattern) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function expression(): string {
+    return '(?:' . $this->pattern->expression() . ')?';
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function parameterNames(): vec<string> {
+    return $this->pattern->parameterNames();
+  }
+}

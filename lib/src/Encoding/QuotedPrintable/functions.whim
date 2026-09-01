@@ -1,0 +1,32 @@
+namespace Whim\Encoding\QuotedPrintable;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Encodes bytes with quoted-printable transfer encoding. */
+#[AlwaysInline]
+#[MustUse]
+function encode(string $bytes, bool $binary = false): string {
+  return Whim\_Private\mime_quoted_printable_encode($bytes, $binary);
+}
+
+/**
+ * Decodes quoted-printable transfer encoding.
+ *
+ * @throws DecodingException when the input is not valid quoted-printable data.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(string $encoded, bool $strict = true): string {
+  $decoded = Whim\_Private\mime_quoted_printable_decode($encoded, $strict);
+  if ($decoded == null) {
+    throw new DecodingException('the input is not valid quoted-printable data');
+  }
+
+  return $decoded;
+}

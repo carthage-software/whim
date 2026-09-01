@@ -1,0 +1,211 @@
+namespace Whim\Network\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IO\FileDescriptorHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\ClosedException;
+use Whim\Network\Endpoint;
+use Whim\Network\ShutdownDirection;
+use Whim\OS\FileDescriptor;
+use Whim\Str;
+
+/** Shares descriptor-stream behavior across plain transports. */
+abstract class StreamImpl<TEndpoint: Endpoint> implements
+  Whim\Network\Stream<TEndpoint>,
+  FileDescriptorHandle {
+  private bool $reachedEnd = false;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  protected function __construct(
+    private FileDescriptor $descriptor,
+    private TEndpoint $localEndpoint,
+    private TEndpoint $peerEndpoint,
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    if ($this->descriptor->isClosed()) {
+      throw new ClosedException('the network stream is closed');
+    }
+
+    return $this->descriptor;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLocalEndpoint(): TEndpoint {
+    return $this->localEndpoint;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getPeerEndpoint(): TEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    wait_readable($this->getFileDescriptor(), $cancellation);
+  }
+
+  #[AlwaysInline]
+  public function reachedEndOfDataSource(): bool {
+    return $this->reachedEnd;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryRead(null|int $maxBytes = null): string {
+    $maximum = $maxBytes ?? 8192;
+    if ($maximum <= 0) {
+      return '';
+    }
+
+    try {
+      $bytes = Whim\_Private\read_descriptor(
+        $this->getFileDescriptor(),
+        $maximum,
+      );
+    } catch (Whim\_Private\SystemError $error) {
+      failure($error);
+    }
+
+    if ($bytes == null) {
+      return '';
+    }
+
+    if ($bytes == '') {
+      $this->reachedEnd = true;
+    }
+
+    return $bytes;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    $maximum = $maxBytes ?? 8192;
+    if ($maximum <= 0) {
+      return '';
+    }
+
+    $descriptor = $this->descriptor;
+    if ($descriptor->isClosed()) {
+      throw new ClosedException('the network stream is closed');
+    }
+
+    while (true) {
+      try {
+        $bytes = Whim\_Private\read_descriptor($descriptor, $maximum);
+      } catch (Whim\_Private\SystemError $error) {
+        failure($error);
+      }
+
+      if ($bytes == null) {
+        wait_readable($descriptor, $cancellation);
+        continue;
+      }
+
+      if ($bytes == '') {
+        $this->reachedEnd = true;
+      }
+
+      return $bytes;
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    wait_writable($this->getFileDescriptor(), $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryWrite(string $bytes): int {
+    try {
+      return Whim\_Private\write_descriptor($this->getFileDescriptor(), $bytes);
+    } catch (Whim\_Private\SystemError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    if ($bytes == '') {
+      return 0;
+    }
+
+    while (true) {
+      $written = $this->tryWrite($bytes);
+      if ($written > 0) {
+        return $written;
+      }
+
+      $this->waitUntilWritable($cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function writeAll(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $descriptor = $this->descriptor;
+    if ($descriptor->isClosed()) {
+      throw new ClosedException('the network stream is closed');
+    }
+
+    while ($bytes != '') {
+      try {
+        $written = Whim\_Private\write_descriptor($descriptor, $bytes);
+      } catch (Whim\_Private\SystemError $error) {
+        failure($error);
+      }
+
+      if ($written == 0) {
+        wait_writable($descriptor, $cancellation);
+        continue;
+      }
+
+      $bytes = Str\slice($bytes, $written);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {
+    try {
+      Whim\_Private\shutdown_socket(
+        $this->getFileDescriptor(),
+        $direction->value,
+      );
+    } catch (Whim\_Private\SystemError $error) {
+      failure($error);
+    }
+  }
+}

@@ -1,0 +1,89 @@
+namespace Whim\Result;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Option\Option;
+use Whim\Refine\Consumer;
+use Whim\Refine\Transform;
+
+/** Defines the behavior of result values. */
+interface Result<out T, out E> for Ok, Err {
+  /** Reports whether the result is successful. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isOk(): bool;
+
+  /** Reports whether the result is an error. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isErr(): bool;
+
+  /** Returns the contained success value or fails. */
+  #[MustUse]
+  #[TrackCaller]
+  public function unwrap(): T;
+
+  /** Returns the contained error value or fails. */
+  #[MustUse]
+  #[TrackCaller]
+  public function unwrapErr(): E;
+
+  /** Returns the contained value or the supplied default. */
+  #[MustUse]
+  #[TrackCaller]
+  public function unwrapOr<D>(D $default): T|D;
+
+  /** Returns the contained value or computes a fallback. */
+  #[MustUse]
+  #[TrackCaller]
+  public function unwrapOrElse<D>(Transform<E, D> $fallback): T|D;
+
+  /** Transforms the contained success value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function map<U>(Transform<T, U> $function): Result<U, E>;
+
+  /** Transforms the contained error value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function mapErr<F>(Transform<E, F> $function): Result<T, F>;
+
+  /** Transforms the contained value or returns a default. */
+  #[MustUse]
+  #[TrackCaller]
+  public function mapOr<U>(U $default, Transform<T, U> $function): U;
+
+  /** Chains another operation after a successful value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function andThen<U, F>(
+    Transform<T, Result<U, F>> $function,
+  ): Result<U, E|F>;
+
+  /** Recovers from an error or absent value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function orElse<V, F>(
+    Transform<E, Result<V, F>> $function,
+  ): Result<T|V, F>;
+
+  /** Returns the success value as an option. */
+  #[MustUse]
+  #[TrackCaller]
+  public function ok(): Option<T>;
+
+  /** Returns the error value as an option. */
+  #[MustUse]
+  #[TrackCaller]
+  public function err(): Option<E>;
+
+  /** Observes a contained success value without changing it. */
+  #[MustUse]
+  #[TrackCaller]
+  public function inspect(Consumer<T> $function): Result<T, E>;
+
+  /** Observes a contained error value without changing it. */
+  #[MustUse]
+  #[TrackCaller]
+  public function inspectErr(Consumer<E> $function): Result<T, E>;
+}

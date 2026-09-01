@@ -1,0 +1,202 @@
+namespace Whim\Async;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\_Private;
+use Whim\Refine\Transform;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Unwind\Throwable;
+use Whim\_Private\RingBuffer;
+use Whim;
+
+/** Represents a semaphore. */
+final class Semaphore<in Tin, out Tout> {
+  private int $ongoing = 0;
+  private RingBuffer<_Private\Waiter<null>> $pending;
+  private RingBuffer<_Private\Waiter<null>> $waits;
+
+  /** Creates a semaphore. */
+  #[TrackCaller]
+  public function __construct(
+    private readonly PositiveInt $concurrencyLimit,
+    private readonly Transform<Tin, Tout> $operation,
+  ) {
+    $this->pending = new RingBuffer::<_Private\Waiter<null>>();
+    $this->waits = new RingBuffer::<_Private\Waiter<null>>();
+  }
+
+  /** Runs an operation after acquiring a concurrency slot. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function waitFor(
+    Tin $input,
+    null|CancellationToken $cancellation = null,
+  ): Tout {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    $inherited = false;
+    if ($this->ongoing >= $this->concurrencyLimit) {
+      $suspension = Whim\_Private\create_suspension::<null>();
+      $waiter = new _Private\Waiter::<null>($suspension);
+
+      $this->pending->pushBack($waiter);
+      $id = null;
+      if ($cancellation != null) {
+        $id = $cancellation->register(fn(): void {
+          if (!$waiter->active) {
+            return;
+          }
+
+          $waiter->active = false;
+          try {
+            $cancellation->throwIfCancellationRequested();
+          } catch (Throwable $error) {
+            $waiter->suspension->throw($error);
+          }
+        });
+      }
+
+      try {
+        $suspension->suspend();
+        $inherited = true;
+      } finally {
+        $waiter->active = false;
+        if ($cancellation != null && $id != null) {
+          $cancellation->unregister($id);
+        }
+      }
+    }
+
+    if (!$inherited) {
+      $this->ongoing++;
+    }
+
+    try {
+      return ($this->operation)($input);
+    } finally {
+      $this->releaseSlot();
+    }
+  }
+
+  /** Cancels pending work. */
+  #[TrackCaller]
+  public function cancel(Throwable $error): void {
+    $pending = $this->pending;
+    $this->pending = new RingBuffer::<_Private\Waiter<null>>();
+    while (!$pending->isEmpty()) {
+      $waiter = $pending->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->throw($error);
+      }
+    }
+  }
+
+  /** Waits until a concurrency slot becomes available. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function waitForPending(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->ongoing < $this->concurrencyLimit) {
+      return;
+    }
+
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    $suspension = Whim\_Private\create_suspension::<null>();
+    $waiter = new _Private\Waiter::<null>($suspension);
+
+    $this->waits->pushBack($waiter);
+    $id = null;
+    if ($cancellation != null) {
+      $id = $cancellation->register(fn(): void {
+        if (!$waiter->active) {
+          return;
+        }
+
+        $waiter->active = false;
+        try {
+          $cancellation->throwIfCancellationRequested();
+        } catch (Throwable $error) {
+          $waiter->suspension->throw($error);
+        }
+      });
+    }
+
+    try {
+      $suspension->suspend();
+    } finally {
+      $waiter->active = false;
+      if ($cancellation != null && $id != null) {
+        $cancellation->unregister($id);
+      }
+    }
+  }
+
+  /** Returns the maximum number of concurrent operations. */
+  #[AlwaysInline]
+  public function getConcurrencyLimit(): PositiveInt {
+    return $this->concurrencyLimit;
+  }
+
+  /** Returns the number of running operations. */
+  #[TrackCaller]
+  public function getOngoingOperations(): NonNegativeInt {
+    return $this->ongoing as NonNegativeInt;
+  }
+
+  /** Returns the number of operations waiting for a slot. */
+  #[TrackCaller]
+  public function getPendingOperations(): NonNegativeInt {
+    $count = 0;
+    foreach ($this->pending->toVec() as $waiter) {
+      if ($waiter->active) {
+        $count++;
+      }
+    }
+
+    return $count as NonNegativeInt;
+  }
+
+  /** Reports whether an operation is currently running. */
+  #[AlwaysInline]
+  public function hasOngoingOperations(): bool {
+    return $this->ongoing != 0;
+  }
+
+  /** Reports whether an operation is waiting for a slot. */
+  #[TrackCaller]
+  public function hasPendingOperations(): bool {
+    return $this->getPendingOperations() != 0;
+  }
+
+  #[TrackCaller]
+  private function releaseSlot(): void {
+    while (!$this->pending->isEmpty()) {
+      $waiter = $this->pending->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+        return;
+      }
+    }
+
+    $this->ongoing--;
+    $waits = $this->waits;
+    $this->waits = new RingBuffer::<_Private\Waiter<null>>();
+    while (!$waits->isEmpty()) {
+      $waiter = $waits->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+      }
+    }
+  }
+}

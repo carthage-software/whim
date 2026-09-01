@@ -1,0 +1,241 @@
+namespace Whim\HTTP\Message;
+
+/** The 100 Continue status. */
+const STATUS_CONTINUE = 100;
+
+/** The 101 Switching Protocols status. */
+const STATUS_SWITCHING_PROTOCOLS = 101;
+
+/** The 102 Processing status. */
+const STATUS_PROCESSING = 102;
+
+/** The 103 Early Hints status. */
+const STATUS_EARLY_HINTS = 103;
+
+/** The 200 OK status. */
+const STATUS_OK = 200;
+
+/** The 201 Created status. */
+const STATUS_CREATED = 201;
+
+/** The 202 Accepted status. */
+const STATUS_ACCEPTED = 202;
+
+/** The 203 Non-Authoritative Information status. */
+const STATUS_NON_AUTHORITATIVE_INFORMATION = 203;
+
+/** The 204 No Content status. */
+const STATUS_NO_CONTENT = 204;
+
+/** The 205 Reset Content status. */
+const STATUS_RESET_CONTENT = 205;
+
+/** The 206 Partial Content status. */
+const STATUS_PARTIAL_CONTENT = 206;
+
+/** The 207 Multi-Status status. */
+const STATUS_MULTI_STATUS = 207;
+
+/** The 208 Already Reported status. */
+const STATUS_ALREADY_REPORTED = 208;
+
+/** The 226 IM Used status. */
+const STATUS_IM_USED = 226;
+
+/** The 300 Multiple Choices status. */
+const STATUS_MULTIPLE_CHOICES = 300;
+
+/** The 301 Moved Permanently status. */
+const STATUS_MOVED_PERMANENTLY = 301;
+
+/** The 302 Found status. */
+const STATUS_FOUND = 302;
+
+/** The 303 See Other status. */
+const STATUS_SEE_OTHER = 303;
+
+/** The 304 Not Modified status. */
+const STATUS_NOT_MODIFIED = 304;
+
+/** The 305 Use Proxy status. */
+const STATUS_USE_PROXY = 305;
+
+/** The 307 Temporary Redirect status. */
+const STATUS_TEMPORARY_REDIRECT = 307;
+
+/** The 308 Permanent Redirect status. */
+const STATUS_PERMANENT_REDIRECT = 308;
+
+/** The 400 Bad Request status. */
+const STATUS_BAD_REQUEST = 400;
+
+/** The 401 Unauthorized status. */
+const STATUS_UNAUTHORIZED = 401;
+
+/** The 402 Payment Required status. */
+const STATUS_PAYMENT_REQUIRED = 402;
+
+/** The 403 Forbidden status. */
+const STATUS_FORBIDDEN = 403;
+
+/** The 404 Not Found status. */
+const STATUS_NOT_FOUND = 404;
+
+/** The 405 Method Not Allowed status. */
+const STATUS_METHOD_NOT_ALLOWED = 405;
+
+/** The 406 Not Acceptable status. */
+const STATUS_NOT_ACCEPTABLE = 406;
+
+/** The 407 Proxy Authentication Required status. */
+const STATUS_PROXY_AUTHENTICATION_REQUIRED = 407;
+
+/** The 408 Request Timeout status. */
+const STATUS_REQUEST_TIMEOUT = 408;
+
+/** The 409 Conflict status. */
+const STATUS_CONFLICT = 409;
+
+/** The 410 Gone status. */
+const STATUS_GONE = 410;
+
+/** The 411 Length Required status. */
+const STATUS_LENGTH_REQUIRED = 411;
+
+/** The 412 Precondition Failed status. */
+const STATUS_PRECONDITION_FAILED = 412;
+
+/** The 413 Content Too Large status. */
+const STATUS_CONTENT_TOO_LARGE = 413;
+
+/** The 414 URI Too Long status. */
+const STATUS_URI_TOO_LONG = 414;
+
+/** The 415 Unsupported Media Type status. */
+const STATUS_UNSUPPORTED_MEDIA_TYPE = 415;
+
+/** The 416 Range Not Satisfiable status. */
+const STATUS_RANGE_NOT_SATISFIABLE = 416;
+
+/** The 417 Expectation Failed status. */
+const STATUS_EXPECTATION_FAILED = 417;
+
+/** The 418 I'm a Teapot status. */
+const STATUS_IM_A_TEAPOT = 418;
+
+/** The 421 Misdirected Request status. */
+const STATUS_MISDIRECTED_REQUEST = 421;
+
+/** The 422 Unprocessable Content status. */
+const STATUS_UNPROCESSABLE_CONTENT = 422;
+
+/** The 423 Locked status. */
+const STATUS_LOCKED = 423;
+
+/** The 424 Failed Dependency status. */
+const STATUS_FAILED_DEPENDENCY = 424;
+
+/** The 425 Too Early status. */
+const STATUS_TOO_EARLY = 425;
+
+/** The 426 Upgrade Required status. */
+const STATUS_UPGRADE_REQUIRED = 426;
+
+/** The 428 Precondition Required status. */
+const STATUS_PRECONDITION_REQUIRED = 428;
+
+/** The 429 Too Many Requests status. */
+const STATUS_TOO_MANY_REQUESTS = 429;
+
+/** The 431 Request Header Fields Too Large status. */
+const STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE = 431;
+
+/** The 451 Unavailable For Legal Reasons status. */
+const STATUS_UNAVAILABLE_FOR_LEGAL_REASONS = 451;
+
+/** The 500 Internal Server Error status. */
+const STATUS_INTERNAL_SERVER_ERROR = 500;
+
+/** The 501 Not Implemented status. */
+const STATUS_NOT_IMPLEMENTED = 501;
+
+/** The 502 Bad Gateway status. */
+const STATUS_BAD_GATEWAY = 502;
+
+/** The 503 Service Unavailable status. */
+const STATUS_SERVICE_UNAVAILABLE = 503;
+
+/** The 504 Gateway Timeout status. */
+const STATUS_GATEWAY_TIMEOUT = 504;
+
+/** The 505 HTTP Version Not Supported status. */
+const STATUS_HTTP_VERSION_NOT_SUPPORTED = 505;
+
+/** The 506 Variant Also Negotiates status. */
+const STATUS_VARIANT_ALSO_NEGOTIATES = 506;
+
+/** The 507 Insufficient Storage status. */
+const STATUS_INSUFFICIENT_STORAGE = 507;
+
+/** The 508 Loop Detected status. */
+const STATUS_LOOP_DETECTED = 508;
+
+/** The 510 Not Extended status. */
+const STATUS_NOT_EXTENDED = 510;
+
+/** The 511 Network Authentication Required status. */
+const STATUS_NETWORK_AUTHENTICATION_REQUIRED = 511;
+
+/** The GET method. */
+const METHOD_GET = 'GET';
+
+/** The HEAD method. */
+const METHOD_HEAD = 'HEAD';
+
+/** The POST method. */
+const METHOD_POST = 'POST';
+
+/** The PUT method. */
+const METHOD_PUT = 'PUT';
+
+/** The DELETE method. */
+const METHOD_DELETE = 'DELETE';
+
+/** The CONNECT method. */
+const METHOD_CONNECT = 'CONNECT';
+
+/** The OPTIONS method. */
+const METHOD_OPTIONS = 'OPTIONS';
+
+/** The TRACE method. */
+const METHOD_TRACE = 'TRACE';
+
+/** The PATCH method. */
+const METHOD_PATCH = 'PATCH';
+
+/** The COPY method. */
+const METHOD_COPY = 'COPY';
+
+/** The MOVE method. */
+const METHOD_MOVE = 'MOVE';
+
+/** The LOCK method. */
+const METHOD_LOCK = 'LOCK';
+
+/** The UNLOCK method. */
+const METHOD_UNLOCK = 'UNLOCK';
+
+/** The REPORT method. */
+const METHOD_REPORT = 'REPORT';
+
+/** The MERGE method. */
+const METHOD_MERGE = 'MERGE';
+
+/** The SEARCH method. */
+const METHOD_SEARCH = 'SEARCH';
+
+/** The QUERY method. */
+const METHOD_QUERY = 'QUERY';
+
+/** The PURGE method. */
+const METHOD_PURGE = 'PURGE';

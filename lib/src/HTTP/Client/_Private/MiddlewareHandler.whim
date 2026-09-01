@@ -1,0 +1,38 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\Handler;
+use Whim\HTTP\Client\Middleware;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Adds one middleware layer to a handler. */
+final readonly class MiddlewareHandler implements Handler {
+  #[AlwaysInline]
+  public function __construct(
+    private Middleware $middleware,
+    private Handler $next,
+  ) {}
+
+  #[MustUse]
+  #[TrackCaller]
+  public function handle(
+    Connection $connection,
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    return $this->middleware->process(
+      $connection,
+      $request,
+      $configuration,
+      $this->next,
+      $cancellation,
+    );
+  }
+}

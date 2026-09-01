@@ -1,0 +1,41 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\SettingId;
+use Whim\HTTP\_Private\SettingValue;
+
+/** Seeds stream one for an HTTP/1.1 to HTTP/2 upgrade. */
+function accept_upgrade_request(
+  State $state,
+  vec<Header> $headers,
+  dict<SettingId, SettingValue> $settings,
+): vec<Event\WeakendEvent> {
+  if ($state->role != Role::Server || $state->lastPeerStreamId != 0) {
+    throw new H2\ProtocolException(
+      'an HTTP/2 upgrade must be the first server request',
+    );
+  }
+
+  $settingsEvent = apply_remote_settings($state, $settings);
+
+  $contentLength = HeaderValidator::validate(
+    1,
+    $headers,
+    Role::Server,
+    false,
+    false,
+    extended_connect_enabled($state, true),
+  );
+
+  $entry = open_peer_stream($state, 1);
+  $entry->receivedInitialHeaders = true;
+  $entry->requestMethod = HeaderValidator::requestMethod(1, $headers);
+  $entry->expectedContentLength = $contentLength;
+  $entry->receivedContentLength = $contentLength ?? 0;
+  discard!(end_remote($state, 1, $entry));
+
+  return vec[$settingsEvent, (2, 1, $headers, true, false, false)];
+}

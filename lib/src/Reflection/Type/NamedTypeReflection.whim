@@ -1,0 +1,37 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Member\ClassConstantReflection;
+use Whim\Reflection\Member\EnumCaseReflection;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Reflection\Symbol\SymbolReflection;
+
+/** Describes a type that names a symbol or class-like member. */
+#[Stub]
+interface NamedTypeReflection extends
+  TypeReflection for
+  ClassTypeReflection,
+  SymbolTypeReflection,
+  MemberTypeReflection {
+  /** Returns the declaration named by this type. */
+  #[MustUse]
+  public function getDeclaration(
+  ): SymbolReflection
+  | MethodReflection
+  | ClassConstantReflection
+  | EnumCaseReflection;
+
+  /** Returns arguments for the named declaration's own type parameters. */
+  #[MustUse]
+  public function getTypeArguments(): vec<TypeReflection>;
+
+  /** Returns all bindings implied by this named specialization. */
+  #[MustUse]
+  public function getTypeEnvironment(): TypeEnvironmentReflection;
+
+  /** Reports whether this reference closes a recursive type-alias cycle. */
+  #[MustUse]
+  public function isRecursiveReference(): bool;
+}

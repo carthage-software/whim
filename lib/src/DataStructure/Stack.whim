@@ -1,0 +1,80 @@
+namespace Whim\DataStructure;
+
+use Whim\Iterate\ToIterator;
+use Whim\Iterate\ArrayIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonNegativeInt;
+use Whim\Vec;
+
+/** Stores values in last-in, first-out order. */
+final class Stack<T> implements ToIterator<int, T> {
+  private vec<T> $values = vec[];
+
+  /** Creates a stack by pushing the yielded values in order. */
+  #[TrackCaller]
+  public function __construct(Iterable<_, T> $values = vec[]) {
+    foreach ($values as $value) {
+      $this->values[] = $value;
+    }
+  }
+
+  /** Adds a value to the top. */
+  #[AlwaysInline]
+  public function push(T $value): void {
+    $this->values[] = $value;
+  }
+
+  /** Removes and returns the top value. */
+  #[AlwaysInline]
+  public function pop(): Option<T> {
+    if (length!($this->values) == 0) {
+      return new None();
+    }
+
+    return new Some::<T>(remove_last!($this->values));
+  }
+
+  /** Returns the top value without removing it. */
+  #[AlwaysInline]
+  public function peek(): Option<T> {
+    $count = length!($this->values);
+    if ($count == 0) {
+      return new None();
+    }
+
+    return new Some::<T>($this->values[$count - 1]);
+  }
+
+  /** Returns the number of stored values. */
+  #[AlwaysInline]
+  public function count(): NonNegativeInt {
+    return length!($this->values);
+  }
+
+  /** Reports whether the stack contains no values. */
+  #[AlwaysInline]
+  public function isEmpty(): bool {
+    return length!($this->values) == 0;
+  }
+
+  /** Removes every stored value. */
+  #[AlwaysInline]
+  public function clear(): void {
+    $this->values = vec[];
+  }
+
+  /** Returns the values from top to bottom. */
+  public function toVec(): vec<T> {
+    return Vec\reverse::<T>($this->values);
+  }
+
+  /** Creates a snapshot iterator from top to bottom. */
+  public function toIterator(): ArrayIterator<int, T> {
+    return new ArrayIterator::<int, T>($this->toVec());
+  }
+}

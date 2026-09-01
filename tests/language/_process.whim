@@ -1,0 +1,42 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\Refine\NonEmptyString;
+
+require_once!('_files.whim');
+
+function prints(
+  string $fixture,
+  string $output,
+  dict<NonEmptyString, string> $variables = dict[],
+): void {
+  $run = Command\Command::create(interpreter())
+    ->withArgument(beside('_process/' . $fixture . '.whim'))
+    ->withVariables($variables)
+    ->run();
+
+  assert!(length!($run->standardError) == 0);
+  assert!($run->isSuccess());
+  assert!($run->standardOutput == $output);
+}
+
+/**
+ * Runs a persisted fixture in a child interpreter and expects it to end with
+ * the given diagnostic. For what only a whole process can show: an error
+ * raised after the top level has finished.
+ */
+function fails(string $fixture, string $error): void {
+  $run = Command\run(
+    interpreter(),
+    vec[beside('_process/' . $fixture . '.whim')],
+  );
+
+  assert!(!($run->isSuccess()));
+  assert!(Whim\Str\contains($run->standardError, $error));
+}
+
+/** The interpreter running this test. */
+function interpreter(): string {
+  $binary = Env\current_binary();
+  assert!($binary is string);
+  return $binary;
+}

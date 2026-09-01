@@ -1,0 +1,376 @@
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\LinkerError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_declarations-inheritance/mutable-extends-readonly.whim',
+  'so it must be readonly too',
+);
+
+raises(
+  '_declarations-inheritance/readonly-extends-mutable.whim',
+  'cannot extend A, which is not readonly',
+);
+
+raises(
+  '_declarations-inheritance/readonly-property-write.whim',
+  'readonly property',
+);
+
+raises(
+  '_declarations-inheritance/added-required-parameter.whim',
+  'may not demand more',
+);
+
+raises(
+  '_declarations-inheritance/narrow-visibility.whim',
+  'may only widen visibility',
+);
+
+raises(
+  '_declarations-inheritance/override-final.whim',
+  'final and cannot be overridden',
+);
+
+raises(
+  '_declarations-inheritance/static-mismatch.whim',
+  'is static and the inherited method is not',
+);
+
+raises(
+  '_declarations-inheritance/abstract-method-in-a-concrete-class.whim',
+  'an abstract method may appear only in an abstract class',
+);
+
+raises(
+  '_declarations-inheritance/concrete-inherits-abstract.whim',
+  'is not abstract and does not implement m',
+);
+
+raises(
+  '_declarations-inheritance/extends-a-final-class.whim',
+  'cannot extend the final class',
+);
+
+raises(
+  '_declarations-inheritance/instantiate-an-abstract-class.whim',
+  'cannot instantiate Shape',
+);
+
+raises(
+  '_declarations-inheritance/two-base-classes.whim',
+  'a class extends at most one base class',
+);
+
+raises(
+  '_declarations-inheritance/base-arguments-on-non-generic.whim',
+  'to I, which is not generic',
+);
+
+raises(
+  '_declarations-inheritance/base-type-argument-arity.whim',
+  'supplies 2 type argument(s) to Box, which takes exactly 1',
+);
+
+raises(
+  '_declarations-inheritance/property-type-invariance.whim',
+  'property types are invariant',
+);
+
+raises(
+  '_declarations-inheritance/readonly-property-cannot-become-writable.whim',
+  'cannot redeclare readonly inherited property',
+);
+
+raises(
+  '_declarations-inheritance/writable-property-cannot-become-readonly.whim',
+  'cannot redeclare writable inherited property',
+);
+
+raises(
+  '_declarations-inheritance/constant-over-inherited-method.whim',
+  'declares the constant value, but already has a method of that name',
+);
+
+raises(
+  '_declarations-inheritance/method-over-inherited-constant.whim',
+  'declares the method value, but already has a constant of that name',
+);
+
+raises(
+  '_declarations-inheritance/interface-member-kind-conflict.whim',
+  'inherits a constant named value, but also inherits a method of that name',
+);
+
+$assertion_value_1 = function(): void {
+  require!('_declarations-inheritance/incompatible-constant.whim');
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (LinkerError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is LinkerError);
+
+$assertion_value_2 = function(): void {
+  require!('_declarations-inheritance/cyclic-interfaces.whim');
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (LinkerError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_2->getMessage(),
+      'the interface Left participates in cyclic inheritance',
+    ),
+  );
+}
+
+assert!($assertion_error_2 is LinkerError);
+
+$assertion_value_3 = function(): void {
+  require!('_declarations-inheritance/private-method-narrows.whim');
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (LinkerError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is LinkerError);
+
+$assertion_value_4 = function(): void {
+  require!('_declarations-inheritance/sealed-both-subclasses.whim');
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (CompilerError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is CompilerError);
+
+class BroadConstant {
+  public const int|string VALUE = 1;
+}
+
+class NarrowConstant extends BroadConstant {
+  public const int VALUE = 2;
+}
+
+assert!(NarrowConstant::VALUE == 2);
+
+class ExemptBase {
+  public function __construct(public int $id) {}
+}
+
+class ExemptUser extends ExemptBase {
+  public function __construct(int $id, public string $name) {
+    parent::__construct($id);
+  }
+}
+
+$user = new ExemptUser(7, 'ada');
+assert!($user->id == 7);
+assert!($user->name == 'ada');
+
+class ScopedBase {
+  private string $x = 'A';
+
+  public function fromBase(): string {
+    return $this->x;
+  }
+}
+
+class ScopedChild extends ScopedBase {
+  private string $x = 'B';
+
+  public function fromChild(): string {
+    return $this->x;
+  }
+}
+
+$scoped = new ScopedChild();
+assert!($scoped->fromBase() == 'A');
+assert!($scoped->fromChild() == 'B');
+
+abstract class ParentFactory {
+  abstract public static function make(): static;
+}
+
+final class ChildFactory extends ParentFactory {
+  public static function make(): self {
+    return new self();
+  }
+}
+
+assert!(ChildFactory::make() is ChildFactory);
+
+abstract class ProtectedDispatchParent {
+  public function value(): int {
+    return $this->implementation();
+  }
+
+  protected function implementation(): int {
+    return 1;
+  }
+}
+
+final class InheritedProtectedDispatch extends ProtectedDispatchParent {}
+
+final class OverriddenProtectedDispatch extends ProtectedDispatchParent {
+  protected function implementation(): int {
+    return 2;
+  }
+}
+
+assert!(new InheritedProtectedDispatch()->value() == 1);
+assert!(new OverriddenProtectedDispatch()->value() == 2);
+
+class ShadowMethodParent {
+  private function value(): int {
+    return 1;
+  }
+
+  public function parentValue(): int {
+    return $this->value();
+  }
+}
+
+class ShadowMethodChild extends ShadowMethodParent {
+  private function value(): int {
+    return 2;
+  }
+
+  public function childValue(): int {
+    return $this->value();
+  }
+}
+
+class ShadowMethodPublicChild extends ShadowMethodParent {
+  public function value(string $value): string {
+    return $value;
+  }
+}
+
+$shadowChild = new ShadowMethodChild();
+assert!($shadowChild->parentValue() == 1);
+assert!($shadowChild->childValue() == 2);
+
+$shadowPublic = new ShadowMethodPublicChild();
+assert!($shadowPublic->parentValue() == 1);
+assert!($shadowPublic->value('child') == 'child');
+
+class ShadowPropertyParent {
+  private int $value = 10;
+
+  public function value(): int {
+    return $this->value;
+  }
+}
+
+class ShadowPropertyChild extends ShadowPropertyParent {
+  public string $value = 'child';
+}
+
+$shadowProperty = new ShadowPropertyChild();
+assert!($shadowProperty->value == 'child');
+assert!($shadowProperty->value() == 10);
+
+$shadowProperty->value = 'updated';
+assert!($shadowProperty->value == 'updated');
+assert!($shadowProperty->value() == 10);
+
+class RedeclaredBase {
+  public readonly int $id;
+
+  public function __construct(int $id) {
+    $this->id = $id;
+  }
+}
+
+class RedeclaredChild extends RedeclaredBase {
+  public readonly int $id;
+}
+
+$redeclared = new RedeclaredChild(5);
+assert!($redeclared->id == 5);
+
+class PromotedBase {
+  public function __construct(public readonly int $id) {}
+}
+
+class PromotedChild extends PromotedBase {
+  public readonly int $id;
+}
+
+$promoted = new PromotedChild(6);
+assert!($promoted->id == 6);
+
+abstract class SealedEvent for SealedLogin {}
+
+class SealedLogin extends SealedEvent {}
+
+class SealedDetailedLogin extends SealedLogin {}
+
+assert!(new SealedLogin() is SealedEvent);
+assert!(new SealedDetailedLogin() is SealedEvent);
+
+$assertion_value_25 = function(): void {
+  require!('_declarations-inheritance/sealed-rogue.whim');
+};
+
+$assertion_error_25 = null;
+try {
+  $assertion_value_25();
+} catch (LinkerError $assertion_caught_25) {
+  $assertion_error_25 = $assertion_caught_25;
+}
+
+assert!($assertion_error_25 is LinkerError);
+
+interface SealedShape for SealedPolygon {}
+
+abstract class SealedPolygon implements SealedShape for SealedQuad {}
+
+final class SealedQuad extends SealedPolygon {}
+
+assert!(new SealedQuad() is SealedPolygon);
+assert!(new SealedQuad() is SealedShape);
+
+$assertion_value_28 = function(): void {
+  require!('_declarations-inheritance/sealed-rogue-shape.whim');
+};
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (LinkerError $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is LinkerError);
+
+$assertion_value_29 = function(): void {
+  require!('_declarations-inheritance/sealed-rogue-polygon.whim');
+};
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (LinkerError $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is LinkerError);

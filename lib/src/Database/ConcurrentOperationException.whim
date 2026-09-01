@@ -1,0 +1,4 @@
+namespace Whim\Database;
+
+/** Raised when a connection receives overlapping operations. */
+final class ConcurrentOperationException extends ConnectionException {}

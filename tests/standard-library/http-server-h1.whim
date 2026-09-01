@@ -1,0 +1,494 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Context\Informational;
+use Whim\HTTP\Server\Handler\FunctionHandler;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\_Private\H1Driver;
+use Whim\IP\Address;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\ShutdownDirection;
+use Whim\Network\Stream;
+use Whim\Str;
+use Whim\Unwind\RuntimeException;
+
+final class HTTPServerH1ParityStream implements Stream<InternetEndpoint> {
+  private int $offset = 0;
+  private bool $closed = false;
+  public string $written = '';
+
+  public function __construct(
+    private string $incoming,
+    private InternetEndpoint $localEndpoint,
+    private InternetEndpoint $peerEndpoint,
+  ) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->offset >= length!($this->incoming);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->reachedEndOfDataSource()) {
+      return '';
+    }
+
+    $length = length!($this->incoming) - $this->offset;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->incoming, $this->offset, $length);
+    $this->offset += $length;
+    return $data;
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    $this->written .= $bytes;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return $this->tryWrite($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class HTTPServerH1ParityState {
+  public int $calls = 0;
+  public vec<string> $targets = vec[];
+  public vec<string> $bodies = vec[];
+  public null|Request $request = null;
+  public null|string $trailer = null;
+  public int $completed = 0;
+}
+
+final class HTTPServerH1FailingBody implements ReadHandle {
+  private int $reads = 0;
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return false;
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    return '';
+  }
+
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    $cancellation?->throwIfCancellationRequested();
+    $this->reads++;
+    if ($this->reads == 1) {
+      return 'partial';
+    }
+
+    throw new RuntimeException('response body failed');
+  }
+}
+
+function http_server_h1_serve(
+  string $request,
+  Handler $handler,
+  Configuration $configuration = new Configuration(),
+): HTTPServerH1ParityStream {
+  $stream = new HTTPServerH1ParityStream(
+    $request,
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+  );
+
+  new H1Driver()->serve(
+    $stream,
+    false,
+    $handler,
+    $configuration,
+    new SignalCancellationToken(),
+    new SignalCancellationToken(),
+  );
+
+  return $stream;
+}
+
+function http_server_h1_ok_handler(
+  null|HTTPServerH1ParityState $state = null,
+): Handler {
+  return new FunctionHandler(
+    function(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ) use ($state): Response {
+      if ($state != null) {
+        $state->calls++;
+        $state->targets[] = $request->requestTarget;
+        $state->request = $request;
+        $state->bodies[] = $request->body?->readAll() ?? '';
+      }
+
+      return new Response(
+        200,
+        headers: FieldMap::from(vec[('Content-Length', '2')]),
+        body: new MemoryHandle('ok'),
+      );
+    },
+  );
+}
+
+function http_server_h1_status(string $response, int $status): bool {
+  return (
+    Str\starts_with($response, 'HTTP/1.1 ' . $status . ' ')
+    || Str\starts_with($response, 'HTTP/1.0 ' . $status . ' ')
+  );
+}
+
+function http_server_h1_body(string $response): string {
+  $separator = Str\search($response, "\r\n\r\n");
+  if ($separator == null) {
+    return '';
+  }
+
+  return Str\slice($response, $separator + 4);
+}
+
+$state = new HTTPServerH1ParityState();
+$response = http_server_h1_serve(
+  "GET /search?q=hello&lang=en HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  http_server_h1_ok_handler($state),
+);
+
+assert!(http_server_h1_status($response->written, 200), $response->written);
+assert!($state->targets == vec['/search?q=hello&lang=en']);
+assert!(
+  $state->request?->url?->toString()
+  == 'http://example.com/search?q=hello&lang=en',
+);
+
+assert!(Str\search($response->written, 'date: ') != null);
+
+$asterisk = http_server_h1_serve(
+  "OPTIONS * HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  http_server_h1_ok_handler(),
+);
+
+assert!(http_server_h1_status($asterisk->written, 200));
+
+foreach (vec[
+  "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: hello\r\n\r\n",
+  "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: -1\r\n\r\n",
+  "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5\r\nContent-Length: 10\r\n\r\nhello",
+] as $invalidLength) {
+  $invalid = http_server_h1_serve($invalidLength, http_server_h1_ok_handler());
+  assert!(http_server_h1_status($invalid->written, 400));
+}
+
+$sameLengths = new HTTPServerH1ParityState();
+$sameLengthsResponse = http_server_h1_serve(
+  "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5, 5\r\nConnection: close\r\n\r\nhello",
+  http_server_h1_ok_handler($sameLengths),
+);
+
+assert!(http_server_h1_status($sameLengthsResponse->written, 200));
+assert!($sameLengths->bodies == vec['hello']);
+
+$chunkedState = new HTTPServerH1ParityState();
+$chunked = http_server_h1_serve(
+  "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 999\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5;name=value\r\nhello\r\n1\r\n \r\n5\r\nworld\r\n0\r\n\r\n",
+  http_server_h1_ok_handler($chunkedState),
+);
+
+assert!(http_server_h1_status($chunked->written, 200));
+assert!($chunkedState->bodies == vec['hello world']);
+
+foreach (vec[
+  "ZZZ\r\nhello\r\n0\r\n\r\n",
+  "\r\nhello\r\n0\r\n\r\n",
+  "-5\r\nhello\r\n0\r\n\r\n",
+  "5;\x00evil\r\nhello\r\n0\r\n\r\n",
+  '5;' . Str\join('', vec['x'; 4097]) . "\r\nhello\r\n0\r\n\r\n",
+] as $invalidChunks) {
+  $invalid = http_server_h1_serve(
+    "POST / HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n"
+    . $invalidChunks,
+    http_server_h1_ok_handler(),
+  );
+
+  assert!(http_server_h1_status($invalid->written, 400));
+}
+
+$badCoding = http_server_h1_serve(
+  "POST / HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked, gzip\r\n\r\n0\r\n\r\n",
+  http_server_h1_ok_handler(),
+);
+
+assert!(http_server_h1_status($badCoding->written, 400));
+
+foreach (vec[
+  "GET / HTTP/1.1\r\nHost: \r\n\r\n",
+  "GET / HTTP/1.1\r\nHost: a.example\r\nHost: b.example\r\n\r\n",
+  "GET / HTTP/1.1\r\nHost: bad host\r\n\r\n",
+  "GET / HTTP/1.1\r\nHost: example.com\r\nBad Header: value\r\n\r\n",
+  "GET / HTTP/1.1\r\nHost: example.com\r\nBad[Name]: value\r\n\r\n",
+  "GET /foo\tbar HTTP/1.1\r\nHost: example.com\r\n\r\n",
+  "GET /foo\x00bar HTTP/1.1\r\nHost: example.com\r\n\r\n",
+] as $malformedRequest) {
+  $invalid = http_server_h1_serve(
+    $malformedRequest,
+    http_server_h1_ok_handler(),
+  );
+
+  assert!(http_server_h1_status($invalid->written, 400));
+}
+
+$tooLarge = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nX-Large: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\r\n\r\n",
+  http_server_h1_ok_handler(),
+  new Configuration(maximumHeaderSize: 128),
+);
+
+assert!(http_server_h1_status($tooLarge->written, 431));
+
+$unknownExpectation = http_server_h1_serve(
+  "POST / HTTP/1.1\r\nHost: example.com\r\nExpect: something-weird\r\nContent-Length: 5\r\n\r\nhello",
+  http_server_h1_ok_handler(),
+);
+
+assert!(http_server_h1_status($unknownExpectation->written, 417));
+
+$continuedState = new HTTPServerH1ParityState();
+$continued = http_server_h1_serve(
+  "POST / HTTP/1.1\r\nHost: example.com\r\nExpect: 100-continue\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello",
+  http_server_h1_ok_handler($continuedState),
+);
+
+assert!(Str\starts_with($continued->written, "HTTP/1.1 100 Continue\r\n\r\n"));
+assert!(Str\search($continued->written, 'HTTP/1.1 200 OK') != null);
+assert!($continuedState->bodies == vec['hello']);
+
+$informational = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  new FunctionHandler(
+    function(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response {
+      if ($context is Informational) {
+        $context->sendInformationalResponse(
+          103,
+          FieldMap::from(vec[('Link', '</style.css>; rel=preload')]),
+        );
+      }
+
+      return new Response(204);
+    },
+  ),
+);
+
+assert!(Str\starts_with($informational->written, 'HTTP/1.1 103 Early Hints'));
+assert!(Str\search($informational->written, 'HTTP/1.1 204 No Content') != null);
+
+$invalidFinal = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => new Response(101),
+  ),
+);
+
+assert!(http_server_h1_status($invalidFinal->written, 500));
+
+$head = http_server_h1_serve(
+  "HEAD / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  http_server_h1_ok_handler(),
+);
+
+assert!(http_server_h1_status($head->written, 200));
+assert!(http_server_h1_body($head->written) == '');
+assert!(Str\search($head->written, "content-length: 2\r\n") != null);
+
+$serverHeader = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => (
+      new Response(204, headers: FieldMap::from(vec[('Server', 'custom')]))
+    ),
+  ),
+);
+
+assert!(Str\search($serverHeader->written, "server: custom\r\n") != null);
+assert!(Str\search($serverHeader->written, "server: Whim\r\n") == null);
+
+$customDate = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => (
+      new Response(
+        204,
+        headers: FieldMap::from(vec[('Date', 'Thu, 01 Jan 2026 00:00:00 GMT')]),
+      )
+    ),
+  ),
+);
+
+assert!(
+  Str\search($customDate->written, "date: Thu, 01 Jan 2026 00:00:00 GMT\r\n")
+  != null,
+);
+
+$http10 = http_server_h1_serve(
+  "GET / HTTP/1.0\r\nHost: example.com\r\n\r\n",
+  http_server_h1_ok_handler(),
+);
+
+assert!(Str\search($http10->written, "connection: close\r\n") != null);
+
+$drainedState = new HTTPServerH1ParityState();
+$drained = http_server_h1_serve(
+  "POST /first HTTP/1.0\r\nHost: example.com\r\nConnection: keep-alive\r\nContent-Length: 5\r\n\r\nhelloGET /second HTTP/1.0\r\nHost: example.com\r\n\r\n",
+  new FunctionHandler(
+    function(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ) use ($drainedState): Response {
+      $drainedState->targets[] = $request->requestTarget;
+      return new Response(
+        200,
+        headers: FieldMap::from(vec[('Content-Length', '2')]),
+        body: new MemoryHandle('ok'),
+      );
+    },
+  ),
+);
+
+assert!($drainedState->targets == vec['/first', '/second']);
+assert!(Str\search($drained->written, 'HTTP/1.0 200 OK') != null);
+
+$completedState = new HTTPServerH1ParityState();
+$completed = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  new FunctionHandler(
+    function(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ) use ($completedState): Response {
+      $context->onResponseComplete(function() use ($completedState): void {
+        $completedState->completed++;
+      });
+
+      return new Response(204);
+    },
+  ),
+);
+
+assert!(http_server_h1_status($completed->written, 204));
+assert!($completedState->completed == 1);
+
+$shortBody = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => (
+      new Response(
+        200,
+        headers: FieldMap::from(vec[('Content-Length', '3')]),
+        body: new MemoryHandle('abcdef'),
+      )
+    ),
+  ),
+);
+
+assert!(http_server_h1_body($shortBody->written) == 'abc');
+
+$failingBody = http_server_h1_serve(
+  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => new Response(200, body: new HTTPServerH1FailingBody()),
+  ),
+);
+
+assert!(http_server_h1_status($failingBody->written, 200));
+assert!(Str\search($failingBody->written, 'partial') != null);
+
+foreach (vec[
+  'transfer-encoding',
+  'content-length',
+  'host',
+  'content-type',
+] as $forbidden) {
+  $invalidTrailer = http_server_h1_serve(
+    "POST / HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n1\r\na\r\n0\r\n"
+    . $forbidden
+    . ": bad\r\n\r\n",
+    http_server_h1_ok_handler(),
+  );
+
+  assert!(http_server_h1_status($invalidTrailer->written, 400));
+}

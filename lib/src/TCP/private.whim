@@ -1,0 +1,82 @@
+namespace Whim\TCP\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\ConnectionException;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Port;
+use Whim\OS\FileDescriptor;
+use Whim\Unwind\Throwable;
+
+/** Connects one descriptor to a concrete endpoint. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function connect_endpoint(
+  InternetEndpoint $endpoint,
+  Whim\TCP\ConnectConfiguration $configuration,
+  null|CancellationToken $cancellation,
+): Whim\TCP\Stream {
+  if (
+    $configuration->bindTo != null
+    && $configuration->bindTo->address->family != $endpoint->address->family
+  ) {
+    throw new ConnectionException(
+      'the local and peer TCP endpoints use different address families',
+    );
+  }
+
+  $descriptor = Whim\Network\_Private\create_socket(
+    Whim\Network\_Private\socket_family($endpoint->address->family),
+    Whim\_Private\SOCKET_KIND_STREAM,
+  );
+
+  try {
+    if ($configuration->noDelay) {
+      Whim\_Private\set_socket_option(
+        $descriptor,
+        Whim\_Private\SOCKET_LEVEL_TCP,
+        Whim\_Private\SOCKET_OPTION_NO_DELAY,
+        1,
+      );
+    }
+
+    if ($configuration->bindTo != null) {
+      Whim\_Private\bind_socket(
+        $descriptor,
+        $configuration->bindTo->address->toString(),
+        $configuration->bindTo->port,
+      );
+    }
+
+    $connected = Whim\_Private\connect_socket(
+      $descriptor,
+      $endpoint->address->toString(),
+      $endpoint->port,
+    );
+
+    if (!$connected) {
+      Whim\Network\_Private\wait_writable($descriptor, $cancellation);
+      Whim\_Private\complete_socket_connection($descriptor);
+    }
+
+    $local = Whim\Network\_Private\internet_endpoint(
+      Whim\_Private\socket_address($descriptor),
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    $descriptor->close();
+    throw new ConnectionException(
+      'failed to connect to ' . $endpoint->toString(),
+      $error->errno(),
+      $error,
+    );
+  } catch (Throwable $error) {
+    $descriptor->close();
+    throw $error;
+  }
+
+  return new StreamImpl($descriptor, $local, $endpoint);
+}

@@ -1,0 +1,4 @@
+namespace Whim\Channel;
+
+/** Thrown when a non-blocking send finds no space. */
+final class FullException extends Exception {}

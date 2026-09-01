@@ -1,0 +1,30 @@
+namespace Whim\DateTime;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** One half of a twelve-hour day. */
+enum Meridiem: string {
+  case AnteMeridiem = 'AM';
+  case PostMeridiem = 'PM';
+
+  /** Returns the meridiem containing a twenty-four-hour clock value. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromHour(Hour $hour): Meridiem {
+    return match ($hour < 12) {
+      true => Meridiem::AnteMeridiem,
+      false => Meridiem::PostMeridiem,
+    };
+  }
+
+  /** Returns the other half of the day. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function opposite(): Meridiem {
+    return match ($this) {
+      Meridiem::AnteMeridiem => Meridiem::PostMeridiem,
+      Meridiem::PostMeridiem => Meridiem::AnteMeridiem,
+    };
+  }
+}

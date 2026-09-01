@@ -1,0 +1,304 @@
+use Whim\Comparison\Ordering;
+use Whim\DataStructure\BinaryHeap;
+use Whim\DataStructure\Deque;
+use Whim\DataStructure\PriorityQueue;
+use Whim\DataStructure\Queue;
+use Whim\DataStructure\Stack;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\RuntimeException;
+use Whim\Vec;
+
+function compare_int(int $left, int $right): Ordering {
+  return Ordering::from($left <=> $right);
+}
+
+function compare_int_reverse(int $left, int $right): Ordering {
+  return Ordering::from($right <=> $left);
+}
+
+function compare_nullable_int(null|int $left, null|int $right): Ordering {
+  if ($left == null) {
+    return match ($right) {
+      null => Ordering::Equal,
+      $_ => Ordering::Less,
+    };
+  }
+
+  if ($right == null) {
+    return Ordering::Greater;
+  }
+
+  return compare_int($left, $right);
+}
+
+final class ConditionalComparator {
+  public bool $fail = false;
+
+  public function compare(int $left, int $right): Ordering {
+    if ($this->fail) {
+      throw new RuntimeException('comparison failed');
+    }
+
+    return compare_int($left, $right);
+  }
+}
+
+final class ReentrantHeapComparator {
+  public null|BinaryHeap<int> $heap = null;
+  public bool $mutate = false;
+
+  public function compare(int $left, int $right): Ordering {
+    if ($this->mutate && $this->heap != null) {
+      $this->heap->clear();
+    }
+
+    return compare_int($left, $right);
+  }
+}
+
+final class ReentrantPriorityComparator {
+  public null|PriorityQueue<int, int> $queue = null;
+  public bool $mutate = false;
+
+  public function compare(int $left, int $right): Ordering {
+    if ($this->mutate && $this->queue != null) {
+      $this->queue->clear();
+    }
+
+    return compare_int($left, $right);
+  }
+}
+
+$stack = new Stack::<null|int>(vec[1, null, 3]);
+assert!($stack->count() == 3);
+assert!($stack->toVec() == vec[3, null, 1]);
+assert!($stack->peek()->unwrap() == 3);
+assert!($stack->pop()->unwrap() == 3);
+$nullStackValue = $stack->pop();
+assert!($nullStackValue->isSome());
+assert!($nullStackValue->unwrap() == null);
+assert!($stack->pop()->unwrap() == 1);
+assert!($stack->pop()->isNone());
+assert!($stack->isEmpty());
+
+$stack = new Stack::<int>(vec[1, 2, 3]);
+$stackIterator = $stack->toIterator();
+$stack->push(4);
+$stackSnapshot = vec[];
+foreach ($stackIterator as $value) {
+  $stackSnapshot[] = $value;
+}
+
+assert!($stackSnapshot == vec[3, 2, 1]);
+assert!($stack->toVec() == vec[4, 3, 2, 1]);
+$stack->clear();
+assert!($stack->isEmpty());
+
+$stackFromQueue = new Stack::<int>(new Queue::<int>(vec[1, 2, 3]));
+assert!($stackFromQueue->toVec() == vec[3, 2, 1]);
+
+$queue = new Queue::<null|int>();
+$index = 0;
+while ($index < 24) {
+  $queue->enqueue($index);
+  $index++;
+}
+
+$index = 0;
+while ($index < 12) {
+  assert!($queue->dequeue()->unwrap() == $index);
+  $index++;
+}
+
+$queue->enqueue(null);
+$index = 24;
+while ($index < 48) {
+  $queue->enqueue($index);
+  $index++;
+}
+
+assert!($queue->count() == 37);
+assert!($queue->peek()->unwrap() == 12);
+$queueSnapshot = $queue->toIterator();
+$queue->enqueue(48);
+
+$index = 12;
+while ($index < 24) {
+  assert!($queue->dequeue()->unwrap() == $index);
+  $index++;
+}
+
+$nullQueueValue = $queue->dequeue();
+assert!($nullQueueValue->isSome());
+assert!($nullQueueValue->unwrap() == null);
+$index = 24;
+while ($index <= 48) {
+  assert!($queue->dequeue()->unwrap() == $index);
+  $index++;
+}
+
+assert!($queue->isEmpty());
+assert!($queue->dequeue()->isNone());
+
+$queueSnapshotValues = vec[];
+foreach ($queueSnapshot as $value) {
+  $queueSnapshotValues[] = $value;
+}
+
+assert!(length!($queueSnapshotValues) == 37);
+assert!($queueSnapshotValues[0] == 12);
+assert!($queueSnapshotValues[12] == null);
+assert!($queueSnapshotValues[36] == 47);
+
+$deque = new Deque::<null|int>(vec[2, 3]);
+$deque->pushFront(1);
+$deque->pushFront(null);
+$deque->pushBack(4);
+assert!($deque->toVec() == vec[null, 1, 2, 3, 4]);
+assert!($deque->peekFront()->isSome());
+assert!($deque->peekBack()->unwrap() == 4);
+assert!($deque->popFront()->isSome());
+assert!($deque->popBack()->unwrap() == 4);
+assert!($deque->toVec() == vec[1, 2, 3]);
+$deque->clear();
+assert!($deque->popFront()->isNone());
+assert!($deque->popBack()->isNone());
+
+$heap = new BinaryHeap::<int>(compare_int(...), vec[5, 1, 4, 2, 3]);
+assert!($heap->count() == 5);
+assert!($heap->peek()->unwrap() == 1);
+assert!($heap->toVec() == vec[1, 2, 3, 4, 5]);
+assert!($heap->count() == 5);
+assert!($heap->pop()->unwrap() == 1);
+$heap->push(0);
+assert!($heap->toVec() == vec[0, 2, 3, 4, 5]);
+
+$maxHeap = new BinaryHeap::<int>(compare_int_reverse(...), vec[1, 5, 2, 4, 3]);
+assert!($maxHeap->toVec() == vec[5, 4, 3, 2, 1]);
+
+$nullableHeap = new BinaryHeap::<null|int>(
+  compare_nullable_int(...),
+  vec[2, null, 1],
+);
+
+$nullHeapValue = $nullableHeap->pop();
+assert!($nullHeapValue->isSome());
+assert!($nullHeapValue->unwrap() == null);
+
+$heapValues = vec[];
+$index = 0;
+while ($index < 200) {
+  $heapValues[] = ($index * 37) % 101;
+  $index++;
+}
+
+$bulkHeap = new BinaryHeap::<int>(compare_int(...), $heapValues);
+assert!($bulkHeap->toVec() == Vec\sort::<int>($heapValues, compare_int(...)));
+
+$comparison = new ConditionalComparator();
+$guardedHeap = new BinaryHeap::<int>($comparison->compare(...), vec[3, 1, 2]);
+$comparison->fail = true;
+$failed = false;
+try {
+  $guardedHeap->push(0);
+} catch (RuntimeException $_) {
+  $failed = true;
+}
+
+assert!($failed);
+$comparison->fail = false;
+assert!($guardedHeap->toVec() == vec[1, 2, 3]);
+
+$reentrantComparison = new ReentrantHeapComparator();
+$reentrantHeap = new BinaryHeap::<int>(
+  $reentrantComparison->compare(...),
+  vec[2, 1, 3],
+);
+
+$reentrantComparison->heap = $reentrantHeap;
+$reentrantComparison->mutate = true;
+$failed = false;
+try {
+  $reentrantHeap->push(0);
+} catch (LogicException $_) {
+  $failed = true;
+}
+
+assert!($failed);
+$reentrantComparison->mutate = false;
+assert!($reentrantHeap->toVec() == vec[1, 2, 3]);
+
+$comparison->fail = true;
+$failed = false;
+try {
+  $guardedHeap->pop();
+} catch (RuntimeException $_) {
+  $failed = true;
+}
+
+assert!($failed);
+$comparison->fail = false;
+assert!($guardedHeap->toVec() == vec[1, 2, 3]);
+
+$priorityQueue = new PriorityQueue::<string, int>(
+  compare_int(...),
+  vec[('low', 30), ('high', 10), ('middle', 20)],
+);
+
+assert!($priorityQueue->count() == 3);
+assert!($priorityQueue->peek()->unwrap() == ('high', 10));
+assert!(
+  $priorityQueue->toVec() == vec[('high', 10), ('middle', 20), ('low', 30)],
+);
+
+assert!($priorityQueue->count() == 3);
+
+$priorityIterator = $priorityQueue->toIterator();
+$priorityQueue->enqueue('first', 0);
+$prioritySnapshot = vec[];
+foreach ($priorityIterator as $entry) {
+  $prioritySnapshot[] = $entry;
+}
+
+assert!($prioritySnapshot == vec[('high', 10), ('middle', 20), ('low', 30)]);
+assert!($priorityQueue->dequeue()->unwrap() == ('first', 0));
+assert!($priorityQueue->dequeue()->unwrap() == ('high', 10));
+$priorityQueue->clear();
+assert!($priorityQueue->isEmpty());
+assert!($priorityQueue->dequeue()->isNone());
+
+$reentrantPriorityComparison = new ReentrantPriorityComparator();
+$reentrantPriorityQueue = new PriorityQueue::<int, int>(
+  $reentrantPriorityComparison->compare(...),
+  vec[(2, 2), (1, 1), (3, 3)],
+);
+
+$reentrantPriorityComparison->queue = $reentrantPriorityQueue;
+$reentrantPriorityComparison->mutate = true;
+$failed = false;
+try {
+  $reentrantPriorityQueue->enqueue(0, 0);
+} catch (LogicException $_) {
+  $failed = true;
+}
+
+assert!($failed);
+$reentrantPriorityComparison->mutate = false;
+assert!($reentrantPriorityQueue->toVec() == vec[(1, 1), (2, 2), (3, 3)]);
+
+$nullablePriorityQueue = new PriorityQueue::<null, int>(compare_int(...));
+$nullablePriorityQueue->enqueue(null, 1);
+assert!($nullablePriorityQueue->dequeue()->unwrap() == (null, 1));
+
+$bulkPriorityQueue = new PriorityQueue::<int, int>(compare_int(...));
+$index = 0;
+while ($index < 200) {
+  $bulkPriorityQueue->enqueue($index, 199 - $index);
+  $index++;
+}
+
+$index = 199;
+while ($index >= 0) {
+  assert!($bulkPriorityQueue->dequeue()->unwrap() == ($index, 199 - $index));
+  $index--;
+}

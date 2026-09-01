@@ -1,0 +1,24 @@
+[package]
+name = "whim-syn"
+description = "The Whim parser and syntax tree"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+allocator-api2 = { workspace = true }
+annotate-snippets = { workspace = true }
+blink-alloc = { workspace = true }
+memchr = { workspace = true }
+target-guard = { workspace = true }
+whim-span = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

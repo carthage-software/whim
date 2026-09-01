@@ -1,0 +1,3 @@
+function make<out T>(T $value): T {
+  return $value;
+}

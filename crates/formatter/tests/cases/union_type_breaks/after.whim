@@ -1,0 +1,12 @@
+type Response = SuccessResponse
+| RedirectResponse
+| ClientError
+| ServerError;
+
+function handle(
+): NetworkError
+| Timeout
+| ParseFailure
+| UnknownError {
+  return fail();
+}

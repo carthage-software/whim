@@ -1,0 +1,86 @@
+namespace Whim\Database\PostgreSQL\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Result;
+use Whim\Database\Transaction;
+use Whim\Database\TransactionException;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\_Private\PostgreSQLConnection;
+
+/** Implements one PostgreSQL transaction. */
+final class TransactionImpl implements Transaction {
+  private bool $active = true;
+
+  /** Creates an active transaction. */
+  public function __construct(
+    private ConnectionImpl $connection,
+    private PostgreSQLConnection $state,
+  ) {}
+
+  /** Executes work in this transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    $this->requireActive();
+    return $this->connection->executeTransaction(
+      $sql,
+      $parameters,
+      $cancellation,
+    );
+  }
+
+  /** Reports whether this transaction is active. */
+  #[MustUse]
+  public function isActive(): bool {
+    return $this->active;
+  }
+
+  /** Commits this transaction. */
+  #[TrackCaller]
+  public function commit(): void {
+    $this->requireActive();
+    await_transaction($this->state->commit());
+    $this->active = false;
+    $this->connection->finishTransaction();
+  }
+
+  /** Rolls back this transaction. */
+  #[TrackCaller]
+  public function rollback(): void {
+    $this->requireActive();
+    await_transaction($this->state->rollback());
+    $this->active = false;
+    $this->connection->finishTransaction();
+  }
+
+  /** Reports whether this transaction is closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return !$this->active;
+  }
+
+  /** Rolls back this transaction when needed. */
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->active) {
+      $this->rollback();
+    }
+  }
+
+  /** Requires an active transaction. */
+  #[TrackCaller]
+  private function requireActive(): void {
+    if (!$this->active) {
+      throw new TransactionException(
+        'the PostgreSQL transaction is not active',
+      );
+    }
+  }
+}

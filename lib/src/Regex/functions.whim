@@ -1,0 +1,12 @@
+namespace Whim\Regex;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\_Private\regex_escape;
+
+/** Escapes bytes for literal use in a regular expression. */
+#[AlwaysInline]
+#[MustUse]
+function escape(string $literal): string {
+  return regex_escape($literal);
+}

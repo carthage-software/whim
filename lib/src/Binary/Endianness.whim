@@ -1,0 +1,21 @@
+namespace Whim\Binary;
+
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Selects the byte order used to encode a value. */
+enum Endianness implements Default {
+  /** Most-significant byte first, as network protocols use. */
+  case Big;
+
+  /** Least-significant byte first. */
+  case Little;
+
+  /** Network byte order, which is what most formats on the wire use. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return Endianness::Big;
+  }
+}

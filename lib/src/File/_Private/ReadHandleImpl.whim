@@ -1,0 +1,103 @@
+namespace Whim\File\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\File\LockType;
+use Whim\File\ReadHandle;
+use Whim\IO\SeekWhence;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+
+/** Descriptor-backed implementation returned by the readable file factory. */
+final class ReadHandleImpl implements ReadHandle {
+  /** Wraps one open descriptor. This class is private standard-library API. */
+  #[AlwaysInline]
+  public function __construct(private State $state) {}
+
+  #[AlwaysInline]
+  public function getPath(): string {
+    return $this->state->getPath();
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    return $this->state->getFileDescriptor();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getSize(): int {
+    return $this->state->getSize();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+    return $this->state->seek($offset, $whence);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->state->waitUntilReadable($cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function reachedEndOfDataSource(): bool {
+    return $this->state->reachedEnd();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryRead(null|int $maxBytes = null): string {
+    return $this->state->tryRead($maxBytes);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  #[NeverInline]
+  public function tryLocked<T>(
+    LockType $type,
+    fn(static): T $function,
+  ): Option<T> {
+    if (!$this->state->acquire($type, false)) {
+      return new None();
+    }
+
+    try {
+      return new Some::<T>($function($this));
+    } finally {
+      $this->state->release();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  #[NeverInline]
+  public function locked<T>(
+    LockType $type,
+    fn(static): T $function,
+    null|CancellationToken $cancellation = null,
+  ): T {
+    $cancellation?->throwIfCancellationRequested();
+
+    $this->state->acquire($type, true);
+    try {
+      return $function($this);
+    } finally {
+      $this->state->release();
+    }
+  }
+}

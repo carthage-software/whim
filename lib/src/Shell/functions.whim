@@ -1,0 +1,52 @@
+namespace Whim\Shell;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/**
+ * Quotes one argument for non-interactive POSIX shell text.
+ *
+ * Do not pass the result to `Whim\Command`; it already passes arguments without
+ * a shell.
+ *
+ * @throws InvalidArgumentException when the argument contains a null byte.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function escape_argument(string $argument): string {
+  if (Str\contains($argument, "\x00")) {
+    throw new InvalidArgumentException(
+      'a POSIX shell argument cannot contain a null byte',
+    );
+  }
+
+  return "'" . Str\replace($argument, "'", "'\\''") . "'";
+}
+
+/**
+ * Quotes arguments and joins them as non-interactive POSIX shell text.
+ *
+ * Do not pass the result to `Whim\Command`; it already passes arguments without
+ * a shell.
+ */
+#[MustUse]
+#[TrackCaller]
+function join(Iterable<_, string> $arguments): string {
+  $command = '';
+  $first = true;
+  foreach ($arguments as $argument) {
+    if (!$first) {
+      $command .= ' ';
+    }
+
+    $command .= escape_argument($argument);
+    $first = false;
+  }
+
+  return $command;
+}

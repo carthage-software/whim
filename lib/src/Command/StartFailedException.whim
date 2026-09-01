@@ -1,0 +1,6 @@
+namespace Whim\Command;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports a program that could not be started. */
+final class StartFailedException extends RuntimeException {}

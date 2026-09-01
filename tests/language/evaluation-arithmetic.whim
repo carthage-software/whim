@@ -1,0 +1,321 @@
+use Whim\Unwind\ArithmeticError;
+use Whim\Unwind\DivisionByZeroError;
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\UnderflowError;
+
+$assertion_value_1 = 10 / 2;
+assert!($assertion_value_1 == 5.0);
+assert!($assertion_value_1 is float);
+assert!(7 / 2 == 3.5);
+
+$assertion_value_3 = fn(): float => 1 / 0;
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (DivisionByZeroError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is DivisionByZeroError);
+$assertion_value_4 = fn(): int => 1 % 0;
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (DivisionByZeroError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is DivisionByZeroError);
+$assertion_value_5 = fn(): float => 1.0 / 0.0;
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (DivisionByZeroError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is DivisionByZeroError);
+$assertion_value_6 = fn(): float => 1 / 0.0;
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (DivisionByZeroError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is DivisionByZeroError);
+
+$assertion_value_7 = 1 + 0.5;
+assert!($assertion_value_7 == 1.5);
+assert!($assertion_value_7 is float);
+assert!(2.0 * 3 == 6.0);
+assert!(1.0 - 0.75 == 0.25);
+
+assert!(2 + 3 == 5);
+assert!(2 - 3 == -1);
+assert!(2 * 3 == 6);
+
+function add_literal_zero(float $value): float {
+  return $value + 0;
+}
+
+assert!(Whim\Float\to_bits(add_literal_zero(-0.0)) == 0);
+
+$assertion_value_13 = fn(): int => 9223372036854775807 + 1;
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (OverflowError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is OverflowError);
+
+$assertion_value_14 = fn(): int => 9223372036854775807 * 2;
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (OverflowError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is OverflowError);
+
+$assertion_value_15 = fn(): int => (-9223372036854775807 - 1) - 1;
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (UnderflowError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is UnderflowError);
+
+$assertion_value_16 = fn(): mixed => 'a' + 1;
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (IncompatibleOperandsError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is IncompatibleOperandsError);
+$assertion_value_17 = fn(): mixed => true * 2;
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (IncompatibleOperandsError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is IncompatibleOperandsError);
+
+assert!(7 % 2 == 1);
+assert!(-7 % 2 == -1);
+assert!(7 % -2 == 1);
+$assertion_value_21 = fn(): mixed => 1.0 % 2.0;
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (IncompatibleOperandsError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is IncompatibleOperandsError);
+
+$assertion_value_22 = fn(): mixed => 1 % 2.0;
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (IncompatibleOperandsError $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is IncompatibleOperandsError);
+
+$assertion_value_23 = 2 ** 10;
+assert!($assertion_value_23 == 1024);
+assert!($assertion_value_23 is int);
+$assertion_value_24 = 2 ** -1;
+assert!($assertion_value_24 == 0.5);
+assert!($assertion_value_24 is float);
+assert!(2.0 ** 2 == 4.0);
+assert!(2 ** 0 == 1);
+$assertion_value_27 = fn(): mixed => 2 ** 63;
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (OverflowError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is OverflowError);
+
+function integer_power(int $base, int $exponent): int|float {
+  return $base ** $exponent;
+}
+
+$assertion_value_28 = fn(): mixed => 0 ** -1;
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (DivisionByZeroError $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is DivisionByZeroError);
+$assertion_value_29 = fn(): int|float => integer_power(0, -1);
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (DivisionByZeroError $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is DivisionByZeroError);
+
+assert!(-(5) == -5);
+assert!(-(1.5) == -1.5);
+assert!(+7 == 7);
+assert!(+7.5 == 7.5);
+$minimum = -9223372036854775807 - 1;
+$assertion_value_34 = fn(): int => -$minimum;
+$assertion_error_34 = null;
+try {
+  $assertion_value_34();
+} catch (OverflowError $assertion_caught_34) {
+  $assertion_error_34 = $assertion_caught_34;
+}
+
+assert!($assertion_error_34 is OverflowError);
+$assertion_value_35 = fn(): mixed => -'a';
+$assertion_error_35 = null;
+try {
+  $assertion_value_35();
+} catch (IncompatibleOperandsError $assertion_caught_35) {
+  $assertion_error_35 = $assertion_caught_35;
+}
+
+assert!($assertion_error_35 is IncompatibleOperandsError);
+$assertion_value_36 = fn(): mixed => +true;
+$assertion_error_36 = null;
+try {
+  $assertion_value_36();
+} catch (IncompatibleOperandsError $assertion_caught_36) {
+  $assertion_error_36 = $assertion_caught_36;
+}
+
+assert!($assertion_error_36 is IncompatibleOperandsError);
+
+assert!(6 & 3 == 2);
+assert!(6 | 3 == 7);
+assert!(6 ^ 3 == 5);
+assert!(~0 == -1);
+assert!(1 << 4 == 16);
+assert!(-8 >> 1 == -4);
+assert!(8 >> 1 == 4);
+$assertion_value_44 = fn(): mixed => 1.0 & 1.0;
+$assertion_error_44 = null;
+try {
+  $assertion_value_44();
+} catch (IncompatibleOperandsError $assertion_caught_44) {
+  $assertion_error_44 = $assertion_caught_44;
+}
+
+assert!($assertion_error_44 is IncompatibleOperandsError);
+
+$assertion_value_45 = fn(): mixed => 'a' | 'b';
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (IncompatibleOperandsError $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is IncompatibleOperandsError);
+
+assert!(1 << 63 == -9223372036854775807 - 1);
+assert!(1 << 0 == 1);
+$assertion_value_48 = fn(): int => 1 << 64;
+$assertion_error_48 = null;
+try {
+  $assertion_value_48();
+} catch (ArithmeticError $assertion_caught_48) {
+  $assertion_error_48 = $assertion_caught_48;
+}
+
+assert!($assertion_error_48 is ArithmeticError);
+$assertion_value_49 = fn(): int => 1 >> -1;
+$assertion_error_49 = null;
+try {
+  $assertion_value_49();
+} catch (ArithmeticError $assertion_caught_49) {
+  $assertion_error_49 = $assertion_caught_49;
+}
+
+assert!($assertion_error_49 is ArithmeticError);
+$assertion_value_50 = fn(): int => 1 >> 64;
+$assertion_error_50 = null;
+try {
+  $assertion_value_50();
+} catch (ArithmeticError $assertion_caught_50) {
+  $assertion_error_50 = $assertion_caught_50;
+}
+
+assert!($assertion_error_50 is ArithmeticError);
+
+$number = 5;
+assert!($number++ == 5);
+assert!($number == 6);
+assert!(++$number == 7);
+assert!($number-- == 7);
+assert!(--$number == 5);
+
+$fraction = 1.5;
+$fraction++;
+assert!($fraction == 2.5);
+--$fraction;
+assert!($fraction == 1.5);
+
+$assertion_value_58 = function(): void {
+  $letter = 'a';
+  $letter++;
+};
+
+$assertion_error_58 = null;
+try {
+  $assertion_value_58();
+} catch (IncompatibleOperandsError $assertion_caught_58) {
+  $assertion_error_58 = $assertion_caught_58;
+}
+
+assert!($assertion_error_58 is IncompatibleOperandsError);
+
+$assertion_value_59 = function(): void {
+  $maximum = 9223372036854775807;
+  $maximum++;
+};
+
+$assertion_error_59 = null;
+try {
+  $assertion_value_59();
+} catch (OverflowError $assertion_caught_59) {
+  $assertion_error_59 = $assertion_caught_59;
+}
+
+assert!($assertion_error_59 is OverflowError);
+
+$assertion_value_60 = function(): void {
+  $bottom = -9223372036854775807 - 1;
+  $bottom--;
+};
+
+$assertion_error_60 = null;
+try {
+  $assertion_value_60();
+} catch (UnderflowError $assertion_caught_60) {
+  $assertion_error_60 = $assertion_caught_60;
+}
+
+assert!($assertion_error_60 is UnderflowError);

@@ -1,0 +1,87 @@
+namespace Whim\SMTP\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\Reader;
+use Whim\SMTP\EnhancedStatusCode;
+use Whim\SMTP\ProtocolException;
+use Whim\SMTP\Reply;
+use Whim\SMTP\ReplyCode;
+use Whim\Str;
+
+/** Parses one SMTP reply. */
+function parse_reply(
+  Reader $reader,
+  null|CancellationToken $cancellation,
+): Reply {
+  $message = '';
+  $code = null;
+  while (true) {
+    $wireLine = $reader->readUntilBounded("\n", 512, $cancellation);
+    if ($wireLine == null || !Str\ends_with($wireLine, "\r\n")) {
+      throw new ProtocolException('the SMTP server sent a malformed reply');
+    }
+
+    $line = Str\slice($wireLine, 0, length!($wireLine) - 2);
+    if (length!($line) < 3) {
+      throw new ProtocolException(
+        'the SMTP server sent a malformed reply: `' . $line . '`',
+      );
+    }
+
+    $lineCode = parse_decimal(Str\slice($line, 0, 3));
+    if (!($lineCode is ReplyCode)) {
+      throw new ProtocolException(
+        'the SMTP server sent a malformed reply: `' . $line . '`',
+      );
+    }
+
+    if ($code == null) {
+      $code = $lineCode;
+    } else if ($lineCode != $code) {
+      throw new ProtocolException(
+        'the SMTP server changed the reply code between lines',
+      );
+    }
+
+    $separator = '';
+    $text = '';
+    if (length!($line) > 3) {
+      $separator = $line[3];
+      if (!($separator is ' '|'-')) {
+        throw new ProtocolException(
+          'the SMTP server sent a malformed reply: `' . $line . '`',
+        );
+      }
+
+      if (length!($line) > 4) {
+        $text = Str\slice($line, 4);
+      }
+    }
+
+    if ($message != '') {
+      $message .= "\n";
+    }
+
+    $message .= $text;
+    if ($separator != '-') {
+      break;
+    }
+  }
+
+  $enhanced = null;
+  $space = Str\search($message, ' ');
+  $candidate = match ($space) {
+    null => $message,
+    $_ => Str\slice($message, 0, $space),
+  };
+
+  $enhanced = EnhancedStatusCode::parse($candidate);
+  if ($enhanced != null) {
+    $message = match ($space) {
+      null => '',
+      $_ => Str\slice($message, $space + 1),
+    };
+  }
+
+  return new Reply($code as ReplyCode, $enhanced, $message);
+}

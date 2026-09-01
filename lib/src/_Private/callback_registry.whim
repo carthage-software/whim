@@ -1,0 +1,21 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Stores callbacks under reusable opaque identifiers. */
+#[Stub]
+final class CallbackRegistry {
+  public function __construct() {}
+
+  #[MustUse]
+  public function insert(fn(): void $callback): int {}
+
+  public function remove(int $id): void {}
+
+  #[MustUse]
+  public function isEmpty(): bool {}
+
+  #[MustUse]
+  public function drain(): vec<fn(): void> {}
+}

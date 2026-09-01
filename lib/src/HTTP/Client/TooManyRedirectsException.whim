@@ -1,0 +1,4 @@
+namespace Whim\HTTP\Client;
+
+/** Reports a redirect chain beyond its configured limit. */
+final class TooManyRedirectsException extends Exception {}

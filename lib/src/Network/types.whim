@@ -1,0 +1,10 @@
+namespace Whim\Network;
+
+use Whim\IP\Address;
+use Whim\Refine\NonEmptyString;
+
+/** A TCP or UDP port. */
+type Port = 0..=65535;
+
+/** An internet address or a host name to resolve. */
+type Host = Address|NonEmptyString;

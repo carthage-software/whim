@@ -1,0 +1,4 @@
+interface NewtypeComparable {}
+class NewtypeFoo {}
+
+newtype NewtypeBoxed<T: NewtypeComparable = NewtypeFoo> = T;

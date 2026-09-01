@@ -1,0 +1,5 @@
+namespace Limits\binder_sibling_bound_4;
+
+class C {
+  public function m<T, U: T>(): void {}
+}

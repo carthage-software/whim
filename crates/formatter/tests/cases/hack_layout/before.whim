@@ -1,0 +1,10 @@
+result(foo:1,bar:2);
+result(1,bar:2);
+
+#[Example(foo:1,bar:2)] function attributed():void{}
+
+$short->chain()->staysInline();
+$service->firstExtremelyLongMethodName()->secondExtremelyLongMethodName()->thirdExtremelyLongMethodName();
+
+write_line!($firstExtremelyLongArgument,$secondExtremelyLongArgument,$thirdExtremelyLongArgument,$fourthExtremelyLongArgument);
+assert!($firstExtremelyLongConditionThatCannotFitOnOneLine,$secondExtremelyLongMessageThatCannotFitOnOneLine);

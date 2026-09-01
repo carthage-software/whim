@@ -1,0 +1,12 @@
+namespace Whim\Int;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\_Private\int_try_parse;
+
+/** Parses a complete decimal integer string, or returns null. */
+#[AlwaysInline]
+#[MustUse]
+function try_parse(string $value): null|int {
+  return int_try_parse($value);
+}

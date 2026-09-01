@@ -1,0 +1,145 @@
+namespace Whim\Message\Address;
+
+use Whim\Convert\ToString;
+use Whim\Default\Default;
+use Whim\Iterate\ArrayIterator;
+use Whim\Iterate\Iterator;
+use Whim\Iterate\ToIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable ordered list of mailboxes and groups. */
+final readonly class AddressList implements
+  Default,
+  ToIterator<int, Address>,
+  ToString {
+  /** Creates an address list. */
+  #[AlwaysInline]
+  public function __construct(public vec<Address> $addresses = vec[]) {}
+
+  /** Parses an address list, or returns null when malformed. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $input): null|AddressList {
+    $input = match (Str\trim($input)) {
+      '' => return new AddressList(),
+      $input => $input,
+    };
+
+    $addresses = vec[];
+    foreach (_Private\split_addresses($input) as $segment) {
+      $address =
+        match (Str\ends_with($segment, ';')) {
+          true => Group::parse($segment),
+          false => Mailbox::parse($segment),
+        }
+        ?? return null;
+
+      $addresses[] = $address;
+    }
+
+    return new AddressList($addresses);
+  }
+
+  /** Parses an address list. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $input): AddressList {
+    $addresses = AddressList::parse($input);
+    if ($addresses == null) {
+      throw new InvalidArgumentException(
+        'invalid address list: `' . $input . '`',
+      );
+    }
+
+    return $addresses;
+  }
+
+  /** Creates an empty address list. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new AddressList();
+  }
+
+  /** Returns all mailboxes, flattening groups. */
+  #[MustUse]
+  #[TrackCaller]
+  public function mailboxes(): vec<Mailbox> {
+    $result = vec[];
+    foreach ($this->addresses as $address) {
+      if ($address is Mailbox) {
+        $result[] = $address;
+        continue;
+      }
+
+      foreach (($address as Group)->mailboxes as $mailbox) {
+        $result[] = $mailbox;
+      }
+    }
+
+    return $result;
+  }
+
+  /** Returns a list without a case-insensitive mailbox address. */
+  #[MustUse]
+  #[TrackCaller]
+  public function excluding(Mailbox $mailbox): AddressList {
+    $excluded = Str\lowercase($mailbox->address);
+    $addresses = vec[];
+    foreach ($this->addresses as $address) {
+      if ($address is Mailbox) {
+        if (Str\lowercase($address->address) != $excluded) {
+          $addresses[] = $address;
+        }
+
+        continue;
+      }
+
+      $group = $address as Group;
+      $mailboxes = vec[];
+      foreach ($group->mailboxes as $candidate) {
+        if (Str\lowercase($candidate->address) != $excluded) {
+          $mailboxes[] = $candidate;
+        }
+      }
+
+      if ($mailboxes != vec[]) {
+        $addresses[] = new Group($group->displayName, $mailboxes);
+      }
+    }
+
+    return new AddressList($addresses);
+  }
+
+  /** Returns the number of top-level addresses. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function count(): int {
+    return length!($this->addresses);
+  }
+
+  /** Iterates over top-level addresses. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toIterator(): Iterator<int, Address> {
+    return new ArrayIterator::<int, Address>($this->addresses);
+  }
+
+  /** Serializes the address list for a message header. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    $values = vec[];
+    foreach ($this->addresses as $address) {
+      $values[] = $address->toString();
+    }
+
+    return Str\join(', ', $values);
+  }
+}

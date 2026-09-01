@@ -1,0 +1,119 @@
+namespace Whim\Database\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Result;
+use Whim\Database\Transaction;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\Throwable;
+
+/** Keeps a pooled connection checked out for a transaction. */
+final class PooledTransaction implements Transaction {
+  private bool $closed = false;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private Lease $lease,
+    private Transaction $transaction,
+  ) {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    $this->lease->retain();
+    try {
+      $result = $this->transaction->execute($sql, $parameters, $cancellation);
+    } catch (Throwable $error) {
+      $connection = $this->lease->connection();
+      $this->lease->release(
+        !$connection->isClosed()
+        && $connection->isReusable(),
+      );
+
+      throw $error;
+    }
+
+    return new PooledResult($this->lease, $result);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isActive(): bool {
+    return !$this->closed && $this->transaction->isActive();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function commit(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $reusable = true;
+    try {
+      $this->transaction->commit();
+    } catch (Throwable $error) {
+      $reusable = false;
+      throw $error;
+    } finally {
+      $this->closed = true;
+      $this->lease->release($reusable);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function rollback(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $reusable = true;
+    try {
+      $this->transaction->rollback();
+    } catch (Throwable $error) {
+      $reusable = false;
+      throw $error;
+    } finally {
+      $this->closed = true;
+      $this->lease->release($reusable);
+    }
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    if ($this->transaction->isActive()) {
+      $this->rollback();
+      return;
+    }
+
+    $this->closed = true;
+    $connection = $this->lease->connection();
+    $this->lease->release(
+      !$connection->isClosed()
+      && $connection->isReusable(),
+    );
+  }
+}

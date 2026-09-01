@@ -1,0 +1,921 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\Deferred;
+use Whim\Async\LinkedCancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\Async\TaskGroup;
+use Whim\Async\_Private as AsyncPrivate;
+use Whim\Channel;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Context\Security;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\HTTPException;
+use Whim\IO\CloseHandle;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Stream;
+use Whim\Network\Endpoint;
+use Whim\Str;
+use Whim\Unwind\Throwable;
+use Whim\_Private\RingBuffer;
+
+/** Runs one multiplexed HTTP/2 connection. */
+final class H2Session {
+  private H2\ServerConnection $protocol;
+  private dict<H2\StreamId, H2StreamState> $streams = dict[];
+  private TaskGroup $handlers;
+  private bool $writeLocked = false;
+  private RingBuffer<AsyncPrivate\Waiter<null>> $writeWaiters;
+  private Channel\Sender<null> $capacitySender;
+  private Channel\Receiver<null> $capacityReceiver;
+  private SignalCancellationToken $drainWake;
+  private int $activeRequests = 0;
+  private int $pushCount = 0;
+  private bool $pushEnabled = true;
+  private bool $drainingStarted = false;
+  private Endpoint $localEndpoint;
+  private Endpoint $peerEndpoint;
+  private null|Security $security;
+
+  public function __construct(
+    private Stream<_> $stream,
+    private ReadHandle $read,
+    private Handler $handler,
+    private Configuration $configuration,
+    private CancellationToken $draining,
+    private CancellationToken $forced,
+  ) {
+    $this->protocol = new H2\ServerConnection(h2_configuration($configuration));
+    $this->writeWaiters = new RingBuffer::<AsyncPrivate\Waiter<null>>();
+
+    $this->localEndpoint = $stream->getLocalEndpoint();
+    $this->peerEndpoint = $stream->getPeerEndpoint();
+    $this->security = h2_security($stream);
+
+    $this->handlers = new TaskGroup();
+    ($this->capacitySender, $this->capacityReceiver) = Channel\unbounded::<
+      null,
+    >();
+
+    $this->drainWake = new SignalCancellationToken();
+  }
+
+  /** Seeds and serves an HTTP/1.1 request upgraded to stream one. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function runUpgrade(
+    Request $request,
+    dict<H2\SettingId, H2\SettingValue> $settings,
+  ): void {
+    discard!(
+      $this->protocol->acceptUpgradeRequest(
+        h2_upgrade_headers($request),
+        $settings,
+      ),
+    );
+
+    $setting = H2\Setting::EnablePush->value;
+    if (contains_key!($settings, $setting)) {
+      $this->pushEnabled = $settings[$setting] == 1;
+    }
+
+    $state = new H2StreamState(null, null, new SignalCancellationToken());
+
+    $this->streams[1] = $state;
+    $this->startRequest(
+      1,
+      $request->withProtocolVersion(ProtocolVersion::V2),
+      $state,
+      true,
+    );
+
+    $this->run();
+  }
+
+  /** Processes the transport until it closes or shutdown completes. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function run(string $initialBytes = ''): void {
+    $handlersAwaited = false;
+    try {
+      $this->flush($this->forced);
+      if ($initialBytes != '') {
+        $this->dispatch($this->receive($initialBytes, $this->forced));
+      }
+
+      while (!$this->forced->isCancellationRequested()) {
+        if (
+          $this->draining->isCancellationRequested()
+          && !$this->drainingStarted
+        ) {
+          $this->beginDrain();
+          if ($this->activeRequests == 0) {
+            break;
+          }
+        }
+
+        $parent = match ($this->drainingStarted) {
+          true => new LinkedCancellationToken(vec[
+            $this->forced,
+            $this->drainWake,
+          ]),
+          false => new LinkedCancellationToken(vec[
+            $this->forced,
+            $this->draining,
+          ]),
+        };
+
+        $timeout = match ($this->drainingStarted) {
+          true => null,
+          false => $this->configuration->connectionIdleTimeout,
+        };
+
+        try {
+          $bytes = $this->read->read(
+            16_384,
+            h2_cancellation($parent, $timeout),
+          );
+        } catch (CancelledException $_) {
+          if (
+            $this->draining->isCancellationRequested()
+            && !$this->drainingStarted
+          ) {
+            $this->beginDrain();
+            if ($this->activeRequests != 0) {
+              continue;
+            }
+          }
+
+          break;
+        }
+
+        if ($bytes == '') {
+          if ($this->read->reachedEndOfDataSource()) {
+            break;
+          }
+
+          continue;
+        }
+
+        $this->dispatch($this->receive($bytes, $this->forced));
+      }
+
+      $this->failIncompleteStreams(
+        new H2\ProtocolException('the HTTP/2 transport ended during a request'),
+      );
+
+      $this->handlers->awaitAll(null);
+      $handlersAwaited = true;
+      if (!$this->forced->isCancellationRequested()) {
+        $this->dispatch($this->finish($this->forced));
+      }
+    } finally {
+      if ($this->forced->isCancellationRequested()) {
+        $this->failStreams(
+          new CancelledException('the HTTP/2 connection was cancelled'),
+        );
+      }
+
+      if (!$handlersAwaited) {
+        try {
+          $this->handlers->awaitAll(null);
+        } catch (Throwable $_) {
+        }
+      }
+    }
+  }
+
+  /** Sends one informational response. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendInformational(
+    H2\StreamId $streamId,
+    Message\InformationalStatusCode $status,
+    FieldMap $fields,
+    CancellationToken $cancellation,
+  ): void {
+    $this->sendResponseHeaders(
+      $streamId,
+      h2_response_headers($status, $fields),
+      $status,
+      h1_content_length($fields),
+      false,
+      $cancellation,
+    );
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function beginDrain(): void {
+    if ($this->drainingStarted) {
+      return;
+    }
+
+    $this->drainingStarted = true;
+    $this->withWrite(fn(): void {
+      $this->protocol->goAway(
+        H2\ErrorCode::NoError->value,
+        'server shutting down',
+      );
+    }, $this->forced);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function receive(
+    string $bytes,
+    CancellationToken $cancellation,
+  ): vec<Event\WeakendEvent> {
+    $this->acquireWrite($cancellation);
+    try {
+      try {
+        return $this->protocol->receive($bytes);
+      } finally {
+        $this->writeOutbound($cancellation);
+      }
+    } finally {
+      $this->releaseWrite();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function finish(
+    CancellationToken $cancellation,
+  ): vec<Event\WeakendEvent> {
+    $this->acquireWrite($cancellation);
+    try {
+      try {
+        return $this->protocol->finish();
+      } finally {
+        $this->writeOutbound($cancellation);
+      }
+    } finally {
+      $this->releaseWrite();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function dispatch(vec<Event\WeakendEvent> $events): void {
+    foreach ($events as $event) {
+      if ($event[0] == 2) {
+        $this->receiveHeaders($event);
+      } else if ($event[0] == 11) {
+        $this->receiveRequest($event);
+      } else if ($event[0] == 1) {
+        $this->receiveData($event);
+      } else if ($event[0] == 9) {
+        $this->failStream(
+          $event[1],
+          new H2\ProtocolException($event[3], $event[2]),
+        );
+      } else if ($event[0] == 7) {
+        $this->failStream(
+          $event[1],
+          new H2\StreamException(
+            'the HTTP/2 request stream was reset',
+            $event[1],
+            $event[2],
+          ),
+        );
+      } else if ($event[0] == 3) {
+        $setting = H2\Setting::EnablePush->value;
+        if (contains_key!($event[1], $setting)) {
+          $this->pushEnabled = $event[1][$setting] == 1;
+        }
+
+        $this->capacitySender->send(null);
+      } else if ($event[0] == 4) {
+        $this->capacitySender->send(null);
+      } else if ($event[0] == 10) {
+        $this->capacitySender->send(null);
+      }
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function receiveHeaders(Event\WeakendEvent $event): void {
+    if ($event[4]) {
+      if (!contains_key!($this->streams, $event[1])) {
+        return;
+      }
+
+      $state = $this->streams[$event[1]];
+      if ($state->trailers != null && !$state->trailers->isComplete()) {
+        $state->trailers->complete(h2_field_map($event[2]));
+      }
+
+      $state->body?->complete();
+      return;
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function receiveRequest(Event\WeakendEvent $event): void {
+    if ($this->drainingStarted) {
+      $this->reset($event[1], H2\ErrorCode::RefusedStream->value);
+      return;
+    }
+
+    $body = null;
+    $trailers = null;
+    if (!$event[7]) {
+      $body = new RequestBody();
+      $trailers = new Deferred::<FieldMap>();
+    }
+
+    $streamCancellation = new SignalCancellationToken();
+    $state = new H2StreamState($body, $trailers, $streamCancellation);
+    $this->streams[$event[1]] = $state;
+
+    try {
+      $request = h2_request(
+        $event[2],
+        $event[3],
+        $event[4],
+        $event[5],
+        $event[6],
+        $body,
+        $trailers?->getFuture(),
+      );
+
+      if ($request == null) {
+        $this->sendResponse(
+          $event[1],
+          Message\METHOD_GET,
+          $this->configuration->errorResponder->respond(400, null),
+          $this->forced,
+        );
+
+        $this->reset($event[1], H2\ErrorCode::Cancel->value);
+        $this->removeStream($event[1]);
+        return;
+      }
+
+      if ($event[7]) {
+        $body?->complete();
+        $trailers?->complete(FieldMap::default());
+      }
+
+      $this->startRequest($event[1], $request, $state, true);
+    } catch (Throwable $error) {
+      $this->failStream($event[1], $error);
+      $this->reset($event[1], H2\ErrorCode::ProtocolError->value);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function receiveData(Event\WeakendEvent $event): void {
+    if (!contains_key!($this->streams, $event[1])) {
+      return;
+    }
+
+    $state = $this->streams[$event[1]];
+    $state->bodyBytes += length!($event[2]);
+    if ($state->bodyBytes > $this->configuration->maximumRequestBodySize) {
+      $error = new HTTPException(
+        413,
+        'the request body exceeds its configured limit',
+      );
+
+      $state->body?->fail($error);
+      if ($state->trailers != null && !$state->trailers->isComplete()) {
+        $state->trailers->complete(FieldMap::default());
+      }
+
+      $state->cancellation->cancel();
+      $this->reset($event[1], H2\ErrorCode::Cancel->value);
+      return;
+    }
+
+    $state->body?->push($event[2]);
+    if ($event[3]) {
+      $state->body?->complete();
+      if ($state->trailers != null && !$state->trailers->isComplete()) {
+        $state->trailers->complete(FieldMap::default());
+      }
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function startRequest(
+    H2\StreamId $streamId,
+    Request $request,
+    H2StreamState $state,
+    bool $allowPush,
+  ): void {
+    $handlerCancellation = new RequestCancellationToken(
+      $this->forced,
+      $state->cancellation,
+    );
+
+    $context = $this->createContext(
+      $streamId,
+      $request,
+      $handlerCancellation,
+      $allowPush,
+    );
+
+    $this->activeRequests++;
+    $this->handlers->defer(fn(): void {
+      try {
+        $this->handleRequest(
+          $streamId,
+          $request,
+          $context,
+          $handlerCancellation,
+        );
+      } finally {
+        $state->body?->discard();
+        $context->completeResponse();
+        $this->removeStream($streamId);
+        $this->activeRequests--;
+        if ($this->drainingStarted && $this->activeRequests == 0) {
+          $this->drainWake->cancel();
+        }
+      }
+    });
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function createContext(
+    H2\StreamId $streamId,
+    Request $request,
+    CancellationToken $cancellation,
+    bool $allowPush,
+  ): H2Context {
+    $pushLimit = $this->configuration->maximumServerPushes;
+    $canPush =
+      $allowPush
+      && $this->pushEnabled
+      && ($request->method is 'GET'|'HEAD')
+      && ($pushLimit == null || $this->pushCount < $pushLimit);
+
+    if ($canPush) {
+      if ($this->security != null) {
+        return new H2SecurePushContext(
+          ProtocolVersion::V2,
+          $this->localEndpoint,
+          $this->peerEndpoint,
+          $this,
+          $streamId,
+          $cancellation,
+          $this->security,
+        );
+      }
+
+      return new H2PushContext(
+        ProtocolVersion::V2,
+        $this->localEndpoint,
+        $this->peerEndpoint,
+        $this,
+        $streamId,
+        $cancellation,
+      );
+    }
+
+    if ($this->security != null) {
+      return new H2SecureContext(
+        ProtocolVersion::V2,
+        $this->localEndpoint,
+        $this->peerEndpoint,
+        $this,
+        $streamId,
+        $cancellation,
+        $this->security,
+      );
+    }
+
+    return new H2Context(
+      ProtocolVersion::V2,
+      $this->localEndpoint,
+      $this->peerEndpoint,
+      $this,
+      $streamId,
+      $cancellation,
+    );
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function handleRequest(
+    H2\StreamId $streamId,
+    Request $request,
+    H2Context $context,
+    CancellationToken $cancellation,
+  ): void {
+    try {
+      try {
+        $response = $this->handler->handle($context, $request, $cancellation);
+      } catch (CancelledException $error) {
+        if ($this->forced->isCancellationRequested()) {
+          return;
+        }
+
+        $response = $this->configuration->errorResponder->respond(504, $error);
+      } catch (Throwable $error) {
+        $status = 500;
+        if ($error is HTTPException) {
+          $status = $error->status;
+        }
+
+        $response = $this->configuration->errorResponder->respond(
+          $status,
+          $error,
+        );
+      }
+
+      if ($response->status is 100..=199) {
+        $response = $this->configuration->errorResponder->respond(500, null);
+      }
+
+      $this->sendResponse(
+        $streamId,
+        $request->method,
+        $response,
+        h2_cancellation(
+          $this->forced,
+          $this->configuration->responseWriteTimeout,
+        ),
+      );
+    } catch (Throwable $_) {
+      $this->reset($streamId, H2\ErrorCode::InternalError->value);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function sendResponse(
+    H2\StreamId $streamId,
+    Message\Method $method,
+    Response $response,
+    CancellationToken $cancellation,
+  ): void {
+    $bodyAllowed =
+      $method != Message\METHOD_HEAD
+      && !($response->status is 100..=199|204|304);
+
+    $body = $response->body;
+    if (!$bodyAllowed && $body != null) {
+      if ($body is CloseHandle) {
+        $body->close();
+      }
+
+      $body = null;
+    }
+
+    $hasTrailers = $response->trailers != null;
+    $contentLength = h1_content_length($response->headers);
+    if (
+      $body is MemoryHandle
+      && !$hasTrailers
+      && $contentLength != null
+      && $contentLength <= 16_384
+    ) {
+      try {
+        $data = $body->readAll($contentLength, $cancellation);
+        $headers = h2_response_headers($response->status, $response->headers);
+        $this->acquireWrite($cancellation);
+        try {
+          $this->protocol->sendResponseHeaders(
+            $streamId,
+            $headers,
+            $response->status,
+            $contentLength,
+            false,
+          );
+
+          $this->protocol->sendData($streamId, $data, true);
+          $this->writeOutbound($cancellation);
+        } finally {
+          $this->releaseWrite();
+        }
+      } finally {
+        $body->close();
+      }
+
+      return;
+    }
+
+    $this->sendResponseHeaders(
+      $streamId,
+      h2_response_headers($response->status, $response->headers),
+      $response->status,
+      $contentLength,
+      $body == null
+      && !$hasTrailers,
+      $cancellation,
+    );
+
+    if ($body != null) {
+      try {
+        while (!$body->reachedEndOfDataSource()) {
+          $data = match ($body->read(16_384, $cancellation)) {
+            '' => match ($body->reachedEndOfDataSource()) {
+              true => break,
+              false => continue,
+            },
+            $data => $data,
+          };
+
+          $this->sendData($streamId, $data, false, $cancellation);
+        }
+      } finally {
+        if ($body is CloseHandle) {
+          $body->close();
+        }
+      }
+    }
+
+    if ($hasTrailers) {
+      $trailers = $response->trailers?->await($cancellation) as FieldMap;
+      $headers = vec[];
+      foreach ($trailers as ($name, $value)) {
+        $headers[] = (Str\lowercase($name), $value, false);
+      }
+
+      $this->sendHeaders($streamId, $headers, true, $cancellation);
+    } else if ($body != null) {
+      $this->sendData($streamId, '', true, $cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function sendHeaders(
+    H2\StreamId $streamId,
+    vec<Header> $headers,
+    bool $endStream,
+    CancellationToken $cancellation,
+  ): void {
+    $this->withWrite(fn(): void {
+      $this->protocol->sendHeaders($streamId, $headers, $endStream);
+    }, $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function sendResponseHeaders(
+    H2\StreamId $streamId,
+    vec<Header> $headers,
+    Message\StatusCode $status,
+    null|int $contentLength,
+    bool $endStream,
+    CancellationToken $cancellation,
+  ): void {
+    $this->withWrite(fn(): void {
+      $this->protocol->sendResponseHeaders(
+        $streamId,
+        $headers,
+        $status,
+        $contentLength,
+        $endStream,
+      );
+    }, $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function sendData(
+    H2\StreamId $streamId,
+    string $data,
+    bool $endStream,
+    CancellationToken $cancellation,
+  ): void {
+    if ($data == '') {
+      $this->withWrite(fn(): void {
+        $this->protocol->sendData($streamId, '', $endStream);
+      }, $cancellation);
+
+      return;
+    }
+
+    $offset = 0;
+    while ($offset < length!($data)) {
+      $this->acquireWrite($cancellation);
+      $sent = false;
+      try {
+        $window = $this->protocol->availableSendWindow($streamId);
+        if ($window > 0) {
+          $length = length!($data) - $offset;
+          if ($length > 16_384) {
+            $length = 16_384;
+          }
+
+          if ($length > $window) {
+            $length = $window;
+          }
+
+          $chunk = Str\slice($data, $offset, $length);
+          $offset += $length;
+          $this->protocol->sendData(
+            $streamId,
+            $chunk,
+            $endStream
+            && $offset == length!($data),
+          );
+
+          $this->writeOutbound($cancellation);
+          $sent = true;
+        }
+      } finally {
+        $this->releaseWrite();
+      }
+
+      if (!$sent) {
+        $_ = $this->capacityReceiver->receive($cancellation);
+      }
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(H2\StreamId $parentStreamId, Request $request): void {
+    $headers = h2_push_headers($request);
+    if ($headers == null) {
+      throw new H2\ProtocolException(
+        'an HTTP/2 push request requires an absolute URL',
+      );
+    }
+
+    $limit = $this->configuration->maximumServerPushes;
+    if (!$this->pushEnabled || ($limit != null && $this->pushCount >= $limit)) {
+      throw new H2\ProtocolException('server push is unavailable for HTTP/2');
+    }
+
+    $this->acquireWrite($this->forced);
+    try {
+      $streamId = $this->protocol->nextStreamId();
+      $this->protocol->sendPushPromise($parentStreamId, $streamId, $headers);
+
+      $this->writeOutbound($this->forced);
+    } finally {
+      $this->releaseWrite();
+    }
+
+    $this->pushCount++;
+    $state = new H2StreamState(null, null, new SignalCancellationToken());
+
+    $this->streams[$streamId] = $state;
+    $this->startRequest(
+      $streamId,
+      $request->withProtocolVersion(ProtocolVersion::V2),
+      $state,
+      false,
+    );
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function reset(
+    H2\StreamId $streamId,
+    H2\ErrorCodeValue $errorCode,
+  ): void {
+    try {
+      $this->withWrite(fn(): void {
+        $this->protocol->resetStream($streamId, $errorCode);
+      }, $this->forced);
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function failStream(H2\StreamId $streamId, Throwable $error): void {
+    if (!contains_key!($this->streams, $streamId)) {
+      return;
+    }
+
+    $state = $this->streams[$streamId];
+    $state->body?->fail($error);
+    if ($state->trailers != null && !$state->trailers->isComplete()) {
+      $state->trailers->complete(FieldMap::default());
+    }
+
+    $state->cancellation->cancel();
+  }
+
+  #[TrackCaller]
+  private function failStreams(Throwable $error): void {
+    foreach ($this->streams as $streamId => $_) {
+      $this->failStream($streamId, $error);
+    }
+  }
+
+  #[TrackCaller]
+  private function failIncompleteStreams(Throwable $error): void {
+    foreach ($this->streams as $streamId => $state) {
+      if ($state->body != null && !$state->body->isComplete()) {
+        $this->failStream($streamId, $error);
+      }
+    }
+  }
+
+  #[TrackCaller]
+  private function removeStream(H2\StreamId $streamId): void {
+    if (!contains_key!($this->streams, $streamId)) {
+      return;
+    }
+
+    remove!($this->streams, $streamId);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function flush(CancellationToken $cancellation): void {
+    $this->withWrite(fn(): void {}, $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function withWrite(
+    fn(): void $operation,
+    CancellationToken $cancellation,
+  ): void {
+    $this->acquireWrite($cancellation);
+    try {
+      $operation();
+      $this->writeOutbound($cancellation);
+    } finally {
+      $this->releaseWrite();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function acquireWrite(CancellationToken $cancellation): void {
+    $cancellation->throwIfCancellationRequested();
+    if (!$this->writeLocked) {
+      $this->writeLocked = true;
+      return;
+    }
+
+    $suspension = Whim\_Private\create_suspension::<null>();
+    $waiter = new AsyncPrivate\Waiter::<null>($suspension);
+    $this->writeWaiters->pushBack($waiter);
+    $subscription = $cancellation->register(fn(): void {
+      if (!$waiter->active) {
+        return;
+      }
+
+      $waiter->active = false;
+      try {
+        $cancellation->throwIfCancellationRequested();
+      } catch (Throwable $error) {
+        $waiter->suspension->throw($error);
+      }
+    });
+
+    try {
+      $suspension->suspend();
+    } finally {
+      $waiter->active = false;
+      $cancellation->unregister($subscription);
+    }
+  }
+
+  private function releaseWrite(): void {
+    while (!$this->writeWaiters->isEmpty()) {
+      $waiter = $this->writeWaiters->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+        return;
+      }
+    }
+
+    $this->writeLocked = false;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function writeOutbound(CancellationToken $cancellation): void {
+    $bytes = $this->protocol->takeOutboundBytes();
+    if ($bytes != '') {
+      $this->stream->writeAll($bytes, $cancellation);
+    }
+  }
+}

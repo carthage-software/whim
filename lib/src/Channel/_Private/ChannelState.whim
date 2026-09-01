@@ -1,0 +1,38 @@
+namespace Whim\Channel\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\NonNegativeInt;
+
+/** Defines the behavior of channel state values. */
+interface ChannelState {
+  /** Returns the channel capacity when it is bounded. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getCapacity(): null|NonNegativeInt;
+
+  /** Closes the resource to further operations. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void;
+
+  /** Reports whether the resource is closed. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool;
+
+  /** Returns the number of buffered values. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function count(): NonNegativeInt;
+
+  /** Reports whether the channel buffer is full. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isFull(): bool;
+
+  /** Reports whether the channel buffer is empty. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isEmpty(): bool;
+}

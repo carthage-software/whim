@@ -1,0 +1,32 @@
+namespace Whim\Encoding\Hex;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Encodes bytes as lowercase hexadecimal text. */
+#[AlwaysInline]
+#[MustUse]
+function encode(string $bytes): string {
+  return Whim\_Private\hex_encode($bytes);
+}
+
+/**
+ * Decodes hexadecimal text of either case back into bytes.
+ *
+ * @throws DecodingException when the input is not valid hexadecimal text.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(string $encoded): string {
+  $decoded = Whim\_Private\hex_decode($encoded);
+  if ($decoded == null) {
+    throw new DecodingException('the input is not hexadecimal');
+  }
+
+  return $decoded;
+}

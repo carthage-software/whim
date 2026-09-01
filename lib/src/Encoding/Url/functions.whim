@@ -1,0 +1,60 @@
+namespace Whim\Encoding\Url;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Percent-encodes bytes for a URL component, sparing RFC 3986 unreserved bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode(string $bytes): string {
+  return Whim\_Private\url_encode($bytes);
+}
+
+/**
+ * Decodes a percent-encoded URL component back into bytes.
+ *
+ * @throws DecodingException when the input is not valid percent-encoded text.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(string $encoded): string {
+  $decoded = Whim\_Private\url_decode($encoded);
+  if ($decoded == null) {
+    throw new DecodingException(
+      'a percent escape must be two hexadecimal digits',
+    );
+  }
+
+  return $decoded;
+}
+
+/** Percent-encodes bytes as a form field, writing a space as `+`. */
+#[AlwaysInline]
+#[MustUse]
+function encode_form(string $bytes): string {
+  return Whim\_Private\url_encode_form($bytes);
+}
+
+/**
+ * Decodes a form field, reading `+` as a space.
+ *
+ * @throws DecodingException when the input is not valid percent-encoded text.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode_form(string $encoded): string {
+  $decoded = Whim\_Private\url_decode_form($encoded);
+  if ($decoded == null) {
+    throw new DecodingException(
+      'a percent escape must be two hexadecimal digits',
+    );
+  }
+
+  return $decoded;
+}

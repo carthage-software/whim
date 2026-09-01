@@ -1,0 +1,11 @@
+class Empty {
+    // nothing here yet
+}
+
+function todo(): void {
+    // implement me
+}
+
+interface Marker {
+    /* no members */
+}

@@ -1,0 +1,86 @@
+namespace Whim\RandomSequence;
+
+use Whim\Marker\TrackCaller;
+use Whim\SecureRandom;
+use Whim\Refine\Uint32;
+
+/** Represents a mersenne twister sequence. */
+final class MersenneTwisterSequence implements WordSequence {
+  private vec<Uint32> $state = vec[];
+  private int $index = 624;
+
+  /** Creates a mersenne twister sequence. */
+  #[TrackCaller]
+  public function __construct(Uint32 $seed) {
+    $state = vec[$seed; 624];
+    $index = 1;
+    while ($index < 624) {
+      $previous = $state[$index - 1];
+      $state[$index] =
+        (1812433253 * ($previous ^ ($previous >> 30)) + $index) & 0xffffffff;
+
+      $index++;
+    }
+
+    $this->state = $state;
+  }
+
+  /** Creates a mersenne twister sequence with a secure random seed. */
+  #[TrackCaller]
+  public static function fromSecureSeed(): static {
+    return new MersenneTwisterSequence(SecureRandom\int(0, 0xffffffff));
+  }
+
+  /** Return the next value in the sequence. */
+  #[TrackCaller]
+  public function nextWord(): Uint32 {
+    if ($this->index >= 624) {
+      $index = 0;
+      while ($index < 227) {
+        $this->state[$index] = $this->twist(
+          $this->state[$index + 397],
+          $this->state[$index],
+          $this->state[$index + 1],
+        );
+
+        $index++;
+      }
+
+      while ($index < 623) {
+        $this->state[$index] = $this->twist(
+          $this->state[$index - 227],
+          $this->state[$index],
+          $this->state[$index + 1],
+        );
+
+        $index++;
+      }
+
+      $this->state[623] = $this->twist(
+        $this->state[396],
+        $this->state[623],
+        $this->state[0],
+      );
+
+      $this->index = 0;
+    }
+
+    $value = $this->state[$this->index];
+    $this->index++;
+    $value = $value ^ (($value >> 11) & 0x001fffff);
+    $value = $value ^ (($value << 7) & 0x9d2c5680);
+    $value = $value ^ (($value << 15) & 0xefc60000);
+    $value = $value ^ (($value >> 18) & 0x00003fff);
+    return $value;
+  }
+
+  #[TrackCaller]
+  private function twist(Uint32 $middle, Uint32 $upper, Uint32 $lower): Uint32 {
+    $parity = $lower & 1;
+    return (
+      $middle
+      ^ ((($upper & 0x80000000) | ($lower & 0x7fffffff)) >> 1)
+      ^ (0x9908b0df * $parity)
+    );
+  }
+}

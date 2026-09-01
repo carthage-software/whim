@@ -1,0 +1,63 @@
+namespace Whim\HTTP\Session;
+
+use Whim\HTTP\Cookie\SameSite;
+use Whim\HTTP\Cookie\SetCookie;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Configures cookie and expiry policy for persisted HTTP sessions. */
+final readonly class Configuration {
+  private const string DEFAULT_COOKIE_NAME = '__session';
+
+  public SetCookie $cookie;
+  public Duration $idleTimeout;
+
+  /**
+   * Creates a session configuration with secure cookie defaults.
+   * Pass a cookie with `secure: false` for plain-HTTP local development.
+   */
+  #[TrackCaller]
+  public function __construct(
+    null|SetCookie $cookie = null,
+    null|Duration $idleTimeout = null,
+    public null|Duration $cookieLifetime = null,
+    public bool $rollingExpiration = false,
+  ) {
+    $cookie ??= SetCookie::fromParts(
+      self::DEFAULT_COOKIE_NAME,
+      '',
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: SameSite::Lax,
+    );
+
+    $idleTimeout ??= Duration::fromMinutes(30);
+
+    if (
+      $cookie->value != ''
+      || $cookie->expires != null
+      || $cookie->maxAge != null
+    ) {
+      throw new InvalidArgumentException(
+        'the session cookie template must have an empty value and no expiry',
+      );
+    }
+
+    if (!$idleTimeout->isPositive()) {
+      throw new InvalidArgumentException(
+        'the session idle timeout must be positive',
+      );
+    }
+
+    if ($cookieLifetime != null && !$cookieLifetime->isPositive()) {
+      throw new InvalidArgumentException(
+        'the session cookie lifetime must be positive',
+      );
+    }
+
+    $this->cookie = $cookie;
+    $this->idleTimeout = $idleTimeout;
+  }
+}

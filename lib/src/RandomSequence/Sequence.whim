@@ -1,0 +1,55 @@
+namespace Whim\RandomSequence;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Defines the behavior of sequence values. */
+interface Sequence {
+  /** Return the next value in the sequence. */
+  #[TrackCaller]
+  public function next(): int;
+
+  /** Advances the iterator and returns a float in the unit interval [0, 1). */
+  #[TrackCaller]
+  public function nextFloat(): float {
+    $value = $this->next() & 0x1fffffffffffff;
+
+    return $value / 9007199254740992.0;
+  }
+
+  /**
+   * Advances the iterator and returns a value in [$min, $max], inclusive.
+   *
+   * @throws InvalidArgumentException when the minimum exceeds the maximum.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function nextIn(int $min, int $max): int {
+    if ($min == Math\INT_MIN && $max == Math\INT_MAX) {
+      return $this->next();
+    }
+
+    if ($min > $max) {
+      throw new InvalidArgumentException('$min must not exceed $max');
+    }
+
+    if ($max >= -1 && $max - Math\INT_MAX >= $min) {
+      do {
+        $value = $this->next();
+      } while ($value < $min
+      || $value > $max);
+
+      return $value;
+    }
+
+    $range = $max - $min + 1;
+    $limit = Math\INT_MAX - (Math\INT_MAX % $range);
+    do {
+      $value = $this->next() & Math\INT_MAX;
+    } while ($value >= $limit);
+
+    return $min + ($value % $range);
+  }
+}

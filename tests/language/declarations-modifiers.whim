@@ -1,0 +1,67 @@
+require_once!('_diagnostics.whim');
+
+raises(
+  '_declarations-modifiers/conflicting-visibility.whim',
+  'conflicts with `public`',
+);
+
+raises(
+  '_declarations-modifiers/duplicate-modifier.whim',
+  '`public` is not a modifier of a class declaration',
+);
+
+raises(
+  '_declarations-modifiers/modifier-before-enum.whim',
+  'only classes accept modifiers',
+);
+
+raises(
+  '_declarations-modifiers/modifier-before-interface.whim',
+  'only classes accept modifiers',
+);
+
+raises(
+  '_declarations-modifiers/parameter-modifier-outside-constructor.whim',
+  'promotes a parameter to a property',
+);
+
+raises(
+  '_declarations-modifiers/static-only-instance-member.whim',
+  'a final abstract class may declare only concrete static methods, static properties, and constants',
+);
+
+raises(
+  '_declarations-modifiers/abstract-method-with-body.whim',
+  'cannot have a body',
+);
+
+raises(
+  '_declarations-modifiers/concrete-method-without-body.whim',
+  'has no body',
+);
+
+raises(
+  '_declarations-modifiers/static-readonly.whim',
+  '`static` and `readonly` cannot be combined',
+);
+
+raises(
+  '_declarations-modifiers/static-parameter-type.whim',
+  '`static` may not be used as a parameter type',
+);
+
+raises(
+  '_declarations-modifiers/static-parameter-hint.whim',
+  'use `self` to accept an instance of the declaring class',
+);
+
+final abstract class FinalAbstractNumbers {
+  public static int $value = 1;
+  public const int ONE = 1;
+
+  public static function current(): int {
+    return self::$value;
+  }
+}
+
+assert!(FinalAbstractNumbers::current() == FinalAbstractNumbers::ONE);

@@ -1,0 +1,7 @@
+error: unexpected end of input, expected string literal
+ --> tests/ui/function_missing_name.rs:3:1
+  |
+3 | #[whim_function]
+  | ^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `whim_function` (in Nightly builds, run with -Z macro-backtrace for more info)

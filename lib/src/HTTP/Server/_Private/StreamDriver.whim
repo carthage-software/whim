@@ -1,0 +1,23 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Stream;
+
+/** Drives HTTP/1 or HTTP/2 and contains connection-level failures. */
+interface StreamDriver {
+  /** Serves the connection until it closes or forced shutdown is requested. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function serve(
+    Stream<_> $stream,
+    bool $enableH2c,
+    Handler $handler,
+    Configuration $configuration,
+    CancellationToken $draining,
+    CancellationToken $forced,
+  ): void;
+}

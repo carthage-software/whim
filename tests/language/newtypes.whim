@@ -1,0 +1,314 @@
+use Whim\Attribute\Attribute;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Marker\Deprecated;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\TypeError;
+
+newtype Foo = int;
+newtype Bar = int;
+
+/** Accepts the backing type transparently. */
+function take_int(int $value): int {
+  return $value + 1;
+}
+
+/** Accepts only values tagged as Foo. */
+function take_foo(Foo $value): void {}
+
+$foo = Foo(1);
+assert!($foo is Foo);
+assert!($foo is int);
+assert!(!(1 is Foo));
+assert!(take_int($foo) == 2);
+take_foo($foo);
+assert!(Bar(1) is Bar);
+assert!(!(Bar(1) is Foo));
+assert!(Foo(1) + Foo(2) == 3);
+assert!(Foo(3) << 1 == 6);
+assert!('x' . Foo(2) == 'x2');
+$assertion_value_12 = function(): void {
+  take_foo(1);
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (TypeError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_12->getMessage(),
+      'must be of type Foo, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_12 is TypeError);
+
+newtype Identifier<T: int|string = int> = T;
+newtype Producer<out T> = fn(): T;
+
+$default = Identifier(42);
+$string = Identifier::<string>('user');
+assert!($default is Identifier<int>);
+assert!($string is Identifier<string>);
+$producer = Producer::<int>(fn(): int => 1);
+assert!($producer is Producer<int>);
+assert!($producer is Producer<int|float>);
+assert!($producer() == 1);
+
+newtype Strict<T: int|string> = T;
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+File\write($work . '/missing-type-argument.whim', 'Strict(1);' . "\n");
+$missingTypeArgument = $work . '/missing-type-argument.whim';
+$assertion_value_18 = function() use ($missingTypeArgument): void {
+  require!($missingTypeArgument);
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_18->getMessage(),
+      'expects exactly 1 type argument(s), 0 provided',
+    ),
+  );
+}
+
+assert!($assertion_error_18 is TypeError);
+
+$assertion_value_19 = function(): void {
+  Strict::<float>(1.0);
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_19->getMessage(),
+      'does not satisfy bound',
+    ),
+  );
+}
+
+assert!($assertion_error_19 is TypeError);
+
+newtype Outer = Foo;
+
+$tagged = 100 as Foo;
+assert!($tagged is Foo);
+assert!($tagged as int == 100);
+assert!((Foo(1) as Bar) is Bar);
+$inner = Outer(Foo(2)) as Foo;
+assert!($inner is Foo);
+assert!($inner as int == 2);
+assert!((0 ?as Foo) is Foo);
+assert!('x' ?as Foo == null);
+
+/** Declares a default value that violates its own newtype tag. */
+function invalid(Foo $value = 1): Foo {
+  return $value;
+}
+
+$assertion_value_27 = function(): void {
+  invalid();
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (TypeError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_27->getMessage(),
+      'expected Foo, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_27 is TypeError);
+
+newtype Numbers = vec<int>;
+newtype Callback = fn(int): int;
+
+final class Box {
+  public function __construct(public int $value) {}
+}
+
+newtype Boxed = Box;
+newtype NestedInner = int;
+newtype NestedOuter = NestedInner;
+newtype CachedIdentifier<T: int|string> = T;
+newtype CachedOuter<T: int|string> = CachedIdentifier<T>;
+
+/** Constructs one generic newtype site under distinct outer environments. */
+function cached_identifier<T: int|string>(T $value): CachedIdentifier<T> {
+  return CachedIdentifier::<T>($value);
+}
+
+/** Constructs nested newtypes under distinct outer environments. */
+function cached_outer<T: int|string>(T $value): CachedOuter<T> {
+  return CachedOuter::<T>(CachedIdentifier::<T>($value));
+}
+
+/** Exercises one prepared newtype site with valid and invalid values. */
+function cached_foo(mixed $value): Foo {
+  return Foo($value);
+}
+
+$numbers = Numbers(vec[1, 2]);
+assert!($numbers[0] == 1);
+$numbers[] = 3;
+assert!(length!($numbers) == 3);
+$sum = 0;
+foreach ($numbers as $number) {
+  $sum += $number;
+}
+
+assert!($sum == 6);
+$callback = Callback(fn(int $value): int => $value + 1);
+assert!($callback(2) == 3);
+$boxed = Boxed(new Box(4));
+assert!($boxed->value == 4);
+$nested = NestedOuter(NestedInner(5));
+assert!($nested is NestedOuter);
+assert!($nested is NestedInner);
+assert!($nested is int);
+assert!(cached_identifier::<int>(6) is CachedIdentifier<int>);
+assert!(cached_identifier::<string>('six') is CachedIdentifier<string>);
+assert!(cached_outer::<int>(7) is CachedOuter<int>);
+assert!(cached_outer::<string>('seven') is CachedOuter<string>);
+assert!(cached_foo(8) is Foo);
+$assertion_value_41 = fn(): Foo => cached_foo('eight');
+$assertion_error_41 = null;
+try {
+  $assertion_value_41();
+} catch (TypeError $assertion_caught_41) {
+  $assertion_error_41 = $assertion_caught_41;
+}
+
+assert!($assertion_error_41 is TypeError);
+assert!(cached_foo(9) is Foo);
+
+/** Accepts only vectors that still satisfy the Numbers tag. */
+function take_numbers(Numbers $numbers): void {}
+
+$mutated = Numbers(vec[1]);
+$mutated[] = 'changed';
+assert!(!($mutated is Numbers));
+assert!($mutated ?as Numbers == null);
+$assertion_value_45 = function() use ($mutated): void {
+  take_numbers($mutated);
+};
+
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (TypeError $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is TypeError);
+
+#[Attribute(Attribute::TARGET_NEWTYPE)]
+final class Domain {}
+
+#[Domain]
+newtype UserId = int;
+
+#[Deprecated('1.0')]
+newtype LegacyId = int;
+
+assert!(Attribute::TARGET_ALL & Attribute::TARGET_NEWTYPE != 0);
+assert!(UserId(1) is UserId);
+
+File\write(
+  $work . '/alias-only-attribute.whim',
+  'use Whim\Attribute\Attribute;'
+  . "\n\n"
+  . '#[Attribute(Attribute::TARGET_TYPE_ALIAS)]'
+  . "\n"
+  . 'final class AliasOnly {}'
+  . "\n\n"
+  . '#[AliasOnly]'
+  . "\n"
+  . 'newtype BadId = int;'
+  . "\n",
+);
+
+$aliasOnlyAttribute = $work . '/alias-only-attribute.whim';
+$assertion_value_48 = function() use ($aliasOnlyAttribute): void {
+  require!($aliasOnlyAttribute);
+};
+
+$assertion_error_48 = null;
+try {
+  $assertion_value_48();
+} catch (LinkerError $assertion_caught_48) {
+  $assertion_error_48 = $assertion_caught_48;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_48->getMessage(),
+      'does not target newtypes',
+    ),
+  );
+}
+
+assert!($assertion_error_48 is LinkerError);
+
+newtype NewtypeDictKey = int;
+
+/** Returns a dictionary whose normalized keys violate its declared type. */
+function invalid_newtype_key_dictionary(): dict<NewtypeDictKey, string> {
+  $values = dict[];
+  $values[NewtypeDictKey(1)] = 'value';
+  return $values;
+}
+
+/** Builds the same invalid dictionary through a generic key type. */
+function invalid_generic_newtype_key_dictionary<T: int>(
+  T $key,
+): dict<T, string> {
+  $values = dict[];
+  $values[$key] = 'value';
+  return $values;
+}
+
+$assertion_value_49 = function(): dict<NewtypeDictKey, string> {
+  return invalid_newtype_key_dictionary();
+};
+
+$assertion_error_49 = null;
+try {
+  $assertion_value_49();
+} catch (TypeError $assertion_caught_49) {
+  $assertion_error_49 = $assertion_caught_49;
+}
+
+assert!($assertion_error_49 is TypeError);
+
+$assertion_value_50 = function(): dict<NewtypeDictKey, string> {
+  return invalid_generic_newtype_key_dictionary::<NewtypeDictKey>(
+    NewtypeDictKey(1),
+  );
+};
+
+$assertion_error_50 = null;
+try {
+  $assertion_value_50();
+} catch (TypeError $assertion_caught_50) {
+  $assertion_error_50 = $assertion_caught_50;
+}
+
+assert!($assertion_error_50 is TypeError);
+
+Filesystem\delete_directory($work, true);

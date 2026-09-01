@@ -1,0 +1,107 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Default\Default;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\TLS;
+use Whim\URL\URL;
+
+/** Configures HTTP transports, preferences, and response limits. */
+final readonly class Configuration implements Default {
+  #[AlwaysInline]
+  public function __construct(
+    public PositiveInt $maximumResponseHeaderSize = 8192,
+    public PositiveInt $maximumResponseBodySize = 10_485_760,
+    public NonNegativeInt $maximumInformationalResponses = 16,
+    public null|URL $baseURL = null,
+    public TLS\ClientConfiguration $tls = new TLS\ClientConfiguration(),
+    public H2\Configuration $h2 = new H2\Configuration(),
+    public vec<ProtocolVersion> $protocolVersions = vec[
+      ProtocolVersion::V2,
+      ProtocolVersion::V11,
+    ],
+    public null|ProxyConfiguration $proxy = null,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumResponseHeaderSize(
+    PositiveInt $size,
+  ): Configuration {
+    return clone!($this, maximumResponseHeaderSize: $size);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumResponseBodySize(
+    PositiveInt $size,
+  ): Configuration {
+    return clone!($this, maximumResponseBodySize: $size);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumInformationalResponses(
+    NonNegativeInt $maximum,
+  ): Configuration {
+    return clone!($this, maximumInformationalResponses: $maximum);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBaseURL(null|URL $baseURL): Configuration {
+    return clone!($this, baseURL: $baseURL);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTLS(TLS\ClientConfiguration $tls): Configuration {
+    return clone!($this, tls: $tls);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withH2(H2\Configuration $h2): Configuration {
+    return clone!($this, h2: $h2);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withProtocolVersions(
+    vec<ProtocolVersion> $protocolVersions,
+  ): Configuration {
+    return clone!($this, protocolVersions: $protocolVersions);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withProxy(null|ProxyConfiguration $proxy): Configuration {
+    return clone!($this, proxy: $proxy);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withOverrides(SendConfiguration $overrides): Configuration {
+    return new Configuration(
+      $overrides->maximumResponseHeaderSize ?? $this->maximumResponseHeaderSize,
+      $overrides->maximumResponseBodySize ?? $this->maximumResponseBodySize,
+      $overrides->maximumInformationalResponses
+      ?? $this->maximumInformationalResponses,
+      $overrides->baseURL ?? $this->baseURL,
+      $overrides->tls ?? $this->tls,
+      $overrides->h2 ?? $this->h2,
+      $overrides->protocolVersions ?? $this->protocolVersions,
+      $this->proxy,
+    );
+  }
+}

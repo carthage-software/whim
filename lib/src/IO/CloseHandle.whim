@@ -1,0 +1,26 @@
+namespace Whim\IO;
+
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Defines a handle whose underlying resource can be released. */
+interface CloseHandle extends Handle {
+  /** Whether the underlying resource has already been released. */
+  #[TrackCaller]
+  public function isClosed(): bool;
+
+  /** Releases the underlying resource. */
+  #[TrackCaller]
+  public function close(): void;
+
+  /** Releases the underlying resource when this handle is collected. */
+  #[TrackCaller]
+  public function __destruct(): void {
+    if (!$this->isClosed()) {
+      try {
+        $this->close();
+      } catch (Throwable $_) {
+      }
+    }
+  }
+}

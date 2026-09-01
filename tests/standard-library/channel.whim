@@ -1,0 +1,139 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Channel;
+
+$pair = Channel\unbounded::<int>();
+$sender = $pair[0];
+$receiver = $pair[1];
+
+assert!($sender is Channel\Sender<int>);
+assert!($receiver is Channel\Receiver<int>);
+assert!($sender->getCapacity() == null);
+assert!($receiver->getCapacity() == null);
+assert!($sender->count() == 0);
+assert!($receiver->isEmpty());
+
+$sender->send(41);
+assert!($receiver->count() == 1);
+assert!(!($receiver->isEmpty()));
+assert!($receiver->receive() == 41);
+assert!($receiver->isEmpty());
+
+($nullableSender, $nullableReceiver) = Channel\unbounded::<null>();
+$nullableSender->send(null);
+assert!($nullableReceiver->receive() == null);
+$nullableReceiver->close();
+
+$bounded = Channel\bounded::<string>(2);
+$boundedSender = $bounded[0];
+$boundedReceiver = $bounded[1];
+assert!($boundedSender->getCapacity() == 2);
+$boundedSender->trySend('a');
+$boundedSender->trySend('b');
+assert!($boundedSender->isFull());
+assert!($boundedReceiver->tryReceive() == 'a');
+assert!($boundedReceiver->tryReceive() == 'b');
+
+$boundedSender->close();
+assert!($boundedReceiver->isClosed());
+$assertion_value_17 = function() use ($boundedSender): void {
+  $boundedSender->send('c');
+};
+
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (Channel\ClosedException $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is Channel\ClosedException);
+
+$assertion_value_18 = fn(): string => $boundedReceiver->receive();
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (Channel\ClosedException $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is Channel\ClosedException);
+
+($waitingSender, $waitingReceiver) = Channel\unbounded::<int>();
+$waiting = Async\spawn::<null>(function() use ($waitingReceiver): null {
+  $waitingReceiver->waitUntilReceivable();
+  return null;
+});
+
+Async\later();
+$waitingSender->send(42);
+$waiting->await();
+assert!($waitingReceiver->receive() == 42);
+
+$cancellation = new SignalCancellationToken();
+$cancelledWait = Async\spawn::<null>(
+  function() use ($waitingReceiver, $cancellation): null {
+    $waitingReceiver->waitUntilReceivable($cancellation);
+    return null;
+  },
+);
+
+Async\later();
+$cancellation->cancel();
+$assertion_value_20 = fn(): null => $cancelledWait->await();
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (CancelledException $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is CancelledException);
+
+($sendableSender, $sendableReceiver) = Channel\bounded::<int>(1);
+$sendableSender->send(1);
+$sendable = Async\spawn::<null>(function() use ($sendableSender): null {
+  $sendableSender->waitUntilSendable();
+  return null;
+});
+
+Async\later();
+assert!($sendableReceiver->receive() == 1);
+$sendable->await();
+$sendableSender->send(2);
+
+$sendCancellation = new SignalCancellationToken();
+$cancelledSend = Async\spawn::<null>(
+  function() use ($sendableSender, $sendCancellation): null {
+    $sendableSender->waitUntilSendable($sendCancellation);
+    return null;
+  },
+);
+
+Async\later();
+$sendCancellation->cancel();
+$assertion_value_22 = fn(): null => $cancelledSend->await();
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (CancelledException $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is CancelledException);
+
+($fifoSender, $fifoReceiver) = Channel\unbounded::<int>();
+$fifoWaiters = vec[];
+for ($index = 0; $index < 64; $index++) {
+  $fifoWaiters[] = Async\spawn::<int>(fn(): int => $fifoReceiver->receive());
+}
+
+Async\later();
+for ($index = 0; $index < 64; $index++) {
+  $fifoSender->send($index);
+}
+
+for ($index = 0; $index < 64; $index++) {
+  assert!($fifoWaiters[$index]->await() == $index);
+}

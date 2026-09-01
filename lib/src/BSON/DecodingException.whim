@@ -1,0 +1,6 @@
+namespace Whim\BSON;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports malformed BSON bytes. */
+final class DecodingException extends InvalidArgumentException {}

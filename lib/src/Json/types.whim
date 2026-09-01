@@ -1,0 +1,4 @@
+namespace Whim\Json;
+
+/** A decoded JSON value: the JSON data model as a Whim type. */
+type Value = null|bool|int|float|string|vec<Value>|dict<string, Value>;

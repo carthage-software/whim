@@ -1,0 +1,6 @@
+namespace Whim\HTTP\Cookie;
+
+use Whim\Refine\NonEmptyString;
+
+/** One name and value from a Cookie header field. */
+type Pair = (NonEmptyString, string);

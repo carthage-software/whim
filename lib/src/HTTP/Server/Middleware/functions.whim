@@ -1,0 +1,14 @@
+namespace Whim\HTTP\Server\Middleware;
+
+use Whim\HTTP\Server\Handler\Handler;
+
+/** Wraps a handler with middleware in declaration order. */
+function wrap(Handler $handler, vec<Middleware> $middleware): Handler {
+  $index = length!($middleware);
+  while ($index > 0) {
+    $index--;
+    $handler = new MiddlewareHandler($middleware[$index], $handler);
+  }
+
+  return $handler;
+}

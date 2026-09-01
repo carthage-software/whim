@@ -1,0 +1,77 @@
+namespace Whim\HTTP\Server\Handler;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+
+/** Adapts a callable into a request handler. */
+final readonly class FunctionHandler implements Handler {
+  private (fn(Context, Request, CancellationToken): Response) $function;
+
+  #[AlwaysInline]
+  public function __construct(
+    (fn(): Response)
+    | (fn(Context): Response)
+    | (fn(Request): Response)
+    | (fn(CancellationToken): Response)
+    | (fn(Context, Request): Response)
+    | (fn(Context, CancellationToken): Response)
+    | (fn(Request, CancellationToken): Response)
+    | (fn(Context, Request, CancellationToken): Response) $function,
+  ) {
+    $this->function = match ($function) {
+      $handler @ (fn(
+        Context,
+        Request,
+        CancellationToken,
+      ): Response) => $handler,
+      $handler @ (fn(Context, Request): Response) => fn(
+        Context $context,
+        Request $request,
+        CancellationToken $_cancellation,
+      ): Response => $handler($context, $request),
+      $handler @ (fn(Context, CancellationToken): Response) => fn(
+        Context $context,
+        Request $_request,
+        CancellationToken $cancellation,
+      ): Response => $handler($context, $cancellation),
+      $handler @ (fn(Request, CancellationToken): Response) => fn(
+        Context $_context,
+        Request $request,
+        CancellationToken $cancellation,
+      ): Response => $handler($request, $cancellation),
+      $handler @ (fn(Context): Response) => fn(
+        Context $context,
+        Request $_request,
+        CancellationToken $_cancellation,
+      ): Response => $handler($context),
+      $handler @ (fn(Request): Response) => fn(
+        Context $_context,
+        Request $request,
+        CancellationToken $_cancellation,
+      ): Response => $handler($request),
+      $handler @ (fn(CancellationToken): Response) => fn(
+        Context $_context,
+        Request $_request,
+        CancellationToken $cancellation,
+      ): Response => $handler($cancellation),
+      $handler @ (fn(): Response) => fn(
+        Context $_context,
+        Request $_request,
+        CancellationToken $_cancellation,
+      ): Response => $handler(),
+    };
+  }
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response {
+    return ($this->function)($context, $request, $cancellation);
+  }
+}

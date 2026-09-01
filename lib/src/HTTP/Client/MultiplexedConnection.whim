@@ -1,0 +1,4 @@
+namespace Whim\HTTP\Client;
+
+/** Performs concurrent exchanges over one connection. */
+interface MultiplexedConnection extends Connection {}

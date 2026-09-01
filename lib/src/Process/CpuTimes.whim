@@ -1,0 +1,15 @@
+namespace Whim\Process;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Time\Duration;
+
+/** CPU time consumed by a process and its waited-for child processes. */
+final readonly class CpuTimes {
+  #[AlwaysInline]
+  public function __construct(
+    public Duration $user,
+    public Duration $system,
+    public Duration $childrenUser,
+    public Duration $childrenSystem,
+  ) {}
+}

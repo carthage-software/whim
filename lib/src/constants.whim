@@ -1,0 +1,7 @@
+namespace Whim;
+
+use Whim\Marker\Stub;
+
+/** The Whim standard-library version. */
+#[Stub]
+const VERSION = VERSION;

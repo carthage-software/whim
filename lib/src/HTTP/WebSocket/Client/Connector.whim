@@ -1,0 +1,18 @@
+namespace Whim\HTTP\WebSocket\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\URL\URL;
+
+/** Defines a strategy for opening WebSocket connections. */
+interface Connector {
+  /** Opens and validates a WebSocket connection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    URL $url,
+    Configuration $configuration = new Configuration(),
+    null|CancellationToken $cancellation = null,
+  ): Connection;
+}

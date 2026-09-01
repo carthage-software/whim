@@ -1,0 +1,27 @@
+namespace Whim\HTTP\Message\_Private;
+
+use Whim\HTTP\Message\Field;
+use Whim\Iterate\Iterator;
+use Whim\Marker\AlwaysInline;
+
+/** Iterates over an HTTP field map in insertion order. */
+final class FieldMapIterator implements Iterator<int, Field> {
+  private int $index = 0;
+
+  /** Creates an iterator over ordered field entries. */
+  #[AlwaysInline]
+  public function __construct(private vec<Field> $fields) {}
+
+  /** Returns the next field entry. */
+  #[AlwaysInline]
+  public function next(): null|(int, Field) {
+    if ($this->index >= length!($this->fields)) {
+      return null;
+    }
+
+    $index = $this->index;
+    $this->index++;
+
+    return ($index, $this->fields[$index]);
+  }
+}

@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a value that is invalid despite having the expected type. */
+#[Stub]
+class ValueError extends Error {}

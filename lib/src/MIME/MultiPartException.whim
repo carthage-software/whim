@@ -1,0 +1,6 @@
+namespace Whim\MIME;
+
+use Whim\Unwind\RuntimeException;
+
+/** A malformed or over-limit multipart body. */
+final class MultiPartException extends RuntimeException {}

@@ -1,0 +1,49 @@
+namespace Whim\Database;
+
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Configures a database connection pool. */
+final readonly class PoolConfiguration {
+  /** Creates a pool configuration. */
+  #[TrackCaller]
+  public function __construct(
+    public PositiveInt $maximumConnections = 10,
+    public NonNegativeInt $maximumIdleConnections = 10,
+    public Duration $maximumIdleTime = new Duration(300, 0),
+    public Duration $maximumLifetime = new Duration(1_800, 0),
+    public null|Duration $validationInterval = new Duration(30, 0),
+    public null|Duration $acquisitionTimeout = new Duration(30, 0),
+  ) {
+    if ($maximumIdleConnections > $maximumConnections) {
+      throw new InvalidArgumentException(
+        'maximum idle connections must not exceed maximum connections',
+      );
+    }
+
+    if (!$maximumIdleTime->isPositive()) {
+      throw new InvalidArgumentException('maximum idle time must be positive');
+    }
+
+    if (!$maximumLifetime->isPositive()) {
+      throw new InvalidArgumentException(
+        'maximum connection lifetime must be positive',
+      );
+    }
+
+    if ($validationInterval?->isNegative() ?? false) {
+      throw new InvalidArgumentException(
+        'validation interval must not be negative',
+      );
+    }
+
+    if ($acquisitionTimeout != null && !$acquisitionTimeout->isPositive()) {
+      throw new InvalidArgumentException(
+        'connection acquisition timeout must be positive',
+      );
+    }
+  }
+}

@@ -1,0 +1,17 @@
+namespace Whim\HTTP\Client\Middleware\_Private;
+
+use Whim\Refine\NonEmptyString;
+
+/** One cookie with the request scope derived when it was received. */
+final readonly class StoredCookie {
+  public function __construct(
+    public NonEmptyString $name,
+    public string $value,
+    public string $domain,
+    public NonEmptyString $path,
+    public null|int $expiresAt,
+    public bool $secure,
+    public bool $hostOnly,
+    public int $createdAt,
+  ) {}
+}

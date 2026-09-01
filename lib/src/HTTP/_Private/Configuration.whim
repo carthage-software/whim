@@ -1,0 +1,24 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+
+/** Controls an HTTP/2 protocol connection. */
+final readonly class Configuration {
+  public function __construct(
+    public dict<SettingId, SettingValue> $settings = dict[],
+    public null|RateLimiter $rateLimiter = null,
+    public NonNegativeInt $maximumHeaderBlockSize = 1_048_576,
+    public PositiveInt $maximumOutboundBufferSize = 16_777_216,
+    public NonNegativeInt $maximumReservedPushes = 100,
+  ) {}
+
+  /** Replaces the settings advertised to the peer. */
+  #[MustUse]
+  public function withSettings(
+    dict<SettingId, SettingValue> $settings,
+  ): Configuration {
+    return clone!($this, settings: $settings);
+  }
+}

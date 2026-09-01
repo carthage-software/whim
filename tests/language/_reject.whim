@@ -1,0 +1,64 @@
+use Whim\File;
+use Whim\Str;
+use Whim\Unwind\Throwable;
+
+/** The namespace a snippet's own declarations live in. */
+function snippet_namespace(string $name): string {
+  return 'Snippet\\' . Str\replace($name, '-', '_');
+}
+
+/**
+ * Wraps a snippet in a namespace of its own, so the names it declares cannot
+ * collide with the test's own, or another snippet's, in the one symbol world
+ * every `require!` shares. A snippet that writes its own namespace is left
+ * alone.
+ */
+function isolate(string $name, string $source): string {
+  if (Str\contains($source, 'namespace') || Str\contains($source, 'require!')) {
+    return $source;
+  }
+
+  return (
+    'namespace '
+    . snippet_namespace($name)
+    . ';'
+    . "\n"
+    . 'use Whim;'
+    . "\n"
+    . $source
+  );
+}
+
+/** Requires a source snippet and expects it to throw the given diagnostic. */
+function rejects(
+  string $directory,
+  string $name,
+  string $source,
+  string $error,
+): void {
+  $file = $directory . '/' . $name . '.whim';
+  File\write($file, isolate($name, $source));
+  $raised = null;
+  try {
+    require!($file);
+  } catch (Throwable $thrown) {
+    $raised = $thrown;
+  }
+
+  $raised = $raised;
+  assert!($raised is Throwable);
+  $message = Str\replace(
+    $raised->getMessage(),
+    snippet_namespace($name) . '\\',
+    '',
+  );
+
+  assert!(Whim\Str\contains($message, $error));
+}
+
+/** Requires a source snippet and expects it to load without throwing. */
+function accepts(string $directory, string $name, string $source): void {
+  $file = $directory . '/' . $name . '.whim';
+  File\write($file, isolate($name, $source));
+  require!($file);
+}

@@ -1,0 +1,509 @@
+use Whim\IO\BoundedReadHandle;
+use Whim\IO\BufferedReadHandle;
+use Whim\IO\ConcatReadHandle;
+use Whim\IO\Exception as IOException;
+use Whim\IO\FileDescriptorHandle;
+use Whim\IO\FixedLengthReadHandle;
+use Whim\IO\Handle;
+use Whim\IO\JoinedReadWriteHandle;
+use Whim\IO\LimitExceededException;
+use Whim\IO\MemoryHandle;
+use Whim\IO\Reader;
+use Whim\IO\ReadHandle;
+use Whim\IO\SeekHandle;
+use Whim\IO\SeekWhence;
+use Whim\IO\SinkWriteHandle;
+use Whim\IO\SpoolHandle;
+use Whim\IO\TeeWriteHandle;
+use Whim\IO\TruncatedReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Math;
+use Whim\OS\FileDescriptor;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\RuntimeException;
+
+$memory = new MemoryHandle();
+assert!($memory is Handle);
+assert!($memory is ReadHandle);
+assert!($memory is WriteHandle);
+assert!($memory is SeekHandle);
+assert!(!($memory is FileDescriptorHandle));
+
+$memorySpool = new SpoolHandle(16);
+assert!($memorySpool is ReadHandle);
+assert!($memorySpool is WriteHandle);
+assert!($memorySpool is SeekHandle);
+assert!(!($memorySpool is FileDescriptorHandle));
+assert!($memorySpool->write('hello') == 5);
+$memorySpool->seek(0);
+assert!($memorySpool->readAll() == 'hello');
+
+$spilled = new SpoolHandle(3);
+assert!($spilled->tryWrite('abcd') == 0);
+$spilled->waitUntilWritable();
+$spilledWrite = $spilled->tryWrite('abcd');
+if ($spilledWrite == 0) {
+  $spilled->waitUntilWritable();
+  $spilledWrite = $spilled->tryWrite('abcd');
+}
+
+assert!($spilledWrite == 4);
+$spilled->seek(1);
+assert!($spilled->write('Z') == 1);
+$spilled->seek(0);
+assert!($spilled->readAll() == 'aZcd');
+$spilled->close();
+assert!($spilled->isClosed());
+$assertion_value_17 = fn(): string => $spilled->tryRead();
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (IOException $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is IOException);
+
+($pipeReader, $pipeWriter) = Whim\IO\pipe();
+assert!($pipeReader is FileDescriptorHandle);
+assert!($pipeWriter is FileDescriptorHandle);
+$readDescriptor = $pipeReader->getFileDescriptor();
+$writeDescriptor = $pipeWriter->getFileDescriptor();
+assert!($readDescriptor is FileDescriptor);
+assert!($writeDescriptor is FileDescriptor);
+assert!($readDescriptor->toInt() >= 0);
+assert!($writeDescriptor->toInt() >= 0);
+assert!($readDescriptor->toInt() != $writeDescriptor->toInt());
+$readNumber = $readDescriptor->toInt();
+$duplicate = FileDescriptor::duplicate($readNumber);
+assert!($duplicate->toInt() != $readNumber);
+$duplicate->close();
+assert!($pipeReader->getFileDescriptor() == $readDescriptor);
+$pipeReader->close();
+$pipeWriter->close();
+$assertion_value_27 = fn(): FileDescriptor => $pipeReader->getFileDescriptor();
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (IOException $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is IOException);
+
+$assertion_value_28 = fn(): FileDescriptor => (
+  FileDescriptor::duplicate($readNumber)
+);
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (Whim\_Private\SystemError $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is Whim\_Private\SystemError);
+
+assert!($memory->write('hello world') == 11);
+assert!($memory->seek(0, SeekWhence::Current) == 11);
+assert!($memory->reachedEndOfDataSource());
+$memory->seek(0);
+assert!($memory->seek(0, SeekWhence::Current) == 0);
+assert!(!($memory->reachedEndOfDataSource()));
+assert!($memory->read() == 'hello world');
+assert!($memory->reachedEndOfDataSource());
+assert!($memory->toString() == 'hello world');
+
+$memory->seek(0);
+assert!($memory->read(0) == '');
+assert!($memory->seek(0, SeekWhence::Current) == 0);
+assert!($memory->read() == 'hello world');
+
+$memory->seek(0);
+assert!($memory->readFixedSize(5) == 'hello');
+assert!($memory->read(1) == ' ');
+assert!($memory->readAll() == 'world');
+
+$memory->seek(0);
+$assertion_value_43 = fn(): string => $memory->readFixedSize(-1);
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (InvalidArgumentException $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is InvalidArgumentException);
+
+assert!($memory->tryRead() == 'hello world');
+
+$appending = new MemoryHandle('one');
+$appending->seek(0, SeekWhence::End);
+assert!($appending->write('two') == 3);
+assert!($appending->write('three') == 5);
+assert!($appending->toString() == 'onetwothree');
+
+$overwriting = new MemoryHandle();
+$overwriting->write('abcdef');
+$overwriting->seek(2);
+assert!($overwriting->write('XY') == 2);
+assert!($overwriting->toString() == 'abXYef');
+$overwriting->seek(4);
+assert!($overwriting->write('WXYZ') == 4);
+assert!($overwriting->toString() == 'abXYWXYZ');
+
+$sparse = new MemoryHandle();
+$sparse->write('abc');
+$sparse->seek(5);
+assert!($sparse->write('z') == 1);
+assert!($sparse->toString() == "abc\x00\x00z");
+
+$fixedSource = new MemoryHandle('abc');
+$assertion_value_45 = fn(): FixedLengthReadHandle => (
+  new FixedLengthReadHandle($fixedSource, -1)
+);
+
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (InvalidArgumentException $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is InvalidArgumentException);
+
+assert!($fixedSource->tryRead() == 'abc');
+
+$copySource = new MemoryHandle('abc');
+$copyDestination = new MemoryHandle();
+$assertion_value_47 = function() use ($copySource, $copyDestination): void {
+  Whim\IO\copy_chunked($copySource, $copyDestination, 0);
+};
+
+$assertion_error_47 = null;
+try {
+  $assertion_value_47();
+} catch (InvalidArgumentException $assertion_caught_47) {
+  $assertion_error_47 = $assertion_caught_47;
+}
+
+assert!($assertion_error_47 is InvalidArgumentException);
+
+assert!($copySource->tryRead() == 'abc');
+assert!($copyDestination->toString() == '');
+
+$memory->seek(-5, SeekWhence::End);
+assert!($memory->seek(0, SeekWhence::Current) == 6);
+assert!($memory->read() == 'world');
+$memory->seek(0);
+$memory->seek(3, SeekWhence::Current);
+assert!($memory->seek(0, SeekWhence::Current) == 3);
+
+$overflowing = new MemoryHandle();
+$overflowing->seek(Math\INT_MAX);
+$assertion_value_53 = fn(): int => $overflowing->seek(1, SeekWhence::Current);
+$assertion_error_53 = null;
+try {
+  $assertion_value_53();
+} catch (OverflowError $assertion_caught_53) {
+  $assertion_error_53 = $assertion_caught_53;
+}
+
+assert!($assertion_error_53 is OverflowError);
+
+assert!($overflowing->seek(0, SeekWhence::Current) == Math\INT_MAX);
+
+$reader = new Reader(new MemoryHandle("alpha\nbeta\ngamma"));
+assert!($reader is BufferedReadHandle);
+assert!($reader is ReadHandle);
+assert!($reader->readLine() == 'alpha');
+assert!($reader->readLine() == 'beta');
+assert!($reader->readUntil('m') == 'gam');
+assert!($reader->readByte() == 'm');
+assert!($reader->readByte() == 'a');
+assert!($reader->readByte() == null);
+
+$limitedReader = new Reader(new MemoryHandle('abcdef'));
+$assertion_value_63 = fn(): null|string => (
+  $limitedReader->readUntilBounded('f', 5)
+);
+
+$assertion_error_63 = null;
+try {
+  $assertion_value_63();
+} catch (LimitExceededException $assertion_caught_63) {
+  $assertion_error_63 = $assertion_caught_63;
+}
+
+assert!($assertion_error_63 is LimitExceededException);
+
+$bounded = new BoundedReadHandle(new MemoryHandle('hello'), 3);
+assert!($bounded is ReadHandle);
+assert!($bounded->readFixedSize(3) == 'hel');
+assert!($bounded->reachedEndOfDataSource());
+$bounded->waitUntilReadable();
+$assertion_value_67 = fn(): string => $bounded->tryRead();
+$assertion_error_67 = null;
+try {
+  $assertion_value_67();
+} catch (LimitExceededException $assertion_caught_67) {
+  $assertion_error_67 = $assertion_caught_67;
+}
+
+assert!($assertion_error_67 is LimitExceededException);
+
+$boundedSource = new MemoryHandle('abc');
+$assertion_value_68 = fn(): BoundedReadHandle => (
+  new BoundedReadHandle($boundedSource, -1)
+);
+
+$assertion_error_68 = null;
+try {
+  $assertion_value_68();
+} catch (InvalidArgumentException $assertion_caught_68) {
+  $assertion_error_68 = $assertion_caught_68;
+}
+
+assert!($assertion_error_68 is InvalidArgumentException);
+
+assert!($boundedSource->tryRead() == 'abc');
+
+$truncated = new TruncatedReadHandle(new MemoryHandle('hello'), 3);
+assert!($truncated->readAll() == 'hel');
+assert!($truncated->reachedEndOfDataSource());
+
+$truncatedSource = new MemoryHandle('abc');
+$assertion_value_72 = fn(): TruncatedReadHandle => (
+  new TruncatedReadHandle($truncatedSource, -1)
+);
+
+$assertion_error_72 = null;
+try {
+  $assertion_value_72();
+} catch (InvalidArgumentException $assertion_caught_72) {
+  $assertion_error_72 = $assertion_caught_72;
+}
+
+assert!($assertion_error_72 is InvalidArgumentException);
+
+assert!($truncatedSource->tryRead() == 'abc');
+
+$concat = new ConcatReadHandle(
+  new MemoryHandle('foo'),
+  new MemoryHandle('bar'),
+);
+
+assert!($concat->readAll() == 'foobar');
+assert!($concat->reachedEndOfDataSource());
+
+$sink = new SinkWriteHandle();
+assert!($sink is WriteHandle);
+assert!($sink->write('anything') == 8);
+$sink->writeAll('more bytes');
+assert!($sink->tryWrite('x') == 1);
+
+final class OneByteWriteHandle implements WriteHandle {
+  private string $buffer = '';
+
+  public function waitUntilWritable(
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): void {}
+
+  public function tryWrite(string $bytes): int {
+    if ($bytes == '') {
+      return 0;
+    }
+
+    $this->buffer = $this->buffer . $bytes[0];
+    return 1;
+  }
+
+  public function write(
+    string $bytes,
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): int {
+    return $this->tryWrite($bytes);
+  }
+
+  public function toString(): string {
+    return $this->buffer;
+  }
+}
+
+$fast = new MemoryHandle();
+$slow = new OneByteWriteHandle();
+$tee = new TeeWriteHandle($fast, $slow);
+assert!($tee->tryWrite('abc') == 3);
+assert!($fast->toString() == 'abc');
+assert!($slow->toString() == 'a');
+
+assert!($tee->tryWrite('d') == 0);
+assert!($fast->toString() == 'abc');
+assert!($slow->toString() == 'ab');
+$tee->waitUntilWritable();
+assert!($fast->toString() == 'abc');
+assert!($slow->toString() == 'abc');
+
+assert!($tee->tryWrite('d') == 1);
+assert!($fast->toString() == 'abcd');
+assert!($slow->toString() == 'abcd');
+
+assert!($tee->tryWrite('ef') == 2);
+assert!($fast->toString() == 'abcdef');
+assert!($slow->toString() == 'abcde');
+assert!($tee->write('g') == 1);
+assert!($fast->toString() == 'abcdefg');
+assert!($slow->toString() == 'abcdefg');
+
+final class CountingDuplexHandle implements
+  ReadHandle,
+  WriteHandle,
+  Whim\IO\CloseHandle {
+  public int $closes = 0;
+  private bool $closed = false;
+
+  public function waitUntilReadable(
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): void {}
+
+  public function reachedEndOfDataSource(): bool {
+    return true;
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    return '';
+  }
+
+  public function waitUntilWritable(
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): void {}
+
+  public function tryWrite(string $bytes): int {
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): int {
+    return length!($bytes);
+  }
+
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    $this->closes++;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+}
+
+$duplex = new CountingDuplexHandle();
+new JoinedReadWriteHandle($duplex, $duplex)->close();
+assert!($duplex->closes == 1);
+
+$readerSide = new CountingDuplexHandle();
+$writerSide = new CountingDuplexHandle();
+new JoinedReadWriteHandle($readerSide, $writerSide)->close();
+assert!($readerSide->closes == 1);
+assert!($writerSide->closes == 1);
+
+final class FailingCloseReadHandle implements ReadHandle, Whim\IO\CloseHandle {
+  public static int $closes = 0;
+  private bool $closed = false;
+
+  public function waitUntilReadable(
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): void {}
+
+  public function reachedEndOfDataSource(): bool {
+    return true;
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    return '';
+  }
+
+  public function close(): void {
+    $this->closed = true;
+    self::$closes++;
+    throw new RuntimeException('reader close failed');
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+}
+
+function discard_failing_close_handle(): void {
+  $handle = new FailingCloseReadHandle();
+}
+
+discard_failing_close_handle();
+assert!(FailingCloseReadHandle::$closes == 1);
+
+$writerAfterFailure = new CountingDuplexHandle();
+$readerFailure = null;
+$assertion_callable_99 = function() use ($writerAfterFailure): void {
+  new JoinedReadWriteHandle(
+    new FailingCloseReadHandle(),
+    $writerAfterFailure,
+  )->close();
+};
+
+try {
+  $assertion_callable_99();
+} catch (RuntimeException $assertion_caught_99) {
+  $readerFailure = $assertion_caught_99;
+}
+
+assert!($readerFailure is RuntimeException);
+
+assert!($readerFailure->getMessage() == 'reader close failed');
+
+assert!($writerAfterFailure->closes == 1);
+
+$closed = new MemoryHandle('data');
+$closed->close();
+assert!($closed->toString() == 'data');
+$assertion_value_103 = fn(): string => $closed->tryRead();
+$assertion_error_103 = null;
+try {
+  $assertion_value_103();
+} catch (IOException $assertion_caught_103) {
+  $assertion_error_103 = $assertion_caught_103;
+}
+
+assert!($assertion_error_103 is IOException);
+
+$assertion_value_104 = function() use ($closed): void {
+  $closed->waitUntilReadable();
+};
+
+$assertion_error_104 = null;
+try {
+  $assertion_value_104();
+} catch (IOException $assertion_caught_104) {
+  $assertion_error_104 = $assertion_caught_104;
+}
+
+assert!($assertion_error_104 is IOException);
+
+$assertion_value_105 = function() use ($closed): void {
+  $closed->waitUntilWritable();
+};
+
+$assertion_error_105 = null;
+try {
+  $assertion_value_105();
+} catch (IOException $assertion_caught_105) {
+  $assertion_error_105 = $assertion_caught_105;
+}
+
+assert!($assertion_error_105 is IOException);

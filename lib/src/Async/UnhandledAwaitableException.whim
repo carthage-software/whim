@@ -1,0 +1,6 @@
+namespace Whim\Async;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports an asynchronous failure that was never observed. */
+class UnhandledAwaitableException extends RuntimeException {}

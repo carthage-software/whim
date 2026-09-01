@@ -1,0 +1,138 @@
+namespace Whim\MIME\MultiPart\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\MIME\Part\Part;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+
+/** Streams a multipart body without buffering its parts. */
+final class MultiPartReadHandle implements ReadHandle {
+  private const STATE_BOUNDARY = 0;
+  private const STATE_BODY = 1;
+  private const STATE_CLOSING = 2;
+  private const STATE_END = 3;
+
+  private int $state;
+  private int $index = 0;
+  private string $buffer = '';
+  private null|ReadHandle $body = null;
+
+  #[TrackCaller]
+  public function __construct(
+    private NonEmptyString $boundary,
+    private vec<Part> $parts,
+  ) {
+    $this->state = match ($parts == vec[]) {
+      true => self::STATE_CLOSING,
+      false => self::STATE_BOUNDARY,
+    };
+  }
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->buffer != '' || $this->state != self::STATE_BODY) {
+      return;
+    }
+
+    ($this->body as ReadHandle)->waitUntilReadable($cancellation);
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->state == self::STATE_END && $this->buffer == '';
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($maxBytes == 0 || $this->reachedEndOfDataSource()) {
+      return '';
+    }
+
+    while ($this->buffer == '') {
+      if ($this->state == self::STATE_BOUNDARY) {
+        $this->enterBoundary();
+        continue;
+      }
+
+      if ($this->state == self::STATE_CLOSING) {
+        $this->enterClosing();
+        continue;
+      }
+
+      if ($this->state == self::STATE_END) {
+        return '';
+      }
+
+      $body = $this->body as ReadHandle;
+      $chunk = $body->tryRead($maxBytes);
+      if ($chunk != '') {
+        return $chunk;
+      }
+
+      if (!$body->reachedEndOfDataSource()) {
+        return '';
+      }
+
+      $this->advance();
+    }
+
+    return $this->drain($maxBytes);
+  }
+
+  #[TrackCaller]
+  private function enterBoundary(): void {
+    $prefix = match ($this->index == 0) {
+      true => '--',
+      false => "\r\n--",
+    };
+
+    $part = $this->parts[$this->index];
+    $this->buffer =
+      $prefix
+      . $this->boundary
+      . "\r\n"
+      . $part->headers()->toFoldedString()
+      . "\r\n";
+
+    $this->body = $part->body();
+    $this->state = self::STATE_BODY;
+  }
+
+  #[TrackCaller]
+  private function advance(): void {
+    $this->body = null;
+    $this->index++;
+    $this->state = match ($this->index >= length!($this->parts)) {
+      true => self::STATE_CLOSING,
+      false => self::STATE_BOUNDARY,
+    };
+  }
+
+  #[TrackCaller]
+  private function enterClosing(): void {
+    $prefix = match ($this->parts == vec[]) {
+      true => '--',
+      false => "\r\n--",
+    };
+
+    $this->buffer = $prefix . $this->boundary . "--\r\n";
+    $this->state = self::STATE_END;
+  }
+
+  #[TrackCaller]
+  private function drain(null|int $maxBytes): string {
+    if ($maxBytes == null || $maxBytes >= length!($this->buffer)) {
+      $result = $this->buffer;
+      $this->buffer = '';
+      return $result;
+    }
+
+    $result = Str\slice($this->buffer, 0, $maxBytes);
+    $this->buffer = Str\slice($this->buffer, $maxBytes);
+    return $result;
+  }
+}

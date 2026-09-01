@@ -1,0 +1,196 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Client\ConnectionException;
+use Whim\HTTP\Client\Origin;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Client\ProxyConfiguration;
+use Whim\HTTP\Client\RequestException;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Request;
+use Whim\IO\Reader;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Stream as NetworkStream;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\TCP;
+use Whim\TLS;
+use Whim\URI\IPHost;
+use Whim\URI\RegisteredNameHost;
+
+/** Reports whether this origin should use the configured proxy. */
+#[MustUse]
+function should_use_proxy(
+  Origin $origin,
+  ProxyConfiguration $configuration,
+): bool {
+  $host = match ($origin->host) {
+    $value @ IPHost => $value->address->toString(),
+    $value @ RegisteredNameHost => Str\lowercase($value->name),
+    $_ => $origin->host->toString(),
+  };
+
+  foreach ($configuration->bypass as $candidate) {
+    $rule = Str\lowercase($candidate);
+    if ($rule == '*') {
+      return false;
+    }
+
+    if (Str\starts_with($rule, '.')) {
+      $rule = Str\slice($rule, 1);
+    }
+
+    if ($rule == $host || Str\ends_with($host, '.' . $rule)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/** Opens the byte stream to an HTTP proxy. */
+#[MustUse]
+#[TrackCaller]
+function connect_proxy(
+  TCP\Connector $connector,
+  ProxyConfiguration $configuration,
+  null|CancellationToken $cancellation,
+): NetworkStream<InternetEndpoint> {
+  ($host, $serverName) = proxy_host($configuration);
+  $port =
+    $configuration->url->authority->port ?? match (
+      $configuration->url->scheme
+    ) {
+      'https' => 443,
+      $_ => 80,
+    };
+
+  $stream = $connector->connect($host, $port, $cancellation);
+  if ($configuration->url->scheme == 'http') {
+    return $stream;
+  }
+
+  $stream = new TLS\Connector::<InternetEndpoint>(
+    $configuration->tls->withAlpnProtocols(vec['http/1.1']),
+  )->connect($stream, $configuration->serverName ?? $serverName, $cancellation);
+
+  $protocol = $stream->getConnectionState()->alpnProtocol;
+  if ($protocol != null && $protocol != 'http/1.1') {
+    $stream->close();
+    throw new ConnectionException(
+      'the HTTP proxy selected an unsupported application protocol',
+    );
+  }
+
+  return $stream;
+}
+
+/** Establishes an HTTP CONNECT tunnel over a proxy stream. */
+#[TrackCaller]
+function establish_tunnel(
+  NetworkStream<InternetEndpoint> $stream,
+  Origin $origin,
+  ProxyConfiguration $configuration,
+  int $maximumHeaderSize,
+  null|CancellationToken $cancellation,
+): void {
+  $authority = $origin->host->toString() . ':' . $origin->port;
+  $request =
+    'CONNECT ' . $authority . " HTTP/1.1\r\nHost: " . $authority . "\r\n";
+
+  if ($configuration->authorization != null) {
+    $request .=
+      'Proxy-Authorization: ' . $configuration->authorization . "\r\n";
+  }
+
+  $stream->writeAll($request . "\r\n", $cancellation);
+  $reader = new Reader($stream);
+
+  $informational = 0;
+  while (true) {
+    $head = read_h1_response_head($reader, $maximumHeaderSize, $cancellation);
+
+    if ($head->status >= 200) {
+      if ($head->status < 300) {
+        return;
+      }
+
+      $stream->close();
+      throw new ProtocolException(
+        'the HTTP proxy refused the CONNECT tunnel with status '
+        . $head->status,
+      );
+    }
+
+    $informational++;
+    if (
+      $informational > 16
+      || $head->status == Message\STATUS_SWITCHING_PROTOCOLS
+    ) {
+      $stream->close();
+      throw new ProtocolException(
+        'the HTTP proxy sent an invalid CONNECT response',
+      );
+    }
+  }
+}
+
+/** Returns an absolute-form target for an HTTP proxy. */
+#[MustUse]
+function absolute_request_target(Request $request): string {
+  $url = $request->url;
+  if ($url == null) {
+    throw new RequestException(
+      'a forward-proxy request requires an absolute URL',
+    );
+  }
+
+  $authority = $url->authority->host->toString();
+  if ($url->authority->port != null) {
+    $authority .= ':' . $url->authority->port;
+  }
+
+  $target = $url->scheme . '://' . $authority;
+  $target .= match ($url->path) {
+    '' => '/',
+    $_ => $url->path,
+  };
+
+  if ($url->query != null) {
+    $target .= '?' . $url->query;
+  }
+
+  return $target;
+}
+
+/** Returns the final destination when it is already an IP literal. */
+#[MustUse]
+function known_destination(Origin $origin): null|InternetEndpoint {
+  return match ($origin->host) {
+    $host @ IPHost => new InternetEndpoint($host->address, $origin->port),
+    $_ => null,
+  };
+}
+
+/** Returns the proxy network host and TLS server name. */
+#[MustUse]
+function proxy_host(
+  ProxyConfiguration $configuration,
+): (Network\Host, NonEmptyString) {
+  return match ($configuration->url->authority->host) {
+    $host @ IPHost => (
+      $host->address,
+      $host->address->toString() as NonEmptyString,
+    ),
+    $host @ RegisteredNameHost => (
+      $host->name as NonEmptyString,
+      $host->name as NonEmptyString,
+    ),
+    $_ => throw new ConnectionException(
+      'an IPvFuture proxy host cannot serve as a network endpoint',
+    ),
+  };
+}

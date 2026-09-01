@@ -1,0 +1,6 @@
+namespace Whim\SMTP;
+
+use Whim\Unwind\RuntimeException;
+
+/** Thrown when an SMTP server rejects message delivery. */
+final class TransmissionException extends RuntimeException {}

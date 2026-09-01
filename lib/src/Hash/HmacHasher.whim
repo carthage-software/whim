@@ -1,0 +1,65 @@
+namespace Whim\Hash;
+
+use Whim;
+use Whim\Hash\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\RuntimeException;
+
+/** Authenticates a stream with a keyed hash, incrementally. */
+final class HmacHasher {
+  #[AlwaysInline]
+  private function __construct(
+    private readonly Whim\_Private\HashState $state,
+  ) {}
+
+  /**
+   * Begins an authentication with the given algorithm and key.
+   *
+   * @throws InvalidArgumentException when the algorithm is not cryptographic.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public static function create(
+    Algorithm $algorithm,
+    #[SensitiveParameter] string $key,
+  ): HmacHasher {
+    _Private\require_cryptographic($algorithm);
+    return new HmacHasher(
+      Whim\_Private\create_hmac_state($algorithm->value, $key),
+    );
+  }
+
+  /**
+   * Feeds message bytes into the authentication.
+   *
+   * @throws RuntimeException when the authentication is already finished.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function update(#[SensitiveParameter] string $bytes): void {
+    if (!Whim\_Private\update_hash_state($this->state, $bytes)) {
+      throw new RuntimeException('the digest is already finished');
+    }
+  }
+
+  /**
+   * Ends the authentication and returns its bytes.
+   *
+   * @throws RuntimeException when the authentication is already finished.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function finish(): string {
+    $digest = Whim\_Private\finish_hash_state($this->state);
+    if ($digest == null) {
+      throw new RuntimeException('the digest is already finished');
+    }
+
+    return $digest;
+  }
+}

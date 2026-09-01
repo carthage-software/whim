@@ -1,0 +1,11 @@
+namespace Whim\DateTime;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Reports whether a year has a Gregorian leap day. */
+#[AlwaysInline]
+#[MustUse]
+function is_leap_year(Year $year): bool {
+  return $year % 4 == 0 && ($year % 100 != 0 || $year % 400 == 0);
+}

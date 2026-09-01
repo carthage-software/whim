@@ -1,0 +1,34 @@
+namespace Whim\SMTP;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An RFC 2852 delivery deadline. */
+final readonly class DeliverBy {
+  #[AlwaysInline]
+  private function __construct(
+    public Duration $deadline,
+    public DeliverByMode $mode,
+  ) {}
+
+  /** Creates a positive delivery deadline. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function after(
+    Duration $deadline,
+    DeliverByMode $mode = DeliverByMode::Return,
+  ): DeliverBy {
+    if (!$deadline->isPositive()) {
+      throw new InvalidArgumentException(
+        'an SMTP delivery deadline must be positive',
+      );
+    }
+
+    return new DeliverBy($deadline, $mode);
+  }
+}

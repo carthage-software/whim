@@ -1,0 +1,22 @@
+namespace Whim\TCP\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\_Private\StreamImpl as NetworkStreamImpl;
+use Whim\OS\FileDescriptor;
+use Whim\TCP\Stream as TCPStream;
+
+/** Implements a plain TCP stream. */
+final class StreamImpl extends NetworkStreamImpl<InternetEndpoint> implements
+  TCPStream {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    FileDescriptor $descriptor,
+    InternetEndpoint $localEndpoint,
+    InternetEndpoint $peerEndpoint,
+  ) {
+    parent::__construct($descriptor, $localEndpoint, $peerEndpoint);
+  }
+}

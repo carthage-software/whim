@@ -1,0 +1,40 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Reuses compatible idle HTTP connections. */
+final readonly class PooledConnector implements Connector {
+  private _Private\Pool $pool;
+
+  public function __construct(
+    Connector $connector = new DirectConnector(),
+    NonNegativeInt $maximumIdleConnections = 256,
+    NonNegativeInt $maximumIdleConnectionsPerOrigin = 32,
+  ) {
+    $this->pool = new _Private\Pool(
+      $connector,
+      $maximumIdleConnections,
+      $maximumIdleConnectionsPerOrigin,
+    );
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    Origin $origin,
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    return $this->pool->connect(
+      $origin,
+      $request,
+      $configuration,
+      $cancellation,
+    );
+  }
+}

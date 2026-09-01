@@ -1,0 +1,7 @@
+namespace Whim\TCP;
+
+use Whim\Network\InternetEndpoint;
+use Whim\TLS\Stream as TLSStream;
+
+/** A TLS-encrypted TCP stream. */
+interface SecureStream extends TLSStream<InternetEndpoint>, Stream {}

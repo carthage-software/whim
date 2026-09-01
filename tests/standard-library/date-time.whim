@@ -1,0 +1,116 @@
+use Whim\DateTime\Date;
+use Whim\DateTime\DateTime;
+use Whim\DateTime\Disambiguation;
+use Whim\DateTime\Era;
+use Whim\DateTime\Formatter;
+use Whim\DateTime\Meridiem;
+use Whim\DateTime\Month;
+use Whim\DateTime\Overflow;
+use Whim\DateTime\Period;
+use Whim\DateTime\Time;
+use Whim\DateTime\TimeZone;
+use Whim\DateTime\Weekday;
+use Whim\DateTime\ZonedDateTime;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+$leapDay = Date::fromParts(2024, Month::February, 29);
+assert!($leapDay->toString() == '2024-02-29');
+assert!($leapDay->weekday() == Weekday::Thursday);
+assert!($leapDay->dayOfYear() == 60);
+assert!($leapDay->daysInMonth() == 29);
+assert!($leapDay->era() == Era::CommonEra);
+assert!($leapDay->yearOfEra() == 2024);
+assert!(Date::parse('2023-02-29') == null);
+assert!(
+  Date::from('2024-12-31')->equals(Date::fromParts(2024, Month::December, 31)),
+);
+
+assert!(
+  Date::fromParts(2023, Month::January, 31)->plus(Period::months(1))->toString()
+  == '2023-02-28',
+);
+
+$assertion_value_10 = fn(): Date => (
+  Date::fromParts(2023, Month::January, 31)->plus(
+    Period::months(1),
+    Overflow::Reject,
+  )
+);
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (InvalidArgumentException $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is InvalidArgumentException);
+
+$time = Time::from('13:05:09.123456789');
+assert!($time->hour == 13);
+assert!($time->nanosecond == 123_456_789);
+assert!($time->meridiem() == Meridiem::PostMeridiem);
+assert!($time->hourOfMeridiem() == 1);
+assert!($time->format(Formatter::fromPattern('%I:%M %p')) == '01:05 PM');
+
+$dateTime = DateTime::from('2024-07-13T23:59:59.500');
+assert!(
+  $dateTime->plusDuration(Duration::fromMilliseconds(500))->toString()
+  == '2024-07-14T00:00:00',
+);
+
+$utc = TimeZone::utc();
+$epoch = $utc->at(SystemTime::unixEpoch());
+assert!($epoch->dateTime->toString() == '1970-01-01T00:00:00');
+assert!($epoch->offsetSeconds == 0);
+assert!(
+  $epoch->format(Formatter::httpDate()) == 'Thu, 01 Jan 1970 00:00:00 GMT',
+);
+
+assert!(
+  $epoch->format(Formatter::rfc2822()) == 'Thu, 1 Jan 1970 00:00:00 +0000',
+);
+
+assert!($epoch->format(Formatter::rfc3339()) == '1970-01-01T00:00:00+00:00');
+
+$newYork = TimeZone::from('America/New_York');
+$summer = ZonedDateTime::fromDateTime(
+  DateTime::from('2024-07-13T15:09:59'),
+  $newYork,
+);
+
+assert!($summer->offsetSeconds == -14_400);
+assert!($summer->abbreviation == 'EDT');
+assert!($summer->toString() == '2024-07-13T15:09:59-04:00[America/New_York]');
+
+assert!(ZonedDateTime::parse($summer->toString())?->equals($summer) == true);
+
+$gap = DateTime::from('2024-03-10T02:30:00');
+assert!($newYork->resolve($gap)->dateTime->toString() == '2024-03-10T03:30:00');
+
+$assertion_value_27 = fn(): ZonedDateTime => (
+  $newYork->resolve($gap, Disambiguation::Reject)
+);
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (InvalidArgumentException $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is InvalidArgumentException);
+
+$fold = DateTime::from('2024-11-03T01:30:00');
+assert!(
+  $newYork->resolve($fold, Disambiguation::Earlier)->offsetSeconds == -14_400,
+);
+
+assert!(
+  $newYork->resolve($fold, Disambiguation::Later)->offsetSeconds == -18_000,
+);
+
+assert!(Month::December->next() == Month::January);
+assert!(Weekday::Monday->previous() == Weekday::Sunday);

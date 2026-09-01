@@ -1,0 +1,67 @@
+use Whim\Unwind\Error;
+use Whim\Unwind\LeakedResourceError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TraceFrame;
+
+$innerError = new Error('root cause', 1);
+$outerError = new Error('wrapper', 2, $innerError);
+assert!($outerError->getMessage() == 'wrapper');
+assert!($outerError->getCode() == 2);
+assert!($outerError->getPrevious() == $innerError);
+$plainError = new Error('alone', 3);
+assert!($plainError->getPrevious() == null);
+assert!(Whim\Str\contains($plainError->getFile(), 'errors.whim'));
+assert!($plainError->getLine() > 0);
+$firstLocated = new Error('first located', 0);
+$secondLocated = new Error('second located', 0);
+assert!($secondLocated->getLine() == $firstLocated->getLine() + 1);
+$assertion_value_8 = $plainError->toString();
+assert!(Whim\Str\contains($assertion_value_8, 'Whim\Unwind\Error'));
+assert!(Whim\Str\contains($assertion_value_8, 'alone'));
+assert!(Whim\Str\contains($assertion_value_8, '3'));
+
+$signatureProbe = new RuntimeException('message', 7);
+assert!($signatureProbe->getMessage(...) is fn(): string);
+assert!($signatureProbe->getCode(...) is fn(): int);
+assert!($signatureProbe->getFile(...) is fn(): string);
+assert!($signatureProbe->getLine(...) is fn(): int);
+assert!($signatureProbe->getTrace(...) is fn(): vec<TraceFrame>);
+
+assert!($signatureProbe->getPrevious(...) is fn(): null|Throwable);
+
+$leaked = new LeakedResourceError('resource escaped', 0);
+assert!($leaked is LeakedResourceError);
+assert!($leaked is Error);
+assert!($leaked->getMessage() == 'resource escaped');
+
+function trace_inner(string $word, int $number): void {
+  throw new Error('from inner', 0);
+}
+
+function trace_outer(): void {
+  trace_inner('carthage', 9);
+}
+
+$traced = null;
+$assertion_callable_18 = function(): void {
+  trace_outer();
+};
+
+try {
+  $assertion_callable_18();
+} catch (Error $assertion_caught_18) {
+  $traced = $assertion_caught_18;
+  assert!(Whim\Str\contains($assertion_caught_18->getMessage(), 'from inner'));
+}
+
+assert!($traced is Error);
+
+$trace = $traced->getTrace();
+$innerFrame = $trace[0];
+assert!($innerFrame->function == 'trace_inner');
+assert!(Whim\Str\contains($innerFrame->file, 'errors.whim'));
+assert!($innerFrame->line == $traced->getLine());
+assert!($innerFrame->arguments[0] == 'carthage');
+assert!($innerFrame->arguments[1] == 9);
+assert!($trace[1]->function == 'trace_outer');

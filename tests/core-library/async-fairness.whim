@@ -1,0 +1,63 @@
+use Whim\_Private;
+use Whim\Async;
+use Whim\Time\Duration;
+
+final class MicrotaskFlood {
+  public bool $running = true;
+  public bool $deferredRan = false;
+  public bool $timerRan = false;
+  public int $iterations = 0;
+
+  public function queue(): void {
+    _Private\queue_task(function() use ($this): void {
+      $this->iterations++;
+      if ($this->running) {
+        $this->queue();
+      }
+    });
+  }
+}
+
+$flood = new MicrotaskFlood();
+_Private\defer_task(function() use ($flood): void {
+  $flood->deferredRan = true;
+});
+
+_Private\delay_task(Duration::zero(), function() use ($flood): void {
+  $flood->timerRan = true;
+  $flood->running = false;
+});
+
+$flood->queue();
+Async\drain();
+
+assert!($flood->deferredRan);
+assert!($flood->timerRan);
+assert!($flood->iterations > 0);
+
+final class OrdinaryFlood {
+  public bool $running = true;
+  public bool $timerRan = false;
+  public int $iterations = 0;
+
+  public function queue(): void {
+    _Private\defer_task(function() use ($this): void {
+      $this->iterations++;
+      if ($this->running) {
+        $this->queue();
+      }
+    });
+  }
+}
+
+$ordinary = new OrdinaryFlood();
+_Private\delay_task(Duration::zero(), function() use ($ordinary): void {
+  $ordinary->timerRan = true;
+  $ordinary->running = false;
+});
+
+$ordinary->queue();
+Async\drain();
+
+assert!($ordinary->timerRan);
+assert!($ordinary->iterations > 0);

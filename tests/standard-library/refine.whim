@@ -1,0 +1,88 @@
+use Whim\Comparison\Ordering;
+use Whim\Refine;
+
+assert!(1 is Refine\PositiveInt);
+assert!(!(0 is Refine\PositiveInt));
+assert!(0 is Refine\NonNegativeInt);
+assert!(-1 is Refine\NegativeInt);
+assert!(-1 is Refine\NonPositiveInt);
+assert!(0 is Refine\NonPositiveInt);
+
+assert!(255 is Refine\Uint8);
+assert!(!(256 is Refine\Uint8));
+assert!(-128 is Refine\Int8);
+assert!(65535 is Refine\Uint16);
+assert!(4294967295 is Refine\Uint32);
+assert!(-2147483648 is Refine\Int32);
+assert!(2147483647 is Refine\Int32);
+assert!(0 is Refine\Uint64);
+assert!(!(-1 is Refine\Uint64));
+assert!(100 is Refine\Percent);
+assert!(!(101 is Refine\Percent));
+assert!(9 is Refine\Digit);
+assert!(!(10 is Refine\Digit));
+
+assert!(1 is Refine\NonZero<int>);
+assert!(!(0 is Refine\NonZero<int>));
+assert!(1.0 is Refine\NonZero<float>);
+assert!(!(0.0 is Refine\NonZero<float>));
+
+assert!(vec[1] is Refine\NonEmptyVec<int>);
+assert!(!(vec[] is Refine\NonEmptyVec<int>));
+assert!(dict['value' => 1] is Refine\NonEmptyDict<string, int>);
+
+assert!(!(dict[] is Refine\NonEmptyDict<string, int>));
+assert!('value' is Refine\NonEmptyString);
+assert!(!('' is Refine\NonEmptyString));
+
+assert!(null is Refine\Nullable<null>);
+assert!(!(null is Refine\NonNull));
+assert!('value' is Refine\NonNull);
+assert!(false is Refine\Falsy);
+assert!(!(true is Refine\Falsy));
+assert!(true is Refine\Truthy);
+assert!(true is Refine\ArrayKey);
+
+assert!('value' is Refine\Exclude<string|int, int>);
+assert!(!(1 is Refine\Exclude<string|int, int>));
+assert!(1 is Refine\Extract<string|int, int>);
+assert!(!('value' is Refine\Extract<string|int, int>));
+
+$predicate = fn(int $value): bool => $value > 0;
+$transform = fn(int $value): string => '' . $value;
+$reducer = fn(int $carry, int $value): int => $carry + $value;
+$consumer = function(int $_): void {};
+$supplier = fn(): int => 1;
+$comparator = fn(
+  int $left,
+  int $right,
+): Ordering => Ordering::from($left <=> $right);
+
+assert!($predicate is Refine\Predicate<int>);
+assert!($transform is Refine\Transform<int, string>);
+assert!($reducer is Refine\Reducer<int, int>);
+assert!($consumer is Refine\Consumer<int>);
+assert!($supplier is Refine\Supplier<int>);
+assert!($comparator is Refine\Comparator<int>);
+
+final class RefineIterator implements Whim\Iterate\Iterator<string, int> {
+  private bool $complete = false;
+
+  public function next(): null|(string, int) {
+    if ($this->complete) {
+      return null;
+    }
+
+    $this->complete = true;
+
+    return ('value', 1);
+  }
+}
+
+assert!(vec[1] is Refine\Iterable<int, int>);
+assert!(dict['value' => 1] is Refine\Iterable<string, int>);
+
+assert!((1, 'two') is Refine\Iterable<int, int|string>);
+assert!(new RefineIterator() is Refine\Iterable<string, int>);
+
+assert!(!(new RefineIterator() is Refine\Iterable<int, int>));

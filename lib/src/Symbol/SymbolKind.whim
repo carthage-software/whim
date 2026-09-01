@@ -1,0 +1,14 @@
+namespace Whim\Symbol;
+
+use Whim\_Private;
+
+/** Identifies the declaration kind of a named symbol. */
+enum SymbolKind: int {
+  case Class = _Private\SYMBOL_KIND_CLASS;
+  case Interface = _Private\SYMBOL_KIND_INTERFACE;
+  case Enum = _Private\SYMBOL_KIND_ENUM;
+  case TypeAlias = _Private\SYMBOL_KIND_TYPE_ALIAS;
+  case Newtype = _Private\SYMBOL_KIND_NEWTYPE;
+  case Function = _Private\SYMBOL_KIND_FUNCTION;
+  case Constant = _Private\SYMBOL_KIND_CONSTANT;
+}

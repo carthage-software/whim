@@ -1,0 +1,6 @@
+namespace Whim\Network;
+
+use Whim\Convert\ToString;
+
+/** Identifies one end of a network connection. */
+interface Endpoint extends ToString for InternetEndpoint, UnixEndpoint {}

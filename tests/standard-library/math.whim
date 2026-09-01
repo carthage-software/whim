@@ -1,0 +1,385 @@
+use Whim\Str;
+
+final class NanKeyObservation {
+  public int $calls = 0;
+}
+
+final class MathTestIterator<T> implements Whim\Iterate\Iterator<int, T> {
+  private int $offset = 0;
+
+  public function __construct(private vec<T> $values) {}
+
+  public function next(): null|(int, T) {
+    if ($this->offset >= length!($this->values)) {
+      return null;
+    }
+
+    $offset = $this->offset;
+    $this->offset++;
+    return ($offset, $this->values[$offset]);
+  }
+}
+
+assert!(Whim\Math\abs(-4) == 4);
+assert!(Whim\Math\clamp(9, 0, 5) == 5);
+assert!(Whim\Math\div(7, 2) == 3);
+assert!(Whim\Math\sum(vec[1, 2, 3]) == 6);
+assert!(Whim\Math\sum(dict['one' => 1, 'two' => 2, 'three' => 3]) == 6);
+
+assert!(Whim\Math\sum((1, 2, 3)) == 6);
+assert!(Whim\Math\sum(new MathTestIterator::<int>(vec[1, 2, 3])) == 6);
+assert!(Whim\Math\sum(vec[]) == 0);
+
+$sumOverflow = null;
+try {
+  discard!(Whim\Math\sum(vec[Whim\Math\INT_MAX, 1]));
+} catch (Whim\Unwind\OverflowError $error) {
+  $sumOverflow = $error;
+}
+
+assert!($sumOverflow is Whim\Unwind\OverflowError);
+
+$sumUnderflow = null;
+try {
+  discard!(Whim\Math\sum(vec[Whim\Math\INT_MIN, -1]));
+} catch (Whim\Unwind\UnderflowError $error) {
+  $sumUnderflow = $error;
+}
+
+assert!($sumUnderflow is Whim\Unwind\UnderflowError);
+
+assert!(Whim\Math\sum_floats(vec[1.0, 2.0]) == 3.0);
+assert!(Whim\Math\sum_floats(dict['one' => 1.0, 'two' => 2.0]) == 3.0);
+assert!(
+  Whim\Math\sum_floats(new MathTestIterator::<float>(vec[1.0, 2.0])) == 3.0,
+);
+
+assert!(Whim\Math\min(vec[3, 1, 2]) == 1);
+assert!(Whim\Math\min(dict['three' => 3, 'one' => 1, 'two' => 2]) == 1);
+
+assert!(Whim\Math\max(vec[3, 1, 2]) == 3);
+assert!(Whim\Math\max((3, 1, 2)) == 3);
+assert!(Whim\Math\max(new MathTestIterator::<int>(vec[3, 1, 2])) == 3);
+
+assert!(Whim\Math\mean(vec[1, 2, 3]) == 2.0);
+assert!(Whim\Math\median(vec[4, 1, 3, 2]) == 2.5);
+assert!(Whim\Math\median(vec[3, 1, 2]) == 2.0);
+assert!(Whim\Math\FLOAT_MIN == Whim\Math\FLOAT64_MIN);
+assert!(Whim\Math\FLOAT_MIN < 0.0);
+
+assert!(Whim\Float\is_nan(Whim\Math\sum_floats(vec[1.0, Whim\Math\NAN, 2.0])));
+
+assert!(Whim\Float\to_bits(1.5) == 4_609_434_218_613_702_656);
+assert!(Whim\Float\from_bits(4_609_434_218_613_702_656) == 1.5);
+assert!(
+  Whim\Float\to_bits(Whim\Float\from_bits(-9_223_372_036_854_775_808))
+  == -9_223_372_036_854_775_808,
+);
+
+$nanBits = 9_221_120_237_041_090_561;
+assert!(Whim\Float\is_nan(Whim\Float\from_bits($nanBits)));
+assert!(Whim\Float\to_bits(Whim\Float\from_bits($nanBits)) == $nanBits);
+
+$floatBigEndian = "\x3f\xf8\x00\x00\x00\x00\x00\x00";
+$floatLittleEndian = "\x00\x00\x00\x00\x00\x00\xf8\x3f";
+assert!(
+  Whim\Float\to_bytes(1.5, Whim\Binary\Endianness::Big) == $floatBigEndian,
+);
+
+assert!(
+  Whim\Float\to_bytes(1.5, Whim\Binary\Endianness::Little)
+  == $floatLittleEndian,
+);
+
+assert!(
+  Whim\Float\from_bytes($floatBigEndian, Whim\Binary\Endianness::Big) == 1.5,
+);
+
+assert!(
+  Whim\Float\from_bytes($floatLittleEndian, Whim\Binary\Endianness::Little)
+  == 1.5,
+);
+
+assert!(Whim\Float\is_nan(Whim\Math\min(vec[Whim\Math\NAN, 1.0])));
+
+assert!(Whim\Float\is_nan(Whim\Math\min(vec[1.0, Whim\Math\NAN])));
+
+assert!(Whim\Float\is_nan(Whim\Math\max(vec[Whim\Math\NAN, 1.0])));
+
+assert!(Whim\Float\is_nan(Whim\Math\max(vec[1.0, Whim\Math\NAN])));
+
+assert!(Whim\Float\is_nan(Whim\Math\minva(Whim\Math\NAN, 1.0)));
+assert!(Whim\Float\is_nan(Whim\Math\minva(1.0, Whim\Math\NAN)));
+assert!(Whim\Float\is_nan(Whim\Math\minva(1.0, 2.0, vec[Whim\Math\NAN])));
+
+assert!(Whim\Float\is_nan(Whim\Math\maxva(Whim\Math\NAN, 1.0)));
+assert!(Whim\Float\is_nan(Whim\Math\maxva(1.0, Whim\Math\NAN)));
+assert!(Whim\Float\is_nan(Whim\Math\maxva(1.0, 2.0, vec[Whim\Math\NAN])));
+
+assert!(Whim\Float\is_nan(Whim\Math\mean(vec[1.0, Whim\Math\NAN, 2.0])));
+
+assert!(
+  Whim\Float\is_nan(Whim\Math\median(vec[Whim\Math\NAN, 1.0, 2.0]) as float),
+);
+
+assert!(
+  Whim\Float\is_nan(Whim\Math\median(vec[1.0, Whim\Math\NAN, 2.0]) as float),
+);
+
+assert!(
+  Whim\Float\is_nan(Whim\Math\median(vec[1.0, 2.0, Whim\Math\NAN]) as float),
+);
+
+assert!(Whim\Float\is_nan(Whim\Math\clamp(Whim\Math\NAN, 0.0, 1.0)));
+
+assert!(Whim\Float\is_nan(Whim\Math\clamp(0.5, Whim\Math\NAN, 1.0)));
+
+assert!(Whim\Float\is_nan(Whim\Math\clamp(0.5, 0.0, Whim\Math\NAN)));
+
+$invalidClamp = null;
+$assertion_callable_46 = fn(): int => Whim\Math\clamp(0, 2, 1);
+try {
+  $assertion_callable_46();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_46) {
+  $invalidClamp = $assertion_caught_46;
+}
+
+assert!($invalidClamp is Whim\Unwind\InvalidArgumentException);
+
+$frame = $invalidClamp->getTrace()[0];
+assert!($frame->function == 'Whim\Math\clamp');
+assert!($frame->file == '<std>/Math/clamp.whim');
+
+$nanKeyObservation = new NanKeyObservation();
+$nanKey = function(
+  string $value,
+) use ($nanKeyObservation): int|float {
+  $nanKeyObservation->calls++;
+  return match ($value) {
+    'nan' => Whim\Math\NAN,
+    $_ => length!($value),
+  };
+};
+
+assert!(
+  Whim\Math\min_by::<string>(vec['long', 'nan', 'x'], $nanKey)->unwrap()
+  == 'nan',
+);
+
+assert!($nanKeyObservation->calls == 3);
+assert!(
+  Whim\Math\max_by::<string>(vec['x', 'nan', 'long'], $nanKey)->unwrap()
+  == 'nan',
+);
+
+assert!($nanKeyObservation->calls == 6);
+assert!(
+  Whim\Math\min_by::<string>(vec['nan', 'x'], $nanKey)->unwrap() == 'nan',
+);
+
+assert!($nanKeyObservation->calls == 8);
+assert!(
+  Whim\Math\max_by::<string>(vec['nan', 'long'], $nanKey)->unwrap() == 'nan',
+);
+
+assert!($nanKeyObservation->calls == 10);
+
+assert!(Whim\Math\round(1.234, 2) == 1.23);
+assert!(Whim\Math\sqrt(9.0) == 3.0);
+assert!(Whim\Math\ln(Whim\Math\E) == 1.0);
+assert!(Whim\Math\log_base(8.0, 2.0) == 3.0);
+assert!(Whim\Math\from_base('ff', 16) == 255);
+assert!(Whim\Math\from_base('FF', 16) == 255);
+assert!(Whim\Math\to_base(255, 16) == 'ff');
+assert!(Whim\Math\base_convert('ff', 16, 10) == '255');
+assert!(
+  Whim\Math\base_convert('18446744073709551615', 10, 16) == 'ffffffffffffffff',
+);
+
+assert!(
+  Whim\Math\base_convert('18446744073709551616', 10, 16) == '10000000000000000',
+);
+
+assert!(Whim\Math\base_convert('0000', 10, 2) == '0');
+
+$largeDecimal = Str\repeat('1234567890', 10);
+assert!(
+  Whim\Math\base_convert(Whim\Math\base_convert($largeDecimal, 10, 36), 36, 10)
+  == $largeDecimal,
+);
+
+$largeBinary = '1' . Str\repeat('00101101', 128);
+assert!(
+  Whim\Math\base_convert(Whim\Math\base_convert($largeBinary, 2, 36), 36, 2)
+  == $largeBinary,
+);
+
+$assertion_value_70 = fn(): int => Whim\Math\from_base('2', 2);
+$assertion_error_70 = null;
+try {
+  $assertion_value_70();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_70) {
+  $assertion_error_70 = $assertion_caught_70;
+}
+
+assert!($assertion_error_70 is Whim\Unwind\InvalidArgumentException);
+
+$assertion_value_71 = fn(): string => Whim\Math\base_convert('2', 2, 10);
+$assertion_error_71 = null;
+try {
+  $assertion_value_71();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_71) {
+  $assertion_error_71 = $assertion_caught_71;
+}
+
+assert!($assertion_error_71 is Whim\Unwind\InvalidArgumentException);
+
+$assertion_value_72 = fn(): string => (
+  Whim\Math\base_convert(Str\repeat('9', 32) . 'z', 10, 16)
+);
+
+$assertion_error_72 = null;
+try {
+  $assertion_value_72();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_72) {
+  $assertion_error_72 = $assertion_caught_72;
+}
+
+assert!($assertion_error_72 is Whim\Unwind\InvalidArgumentException);
+
+$assertion_value_73 = fn(): int => (
+  Whim\Math\from_base('9223372036854775808', 10)
+);
+
+$assertion_error_73 = null;
+try {
+  $assertion_value_73();
+} catch (Whim\Unwind\OverflowException $assertion_caught_73) {
+  $assertion_error_73 = $assertion_caught_73;
+}
+
+assert!($assertion_error_73 is Whim\Unwind\OverflowException);
+
+assert!(
+  Whim\Math\min_by::<string>(
+    dict['long' => 'aaaa', 'short' => 'b', 'medium' => 'cc'],
+    fn(string $value): int => length!($value),
+  )->unwrap()
+  == 'b',
+);
+
+$assertion_value_75 = fn(): float => Whim\Math\sqrt(-1.0);
+$assertion_error_75 = null;
+try {
+  $assertion_value_75();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_75) {
+  $assertion_error_75 = $assertion_caught_75;
+}
+
+assert!($assertion_error_75 is Whim\Unwind\InvalidArgumentException);
+
+$assertion_value_76 = fn(): int => Whim\Math\sum(vec[Whim\Math\INT_MAX, 1]);
+$assertion_error_76 = null;
+try {
+  $assertion_value_76();
+} catch (Whim\Unwind\OverflowError $assertion_caught_76) {
+  $assertion_error_76 = $assertion_caught_76;
+}
+
+assert!($assertion_error_76 is Whim\Unwind\OverflowError);
+
+$assertion_value_77 = fn(): int => Whim\Math\sum(vec[Whim\Math\INT_MIN, -1]);
+$assertion_error_77 = null;
+try {
+  $assertion_value_77();
+} catch (Whim\Unwind\UnderflowError $assertion_caught_77) {
+  $assertion_error_77 = $assertion_caught_77;
+}
+
+assert!($assertion_error_77 is Whim\Unwind\UnderflowError);
+
+$assertion_value_78 = fn(): int => Whim\Math\abs(Whim\Math\INT_MIN);
+$assertion_error_78 = null;
+try {
+  $assertion_value_78();
+} catch (Whim\Unwind\OverflowError $assertion_caught_78) {
+  $assertion_error_78 = $assertion_caught_78;
+}
+
+assert!($assertion_error_78 is Whim\Unwind\OverflowError);
+
+$assertion_value_79 = fn(): float => Whim\Math\log_base(-1.0, 2.0);
+$assertion_error_79 = null;
+try {
+  $assertion_value_79();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_79) {
+  $assertion_error_79 = $assertion_caught_79;
+}
+
+assert!($assertion_error_79 is Whim\Unwind\InvalidArgumentException);
+
+assert!(Whim\Math\round(100.0, 307) == 100.0);
+assert!(Whim\Math\round(1.5, 400) == 1.5);
+assert!(
+  Whim\Math\mean(vec[Whim\Math\FLOAT_MAX, Whim\Math\FLOAT_MAX])
+  == Whim\Math\FLOAT_MAX,
+);
+
+assert!(
+  Whim\Math\median(vec[Whim\Math\FLOAT_MAX, Whim\Math\FLOAT_MAX])
+  == Whim\Math\FLOAT_MAX,
+);
+
+assert!(Whim\Math\median(vec[Whim\Math\INT_MIN, Whim\Math\INT_MAX]) == -0.5);
+
+assert!(
+  Whim\Math\min(vec[Whim\Math\INT_MAX, 9_223_372_036_854_776_000.0])
+  == Whim\Math\INT_MAX,
+);
+
+assert!(
+  Whim\Math\max(vec[Whim\Math\INT_MAX, 9_223_372_036_854_776_000.0])
+  == 9_223_372_036_854_776_000.0,
+);
+
+assert!(Whim\Math\INT53_MAX == 9_007_199_254_740_991);
+assert!(Whim\Math\INT53_MIN == -9_007_199_254_740_991);
+
+$divisionError = null;
+$assertion_callable_89 = fn(): int => Whim\Math\div(1, 0);
+try {
+  $assertion_callable_89();
+} catch (Whim\Unwind\DivisionByZeroError $assertion_caught_89) {
+  $divisionError = $assertion_caught_89;
+}
+
+assert!($divisionError is Whim\Unwind\DivisionByZeroError);
+
+assert!($divisionError is Whim\Unwind\Error);
+assert!(!($divisionError is Whim\Unwind\Exception));
+
+$assertion_value_92 = function(): void {
+  Whim\Float\is_finite(1.0);
+};
+
+$assertion_error_92 = null;
+try {
+  $assertion_value_92();
+} catch (Whim\Unwind\DiscardedResultError $assertion_caught_92) {
+  $assertion_error_92 = $assertion_caught_92;
+}
+
+assert!($assertion_error_92 is Whim\Unwind\DiscardedResultError);
+
+$assertion_value_93 = function(): void {
+  Whim\Float\from_bits(0);
+};
+
+$assertion_error_93 = null;
+try {
+  $assertion_value_93();
+} catch (Whim\Unwind\DiscardedResultError $assertion_caught_93) {
+  $assertion_error_93 = $assertion_caught_93;
+}
+
+assert!($assertion_error_93 is Whim\Unwind\DiscardedResultError);

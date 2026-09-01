@@ -1,0 +1,257 @@
+namespace Whim\URL;
+
+use Whim;
+use Whim\Comparison\Equal;
+use Whim\Convert\ToString;
+use Whim\IRI\IRI;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\URI\URI;
+
+/** Represents an immutable, absolute URL with an authority. */
+final readonly class URL implements Equal<URL>, ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public NonEmptyString $scheme,
+    public Authority $authority,
+    public string $path,
+    public null|string $query,
+    public null|string $fragment,
+  ) {}
+
+  /** Parses and canonicalizes a URL, or returns null. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function parse(string $url): null|URL {
+    $components = Whim\_Private\url_parse_reference($url) ?? return null;
+
+    $authority = Authority::parse($components[1]) ?? return null;
+
+    return new URL(
+      $components[0],
+      $authority,
+      $components[2],
+      $components[3],
+      $components[4],
+    );
+  }
+
+  /** Creates a URL from canonical components without validating them. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    NonEmptyString $scheme,
+    Authority $authority,
+    string $path,
+    null|string $query = null,
+    null|string $fragment = null,
+  ): URL {
+    return new URL($scheme, $authority, $path, $query, $fragment);
+  }
+
+  /** Parses and canonicalizes a URL. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $url): URL {
+    $parsed = URL::parse($url);
+    if ($parsed == null) {
+      throw new InvalidArgumentException('invalid URL: `' . $url . '`');
+    }
+
+    return $parsed;
+  }
+
+  /** Converts a URI to a URL, or returns null when it is not a URL. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function parseURI(URI $uri): null|URL {
+    return URL::parse($uri->toString());
+  }
+
+  /** Converts a URI to a URL. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromURI(URI $uri): URL {
+    $parsed = URL::parseURI($uri);
+    if ($parsed == null) {
+      throw new InvalidArgumentException('the URI is not a URL');
+    }
+
+    return $parsed;
+  }
+
+  /** Converts an IRI to a URL, or returns null when it is not a URL. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function parseIRI(IRI $iri): null|URL {
+    return URL::parse($iri->toString());
+  }
+
+  /** Converts an IRI to a URL. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromIRI(IRI $iri): URL {
+    $parsed = URL::parseIRI($iri);
+    if ($parsed == null) {
+      throw new InvalidArgumentException('the IRI is not a URL');
+    }
+
+    return $parsed;
+  }
+
+  /** Creates and canonicalizes a URL from its components. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromComponents(
+    NonEmptyString $scheme,
+    Authority $authority,
+    string $path,
+    null|string $query = null,
+    null|string $fragment = null,
+  ): URL {
+    $url = $scheme . '://' . $authority->toString() . $path;
+    if ($query != null) {
+      $url .= '?' . $query;
+    }
+
+    if ($fragment != null) {
+      $url .= '#' . $fragment;
+    }
+
+    return URL::from($url);
+  }
+
+  /** Returns a copy with a new scheme. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withScheme(NonEmptyString $scheme): URL {
+    return URL::fromComponents(
+      $scheme,
+      $this->authority,
+      $this->path,
+      $this->query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with a new authority. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withAuthority(Authority $authority): URL {
+    return URL::fromComponents(
+      $this->scheme,
+      $authority,
+      $this->path,
+      $this->query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with a new path. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withPath(string $path): URL {
+    return URL::fromComponents(
+      $this->scheme,
+      $this->authority,
+      $path,
+      $this->query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with a new query. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withQuery(null|string $query): URL {
+    return URL::fromComponents(
+      $this->scheme,
+      $this->authority,
+      $this->path,
+      $query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with form query parameters. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withQueryParameters(
+    Iterable<string, Iterable<_, string>> $parameters,
+  ): URL {
+    return $this->withQuery(build_query($parameters));
+  }
+
+  /** Returns a copy with a new fragment. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withFragment(null|string $fragment): URL {
+    return URL::fromComponents(
+      $this->scheme,
+      $this->authority,
+      $this->path,
+      $this->query,
+      $fragment,
+    );
+  }
+
+  /** Parses the query as form fields. */
+  #[MustUse]
+  #[TrackCaller]
+  public function queryParameters(): dict<string, vec<string>> {
+    return parse_query($this->query ?? '');
+  }
+
+  /** Returns this URL's origin. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function origin(): Origin {
+    return Origin::fromURL($this);
+  }
+
+  /** Converts this URL to its canonical URI. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toURI(): URI {
+    return URI::parse($this->toString()) as URI;
+  }
+
+  /** Converts this URL to an IRI. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toIRI(): IRI {
+    return IRI::fromURI($this->toURI());
+  }
+
+  /** Reports whether two URLs are the same. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(URL $other): bool {
+    return $this->toString() == $other->toString();
+  }
+
+  /** Returns the canonical URL text. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    $url = $this->scheme . '://' . $this->authority->toString() . $this->path;
+    if ($this->query != null) {
+      $url .= '?' . $this->query;
+    }
+
+    if ($this->fragment != null) {
+      $url .= '#' . $this->fragment;
+    }
+
+    return $url;
+  }
+}

@@ -1,0 +1,39 @@
+namespace Whim\Symbol;
+
+use Whim\_Private;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\UndefinedSymbolError;
+
+/** Returns the kind of an existing symbol. Never autoloads. */
+#[NeverInline]
+#[TrackCaller]
+function get_kind(string $name): SymbolKind {
+  $kind = _Private\get_symbol_kind($name);
+  if ($kind == null) {
+    throw new UndefinedSymbolError('the symbol `' . $name . '` is not defined');
+  }
+
+  return SymbolKind::from($kind);
+}
+
+/** Returns whether a symbol exists, autoloading unless asked not to. */
+#[TrackCaller]
+function exists(string $name, bool $autoload = true): bool {
+  if (_Private\get_symbol_kind($name) != null) {
+    return true;
+  }
+
+  if (!$autoload) {
+    return false;
+  }
+
+  foreach (SymbolKind::cases() as $kind) {
+    _Private\run_symbol_autoload($kind->value, $name);
+    if (_Private\get_symbol_kind($name) != null) {
+      return true;
+    }
+  }
+
+  return false;
+}

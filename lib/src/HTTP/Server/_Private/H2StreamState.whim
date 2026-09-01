@@ -1,0 +1,16 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\Deferred;
+use Whim\Async\SignalCancellationToken;
+use Whim\HTTP\Message\FieldMap;
+
+/** Tracks the inbound side of one HTTP/2 request stream. */
+final class H2StreamState {
+  public int $bodyBytes = 0;
+
+  public function __construct(
+    public null|RequestBody $body,
+    public null|Deferred<FieldMap> $trailers,
+    public SignalCancellationToken $cancellation,
+  ) {}
+}

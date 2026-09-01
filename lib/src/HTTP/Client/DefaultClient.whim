@@ -1,0 +1,139 @@
+namespace Whim\HTTP\Client;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Async\LinkedCancellationToken;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\URI\URI;
+use Whim\Unwind\Throwable;
+use Whim\URL\URL;
+
+/** Sends requests through a connector and middleware chain. */
+final class DefaultClient implements Client {
+  private Handler $handler;
+
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    private readonly Connector $connector = new PooledConnector(),
+    public readonly Configuration $configuration = new Configuration(),
+    Iterable<_, Middleware> $middleware = vec[],
+  ) {
+    $layers = vec[];
+    foreach ($middleware as $layer) {
+      $layers[] = $layer;
+    }
+
+    $handler = new _Private\ExchangeHandler();
+    $index = length!($layers) - 1;
+    while ($index >= 0) {
+      $handler = new _Private\MiddlewareHandler($layers[$index], $handler);
+
+      $index--;
+    }
+
+    $this->handler = $handler;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function send(
+    Request $request,
+    SendConfiguration $configuration = new SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    if ($request->body == null && $request->trailers != null) {
+      throw new RequestException('request trailers require a message body');
+    }
+
+    if ($request->method == Message\METHOD_CONNECT) {
+      throw new RequestException(
+        '`CONNECT` requires a full-duplex tunnel transport',
+      );
+    }
+
+    if ($request->method == Message\METHOD_TRACE && $request->body != null) {
+      throw new RequestException('`TRACE` requests must not include a body');
+    }
+
+    $effective = $this->configuration->withOverrides($configuration);
+    $url = $request->url;
+    if ($url == null && $effective->baseURL != null) {
+      $reference = URI::parse($request->requestTarget);
+      if ($reference != null) {
+        $url = URL::parseURI(
+          Whim\URI\resolve($effective->baseURL->toURI(), $reference),
+        );
+      }
+    }
+
+    if ($url == null) {
+      throw new RequestException(
+        'the request needs an absolute URL or a configured base URL',
+      );
+    }
+
+    $request = $request->withURL($url);
+    $versions = _Private\resolve_protocol_versions($request, $effective);
+    $connectionCancellation = $cancellation;
+    if ($configuration->connectionTimeout != null) {
+      $timeout = new TimeoutCancellationToken(
+        $configuration->connectionTimeout,
+      );
+
+      if ($cancellation == null) {
+        $connectionCancellation = $timeout;
+      } else {
+        $connectionCancellation = new LinkedCancellationToken(vec[
+          $cancellation,
+          $timeout,
+        ]);
+      }
+    }
+
+    $connection = $this->connector->connect(
+      Origin::fromURL($url),
+      $request,
+      $effective,
+      $connectionCancellation,
+    );
+
+    if (!contains!($versions, $connection->getMetadata()->protocolVersion)) {
+      try {
+        $connection->close();
+      } catch (Throwable $_) {
+      }
+
+      throw new ProtocolException(
+        'the connector selected a disabled HTTP protocol version',
+      );
+    }
+
+    if ($configuration->onConnection != null) {
+      ($configuration->onConnection)($connection->getMetadata());
+    }
+
+    $transaction = $this->handler->handle(
+      $connection,
+      $request,
+      $effective,
+      $cancellation,
+    );
+
+    if ($configuration->onInformationalResponse != null) {
+      foreach ($transaction->informational as $response) {
+        ($configuration->onInformationalResponse)($response);
+      }
+    }
+
+    return $transaction;
+  }
+}

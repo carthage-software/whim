@@ -1,0 +1,96 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Holds an HTTP/1 connection until its response body ends. */
+final class H1ResponseBody implements ReadHandle {
+  private bool $released = false;
+
+  public function __construct(
+    private ReadHandle $body,
+    private H1Connection $connection,
+  ) {}
+
+  public function __destruct(): void {
+    try {
+      $this->finish(false);
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if (!$this->released) {
+      $this->body->waitUntilReadable($cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    if ($this->released) {
+      return true;
+    }
+
+    $ended = $this->body->reachedEndOfDataSource();
+    if ($ended) {
+      $this->finish(true);
+    }
+
+    return $ended;
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->released) {
+      return '';
+    }
+
+    try {
+      $data = $this->body->tryRead($maxBytes);
+      $this->releaseIfEnded();
+      return $data;
+    } catch (Throwable $error) {
+      $this->finish(false);
+      throw $error;
+    }
+  }
+
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($this->released) {
+      return '';
+    }
+
+    try {
+      $data = $this->body->read($maxBytes, $cancellation);
+      $this->releaseIfEnded();
+      return $data;
+    } catch (Throwable $error) {
+      $this->finish(false);
+      throw $error;
+    }
+  }
+
+  private function releaseIfEnded(): void {
+    if ($this->body->reachedEndOfDataSource()) {
+      $this->finish(true);
+    }
+  }
+
+  private function finish(bool $complete): void {
+    if ($this->released) {
+      return;
+    }
+
+    $this->released = true;
+    $this->connection->releaseResponse($complete);
+  }
+}

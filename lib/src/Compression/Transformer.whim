@@ -1,0 +1,17 @@
+namespace Whim\Compression;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Transforms a stream of byte chunks. */
+interface Transformer {
+  /** Accepts the next input chunk and returns available output. */
+  #[MustUse]
+  #[TrackCaller]
+  public function push(string $bytes): string;
+
+  /** Finishes the stream and returns its remaining output. */
+  #[MustUse]
+  #[TrackCaller]
+  public function finish(): string;
+}

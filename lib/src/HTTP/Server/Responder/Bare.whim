@@ -1,0 +1,17 @@
+namespace Whim\HTTP\Server\Responder;
+
+use Whim\HTTP\Message\ErrorStatusCode;
+use Whim\HTTP\Message\Response;
+use Whim\Marker\AlwaysInline;
+use Whim\Unwind\Throwable;
+
+/** Produces empty error responses. */
+final readonly class Bare implements Responder {
+  #[AlwaysInline]
+  public function respond(
+    ErrorStatusCode $status,
+    null|Throwable $cause,
+  ): Response {
+    return new Response($status);
+  }
+}

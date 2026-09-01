@@ -1,0 +1,14 @@
+namespace Whim\HTTP\Server\Responder;
+
+use Whim\HTTP\Message\ErrorStatusCode;
+use Whim\HTTP\Message\Response;
+use Whim\Unwind\Throwable;
+
+/** Converts an HTTP processing failure into a response. */
+interface Responder {
+  /** Produces an error response. */
+  public function respond(
+    ErrorStatusCode $status,
+    null|Throwable $cause,
+  ): Response;
+}

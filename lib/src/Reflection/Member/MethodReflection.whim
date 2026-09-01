@@ -1,0 +1,120 @@
+namespace Whim\Reflection\Member;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\Callable\ParameterReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Generic\TypeParameterReflection;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Callable\CallableReflection;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\FunctionTypeReflection;
+use Whim\Reflection\Type\MemberTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one method declaration. */
+#[Stub]
+final class MethodReflection implements MemberReflection, CallableReflection {
+  private function __construct() {}
+
+  /** Returns where this method was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this method's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this method's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns the method name. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the class-like that declares this method. */
+  #[MustUse]
+  public function getDeclaringType(): ClassLikeReflection {}
+
+  /** Returns the method visibility. */
+  #[MustUse]
+  public function getVisibility(): Visibility {}
+
+  /** Returns type parameters in declaration order. */
+  #[MustUse]
+  public function getTypeParameters(): vec<TypeParameterReflection> {}
+
+  /** Returns a type parameter by zero-based position or name. */
+  #[MustUse]
+  public function getTypeParameter(
+    int|string $parameter,
+  ): null|TypeParameterReflection {}
+
+  /** Returns parameters in declaration order. */
+  #[MustUse]
+  public function getParameters(): vec<ParameterReflection> {}
+
+  /** Returns a parameter by zero-based position or name. */
+  #[MustUse]
+  public function getParameter(
+    int|string $parameter,
+  ): null|ParameterReflection {}
+
+  /** Returns the number of parameters a caller must provide. */
+  #[MustUse]
+  public function getRequiredParameterCount(): 0.. {}
+
+  /** Returns the declared return type, when present. */
+  #[MustUse]
+  public function getReturnType(): null|TypeReflection {}
+
+  /** Returns the structural callable type with known bindings resolved. */
+  #[MustUse]
+  public function getCallableType(
+    null|TypeEnvironmentReflection $environment = null,
+    null|ClassTypeReflection $calledType = null,
+  ): FunctionTypeReflection {}
+
+  /** Reports whether calls do not require an object receiver. */
+  #[MustUse]
+  public function isStatic(): bool {}
+
+  /** Reports whether the method has no implementation. */
+  #[MustUse]
+  public function isAbstract(): bool {}
+
+  /** Reports whether a child may not override the method. */
+  #[MustUse]
+  public function isFinal(): bool {}
+
+  /** Reports whether this method is a constructor. */
+  #[MustUse]
+  public function isConstructor(): bool {}
+
+  /** Reports whether this method is a destructor. */
+  #[MustUse]
+  public function isDestructor(): bool {}
+
+  /** Returns inherited declarations whose contracts this method fulfills. */
+  #[MustUse]
+  public function getPrototypes(): vec<MethodReflection> {}
+
+  /** Returns this method family's named type. */
+  #[MustUse]
+  public function getType(): MemberTypeReflection {}
+}

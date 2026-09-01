@@ -1,0 +1,353 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Database;
+use Whim\Database\AcquisitionTimeoutException;
+use Whim\Database\Column;
+use Whim\Database\Connection;
+use Whim\Database\ConnectionException;
+use Whim\Database\ConnectionPool;
+use Whim\Database\Connector;
+use Whim\Database\PoolConfiguration;
+use Whim\Database\QueryException;
+use Whim\Database\Result;
+use Whim\Database\Row;
+use Whim\Database\Statement;
+use Whim\Database\Transaction;
+use Whim\Database\TransactionIsolation;
+use Whim\Database\Value;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Time\Duration;
+
+$databaseError = new QueryException('duplicate', sqlState: '23505');
+assert!($databaseError->getSQLState() == '23505');
+assert!(new QueryException('generic')->getSQLState() == null);
+
+final class DatabaseTestResult implements Result {
+  private bool $closed = false;
+
+  public function __construct(
+    private vec<Row> $rows,
+    private vec<Column> $columns = vec[],
+    private null|NonNegativeInt $affectedRows = null,
+  ) {}
+
+  public function getColumns(): vec<Column> {
+    return $this->columns;
+  }
+
+  public function getAffectedRows(): null|NonNegativeInt {
+    return $this->affectedRows;
+  }
+
+  public function fetch(null|CancellationToken $cancellation = null): null|Row {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    if (length!($this->rows) == 0) {
+      $this->close();
+      return null;
+    }
+
+    $rows = $this->rows;
+    $row = remove_first!($rows);
+    $this->rows = $rows;
+    return $row;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+    $this->rows = vec[];
+  }
+}
+
+final class DatabaseTestStatement implements Statement {
+  private bool $closed = false;
+
+  public function __construct(
+    private DatabaseTestConnection $connection,
+    private NonEmptyString $sql,
+  ) {}
+
+  public function execute(
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    return $this->connection->execute($this->sql, $parameters, $cancellation);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class DatabaseTestTransaction implements Transaction {
+  private bool $active = true;
+  private bool $closed = false;
+
+  public function __construct(private DatabaseTestConnection $connection) {}
+
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    return $this->connection->execute($sql, $parameters, $cancellation);
+  }
+
+  public function isActive(): bool {
+    return $this->active;
+  }
+
+  public function commit(): void {
+    $this->active = false;
+    $this->closed = true;
+  }
+
+  public function rollback(): void {
+    $this->active = false;
+    $this->closed = true;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    if ($this->active) {
+      $this->rollback();
+    }
+  }
+}
+
+final class DatabaseTestConnection implements Connection {
+  public bool $closed = false;
+  public bool $reusable = true;
+  public int $pings = 0;
+  public int $executions = 0;
+
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    $this->executions++;
+    if ($sql == 'SELECT $1') {
+      return new DatabaseTestResult(
+        vec[vec[$parameters[0]]],
+        vec[new Column('value')],
+      );
+    }
+
+    return new DatabaseTestResult(vec[], affectedRows: 1);
+  }
+
+  public function isReusable(): bool {
+    return $this->reusable && !$this->closed;
+  }
+
+  public function ping(null|CancellationToken $cancellation = null): void {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    $this->pings++;
+  }
+
+  public function prepare(
+    NonEmptyString $sql,
+    null|CancellationToken $cancellation = null,
+  ): Statement {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    return new DatabaseTestStatement($this, $sql);
+  }
+
+  public function begin(
+    null|TransactionIsolation $isolation = null,
+    bool $readOnly = false,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    return new DatabaseTestTransaction($this);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class DatabaseTestConnector implements Connector {
+  public int $connections = 0;
+  public vec<DatabaseTestConnection> $opened = vec[];
+
+  public function connect(
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    $this->connections++;
+    $connection = new DatabaseTestConnection();
+    $this->opened[] = $connection;
+    return $connection;
+  }
+}
+
+$nullable = Database\fetch_value(
+  new DatabaseTestResult(vec[vec[null]], vec[new Column('nullable', 'text')]),
+);
+
+assert!($nullable->isSome());
+assert!($nullable->unwrap() == null);
+
+$empty = Database\fetch_value(new DatabaseTestResult(vec[]));
+assert!($empty->isNone());
+
+$rows = Database\fetch_all(
+  new DatabaseTestResult(vec[vec[1, 'one'], vec[2, 'two']]),
+);
+
+assert!($rows == vec[vec[1, 'one'], vec[2, 'two']]);
+
+$transactionConnection = new DatabaseTestConnection();
+$transactionResult = Database\transactional::<int>(
+  $transactionConnection,
+  function(Transaction $transaction): int {
+    $result = $transaction->execute('UPDATE example SET value = $1', vec[1]);
+    return $result->getAffectedRows() ?? 0;
+  },
+);
+
+assert!($transactionResult == 1);
+
+$connector = new DatabaseTestConnector();
+$pool = new ConnectionPool(
+  $connector,
+  new PoolConfiguration(validationInterval: Duration::zero()),
+);
+
+$connection = $pool->connect();
+$result = $connection->execute('SELECT $1', vec['pooled']);
+$connection->close();
+assert!($pool->getOpenConnections() == 1);
+assert!($pool->getIdleConnections() == 0);
+assert!(Database\fetch_one($result) == vec['pooled']);
+assert!($pool->getIdleConnections() == 1);
+
+$connection = $pool->connect();
+assert!($connector->connections == 1);
+assert!($connector->opened[0]->pings == 1);
+
+$statement = $connection->prepare('SELECT $1');
+$connection->close();
+assert!($pool->getIdleConnections() == 0);
+$statementResult = $statement->execute(vec[42]);
+assert!(Database\fetch_one($statementResult) == vec[42]);
+$statement->close();
+assert!($pool->getIdleConnections() == 1);
+
+$connection = $pool->connect();
+$transaction = $connection->begin(TransactionIsolation::Serializable);
+$connection->close();
+assert!($pool->getIdleConnections() == 0);
+$transaction->rollback();
+assert!($pool->getIdleConnections() == 1);
+
+$held = $pool->connect();
+$limited = new ConnectionPool(
+  $connector,
+  new PoolConfiguration(
+    maximumConnections: 1,
+    maximumIdleConnections: 1,
+    validationInterval: null,
+  ),
+);
+
+$limitedConnection = $limited->connect();
+$cancellation = new SignalCancellationToken();
+$waiting = Async\spawn::<Connection>(
+  fn(): Connection => $limited->connect($cancellation),
+);
+
+Async\later();
+assert!($limited->getPendingConnections() == 1);
+$cancellation->cancel();
+$assertion_value_20 = fn(): Connection => $waiting->await();
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (CancelledException $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is CancelledException);
+
+$limitedConnection->close();
+$limited->close();
+
+$timed = new ConnectionPool(
+  $connector,
+  new PoolConfiguration(
+    maximumConnections: 1,
+    maximumIdleConnections: 1,
+    validationInterval: null,
+    acquisitionTimeout: Duration::fromMilliseconds(5),
+  ),
+);
+
+$timedConnection = $timed->connect();
+$timedWaiting = Async\spawn::<Connection>(
+  fn(): Connection => $timed->connect(),
+);
+
+$assertion_value_21 = fn(): Connection => $timedWaiting->await();
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (AcquisitionTimeoutException $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is AcquisitionTimeoutException);
+
+$timedConnection->close();
+$timed->close();
+
+$held->close();
+$pool->close();
+assert!($pool->isClosed());
+$assertion_value_23 = fn(): Connection => $pool->connect();
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (ConnectionException $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is ConnectionException);

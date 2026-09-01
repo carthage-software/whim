@@ -1,0 +1,11 @@
+namespace Whim\HTTP\_Private;
+
+/** A malformed HTTP/2 frame. */
+final class FrameDecodingException extends Exception {
+  public function __construct(
+    string $message,
+    ErrorCodeValue $errorCode = 0x1,
+  ) {
+    parent::__construct($message, $errorCode);
+  }
+}

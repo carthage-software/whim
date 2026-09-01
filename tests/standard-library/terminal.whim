@@ -1,0 +1,29 @@
+use Whim\IO;
+use Whim\Terminal;
+use Whim\Terminal\Size;
+use Whim\Unwind\TypeError;
+
+$size = new Size(80, 24);
+assert!($size->columns == 80);
+assert!($size->rows == 24);
+$assertion_value_3 = fn(): Size => new Size(0, 24);
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (TypeError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is TypeError);
+
+($read, $write) = IO\pipe();
+
+assert!(!(Terminal\attached($read)));
+assert!(!(Terminal\attached($read->getFileDescriptor())));
+assert!(Terminal\size($write) == null);
+assert!(Terminal\size($write->getFileDescriptor()) == null);
+assert!(Terminal\path($write) == null);
+assert!(Terminal\path($write->getFileDescriptor()) == null);
+
+$read->close();
+$write->close();

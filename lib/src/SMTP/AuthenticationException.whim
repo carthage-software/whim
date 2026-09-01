@@ -1,0 +1,6 @@
+namespace Whim\SMTP;
+
+use Whim\Unwind\RuntimeException;
+
+/** Thrown when SMTP authentication fails. */
+final class AuthenticationException extends RuntimeException {}

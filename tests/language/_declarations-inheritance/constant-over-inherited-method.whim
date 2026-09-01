@@ -1,0 +1,7 @@
+class ParentClass {
+  public function value(): void {}
+}
+
+class ChildClass extends ParentClass {
+  public const int value = 1;
+}

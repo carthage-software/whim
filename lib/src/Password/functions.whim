@@ -1,0 +1,98 @@
+namespace Whim\Password;
+
+use Whim\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\SensitiveParameter;
+use Whim\SecureRandom;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+
+/**
+ * Hashes a password with a fresh salt, as a self-describing string.
+ *
+ * @throws InvalidArgumentException when a bcrypt password is longer than 72 bytes.
+ * @throws Whim\SecureRandom\InsufficientEntropyException when the operating system does not provide random bytes.
+ * @throws Whim\Unwind\RuntimeException when the password cannot be hashed.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function hash(
+  #[SensitiveParameter] string $password,
+  Algorithm $algorithm,
+): string {
+  if ($algorithm is Bcrypt && length!($password) > 72) {
+    throw new InvalidArgumentException(
+      'bcrypt reads at most 72 password bytes; hash a digest of longer input instead',
+    );
+  }
+
+  $salt = SecureRandom\bytes(16);
+  $hash = match ($algorithm) {
+    $bcrypt @ Bcrypt => _Private\password_hash_bcrypt(
+      $password,
+      $bcrypt->cost,
+      $salt,
+    ),
+    $argon2i @ Argon2i => _Private\password_hash_argon2i(
+      $password,
+      $argon2i->memoryCost,
+      $argon2i->timeCost,
+      $argon2i->parallelism,
+      $salt,
+    ),
+    $argon2id @ Argon2id => _Private\password_hash_argon2id(
+      $password,
+      $argon2id->memoryCost,
+      $argon2id->timeCost,
+      $argon2id->parallelism,
+      $salt,
+    ),
+  };
+
+  if ($hash == null) {
+    throw new RuntimeException('the password could not be hashed');
+  }
+
+  return $hash;
+}
+
+/** Checks a password against a stored hash; a foreign hash is false. */
+#[AlwaysInline]
+#[MustUse]
+function verify(
+  #[SensitiveParameter] string $password,
+  #[SensitiveParameter] string $hash,
+): bool {
+  return _Private\password_verify($password, $hash);
+}
+
+/** Whether a stored hash no longer matches the algorithm and its costs. */
+#[AlwaysInline]
+#[MustUse]
+function needs_rehash(
+  #[SensitiveParameter] string $hash,
+  Algorithm $algorithm,
+): bool {
+  return match ($algorithm) {
+    $bcrypt @ Bcrypt => _Private\password_needs_rehash_bcrypt(
+      $hash,
+      $bcrypt->cost,
+    ),
+    $argon2i @ Argon2i => _Private\password_needs_rehash_argon2i(
+      $hash,
+      $argon2i->memoryCost,
+      $argon2i->timeCost,
+      $argon2i->parallelism,
+    ),
+    $argon2id @ Argon2id => _Private\password_needs_rehash_argon2id(
+      $hash,
+      $argon2id->memoryCost,
+      $argon2id->timeCost,
+      $argon2id->parallelism,
+    ),
+  };
+}

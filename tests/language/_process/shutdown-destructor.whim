@@ -1,0 +1,7 @@
+class ShutdownResource {
+  public function __destruct() {
+    write_line!('shutdown');
+  }
+}
+
+$resource = new ShutdownResource();

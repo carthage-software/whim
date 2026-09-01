@@ -1,0 +1,190 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\ErrorCodeValue;
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\FlowControlException;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\FrameDecodingException;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\HTTP\_Private\StreamException;
+use Whim\Str;
+
+function receive(State $state, string $bytes): vec<Event\WeakendEvent> {
+  require_open($state);
+  try {
+    $bytes = match (consume_client_preface($state, $bytes)) {
+      '' => return vec[],
+      $bytes => $bytes,
+    };
+
+    $events = vec[];
+    foreach ($state->frameDecoder->push($bytes) as $raw) {
+      try {
+        ($type, $flags, $stream, $payload) = $raw;
+        $frame = Frame\_Private\parse($type, $flags, $stream, $payload);
+
+        if (!$state->receivedInitialSettings) {
+          if ($frame[0] != 4 || $frame[2]) {
+            throw new ProtocolException(
+              'the peer connection preface must begin with SETTINGS',
+            );
+          }
+
+          $state->receivedInitialSettings = true;
+        }
+
+        if ($state->headerBlocks->active() && $frame[0] != 9) {
+          throw new ProtocolException('an HTTP/2 header block was interrupted');
+        }
+
+        record_frame($state, $frame);
+        foreach (receive_frame($state, $frame) as $event) {
+          $events[] = $event;
+        }
+      } catch (StreamException $error) {
+        queue_frame($state, (3, $error->streamId, $error->errorCode));
+
+        close_stream($state, $error->streamId);
+        $retained = vec[];
+        foreach ($events as $event) {
+          $streamId = match ($event[0]) {
+            1 | 2 | 5 | 7 | 8 | 9 | 10 => $event[1],
+            $_ => null,
+          };
+
+          if ($streamId != $error->streamId) {
+            $retained[] = $event;
+          }
+        }
+
+        $events = $retained;
+        $events[] = (
+          9,
+          $error->streamId,
+          $error->errorCode,
+          $error->getMessage(),
+        );
+      }
+    }
+
+    return $events;
+  } catch (FlowControlException $error) {
+    fail_connection($state, H2\ErrorCode::FlowControlError->value, $error);
+  } catch (FrameDecodingException $error) {
+    fail_connection($state, $error->getCode() as ErrorCodeValue, $error);
+  } catch (ProtocolException $error) {
+    fail_connection($state, $error->errorCode, $error);
+  }
+}
+
+function finish(State $state): vec<Event\WeakendEvent> {
+  if (!$state->receivedClientPreface || $state->pendingClientPreface != '') {
+    throw new ProtocolException('the HTTP/2 client preface is truncated');
+  }
+
+  $state->frameDecoder->finish();
+  if ($state->headerBlocks->active()) {
+    throw new ProtocolException('the HTTP/2 header block is truncated');
+  }
+
+  $state->connected = false;
+  $state->closed = true;
+  return vec[];
+}
+
+function consume_client_preface(State $state, string $bytes): string {
+  if ($state->receivedClientPreface) {
+    return $bytes;
+  }
+
+  $state->pendingClientPreface .= $bytes;
+  $received = length!($state->pendingClientPreface);
+  $compared = min_int($received, length!(H2\CLIENT_PREFACE));
+  if (
+    Str\slice($state->pendingClientPreface, 0, $compared) != Str\slice(
+      H2\CLIENT_PREFACE,
+      0,
+      $compared,
+    )
+  ) {
+    throw new ProtocolException('the HTTP/2 client preface is invalid');
+  }
+
+  if ($received < length!(H2\CLIENT_PREFACE)) {
+    return '';
+  }
+
+  $bytes = Str\slice($state->pendingClientPreface, length!(H2\CLIENT_PREFACE));
+  $state->pendingClientPreface = '';
+  $state->receivedClientPreface = true;
+  return $bytes;
+}
+
+function receive_frame(
+  State $state,
+  Frame\WeakendFrame $frame,
+): vec<Event\WeakendEvent> {
+  if ($frame[0] == 0) {
+    return receive_data($state, $frame as Frame\DataFrame);
+  } else if ($frame[0] == 1) {
+    return receive_headers($state, $frame as Frame\HeadersFrame);
+  } else if ($frame[0] == 2) {
+    return receive_priority($state, $frame as Frame\PriorityFrame);
+  } else if ($frame[0] == 3) {
+    return receive_reset($state, $frame as Frame\RstStreamFrame);
+  } else if ($frame[0] == 4) {
+    return vec[receive_settings($state, $frame as Frame\SettingsFrame)];
+  } else if ($frame[0] == 5) {
+    return receive_push_promise($state, $frame as Frame\PushPromiseFrame);
+  } else if ($frame[0] == 6) {
+    return receive_ping($state, $frame as Frame\PingFrame);
+  } else if ($frame[0] == 7) {
+    return receive_go_away($state, $frame as Frame\GoAwayFrame);
+  } else if ($frame[0] == 8) {
+    return receive_window_update($state, $frame as Frame\WindowUpdateFrame);
+  } else if ($frame[0] == 9) {
+    return receive_continuation($state, $frame as Frame\ContinuationFrame);
+  }
+
+  return vec[];
+}
+
+function record_frame(State $state, Frame\WeakendFrame $frame): void {
+  $limiter = $state->configuration->rateLimiter ?? return;
+
+  $type = $frame[0];
+  if ($type == 0 && $frame[2] == '' && !$frame[3]) {
+    $type = Whim\HTTP\_Private\RateLimiter::EMPTY_DATA_FRAME;
+  } else if ($type == 10) {
+    $type = $frame[1];
+  }
+
+  $limiter->record($type);
+}
+
+function fail_connection(
+  State $state,
+  int $errorCode,
+  Whim\Unwind\Throwable $error,
+): never {
+  if ($state->connected) {
+    queue_frame(
+      $state,
+      (7, $state->lastPeerStreamId, $errorCode, $error->getMessage()),
+    );
+
+    $state->connected = false;
+    $state->closed = true;
+  }
+
+  throw $error;
+}
+
+function min_int(int $left, int $right): int {
+  return match ($left < $right) {
+    true => $left,
+    false => $right,
+  };
+}

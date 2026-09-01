@@ -1,0 +1,51 @@
+namespace Whim\Compression;
+
+use Whim\Compression\_Private\Compressor;
+use Whim\Compression\_Private\Decompressor;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\NonEmptyString;
+use Whim\_Private\CompressionDecoder;
+use Whim\_Private\CompressionEncoder;
+
+/** Implements the Brotli content coding. */
+final readonly class Brotli implements Codec {
+  public function __construct(private 0..=11 $quality = 5) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function coding(): NonEmptyString {
+    return 'br';
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function createCompressor(): Compressor {
+    $encoder = CompressionEncoder::brotli($this->quality);
+    if ($encoder == null) {
+      throw new Exception('failed to create a Brotli compression stream');
+    }
+
+    return new Compressor($encoder);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function createDecompressor(): Decompressor {
+    $decoder = CompressionDecoder::brotli();
+    if ($decoder == null) {
+      throw new DecompressionException(
+        'failed to create a Brotli decompression stream',
+      );
+    }
+
+    return new Decompressor($decoder);
+  }
+}

@@ -1,0 +1,272 @@
+use Whim\Attribute\Attribute;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+
+final class Counter {
+  public function __construct(public int $value) {}
+
+  public static function from(int $value): static {
+    return new Counter($value);
+  }
+
+  public function plus(int $value): int {
+    return $this->value + $value;
+  }
+}
+
+function make_counter(int $value): Counter {
+  return new Counter($value);
+}
+
+function add(int $left, int $right): int {
+  return $left + $right;
+}
+
+final readonly class NamedReadonly {
+  private int $number;
+  private string $text;
+
+  public function __construct(int $number, string $text) {
+    $this->number = $number;
+    $this->text = $text;
+  }
+
+  public function values(): (int, string) {
+    return ($this->number, $this->text);
+  }
+}
+
+#[Attribute(Attribute::TARGET_CLASS)]
+final readonly class CallHolds {
+  public function __construct(public int $value) {}
+}
+
+const FUNCTION_VALUE = add(20, 22);
+const STATIC_VALUE = Counter::from(42);
+const METHOD_VALUE = new Counter(40)->plus(2);
+
+#[CallHolds(add(40, 2))]
+final class CallTarget {
+  public const FUNCTION_VALUE = add(20, 22);
+  public const STATIC_VALUE = Counter::from(42);
+  public const METHOD_VALUE = new Counter(40)->plus(2);
+
+  public Counter $functionDefault = make_counter(42);
+  public Counter $staticDefault = Counter::from(42);
+  public int $methodDefault = new Counter(40)->plus(2);
+}
+
+function call_defaults(
+  Counter $function = make_counter(42),
+  Counter $static = Counter::from(42),
+  int $method = new Counter(40)->plus(2),
+): (int, int, int) {
+  return ($function->value, $static->value, $method);
+}
+
+assert!(FUNCTION_VALUE == 42);
+assert!(STATIC_VALUE->value == 42);
+assert!(METHOD_VALUE == 42);
+assert!(CallTarget::FUNCTION_VALUE == 42);
+assert!(CallTarget::STATIC_VALUE->value == 42);
+assert!(CallTarget::METHOD_VALUE == 42);
+
+$callTarget = new CallTarget();
+assert!($callTarget->functionDefault->value == 42);
+assert!($callTarget->staticDefault->value == 42);
+assert!($callTarget->methodDefault == 42);
+assert!(call_defaults() == (42, 42, 42));
+assert!(
+  new NamedReadonly(
+    text: 'value',
+    number: 42,
+  )->values() == (42, 'value'),
+);
+
+$callAttributes = Whim\Attribute\get_attribute::<CallHolds>($callTarget);
+assert!(length!($callAttributes) == 1);
+assert!($callAttributes[0]->value == 42);
+
+final class Box {
+  public function __construct(public int $value) {}
+}
+
+#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
+final readonly class ObjectHolds {
+  public function __construct(public mixed $value) {}
+}
+
+const GLOBAL_BOX = new Box(1);
+const DOUBLE = function(int $value): int {
+  return $value * 2;
+};
+
+#[ObjectHolds(new Box(2))]
+#[ObjectHolds(function(int $value): int {
+  return $value + 3;
+})]
+final class ObjectTarget {
+  public const CLASS_BOX = new Box(3);
+  public Box $box = new Box(4);
+  public (fn(int): int) $transform = function(int $value): int {
+    return $value + 5;
+  };
+}
+
+final class StaticHolder {
+  public static Later $value = new Later(10);
+}
+
+final readonly class Later {
+  public function __construct(public int $value) {}
+}
+
+function object_defaults(
+  Box $box = new Box(6),
+  (fn(int): int) $transform = function(int $value): int {
+    return $value + 7;
+  },
+): (int, int) {
+  return ($box->value, $transform(1));
+}
+
+assert!(GLOBAL_BOX->value == 1);
+$double = DOUBLE;
+assert!($double(4) == 8);
+assert!(ObjectTarget::CLASS_BOX->value == 3);
+assert!(StaticHolder::$value->value == 10);
+
+$first = new ObjectTarget();
+$second = new ObjectTarget();
+assert!($first->box->value == 4);
+$first->box->value = 9;
+assert!($second->box->value == 4);
+$transform = $first->transform;
+assert!($transform(1) == 6);
+assert!(object_defaults() == (6, 8));
+
+$objectAttributes = Whim\Attribute\get_attribute::<ObjectHolds>($first);
+assert!(length!($objectAttributes) == 2);
+$attributeBox = $objectAttributes[0]->value;
+assert!($attributeBox is Box);
+
+assert!($attributeBox->value == 2);
+$attributeFunction = $objectAttributes[1]->value;
+assert!($attributeFunction is fn(int): int);
+
+assert!($attributeFunction(4) == 7);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+$capturing = $work . '/capturing.whim';
+File\write(
+  $capturing,
+  '$captured = 1;'
+  . "\n\n"
+  . 'function invalid((fn(): int) $callback = function () use ($captured): int {'
+  . "\n"
+  . '  return $captured;'
+  . "\n"
+  . '}): int {'
+  . "\n"
+  . '  return $callback();'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$assertion_value_27 = function() use ($capturing): void {
+  require!($capturing);
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (CompilerError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is CompilerError);
+
+$this_ = $work . '/this.whim';
+File\write(
+  $this_,
+  'final class Invalid {'
+  . "\n"
+  . '  public function run((fn(): self) $callback = function (): self {'
+  . "\n"
+  . '    return $this;'
+  . "\n"
+  . '  }): self {'
+  . "\n"
+  . '    return $callback();'
+  . "\n"
+  . '  }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$assertion_value_28 = function() use ($this_): void {
+  require!($this_);
+};
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (CompilerError $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is CompilerError);
+
+$shortClosure = $work . '/short-closure.whim';
+File\write(
+  $shortClosure,
+  'function invalid((fn(): int) $callback = fn(): int => 1): int {'
+  . "\n"
+  . '  return $callback();'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$assertion_value_29 = function() use ($shortClosure): void {
+  require!($shortClosure);
+};
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (CompilerError $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is CompilerError);
+
+$dynamic = $work . '/dynamic.whim';
+File\write(
+  $dynamic,
+  'final class Value {}'
+  . "\n\n"
+  . '$class = Value::class;'
+  . "\n"
+  . 'const VALUE = new $class();'
+  . "\n",
+);
+
+$assertion_value_30 = function() use ($dynamic): void {
+  require!($dynamic);
+};
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (CompilerError $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is CompilerError);
+
+Filesystem\delete_directory($work, true);

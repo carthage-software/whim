@@ -1,0 +1,133 @@
+use Whim\Unwind\TypeError;
+
+/** Collects a dictionary's keys in observed iteration order. */
+function observed_keys(dict<string, int> $entries): vec<string> {
+  $keys = vec[];
+  foreach ($entries as $key => $value) {
+    $keys[] = $key;
+  }
+
+  return $keys;
+}
+
+$ordered = dict['a' => 1, 'b' => 2, 'c' => 3];
+assert!(observed_keys($ordered) == vec['a', 'b', 'c']);
+$ordered['b'] = 20;
+assert!(observed_keys($ordered) == vec['a', 'b', 'c']);
+remove!($ordered, 'a');
+$ordered['a'] = 1;
+assert!(observed_keys($ordered) == vec['b', 'c', 'a']);
+
+$text = 'abc';
+$assertion_value_4 = function() use ($text): void {
+  $text[0] = 'z';
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (TypeError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is TypeError);
+
+$pair = (1, 2);
+$assertion_value_5 = function() use ($pair): void {
+  $pair[0] = 9;
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_5->getMessage(),
+      'a tuple element cannot be written',
+    ),
+  );
+}
+
+assert!($assertion_error_5 is TypeError);
+
+$extended = $text . 'd';
+assert!($text == 'abc');
+assert!($extended == 'abcd');
+
+$tuple_link = (vec[1],);
+$assertion_value_8 = function() use ($tuple_link): void {
+  $tuple_link[0][0] = 2;
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (TypeError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_8->getMessage(),
+      'a tuple element cannot be written',
+    ),
+  );
+}
+
+assert!($assertion_error_8 is TypeError);
+
+assert!($tuple_link[0][0] == 1);
+
+$vec_of_tuples = vec[(vec[1],)];
+$assertion_value_10 = function() use ($vec_of_tuples): void {
+  $vec_of_tuples[0][0][0] = 2;
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (TypeError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_10->getMessage(),
+      'a tuple element cannot be written',
+    ),
+  );
+}
+
+assert!($assertion_error_10 is TypeError);
+
+assert!($vec_of_tuples[0][0][0] == 1);
+
+$grid = vec[vec[1]];
+$grid[0][0] = 2;
+assert!($grid[0][0] == 2);
+
+$rows = dict['row' => vec[1]];
+$rows['row'][0] = 2;
+assert!($rows['row'][0] == 2);
+
+class Cell {
+  public int $value = 0;
+}
+
+$cell = new Cell();
+$cell_alias = $cell;
+$cell_alias->value = 5;
+assert!($cell->value == 5);
+
+$values = vec[1, 2];
+$values[0] = 9;
+$values[] = 3;
+assert!($values == vec[9, 2, 3]);
+assert!(remove!($values, 0) == 9);
+assert!($values[0] == 2);
+
+$mapping = dict['a' => 1];
+$mapping['b'] = 2;
+$mapping['a'] = 10;
+assert!($mapping['a'] == 10);
+assert!($mapping['b'] == 2);
+remove!($mapping, 'a');
+assert!(length!($mapping) == 1);

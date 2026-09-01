@@ -1,0 +1,62 @@
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\EncodingException;
+use Whim\Encoding\Punycode;
+
+assert!(Punycode\encode('bücher') == 'bcher-kva');
+assert!(Punycode\decode('bcher-kva') == 'bücher');
+assert!(Punycode\encode('mañana') == 'maana-pta');
+assert!(Punycode\decode('maana-pta') == 'mañana');
+assert!(Punycode\encode('abc') == 'abc-');
+assert!(Punycode\decode(Punycode\encode('abc')) == 'abc');
+assert!(Punycode\encode('') == '');
+assert!(Punycode\decode('') == '');
+assert!(Punycode\encode('-') == '--');
+assert!(Punycode\decode('--') == '-');
+
+$invalid = null;
+$assertion_callable_11 = fn(): string => Punycode\encode("\xff");
+try {
+  $assertion_callable_11();
+} catch (EncodingException $assertion_caught_11) {
+  $invalid = $assertion_caught_11;
+}
+
+assert!($invalid is EncodingException);
+
+assert!($invalid->getMessage() == 'the input cannot be encoded as punycode');
+
+$nonAscii = null;
+$assertion_callable_13 = fn(): string => Punycode\decode('é');
+try {
+  $assertion_callable_13();
+} catch (DecodingException $assertion_caught_13) {
+  $nonAscii = $assertion_caught_13;
+}
+
+assert!($nonAscii is DecodingException);
+
+assert!($nonAscii->getMessage() == 'the input is not valid punycode');
+
+$truncated = null;
+$assertion_callable_15 = fn(): string => Punycode\decode('a-z');
+try {
+  $assertion_callable_15();
+} catch (DecodingException $assertion_caught_15) {
+  $truncated = $assertion_caught_15;
+}
+
+assert!($truncated is DecodingException);
+
+assert!($truncated->getMessage() == 'the input is not valid punycode');
+
+$invalidDigit = null;
+$assertion_callable_17 = fn(): string => Punycode\decode('bad!');
+try {
+  $assertion_callable_17();
+} catch (DecodingException $assertion_caught_17) {
+  $invalidDigit = $assertion_caught_17;
+}
+
+assert!($invalidDigit is DecodingException);
+
+assert!($invalidDigit->getMessage() == 'the input is not valid punycode');

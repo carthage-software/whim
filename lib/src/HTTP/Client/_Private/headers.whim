@@ -1,0 +1,136 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Client\RequestException;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\Str;
+use Whim\URL\URL;
+
+/** Builds an HTTP/2 request field section. */
+function h2_request_headers(Request $request): vec<H2\Header> {
+  $url = $request->url;
+  if ($url == null) {
+    throw new RequestException('the request URL is missing');
+  }
+
+  $headers = vec[
+    (':method', $request->method, false),
+    (':scheme', $url->scheme, false),
+    (':authority', request_host($request), false),
+    (':path', $request->requestTarget, false),
+  ];
+
+  foreach ($request->headers as ($name, $value)) {
+    $name = match (Str\lowercase($name)) {
+      'host' => continue,
+      $name => $name,
+    };
+
+    if (
+      $name is 'connection'
+        | 'keep-alive'
+        | 'proxy-connection'
+        | 'transfer-encoding'
+        | 'upgrade'
+    ) {
+      throw new RequestException(
+        'a connection-specific field cannot be sent over HTTP/2',
+      );
+    }
+
+    if ($name == 'te' && Str\lowercase($value) != 'trailers') {
+      throw new RequestException(
+        'the HTTP/2 TE field may contain only `trailers`',
+      );
+    }
+
+    $headers[] = ($name, $value, sensitive($name));
+  }
+
+  return $headers;
+}
+
+/** Reconstructs a promised HTTP/2 request from its field section. */
+function h2_push_request(
+  Request $parent,
+  vec<H2\Header> $headers,
+): null|Request {
+  $method = null;
+  $scheme = null;
+  $authority = null;
+  $path = null;
+  $fields = vec[];
+  foreach ($headers as $header) {
+    match ($header[0]) {
+      ':method' => $method = $header[1],
+      ':scheme' => $scheme = $header[1],
+      ':authority' => $authority = $header[1],
+      ':path' => $path = $header[1],
+      $_ => $fields[] = ($header[0], $header[1]),
+    };
+  }
+
+  if (
+    $method == null
+    || $scheme == null
+    || $authority == null
+    || $path == null
+  ) {
+    return null;
+  }
+
+  $url = URL::parse($scheme . '://' . $authority . $path);
+  if (
+    $url == null
+    || $parent->url == null
+    || !$url->origin()->equals($parent->url->origin())
+  ) {
+    return null;
+  }
+
+  return Request::fromPartsUnsafe(
+    $method,
+    $path,
+    $url,
+    ProtocolVersion::V2,
+    FieldMap::from($fields),
+  );
+}
+
+/** Converts decoded HTTP/2 fields into a response status and field map. */
+function h2_response_headers(vec<H2\Header> $headers): (int, FieldMap) {
+  $status = null;
+  $fields = vec[];
+  foreach ($headers as $header) {
+    if ($header[0] == ':status') {
+      $status = decimal($header[1]);
+    } else if (!Str\starts_with($header[0], ':')) {
+      $fields[] = ($header[0], $header[1]);
+    }
+  }
+
+  if ($status == null || !($status is 100..=599)) {
+    throw new ProtocolException('the HTTP/2 response has no valid status');
+  }
+
+  return ($status, FieldMap::from($fields));
+}
+
+function sensitive(string $name): bool {
+  return $name is 'authorization'|'cookie'|'proxy-authorization'|'set-cookie';
+}
+
+/** Reports whether an HTTP response may carry content. */
+function response_has_body(Request $request, int $status): bool {
+  return (
+    $request->method != Message\METHOD_HEAD
+    && $status >= 200
+    && $status != Message\STATUS_NO_CONTENT
+    && $status != Message\STATUS_RESET_CONTENT
+    && $status != Message\STATUS_NOT_MODIFIED
+  );
+}

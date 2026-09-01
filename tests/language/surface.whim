@@ -1,0 +1,121 @@
+use Whim\Attribute\Attribute;
+use Whim\Float;
+use Whim\Marker\Deprecated;
+use Whim\Math;
+use Whim\OS;
+use Whim\Path;
+use Whim\Reference\WeakMap;
+use Whim\Str;
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+assert!(Float\is_nan(Math\NAN));
+assert!(Float\is_finite(1.5));
+assert!(Float\is_infinite(Math\INF));
+$assertion_value_4 = fn(): bool => Float\is_nan(5);
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (TypeError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_4->getMessage(),
+      'argument $value passed to Whim\Float\is_nan must be of type float, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_4 is TypeError);
+
+$assertion_value_5 = Whim\VERSION;
+assert!($assertion_value_5 is string);
+assert!($assertion_value_5 != '');
+assert!(Path\SEPARATOR == '/');
+assert!(
+  contains!(vec['Darwin', 'Linux', 'BSD', 'Solaris', 'Unknown'], OS\FAMILY),
+);
+
+assert!(Str\length('héllo') == 6);
+$assertion_value_9 = function(): void {
+  $x = Math\INT_MAX + 1;
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (OverflowError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is OverflowError);
+
+$assertion_value_10 = fn(): int => Str\length(5);
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (TypeError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_10->getMessage(),
+      'must be of type string, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_10 is TypeError);
+
+$assertion_value_11 = fn(): int => Str\length();
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (ArgumentCountError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is ArgumentCountError);
+
+raises('_surface/mixed-union.whim', '`mixed` already contains every type');
+
+type Any = mixed;
+
+assert!(1 is null|Any);
+assert!(null is null|Any);
+
+#[Attribute(flags: Attribute::TARGET_CLASS)]
+class SurfaceTag {
+  public function __construct() {}
+}
+
+#[Deprecated(
+  note: 'use Replacement',
+  version: '2.0',
+)]
+class Legacy {
+  public function __construct() {}
+}
+
+$tag = new SurfaceTag();
+$markers = Whim\Attribute\get_attribute::<Attribute>($tag);
+assert!($markers[0]->flags == 1);
+$legacy = new Legacy();
+$notices = Whim\Attribute\get_attribute::<Deprecated>($legacy);
+assert!($notices[0]->version == '2.0');
+assert!($notices[0]->note == 'use Replacement');
+
+class Key {}
+
+$map = new WeakMap::<Key, mixed>();
+$setter = $map->set(...);
+assert!($setter is fn(Key, mixed): void);
+$key = new Key();
+$setter(
+  value: 'stored',
+  key: $key,
+);
+
+assert!($map->get($key) == 'stored');

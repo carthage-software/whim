@@ -1,0 +1,111 @@
+namespace Whim\Binary;
+
+use Whim\Marker\AlwaysInline;
+use Whim\IO\WriteHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Int16;
+use Whim\Refine\Int32;
+use Whim\Refine\Int8;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint16;
+use Whim\Refine\Uint32;
+use Whim\Refine\Uint8;
+
+/** Writes values straight through to a write handle. */
+final class HandleWriter implements Writer {
+  #[AlwaysInline]
+  public function __construct(
+    private readonly WriteHandle $handle,
+    private readonly Endianness $endianness = Endianness::Big,
+  ) {}
+
+  #[MustUse]
+  #[TrackCaller]
+  public function u8(Uint8 $value): static {
+    return $this->bytes(encode_u8($value));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function u16(
+    Uint16 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->bytes(encode_u16($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function u32(
+    Uint32 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->bytes(encode_u32($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function u64(
+    NonNegativeInt $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->bytes(encode_u64($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function i8(Int8 $value): static {
+    return $this->bytes(encode_i8($value));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function i16(
+    Int16 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->bytes(encode_i16($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function i32(
+    Int32 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->bytes(encode_i32($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function i64(int $value, null|Endianness $endianness = null): static {
+    return $this->bytes(encode_i64($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function f32(
+    float $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->bytes(encode_f32($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function f64(
+    float $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->bytes(encode_f64($value, $endianness ?? $this->endianness));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function bytes(string $value): static {
+    $this->handle->writeAll($value);
+
+    return $this;
+  }
+}

@@ -1,0 +1,5 @@
+error: flag `static` takes no value
+ --> tests/ui/method_flag_with_value.rs:5:36
+  |
+5 |     #[whim_method("speak(): void", static = true)]
+  |                                    ^^^^^^

@@ -1,0 +1,43 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+$snippet = $work . '/uncaught.whim';
+File\write(
+  $snippet,
+  'throw new Whim\Unwind\OutOfBoundsError(\'kaboom\');' . "\n",
+);
+
+$run = Command\run($binary, vec[$snippet]);
+assert!(!($run->isSuccess()));
+assert!(length!($run->standardOutput) == 0);
+$assertion_value_4 = $run->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_4,
+    'uncaught Whim\Unwind\OutOfBoundsError',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_4, 'kaboom'));
+assert!(Whim\Str\contains($assertion_value_4, 'Stack backtrace:'));
+assert!(Whim\Str\contains($assertion_value_4, 'uncaught.whim:1'));
+
+$parse = $work . '/parse.whim';
+File\write($parse, 'function (;' . "\n");
+$run = Command\run($binary, vec[$parse]);
+assert!(!($run->isSuccess()));
+assert!(Whim\Str\contains($run->standardError, 'Whim\Unwind\ParserError'));
+
+$exit = $work . '/exit.whim';
+File\write($exit, 'exit!(7);' . "\n");
+$run = Command\run($binary, vec[$exit]);
+assert!(!($run->isSuccess()));
+assert!(length!($run->standardError) == 0);
+
+Filesystem\delete_directory($work, true);

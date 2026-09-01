@@ -1,0 +1,2 @@
+readonly class A {}
+class B extends A {}

@@ -1,0 +1,205 @@
+namespace Whim\HTTP\Message;
+
+use Whim\Default\Default;
+use Whim\Iterate\Iterator;
+use Whim\Iterate\ToIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\http_index_fields;
+use Whim\_Private\http_valid_field_value;
+use Whim\_Private\http_valid_token;
+use Whim\_Private\string_lowercase;
+
+/** An immutable, ordered, case-insensitive collection of HTTP fields. */
+final readonly class FieldMap implements Default, ToIterator<int, Field> {
+  private vec<Field> $fields;
+  private dict<string, vec<FieldValue>> $values;
+
+  private function __construct(
+    vec<Field> $fields,
+    dict<string, vec<FieldValue>> $values,
+  ) {
+    $this->fields = $fields;
+    $this->values = $values;
+  }
+
+  /** Creates a checked field map while preserving order and name casing. */
+  #[NeverInline]
+  #[MustUse]
+  #[TrackCaller]
+  public static function from(Iterable<_, Field> $fields): FieldMap {
+    $entries = vec[];
+    foreach ($fields as $field) {
+      $entries[] = $field;
+    }
+
+    $values = http_index_fields($entries);
+    if ($values == null) {
+      foreach ($entries as ($name, $value)) {
+        if (!http_valid_token($name)) {
+          throw new InvalidArgumentException(
+            'invalid HTTP field name: `' . $name . '`',
+          );
+        }
+
+        if (!http_valid_field_value($value)) {
+          throw new InvalidArgumentException(
+            'invalid HTTP field value for `' . $name . '`',
+          );
+        }
+      }
+
+      throw new InvalidArgumentException('invalid HTTP field collection');
+    }
+
+    return new FieldMap($entries, $values);
+  }
+
+  /**
+   * Creates a field map from prevalidated fields and their lowercase index.
+   *
+   * The caller must preserve every field and repeated-value order in the index.
+   */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    vec<Field> $fields,
+    dict<string, vec<FieldValue>> $index,
+  ): FieldMap {
+    return new FieldMap($fields, $index);
+  }
+
+  /** Creates an empty field map. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new FieldMap(vec[], dict[]);
+  }
+
+  /** Returns the first value for a field name, or null when absent. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function get(FieldName $name): null|FieldValue {
+    $normalized = string_lowercase($name);
+    if (!contains_key!($this->values, $normalized)) {
+      return null;
+    }
+
+    return $this->values[$normalized][0];
+  }
+
+  /** Returns every value for a field name in insertion order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getAll(FieldName $name): vec<FieldValue> {
+    $normalized = string_lowercase($name);
+    if (!contains_key!($this->values, $normalized)) {
+      return vec[];
+    }
+
+    return $this->values[$normalized];
+  }
+
+  /** Reports whether a field name is present. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function has(FieldName $name): bool {
+    return contains_key!($this->values, string_lowercase($name));
+  }
+
+  /** Returns a copy with all matching fields replaced by one entry. */
+  #[MustUse]
+  #[TrackCaller]
+  public function with(FieldName $name, FieldValue $value): FieldMap {
+    $normalized = string_lowercase($name);
+    if (contains_key!($this->values, $normalized)) {
+      $values = $this->values[$normalized];
+    } else {
+      $values = vec[];
+    }
+
+    if (length!($values) == 1 && $values[0] == $value) {
+      return $this;
+    }
+
+    $fields = vec[];
+    $replaced = false;
+    foreach ($this->fields as ($currentName, $currentValue)) {
+      if (string_lowercase($currentName) == $normalized) {
+        if (!$replaced) {
+          $fields[] = ($name, $value);
+          $replaced = true;
+        }
+      } else {
+        $fields[] = ($currentName, $currentValue);
+      }
+    }
+
+    if (!$replaced) {
+      $fields[] = ($name, $value);
+    }
+
+    return FieldMap::from($fields);
+  }
+
+  /** Returns a copy with one field entry appended. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withAdded(FieldName $name, FieldValue $value): FieldMap {
+    $fields = $this->fields;
+    $fields[] = ($name, $value);
+
+    return FieldMap::from($fields);
+  }
+
+  /** Returns a copy without fields of the requested name. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function without(FieldName $name): FieldMap {
+    $normalized = string_lowercase($name);
+    if (!contains_key!($this->values, $normalized)) {
+      return $this;
+    }
+
+    $fields = vec[];
+    foreach ($this->fields as ($currentName, $currentValue)) {
+      if (string_lowercase($currentName) != $normalized) {
+        $fields[] = ($currentName, $currentValue);
+      }
+    }
+
+    return FieldMap::from($fields);
+  }
+
+  /** Returns all field entries in insertion order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toVec(): vec<Field> {
+    return $this->fields;
+  }
+
+  /** Returns the number of field entries, including repeated names. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function count(): int {
+    return length!($this->fields);
+  }
+
+  /** Reports whether the field map contains no entries. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isEmpty(): bool {
+    return $this->fields == vec[];
+  }
+
+  /** Returns an iterator over field entries in insertion order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toIterator(): Iterator<int, Field> {
+    return new _Private\FieldMapIterator($this->fields);
+  }
+}

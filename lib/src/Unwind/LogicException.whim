@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports an invalid operation implied by program logic. */
+class LogicException extends Exception {}

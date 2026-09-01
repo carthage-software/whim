@@ -1,0 +1,4 @@
+namespace Whim\Network;
+
+/** Reports an operation on a closed socket. */
+final class ClosedException extends NetworkException {}

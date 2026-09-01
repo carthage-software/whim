@@ -1,0 +1,11 @@
+class NarrowParent {
+  public function greet(): string {
+    return 'parent';
+  }
+}
+
+class NarrowChild extends NarrowParent {
+  private function greet(): string {
+    return 'child';
+  }
+}

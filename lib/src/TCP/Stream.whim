@@ -1,0 +1,10 @@
+namespace Whim\TCP;
+
+use Whim\IO\FileDescriptorHandle;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Stream as NetworkStream;
+
+/** A connected TCP byte stream. */
+interface Stream extends
+  NetworkStream<InternetEndpoint>,
+  FileDescriptorHandle {}

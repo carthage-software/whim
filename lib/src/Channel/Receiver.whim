@@ -1,0 +1,21 @@
+namespace Whim\Channel;
+
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+
+/** Defines the behavior of receiver values. */
+interface Receiver<out T> extends Channel {
+  /** Waits until a value can be received. */
+  #[TrackCaller]
+  public function waitUntilReceivable(
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Receives a value, waiting until one is available. */
+  #[TrackCaller]
+  public function receive(null|CancellationToken $cancellation = null): T;
+
+  /** Attempts to receive a value without waiting. */
+  #[TrackCaller]
+  public function tryReceive(): T;
+}

@@ -1,0 +1,122 @@
+use Whim\Unwind\Error;
+use Whim\Unwind\ParserError;
+
+require_once!('_diagnostics.whim');
+
+raises('_syntax/catch-without-parentheses.whim', 'expected `(`');
+raises('_syntax/for-without-parentheses.whim', 'expected `(`');
+raises('_syntax/foreach-without-parentheses.whim', 'expected `(`');
+raises('_syntax/if-without-parentheses.whim', 'expected `(`');
+raises('_syntax/while-without-parentheses.whim', 'expected `(`');
+raises('_syntax/backtick-string.whim', 'unrecognized byte');
+raises(
+  '_syntax/decimal-with-a-leading-zero.whim',
+  'cannot have a leading zero',
+);
+
+raises(
+  '_syntax/escape-past-the-maximum-scalar-value.whim',
+  'the Unicode escape exceeds the maximum scalar value `10FFFF`',
+);
+
+raises('_syntax/hash-does-not-start-a-comment.whim', 'unrecognized byte `#`');
+raises(
+  '_syntax/octal-escape-overflow.whim',
+  'the octal escape exceeds `\377`, the largest one-byte value',
+);
+
+raises('_syntax/shebang-away-from-offset-zero.whim', 'unrecognized byte `#`');
+raises(
+  '_syntax/surrogate-escape.whim',
+  'a Unicode escape cannot name a surrogate code point',
+);
+
+raises('_syntax/unterminated-block-comment.whim', 'unclosed block comment');
+raises('_syntax/unterminated-string.whim', 'unclosed string literal');
+raises('_syntax/reserved-keyword-names-a-constant.whim', 'unexpected `if`');
+raises('_syntax/reserved-keyword-names-a-function.whim', 'unexpected `match`');
+raises(
+  '_syntax/soft-reserved-keyword-names-a-constant.whim',
+  'unexpected `is`; expected a constant name',
+);
+
+raises(
+  '_syntax/chained-equality-comparison.whim',
+  'expected parentheses around the chained comparison',
+);
+
+raises(
+  '_syntax/chained-relational-comparison.whim',
+  'expected parentheses around the chained comparison',
+);
+
+raises('_syntax/append-is-not-a-value.whim', 'expected `=`');
+raises(
+  '_syntax/arithmetic-is-not-a-target.whim',
+  'an assignment target must be a variable, property access, index access, append, or destructuring pattern',
+);
+
+raises(
+  '_syntax/call-result-is-not-a-target.whim',
+  'an assignment target must be a variable, property access, index access, append, or destructuring pattern',
+);
+
+raises('_syntax/empty-tuple.whim', '`()` is not valid');
+raises(
+  '_syntax/literal-is-not-a-target.whim',
+  'an assignment target must be a variable, property access, index access, append, or destructuring pattern',
+);
+
+raises(
+  '_syntax/parenthesized-append-is-not-a-value.whim',
+  'an append target cannot be read as a value',
+);
+
+assert!("\xF" == "\x0F");
+assert!("\x7z" == "\x07z");
+assert!("\xFF" == "\377");
+assert!("\7\77\377" == "\x07\x3F\xFF");
+assert!("\x" == '\x');
+
+$assertion_value_6 = function(): void {
+  require!('_syntax/invalid-float.whim');
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (ParserError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is ParserError);
+
+$total = 0;
+for ($i = 0; $i < 3; $i = $i + 1) {
+  $total = $total + $i;
+}
+
+foreach (vec[1, 2] as $x) {
+  $total = $total + $x;
+}
+
+assert!($total == 6);
+$caught = null;
+$assertion_callable_8 = function(): void {
+  throw new Error('boom');
+};
+
+try {
+  $assertion_callable_8();
+} catch (Error $assertion_caught_8) {
+  $caught = $assertion_caught_8;
+  assert!(Whim\Str\contains($assertion_caught_8->getMessage(), 'boom'));
+}
+
+assert!($caught is Error);
+
+try {
+  throw new Error('parenthesized');
+} catch (Error $e) {
+  assert!($e->getMessage() == 'parenthesized');
+}

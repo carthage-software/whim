@@ -1,0 +1,12 @@
+function configure(
+  int $timeout, // seconds
+  string $host, // the target
+): void {}
+
+function classify(int $n): string {
+  return match ($n) {
+    0 => 'zero', // the origin
+    1 | 2 | 3 => 'small', // the low range
+    $_ => 'other', // everything else
+  };
+}

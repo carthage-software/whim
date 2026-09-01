@@ -1,0 +1,4 @@
+function f<
+  T = (int, int, int, int, int, int, int, int, int, int, int, int, int),
+>(
+): void {}

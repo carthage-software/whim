@@ -1,0 +1,15 @@
+namespace Whim\HTTP\_Private\Frame;
+
+/** Known HTTP/2 frame type codes. */
+enum FrameType: int {
+  case Data = 0x0;
+  case Headers = 0x1;
+  case Priority = 0x2;
+  case RstStream = 0x3;
+  case Settings = 0x4;
+  case PushPromise = 0x5;
+  case Ping = 0x6;
+  case GoAway = 0x7;
+  case WindowUpdate = 0x8;
+  case Continuation = 0x9;
+}

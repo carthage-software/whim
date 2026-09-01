@@ -1,0 +1,408 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\ConnectionStreamId;
+use Whim\HTTP\_Private\ErrorCodeValue;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\Setting;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\_Private\StreamState;
+use Whim\HTTP\_Private\Header;
+use Whim\Str;
+
+function send_headers(
+  State $state,
+  StreamId $streamId,
+  vec<Header> $headers,
+  bool $endStream,
+): void {
+  require_open($state);
+  $entry = $state->streams->get($streamId);
+  $trailers = $entry != null && $entry->sentInitialHeaders;
+  $receiver = match ($state->role) {
+    Role::Client => Role::Server,
+    Role::Server => Role::Client,
+  };
+
+  $contentLength = HeaderValidator::validate(
+    $streamId,
+    $headers,
+    $receiver,
+    $trailers,
+    false,
+    extended_connect_enabled($state, false),
+  );
+
+  $requestMethod = null;
+  $status = null;
+  if (!$trailers) {
+    if ($receiver == Role::Server) {
+      $requestMethod = HeaderValidator::requestMethod($streamId, $headers);
+    } else {
+      $status = HeaderValidator::responseStatus($streamId, $headers);
+    }
+  }
+
+  $informational = $status is 100..=199;
+
+  if ($informational && $endStream) {
+    stream_error(
+      $streamId,
+      'an informational HTTP/2 response cannot end the stream',
+    );
+  }
+
+  if ($trailers && !$endStream) {
+    stream_error($streamId, 'trailers in HTTP/2 must end the stream');
+  }
+
+  $sentLength = match ($entry) {
+    null => 0,
+    $stream @ StreamEntry => $stream->sentContentLength,
+  };
+
+  $expectedLength = match ($trailers) {
+    true => $entry->expectedSentContentLength,
+    false => $contentLength,
+  };
+
+  if (!$trailers && $status != null) {
+    $method = match ($entry) {
+      null => null,
+      $stream @ StreamEntry => $stream->requestMethod,
+    };
+
+    $expectedLength = HeaderValidator::expectedResponseContentLength(
+      $streamId,
+      $method,
+      $status,
+      $contentLength,
+    );
+  }
+
+  if (
+    $endStream
+    && !$informational
+    && $expectedLength != null
+    && $sentLength != $expectedLength
+  ) {
+    stream_error($streamId, 'the sent HTTP/2 content length does not match');
+  }
+
+  if ($entry == null) {
+    if (stream_state($state, $streamId) == StreamState::Closed) {
+      send_entry($state, $streamId);
+    }
+
+    require_connected($state);
+    $entry = open_local_stream($state, $streamId);
+  } else if ($entry->state == StreamState::ReservedLocal) {
+    $state->streams->activateLocal($entry);
+  } else {
+    $entry = send_entry($state, $streamId);
+  }
+
+  if (!$trailers && !$informational) {
+    $entry->sentInitialHeaders = true;
+    if ($requestMethod != null) {
+      $entry->requestMethod = $requestMethod;
+    }
+
+    $entry->expectedSentContentLength = $expectedLength;
+  }
+
+  queue_header_block(
+    $state,
+    $streamId,
+    encode_headers($state, $headers),
+    $endStream,
+  );
+
+  if ($endStream) {
+    verify_sent_content_length($streamId, $entry);
+    end_local($state, $streamId, $entry);
+  }
+}
+
+function send_response_headers(
+  State $state,
+  StreamId $streamId,
+  vec<Header> $headers,
+  100..=599 $status,
+  null|int $contentLength,
+  bool $endStream,
+): void {
+  require_open($state);
+  $entry = send_entry($state, $streamId);
+  $informational = $status is 100..=199;
+  if ($informational && $endStream) {
+    stream_error(
+      $streamId,
+      'an informational HTTP/2 response cannot end the stream',
+    );
+  }
+
+  $expectedLength = HeaderValidator::expectedResponseContentLength(
+    $streamId,
+    $entry->requestMethod,
+    $status,
+    $contentLength,
+  );
+
+  if (
+    $endStream
+    && !$informational
+    && $expectedLength != null
+    && $entry->sentContentLength != $expectedLength
+  ) {
+    stream_error($streamId, 'the sent HTTP/2 content length does not match');
+  }
+
+  if (!$informational) {
+    $entry->sentInitialHeaders = true;
+    $entry->expectedSentContentLength = $expectedLength;
+  }
+
+  queue_header_block(
+    $state,
+    $streamId,
+    encode_headers($state, $headers),
+    $endStream,
+  );
+
+  if ($endStream) {
+    verify_sent_content_length($streamId, $entry);
+    end_local($state, $streamId, $entry);
+  }
+}
+
+function queue_header_block(
+  State $state,
+  StreamId $streamId,
+  string $block,
+  bool $endStream,
+): void {
+  $maximum = $state->settings->remote(Setting::MaxFrameSize);
+  $first = Str\slice($block, 0, $maximum);
+  $offset = length!($first);
+  $flags = match ($endStream) {
+    true => 0x1,
+    false => 0,
+  };
+
+  if ($offset == length!($block)) {
+    $flags |= 0x4;
+  }
+
+  queue_raw_frame($state, 0x1, $flags, $streamId, $first);
+
+  while ($offset < length!($block)) {
+    $fragment = Str\slice($block, $offset, $maximum);
+    $offset += length!($fragment);
+    queue_raw_frame(
+      $state,
+      0x9,
+      match ($offset == length!($block)) {
+        true => 0x4,
+        false => 0,
+      },
+      $streamId,
+      $fragment,
+    );
+  }
+}
+
+function send_data(
+  State $state,
+  StreamId $streamId,
+  string $data,
+  bool $endStream,
+): void {
+  require_open($state);
+  $entry = send_entry($state, $streamId);
+  if (!$entry->sentInitialHeaders) {
+    stream_error($streamId, 'HTTP/2 DATA cannot precede final fields');
+  }
+
+  if (length!($data) > $state->flow->available($entry)) {
+    throw new H2\FlowControlException(
+      'the HTTP/2 send window cannot hold all supplied data',
+    );
+  }
+
+  $sentLength = $entry->sentContentLength + length!($data);
+  if (
+    $entry->expectedSentContentLength != null
+    && $sentLength > $entry->expectedSentContentLength
+  ) {
+    stream_error($streamId, 'the sent HTTP/2 content length was exceeded');
+  }
+
+  if (
+    $endStream
+    && $entry->expectedSentContentLength != null
+    && $sentLength != $entry->expectedSentContentLength
+  ) {
+    stream_error($streamId, 'the sent HTTP/2 content length does not match');
+  }
+
+  $entry->sentContentLength = $sentLength;
+
+  $maximum = $state->settings->remote(Setting::MaxFrameSize);
+  $offset = 0;
+  if ($data == '') {
+    queue_raw_frame(
+      $state,
+      0x0,
+      match ($endStream) {
+        true => 0x1,
+        false => 0,
+      },
+      $streamId,
+      '',
+    );
+  }
+
+  while ($offset < length!($data)) {
+    $fragment = Str\slice($data, $offset, $maximum);
+    $offset += length!($fragment);
+    $state->flow->consumeSend($entry, length!($fragment));
+    queue_raw_frame(
+      $state,
+      0x0,
+      match ($endStream && $offset == length!($data)) {
+        true => 0x1,
+        false => 0,
+      },
+      $streamId,
+      $fragment,
+    );
+  }
+
+  if ($endStream) {
+    verify_sent_content_length($streamId, $entry);
+    end_local($state, $streamId, $entry);
+  }
+}
+
+function send_reset(
+  State $state,
+  StreamId $streamId,
+  ErrorCodeValue $errorCode,
+): void {
+  require_open($state);
+  $streamState = stream_state($state, $streamId);
+  if ($streamState == StreamState::Closed) {
+    stream_error(
+      $streamId,
+      '`RST_STREAM` cannot target a closed stream',
+      H2\ErrorCode::StreamClosed->value,
+    );
+  }
+
+  $entry = $state->streams->get($streamId);
+  if ($entry == null || $streamState == StreamState::Idle) {
+    throw new ProtocolException('`RST_STREAM` cannot target an idle stream');
+  }
+
+  queue_frame($state, (3, $streamId, $errorCode));
+  close_stream($state, $streamId);
+}
+
+function send_go_away(
+  State $state,
+  ErrorCodeValue $errorCode,
+  string $debugData,
+  null|ConnectionStreamId $lastStreamId,
+): void {
+  require_open($state);
+  if ($lastStreamId == null) {
+    $lastStreamId = $state->lastPeerStreamId;
+  }
+
+  if ($state->sentGoAway != null && $lastStreamId > $state->sentGoAway) {
+    throw new ProtocolException(
+      'an HTTP/2 GOAWAY last stream identifier cannot increase',
+    );
+  }
+
+  queue_frame($state, (7, $lastStreamId, $errorCode, $debugData));
+
+  $state->sentGoAway = $lastStreamId;
+  $state->connected = false;
+}
+
+function send_push_promise(
+  State $state,
+  StreamId $streamId,
+  StreamId $promisedStreamId,
+  vec<Header> $headers,
+): void {
+  require_open($state);
+  require_connected($state);
+  if ($state->role != Role::Server) {
+    throw new ProtocolException('an HTTP/2 client cannot send PUSH_PROMISE');
+  }
+
+  if ($state->settings->remote(Setting::EnablePush) == 0) {
+    throw new ProtocolException('the peer disabled HTTP/2 server push');
+  }
+
+  send_entry($state, $streamId);
+  $promised = reserve_local_stream($state, $promisedStreamId);
+  HeaderValidator::validate(
+    $promisedStreamId,
+    $headers,
+    Role::Server,
+    false,
+    true,
+    extended_connect_enabled($state, false),
+  );
+
+  $promised->requestMethod = HeaderValidator::requestMethod(
+    $promisedStreamId,
+    $headers,
+  );
+
+  $block = encode_headers($state, $headers);
+  $maximum = $state->settings->remote(Setting::MaxFrameSize);
+  $first = Str\slice($block, 0, $maximum - 4);
+  $offset = length!($first);
+  queue_frame(
+    $state,
+    (5, $streamId, $promisedStreamId, $first, $offset == length!($block), 0),
+  );
+
+  while ($offset < length!($block)) {
+    $fragment = Str\slice($block, $offset, $maximum);
+    $offset += length!($fragment);
+    queue_frame($state, (9, $streamId, $fragment, $offset == length!($block)));
+  }
+}
+
+function verify_sent_content_length(
+  StreamId $streamId,
+  StreamEntry $entry,
+): void {
+  if (
+    $entry->expectedSentContentLength != null
+    && $entry->sentContentLength != $entry->expectedSentContentLength
+  ) {
+    stream_error($streamId, 'the sent HTTP/2 content length does not match');
+  }
+}
+
+function require_connected(State $state): void {
+  if (!$state->connected) {
+    throw new ProtocolException('the HTTP/2 connection is shutting down');
+  }
+}
+
+function require_open(State $state): void {
+  if ($state->closed) {
+    throw new ProtocolException('the HTTP/2 connection is closed');
+  }
+}

@@ -1,0 +1,31 @@
+namespace Whim\Channel;
+
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Defines the behavior of channel values. */
+interface Channel {
+  /** Returns the channel capacity when it is bounded. */
+  #[TrackCaller]
+  public function getCapacity(): null|NonNegativeInt;
+
+  /** Closes the resource to further operations. */
+  #[TrackCaller]
+  public function close(): void;
+
+  /** Reports whether the resource is closed. */
+  #[TrackCaller]
+  public function isClosed(): bool;
+
+  /** Returns the number of buffered values. */
+  #[TrackCaller]
+  public function count(): NonNegativeInt;
+
+  /** Reports whether the channel buffer is full. */
+  #[TrackCaller]
+  public function isFull(): bool;
+
+  /** Reports whether the channel buffer is empty. */
+  #[TrackCaller]
+  public function isEmpty(): bool;
+}

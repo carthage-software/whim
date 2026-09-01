@@ -1,0 +1,19 @@
+namespace Whim\HTTP\_Private;
+
+/** Standard HTTP/2 error codes. Unknown wire values remain available as integers. */
+enum ErrorCode: int {
+  case NoError = 0x0;
+  case ProtocolError = 0x1;
+  case InternalError = 0x2;
+  case FlowControlError = 0x3;
+  case SettingsTimeout = 0x4;
+  case StreamClosed = 0x5;
+  case FrameSizeError = 0x6;
+  case RefusedStream = 0x7;
+  case Cancel = 0x8;
+  case CompressionError = 0x9;
+  case ConnectError = 0xa;
+  case EnhanceYourCalm = 0xb;
+  case InadequateSecurity = 0xc;
+  case HTTP11Required = 0xd;
+}

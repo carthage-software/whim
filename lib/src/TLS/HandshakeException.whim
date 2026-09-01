@@ -1,0 +1,4 @@
+namespace Whim\TLS;
+
+/** Reports a failed TLS handshake. */
+final class HandshakeException extends Exception {}

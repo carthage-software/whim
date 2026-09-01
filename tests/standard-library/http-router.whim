@@ -1,0 +1,508 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Router\MethodNotAllowedException;
+use Whim\HTTP\Router\NotFoundException;
+use Whim\HTTP\Router\RouteCollection;
+use Whim\HTTP\Router\Router;
+use Whim\HTTP\Router\parameter;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\FunctionHandler;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\HTTPException;
+use Whim\HTTP\Server\Middleware\Middleware;
+use Whim\HTTP\Session\Session;
+use Whim\IP\Address;
+use Whim\Network\Endpoint;
+use Whim\Network\InternetEndpoint;
+use Whim\Unwind\Exception;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\Regex;
+
+final class RouterTestMiddleware implements Middleware {
+  public int $calls = 0;
+
+  public function __construct(private int $digit) {}
+
+  public function handle(
+    Context $context,
+    Request $request,
+    Handler $next,
+    CancellationToken $cancellation,
+  ): Response {
+    $this->calls++;
+    $response = $next->handle($context, $request, $cancellation);
+    return $response->withStatus(
+      (200 + (($response->status - 200) * 10) + $this->digit) as 100..=599,
+    );
+  }
+}
+
+final class RouterTestGroupException extends Exception {}
+
+final class RouterTestContext implements Context {
+  public dict<string, string> $parameters = dict[];
+
+  public function __construct(
+    public readonly ProtocolVersion $protocolVersion,
+    public readonly Endpoint $localEndpoint,
+    public readonly Endpoint $peerEndpoint,
+  ) {}
+
+  public function getSession(): null|Session {
+    return null;
+  }
+
+  public function setSession(Session $session): void {}
+
+  public function onResponseComplete(fn(): void $callback): void {}
+}
+
+function router_test_context(): RouterTestContext {
+  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+  return new RouterTestContext(ProtocolVersion::V11, $local, $peer);
+}
+
+function router_test_handler(int $status): FunctionHandler {
+  return new FunctionHandler(
+    function(
+      Context $_context,
+      Request $_request,
+      CancellationToken $_cancellation,
+    ) use ($status): Response {
+      return new Response($status);
+    },
+  );
+}
+
+function router_test_dispatch(
+  Router $router,
+  string $method,
+  string $target,
+  RouterTestContext $context,
+): Response {
+  return $router->handle(
+    $context,
+    Request::fromParts($method, $target),
+    new SignalCancellationToken(),
+  );
+}
+
+$primitive = Regex::compile('\A(?P<value>[^/]+)\z');
+assert!(!($primitive == null));
+assert!(
+  $primitive?->find('value') == (
+    0,
+    5,
+    dict[0 => 'value', 1 => 'value', 'value' => 'value'],
+  ),
+);
+
+$router = new Router();
+$router
+  ->add('GET', '/foo', router_test_handler(200))
+  ->add('GET', '/foo/', router_test_handler(201))
+  ->add('GET', '/foo/bar', router_test_handler(202))
+  ->add('GET', '/foo/bar/{baz}', router_test_handler(203))
+  ->add('GET', '/foo/{bar}', router_test_handler(204))
+  ->add('GET', '/foo/{bar}/baz', router_test_handler(205))
+  ->add('GET', '/foo/{bar}{baz:.+}', router_test_handler(206))
+  ->add('GET', '/food/{noms}', router_test_handler(207))
+  ->add('GET', '/bar/{herp:\\d+}', router_test_handler(208))
+  ->add('GET', '/bar/{herp}', router_test_handler(209))
+  ->add('GET', '/unique/{foo}/bar', router_test_handler(210))
+  ->add('GET', '/optional_suffix_[foo]', router_test_handler(211))
+  ->add('GET', '/optional_suffix[/]', router_test_handler(212))
+  ->add('GET', '/optional_suffixes/[herp[/derp]]', router_test_handler(213))
+  ->add('GET', '/manual/en/{LegacyID}.php', router_test_handler(214))
+  ->add('GET', '/bounded/{value:[0-9]{1,3}}', router_test_handler(215))
+  ->add('GET', '/encoded/{value}', router_test_handler(216))
+  ->add('GET', '/static/*', router_test_handler(218))
+  ->add('GET', '/literal/\\*', router_test_handler(219));
+
+$context = router_test_context();
+$context->parameters = dict['source' => 'middleware', 'baz' => 'old'];
+assert!(router_test_dispatch($router, 'GET', '/foo', $context)->status == 200);
+
+assert!(
+  router_test_dispatch($router, 'GET', '/foo/bar/value', $context)->status
+  == 203,
+);
+
+assert!(
+  $context->parameters == dict['source' => 'middleware', 'baz' => 'value'],
+);
+
+$router->add('GET', '/late', router_test_handler(217));
+assert!(
+  router_test_dispatch($router, 'GET', '/late', router_test_context())->status
+  == 217,
+);
+
+$context = router_test_context();
+assert!(
+  router_test_dispatch(
+    $router,
+    'GET',
+    '/foo/=%3Efoo?query=yes',
+    $context,
+  )->status
+  == 204,
+);
+
+assert!(parameter($context, 'bar') == '=>foo');
+assert!(parameter($context, 'missing') == null);
+
+$context = router_test_context();
+assert!(
+  router_test_dispatch($router, 'GET', '/foo/herp/baz', $context)->status
+  == 205,
+);
+
+assert!($context->parameters == dict['bar' => 'herp']);
+
+$context = router_test_context();
+assert!(
+  router_test_dispatch($router, 'GET', '/foo/herp/derp', $context)->status
+  == 206,
+);
+
+assert!($context->parameters == dict['bar' => 'herp', 'baz' => '/derp']);
+
+$context = router_test_context();
+assert!(
+  router_test_dispatch($router, 'GET', '/unique/a%2Fb/bar', $context)->status
+  == 210,
+);
+
+assert!(parameter($context, 'foo') == 'a/b');
+
+$context = router_test_context();
+assert!(
+  router_test_dispatch(
+    $router,
+    'GET',
+    '/static/images/logo.svg',
+    $context,
+  )->status
+  == 218,
+);
+
+assert!(parameter($context, '*') == 'images/logo.svg');
+assert!(
+  router_test_dispatch(
+    $router,
+    'GET',
+    '/literal/*',
+    router_test_context(),
+  )->status
+  == 219,
+);
+
+$assertion_value_19 = function(): Router {
+  return new Router()->get('/static/*/nested', router_test_handler(218));
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (InvalidArgumentException $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is InvalidArgumentException);
+
+foreach (dict[
+  '/foo/' => 201,
+  '/foo/bar' => 202,
+  '/food/burger' => 207,
+  '/bar/123' => 208,
+  '/bar/text' => 209,
+  '/optional_suffix_' => 211,
+  '/optional_suffix_foo' => 211,
+  '/optional_suffix' => 212,
+  '/optional_suffix/' => 212,
+  '/optional_suffixes/' => 213,
+  '/optional_suffixes/herp' => 213,
+  '/optional_suffixes/herp/derp' => 213,
+  '/manual/en/foo.bar.php' => 214,
+  '/bounded/123' => 215,
+] as $path => $status) {
+  assert!(
+    router_test_dispatch($router, 'GET', $path, router_test_context())->status
+    == $status,
+  );
+}
+
+$headRouter = new Router();
+$headRouter
+  ->add('GET', '/fallback', router_test_handler(220))
+  ->add('GET', '/explicit', router_test_handler(221))
+  ->add('HEAD', '/explicit', router_test_handler(222))
+  ->add('POST', '/post', router_test_handler(223));
+
+assert!(
+  router_test_dispatch(
+    $headRouter,
+    'HEAD',
+    '/fallback',
+    router_test_context(),
+  )->status
+  == 220,
+);
+
+assert!(
+  router_test_dispatch(
+    $headRouter,
+    'HEAD',
+    '/explicit',
+    router_test_context(),
+  )->status
+  == 222,
+);
+
+try {
+  discard!(
+    router_test_dispatch($headRouter, 'GET', '/post', router_test_context()),
+  );
+
+  assert!(false);
+} catch (MethodNotAllowedException $error) {
+  assert!($error->status == 405);
+  assert!($error->allowedMethods == vec['POST']);
+}
+
+try {
+  discard!(
+    router_test_dispatch(
+      $headRouter,
+      'POST',
+      '/fallback',
+      router_test_context(),
+    ),
+  );
+
+  assert!(false);
+} catch (MethodNotAllowedException $error) {
+  assert!($error->allowedMethods == vec['GET', 'HEAD']);
+}
+
+$assertion_value_28 = function() use ($headRouter): Response {
+  return router_test_dispatch(
+    $headRouter,
+    'GET',
+    '/missing',
+    router_test_context(),
+  );
+};
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (NotFoundException $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is NotFoundException);
+
+$assertion_value_29 = function() use ($headRouter): Router {
+  return $headRouter->add('GET', '/fallback', router_test_handler(224));
+};
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (InvalidArgumentException $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is InvalidArgumentException);
+
+$assertion_value_30 = function(): Router {
+  return new Router()->add(
+    'GET',
+    '/broken/{value:[}',
+    router_test_handler(225),
+  );
+};
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (InvalidArgumentException $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is InvalidArgumentException);
+
+try {
+  discard!(
+    router_test_dispatch($router, 'GET', '/encoded/%GG', router_test_context()),
+  );
+
+  assert!(false);
+} catch (HTTPException $error) {
+  assert!($error->status == 400);
+}
+
+$collection = new Router();
+$collection
+  ->get('/get', router_test_handler(230))
+  ->head('/head', router_test_handler(231))
+  ->post('/post', router_test_handler(232))
+  ->put('/put', router_test_handler(233))
+  ->patch('/patch', router_test_handler(234))
+  ->delete('/delete', router_test_handler(235))
+  ->options('/options', router_test_handler(236));
+
+foreach (dict[
+  'GET' => ('/get', 230),
+  'HEAD' => ('/head', 231),
+  'POST' => ('/post', 232),
+  'PUT' => ('/put', 233),
+  'PATCH' => ('/patch', 234),
+  'DELETE' => ('/delete', 235),
+  'OPTIONS' => ('/options', 236),
+] as $method => ($path, $status)) {
+  assert!(
+    router_test_dispatch(
+      $collection,
+      $method,
+      $path,
+      router_test_context(),
+    )->status
+    == $status,
+  );
+}
+
+$collection->prefix('/api', function(RouteCollection $routes): void {
+  $routes->get('/users', router_test_handler(240))->prefix(
+    '/v1',
+    function(RouteCollection $routes): void {
+      $routes->post('/users', router_test_handler(241));
+    },
+  );
+});
+
+assert!(
+  router_test_dispatch(
+    $collection,
+    'GET',
+    '/api/users',
+    router_test_context(),
+  )->status
+  == 240,
+);
+
+assert!(
+  router_test_dispatch(
+    $collection,
+    'POST',
+    '/api/v1/users',
+    router_test_context(),
+  )->status
+  == 241,
+);
+
+$firstMiddleware = new RouterTestMiddleware(1);
+$secondMiddleware = new RouterTestMiddleware(2);
+$collection->through(
+  vec[$firstMiddleware, $secondMiddleware],
+  function(RouteCollection $routes): void {
+    $routes->get('/wrapped', router_test_handler(200));
+  },
+)->get('/unwrapped', router_test_handler(200));
+
+assert!(
+  router_test_dispatch(
+    $collection,
+    'GET',
+    '/wrapped',
+    router_test_context(),
+  )->status
+  == 221,
+);
+
+assert!($firstMiddleware->calls == 1);
+assert!($secondMiddleware->calls == 1);
+assert!(
+  router_test_dispatch(
+    $collection,
+    'GET',
+    '/unwrapped',
+    router_test_context(),
+  )->status
+  == 200,
+);
+
+assert!($firstMiddleware->calls == 1);
+assert!($secondMiddleware->calls == 1);
+
+$nestedMiddleware = new RouterTestMiddleware(3);
+$collection->prefix(
+  '/nested',
+  function(RouteCollection $routes) use ($nestedMiddleware): void {
+    $routes->through(
+      $nestedMiddleware,
+      function(RouteCollection $routes): void {
+        $routes->get('/route', router_test_handler(200));
+      },
+    );
+  },
+);
+
+assert!(
+  router_test_dispatch(
+    $collection,
+    'GET',
+    '/nested/route',
+    router_test_context(),
+  )->status
+  == 203,
+);
+
+$transactional = new Router();
+try {
+  $transactional->prefix('/discarded', function(RouteCollection $routes): void {
+    $routes->get('/route', router_test_handler(250));
+    throw new RouterTestGroupException('discard the route group');
+  });
+
+  assert!(false);
+} catch (RouterTestGroupException $_) {
+}
+
+$assertion_value_44 = function() use ($transactional): Response {
+  return router_test_dispatch(
+    $transactional,
+    'GET',
+    '/discarded/route',
+    router_test_context(),
+  );
+};
+
+$assertion_error_44 = null;
+try {
+  $assertion_value_44();
+} catch (NotFoundException $assertion_caught_44) {
+  $assertion_error_44 = $assertion_caught_44;
+}
+
+assert!($assertion_error_44 is NotFoundException);
+
+$enumerable = new Router();
+$enumerable->get('/first', router_test_handler(200))->post(
+  '/second/{id}',
+  router_test_handler(201),
+);
+
+$registrations = vec[];
+foreach ($enumerable as $index => ($method, $pattern, $_handler)) {
+  assert!($index == length!($registrations));
+  $registrations[] = ($method, $pattern);
+}
+
+assert!($registrations == vec[('GET', '/first'), ('POST', '/second/{id}')]);

@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports access that violates member visibility. */
+#[Stub]
+class VisibilityError extends Error {}

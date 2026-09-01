@@ -1,0 +1,89 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\LinkedCancellationToken;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+
+/** Combines request cancellation sources on first subscription. */
+final class RequestCancellationToken implements CancellationToken {
+  private null|LinkedCancellationToken $linked = null;
+  private null|CancellationToken $timeout = null;
+
+  #[AlwaysInline]
+  public function __construct(
+    private CancellationToken $first,
+    private null|CancellationToken $second = null,
+  ) {}
+
+  /** Adds a deadline observed by every holder of this token. */
+  #[TrackCaller]
+  public function addTimeout(Duration $timeout): void {
+    $parent = $this->timeout;
+    if ($parent == null) {
+      $parent = $this->source();
+    }
+
+    $this->timeout = new TimeoutCancellationToken($timeout, $parent);
+  }
+
+  #[AlwaysInline]
+  public function isCancellationRequested(): bool {
+    if ($this->timeout != null) {
+      return $this->timeout->isCancellationRequested();
+    }
+
+    return (
+      $this->first->isCancellationRequested()
+      || ($this->second?->isCancellationRequested() ?? false)
+    );
+  }
+
+  #[TrackCaller]
+  public function throwIfCancellationRequested(): void {
+    if ($this->timeout != null) {
+      $this->timeout->throwIfCancellationRequested();
+      return;
+    }
+
+    $this->first->throwIfCancellationRequested();
+    $this->second?->throwIfCancellationRequested();
+  }
+
+  #[TrackCaller]
+  public function register(fn(): void $callback): int {
+    if ($this->timeout != null) {
+      return $this->timeout->register($callback);
+    }
+
+    return $this->source()->register($callback);
+  }
+
+  #[TrackCaller]
+  public function unregister(int $id): void {
+    if ($this->timeout != null) {
+      $this->timeout->unregister($id);
+      return;
+    }
+
+    $this->source()->unregister($id);
+  }
+
+  #[TrackCaller]
+  private function source(): CancellationToken {
+    if ($this->second == null) {
+      return $this->first;
+    }
+
+    if ($this->linked == null) {
+      $this->linked = new LinkedCancellationToken(vec[
+        $this->first,
+        $this->second,
+      ]);
+    }
+
+    return $this->linked;
+  }
+}

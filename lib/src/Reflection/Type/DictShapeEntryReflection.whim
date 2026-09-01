@@ -1,0 +1,18 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Describes one required key in a dict shape. */
+#[Stub]
+final class DictShapeEntryReflection {
+  private function __construct() {}
+
+  /** Returns the exact required key. */
+  #[MustUse]
+  public function getKey(): int|string {}
+
+  /** Returns the value type required at that key. */
+  #[MustUse]
+  public function getType(): TypeReflection {}
+}

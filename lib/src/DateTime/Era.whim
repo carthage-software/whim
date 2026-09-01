@@ -1,0 +1,30 @@
+namespace Whim\DateTime;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** An era in the proleptic Gregorian calendar. */
+enum Era: string {
+  case CommonEra = 'CE';
+  case BeforeCommonEra = 'BCE';
+
+  /** Returns the era containing an astronomical year. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromYear(Year $year): Era {
+    return match ($year > 0) {
+      true => Era::CommonEra,
+      false => Era::BeforeCommonEra,
+    };
+  }
+
+  /** Returns the other era. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function opposite(): Era {
+    return match ($this) {
+      Era::CommonEra => Era::BeforeCommonEra,
+      Era::BeforeCommonEra => Era::CommonEra,
+    };
+  }
+}

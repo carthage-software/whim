@@ -1,0 +1,32 @@
+namespace Whim\CSV;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** Creates a streaming CSV reader. */
+#[AlwaysInline]
+#[MustUse]
+function read(
+  ReadHandle $handle,
+  NonEmptyString $delimiter = ',',
+  NonEmptyString $enclosure = '"',
+  null|CancellationToken $cancellation = null,
+): Reader {
+  return new Reader($handle, $delimiter, $enclosure, $cancellation);
+}
+
+/** Creates a streaming CSV writer. */
+#[AlwaysInline]
+#[MustUse]
+function write(
+  WriteHandle $handle,
+  NonEmptyString $delimiter = ',',
+  NonEmptyString $enclosure = '"',
+  NonEmptyString $lineEnding = "\r\n",
+): Writer {
+  return new Writer($handle, $delimiter, $enclosure, $lineEnding);
+}

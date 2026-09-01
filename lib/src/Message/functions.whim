@@ -1,0 +1,109 @@
+namespace Whim\Message;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IO\ConcatReadHandle;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\Reader;
+use Whim\MIME\Headers;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Parses an RFC 5322 message from bytes or a readable handle. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function parse(
+  string|ReadHandle $input,
+  null|CancellationToken $cancellation = null,
+): Message {
+  if ($input is string) {
+    $parsed = Whim\_Private\message_parse_headers($input);
+    if ($parsed != null) {
+      return _Private\from_parsed_headers(
+        $parsed[0],
+        new Reader(new MemoryHandle($parsed[1])),
+      );
+    }
+  }
+
+  $source = match ($input) {
+    $bytes @ string => new MemoryHandle($bytes),
+    $handle @ ReadHandle => $handle,
+  };
+
+  $reader = new Reader($source);
+  $pairs = vec[];
+  $name = null;
+  $value = '';
+  while (($line = $reader->readLine($cancellation)) != null) {
+    if ($line == '') {
+      break;
+    }
+
+    if (($line[0] is ' '|"\t") && $name != null) {
+      $value .= ' ' . Str\trim($line);
+      continue;
+    }
+
+    if ($name != null) {
+      $pairs[] = ($name, $value);
+    }
+
+    $colon = Str\search($line, ':');
+    if ($colon == null || $colon == 0) {
+      throw new InvalidArgumentException('invalid RFC 5322 message header');
+    }
+
+    $name = Str\slice($line, 0, $colon);
+    $value = Str\trim(Str\slice($line, $colon + 1));
+  }
+
+  if ($name != null) {
+    $pairs[] = ($name, $value);
+  }
+
+  if ($pairs == vec[]) {
+    throw new InvalidArgumentException('an RFC 5322 message needs headers');
+  }
+
+  return _Private\from_parsed_headers($pairs, $reader);
+}
+
+/** Serializes a message as a streaming RFC 5322 source. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function serialize(Message $message): ReadHandle {
+  $pairs = vec[];
+  foreach ($message->headers->toVec() as ($name, $value)) {
+    $normalized = Str\lowercase($name);
+    if (
+      $normalized is 'content-type'
+        | 'content-transfer-encoding'
+        | 'content-id'
+        | 'content-disposition'
+        | 'mime-version'
+        | 'bcc'
+    ) {
+      continue;
+    }
+
+    $pairs[] = ($name, $value);
+  }
+
+  $pairs[] = ('MIME-Version', '1.0');
+  foreach ($message->content->headers()->toVec() as $pair) {
+    $pairs[] = $pair;
+  }
+
+  $headers = Headers::fromPairs($pairs);
+  return new ConcatReadHandle(
+    new MemoryHandle($headers->toFoldedString() . "\r\n"),
+    $message->content->body(),
+  );
+}

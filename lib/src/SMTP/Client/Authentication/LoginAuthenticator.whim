@@ -1,0 +1,50 @@
+namespace Whim\SMTP\Client\Authentication;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\Client\Connection;
+
+/** Implements the SASL LOGIN exchange. */
+final readonly class LoginAuthenticator implements Authenticator {
+  public function __construct(
+    private string $username,
+    #[SensitiveParameter] private string $password,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function mechanism(): NonEmptyString {
+    return 'LOGIN';
+  }
+
+  #[TrackCaller]
+  public function authenticate(
+    Connection $connection,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    _Private\require_mechanism($connection, $this->mechanism());
+    $reply = $connection->sendCommand('AUTH LOGIN', $cancellation);
+    if ($reply->code != 334) {
+      throw _Private\rejected($this->mechanism(), $reply);
+    }
+
+    $reply = $connection->sendLine(
+      Base64\encode($this->username),
+      $cancellation,
+    );
+
+    if ($reply->code != 334) {
+      throw _Private\rejected($this->mechanism(), $reply);
+    }
+
+    _Private\require_authentication_success(
+      $this->mechanism(),
+      $connection->sendLine(Base64\encode($this->password), $cancellation),
+    );
+  }
+}

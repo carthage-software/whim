@@ -1,0 +1,81 @@
+use Whim\Comparison\Ordering;
+use Whim\Math;
+use Whim\Time\Duration;
+use Whim\Time\Instant;
+use Whim\Time\SystemTime;
+use Whim\Unwind\DiscardedResultError;
+use Whim\Unwind\VisibilityError;
+
+$start = Instant::now();
+$later = $start->plus(Duration::fromMilliseconds(50));
+assert!($later->isGreaterThan($start));
+assert!($start->isLessThan($later));
+assert!($start->compare($later) == Ordering::Less);
+assert!($start == $start);
+
+$gap = $later->durationSince($start);
+assert!($gap->equals(Duration::fromMilliseconds(50)));
+assert!($start->durationSince($later)->isNegative());
+
+$epoch = SystemTime::unixEpoch();
+assert!($epoch->getSeconds() == 0);
+assert!($epoch->getNanoseconds() == 0);
+
+$now = SystemTime::now();
+assert!($now->isGreaterThan($epoch));
+assert!($now->durationSince($epoch)->isPositive());
+assert!($now->durationSince($epoch)->getTotalSeconds() > 1_000_000_000.0);
+
+$plus_one = $epoch->plus(Duration::fromSeconds(1));
+assert!($plus_one->getSeconds() == 1);
+assert!($plus_one->durationSince($epoch)->equals(Duration::fromSeconds(1)));
+
+$maximum = $epoch->plus(Duration::fromSeconds(Math\INT_MAX));
+$before_epoch = $epoch->minus(Duration::nanosecond());
+$boundary = $maximum->durationSince($before_epoch);
+assert!($boundary->seconds == Math\INT_MAX);
+assert!($boundary->nanoseconds == 1);
+
+$near_minimum = $epoch->plus(new Duration(Math\INT_MIN, 999_999_999));
+$minimum_boundary = $near_minimum->durationSince($plus_one);
+assert!($minimum_boundary->seconds == Math\INT_MIN);
+assert!($minimum_boundary->nanoseconds == -1);
+
+$future = Instant::now()->plus(Duration::fromHours(1));
+assert!($future->elapsed()->isNegative());
+
+$assertion_value_19 = fn(): Instant => new Instant();
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (VisibilityError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is VisibilityError);
+
+$assertion_value_20 = function(): void {
+  SystemTime::unixEpoch();
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (DiscardedResultError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is DiscardedResultError);
+
+$assertion_value_21 = function() use ($start): void {
+  $start->plus(Duration::second());
+};
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (DiscardedResultError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is DiscardedResultError);

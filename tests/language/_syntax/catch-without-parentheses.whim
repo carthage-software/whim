@@ -1,0 +1,4 @@
+try {
+  throw new Whim\Unwind\Error('x');
+} catch Whim\Unwind\Error $e {
+}

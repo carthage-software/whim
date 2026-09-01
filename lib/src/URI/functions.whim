@@ -1,0 +1,27 @@
+namespace Whim\URI;
+
+use Whim;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Resolves a URI reference against an absolute base URI. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function resolve(URI $base, URI $reference): URI {
+  if (!$base->isAbsolute()) {
+    throw new InvalidArgumentException(
+      'a URI resolution base must be absolute',
+    );
+  }
+
+  $resolved = Whim\_Private\uri_resolve(
+    $base->toString(),
+    $reference->toString(),
+  )
+    as string;
+
+  return URI::parse($resolved) as URI;
+}

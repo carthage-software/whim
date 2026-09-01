@@ -1,0 +1,655 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Path;
+use Whim\Reference\WeakMap;
+use Whim\Unwind\AssertionError;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\ReadonlyError;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\VisibilityError;
+
+require!('_reject.whim');
+require!('_process.whim');
+
+const LIMIT = 7;
+
+class Bucket {
+  public const int SIZE = LIMIT;
+
+  public function capacity(): int {
+    return Bucket::SIZE;
+  }
+}
+
+assert!(Bucket::SIZE == 7);
+assert!(new Bucket()->capacity() == 7);
+
+const READY = 'value';
+
+class Holder {
+  public const string LABEL = READY;
+}
+
+assert!(READY == 'value');
+assert!(Holder::LABEL == 'value');
+
+assert!(length!('hello') == 5);
+assert!(vec[1, 2, 3][1] + dict['a' => 2]['a'] + (1,)[0] == 5);
+assert!((7 * 6) - (8 / 2) == 38.0);
+assert!((1 << 5) | 3 == 35);
+assert!(17 % 5 == 2);
+assert!(2 ** 10 == 1024);
+assert!('P6' . "\n" . 1400 . ' ' . 900 . "\n255\n" == "P6\n1400 900\n255\n");
+
+const BASE = 40;
+
+enum Priority: int {
+  case Low = BASE;
+  case High = BASE + 10;
+}
+
+class Config {
+  public const int LIMIT = BASE * 2;
+}
+
+const MAX = Config::LIMIT;
+
+class Uses {
+  public const int DERIVED = Later::SEED + 1;
+}
+
+class Later {
+  public const int SEED = 5;
+}
+
+assert!(Priority::Low->value == 40);
+assert!(Priority::High->value == 50);
+assert!(Config::LIMIT == 80);
+assert!(MAX == 80);
+assert!(Uses::DERIVED == 6);
+assert!(Later::SEED == 5);
+
+$assertion_value_18 = function(): void {
+  if (1) {}
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is TypeError);
+
+$assertion_value_19 = function(): void {
+  while ('x') {}
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is TypeError);
+
+$assertion_value_20 = function(): void {
+  do {} while (0.0);
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (TypeError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is TypeError);
+
+$assertion_value_21 = function(): void {
+  for ($i = 0; $i; $i += 1) {}
+};
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (TypeError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is TypeError);
+
+$assertion_value_22 = fn(): mixed => null && true;
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (TypeError $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is TypeError);
+$assertion_value_23 = fn(): mixed => vec[] || true;
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (TypeError $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is TypeError);
+$assertion_value_24 = fn(): mixed => !'';
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (TypeError $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is TypeError);
+
+$branched = false;
+if (length!(vec[1]) > 0) {
+  $branched = true;
+}
+
+assert!($branched);
+
+assert!(1 + 1 == 2);
+
+$withMessage = null;
+$assertion_callable_26 = function(): void {
+  assert!(false, 'with message');
+};
+
+try {
+  $assertion_callable_26();
+} catch (AssertionError $assertion_caught_26) {
+  $withMessage = $assertion_caught_26;
+}
+
+assert!($withMessage is AssertionError);
+
+assert!(
+  $withMessage->getMessage()
+  == 'assertion failed: false' . "\n" . '  message: with message',
+);
+
+$assertion_value_28 = function(): void {
+  assert!(false);
+};
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (AssertionError $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is AssertionError);
+
+$assertion_value_29 = function(): void {
+  assert!(1);
+};
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (TypeError $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is TypeError);
+
+$vectorsDiffer = null;
+$assertion_callable_30 = function(): void {
+  assert!(vec[1, 2] == vec[1, 3], 'vectors differ');
+};
+
+try {
+  $assertion_callable_30();
+} catch (AssertionError $assertion_caught_30) {
+  $vectorsDiffer = $assertion_caught_30;
+}
+
+assert!($vectorsDiffer is AssertionError);
+
+assert!(
+  $vectorsDiffer->getMessage()
+  == 'assertion failed: vec[1, 2] == vec[1, 3]'
+  . "\n"
+  . '  message: vectors differ'
+  . "\n"
+  . '  left:  vec[1, 2]'
+  . "\n"
+  . '  right: vec[1, 3]',
+);
+
+$subjectShown = null;
+$assertion_callable_32 = function(): void {
+  assert!(vec[1] is vec<string>);
+};
+
+try {
+  $assertion_callable_32();
+} catch (AssertionError $assertion_caught_32) {
+  $subjectShown = $assertion_caught_32;
+}
+
+assert!($subjectShown is AssertionError);
+
+assert!(
+  $subjectShown->getMessage()
+  == 'assertion failed: vec[1] is vec<string>' . "\n" . '  subject: vec[1]',
+);
+
+$negated = null;
+$assertion_callable_34 = function(): void {
+  assert!(!true);
+};
+
+try {
+  $assertion_callable_34();
+} catch (AssertionError $assertion_caught_34) {
+  $negated = $assertion_caught_34;
+}
+
+assert!($negated is AssertionError);
+
+assert!($negated->getMessage() == 'assertion failed: !true');
+
+final class AssertionCounter {
+  public int $calls = 0;
+
+  public function next(): int {
+    $this->calls++;
+    return $this->calls;
+  }
+}
+
+$counter = new AssertionCounter();
+$evaluatedOnce = null;
+$assertion_callable_36 = function() use ($counter): void {
+  assert!($counter->next() == 2);
+};
+
+try {
+  $assertion_callable_36();
+} catch (AssertionError $assertion_caught_36) {
+  $evaluatedOnce = $assertion_caught_36;
+}
+
+assert!($evaluatedOnce is AssertionError);
+
+assert!(
+  $evaluatedOnce->getMessage()
+  == 'assertion failed: $counter->next() == 2'
+  . "\n"
+  . '  left:  1'
+  . "\n"
+  . '  right: 2',
+);
+
+assert!($counter->calls == 1);
+
+readonly class ImmutablePoint {
+  public function __construct(public int $x, public int $y) {}
+
+  public function withY(int $y): static {
+    return clone!($this, y: $y);
+  }
+}
+
+$point = new ImmutablePoint(1, 2);
+$moved = $point->withY(9);
+assert!(($moved->x, $moved->y) == (1, 9));
+assert!(($point->x, $point->y) == (1, 2));
+assert!($point != $moved);
+$assertion_value_42 = fn(): ImmutablePoint => clone!($point, ghost: 1);
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (TypeError $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+}
+
+assert!($assertion_error_42 is TypeError);
+
+$assertion_value_43 = fn(): ImmutablePoint => clone!($point, y: 10);
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (ReadonlyError $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is ReadonlyError);
+
+readonly class ProtectedPoint {
+  public function __construct(protected int $value) {}
+
+  public function value(): int {
+    return $this->value;
+  }
+}
+
+readonly class AdjustablePoint extends ProtectedPoint {
+  public function withValue(int $value): static {
+    return clone!($this, value: $value);
+  }
+}
+
+assert!(new AdjustablePoint(1)->withValue(2)->value() == 2);
+
+readonly class PrivatePoint {
+  public function __construct(private int $value) {}
+
+  public function withValue(int $value): static {
+    return clone!($this, value: $value);
+  }
+}
+
+$assertion_value_45 = fn(): PrivatePoint => new PrivatePoint(1)->withValue(2);
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (ReadonlyError $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is ReadonlyError);
+
+class MutablePoint {
+  public function __construct(public readonly int $value) {}
+
+  public function withValue(int $value): static {
+    return clone!($this, value: $value);
+  }
+}
+
+$assertion_value_46 = fn(): MutablePoint => new MutablePoint(1)->withValue(2);
+$assertion_error_46 = null;
+try {
+  $assertion_value_46();
+} catch (ReadonlyError $assertion_caught_46) {
+  $assertion_error_46 = $assertion_caught_46;
+}
+
+assert!($assertion_error_46 is ReadonlyError);
+
+class PayloadPoint {
+  public function __construct(public int $x, public int $y) {}
+}
+
+$payload = new PayloadPoint(1, 2);
+$movedPayload = clone!($payload, y: 9);
+assert!(($movedPayload->x, $movedPayload->y) == (1, 9));
+assert!(($payload->x, $payload->y) == (1, 2));
+
+$weakMap = new WeakMap::<object, mixed>();
+$assertion_value_49 = fn(): mixed => clone!($weakMap);
+$assertion_error_49 = null;
+try {
+  $assertion_value_49();
+} catch (TypeError $assertion_caught_49) {
+  $assertion_error_49 = $assertion_caught_49;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_49->getMessage(),
+      'cannot clone an instance of the built-in class Whim\Reference\WeakMap',
+    ),
+  );
+}
+
+assert!($assertion_error_49 is TypeError);
+
+class PrivateCloneState {
+  public function __construct(private readonly string $name) {}
+
+  public function name(): string {
+    return $this->name;
+  }
+}
+
+$state = new PrivateCloneState('Ada');
+$assertion_value_50 = fn(): PrivateCloneState => clone!($state, name: 'Grace');
+$assertion_error_50 = null;
+try {
+  $assertion_value_50();
+} catch (VisibilityError $assertion_caught_50) {
+  $assertion_error_50 = $assertion_caught_50;
+}
+
+assert!($assertion_error_50 is VisibilityError);
+
+assert!($state->name() == 'Ada');
+
+assert!(length!('héllo') == 6);
+assert!(length!('') == 0);
+assert!(length!(vec[1, 2, 3]) == 3);
+assert!(length!(dict['a' => 1]) == 1);
+assert!(length!((1, 2)) == 2);
+$assertion_value_57 = function(): void {
+  length!(5);
+};
+
+$assertion_error_57 = null;
+try {
+  $assertion_value_57();
+} catch (TypeError $assertion_caught_57) {
+  $assertion_error_57 = $assertion_caught_57;
+}
+
+assert!($assertion_error_57 is TypeError);
+
+$assertion_value_58 = function(): void {
+  length!(null);
+};
+
+$assertion_error_58 = null;
+try {
+  $assertion_value_58();
+} catch (TypeError $assertion_caught_58) {
+  $assertion_error_58 = $assertion_caught_58;
+}
+
+assert!($assertion_error_58 is TypeError);
+
+$letters = vec['a', 'b', 'c'];
+assert!(remove_first!($letters) == 'a');
+assert!(remove_last!($letters) == 'c');
+assert!($letters == vec['b']);
+$assertion_value_62 = function(): void {
+  $empty = vec[];
+  remove_first!($empty);
+};
+
+$assertion_error_62 = null;
+try {
+  $assertion_value_62();
+} catch (OutOfBoundsError $assertion_caught_62) {
+  $assertion_error_62 = $assertion_caught_62;
+}
+
+assert!($assertion_error_62 is OutOfBoundsError);
+
+$assertion_value_63 = function(): void {
+  $empty = vec[];
+  remove_last!($empty);
+};
+
+$assertion_error_63 = null;
+try {
+  $assertion_value_63();
+} catch (OutOfBoundsError $assertion_caught_63) {
+  $assertion_error_63 = $assertion_caught_63;
+}
+
+assert!($assertion_error_63 is OutOfBoundsError);
+
+$items = vec['a', 'b', 'c'];
+assert!(remove!($items, 1) == 'b');
+assert!($items[1] == 'c');
+assert!(length!($items) == 2);
+$mapping = dict['x' => 1, 'y' => 2];
+assert!(remove!($mapping, 'x') == 1);
+assert!(length!($mapping) == 1);
+$assertion_value_69 = function(): void {
+  $mapping = dict['y' => 2];
+  remove!($mapping, 'x');
+};
+
+$assertion_error_69 = null;
+try {
+  $assertion_value_69();
+} catch (OutOfBoundsError $assertion_caught_69) {
+  $assertion_error_69 = $assertion_caught_69;
+}
+
+assert!($assertion_error_69 is OutOfBoundsError);
+
+$assertion_value_70 = function(): void {
+  $items = vec['a', 'b'];
+  remove!($items, 9);
+};
+
+$assertion_error_70 = null;
+try {
+  $assertion_value_70();
+} catch (OutOfBoundsError $assertion_caught_70) {
+  $assertion_error_70 = $assertion_caught_70;
+}
+
+assert!($assertion_error_70 is OutOfBoundsError);
+
+assert!(length!(file!()) > length!(directory!()));
+assert!(
+  file!() == directory!() . Path\SEPARATOR . 'evaluation-constructs.whim',
+);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$binary = Env\current_binary();
+assert!($binary is string);
+
+prints('write-rendering', 'a12.5' . "\n" . 'xy' . "\n");
+
+$assertion_value_74 = function(): void {
+  write!(true);
+};
+
+$assertion_error_74 = null;
+try {
+  $assertion_value_74();
+} catch (TypeError $assertion_caught_74) {
+  $assertion_error_74 = $assertion_caught_74;
+}
+
+assert!($assertion_error_74 is TypeError);
+
+$assertion_value_75 = function(): void {
+  write_line!(vec[]);
+};
+
+$assertion_error_75 = null;
+try {
+  $assertion_value_75();
+} catch (TypeError $assertion_caught_75) {
+  $assertion_error_75 = $assertion_caught_75;
+}
+
+assert!($assertion_error_75 is TypeError);
+
+File\write(
+  $work . '/write-error.whim',
+  'write_error!(\'e1\');'
+  . "\n"
+  . 'write_error_line!(\'e2\');'
+  . "\n"
+  . 'write_line!(\'stdout untouched\');'
+  . "\n",
+);
+
+$writeError = Command\run($binary, vec[$work . '/write-error.whim']);
+assert!($writeError->isSuccess());
+assert!($writeError->standardOutput == 'stdout untouched' . "\n");
+assert!($writeError->standardError == 'e1e2' . "\n");
+
+File\write(
+  $work . '/debug.whim',
+  'debug!(vec[1, 2], dict[\'k\' => (1, \'x\')], null, true);'
+  . "\n"
+  . 'write_line!(\'after debug\');'
+  . "\n",
+);
+
+$debug = Command\run($binary, vec[$work . '/debug.whim']);
+assert!($debug->isSuccess());
+assert!($debug->standardOutput == 'after debug' . "\n");
+assert!(
+  $debug->standardError
+  == '['
+  . Filesystem\canonicalize($work . '/debug.whim')
+  . ':1:1] vec(2) ['
+  . "\n"
+  . '  1,'
+  . "\n"
+  . '  2,'
+  . "\n"
+  . '],'
+  . "\n"
+  . 'dict(1) ['
+  . "\n"
+  . '  string(1) "k" => tuple(2) ['
+  . "\n"
+  . '    1,'
+  . "\n"
+  . '    string(1) "x",'
+  . "\n"
+  . '  ],'
+  . "\n"
+  . '],'
+  . "\n"
+  . 'null,'
+  . "\n"
+  . 'true'
+  . "\n",
+);
+
+File\write($work . '/exit-default.whim', 'exit!();' . "\n");
+$exitDefault = Command\run($binary, vec[$work . '/exit-default.whim']);
+assert!($exitDefault->isSuccess());
+assert!(length!($exitDefault->standardOutput) == 0);
+assert!(length!($exitDefault->standardError) == 0);
+
+File\write(
+  $work . '/exit-terminates.whim',
+  'write_line!(\'before\');'
+  . "\n"
+  . 'try {'
+  . "\n"
+  . '    exit!(7);'
+  . "\n"
+  . '} catch (Whim\Unwind\Error $e) {'
+  . "\n"
+  . '    write_line!(\'caught exit\');'
+  . "\n"
+  . '} finally {'
+  . "\n"
+  . '    write_line!(\'finally ran\');'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'write_line!(\'after\');'
+  . "\n",
+);
+
+$exitTerminates = Command\run($binary, vec[$work . '/exit-terminates.whim']);
+assert!($exitTerminates->status is Command\Exited);
+assert!(($exitTerminates->status as Command\Exited)->code == 7);
+assert!($exitTerminates->standardOutput == 'before' . "\n");
+assert!(length!($exitTerminates->standardError) == 0);
+
+Filesystem\delete_directory($work, true);

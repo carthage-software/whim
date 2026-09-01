@@ -1,0 +1,44 @@
+use Whim\UUID\UUID;
+use Whim\Unwind\InvalidArgumentException;
+
+$v4 = UUID::v4();
+assert!($v4->version == 4);
+assert!(length!($v4->toBytes()) == 16);
+assert!(UUID::parse($v4->toString())?->equals($v4) == true);
+
+$v7 = UUID::v7();
+assert!($v7->version == 7);
+assert!(length!($v7->toBytes()) == 16);
+assert!(UUID::fromBytes($v7->toBytes())->equals($v7));
+assert!($v7->toString() < UUID::v7()->toString());
+
+$known = UUID::from('01890a5d-ac96-774b-bcce-b302099a8057');
+assert!($known->version == 7);
+assert!($known->toString() == '01890a5d-ac96-774b-bcce-b302099a8057');
+
+assert!(UUID::from('00000000-0000-0000-0000-000000000000')->version == null);
+
+assert!(UUID::isValid($known->toString()));
+assert!(!(UUID::isValid('01890A5D-AC96-774B-BCCE-B302099A8057')));
+
+assert!(!(UUID::isValid('01890a5dac96774bbcceb302099a8057')));
+assert!(UUID::parse('not-a-uuid') == null);
+$assertion_value_15 = fn(): UUID => UUID::from('not-a-uuid');
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (InvalidArgumentException $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is InvalidArgumentException);
+
+$assertion_value_16 = fn(): UUID => UUID::fromBytes('too short');
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (InvalidArgumentException $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is InvalidArgumentException);

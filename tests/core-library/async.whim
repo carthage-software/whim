@@ -1,0 +1,228 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Channel;
+use Whim\IO\MemoryHandle;
+use Whim\Time\Duration;
+use Whim\Time\Instant;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+
+final class AsyncEventRecorder {
+  public vec<string> $events = vec[];
+}
+
+$laterTask = Async\spawn::<string>(function(): string {
+  Async\later();
+  return 'a';
+});
+
+$immediateTask = Async\spawn::<string>(function(): string {
+  return 'b';
+});
+
+assert!($immediateTask->await() == 'b');
+assert!($laterTask->await() == 'a');
+
+$sleepOrder = new AsyncEventRecorder();
+$slowSleeper = Async\spawn::<string>(function() use ($sleepOrder): string {
+  Async\sleep(Duration::fromMilliseconds(30));
+  $sleepOrder->events[] = 'slow';
+  return 'slow';
+});
+
+$fastSleeper = Async\spawn::<string>(function() use ($sleepOrder): string {
+  Async\sleep(Duration::fromMilliseconds(5));
+  $sleepOrder->events[] = 'fast';
+  return 'fast';
+});
+
+assert!($fastSleeper->await() == 'fast');
+assert!($slowSleeper->await() == 'slow');
+assert!($sleepOrder->events == vec['fast', 'slow']);
+
+$nestedSum = Async\spawn::<int>(function(): int {
+  $twenty = Async\spawn::<int>(fn(): int => 20);
+  $twentyTwo = Async\spawn::<int>(fn(): int => 22);
+  return $twenty->await() + $twentyTwo->await();
+});
+
+assert!($nestedSum->await() == 42);
+
+$ready = Async\spawn::<string>(fn(): string => 'ready');
+Async\later();
+assert!($ready->await() == 'ready');
+assert!($ready->await() == 'ready');
+
+$completed = new Async\Deferred::<int>();
+$completed->complete(7);
+assert!($completed->getFuture()->await() == 7);
+
+$drainLog = new MemoryHandle();
+Async\spawn::<int>(function() use ($drainLog): int {
+  Async\sleep(Duration::fromMilliseconds(20));
+  $drainLog->writeAll('slow ');
+  return 0;
+})->ignore();
+
+Async\spawn::<int>(function() use ($drainLog): int {
+  Async\sleep(Duration::fromMilliseconds(5));
+  $drainLog->writeAll('quick ');
+  return 0;
+})->ignore();
+
+Async\spawn::<int>(function() use ($drainLog): int {
+  $drainLog->writeAll('immediate ');
+  return 0;
+})->ignore();
+
+$drainLog->seek(0);
+assert!(length!($drainLog->readAll()) == 0);
+Async\drain();
+$drainLog->seek(0);
+assert!($drainLog->readAll() == 'immediate quick slow ');
+
+$demoStart = Instant::now();
+$squareFutures = dict[0 => Async\spawn::<int>(function(): int {
+  Async\sleep(Duration::fromMilliseconds(20));
+  return 1 * 1;
+}), 1 => Async\spawn::<int>(function(): int {
+  Async\sleep(Duration::fromMilliseconds(20));
+  return 2 * 2;
+}), 2 => Async\spawn::<int>(function(): int {
+  Async\sleep(Duration::fromMilliseconds(20));
+  return 3 * 3;
+})];
+
+$squares = Async\all::<int, int>($squareFutures);
+assert!($squares == dict[0 => 1, 1 => 4, 2 => 9]);
+
+$demoChannel = Channel\bounded::<string>(2);
+$demoSender = $demoChannel[0];
+$demoReceiver = $demoChannel[1];
+Async\spawn::<int>(function() use ($demoSender): int {
+  $demoSender->send('h');
+  $demoSender->send('i');
+  $demoSender->send('!');
+  $demoSender->close();
+  return 0;
+})->ignore();
+
+$message = '';
+$reading = true;
+while ($reading) {
+  try {
+    $message .= $demoReceiver->receive();
+  } catch (Channel\ClosedException $_) {
+    $reading = false;
+  }
+}
+
+assert!($message == 'hi!');
+assert!($demoStart->elapsed()->isPositive());
+
+$waitGroup = new Async\WaitGroup();
+for ($i = 0; $i < 3; $i = $i + 1) {
+  $waitGroup->add();
+  Async\spawn::<int>(function() use ($waitGroup): int {
+    Async\sleep(Duration::fromMilliseconds(15));
+    $waitGroup->done();
+    return 0;
+  })->ignore();
+}
+
+assert!($waitGroup->getCount() == 3);
+$waitGroup->wait();
+assert!($waitGroup->getCount() == 0);
+
+$semaphore = new Async\Semaphore::<int, int>(2, function(int $value): int {
+  Async\sleep(Duration::fromMilliseconds(20));
+  return $value * 10;
+});
+
+$firstPermit = Async\spawn::<int>(fn(): int => $semaphore->waitFor(1));
+$secondPermit = Async\spawn::<int>(fn(): int => $semaphore->waitFor(2));
+$thirdPermit = Async\spawn::<int>(fn(): int => $semaphore->waitFor(3));
+$fourthPermit = Async\spawn::<int>(fn(): int => $semaphore->waitFor(4));
+Async\later();
+assert!($semaphore->getOngoingOperations() == 2);
+assert!($semaphore->getPendingOperations() == 2);
+assert!($firstPermit->await() == 10);
+assert!($secondPermit->await() == 20);
+assert!($thirdPermit->await() == 30);
+assert!($fourthPermit->await() == 40);
+
+$sequenceOrder = new AsyncEventRecorder();
+$sequence = new Async\Sequence::<int, int>(
+  function(int $value) use ($sequenceOrder): int {
+    $sequenceOrder->events[] = 'start ' . $value;
+    Async\sleep(Duration::fromMilliseconds(10));
+    $sequenceOrder->events[] = 'end ' . $value;
+    return $value;
+  },
+);
+
+$firstInLine = Async\spawn::<int>(fn(): int => $sequence->waitFor(1));
+$secondInLine = Async\spawn::<int>(fn(): int => $sequence->waitFor(2));
+$thirdInLine = Async\spawn::<int>(fn(): int => $sequence->waitFor(3));
+assert!($firstInLine->await() == 1);
+assert!($secondInLine->await() == 2);
+assert!($thirdInLine->await() == 3);
+assert!(
+  $sequenceOrder->events == vec[
+    'start 1',
+    'end 1',
+    'start 2',
+    'end 2',
+    'start 3',
+    'end 3',
+  ],
+);
+
+$taskGroup = new Async\TaskGroup();
+$taskGroup->defer(function(): void {
+  Async\sleep(Duration::fromMilliseconds(5));
+});
+
+$taskGroup->defer(function(): void {
+  throw new RuntimeException('deferred failure');
+});
+
+$taskGroup->defer(function(): void {
+  Async\sleep(Duration::fromMilliseconds(5));
+});
+
+$assertion_value_27 = function() use ($taskGroup): void {
+  $taskGroup->awaitAll();
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (Throwable $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+  assert!(
+    Whim\Str\contains($assertion_caught_27->getMessage(), 'deferred failure'),
+  );
+}
+
+assert!($assertion_error_27 is Throwable);
+
+$cancelledWaitGroup = new Async\WaitGroup();
+$cancelledWaitGroup->add();
+$cancelledToken = new Async\SignalCancellationToken();
+$cancelledToken->cancel();
+$assertion_value_28 = function() use (
+  $cancelledWaitGroup,
+  $cancelledToken,
+): void {
+  $cancelledWaitGroup->wait($cancelledToken);
+};
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (CancelledException $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is CancelledException);

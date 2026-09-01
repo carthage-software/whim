@@ -1,0 +1,10 @@
+namespace Whim\BSON;
+
+use Whim\Marker\MustUse;
+
+/** Defines a value's BSON document form. */
+interface ToBson {
+  /** Converts this value into a BSON document. */
+  #[MustUse]
+  public function toBson(): Document;
+}

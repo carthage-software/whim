@@ -1,0 +1,17 @@
+namespace Whim\Reflection;
+
+use Whim\Enum\UnitEnum;
+use Whim\Marker\Stub;
+
+/** Identifies where a reflected declaration was defined. */
+#[Stub]
+enum DeclarationOrigin implements UnitEnum {
+  /** The declaration is implemented by the Whim runtime. */
+  case Core;
+
+  /** The declaration was loaded from a compiled artifact. */
+  case Extension;
+
+  /** The declaration was loaded from user source code. */
+  case User;
+}

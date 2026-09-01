@@ -1,0 +1,236 @@
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\File;
+use Whim\Network\ShutdownDirection;
+use Whim\Network\Stream as NetworkStream;
+use Whim\Network\UnixEndpoint;
+use Whim\Str;
+use Whim\TCP;
+use Whim\TLS\Acceptor;
+use Whim\TLS\Certificate;
+use Whim\TLS\CertificateException;
+use Whim\TLS\ClientConfiguration;
+use Whim\TLS\ConfigurationException;
+use Whim\TLS\Connector;
+use Whim\TLS\HandshakeKind;
+use Whim\TLS\Identity;
+use Whim\TLS\PeerVerification;
+use Whim\TLS\ServerConfiguration;
+use Whim\TLS\Version;
+
+final class TLSTestTransport implements NetworkStream<UnixEndpoint> {
+  private string $incoming = '';
+  private bool $closed = false;
+  private UnixEndpoint $endpoint;
+
+  public function __construct(private Whim\_Private\TlsConnection $peer) {
+    $this->endpoint = new UnixEndpoint(null);
+    $this->receiveFromPeer();
+  }
+
+  public function getLocalEndpoint(): UnixEndpoint {
+    return $this->endpoint;
+  }
+
+  public function getPeerEndpoint(): UnixEndpoint {
+    return $this->endpoint;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+    $this->receiveFromPeer();
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->closed && $this->incoming == '';
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    $this->receiveFromPeer();
+    $maximum = $maxBytes ?? length!($this->incoming);
+    if ($maximum <= 0 || $this->incoming == '') {
+      return '';
+    }
+
+    if ($maximum >= length!($this->incoming)) {
+      $bytes = $this->incoming;
+      $this->incoming = '';
+      return $bytes;
+    }
+
+    $bytes = Str\slice($this->incoming, 0, $maximum);
+    $this->incoming = Str\slice($this->incoming, $maximum);
+    return $bytes;
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    if ($bytes == '') {
+      return 0;
+    }
+
+    $this->peer->receiveCiphertext($bytes);
+    $this->receiveFromPeer();
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return $this->tryWrite($bytes);
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {
+    if ($direction != ShutdownDirection::Read) {
+      $this->peer->receiveEnd();
+    }
+  }
+
+  private function receiveFromPeer(): void {
+    while (true) {
+      $bytes = $this->peer->transmitCiphertext(65536);
+      if ($bytes == '') {
+        return;
+      }
+
+      $this->incoming .= $bytes;
+    }
+  }
+}
+
+$certificatePem = File\read(directory!() . '/fixtures/tls/certificate.pem');
+$privateKeyPem = File\read(directory!() . '/fixtures/tls/private-key.pem');
+$certificate = Certificate::from($certificatePem);
+$identity = Identity::from($certificatePem, $privateKeyPem);
+assert!(length!($certificate->toDer()) > 0);
+assert!(length!($identity->certificateChain) == 1);
+assert!(
+  Certificate::from($certificate->toDer())->toDer() == $certificate->toDer(),
+);
+
+assert!($certificate->getNotBefore()->seconds == 1786423033);
+assert!($certificate->getNotAfter()->seconds == 2101783033);
+assert!($certificate->getSubject() == 'CN=localhost');
+assert!($certificate->getIssuer() == 'CN=localhost');
+assert!($certificate->getDnsNames() == vec['localhost']);
+assert!(length!($certificate->getIpAddresses()) == 1);
+assert!($certificate->getIpAddresses()[0]->toString() == '127.0.0.1');
+assert!($certificate->getEmailAddresses() == vec[]);
+assert!($certificate->getUris() == vec[]);
+
+assert!(
+  Identity::from($certificate->toDer(), $identity->privateKey) is Identity,
+);
+
+$assertion_value_5 = fn(): Certificate => (
+  Certificate::from('not a certificate')
+);
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (CertificateException $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is CertificateException);
+
+$clientConfiguration = new ClientConfiguration(
+  useSystemRoots: false,
+  trustedRoots: vec[$certificate],
+  alpnProtocols: vec['whim-test'],
+);
+
+$serverConfiguration = new ServerConfiguration(
+  $identity,
+  alpnProtocols: vec['whim-test'],
+);
+
+assert!(
+  new Connector::<UnixEndpoint>(
+    new ClientConfiguration(
+      useSystemRoots: false,
+      peerVerification: PeerVerification::AllowSelfSigned,
+    ),
+  ) is Connector<UnixEndpoint>,
+);
+
+$assertion_value_7 = fn(): Connector<UnixEndpoint> => (
+  new Connector::<UnixEndpoint>(
+    new ClientConfiguration(
+      useSystemRoots: false,
+      minimumVersion: Version::Tls13,
+      maximumVersion: Version::Tls12,
+    ),
+  )
+);
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (ConfigurationException $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is ConfigurationException);
+
+$serverConnection = Whim\TLS\_Private\server_configuration(
+  $serverConfiguration,
+)->createConnection();
+
+$stream = new Connector::<UnixEndpoint>($clientConfiguration)->connect(
+  new TLSTestTransport($serverConnection),
+  'localhost',
+);
+
+$state = $stream->getConnectionState();
+assert!($state->version == Version::Tls13);
+assert!($state->alpnProtocol == 'whim-test');
+assert!($state->handshakeKind == HandshakeKind::Full);
+assert!(length!($state->cipherSuite) > 0);
+assert!(length!($state->peerCertificates) == 1);
+$stream->writeAll('ping');
+assert!($serverConnection->readPlaintext(4) == 'ping');
+assert!($serverConnection->writePlaintext('pong') == 4);
+assert!($stream->readFixedSize(4) == 'pong');
+$stream->close();
+
+$clientConnection = Whim\TLS\_Private\client_configuration(
+  $clientConfiguration,
+)->createConnection('localhost');
+
+$stream = new Acceptor::<UnixEndpoint>($serverConfiguration)->accept(
+  new TLSTestTransport($clientConnection),
+);
+
+$state = $stream->getConnectionState();
+assert!($state->version == Version::Tls13);
+assert!($state->serverName == 'localhost');
+$stream->writeAll('server');
+assert!($clientConnection->readPlaintext(6) == 'server');
+assert!($clientConnection->writePlaintext('client') == 6);
+assert!($stream->readFixedSize(6) == 'client');
+$stream->close();
+
+assert!(
+  new TCP\SecureConnector(configuration: $clientConfiguration) is TCP\Connector,
+);

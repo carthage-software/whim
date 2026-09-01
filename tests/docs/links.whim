@@ -1,0 +1,150 @@
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Str;
+
+/** Collects files with one suffix beneath a directory. */
+function files_with_suffix(string $directory, string $suffix): vec<string> {
+  $found = vec[];
+  foreach (Filesystem\read_directory($directory) as $entry) {
+    $path = $directory . '/' . $entry->name;
+    if (Filesystem\is_directory($path)) {
+      foreach (files_with_suffix($path, $suffix) as $nested) {
+        $found[] = $nested;
+      }
+
+      continue;
+    }
+
+    if (Str\ends_with($entry->name, $suffix)) {
+      $found[] = $path;
+    }
+  }
+
+  return $found;
+}
+
+/** Reads the namespace declared by a source file. */
+function namespace_of(string $file): null|string {
+  foreach (Str\split(File\read($file), "\n") as $line) {
+    if (Str\starts_with($line, 'namespace ')) {
+      return Str\strip_suffix(Str\strip_prefix($line, 'namespace '), ';');
+    }
+  }
+
+  return null;
+}
+
+$script = Env\current_script();
+assert!($script is string);
+$script = Filesystem\canonicalize($script);
+
+$root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as int);
+
+$docs = $root . '/docs/src';
+$files = files_with_suffix($docs, '.md');
+assert!($files != vec[]);
+
+$summary = File\read($docs . '/SUMMARY.md');
+$unlisted = vec[];
+foreach ($files as $file) {
+  if ($file == $docs . '/SUMMARY.md') {
+    continue;
+  }
+
+  $relative = Str\slice($file, length!($docs) + 1);
+  if (!Str\contains($summary, '](' . $relative . ')')) {
+    $unlisted[] = $relative;
+  }
+}
+
+assert!($unlisted == vec[]);
+
+$broken = vec[];
+foreach ($files as $file) {
+  $directory = Str\slice($file, 0, Str\search_last($file, '/') as int);
+  $lines = Str\split(File\read($file), "\n");
+  $lineNumber = 0;
+  foreach ($lines as $line) {
+    $lineNumber++;
+    $rest = $line;
+    while (true) {
+      $open = Str\search($rest, '](');
+      if ($open == null) {
+        break;
+      }
+
+      $after = Str\slice($rest, $open + 2);
+      $close = Str\search($after, ')');
+      if ($close == null) {
+        break;
+      }
+
+      $target = Str\slice($after, 0, $close);
+      $hash = Str\search($target, '#');
+      if ($hash != null) {
+        $target = Str\slice($target, 0, $hash);
+      }
+
+      if (
+        Str\ends_with($target, '.md')
+        && !Str\starts_with($target, 'http')
+        && !Filesystem\exists($directory . '/' . $target)
+      ) {
+        $broken[] = $file . ':' . $lineNumber . ': ' . $target;
+      }
+
+      $rest = $after;
+    }
+  }
+}
+
+assert!($broken == vec[]);
+
+$index = File\read($docs . '/standard-library/api-reference.md');
+$namespaces = vec[];
+foreach (files_with_suffix($root . '/lib/src', '.whim') as $file) {
+  $namespace = namespace_of($file);
+  if (
+    $namespace == null
+    || Str\contains($namespace, '\\_Private')
+    || contains!($namespaces, $namespace)
+  ) {
+    continue;
+  }
+
+  $namespaces[] = $namespace;
+}
+
+$missing = vec[];
+foreach ($namespaces as $namespace) {
+  if (!Str\contains($index, '| `' . $namespace . '` |')) {
+    $missing[] = $namespace;
+  }
+}
+
+$stale = vec[];
+$indexed = vec[];
+$duplicates = vec[];
+foreach (Str\split($index, "\n") as $line) {
+  if (!Str\starts_with($line, '| `Whim')) {
+    continue;
+  }
+
+  $end = Str\search($line, '`', 3);
+  assert!($end is int);
+  $namespace = Str\slice($line, 3, $end - 3);
+  if (contains!($indexed, $namespace)) {
+    $duplicates[] = $namespace;
+  } else {
+    $indexed[] = $namespace;
+  }
+
+  if (!contains!($namespaces, $namespace)) {
+    $stale[] = $namespace;
+  }
+}
+
+assert!($missing == vec[]);
+assert!($stale == vec[]);
+assert!($duplicates == vec[]);

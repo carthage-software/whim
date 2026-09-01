@@ -1,0 +1,27 @@
+namespace Whim\Promise;
+
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+use Whim\Refine\Transform;
+
+/** Defines the behavior of promise values. */
+interface Promise<out T> {
+  /** Transforms either outcome of the asynchronous operation. */
+  #[TrackCaller]
+  public function then<U>(
+    Transform<T, U> $success,
+    Transform<Throwable, U> $failure,
+  ): Promise<U>;
+
+  /** Transforms the contained success value. */
+  #[TrackCaller]
+  public function map<U>(Transform<T, U> $success): Promise<U>;
+
+  /** Recovers from a failed asynchronous operation. */
+  #[TrackCaller]
+  public function catch<U>(Transform<Throwable, U> $failure): Promise<T|U>;
+
+  /** Runs a callback after either outcome. */
+  #[TrackCaller]
+  public function always(fn(): void $always): Promise<T>;
+}

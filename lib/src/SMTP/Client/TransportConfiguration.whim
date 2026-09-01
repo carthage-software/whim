@@ -1,0 +1,120 @@
+namespace Whim\SMTP\Client;
+
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Network\Host;
+use Whim\Network\Port;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\SMTP\Security;
+use Whim\TCP\Connector;
+use Whim\TCP\DefaultConnector;
+use Whim\TLS\ClientConfiguration;
+use Whim\Time\Duration;
+
+/** Configures SMTP connections and delivery behavior. */
+final readonly class TransportConfiguration implements Default {
+  #[AlwaysInline]
+  public function __construct(
+    public Host $host = 'localhost',
+    public null|Port $port = null,
+    public Security $security = Security::StartTls,
+    public NonEmptyString $localHostname = 'localhost',
+    public bool $pipelining = true,
+    public bool $chunking = true,
+    public PositiveInt $chunkSize = 65536,
+    public bool $allowPartialSuccess = false,
+    public NonNegativeInt $maximumIdleConnections = 1,
+    public Duration $idleConnectionTimeout = Duration::fromMinutes(5),
+    public Connector $connector = new DefaultConnector(),
+    public ClientConfiguration $tls = new ClientConfiguration(),
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withHost(Host $host): TransportConfiguration {
+    return clone!($this, host: $host);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withPort(null|Port $port): TransportConfiguration {
+    return clone!($this, port: $port);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSecurity(Security $security): TransportConfiguration {
+    return clone!($this, security: $security);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withLocalHostname(
+    NonEmptyString $hostname,
+  ): TransportConfiguration {
+    return clone!($this, localHostname: $hostname);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withPipelining(bool $enabled): TransportConfiguration {
+    return clone!($this, pipelining: $enabled);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withChunking(bool $enabled): TransportConfiguration {
+    return clone!($this, chunking: $enabled);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withChunkSize(PositiveInt $size): TransportConfiguration {
+    return clone!($this, chunkSize: $size);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withPartialSuccess(bool $allowed): TransportConfiguration {
+    return clone!($this, allowPartialSuccess: $allowed);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumIdleConnections(
+    NonNegativeInt $maximum,
+  ): TransportConfiguration {
+    return clone!($this, maximumIdleConnections: $maximum);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withIdleConnectionTimeout(
+    Duration $timeout,
+  ): TransportConfiguration {
+    return clone!($this, idleConnectionTimeout: $timeout);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withConnector(Connector $connector): TransportConfiguration {
+    return clone!($this, connector: $connector);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTls(
+    ClientConfiguration $configuration,
+  ): TransportConfiguration {
+    return clone!($this, tls: $configuration);
+  }
+}

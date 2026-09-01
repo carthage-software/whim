@@ -1,0 +1,6 @@
+namespace Whim\Channel;
+
+use Whim\Unwind\RuntimeException;
+
+/** Base exception for channel failures. */
+class Exception extends RuntimeException {}

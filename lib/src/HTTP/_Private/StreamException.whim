@@ -1,0 +1,12 @@
+namespace Whim\HTTP\_Private;
+
+/** A protocol failure scoped to one stream. */
+final class StreamException extends Exception {
+  public function __construct(
+    string $message,
+    public readonly StreamId $streamId,
+    public readonly ErrorCodeValue $errorCode,
+  ) {
+    parent::__construct($message);
+  }
+}

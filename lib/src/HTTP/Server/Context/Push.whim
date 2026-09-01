@@ -1,0 +1,9 @@
+namespace Whim\HTTP\Server\Context;
+
+use Whim\HTTP\Message\Request;
+
+/** A context that can initiate HTTP/2 server push. */
+interface Push extends Context {
+  /** Schedules a pushed request through the server handler. */
+  public function push(Request $request): void;
+}

@@ -1,0 +1,11 @@
+namespace Whim\HTTP\Router;
+
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Server\HTTPException;
+
+/** Reports that a path rejects the request method. */
+final class MethodNotAllowedException extends HTTPException {
+  public function __construct(public readonly vec<Method> $allowedMethods) {
+    parent::__construct(405, 'the route does not accept the request method');
+  }
+}

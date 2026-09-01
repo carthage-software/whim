@@ -1,0 +1,13 @@
+namespace Whim\HTTP\Server\Binding;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Network\Listener;
+
+/** Serves HTTP/1 and HTTP/2 over a byte-stream listener. */
+final readonly class Stream implements Binding {
+  #[AlwaysInline]
+  public function __construct(
+    public Listener<_> $listener,
+    public bool $enableH2c = false,
+  ) {}
+}

@@ -1,0 +1,78 @@
+namespace Whim\UDP\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\ConnectionException;
+use Whim\Network\InternetEndpoint;
+use Whim\OS\FileDescriptor;
+use Whim\UDP\SendMetadata;
+
+/** Implements an unconnected UDP socket. */
+final class SocketImpl extends DatagramSocketImpl implements Whim\UDP\Socket {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    FileDescriptor $descriptor,
+    InternetEndpoint $localEndpoint,
+  ) {
+    parent::__construct($descriptor, $localEndpoint);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendTo(
+    string $bytes,
+    InternetEndpoint $peer,
+    null|SendMetadata $metadata = null,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return parent::sendTo($bytes, $peer, $metadata, $cancellation);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function connect(
+    InternetEndpoint $peer,
+    null|CancellationToken $cancellation = null,
+  ): Whim\UDP\ConnectedSocket {
+    if ($peer->address->family != $this->getLocalEndpoint()->address->family) {
+      throw new ConnectionException(
+        'the local and peer UDP endpoints use different address families',
+      );
+    }
+
+    $descriptor = $this->getFileDescriptor();
+    try {
+      $connected = Whim\_Private\connect_socket(
+        $descriptor,
+        $peer->address->toString(),
+        $peer->port,
+      );
+
+      if (!$connected) {
+        Whim\Network\_Private\wait_writable($descriptor, $cancellation);
+        Whim\_Private\complete_socket_connection($descriptor);
+      }
+
+      $local = Whim\Network\_Private\internet_endpoint(
+        Whim\_Private\socket_address($descriptor),
+      );
+    } catch (Whim\_Private\SystemError $error) {
+      throw new ConnectionException(
+        'failed to connect UDP socket to ' . $peer->toString(),
+        $error->errno(),
+        $error,
+      );
+    }
+
+    $descriptor = $this->takeDescriptor();
+    return new ConnectedSocketImpl($descriptor, $local, $peer);
+  }
+}

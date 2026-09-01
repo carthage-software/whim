@@ -1,0 +1,68 @@
+namespace Whim\Hash;
+
+use Whim\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\PositiveInt;
+
+/** Names a digest the engine can compute. */
+enum Algorithm: int {
+  case Sha2_224 = _Private\HASH_ALGORITHM_SHA2_224;
+  case Sha2_256 = _Private\HASH_ALGORITHM_SHA2_256;
+  case Sha2_384 = _Private\HASH_ALGORITHM_SHA2_384;
+  case Sha2_512 = _Private\HASH_ALGORITHM_SHA2_512;
+  case Sha2_512_256 = _Private\HASH_ALGORITHM_SHA2_512_256;
+  case Sha3_224 = _Private\HASH_ALGORITHM_SHA3_224;
+  case Sha3_256 = _Private\HASH_ALGORITHM_SHA3_256;
+  case Sha3_384 = _Private\HASH_ALGORITHM_SHA3_384;
+  case Sha3_512 = _Private\HASH_ALGORITHM_SHA3_512;
+  case Keccak256 = _Private\HASH_ALGORITHM_KECCAK_256;
+  case Sha1 = _Private\HASH_ALGORITHM_SHA1;
+  case Md5 = _Private\HASH_ALGORITHM_MD5;
+  case Ripemd160 = _Private\HASH_ALGORITHM_RIPEMD160;
+  case Blake3 = _Private\HASH_ALGORITHM_BLAKE3;
+  case Blake2b256 = _Private\HASH_ALGORITHM_BLAKE2B_256;
+  case Crc32 = _Private\HASH_ALGORITHM_CRC32;
+  case Crc32c = _Private\HASH_ALGORITHM_CRC32C;
+  case Adler32 = _Private\HASH_ALGORITHM_ADLER32;
+  case Xxhash64 = _Private\HASH_ALGORITHM_XXHASH64;
+  case Xxhash3 = _Private\HASH_ALGORITHM_XXHASH3;
+
+  /** The number of bytes in this algorithm's digest. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function digestLength(): PositiveInt {
+    return match ($this) {
+      Algorithm::Sha2_224 => 28,
+      Algorithm::Sha2_256 => 32,
+      Algorithm::Sha2_384 => 48,
+      Algorithm::Sha2_512 => 64,
+      Algorithm::Sha2_512_256 => 32,
+      Algorithm::Sha3_224 => 28,
+      Algorithm::Sha3_256 => 32,
+      Algorithm::Sha3_384 => 48,
+      Algorithm::Sha3_512 => 64,
+      Algorithm::Keccak256 => 32,
+      Algorithm::Sha1 => 20,
+      Algorithm::Md5 => 16,
+      Algorithm::Ripemd160 => 20,
+      Algorithm::Blake3 => 32,
+      Algorithm::Blake2b256 => 32,
+      Algorithm::Crc32 => 4,
+      Algorithm::Crc32c => 4,
+      Algorithm::Adler32 => 4,
+      Algorithm::Xxhash64 => 8,
+      Algorithm::Xxhash3 => 8,
+    };
+  }
+
+  /** Whether this is a cryptographic digest rather than a checksum. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isCryptographic(): bool {
+    return match ($this) {
+      Algorithm::Crc32 | Algorithm::Crc32c | Algorithm::Adler32 | Algorithm::Xxhash64 | Algorithm::Xxhash3 => false,
+      $_ => true,
+    };
+  }
+}

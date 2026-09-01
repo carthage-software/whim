@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports an invalid method call. */
+class BadMethodCallException extends BadFunctionCallException {}

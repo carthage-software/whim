@@ -1,0 +1,21 @@
+namespace Whim\BSON;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\WriteHandle;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Writes BSON documents to a handle. */
+final readonly class Writer {
+  public function __construct(private WriteHandle $handle) {}
+
+  /** Writes one document. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function write(
+    Document|ToBson $value,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->handle->writeAll(encode($value), $cancellation);
+  }
+}

@@ -1,0 +1,52 @@
+namespace Whim\Regex;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Str\slice;
+use Whim\Unwind\InvalidArgumentException;
+
+/** A regular-expression match and its numbered and named captures. */
+final readonly class MatchResult {
+  /** Creates a match from byte offsets and captures. */
+  #[TrackCaller]
+  public function __construct(
+    public string $subject,
+    public NonNegativeInt $start,
+    public NonNegativeInt $end,
+    public dict<int|string, null|string> $captures,
+  ) {
+    if ($end < $start || $end > length!($subject)) {
+      throw new InvalidArgumentException(
+        'invalid regular expression match range',
+      );
+    }
+  }
+
+  /** Returns the matched bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function value(): string {
+    return slice($this->subject, $this->start, $this->length());
+  }
+
+  /** Returns a numbered or named capture, or null when absent or unmatched. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function capture(NonNegativeInt|NonEmptyString $capture): null|string {
+    if (!contains_key!($this->captures, $capture)) {
+      return null;
+    }
+
+    return $this->captures[$capture];
+  }
+
+  /** Returns the matched byte length. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function length(): NonNegativeInt {
+    return $this->end - $this->start;
+  }
+}

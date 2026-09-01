@@ -1,0 +1,51 @@
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\URI;
+
+$syntax = "AZaz09-._~:/?#[]@!$&'()*+,;=";
+assert!(URI\encode($syntax) == $syntax);
+assert!(
+  URI\encode('https://example.com/a path?q=one two#part')
+  == 'https://example.com/a%20path?q=one%20two#part',
+);
+
+assert!(URI\encode('x%2fy%zz%') == 'x%2fy%25zz%25');
+assert!(URI\encode("caf\xc3\xa9") == 'caf%C3%A9');
+assert!(URI\encode("\x00\xff") == '%00%FF');
+
+assert!(URI\decode('a%20b%7Ec') == 'a b~c');
+assert!(URI\decode('a%2Fb%3Fc%23d') == 'a%2Fb%3Fc%23d');
+assert!(URI\decode('%5B::1%5D') == '%5B::1%5D');
+$reserved = '%3A%2F%3F%23%5B%5D%40%21%24%26%27%28%29%2A%2B%2C%3B%3D';
+assert!(URI\decode($reserved) == $reserved);
+assert!(URI\decode('%25') == '%');
+assert!(URI\decode('a+b') == 'a+b');
+assert!(URI\decode('caf%C3%A9') == "caf\xc3\xa9");
+assert!(URI\decode('%00%FF') == "\x00\xff");
+
+$truncated = null;
+$assertion_callable_14 = fn(): string => URI\decode('broken%2');
+try {
+  $assertion_callable_14();
+} catch (DecodingException $assertion_caught_14) {
+  $truncated = $assertion_caught_14;
+}
+
+assert!($truncated is DecodingException);
+
+assert!(
+  $truncated->getMessage() == 'a percent escape must be two hexadecimal digits',
+);
+
+$nonHex = null;
+$assertion_callable_16 = fn(): string => URI\decode('broken%zz');
+try {
+  $assertion_callable_16();
+} catch (DecodingException $assertion_caught_16) {
+  $nonHex = $assertion_caught_16;
+}
+
+assert!($nonHex is DecodingException);
+
+assert!(
+  $nonHex->getMessage() == 'a percent escape must be two hexadecimal digits',
+);

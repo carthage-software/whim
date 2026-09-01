@@ -1,0 +1,13 @@
+namespace Whim\HTTP\Cookie;
+
+/** Controls when a browser sends a cookie across sites. */
+enum SameSite: string {
+  /** Send only with same-site requests. */
+  case Strict = 'Strict';
+
+  /** Send with same-site requests and top-level safe navigations. */
+  case Lax = 'Lax';
+
+  /** Send with same-site and cross-site requests. */
+  case None = 'None';
+}

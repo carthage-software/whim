@@ -1,0 +1,16 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Marker\AlwaysInline;
+use Whim\_Private\Regex;
+
+/** One compiled dynamic edge in a prefix map. */
+final readonly class RegexBranch {
+  #[AlwaysInline]
+  public function __construct(
+    public Regex $regex,
+    public vec<string> $parameterNames,
+    public null|PrefixMap $map,
+    public null|Handler $handler,
+  ) {}
+}

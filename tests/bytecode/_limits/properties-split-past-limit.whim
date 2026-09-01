@@ -1,0 +1,69 @@
+class C {
+  public int $e0 = 0;
+  public int $e1 = 1;
+  public int $e2 = 2;
+  public int $e3 = 3;
+  public int $e4 = 4;
+  public int $e5 = 5;
+  public int $e6 = 6;
+  public int $e7 = 7;
+  public int $e8 = 8;
+  public int $e9 = 9;
+  public int $e10 = 10;
+  public int $e11 = 11;
+  public int $e12 = 12;
+  public int $e13 = 13;
+  public int $e14 = 14;
+  public int $e15 = 15;
+  public int $e16 = 16;
+  public int $e17 = 17;
+  public int $e18 = 18;
+  public int $e19 = 19;
+  public int $e20 = 20;
+  public int $e21 = 21;
+  public int $e22 = 22;
+  public int $e23 = 23;
+  public int $e24 = 24;
+  public int $e25 = 25;
+  public int $e26 = 26;
+  public int $e27 = 27;
+  public int $e28 = 28;
+  public int $e29 = 29;
+  public int $e30 = 30;
+  public int $e31 = 31;
+  public int $e32 = 32;
+  public function __construct(
+    public int $p0,
+    public int $p1,
+    public int $p2,
+    public int $p3,
+    public int $p4,
+    public int $p5,
+    public int $p6,
+    public int $p7,
+    public int $p8,
+    public int $p9,
+    public int $p10,
+    public int $p11,
+    public int $p12,
+    public int $p13,
+    public int $p14,
+    public int $p15,
+    public int $p16,
+    public int $p17,
+    public int $p18,
+    public int $p19,
+    public int $p20,
+    public int $p21,
+    public int $p22,
+    public int $p23,
+    public int $p24,
+    public int $p25,
+    public int $p26,
+    public int $p27,
+    public int $p28,
+    public int $p29,
+    public int $p30,
+    public int $p31,
+  ) {}
+}

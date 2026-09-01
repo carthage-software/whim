@@ -1,0 +1,6 @@
+namespace Whim\Compression;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports a compression stream failure. */
+class Exception extends RuntimeException {}

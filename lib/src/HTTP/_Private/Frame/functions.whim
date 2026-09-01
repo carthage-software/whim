@@ -1,0 +1,31 @@
+namespace Whim\HTTP\_Private\Frame;
+
+use Whim;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Encodes one typed HTTP/2 frame. */
+#[MustUse]
+#[TrackCaller]
+function encode(WeakendFrame $frame): string {
+  ($type, $flags, $stream, $payload) = match ($frame[0]) {
+    0 => _Private\encode_data($frame as DataFrame),
+    1 => _Private\encode_headers($frame as HeadersFrame),
+    2 => _Private\encode_priority($frame as PriorityFrame),
+    3 => _Private\encode_reset($frame as RstStreamFrame),
+    4 => _Private\encode_settings($frame as SettingsFrame),
+    5 => _Private\encode_push_promise($frame as PushPromiseFrame),
+    6 => _Private\encode_ping($frame as PingFrame),
+    7 => _Private\encode_go_away($frame as GoAwayFrame),
+    8 => _Private\encode_window_update($frame as WindowUpdateFrame),
+    9 => _Private\encode_continuation($frame as ContinuationFrame),
+    $_ => (
+      $frame[1] as int,
+      $frame[2] as int,
+      $frame[3] as int,
+      $frame[4] as string,
+    ),
+  };
+
+  return Whim\_Private\h2_encode_frame($type, $flags, $stream, $payload);
+}

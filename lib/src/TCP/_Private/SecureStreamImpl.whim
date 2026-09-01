@@ -1,0 +1,30 @@
+namespace Whim\TCP\_Private;
+
+use Whim;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\InternetEndpoint;
+use Whim\OS\FileDescriptor;
+use Whim\TCP\SecureStream;
+use Whim\TCP\Stream;
+
+/** Implements TLS over a TCP stream. */
+final class SecureStreamImpl extends Whim\TLS\_Private\StreamImpl<InternetEndpoint> implements
+  SecureStream {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private Stream $stream,
+    Whim\_Private\TlsConnection $connection,
+  ) {
+    parent::__construct($stream, $connection);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    return $this->stream->getFileDescriptor();
+  }
+}

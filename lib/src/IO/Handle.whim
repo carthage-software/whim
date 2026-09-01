@@ -1,0 +1,4 @@
+namespace Whim\IO;
+
+/** Defines the common root of all IO handle capabilities. */
+interface Handle {}

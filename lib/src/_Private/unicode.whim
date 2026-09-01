@@ -1,0 +1,29 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+
+/** Tests one Unicode property of a code point. */
+#[Stub]
+function unicode_has_property(int $codePoint, 0..=12 $property): bool {}
+
+/** Applies full default Unicode case folding to valid UTF-8. */
+#[Stub]
+function unicode_case_fold(string $value): null|string {}
+
+/** Decodes the scalar value at a byte offset. */
+#[Stub]
+function unicode_code_point_at(
+  string $bytes,
+  int $offset,
+): null|(0..=0xd7ff)|(0xe000..=0x10ffff) {}
+
+/** Decodes the scalar value before a byte offset. */
+#[Stub]
+function unicode_code_point_before(
+  string $bytes,
+  int $offset,
+): null|(0..=0xd7ff)|(0xe000..=0x10ffff) {}
+
+/** Encodes a scalar value as UTF-8. */
+#[Stub]
+function unicode_from_code_point(int $codePoint): string&!'' {}

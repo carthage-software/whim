@@ -1,0 +1,147 @@
+namespace Whim\_Private;
+
+use Whim\Database\Blob;
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Unwind\Error;
+
+/** Reports a failure from SQLite. */
+#[Stub]
+class SQLiteError extends Error {
+  private function __construct() {}
+}
+
+/** Reports an operation attempted while another operation is active. */
+#[Stub]
+final class SQLiteConcurrentOperationError extends SQLiteError {
+  private function __construct() {}
+}
+
+/** Represents one pending SQLite worker operation. */
+#[Stub]
+final class SQLiteOperation {
+  private function __construct() {}
+
+  /** Suspends until the operation completes. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function wait(): void {}
+
+  /** Interrupts the operation when it is still active. */
+  public function cancel(): void {}
+}
+
+/** Owns one SQLite connection and its worker. */
+#[Stub]
+final class SQLiteConnection {
+  private function __construct() {}
+
+  /** Starts opening a connection. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function open(
+    string $path,
+    bool $readOnly,
+    bool $create,
+    bool $uri,
+    0.. $busyTimeoutMilliseconds,
+    0.. $statementCacheCapacity,
+    bool $foreignKeys,
+  ): (SQLiteConnection, SQLiteOperation) {}
+
+  /** Starts a connection health check. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function ping(): SQLiteOperation {}
+
+  /** Starts preparing a statement. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function prepare(string $sql): SQLiteOperation {}
+
+  /** Starts executing a statement. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function execute(
+    string $sql,
+    vec<null|bool|int|float|string|Blob> $parameters,
+  ): (SQLiteResult, SQLiteOperation) {}
+
+  /** Starts a transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function begin(
+    bool $readUncommitted,
+    bool $readOnly,
+  ): SQLiteOperation {}
+
+  /** Starts committing the active transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function commit(): SQLiteOperation {}
+
+  /** Starts rolling back the active transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function rollback(): SQLiteOperation {}
+
+  /** Reports whether this connection is ready and idle. */
+  #[MustUse]
+  public function isReusable(): bool {}
+
+  /** Reports whether this connection is closed. */
+  #[MustUse]
+  public function isClosed(): bool {}
+
+  /** Closes this connection without blocking. */
+  public function close(): void {}
+
+  /** Closes this connection when it is collected. */
+  public function __destruct(): void {}
+}
+
+/** Streams rows produced by one SQLite operation. */
+#[Stub]
+final class SQLiteResult {
+  private function __construct() {}
+
+  /** Returns raw column metadata. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function columns(): vec<(string, null|string)> {}
+
+  /** Returns the affected row count. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function affectedRows(): null|(0..) {}
+
+  /** Suspends until the next row or the end of the result. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function fetch(): null|vec<mixed> {}
+
+  /** Interrupts this result while it is active. */
+  public function interrupt(): void {}
+
+  /** Reports whether this result is closed. */
+  #[MustUse]
+  public function isClosed(): bool {}
+
+  /** Discards unread rows after the worker retires. */
+  public function close(): void {}
+
+  /** Discards unread rows when this result is collected. */
+  public function __destruct(): void {}
+}

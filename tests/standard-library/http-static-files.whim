@@ -1,0 +1,230 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\StaticFiles;
+use Whim\HTTP\Server\HTTPException;
+use Whim\HTTP\Session\Session;
+use Whim\IP\Address;
+use Whim\Network\Endpoint;
+use Whim\Network\InternetEndpoint;
+use Whim\Unwind\InvalidArgumentException;
+
+final class StaticFilesTestContext implements Context {
+  public dict<string, string> $parameters = dict[];
+
+  public function __construct(
+    public readonly ProtocolVersion $protocolVersion,
+    public readonly Endpoint $localEndpoint,
+    public readonly Endpoint $peerEndpoint,
+  ) {}
+
+  public function getSession(): null|Session {
+    return null;
+  }
+
+  public function setSession(Session $session): void {}
+
+  public function onResponseComplete(fn(): void $callback): void {}
+}
+
+function static_files_test_context(): StaticFilesTestContext {
+  return new StaticFilesTestContext(
+    ProtocolVersion::V11,
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+  );
+}
+
+function static_files_test_dispatch(
+  StaticFiles $handler,
+  string $method,
+  string $target,
+  FieldMap $headers = FieldMap::default(),
+): Response {
+  return $handler->handle(
+    static_files_test_context(),
+    Request::fromParts($method, $target, headers: $headers),
+    new SignalCancellationToken(),
+  );
+}
+
+function static_files_expect_error(
+  StaticFiles $handler,
+  string $target,
+  int $status,
+): void {
+  try {
+    discard!(static_files_test_dispatch($handler, 'GET', $target));
+    assert!(false);
+  } catch (HTTPException $error) {
+    assert!($error->status == $status);
+  }
+}
+
+$temporary = Filesystem\create_temporary_directory(null, 'whim-static-');
+$root = $temporary . '/public';
+Filesystem\create_directory($root);
+Filesystem\create_directory($root . '/docs');
+File\write($root . '/application.js', '0123456789');
+File\write($root . '/docs/index.html', '<h1>docs</h1>');
+File\write($temporary . '/secret.txt', 'secret');
+Filesystem\create_symbolic_link(
+  $temporary . '/secret.txt',
+  $root . '/escape.txt',
+);
+
+$handler = new StaticFiles(
+  $root,
+  prefix: '/assets/',
+  cacheControl: 'public, max-age=3600',
+);
+
+$response = static_files_test_dispatch(
+  $handler,
+  'GET',
+  '/assets/application.js?version=1',
+);
+
+assert!($response->status == 200);
+assert!($response->headers->get('Content-Length') == '10');
+assert!(
+  $response->headers->get('Content-Type') == 'text/javascript; charset=utf-8',
+);
+
+assert!($response->headers->get('X-Content-Type-Options') == 'nosniff');
+
+assert!($response->headers->get('Accept-Ranges') == 'bytes');
+assert!($response->headers->get('Cache-Control') == 'public, max-age=3600');
+
+assert!(!($response->headers->get('ETag') == null));
+assert!(!($response->headers->get('Last-Modified') == null));
+assert!($response->body?->readAll() == '0123456789');
+
+$etag = $response->headers->get('ETag') as string;
+$lastModified = $response->headers->get('Last-Modified') as string;
+
+$response = static_files_test_dispatch(
+  $handler,
+  'GET',
+  '/assets/application.js',
+  FieldMap::from(vec[('If-None-Match', $etag)]),
+);
+
+assert!($response->status == 304);
+assert!($response->body == null);
+assert!(!($response->headers->has('Content-Length')));
+
+$response = static_files_test_dispatch(
+  $handler,
+  'GET',
+  '/assets/application.js',
+  FieldMap::from(vec[('If-Modified-Since', $lastModified)]),
+);
+
+assert!($response->status == 304);
+
+$response = static_files_test_dispatch(
+  $handler,
+  'GET',
+  '/assets/application.js',
+  FieldMap::from(vec[('Range', 'bytes=2-5')]),
+);
+
+assert!($response->status == 206);
+assert!($response->headers->get('Content-Length') == '4');
+assert!($response->headers->get('Content-Range') == 'bytes 2-5/10');
+assert!($response->body?->readAll() == '2345');
+
+$response = static_files_test_dispatch(
+  $handler,
+  'GET',
+  '/assets/application.js',
+  FieldMap::from(vec[('Range', 'bytes=-3')]),
+);
+
+assert!($response->status == 206);
+assert!($response->body?->readAll() == '789');
+
+$response = static_files_test_dispatch(
+  $handler,
+  'GET',
+  '/assets/application.js',
+  FieldMap::from(vec[('Range', 'bytes=99-')]),
+);
+
+assert!($response->status == 416);
+assert!($response->headers->get('Content-Range') == 'bytes */10');
+
+$response = static_files_test_dispatch(
+  $handler,
+  'GET',
+  '/assets/application.js',
+  FieldMap::from(vec[('Range', 'bytes=0-1'), ('If-Range', 'W/"different"')]),
+);
+
+assert!($response->status == 200);
+assert!($response->body?->readAll() == '0123456789');
+
+$response = static_files_test_dispatch($handler, 'GET', '/assets/docs/');
+assert!($response->status == 200);
+assert!($response->headers->get('Content-Type') == 'text/html; charset=utf-8');
+
+assert!($response->body?->readAll() == '<h1>docs</h1>');
+
+$response = static_files_test_dispatch(
+  $handler,
+  'HEAD',
+  '/assets/application.js',
+);
+
+assert!($response->status == 200);
+assert!($response->headers->get('Content-Length') == '10');
+
+$response = static_files_test_dispatch(
+  $handler,
+  'POST',
+  '/assets/application.js',
+);
+
+assert!($response->status == 405);
+assert!($response->headers->get('Allow') == 'GET, HEAD');
+
+static_files_expect_error($handler, '/asset/application.js', 404);
+static_files_expect_error($handler, '/assets/missing.txt', 404);
+static_files_expect_error($handler, '/assets/%2e%2e/secret.txt', 404);
+static_files_expect_error($handler, '/assets/escape.txt', 404);
+static_files_expect_error($handler, '/assets/%GG', 400);
+
+$assertion_value_33 = fn(): StaticFiles => (
+  new StaticFiles($temporary . '/missing')
+);
+
+$assertion_error_33 = null;
+try {
+  $assertion_value_33();
+} catch (InvalidArgumentException $assertion_caught_33) {
+  $assertion_error_33 = $assertion_caught_33;
+}
+
+assert!($assertion_error_33 is InvalidArgumentException);
+
+$assertion_value_34 = fn(): StaticFiles => (
+  new StaticFiles($root, prefix: 'assets')
+);
+
+$assertion_error_34 = null;
+try {
+  $assertion_value_34();
+} catch (InvalidArgumentException $assertion_caught_34) {
+  $assertion_error_34 = $assertion_caught_34;
+}
+
+assert!($assertion_error_34 is InvalidArgumentException);
+
+Filesystem\delete_directory($temporary, true);

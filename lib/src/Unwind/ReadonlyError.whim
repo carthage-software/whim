@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports an illegal mutation of readonly state. */
+#[Stub]
+class ReadonlyError extends Error {}

@@ -1,0 +1,16 @@
+namespace Whim\HTTP\Server\Handler;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+
+/** Handles one HTTP request. */
+interface Handler {
+  /** Produces the response for a request. */
+  public function handle(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response;
+}

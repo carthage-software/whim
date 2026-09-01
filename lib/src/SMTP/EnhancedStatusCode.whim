@@ -1,0 +1,77 @@
+namespace Whim\SMTP;
+
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\SMTP\_Private;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An RFC 3463 enhanced mail-system status code. */
+final readonly class EnhancedStatusCode implements ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public EnhancedStatusPart $class,
+    public EnhancedStatusPart $subject,
+    public EnhancedStatusPart $detail,
+  ) {}
+
+  /** Creates an enhanced status code. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromParts(
+    EnhancedStatusPart $class,
+    EnhancedStatusPart $subject,
+    EnhancedStatusPart $detail,
+  ): EnhancedStatusCode {
+    return new EnhancedStatusCode($class, $subject, $detail);
+  }
+
+  /** Parses an enhanced status code. */
+  #[MustUse]
+  public static function parse(string $value): null|EnhancedStatusCode {
+    $parts = _Private\split_enhanced_status($value) ?? return null;
+
+    return new EnhancedStatusCode($parts[0], $parts[1], $parts[2]);
+  }
+
+  /** Parses an enhanced status code or throws. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $value): EnhancedStatusCode {
+    $status = EnhancedStatusCode::parse($value);
+    if ($status == null) {
+      throw new InvalidArgumentException(
+        'invalid enhanced SMTP status code: `' . $value . '`',
+      );
+    }
+
+    return $status;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isSuccess(): bool {
+    return $this->class == 2;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isPersistentTransientFailure(): bool {
+    return $this->class == 4;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isPermanentFailure(): bool {
+    return $this->class == 5;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    return $this->class . '.' . $this->subject . '.' . $this->detail;
+  }
+}

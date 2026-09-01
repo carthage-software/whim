@@ -1,0 +1,3 @@
+function claims_never(): never {
+  return 5;
+}

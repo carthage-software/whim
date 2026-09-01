@@ -1,0 +1,124 @@
+namespace Whim\SMTP\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\_Private\string_slice;
+
+/** Dot-stuffs a message stream and appends its DATA terminator. */
+final class DotStuffingReadHandle implements ReadHandle {
+  private string $buffer = '';
+  private bool $atLineStart = true;
+  private bool $sourceEnded = false;
+  private bool $terminatorQueued = false;
+
+  #[TrackCaller]
+  public function __construct(private ReadHandle $source) {}
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->buffer == '' && !$this->sourceEnded) {
+      $this->source->waitUntilReadable($cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->terminatorQueued && $this->buffer == '';
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->buffer == '') {
+      $this->fill(false, null);
+    }
+
+    return $this->consume($maxBytes);
+  }
+
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($this->buffer == '') {
+      $this->fill(true, $cancellation);
+    }
+
+    return $this->consume($maxBytes);
+  }
+
+  #[TrackCaller]
+  private function fill(
+    bool $wait,
+    null|CancellationToken $cancellation,
+  ): void {
+    if ($this->terminatorQueued) {
+      return;
+    }
+
+    if (!$this->sourceEnded) {
+      $chunk = match ($wait) {
+        true => $this->source->read(8192, $cancellation),
+        false => $this->source->tryRead(8192),
+      };
+
+      if ($chunk != '') {
+        $this->process($chunk);
+        return;
+      }
+
+      if (!$this->source->reachedEndOfDataSource()) {
+        return;
+      }
+
+      $this->sourceEnded = true;
+    }
+
+    if (!$this->atLineStart) {
+      $this->buffer .= "\r\n";
+    }
+
+    $this->buffer .= ".\r\n";
+    $this->terminatorQueued = true;
+  }
+
+  #[TrackCaller]
+  private function process(string $chunk): void {
+    $index = 0;
+    while ($index < length!($chunk)) {
+      $byte = $chunk[$index];
+      if ($this->atLineStart && $byte == '.') {
+        $this->buffer .= '.';
+      }
+
+      $this->buffer .= $byte;
+      $this->atLineStart = $byte == "\n";
+      $index++;
+    }
+  }
+
+  #[TrackCaller]
+  private function consume(null|int $maxBytes): string {
+    if ($this->buffer == '' || $maxBytes == 0) {
+      return '';
+    }
+
+    $length = length!($this->buffer);
+    if ($maxBytes != null && $maxBytes > 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $result = string_slice($this->buffer, 0, $length);
+    $this->buffer = string_slice(
+      $this->buffer,
+      $length,
+      length!($this->buffer) - $length,
+    );
+
+    return $result;
+  }
+}

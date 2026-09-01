@@ -1,0 +1,175 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Filesystem;
+use Whim\IP\Address;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\UnixEndpoint;
+use Whim\TCP;
+use Whim\UDP;
+use Whim\Unix;
+
+final class ResolutionCancellationToken implements CancellationToken {
+  private bool $cancelled = false;
+
+  public function isCancellationRequested(): bool {
+    return $this->cancelled;
+  }
+
+  public function throwIfCancellationRequested(): void {
+    if ($this->cancelled) {
+      throw new CancelledException('the operation was cancelled');
+    }
+  }
+
+  public function register(fn(): void $callback): int {
+    $this->cancelled = true;
+    $callback();
+    return 0;
+  }
+
+  public function unregister(int $id): void {}
+}
+
+$resolutionCancellation = null;
+try {
+  Whim\Network\_Private\resolve_host_addresses(
+    'localhost',
+    new ResolutionCancellationToken(),
+  );
+} catch (CancelledException $error) {
+  $resolutionCancellation = $error;
+}
+
+assert!($resolutionCancellation is CancelledException);
+
+$ipv4 = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+assert!($ipv4->toString() == '127.0.0.1:8080');
+
+$ipv6 = new InternetEndpoint(Address::v6('::1'), 443);
+assert!($ipv6->toString() == '[::1]:443');
+assert!(
+  new UnixEndpoint('/tmp/example.sock')->toString() == '/tmp/example.sock',
+);
+
+assert!(new UnixEndpoint(null)->toString() == '<anonymous>');
+
+$listener = TCP\listen();
+$tcpEndpoint = $listener->getLocalEndpoint();
+$server = Async\spawn::<null>(function() use ($listener): null {
+  $stream = $listener->accept();
+  assert!($stream->readFixedSize(4) == 'ping');
+  $stream->writeAll('pong');
+  $stream->shutdown();
+  $stream->close();
+
+  return null;
+});
+
+$client = TCP\connect($tcpEndpoint->address, $tcpEndpoint->port);
+$client->writeAll('ping');
+assert!($client->readFixedSize(4) == 'pong');
+assert!($client->getLocalEndpoint() is InternetEndpoint);
+assert!(
+  $client->getPeerEndpoint()->address->toString() == $tcpEndpoint->address->toString(),
+);
+
+assert!($client->getPeerEndpoint()->port == $tcpEndpoint->port);
+$client->close();
+$server->await();
+$listener->close();
+
+($left, $right) = Unix\pair();
+$left->writeAll('pair');
+assert!($right->readFixedSize(4) == 'pair');
+assert!($left->getLocalEndpoint()->path == null);
+$left->close();
+$right->close();
+
+$directory = Filesystem\create_temporary_directory(null, 'whim-network-');
+$socketPath = $directory . '/socket';
+$unixListener = Unix\listen($socketPath);
+$unixServer = Async\spawn::<null>(function() use ($unixListener): null {
+  $stream = $unixListener->accept();
+  assert!($stream->readFixedSize(5) == 'hello');
+  $stream->writeAll('world');
+  $stream->close();
+
+  return null;
+});
+
+$unixClient = Unix\connect($socketPath);
+$unixClient->writeAll('hello');
+assert!($unixClient->readFixedSize(5) == 'world');
+$unixClient->close();
+$unixServer->await();
+$unixListener->close();
+Filesystem\delete_file($socketPath);
+Filesystem\delete_directory($directory);
+
+$receiver = UDP\bind(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+
+$sender = UDP\bind(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+
+$senderEndpoint = $sender->getLocalEndpoint();
+$receiverEndpoint = $receiver->getLocalEndpoint();
+$metadata = new UDP\SendMetadata(
+  $senderEndpoint->address,
+  UDP\ExplicitCongestion::CapableTransport1,
+);
+
+assert!($sender->sendTo('datagram', $receiverEndpoint, $metadata) == 8);
+
+$datagram = $receiver->receive(64);
+assert!($datagram->bytes == 'datagram');
+assert!(
+  $datagram->peer->address->toString() == $senderEndpoint->address->toString(),
+);
+
+assert!($datagram->peer->port == $senderEndpoint->port);
+assert!(
+  $datagram->local->address->toString() == $receiverEndpoint->address->toString(),
+);
+
+assert!($datagram->local->port == $receiverEndpoint->port);
+assert!(
+  $datagram->explicitCongestion == UDP\ExplicitCongestion::CapableTransport1,
+);
+
+assert!($datagram->interfaceIndex >= 0);
+assert!(!($datagram->truncated));
+
+discard!($sender->sendTo('truncated', $receiverEndpoint));
+$truncated = $receiver->receive(3);
+assert!($truncated->bytes == 'tru');
+assert!($truncated->truncated);
+
+$connected = $sender->connect($receiverEndpoint);
+assert!($sender->isClosed());
+assert!(
+  $connected->getPeerEndpoint()->address->toString() == $receiverEndpoint->address->toString(),
+);
+
+assert!($connected->getPeerEndpoint()->port == $receiverEndpoint->port);
+
+assert!($connected->send('connected') == 9);
+$connectedDatagram = $receiver->receive(64);
+assert!($connectedDatagram->bytes == 'connected');
+
+$connectedMetadata = new UDP\SendMetadata(
+  $connected->getLocalEndpoint()->address,
+  UDP\ExplicitCongestion::CapableTransport0,
+);
+
+assert!($connected->send('metadata', $connectedMetadata) == 8);
+$metadataDatagram = $receiver->receive(64);
+assert!($metadataDatagram->bytes == 'metadata');
+assert!(
+  $metadataDatagram->explicitCongestion
+  == UDP\ExplicitCongestion::CapableTransport0,
+);
+
+discard!($receiver->sendTo('reply', $connected->getLocalEndpoint()));
+assert!($connected->receive(64)->bytes == 'reply');
+$connected->close();
+$receiver->close();

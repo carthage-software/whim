@@ -1,0 +1,17 @@
+namespace Whim\HTTP\WebSocket\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\URL\URL;
+
+/** Opens a direct WebSocket connection. */
+#[MustUse]
+#[TrackCaller]
+function connect(
+  URL $url,
+  Configuration $configuration = new Configuration(),
+  null|CancellationToken $cancellation = null,
+): Connection {
+  return new DefaultConnector()->connect($url, $configuration, $cancellation);
+}

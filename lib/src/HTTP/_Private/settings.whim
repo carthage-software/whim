@@ -1,0 +1,118 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\Setting;
+use Whim\HTTP\_Private\SettingId;
+use Whim\HTTP\_Private\SettingValue;
+
+function validate_local_settings(
+  Role $role,
+  dict<SettingId, SettingValue> $settings,
+): void {
+  foreach ($settings as $id => $value) {
+    validate_setting($role, $id, $value, true);
+  }
+}
+
+function validate_setting(
+  Role $receiver,
+  SettingId $id,
+  SettingValue $value,
+  bool $local,
+): void {
+  if ($id == Setting::EnablePush->value) {
+    if (
+      ($local && $receiver == Role::Server)
+      || (!$local && $receiver == Role::Client)
+    ) {
+      throw new ProtocolException(
+        'a server must not send SETTINGS_ENABLE_PUSH',
+      );
+    }
+
+    if (!($value is 0|1)) {
+      throw new ProtocolException('`SETTINGS_ENABLE_PUSH` must be zero or one');
+    }
+  }
+
+  if ($id == Setting::InitialWindowSize->value && $value > H2\MAX_WINDOW_SIZE) {
+    throw new ProtocolException(
+      '`SETTINGS_INITIAL_WINDOW_SIZE` exceeds the flow-control limit',
+      H2\ErrorCode::FlowControlError->value,
+    );
+  }
+
+  if (
+    $id == Setting::MaxFrameSize->value
+    && ($value < H2\DEFAULT_MAX_FRAME_SIZE || $value > H2\MAX_FRAME_SIZE)
+  ) {
+    throw new ProtocolException(
+      '`SETTINGS_MAX_FRAME_SIZE` is outside its permitted range',
+    );
+  }
+
+  if ($id == Setting::EnableConnectProtocol->value && !($value is 0|1)) {
+    throw new ProtocolException(
+      '`SETTINGS_ENABLE_CONNECT_PROTOCOL` must be zero or one',
+    );
+  }
+}
+
+function receive_settings(
+  State $state,
+  Frame\SettingsFrame $frame,
+): Event\WeakendEvent {
+  if ($frame[2]) {
+    $state->settings->acknowledgeLocal();
+    return (4, null);
+  }
+
+  $event = apply_remote_settings($state, $frame[1]);
+  queue_frame($state, (4, dict[], true));
+  return $event;
+}
+
+function apply_remote_settings(
+  State $state,
+  dict<SettingId, SettingValue> $settings,
+): Event\WeakendEvent {
+  foreach ($settings as $id => $value) {
+    validate_setting($state->role, $id, $value, false);
+  }
+
+  $oldWindow = $state->settings->remote(Setting::InitialWindowSize);
+  $state->settings->applyRemote($settings);
+
+  if (contains_key!($settings, Setting::InitialWindowSize->value)) {
+    $window = $settings[Setting::InitialWindowSize->value];
+    $state->streams->adjustSendWindows($window - $oldWindow);
+    $state->streams->setInitialSendWindow($window);
+  }
+
+  if (contains_key!($settings, Setting::MaxConcurrentStreams->value)) {
+    $state->streams->setLocalMaximum(
+      $settings[Setting::MaxConcurrentStreams->value],
+    );
+  }
+
+  if (contains_key!($settings, Setting::HeaderTableSize->value)) {
+    $state->headerEncoder->resize($settings[Setting::HeaderTableSize->value]);
+  }
+
+  if (contains_key!($settings, Setting::MaxHeaderListSize->value)) {
+    $state->maximumEncodedHeaderListSize = $settings[Setting::MaxHeaderListSize->value];
+  }
+
+  return (3, $settings);
+}
+
+function extended_connect_enabled(State $state, bool $local): bool {
+  return match ($local) {
+    true => $state->settings->local(Setting::EnableConnectProtocol) == 1,
+    false => $state->settings->remote(Setting::EnableConnectProtocol) == 1,
+  };
+}

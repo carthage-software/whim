@@ -1,0 +1,4 @@
+class Box<T> {}
+class C {
+  public function m<U: Box<int, string>>(): void {}
+}

@@ -1,0 +1,305 @@
+namespace Whim\HTTP\Server;
+
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Async\TaskGroup;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\HTTP\Server\Binding\Binding;
+use Whim\HTTP\Server\Binding\Stream as StreamBinding;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\_Private\DateHeader;
+use Whim\HTTP\Server\_Private\StreamDriver;
+use Whim\HTTP\Server\_Private\StreamDriverImpl;
+use Whim\IO\CloseHandle;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Network\ClosedException as NetworkClosedException;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Stream as NetworkStream;
+use Whim\Refine\NonEmptyVec;
+use Whim\Unwind\Throwable;
+
+/** Serves HTTP/1 and HTTP/2 bindings. */
+final class Server {
+  private bool $started = false;
+  private bool $draining = false;
+  private int $activeConnections = 0;
+  private int $nextConnectionId = 1;
+  private dict<string, int> $connectionsByPeer = dict[];
+  private dict<int, string> $connectionPeers = dict[];
+  private dict<int, CloseHandle> $connections = dict[];
+  private null|Throwable $failure = null;
+  private SignalCancellationToken $acceptCancellation;
+  private SignalCancellationToken $drainCancellation;
+  private SignalCancellationToken $forceCancellation;
+  private TaskGroup $acceptors;
+  private TaskGroup $connectionTasks;
+
+  /** Creates a server for one or more bound transports. */
+  public function __construct(
+    public readonly NonEmptyVec<Binding> $bindings,
+    public readonly Configuration $configuration = new Configuration(),
+    private StreamDriver $streamDriver = new StreamDriverImpl(),
+  ) {
+    $this->acceptCancellation = new SignalCancellationToken();
+    $this->drainCancellation = new SignalCancellationToken();
+    $this->forceCancellation = new SignalCancellationToken();
+    $this->acceptors = new TaskGroup();
+    $this->connectionTasks = new TaskGroup();
+  }
+
+  /** Serves until cancellation or every binding closes. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function serve(
+    Handler $handler,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->started) {
+      throw new Exception('an HTTP server can only be served once');
+    }
+
+    $this->started = true;
+    DateHeader::register();
+    try {
+      $cancellationId = $cancellation?->register(fn(): void {
+        $this->beginDrain(null);
+      });
+
+      try {
+        foreach ($this->bindings as $binding) {
+          $this->acceptors->defer(fn(): void {
+            $this->acceptStreams($binding, $handler);
+          });
+        }
+
+        try {
+          $this->acceptors->awaitAll(null);
+        } catch (Throwable $error) {
+          $this->beginDrain($error);
+        }
+
+        $this->beginDrain(null);
+        $this->drainConnections();
+      } finally {
+        $this->closeBindings();
+        $cancellation?->unregister($cancellationId);
+      }
+    } finally {
+      DateHeader::unregister();
+    }
+
+    if ($this->failure != null) {
+      throw $this->failure;
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function acceptStreams(
+    StreamBinding $binding,
+    Handler $handler,
+  ): void {
+    while (!$this->acceptCancellation->isCancellationRequested()) {
+      try {
+        $stream = $binding->listener->accept($this->acceptCancellation);
+      } catch (CancelledException|NetworkClosedException $_) {
+        return;
+      } catch (Throwable $error) {
+        $this->beginDrain($error);
+        return;
+      }
+
+      if ($this->acceptCancellation->isCancellationRequested()) {
+        $this->closeHandle($stream);
+        return;
+      }
+
+      $this->startStream($stream, $binding->enableH2c, $handler);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function startStream(
+    NetworkStream<_> $stream,
+    bool $enableH2c,
+    Handler $handler,
+  ): void {
+    try {
+      $endpoint = $stream->getPeerEndpoint();
+      $peer = $endpoint->toString();
+      if ($endpoint is InternetEndpoint) {
+        $peer = $endpoint->address->toString();
+      }
+    } catch (Throwable $error) {
+      $this->closeHandle($stream);
+      $this->beginDrain($error);
+      return;
+    }
+
+    $id = $this->reserveConnection($stream, $peer);
+    if ($id == null) {
+      $this->closeHandle($stream);
+      return;
+    }
+
+    $this->connectionTasks->defer(fn(): void {
+      try {
+        $this->streamDriver->serve(
+          $stream,
+          $enableH2c,
+          $handler,
+          $this->configuration,
+          $this->drainCancellation,
+          $this->forceCancellation,
+        );
+      } catch (Throwable $error) {
+        $this->beginDrain($error);
+      } finally {
+        $this->closeHandle($stream);
+        $this->releaseConnection($id);
+      }
+    });
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function reserveConnection(
+    CloseHandle $connection,
+    string $peer,
+  ): null|int {
+    if ($this->activeConnections >= $this->configuration->maximumConnections) {
+      return null;
+    }
+
+    $peerCount = 0;
+    if (contains_key!($this->connectionsByPeer, $peer)) {
+      $peerCount = $this->connectionsByPeer[$peer];
+    }
+
+    $peerLimit = $this->configuration->maximumConnectionsPerPeer;
+    if ($peerLimit != null && $peerCount >= $peerLimit) {
+      return null;
+    }
+
+    $id = $this->nextConnectionId;
+    $this->nextConnectionId++;
+    $this->activeConnections++;
+    $this->connectionsByPeer[$peer] = $peerCount + 1;
+    $this->connectionPeers[$id] = $peer;
+    $this->connections[$id] = $connection;
+    return $id;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function releaseConnection(int $id): void {
+    if (!contains_key!($this->connectionPeers, $id)) {
+      return;
+    }
+
+    $peer = $this->connectionPeers[$id];
+    $peerCount = $this->connectionsByPeer[$peer];
+    if ($peerCount == 1) {
+      remove!($this->connectionsByPeer, $peer);
+    } else {
+      $this->connectionsByPeer[$peer] = $peerCount - 1;
+    }
+
+    remove!($this->connectionPeers, $id);
+    remove!($this->connections, $id);
+    $this->activeConnections--;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function beginDrain(null|Throwable $failure): void {
+    if ($failure != null && $this->failure == null) {
+      $this->failure = $failure;
+    }
+
+    if ($this->draining) {
+      return;
+    }
+
+    $this->draining = true;
+    try {
+      $this->acceptCancellation->cancel();
+    } catch (Throwable $error) {
+      if ($this->failure == null) {
+        $this->failure = $error;
+      }
+    }
+
+    try {
+      $this->drainCancellation->cancel();
+    } catch (Throwable $error) {
+      if ($this->failure == null) {
+        $this->failure = $error;
+      }
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function drainConnections(): void {
+    $timeout = new TimeoutCancellationToken(
+      $this->configuration->shutdownTimeout,
+    );
+
+    try {
+      $this->connectionTasks->awaitAll($timeout);
+      return;
+    } catch (CancelledException $_) {
+      try {
+        $this->forceCancellation->cancel();
+      } catch (Throwable $error) {
+        if ($this->failure == null) {
+          $this->failure = $error;
+        }
+      }
+
+      $this->closeConnections();
+    }
+
+    $this->connectionTasks->awaitAll(null);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function closeConnections(): void {
+    $connections = $this->connections;
+    foreach ($connections as $connection) {
+      $this->closeHandle($connection);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function closeBindings(): void {
+    foreach ($this->bindings as $binding) {
+      $this->closeHandle($binding->listener);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function closeHandle(CloseHandle $handle): void {
+    try {
+      if ($handle->isClosed()) {
+        return;
+      }
+
+      $handle->close();
+    } catch (Throwable $error) {
+      if ($this->failure == null) {
+        $this->failure = $error;
+      }
+    }
+  }
+}

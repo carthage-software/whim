@@ -1,0 +1,13 @@
+namespace Whim\HTTP\WebSocket;
+
+/** A received UTF-8 text message. */
+newtype TextMessage = string;
+
+/** A received binary message. */
+newtype BinaryMessage = string;
+
+/** A received close message as its optional code and reason. */
+newtype CloseMessage = (null|int, string);
+
+/** A message received from a WebSocket peer. */
+type Message = TextMessage|BinaryMessage|CloseMessage;

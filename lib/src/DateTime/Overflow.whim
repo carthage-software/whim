@@ -1,0 +1,10 @@
+namespace Whim\DateTime;
+
+/** Controls invalid dates produced by calendar arithmetic. */
+enum Overflow: int {
+  /** Clamp invalid fields to the nearest valid date. */
+  case Constrain = 0;
+
+  /** Reject invalid fields. */
+  case Reject = 1;
+}

@@ -1,0 +1,19 @@
+type Pair<A, B> = (A, B);
+type Scalar = int|float|string|bool;
+type MaybeMailer = null|Mailer;
+type Handler = fn(int, =string): void;
+type Any = fn;
+type Constrained = Repository<User>&Countable;
+
+function build(): void {
+  $v = vec[1, 2, 3];
+  $filled = vec[0; $size];
+  $has = contains!($v, 2);
+  $hasKey = contains_key!($v, 1);
+  $d = dict['a' => 1, 'b' => vec[4, 5]];
+  $t = (1, 'two', vec[3]);
+  $one = (1,);
+  $nested = dict['xs' => vec[1, 2], 'ys' => vec[3, 4]];
+  $r = Vector::<int, string>::new();
+  $found = $repo->find::<User>($id);
+}

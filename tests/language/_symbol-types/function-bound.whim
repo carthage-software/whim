@@ -1,0 +1,1 @@
+function invalid_function_bound(link_bounded<int> $function): void {}

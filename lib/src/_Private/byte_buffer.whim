@@ -1,0 +1,29 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Mutable byte storage for Whim-written binary code. */
+#[Stub]
+final class ByteBuffer {
+  public function __construct(int $capacity = 0) {}
+
+  #[MustUse]
+  public static function fromString(string $bytes): ByteBuffer {}
+
+  public function append(string $bytes): void {}
+
+  public function appendAll(vec<string> $chunks): void {}
+
+  public function write(int $offset, string $bytes): void {}
+
+  #[MustUse]
+  public function read(int $offset, int $length): string {}
+
+  public function appendInteger(int $value, int $width, bool $little): void {}
+
+  public function appendFloat(float $value, int $width, bool $little): void {}
+
+  #[MustUse]
+  public function toString(): string {}
+}

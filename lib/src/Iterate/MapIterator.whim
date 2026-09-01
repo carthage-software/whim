@@ -1,0 +1,22 @@
+namespace Whim\Iterate;
+
+use Whim\Refine\Transform;
+
+/** Lazily transforms values from another iterator. */
+final class MapIterator<K, T, U> implements Iterator<K, U> {
+  /** Creates an iterator that applies the transform to each value. */
+  public function __construct(
+    private Iterator<K, T> $iterator,
+    private Transform<T, U> $function,
+  ) {}
+
+  /** Returns the next transformed entry. */
+  public function next(): null|(K, U) {
+    $entry = $this->iterator->next();
+    if ($entry == null) {
+      return null;
+    }
+
+    return ($entry[0], ($this->function)($entry[1]));
+  }
+}

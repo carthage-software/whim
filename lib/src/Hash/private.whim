@@ -1,0 +1,23 @@
+namespace Whim\Hash\_Private;
+
+use Whim\Hash\Algorithm;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Requires a cryptographic digest rather than a checksum. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function require_cryptographic(Algorithm $algorithm): void {
+  if ($algorithm->isCryptographic()) {
+    return;
+  }
+
+  throw new InvalidArgumentException(
+    'a message can only be authenticated with a cryptographic algorithm, '
+    . $algorithm->name
+    . ' is a checksum',
+  );
+}

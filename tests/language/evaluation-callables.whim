@@ -1,0 +1,278 @@
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\Error;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\VisibilityError;
+
+$captured = 1;
+$closure = function() use ($captured): int {
+  return $captured;
+};
+
+$shortClosure = fn(): int => $captured;
+$captured = 2;
+assert!($closure() == 1);
+assert!($shortClosure() == 1);
+
+$blockCaptured = 10;
+$blockClosure = fn(int $value): int {
+  $result = $blockCaptured + $value;
+  return $result;
+};
+
+$blockCaptured = 20;
+assert!($blockClosure(5) == 15);
+
+$shadowed = 100;
+$localClosure = fn(): int {
+  $shadowed = 4;
+  return $shadowed;
+};
+
+assert!($localClosure() == 4);
+assert!($shadowed == 100);
+
+$blockCounter = 10;
+$bumpBlockCopy = fn(): int {
+  $blockCounter += 1;
+  return $blockCounter;
+};
+
+assert!($bumpBlockCopy() == 11);
+assert!($blockCounter == 10);
+
+$expressionLocal = 8;
+$assignExpressionLocal = fn(): int => $expressionLocal = 3;
+assert!($assignExpressionLocal() == 3);
+assert!($expressionLocal == 8);
+
+$expressionCounter = 4;
+$bumpExpressionCopy = fn(): int => $expressionCounter += 1;
+assert!($bumpExpressionCopy() == 5);
+assert!($expressionCounter == 4);
+
+$sumValues = fn(vec<int> $values): int {
+  $sum = 0;
+  foreach ($values as $value) {
+    $sum += $value;
+  }
+
+  return $sum;
+};
+
+assert!($sumValues(vec[1, 2, 3]) == 6);
+
+final class CapturedObject {
+  public int $value = 0;
+}
+
+$capturedObject = new CapturedObject();
+$updateCapturedObject = fn(): void {
+  $capturedObject->value += 1;
+};
+
+$updateCapturedObject();
+assert!($capturedObject->value == 1);
+
+final class ShortClosureEvents {
+  public static vec<string> $values = vec[];
+}
+
+$record = fn(string $value): void {
+  ShortClosureEvents::$values[] = $value;
+};
+
+$record('recorded');
+assert!(ShortClosureEvents::$values == vec['recorded']);
+
+$base = 3;
+$factory = fn(int $offset): fn(int): int {
+  return fn(int $value): int {
+    return $base + $offset + $value;
+  };
+};
+
+$nested = $factory(4);
+assert!($nested(5) == 12);
+
+$identity = fn<T>(T $value): T {
+  return $value;
+};
+
+assert!($identity::<string>('short') == 'short');
+
+function double(int $value): int {
+  return $value * 2;
+}
+
+$firstClass = double(...);
+assert!($firstClass(21) == 42);
+
+class Greeter {
+  public function __construct(private string $word) {}
+
+  public function greet(): string {
+    return $this->word;
+  }
+}
+
+$greeter = new Greeter('hello');
+$bound = $greeter->greet(...);
+$greeter = new Greeter('replaced');
+assert!($bound() == 'hello');
+
+$assertion_value_5 = function(): void {
+  $five = 5;
+  $five();
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is TypeError);
+
+final class TapLog {
+  public static vec<string> $events = vec[];
+}
+
+function tap(string $label, int $value): int {
+  TapLog::$events[] = $label;
+  return $value;
+}
+
+function describe(string $prefix, int $a, int $b): string {
+  return $prefix . ($a + $b);
+}
+
+$partial = describe('sum=', ?, tap('E', 10));
+assert!(TapLog::$events == vec['E']);
+assert!($partial(5) == 'sum=15');
+assert!($partial(6) == 'sum=16');
+assert!(TapLog::$events == vec['E']);
+$named = describe(prefix: ?, a: 1, b: 2);
+assert!($named('total=') == 'total=3');
+
+function join_three(string $first, string $second, string $third = ''): string {
+  return $first . ':' . $second . ':' . $third;
+}
+
+$reversed = join_three(second: ?, first: ?);
+assert!($reversed('B', 'A') == 'A:B:');
+
+$mixedOrder = join_three(first: ?, second: 'middle', third: ?);
+assert!(
+  $mixedOrder(
+    third: 'C',
+    first: 'A',
+  )
+  == 'A:middle:C',
+);
+
+class CallableSecret {
+  private static function reveal(): string {
+    return 'secret';
+  }
+}
+
+$assertion_value_13 = fn(): mixed => CallableSecret::reveal(...);
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (VisibilityError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is VisibilityError);
+
+function pair(int $left = 1 + 2, int $right = 4 * 5): int {
+  return $left * 100 + $right;
+}
+
+assert!(pair() == 320);
+assert!(pair(6) == 620);
+assert!(pair(6, 7) == 607);
+
+function fixed(int $a, int $b): int {
+  return $a + $b;
+}
+
+$assertion_value_17 = fn(): int => fixed(1);
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (ArgumentCountError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is ArgumentCountError);
+$assertion_value_18 = fn(): int => fixed(1, 2, 3);
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (ArgumentCountError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is ArgumentCountError);
+$assertion_value_19 = fn(): int => fixed(1, oops: 2);
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (ArgumentCountError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is ArgumentCountError);
+
+function open(int $first, vec<int> $rest = vec[]): int {
+  return $first + length!($rest);
+}
+
+assert!(open(1, vec[2, 3, 4]) == 4);
+
+final class ScopedCounter {
+  private static int $count = 7;
+  private static bool $reported = false;
+  private static string $engineObservation = '';
+
+  public static function read(int $offset, string $label): string {
+    return $label . ': ' . (ScopedCounter::$count + $offset);
+  }
+
+  public static function report(int $kind, string $name): void {
+    if (ScopedCounter::$reported) {
+      return;
+    }
+
+    ScopedCounter::$reported = true;
+    ScopedCounter::$engineObservation =
+      'via engine: ' . (ScopedCounter::$count + $kind - $kind);
+  }
+
+  public static function observation(): string {
+    return ScopedCounter::$engineObservation;
+  }
+}
+
+assert!(ScopedCounter::read(1, 'direct') == 'direct: 8');
+
+$callable = ScopedCounter::read(...);
+assert!($callable(2, 'via callable') == 'via callable: 9');
+
+$partialRead = ScopedCounter::read(3, ?);
+assert!($partialRead('via partial') == 'via partial: 10');
+
+Whim\_Private\register_symbol_autoloader(ScopedCounter::report(...));
+$assertion_value_24 = fn(): mixed => new Ghost();
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (Error $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is Error);
+assert!(ScopedCounter::observation() == 'via engine: 7');

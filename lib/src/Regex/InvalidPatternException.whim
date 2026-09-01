@@ -1,0 +1,6 @@
+namespace Whim\Regex;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Thrown when a regular expression cannot be compiled. */
+final class InvalidPatternException extends InvalidArgumentException {}

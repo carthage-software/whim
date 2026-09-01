@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports an attempt to declare an existing symbol again. */
+#[Stub]
+class RedeclarationError extends Error {}

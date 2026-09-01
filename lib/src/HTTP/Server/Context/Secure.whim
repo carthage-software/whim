@@ -1,0 +1,7 @@
+namespace Whim\HTTP\Server\Context;
+
+/** A request received over TLS. */
+interface Secure extends Context {
+  /** The negotiated transport security state. */
+  public readonly Security $security;
+}

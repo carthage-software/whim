@@ -1,0 +1,273 @@
+namespace Whim\Time;
+
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+
+/** Represents a duration. */
+final readonly class Duration implements Order<Duration> {
+  /** The seconds value. */
+  public int $seconds;
+  /** The nanoseconds value. */
+  public int $nanoseconds;
+
+  /** Creates a duration. */
+  #[TrackCaller]
+  public function __construct(int $seconds, int $nanoseconds) {
+    $seconds += Math\div($nanoseconds, NANOSECONDS_PER_SECOND);
+    $nanoseconds %= NANOSECONDS_PER_SECOND;
+
+    if ($seconds > 0 && $nanoseconds < 0) {
+      $seconds--;
+      $nanoseconds += NANOSECONDS_PER_SECOND;
+    } else if ($seconds < 0 && $nanoseconds > 0) {
+      $seconds++;
+      $nanoseconds -= NANOSECONDS_PER_SECOND;
+    }
+
+    $this->seconds = $seconds;
+    $this->nanoseconds = $nanoseconds;
+  }
+
+  /** Creates a duration from whole seconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromSeconds(int $seconds): Duration {
+    return new Duration($seconds, 0);
+  }
+
+  /** Creates a duration from whole milliseconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromMilliseconds(int $milliseconds): Duration {
+    return new Duration(
+      Math\div($milliseconds, MILLISECONDS_PER_SECOND),
+      ($milliseconds % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND,
+    );
+  }
+
+  /** Creates a duration from whole microseconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromMicroseconds(int $microseconds): Duration {
+    return new Duration(
+      Math\div($microseconds, MICROSECONDS_PER_SECOND),
+      ($microseconds % MICROSECONDS_PER_SECOND) * NANOSECONDS_PER_MICROSECOND,
+    );
+  }
+
+  /** Creates a duration from whole nanoseconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromNanoseconds(int $nanoseconds): Duration {
+    return new Duration(0, $nanoseconds);
+  }
+
+  /** Creates a duration from whole minutes. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromMinutes(int $minutes): Duration {
+    return new Duration($minutes * SECONDS_PER_MINUTE, 0);
+  }
+
+  /** Creates a duration from whole hours. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromHours(int $hours): Duration {
+    return new Duration($hours * SECONDS_PER_MINUTE * MINUTES_PER_HOUR, 0);
+  }
+
+  /** Creates a duration from whole days. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromDays(int $days): Duration {
+    return new Duration(
+      $days * SECONDS_PER_MINUTE * MINUTES_PER_HOUR * HOURS_PER_DAY,
+      0,
+    );
+  }
+
+  /** Creates a duration from whole weeks. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromWeeks(int $weeks): Duration {
+    return new Duration(
+      $weeks
+      * SECONDS_PER_MINUTE
+      * MINUTES_PER_HOUR
+      * HOURS_PER_DAY
+      * DAYS_PER_WEEK,
+      0,
+    );
+  }
+
+  /** Returns a zero-length duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function zero(): Duration {
+    return new Duration(0, 0);
+  }
+
+  /** Returns a duration of one second. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function second(): Duration {
+    return new Duration(1, 0);
+  }
+
+  /** Returns a duration of one millisecond. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function millisecond(): Duration {
+    return new Duration(0, NANOSECONDS_PER_MILLISECOND);
+  }
+
+  /** Returns a duration of one microsecond. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function microsecond(): Duration {
+    return new Duration(0, NANOSECONDS_PER_MICROSECOND);
+  }
+
+  /** Returns a duration of one nanosecond. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function nanosecond(): Duration {
+    return new Duration(0, 1);
+  }
+
+  /** Returns the greatest representable duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function max(): Duration {
+    return new Duration(Math\INT_MAX, NANOSECONDS_PER_SECOND - 1);
+  }
+
+  /** Reports whether the duration is zero. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isZero(): bool {
+    return $this->seconds == 0 && $this->nanoseconds == 0;
+  }
+
+  /** Reports whether the duration is positive. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isPositive(): bool {
+    return (
+      $this->seconds > 0
+      || ($this->seconds == 0 && $this->nanoseconds > 0)
+    );
+  }
+
+  /** Reports whether the duration is negative. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isNegative(): bool {
+    return (
+      $this->seconds < 0
+      || ($this->seconds == 0 && $this->nanoseconds < 0)
+    );
+  }
+
+  /** Compares this duration with another. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(Duration $other): Ordering {
+    if ($this->seconds != $other->seconds) {
+      return Ordering::from($this->seconds <=> $other->seconds);
+    }
+
+    return Ordering::from($this->nanoseconds <=> $other->nanoseconds);
+  }
+
+  /** Reports whether two durations are equal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Duration $other): bool {
+    return (
+      $this->seconds == $other->seconds
+      && $this->nanoseconds == $other->nanoseconds
+    );
+  }
+
+  /** Adds another duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function plus(Duration $other): Duration {
+    return new Duration(
+      $this->seconds + $other->seconds,
+      $this->nanoseconds + $other->nanoseconds,
+    );
+  }
+
+  /** Subtracts another duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minus(Duration $other): Duration {
+    return new Duration(
+      $this->seconds - $other->seconds,
+      $this->nanoseconds - $other->nanoseconds,
+    );
+  }
+
+  /** Negates this duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function invert(): Duration {
+    return new Duration(-$this->seconds, -$this->nanoseconds);
+  }
+
+  /** Returns total seconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getTotalSeconds(): float {
+    return $this->seconds + $this->nanoseconds / NANOSECONDS_PER_SECOND;
+  }
+
+  /** Returns total milliseconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getTotalMilliseconds(): float {
+    return (
+      $this->seconds
+      * MILLISECONDS_PER_SECOND
+      + $this->nanoseconds / NANOSECONDS_PER_MILLISECOND
+    );
+  }
+
+  /** Returns total microseconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getTotalMicroseconds(): float {
+    return (
+      $this->seconds
+      * MICROSECONDS_PER_SECOND
+      + $this->nanoseconds / NANOSECONDS_PER_MICROSECOND
+    );
+  }
+
+  /** Returns total nanoseconds. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getTotalNanoseconds(): int {
+    return $this->seconds * NANOSECONDS_PER_SECOND + $this->nanoseconds;
+  }
+
+  /** Returns total minutes. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getTotalMinutes(): float {
+    return $this->getTotalSeconds() / SECONDS_PER_MINUTE;
+  }
+
+  /** Returns total hours. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getTotalHours(): float {
+    return $this->getTotalMinutes() / MINUTES_PER_HOUR;
+  }
+}

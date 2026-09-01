@@ -1,0 +1,115 @@
+namespace Whim\HTTP\Router;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Router\_Private\Pattern;
+use Whim\HTTP\Router\_Private\Resolver;
+use Whim\HTTP\Router\_Private\Route;
+use Whim\HTTP\Router\_Private\request_path;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Iterate\ArrayIterator;
+use Whim\Iterate\ToIterator;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\http_valid_token;
+
+/** Dispatches requests through an in-memory route map. */
+final class Router implements
+  Handler,
+  RouteCollection,
+  ToIterator<int, Registration> {
+  private dict<Method, dict<string, Route>> $routes = dict[];
+  private null|Resolver $resolver = null;
+
+  /** Registers one method and path pattern. */
+  #[TrackCaller]
+  public function add(
+    Method $method,
+    NonEmptyString $pattern,
+    Handler $handler,
+  ): static {
+    if (!http_valid_token($method)) {
+      throw new InvalidArgumentException(
+        'invalid HTTP method: `' . $method . '`',
+      );
+    }
+
+    $methodRoutes = match (contains_key!($this->routes, $method)) {
+      true => $this->routes[$method],
+      false => dict[],
+    };
+
+    if (contains_key!($methodRoutes, $pattern)) {
+      throw new InvalidArgumentException(
+        'the route is already registered for this method and pattern',
+      );
+    }
+
+    $methodRoutes[$pattern] = (Pattern::parse($pattern), $handler);
+    $this->routes[$method] = $methodRoutes;
+    $this->resolver = null;
+    return $this;
+  }
+
+  /** Resolves and dispatches one request. */
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response {
+    $path = request_path($request);
+    $resolver = $this->getResolver();
+    $resolution = $resolver->resolve($request->method, $path);
+    if ($resolution == null && $request->method == Message\METHOD_HEAD) {
+      $resolution = $resolver->resolve(Message\METHOD_GET, $path);
+    }
+
+    if ($resolution == null) {
+      $allowedMethods = $resolver->allowedMethods($path);
+      if (length!($allowedMethods) == 0) {
+        throw new NotFoundException();
+      }
+
+      throw new MethodNotAllowedException($allowedMethods);
+    }
+
+    ($handler, $parameters) = $resolution;
+    foreach ($parameters as $name => $value) {
+      $context->parameters[$name] = $value;
+    }
+
+    return $handler->handle($context, $request, $cancellation);
+  }
+
+  /** Iterates over registered routes in registration order. */
+  #[MustUse]
+  public function toIterator(): ArrayIterator<int, Registration> {
+    $registrations = vec[];
+    foreach ($this->routes as $method => $routes) {
+      foreach ($routes as $pattern => ($_pattern, $handler)) {
+        $registrations[] = ($method, $pattern as NonEmptyString, $handler);
+      }
+    }
+
+    return new ArrayIterator::<int, Registration>($registrations);
+  }
+
+  /** Returns the current compiled resolver. */
+  #[MustUse]
+  private function getResolver(): Resolver {
+    $resolver = $this->resolver;
+    if ($resolver == null) {
+      $resolver = Resolver::fromRoutes($this->routes);
+      $this->resolver = $resolver;
+    }
+
+    return $resolver;
+  }
+}

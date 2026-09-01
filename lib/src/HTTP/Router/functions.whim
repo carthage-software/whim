@@ -1,0 +1,15 @@
+namespace Whim\HTTP\Router;
+
+use Whim\HTTP\Server\Context\Context;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** Returns one matched parameter. */
+#[MustUse]
+function parameter(Context $context, NonEmptyString $name): null|string {
+  if (!contains_key!($context->parameters, $name)) {
+    return null;
+  }
+
+  return $context->parameters[$name];
+}

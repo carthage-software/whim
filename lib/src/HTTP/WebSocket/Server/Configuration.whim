@@ -1,0 +1,34 @@
+namespace Whim\HTTP\WebSocket\Server;
+
+use Whim\Marker\TrackCaller;
+use Whim\Refine\PositiveInt;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\http_valid_token;
+
+/** Configures WebSocket handshakes and message limits. */
+final readonly class Configuration {
+  #[TrackCaller]
+  public function __construct(
+    public PositiveInt $maximumMessageSize = 16_777_216,
+    public PositiveInt $maximumFrameSize = 1_048_576,
+    public PositiveInt $readSize = 16_384,
+    public vec<string> $subprotocols = vec[],
+  ) {
+    $seen = dict[];
+    foreach ($subprotocols as $subprotocol) {
+      if (!http_valid_token($subprotocol)) {
+        throw new InvalidArgumentException(
+          'invalid WebSocket subprotocol: `' . $subprotocol . '`',
+        );
+      }
+
+      if (contains_key!($seen, $subprotocol)) {
+        throw new InvalidArgumentException(
+          'duplicate WebSocket subprotocol: `' . $subprotocol . '`',
+        );
+      }
+
+      $seen[$subprotocol] = true;
+    }
+  }
+}

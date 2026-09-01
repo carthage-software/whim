@@ -1,0 +1,54 @@
+namespace Whim\Filesystem;
+
+use Whim;
+use Whim\Filesystem\_Private;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/**
+ * Resolves a path into an absolute path free of symbolic links.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function canonicalize(NonEmptyString $path): NonEmptyString {
+  try {
+    return Whim\_Private\resolve_path($path);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'canonicalize');
+  }
+}
+
+/**
+ * Returns the target a symbolic link points to.
+ *
+ * @throws NotSymbolicLinkException when the path does not point to a symbolic link.
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function read_symbolic_link(NonEmptyString $link): NonEmptyString {
+  try {
+    return Whim\_Private\read_symbolic_link($link);
+  } catch (Whim\_Private\SystemError $error) {
+    if ($error->errno() == Whim\_Private\ERRNO_INVALID_ARGUMENT) {
+      throw new NotSymbolicLinkException(
+        'path `' . $link . '` does not point to a symbolic link',
+        $error->errno(),
+      );
+    }
+
+    _Private\failure($error, $link, 'read symbolic link');
+  }
+}

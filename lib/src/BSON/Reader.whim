@@ -1,0 +1,58 @@
+namespace Whim\BSON;
+
+use Whim\Async\CancellationToken;
+use Whim\Binary;
+use Whim\Binary\Endianness;
+use Whim\IO\ReadHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\PositiveInt;
+
+/** Reads BSON documents from a handle. */
+final readonly class Reader {
+  public function __construct(
+    private ReadHandle $handle,
+    private PositiveInt $maximumBytes = DEFAULT_MAXIMUM_DOCUMENT_BYTES,
+  ) {}
+
+  /** Reads the next document, or null after the source ends. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function read(
+    null|CancellationToken $cancellation = null,
+  ): null|Document {
+    $prefix = match ($this->handle->readAll(4, $cancellation)) {
+      '' => return null,
+      $prefix => $prefix,
+    };
+
+    if (length!($prefix) < 4) {
+      throw new DecodingException('the BSON document length is incomplete');
+    }
+
+    $length = Binary\decode_i32($prefix, Endianness::Little);
+    if ($length < 5) {
+      throw new DecodingException(
+        'a BSON document must contain at least five bytes',
+      );
+    }
+
+    if ($length > $this->maximumBytes) {
+      throw new DecodingException(
+        'the BSON document exceeds the configured byte limit',
+      );
+    }
+
+    $bytes = $prefix . $this->handle->readAll($length - 4, $cancellation);
+
+    if (length!($bytes) != $length) {
+      throw new DecodingException(
+        'the BSON document is shorter than its declared length',
+      );
+    }
+
+    return decode($bytes);
+  }
+}

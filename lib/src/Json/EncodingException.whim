@@ -1,0 +1,6 @@
+namespace Whim\Json;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports a value JSON cannot carry. */
+final class EncodingException extends InvalidArgumentException {}

@@ -1,0 +1,4 @@
+namespace Whim\Channel;
+
+/** Thrown when a non-blocking receive finds no value. */
+final class EmptyException extends Exception {}

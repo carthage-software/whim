@@ -1,0 +1,118 @@
+namespace Whim\File;
+
+use Whim\Async\CancellationToken;
+use Whim\File\_Private;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\_Private\FileOperation;
+use Whim\_Private\SystemError;
+use Whim\_Private\read_file;
+
+/**
+ * Writes an entire byte string to a file.
+ *
+ * @throws NotFoundException when a parent directory does not exist.
+ * @throws NotFileException when the path does not point to a regular file.
+ * @throws AlreadyCreatedException when the file exists and the mode is `WriteMode::MustCreate`.
+ * @throws NotWritableException when the file is not writable.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function write(
+  NonEmptyString $file,
+  string $content,
+  WriteMode $mode = WriteMode::OpenOrCreate,
+  null|CancellationToken $cancellation = null,
+): void {
+  using ($handle = _Private\open_write_handle($file, $mode, $cancellation)) {
+    $handle->writeAll($content, $cancellation);
+  }
+}
+
+/**
+ * Reads a byte range from a file.
+ *
+ * @throws NotFoundException when the file does not exist.
+ * @throws NotFileException when the path does not point to a regular file.
+ * @throws NotReadableException when the file is not readable.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function read(
+  NonEmptyString $file,
+  NonNegativeInt $offset = 0,
+  null|PositiveInt $length = null,
+  null|CancellationToken $cancellation = null,
+): string {
+  try {
+    if ($cancellation == null) {
+      return read_file($file, $offset, $length);
+    }
+
+    $operation = FileOperation::readPath($file, $offset, $length);
+    _Private\await_operation($operation, $cancellation);
+    return $operation->takeBytes() as string;
+  } catch (SystemError $error) {
+    _Private\failure($error, $file, false);
+  }
+}
+
+/**
+ * Opens a file for reading.
+ *
+ * @throws NotFoundException when the file does not exist.
+ * @throws NotFileException when the path does not point to a regular file.
+ * @throws NotReadableException when the file is not readable.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function open_read_only(
+  NonEmptyString $path,
+  null|CancellationToken $cancellation = null,
+): ReadHandle {
+  return _Private\open_read_handle($path, $cancellation);
+}
+
+/**
+ * Opens a file for writing.
+ *
+ * @throws NotFoundException when a parent directory does not exist.
+ * @throws NotFileException when the path does not point to a regular file.
+ * @throws AlreadyCreatedException when the file exists and the mode is `WriteMode::MustCreate`.
+ * @throws NotWritableException when the file is not writable.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function open_write_only(
+  NonEmptyString $path,
+  WriteMode $mode = WriteMode::OpenOrCreate,
+  null|CancellationToken $cancellation = null,
+): WriteHandle {
+  return _Private\open_write_handle($path, $mode, $cancellation);
+}
+
+/**
+ * Opens a file for reading and writing.
+ *
+ * @throws NotFoundException when a parent directory does not exist.
+ * @throws NotFileException when the path does not point to a regular file.
+ * @throws AlreadyCreatedException when the file exists and the mode is `WriteMode::MustCreate`.
+ * @throws NotWritableException when the file is not writable.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function open_read_write(
+  NonEmptyString $path,
+  WriteMode $mode = WriteMode::OpenOrCreate,
+  null|CancellationToken $cancellation = null,
+): ReadHandle&WriteHandle {
+  return _Private\open_read_write_handle($path, $mode, $cancellation);
+}

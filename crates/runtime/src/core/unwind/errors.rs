@@ -1,0 +1,138 @@
+//! `Whim\Unwind\Error` subclasses.
+
+use whim_macros::whim_class;
+
+macro_rules! error_subclass {
+    ($identifier:ident, $name:literal, $parent:literal) => {
+        #[whim_class($name)]
+        #[whim_extends($parent)]
+        struct $identifier;
+    };
+}
+
+error_subclass!(
+    ParserError,
+    "Whim\\Unwind\\ParserError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    CompilerError,
+    "Whim\\Unwind\\CompilerError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    LinkerError,
+    "Whim\\Unwind\\LinkerError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(TypeError, "Whim\\Unwind\\TypeError", "Whim\\Unwind\\Error");
+error_subclass!(
+    ValueError,
+    "Whim\\Unwind\\ValueError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    IncompatibleOperandsError,
+    "Whim\\Unwind\\IncompatibleOperandsError",
+    "Whim\\Unwind\\TypeError"
+);
+error_subclass!(
+    ArithmeticError,
+    "Whim\\Unwind\\ArithmeticError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    DivisionByZeroError,
+    "Whim\\Unwind\\DivisionByZeroError",
+    "Whim\\Unwind\\ArithmeticError"
+);
+error_subclass!(
+    OverflowError,
+    "Whim\\Unwind\\OverflowError",
+    "Whim\\Unwind\\ArithmeticError"
+);
+error_subclass!(
+    UnderflowError,
+    "Whim\\Unwind\\UnderflowError",
+    "Whim\\Unwind\\ArithmeticError"
+);
+error_subclass!(
+    ArgumentCountError,
+    "Whim\\Unwind\\ArgumentCountError",
+    "Whim\\Unwind\\TypeError"
+);
+error_subclass!(
+    OutOfBoundsError,
+    "Whim\\Unwind\\OutOfBoundsError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    UnhandledMatchError,
+    "Whim\\Unwind\\UnhandledMatchError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    AssertionError,
+    "Whim\\Unwind\\AssertionError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    UndefinedVariableError,
+    "Whim\\Unwind\\UndefinedVariableError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    UninitializedPropertyError,
+    "Whim\\Unwind\\UninitializedPropertyError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    ReadonlyError,
+    "Whim\\Unwind\\ReadonlyError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    LeakedResourceError,
+    "Whim\\Unwind\\LeakedResourceError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    DiscardedResultError,
+    "Whim\\Unwind\\DiscardedResultError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    VisibilityError,
+    "Whim\\Unwind\\VisibilityError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    InstantiationError,
+    "Whim\\Unwind\\InstantiationError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    UndefinedSymbolError,
+    "Whim\\Unwind\\UndefinedSymbolError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    RedeclarationError,
+    "Whim\\Unwind\\RedeclarationError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    RequireError,
+    "Whim\\Unwind\\RequireError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    StackOverflowError,
+    "Whim\\Unwind\\StackOverflowError",
+    "Whim\\Unwind\\Error"
+);
+error_subclass!(
+    CoroutineError,
+    "Whim\\Unwind\\CoroutineError",
+    "Whim\\Unwind\\Error"
+);

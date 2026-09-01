@@ -1,0 +1,2 @@
+class Box<T> {}
+function f<U: Box<int, string>>(): void {}

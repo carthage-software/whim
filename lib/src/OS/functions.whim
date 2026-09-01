@@ -1,0 +1,144 @@
+namespace Whim\OS;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Time\Duration;
+use Whim\_Private\OSOperation;
+
+/** Returns information about the running operating system and machine. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function information(): Information {
+  try {
+    (
+      $systemName,
+      $nodeName,
+      $release,
+      $version,
+      $machine,
+    ) = Whim\_Private\system_information();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the operating-system information');
+  }
+
+  return new Information($systemName, $nodeName, $release, $version, $machine);
+}
+
+/** Returns the time elapsed since the operating system started. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function uptime(): Duration {
+  try {
+    $milliseconds = Whim\_Private\system_uptime();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the operating-system uptime');
+  }
+
+  return Duration::fromMilliseconds($milliseconds);
+}
+
+/** Returns system load averages over one, five, and fifteen minutes. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function load_averages(): LoadAverages {
+  try {
+    ($oneMinute, $fiveMinutes, $fifteenMinutes) = Whim\_Private\load_averages();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the operating-system load averages');
+  }
+
+  return new LoadAverages($oneMinute, $fiveMinutes, $fifteenMinutes);
+}
+
+/** Returns total and currently available physical memory. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function memory(): MemoryInformation {
+  try {
+    ($total, $available) = Whim\_Private\memory_information();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the operating-system memory information');
+  }
+
+  return new MemoryInformation($total, $available);
+}
+
+/** Finds a user by name or identifier, or returns `null` when absent. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function find_user(
+  NonEmptyString|NonNegativeInt $identity,
+  null|CancellationToken $cancellation = null,
+): null|User {
+  try {
+    $operation = OSOperation::user($identity);
+    _Private\await_operation($operation, $cancellation);
+    $record = $operation->takeUser();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'look up an operating-system user');
+  }
+
+  if ($record == null) {
+    return null;
+  }
+
+  return _Private\user_from_record($record);
+}
+
+/** Finds a group by name or identifier, or returns `null` when absent. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function find_group(
+  NonEmptyString|NonNegativeInt $identity,
+  null|CancellationToken $cancellation = null,
+): null|Group {
+  try {
+    $operation = OSOperation::group($identity);
+    _Private\await_operation($operation, $cancellation);
+    $record = $operation->takeGroup();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'look up an operating-system group');
+  }
+
+  if ($record == null) {
+    return null;
+  }
+
+  return _Private\group_from_record($record);
+}
+
+/** Returns the available primary and supplementary groups of a user. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function groups_for_user(
+  User $user,
+  null|CancellationToken $cancellation = null,
+): vec<Group> {
+  try {
+    $operation = OSOperation::groupsForUser($user->name, $user->primaryGroupId);
+
+    _Private\await_operation($operation, $cancellation);
+    $records = $operation->takeGroups();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'look up the groups of an operating-system user');
+  }
+
+  $groups = vec[];
+  foreach ($records ?? vec[] as $record) {
+    $groups[] = _Private\group_from_record($record);
+  }
+
+  return $groups;
+}

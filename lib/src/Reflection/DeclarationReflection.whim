@@ -1,0 +1,49 @@
+namespace Whim\Reflection;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Describes one declaration that may carry attributes and source metadata. */
+#[Stub]
+interface DeclarationReflection for
+  Symbol\SymbolReflection,
+  Symbol\ClassLikeReflection,
+  Generic\GenericDeclarationReflection,
+  Member\MemberReflection,
+  Callable\CallableReflection,
+  Callable\ParameterReflection,
+  Symbol\ClassReflection,
+  Symbol\InterfaceReflection,
+  Symbol\EnumReflection,
+  Symbol\TypeAliasReflection,
+  Symbol\NewtypeReflection,
+  Symbol\FunctionReflection,
+  Symbol\ConstantReflection,
+  Member\MethodReflection,
+  Member\PropertyReflection,
+  Member\ClassConstantReflection,
+  Member\EnumCaseReflection,
+  Callable\ClosureReflection {
+  /** Returns where the declaration was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin;
+
+  /** Returns the source span of a user declaration, or null otherwise. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation;
+
+  /** Returns the declaration's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string;
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>>;
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>>;
+}

@@ -1,0 +1,24 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+use Whim\_Private\regex_escape;
+
+/** A literal route-pattern component. */
+final readonly class LiteralNode implements Node {
+  #[AlwaysInline]
+  public function __construct(public NonEmptyString $text) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function expression(): string {
+    return regex_escape($this->text);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function parameterNames(): vec<string> {
+    return vec[];
+  }
+}

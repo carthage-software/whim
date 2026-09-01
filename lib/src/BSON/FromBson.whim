@@ -1,0 +1,10 @@
+namespace Whim\BSON;
+
+use Whim\Marker\MustUse;
+
+/** Defines construction from a BSON document. */
+interface FromBson {
+  /** Builds an instance from a BSON document. */
+  #[MustUse]
+  public static function fromBson(Document $document): static;
+}

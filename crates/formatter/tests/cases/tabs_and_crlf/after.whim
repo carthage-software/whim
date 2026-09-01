@@ -1,0 +1,7 @@
+function outer(): void {
+	if ($ready) {
+		while ($i < 10) {
+			$i += 1;
+		}
+	}
+}

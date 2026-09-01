@@ -1,0 +1,5 @@
+class Invalid<out T> {
+  public function produce(): !T {
+    exit!(1);
+  }
+}

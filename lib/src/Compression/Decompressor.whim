@@ -1,0 +1,4 @@
+namespace Whim\Compression;
+
+/** Decompresses a stream of byte chunks. */
+interface Decompressor extends Transformer {}

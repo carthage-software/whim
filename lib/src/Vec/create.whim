@@ -1,0 +1,74 @@
+namespace Whim\Vec;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\Transform;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\LogicException;
+use Whim\Vec\_Private;
+
+/** Creates a vec containing repeated copies of a value. */
+#[MustUse]
+#[TrackCaller]
+function fill<T>(NonNegativeInt $size, T $value): vec<T> {
+  return vec[$value; $size];
+}
+
+/** Creates a vec by deriving each value from its index. */
+#[MustUse]
+#[TrackCaller]
+function reproduce<T>(
+  NonNegativeInt $size,
+  Transform<NonNegativeInt, T> $factory,
+): vec<T> {
+  $result = vec[];
+  $index = 0;
+  while ($index < $size) {
+    $result[] = $factory($index);
+    $index++;
+  }
+
+  return $result;
+}
+
+/**
+ * Creates an inclusive integer sequence.
+ *
+ * @throws LogicException when the step is zero, or walks away from the end bound.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function range(int $start, int $end, null|int $step = null): vec<int> {
+  if ($step != null && $step == 0) {
+    throw new LogicException('$step must not be zero');
+  }
+
+  if ($start == $end) {
+    return vec[$start];
+  }
+
+  $ascending = $start < $end;
+  if ($step == null) {
+    if ($ascending) {
+      $step = 1;
+    } else {
+      $step = -1;
+    }
+  }
+
+  if ($ascending && $step <= 0) {
+    throw new LogicException(
+      '$step must be positive when $end is greater than $start',
+    );
+  }
+
+  if (!$ascending && $step >= 0) {
+    throw new LogicException(
+      '$step must be negative when $start is greater than $end',
+    );
+  }
+
+  return _Private\integer_range($start, $end, $step, $ascending);
+}

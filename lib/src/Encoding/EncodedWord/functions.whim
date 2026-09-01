@@ -1,0 +1,19 @@
+namespace Whim\Encoding\EncodedWord;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Encodes a MIME header value when it contains non-ASCII text. */
+#[AlwaysInline]
+#[MustUse]
+function encode(string $value): string {
+  return Whim\_Private\mime_encoded_word_encode($value);
+}
+
+/** Decodes RFC 2047 encoded words in a MIME header value. */
+#[AlwaysInline]
+#[MustUse]
+function decode(string $value): string {
+  return Whim\_Private\mime_encoded_word_decode($value);
+}

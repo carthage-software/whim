@@ -1,0 +1,44 @@
+namespace Whim\HTTP\Server;
+
+use Whim\Default\Default;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Server\Responder\Bare;
+use Whim\HTTP\Server\Responder\Responder;
+use Whim\HTTP\Server\Middleware\Middleware;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Time\Duration;
+
+/** Configures protocol limits, timeouts, and error responses. */
+final readonly class Configuration implements Default {
+  #[AlwaysInline]
+  public function __construct(
+    public null|Duration $connectionIdleTimeout = new Duration(60, 0),
+    public null|Duration $requestHeaderTimeout = new Duration(10, 0),
+    public null|Duration $requestBodyTimeout = new Duration(30, 0),
+    public null|Duration $responseWriteTimeout = new Duration(60, 0),
+    public Duration $shutdownTimeout = new Duration(30, 0),
+    public PositiveInt $maximumConnections = 1_000,
+    public null|PositiveInt $maximumConnectionsPerPeer = null,
+    public PositiveInt $maximumConcurrentRequests = 10_000,
+    public null|NonNegativeInt $maximumServerPushes = 100,
+    public PositiveInt $maximumHeaderSize = 16_384,
+    public NonNegativeInt $maximumRequestBodySize = 10_485_760,
+    public PositiveInt $maximumRequestsPerConnection = 1_000,
+    public bool $keepAlive = true,
+    public H2\Configuration $h2 = new H2\Configuration(
+      rateLimiter: H2\RateLimiter::default(),
+    ),
+    public vec<Middleware> $middleware = vec[],
+    public Responder $errorResponder = new Bare(),
+  ) {}
+
+  /** Returns the production defaults. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+}

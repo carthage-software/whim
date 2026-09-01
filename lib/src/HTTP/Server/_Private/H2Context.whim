@@ -1,0 +1,65 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\InformationalStatusCode;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Context\Informational;
+use Whim\HTTP\Session\Session;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Endpoint;
+
+/** Implements the common capabilities of one HTTP/2 request. */
+class H2Context implements Context, Informational {
+  public dict<string, string> $parameters = dict[];
+  private vec<fn(): void> $responseCallbacks = vec[];
+  private null|Session $httpSession = null;
+
+  public function __construct(
+    public readonly ProtocolVersion $protocolVersion,
+    public readonly Endpoint $localEndpoint,
+    public readonly Endpoint $peerEndpoint,
+    protected H2Session $session,
+    protected StreamId $streamId,
+    protected CancellationToken $cancellation,
+  ) {}
+
+  public function getSession(): null|Session {
+    return $this->httpSession;
+  }
+
+  public function setSession(Session $session): void {
+    $this->httpSession = $session;
+  }
+
+  public function onResponseComplete(fn(): void $callback): void {
+    $this->responseCallbacks[] = $callback;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendInformationalResponse(
+    InformationalStatusCode $status,
+    FieldMap $headers = FieldMap::default(),
+  ): void {
+    $this->session->sendInformational(
+      $this->streamId,
+      $status,
+      $headers,
+      $this->cancellation,
+    );
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function completeResponse(): void {
+    $callbacks = $this->responseCallbacks;
+    $this->responseCallbacks = vec[];
+    foreach ($callbacks as $callback) {
+      $callback();
+    }
+  }
+}

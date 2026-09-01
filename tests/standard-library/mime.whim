@@ -1,0 +1,367 @@
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\Encoding\EncodedWord;
+use Whim\Encoding\QuotedPrintable;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\SeekWhence;
+use Whim\IO\SpoolHandle;
+use Whim\MIME\ContentDisposition;
+use Whim\MIME\ContentId;
+use Whim\MIME\Headers;
+use Whim\MIME\MediaType;
+use Whim\MIME\MultiPart\MultiPart;
+use Whim\MIME\MultiPart\Parser;
+use Whim\MIME\MultiPartException;
+use Whim\MIME\Parameters;
+use Whim\MIME\Part\Data;
+use Whim\MIME\Part\Part;
+use Whim\MIME\Part\Text;
+use Whim\MIME\Sniff;
+use Whim\MIME\TransferEncoding;
+use Whim\Str;
+
+final class MIMEStreamingReadHandle implements ReadHandle {
+  public int $bytesRead = 0;
+
+  public function __construct(private string $bytes, private int $chunkSize) {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->bytesRead >= length!($this->bytes);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    $remaining = length!($this->bytes) - $this->bytesRead;
+    if ($remaining <= 0) {
+      return '';
+    }
+
+    $length = $remaining;
+    if ($length > $this->chunkSize) {
+      $length = $this->chunkSize;
+    }
+
+    if ($maxBytes != null && $maxBytes >= 0 && $length > $maxBytes) {
+      $length = $maxBytes;
+    }
+
+    $result = Str\slice($this->bytes, $this->bytesRead, $length);
+    $this->bytesRead += $length;
+    return $result;
+  }
+}
+
+$parameters = Parameters::from('; charset=utf-8; title="hello world"');
+assert!($parameters->get('CHARSET') == 'utf-8');
+assert!($parameters->toString() == '; charset=utf-8; title="hello world"');
+
+$mediaType = MediaType::from('application/vnd.example+json; charset=utf-8');
+assert!($mediaType->essence() == 'application/vnd.example+json');
+assert!($mediaType->suffix == 'json');
+assert!($mediaType->tree == 'vnd');
+
+assert!(Sniff\from_string("\x89PNG\r\n\x1a\n")->essence() == 'image/png');
+
+assert!(
+  Sniff\from_string("RIFF\x00\x00\x00\x00WEBP\x00\x00\x00\x00")->essence()
+  == 'image/webp',
+);
+
+assert!(
+  Sniff\from_string("\x00\x00\x00\x1cftypisom\x00\x00\x00\x00")->essence()
+  == 'video/mp4',
+);
+
+assert!(Sniff\from_string('<!DOCTYPE html><html>')->essence() == 'text/html');
+
+assert!(
+  Sniff\from_string('<svg xmlns="http://www.w3.org/2000/svg">')->essence()
+  == 'image/svg+xml',
+);
+
+assert!(Sniff\from_string('{"value": 1}')->essence() == 'application/json');
+
+assert!(Sniff\from_string('plain text')->essence() == 'text/plain');
+assert!(
+  Sniff\from_string("\x00\x01\x02")->essence() == 'application/octet-stream',
+);
+
+assert!(Sniff\from_string('')->essence() == 'application/octet-stream');
+
+$sniffHandle = new MemoryHandle('xx%PDF-1.7');
+discard!($sniffHandle->seek(2));
+assert!(Sniff\from_handle($sniffHandle)->essence() == 'application/pdf');
+
+assert!($sniffHandle->seek(0, SeekWhence::Current) == 2);
+
+$disposition = ContentDisposition::attachment('../report.csv');
+assert!($disposition->filename() == 'report.csv');
+assert!($disposition->unsafeFilename() == '../report.csv');
+
+$contentId = ContentId::from('<part@example.com>');
+assert!($contentId->toURI() == 'cid:part@example.com');
+assert!($contentId->toString() == '<part@example.com>');
+
+$headers = Headers::fromPairs(vec[
+  ('Subject', EncodedWord\encode('Bonjour, été')),
+  ('X-Value', 'first'),
+  ('x-value', 'second'),
+]);
+
+assert!($headers->get('subject') != null);
+assert!($headers->getAll('X-VALUE') == vec['first', 'second']);
+assert!(
+  EncodedWord\decode($headers->get('subject') as string) == 'Bonjour, été',
+);
+
+$quoted = QuotedPrintable\encode("hello\x00world", true);
+assert!(QuotedPrintable\decode($quoted) == "hello\x00world");
+assert!(TransferEncoding::detect('plain ASCII') == TransferEncoding::SevenBit);
+
+$text = new Text('hello', 'plain', 'utf-8', TransferEncoding::SevenBit);
+assert!($text->body()->readAll() == 'hello');
+
+$data = new Data("\x00\x01");
+assert!($data->body()->readAll() == 'AAE=');
+
+$attachment = new Data('hello world', filename: 'hello.txt');
+$inline = $attachment->asInline(new ContentId('part@example.com'));
+assert!($attachment->body()->readAll() == 'aGVsbG8gd29ybGQ=');
+
+$streamedBytes = '';
+$index = 0;
+while ($index < 20) {
+  $streamedBytes .= "chunk $index with spaces \r\n\x00";
+  $index++;
+}
+
+$base64Source = new MIMEStreamingReadHandle($streamedBytes, 7);
+$base64Body = new Data($base64Source)->body();
+$base64Prefix = $base64Body->read(4);
+assert!($base64Source->bytesRead < length!($streamedBytes));
+$base64Encoded = $base64Prefix . $base64Body->readAll();
+assert!(
+  Base64\decode(Str\replace($base64Encoded, "\r\n", '')) == $streamedBytes,
+);
+
+$quotedPrintableSource = new MIMEStreamingReadHandle($streamedBytes, 5);
+$quotedPrintableBody = new Text(
+  $quotedPrintableSource,
+  encoding: TransferEncoding::QuotedPrintable,
+)->body();
+
+$quotedPrintablePrefix = $quotedPrintableBody->read(4);
+assert!($quotedPrintableSource->bytesRead < length!($streamedBytes));
+
+assert!(
+  QuotedPrintable\decode(
+    $quotedPrintablePrefix . $quotedPrintableBody->readAll(),
+  )
+  == $streamedBytes,
+);
+
+assert!($inline->body()->readAll() == 'aGVsbG8gd29ybGQ=');
+
+$attachment = new Data('hello world', filename: 'hello.txt');
+$inline = $attachment->asInline(new ContentId('part@example.com'));
+assert!($inline->body()->readAll() == 'aGVsbG8gd29ybGQ=');
+assert!($attachment->body()->readAll() == 'aGVsbG8gd29ybGQ=');
+
+$multipart = new MultiPart(
+  'mixed',
+  vec[new Text('hello', 'plain', 'utf-8', TransferEncoding::SevenBit)],
+  'test-boundary',
+);
+
+$multipart->add(
+  new Text('world', 'plain', 'utf-8', TransferEncoding::SevenBit),
+);
+
+$serialized = $multipart->body()->readAll();
+assert!(Whim\Str\contains($serialized, '--test-boundary'));
+assert!(
+  Whim\Str\contains($serialized, 'Content-Type: text/plain; charset=utf-8'),
+);
+
+assert!(Whim\Str\contains($serialized, 'hello'));
+assert!(Whim\Str\contains($serialized, 'world'));
+assert!(Whim\Str\contains($serialized, '--test-boundary--'));
+
+$parsedBytes =
+  "ignored preamble\r\n"
+  . "--parse-boundary\r\n"
+  . "X-First: one\r\n"
+  . "\tcontinued\r\n"
+  . "\r\n"
+  . "first body\r\n"
+  . "--parse-boundary\r\n"
+  . "\r\n"
+  . "second body with --parse-boundary inside\r\n"
+  . "--parse-boundaryX is body text\r\n"
+  . "--parse-boundary--\r\n"
+  . 'ignored epilogue';
+
+$parsedSource = new MIMEStreamingReadHandle($parsedBytes, 5);
+
+$parsed = new Parser('parse-boundary', spoolThreshold: 4)->parse($parsedSource);
+
+assert!($parsedSource->bytesRead == 0);
+($firstIndex, $firstPart) = $parsed->next() as (int, Part);
+assert!($firstIndex == 0);
+assert!($firstPart->headers()->get('x-first') == 'one continued');
+assert!($firstPart->body() is SpoolHandle);
+assert!($firstPart->body()->readAll() == 'first body');
+assert!($parsedSource->bytesRead < length!($parsedBytes));
+
+($secondIndex, $secondPart) = $parsed->next() as (int, Part);
+assert!($secondIndex == 1);
+assert!($secondPart->headers()->count() == 0);
+assert!(
+  $secondPart->body()->readAll()
+  == "second body with --parse-boundary inside\r\n"
+  . '--parse-boundaryX is body text',
+);
+
+assert!($parsed->next() == null);
+
+$lfOnly = new Parser('lf')->parse(
+  new MIMEStreamingReadHandle(
+    "--lf\nContent-Type: text/plain\n\nbody\n--lf--\n",
+    1,
+  ),
+);
+
+($_, $lfPart) = $lfOnly->next() as (int, Part);
+assert!($lfPart->body()->readAll() == 'body');
+assert!($lfOnly->next() == null);
+
+$largeBody = '';
+$largeIndex = 0;
+while ($largeIndex < 1_000) {
+  $largeBody .= 'multipart-stream-' . $largeIndex . "\n";
+  $largeIndex++;
+}
+
+$largeParts = new Parser('large', spoolThreshold: 32)->parse(
+  new MIMEStreamingReadHandle(
+    "--large\r\n\r\n" . $largeBody . "\r\n--large--\r\n",
+    11,
+  ),
+);
+
+($_, $largePart) = $largeParts->next() as (int, Part);
+assert!($largePart->body() is SpoolHandle);
+assert!($largePart->body()->readAll() == $largeBody);
+
+$roundTrip = new Parser('test-boundary')->parse(
+  new MIMEStreamingReadHandle($serialized, 3),
+);
+
+($_, $roundTripFirst) = $roundTrip->next() as (int, Part);
+($_, $roundTripSecond) = $roundTrip->next() as (int, Part);
+assert!($roundTripFirst->body()->readAll() == 'hello');
+assert!($roundTripSecond->body()->readAll() == 'world');
+assert!($roundTrip->next() == null);
+
+$assertion_value_58 = fn(): Parser => new Parser('');
+$assertion_error_58 = null;
+try {
+  $assertion_value_58();
+} catch (MultiPartException $assertion_caught_58) {
+  $assertion_error_58 = $assertion_caught_58;
+}
+
+assert!($assertion_error_58 is MultiPartException);
+$longBoundary = '';
+$boundaryIndex = 0;
+while ($boundaryIndex < 71) {
+  $longBoundary .= 'x';
+  $boundaryIndex++;
+}
+
+$assertion_value_59 = fn(): Parser => new Parser($longBoundary);
+$assertion_error_59 = null;
+try {
+  $assertion_value_59();
+} catch (MultiPartException $assertion_caught_59) {
+  $assertion_error_59 = $assertion_caught_59;
+}
+
+assert!($assertion_error_59 is MultiPartException);
+
+$assertion_value_60 = function(): void {
+  $parts = new Parser('limit', maximumPartSize: 3)->parse(
+    new MemoryHandle("--limit\r\n\r\nfour\r\n--limit--\r\n"),
+  );
+
+  discard!($parts->next());
+};
+
+$assertion_error_60 = null;
+try {
+  $assertion_value_60();
+} catch (MultiPartException $assertion_caught_60) {
+  $assertion_error_60 = $assertion_caught_60;
+}
+
+assert!($assertion_error_60 is MultiPartException);
+
+$assertion_value_61 = function(): void {
+  $parts = new Parser('limit', maximumParts: 1)->parse(
+    new MemoryHandle(
+      "--limit\r\n\r\none\r\n" . "--limit\r\n\r\ntwo\r\n" . "--limit--\r\n",
+    ),
+  );
+
+  discard!($parts->next());
+  discard!($parts->next());
+};
+
+$assertion_error_61 = null;
+try {
+  $assertion_value_61();
+} catch (MultiPartException $assertion_caught_61) {
+  $assertion_error_61 = $assertion_caught_61;
+}
+
+assert!($assertion_error_61 is MultiPartException);
+
+$assertion_value_62 = function(): void {
+  $parts = new Parser('missing')->parse(
+    new MemoryHandle("--missing\r\n\r\nbody"),
+  );
+
+  discard!($parts->next());
+};
+
+$assertion_error_62 = null;
+try {
+  $assertion_value_62();
+} catch (MultiPartException $assertion_caught_62) {
+  $assertion_error_62 = $assertion_caught_62;
+}
+
+assert!($assertion_error_62 is MultiPartException);
+
+$assertion_value_63 = function(): void {
+  $parts = new Parser('headers', maximumHeaderSize: 8)->parse(
+    new MemoryHandle(
+      "--headers\r\nX-Header: too-large\r\n\r\nbody\r\n--headers--\r\n",
+    ),
+  );
+
+  discard!($parts->next());
+};
+
+$assertion_error_63 = null;
+try {
+  $assertion_value_63();
+} catch (MultiPartException $assertion_caught_63) {
+  $assertion_error_63 = $assertion_caught_63;
+}
+
+assert!($assertion_error_63 is MultiPartException);

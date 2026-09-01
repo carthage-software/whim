@@ -1,0 +1,4 @@
+type Pair<A, B> = (A, B);
+
+$value = (1, 2);
+$checked = $value as Pair;

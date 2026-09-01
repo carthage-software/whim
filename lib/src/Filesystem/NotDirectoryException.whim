@@ -1,0 +1,6 @@
+namespace Whim\Filesystem;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports a path that does not point to a directory. */
+final class NotDirectoryException extends InvalidArgumentException {}

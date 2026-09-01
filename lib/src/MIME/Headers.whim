@@ -1,0 +1,184 @@
+namespace Whim\MIME;
+
+use Whim\Convert\ToString;
+use Whim\Default\Default;
+use Whim\Iterate\ArrayIterator;
+use Whim\Iterate\Iterator;
+use Whim\Iterate\ToIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable ordered collection of message headers. */
+final readonly class Headers implements
+  Default,
+  ToIterator<int, Header>,
+  ToString {
+  private vec<Header> $headers;
+  private dict<string, vec<string>> $values;
+
+  #[AlwaysInline]
+  private function __construct(
+    vec<Header> $headers,
+    dict<string, vec<string>> $values,
+  ) {
+    $this->headers = $headers;
+    $this->values = $values;
+  }
+
+  /** Creates checked headers while preserving order and name casing. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromPairs(Iterable<_, Header> $pairs): Headers {
+    $headers = vec[];
+    $values = dict[];
+    foreach ($pairs as ($name, $value)) {
+      if (!_Private\valid_header($name, $value)) {
+        throw new InvalidArgumentException(
+          'invalid message header: `' . $name . '`',
+        );
+      }
+
+      $headers[] = ($name, $value);
+      $normalized = Str\lowercase($name);
+      if (!contains_key!($values, $normalized)) {
+        $values[$normalized] = vec[];
+      }
+
+      $values[$normalized][] = $value;
+    }
+
+    return new Headers($headers, $values);
+  }
+
+  /** Creates an empty header collection. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new Headers(vec[], dict[]);
+  }
+
+  /** Returns the first value for a header name. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function get(string $name): null|string {
+    $name = Str\lowercase($name);
+    if (!contains_key!($this->values, $name)) {
+      return null;
+    }
+
+    return $this->values[$name][0];
+  }
+
+  /** Returns all values for a header name. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getAll(string $name): vec<string> {
+    $name = Str\lowercase($name);
+    if (!contains_key!($this->values, $name)) {
+      return vec[];
+    }
+
+    return $this->values[$name];
+  }
+
+  /** Reports whether a header is present. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(string $name): bool {
+    return contains_key!($this->values, Str\lowercase($name));
+  }
+
+  /** Returns a copy with one header appended. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withAdded(string $name, string $value): Headers {
+    $headers = $this->headers;
+    $headers[] = ($name, $value);
+    return Headers::fromPairs($headers);
+  }
+
+  /** Returns a copy with a header replaced by one value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function with(string $name, string $value): Headers {
+    return $this->without($name)->withAdded($name, $value);
+  }
+
+  /** Returns a copy without a named header. */
+  #[MustUse]
+  #[TrackCaller]
+  public function without(string $name): Headers {
+    $normalized = Str\lowercase($name);
+    if (!contains_key!($this->values, $normalized)) {
+      return $this;
+    }
+
+    $headers = vec[];
+    foreach ($this->headers as ($candidate, $value)) {
+      if (Str\lowercase($candidate) != $normalized) {
+        $headers[] = ($candidate, $value);
+      }
+    }
+
+    return Headers::fromPairs($headers);
+  }
+
+  /** Returns all headers in insertion order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toVec(): vec<Header> {
+    return $this->headers;
+  }
+
+  /** Returns the number of header entries. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function count(): int {
+    return length!($this->headers);
+  }
+
+  /** Iterates over headers in insertion order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toIterator(): Iterator<int, Header> {
+    return new ArrayIterator::<int, Header>($this->headers);
+  }
+
+  /** Serializes headers with CRLF line endings. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    $result = '';
+    foreach ($this->headers as ($name, $value)) {
+      $result .= $name . ': ' . $value . "\r\n";
+    }
+
+    return $result;
+  }
+
+  /** Serializes and folds headers at whitespace boundaries. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function toFoldedString(
+    int $softLimit = 78,
+    int $hardLimit = 998,
+  ): string {
+    if ($softLimit < 1 || $hardLimit < $softLimit) {
+      throw new InvalidArgumentException('invalid message header line limits');
+    }
+
+    $result = '';
+    foreach ($this->headers as ($name, $value)) {
+      $result .= _Private\fold_header($name, $value, $softLimit, $hardLimit);
+    }
+
+    return $result;
+  }
+}

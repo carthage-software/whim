@@ -1,0 +1,122 @@
+namespace Whim\Vec;
+
+use Whim\Comparison\Equal;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\PseudoRandom;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Comparator;
+use Whim\Refine\Transform;
+use Whim\Refine\Iterable;
+use Whim;
+
+/** Reports whether two vecs contain equal values in the same order. */
+#[MustUse]
+#[TrackCaller]
+function equals<T: Equal<T>>(vec<T> $left, vec<T> $right): bool {
+  $length = length!($left);
+  if ($length != length!($right)) {
+    return false;
+  }
+
+  $index = 0;
+  while ($index < $length) {
+    if (!$left[$index]->equals($right[$index])) {
+      return false;
+    }
+
+    $index++;
+  }
+
+  return true;
+}
+
+/** Reverses the order of yielded values. */
+#[MustUse]
+#[TrackCaller]
+function reverse<T>(Iterable<_, T> $values): vec<T> {
+  return Whim\_Private\vec_reverse(values::<T>($values));
+}
+
+/** Removes duplicate values while preserving first occurrences. */
+#[MustUse]
+#[TrackCaller]
+function unique<T>(Iterable<_, T> $values): vec<T> {
+  return Whim\_Private\vec_unique(values::<T>($values));
+}
+
+/** Removes values with duplicate derived identities. */
+#[MustUse]
+#[TrackCaller]
+function unique_by<T, U>(
+  Iterable<_, T> $values,
+  Transform<T, U> $scalar,
+): vec<T> {
+  $values = values::<T>($values);
+  $keys = vec[];
+  foreach ($values as $value) {
+    $keys[] = $scalar($value);
+  }
+
+  return Whim\_Private\vec_unique_by($values, $keys);
+}
+
+/** Sorts a vec by its values. */
+#[MustUse]
+#[TrackCaller]
+function sort<T>(
+  Iterable<_, T> $values,
+  null|Comparator<T> $comparator = null,
+): vec<T> {
+  $values = values::<T>($values);
+  if ($comparator == null) {
+    return Whim\_Private\vec_sort($values, null);
+  }
+
+  return Whim\_Private\vec_sort(
+    $values,
+    fn(T $left, T $right): int => $comparator($left, $right)->value,
+  );
+}
+
+/** Sorts a vec by a scalar derived from each value. */
+#[MustUse]
+#[TrackCaller]
+function sort_by<T, S>(
+  Iterable<_, T> $values,
+  Transform<T, S> $scalar,
+  null|Comparator<S> $comparator = null,
+): vec<T> {
+  $values = values::<T>($values);
+  $keys = vec[];
+  foreach ($values as $value) {
+    $keys[] = $scalar($value);
+  }
+
+  if ($comparator == null) {
+    return Whim\_Private\vec_sort_by($values, $keys, null);
+  }
+
+  return Whim\_Private\vec_sort_by(
+    $values,
+    $keys,
+    fn(S $left, S $right): int => $comparator($left, $right)->value,
+  );
+}
+
+/** Returns the values in pseudo-random order. */
+#[MustUse]
+#[TrackCaller]
+function shuffle<T>(Iterable<_, T> $values): vec<T> {
+  $values = values::<T>($values);
+  $index = length!($values) - 1;
+  while ($index > 0) {
+    $other = PseudoRandom\int(0, $index);
+    $temporary = $values[$index];
+    $values[$index] = $values[$other];
+    $values[$other] = $temporary;
+    $index--;
+  }
+
+  return $values;
+}

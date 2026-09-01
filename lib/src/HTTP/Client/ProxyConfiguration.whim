@@ -1,0 +1,100 @@
+namespace Whim\HTTP\Client;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\TLS;
+use Whim\URL\URL;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Configures an HTTP forward or CONNECT proxy. */
+final readonly class ProxyConfiguration {
+  #[TrackCaller]
+  public function __construct(
+    public URL $url,
+    #[SensitiveParameter] public null|string $authorization = null,
+    public null|NonEmptyString $serverName = null,
+    public TLS\ClientConfiguration $tls = new TLS\ClientConfiguration(),
+    public vec<NonEmptyString> $bypass = vec[],
+  ) {
+    if ($url->scheme != 'http' && $url->scheme != 'https') {
+      throw new InvalidArgumentException(
+        'an HTTP proxy URL must use the http or https scheme',
+      );
+    }
+
+    if ($url->authority->userInfo != null) {
+      throw new InvalidArgumentException(
+        'the HTTP proxy credentials must use the authorization parameter',
+      );
+    }
+
+    if (
+      ($url->path != '' && $url->path != '/')
+      || $url->query != null
+      || $url->fragment != null
+    ) {
+      throw new InvalidArgumentException(
+        'an HTTP proxy URL cannot contain a path, query, or fragment',
+      );
+    }
+
+    if (
+      $authorization != null
+      && !Whim\_Private\http_valid_field_value($authorization)
+    ) {
+      throw new InvalidArgumentException(
+        'the proxy authorization value is invalid',
+      );
+    }
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withURL(URL $url): ProxyConfiguration {
+    return new ProxyConfiguration(
+      $url,
+      $this->authorization,
+      $this->serverName,
+      $this->tls,
+      $this->bypass,
+    );
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withAuthorization(
+    #[SensitiveParameter] null|string $authorization,
+  ): ProxyConfiguration {
+    return new ProxyConfiguration(
+      $this->url,
+      $authorization,
+      $this->serverName,
+      $this->tls,
+      $this->bypass,
+    );
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withServerName(
+    null|NonEmptyString $serverName,
+  ): ProxyConfiguration {
+    return clone!($this, serverName: $serverName);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTLS(TLS\ClientConfiguration $tls): ProxyConfiguration {
+    return clone!($this, tls: $tls);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBypass(vec<NonEmptyString> $bypass): ProxyConfiguration {
+    return clone!($this, bypass: $bypass);
+  }
+}

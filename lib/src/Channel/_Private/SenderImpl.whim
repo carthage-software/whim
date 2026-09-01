@@ -1,0 +1,83 @@
+namespace Whim\Channel\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Async\CancellationToken;
+use Whim\Channel\Sender;
+use Whim\Refine\NonNegativeInt;
+
+/** Represents a sender. */
+final readonly class SenderImpl<in T> implements Sender<T> {
+  /** Creates a sender. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private SenderState<T> $state) {}
+
+  /** Waits until a value can be sent. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilSendable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->state->waitUntilSendable($cancellation);
+  }
+
+  /** Sends a value, waiting until the channel can accept it. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function send(
+    T $value,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->state->send($value, $cancellation);
+  }
+
+  /** Attempts to send a value without waiting. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function trySend(T $value): void {
+    $this->state->trySend($value);
+  }
+
+  /** Returns the channel capacity when it is bounded. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getCapacity(): null|NonNegativeInt {
+    return $this->state->getCapacity();
+  }
+
+  /** Closes the resource to further operations. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    $this->state->close();
+  }
+
+  /** Reports whether the resource is closed. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool {
+    return $this->state->isClosed();
+  }
+
+  /** Returns the number of buffered values. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function count(): NonNegativeInt {
+    return $this->state->count();
+  }
+
+  /** Reports whether the channel buffer is full. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isFull(): bool {
+    return $this->state->isFull();
+  }
+
+  /** Reports whether the channel buffer is empty. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isEmpty(): bool {
+    return $this->state->isEmpty();
+  }
+}

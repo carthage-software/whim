@@ -1,0 +1,213 @@
+namespace Whim\IO;
+
+use Whim\Async\CancellationToken;
+use Whim\File\_Private as FilePrivate;
+use Whim\File\_Private\ReadWriteHandleImpl;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Stores bytes in memory, spilling larger buffers to an anonymous file. */
+final class SpoolHandle implements
+  ReadHandle,
+  WriteHandle,
+  SeekHandle,
+  CloseHandle {
+  private null|MemoryHandle $memory;
+  private null|ReadWriteHandleImpl $file = null;
+  private bool $closed = false;
+  private bool $spillRequired = false;
+  private int $position = 0;
+  private int $size = 0;
+
+  /** Creates a spool with its maximum in-memory byte count. */
+  #[AlwaysInline]
+  public function __construct(
+    private NonNegativeInt $memoryThreshold = 2_097_152,
+  ) {
+    $this->memory = new MemoryHandle();
+  }
+
+  /** Waits until bytes can be read. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->ensureOpen();
+    if ($this->file != null) {
+      $this->file->waitUntilReadable($cancellation);
+      return;
+    }
+
+    ($this->memory as MemoryHandle)->waitUntilReadable($cancellation);
+  }
+
+  /** Reports whether the cursor has reached the stored byte count. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    $this->ensureOpen();
+    return $this->position >= $this->size;
+  }
+
+  /** Reads available bytes without waiting. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    $this->ensureOpen();
+    if ($maxBytes != null && $maxBytes < 0) {
+      throw new InvalidArgumentException(
+        'the maximum byte count must be non-negative',
+      );
+    }
+
+    if ($this->file != null) {
+      $bytes = $this->file->tryRead($maxBytes);
+    } else {
+      $bytes = ($this->memory as MemoryHandle)->tryRead($maxBytes);
+    }
+
+    $this->position += length!($bytes);
+    return $bytes;
+  }
+
+  /** Creates the backing file when needed, then waits until writable. */
+  #[TrackCaller]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->ensureOpen();
+    $cancellation?->throwIfCancellationRequested();
+    if ($this->spillRequired) {
+      $this->spill($cancellation);
+    }
+
+    if ($this->file != null) {
+      $this->file->waitUntilWritable($cancellation);
+      return;
+    }
+
+    ($this->memory as MemoryHandle)->waitUntilWritable($cancellation);
+  }
+
+  /** Attempts one write without waiting for a spill. */
+  #[TrackCaller]
+  public function tryWrite(string $bytes): int {
+    $this->ensureOpen();
+    if ($bytes == '') {
+      return 0;
+    }
+
+    if ($this->file == null) {
+      $end = $this->position + length!($bytes);
+      if ($this->spillRequired || $end > $this->memoryThreshold) {
+        $this->spillRequired = true;
+        return 0;
+      }
+
+      $written = ($this->memory as MemoryHandle)->tryWrite($bytes);
+    } else {
+      $written = $this->file->tryWrite($bytes);
+    }
+
+    $this->advance($written);
+    return $written;
+  }
+
+  /** Writes bytes, spilling to disk when the threshold is crossed. */
+  #[TrackCaller]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    if ($bytes == '') {
+      $this->ensureOpen();
+      return 0;
+    }
+
+    while (true) {
+      $written = $this->tryWrite($bytes);
+      if ($written != 0) {
+        return $written;
+      }
+
+      $this->waitUntilWritable($cancellation);
+    }
+  }
+
+  /** Moves the cursor and returns its new byte offset. */
+  #[TrackCaller]
+  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+    $this->ensureOpen();
+    if ($this->file != null) {
+      $this->position = $this->file->seek($offset, $whence);
+    } else {
+      $this->position = ($this->memory as MemoryHandle)->seek($offset, $whence);
+    }
+
+    return $this->position;
+  }
+
+  /** Closes the active backing handle. */
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    if ($this->file != null) {
+      $this->file->close();
+      return;
+    }
+
+    ($this->memory as MemoryHandle)->close();
+  }
+
+  /** Whether the spool has been closed. */
+  #[AlwaysInline]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  /** Updates the tracked cursor and byte count after a write. */
+  #[AlwaysInline]
+  private function advance(int $written): void {
+    $this->position += $written;
+    if ($this->position > $this->size) {
+      $this->size = $this->position;
+    }
+  }
+
+  /** Moves the in-memory bytes into an anonymous file. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function spill(null|CancellationToken $cancellation): void {
+    if ($this->file != null) {
+      $this->spillRequired = false;
+      return;
+    }
+
+    $memory = $this->memory as MemoryHandle;
+    $file = FilePrivate\open_temporary_handle($cancellation);
+    $bytes = $memory->toString();
+    if ($bytes != '') {
+      $file->writeAll($bytes, $cancellation);
+    }
+
+    $file->seek($this->position);
+    $this->file = $file;
+    $this->memory = null;
+    $this->spillRequired = false;
+  }
+
+  /** Throws when the spool is closed. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function ensureOpen(): void {
+    if ($this->closed) {
+      throw new Exception('the spool handle is closed');
+    }
+  }
+}

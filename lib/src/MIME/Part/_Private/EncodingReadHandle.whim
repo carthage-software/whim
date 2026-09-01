@@ -1,0 +1,144 @@
+namespace Whim\MIME\Part\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\Encoding\QuotedPrintable;
+use Whim\IO\ReadHandle;
+use Whim\MIME\TransferEncoding;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+
+/** Transfer-encodes a readable body in bounded chunks. */
+final class EncodingReadHandle implements ReadHandle {
+  private const int BASE64_CHUNK_SIZE = 57;
+  private const int QUOTED_PRINTABLE_CHUNK_SIZE = 18;
+
+  private string $sourceBuffer = '';
+  private string $encodedBuffer = '';
+  private bool $sourceEnded = false;
+  private bool $emittedChunk = false;
+
+  #[TrackCaller]
+  public function __construct(
+    private ReadHandle $source,
+    private TransferEncoding $encoding,
+  ) {}
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->encodedBuffer != '' || $this->sourceEnded) {
+      return;
+    }
+
+    $this->source->waitUntilReadable($cancellation);
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    if ($this->isPassThrough()) {
+      return $this->source->reachedEndOfDataSource();
+    }
+
+    return (
+      $this->sourceEnded
+      && $this->sourceBuffer == ''
+      && $this->encodedBuffer == ''
+    );
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($maxBytes == 0) {
+      return '';
+    }
+
+    if ($this->isPassThrough()) {
+      return $this->source->tryRead($maxBytes);
+    }
+
+    if ($this->encodedBuffer == '') {
+      $this->fillEncodedBuffer();
+    }
+
+    return $this->drain($maxBytes);
+  }
+
+  #[TrackCaller]
+  private function fillEncodedBuffer(): void {
+    $chunkSize = match ($this->encoding) {
+      TransferEncoding::Base64 => self::BASE64_CHUNK_SIZE,
+      TransferEncoding::QuotedPrintable => self::QUOTED_PRINTABLE_CHUNK_SIZE,
+      TransferEncoding::SevenBit | TransferEncoding::EightBit | TransferEncoding::Binary => 0,
+    };
+
+    while (length!($this->sourceBuffer) < $chunkSize && !$this->sourceEnded) {
+      $remaining = $chunkSize - length!($this->sourceBuffer);
+      $chunk = $this->source->tryRead($remaining);
+      if ($chunk != '') {
+        $this->sourceBuffer .= $chunk;
+        continue;
+      }
+
+      if ($this->source->reachedEndOfDataSource()) {
+        $this->sourceEnded = true;
+      }
+
+      break;
+    }
+
+    if (
+      $this->sourceBuffer == ''
+      || (length!($this->sourceBuffer) < $chunkSize && !$this->sourceEnded)
+    ) {
+      return;
+    }
+
+    $encoded = match ($this->encoding) {
+      TransferEncoding::Base64 => Base64\encode($this->sourceBuffer),
+      TransferEncoding::QuotedPrintable => QuotedPrintable\encode(
+        $this->sourceBuffer,
+        true,
+      ),
+      TransferEncoding::SevenBit | TransferEncoding::EightBit | TransferEncoding::Binary => '',
+    };
+
+    if ($this->emittedChunk) {
+      $encoded = match ($this->encoding) {
+        TransferEncoding::Base64 => "\r\n" . $encoded,
+        TransferEncoding::QuotedPrintable => "=\r\n" . $encoded,
+        TransferEncoding::SevenBit | TransferEncoding::EightBit | TransferEncoding::Binary => $encoded,
+      };
+    }
+
+    $this->sourceBuffer = '';
+    $this->encodedBuffer = $encoded;
+    $this->emittedChunk = true;
+  }
+
+  private function isPassThrough(): bool {
+    return (
+      $this->encoding is TransferEncoding::SevenBit
+        | TransferEncoding::EightBit
+        | TransferEncoding::Binary
+    );
+  }
+
+  #[TrackCaller]
+  private function drain(null|int $maxBytes): string {
+    if (
+      $maxBytes == null
+      || $maxBytes < 0
+      || $maxBytes >= length!($this->encodedBuffer)
+    ) {
+      $result = $this->encodedBuffer;
+      $this->encodedBuffer = '';
+      return $result;
+    }
+
+    $result = Str\slice($this->encodedBuffer, 0, $maxBytes);
+    $this->encodedBuffer = Str\slice($this->encodedBuffer, $maxBytes);
+    return $result;
+  }
+}

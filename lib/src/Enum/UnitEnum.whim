@@ -1,0 +1,13 @@
+namespace Whim\Enum;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\Stub;
+
+/** Describes the common API implemented by every enum. */
+#[Stub]
+interface UnitEnum {
+  public readonly string $name;
+
+  #[TrackCaller]
+  public static function cases(): vec<static>;
+}

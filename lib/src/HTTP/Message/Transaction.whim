@@ -1,0 +1,14 @@
+namespace Whim\HTTP\Message;
+
+use Whim\Async\Future;
+use Whim\Marker\AlwaysInline;
+
+/** Holds every result produced by one HTTP exchange. */
+final readonly class Transaction {
+  #[AlwaysInline]
+  public function __construct(
+    public vec<Response> $informational,
+    public null|Future<vec<Exchange>> $pushed,
+    public Response $response,
+  ) {}
+}

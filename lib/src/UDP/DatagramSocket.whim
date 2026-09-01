@@ -1,0 +1,27 @@
+namespace Whim\UDP;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\FileDescriptorHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Socket as NetworkSocket;
+use Whim\Refine\PositiveInt;
+
+/** Defines common UDP receive behavior and descriptor access. */
+interface DatagramSocket extends
+  NetworkSocket<InternetEndpoint>,
+  FileDescriptorHandle {
+  /** Attempts one non-blocking receive. */
+  #[MustUse]
+  #[TrackCaller]
+  public function tryReceive(PositiveInt $maxBytes): null|Datagram;
+
+  /** Waits for and receives one datagram. */
+  #[MustUse]
+  #[TrackCaller]
+  public function receive(
+    PositiveInt $maxBytes,
+    null|CancellationToken $cancellation = null,
+  ): Datagram;
+}

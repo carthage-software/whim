@@ -1,0 +1,171 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\UnhandledAwaitableException;
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\RuntimeException;
+
+$awaited = Async\spawn::<int>(function(): int {
+  throw new RuntimeException('observed by await');
+});
+
+$assertion_value_1 = fn(): int => $awaited->await();
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (RuntimeException $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+  assert!(
+    Whim\Str\contains($assertion_caught_1->getMessage(), 'observed by await'),
+  );
+}
+
+assert!($assertion_error_1 is RuntimeException);
+
+$suppressed = Async\spawn::<int>(function(): int {
+  throw new RuntimeException('suppressed');
+});
+
+$suppressed->ignore();
+
+$late = Async\spawn::<int>(function(): int {
+  throw new RuntimeException('observed late');
+});
+
+Async\later();
+$assertion_value_2 = fn(): int => $late->await();
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (RuntimeException $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+  assert!(
+    Whim\Str\contains($assertion_caught_2->getMessage(), 'observed late'),
+  );
+}
+
+assert!($assertion_error_2 is RuntimeException);
+
+Async\drain();
+
+$unobservedDeferred = new Async\Deferred::<int>();
+$unobservedDeferred->error(new RuntimeException('unobserved'));
+$unhandledError = null;
+$assertion_callable_3 = function(): void {
+  Async\drain();
+};
+
+try {
+  $assertion_callable_3();
+} catch (UnhandledAwaitableException $assertion_caught_3) {
+  $unhandledError = $assertion_caught_3;
+}
+
+assert!($unhandledError is UnhandledAwaitableException);
+
+$unobservedCause = $unhandledError->getPrevious();
+assert!($unobservedCause is RuntimeException);
+
+assert!($unobservedCause->getMessage() == 'unobserved');
+
+$releaseGate = new Async\Deferred::<null>();
+$staleAwaitToken = new Async\SignalCancellationToken();
+$failingSource = Async\spawn::<int>(function() use ($releaseGate): int {
+  $releaseGate->getFuture()->await();
+  throw new RuntimeException('source failed');
+});
+
+$cancelledWaiter = Async\spawn::<null>(
+  function() use ($failingSource, $staleAwaitToken): null {
+    try {
+      $failingSource->await($staleAwaitToken);
+    } catch (CancelledException $_) {
+    }
+
+    return null;
+  },
+);
+
+$cancelledWaiter->ignore();
+$canceller = Async\spawn::<null>(
+  function() use ($releaseGate, $staleAwaitToken): null {
+    Async\later();
+    $staleAwaitToken->cancel();
+    $releaseGate->complete(null);
+    return null;
+  },
+);
+
+$canceller->ignore();
+$assertion_value_6 = function(): void {
+  Async\drain();
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (UnhandledAwaitableException $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is UnhandledAwaitableException);
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+$deadlocked = $work . '/deadlocked.whim';
+File\write(
+  $deadlocked,
+  '$deferred = new Whim\Async\Deferred::<int>();'
+  . "\n\n"
+  . 'write_line!(\'waiting\');'
+  . "\n"
+  . '$deferred->getFuture()->await();'
+  . "\n"
+  . 'write_line!(\'unreachable\');'
+  . "\n",
+);
+
+$deadlockedRun = Command\run($binary, vec[$deadlocked]);
+assert!($deadlockedRun->status is Command\Exited);
+assert!(($deadlockedRun->status as Command\Exited)->code == 255);
+assert!($deadlockedRun->standardOutput == 'waiting' . "\n");
+assert!(
+  Whim\Str\contains(
+    $deadlockedRun->standardError,
+    'the event loop drained without completing the awaited operation',
+  ),
+);
+
+$surfacing = $work . '/unhandled-failure-surfaces.whim';
+File\write(
+  $surfacing,
+  'write_line!(\'spawning\');'
+  . "\n"
+  . '$unobserved = Whim\Async\spawn::<int>(function (): int {'
+  . "\n"
+  . '    throw new Whim\Unwind\RuntimeException(\'nobody is watching\');'
+  . "\n"
+  . '});'
+  . "\n\n"
+  . 'Whim\Async\drain();'
+  . "\n"
+  . 'write_line!(\'unreachable\');'
+  . "\n",
+);
+
+$surfacingRun = Command\run($binary, vec[$surfacing]);
+assert!($surfacingRun->status is Command\Exited);
+assert!(($surfacingRun->status as Command\Exited)->code == 255);
+assert!($surfacingRun->standardOutput == 'spawning' . "\n");
+assert!(
+  Whim\Str\contains(
+    $surfacingRun->standardError,
+    'an awaitable failed and its error was never observed',
+  ),
+);
+
+Filesystem\delete_directory($work, true);

@@ -1,0 +1,29 @@
+namespace Whim\Reflection;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Symbol\NewtypeReflection;
+use Whim\Reflection\Type\SymbolTypeReflection;
+
+/** Describes the outer nominal layer carried by one newtype value. */
+#[Stub]
+final class NewtypeValueReflection {
+  private function __construct() {}
+
+  /** Returns the declaration that created the outer newtype layer. */
+  #[MustUse]
+  public function getDeclaration(): NewtypeReflection {}
+
+  /** Returns the outer newtype with its reified type arguments. */
+  #[MustUse]
+  public function getType(): SymbolTypeReflection {}
+
+  /** Returns the newtype declaration's reified bindings. */
+  #[MustUse]
+  public function getTypeEnvironment(): TypeEnvironmentReflection {}
+
+  /** Returns the value after removing only the outer newtype layer. */
+  #[MustUse]
+  public function getBackingValue(): mixed {}
+}

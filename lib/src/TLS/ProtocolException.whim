@@ -1,0 +1,4 @@
+namespace Whim\TLS;
+
+/** Reports an invalid or truncated TLS record stream. */
+final class ProtocolException extends Exception {}

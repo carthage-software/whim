@@ -1,0 +1,12 @@
+namespace Whim\Iterate;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+
+/** Produces key-value entries until no entries remain. */
+#[Stub]
+interface Iterator<out K, out V> {
+  /** Advances the iterator and returns its next entry. */
+  #[TrackCaller]
+  public function next(): null|(K, V);
+}

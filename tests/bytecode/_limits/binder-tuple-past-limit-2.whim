@@ -1,0 +1,3 @@
+interface I<
+  T = (int, int, int, int, int, int, int, int, int, int, int, int, int),
+> {}

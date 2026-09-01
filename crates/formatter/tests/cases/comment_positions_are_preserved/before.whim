@@ -1,0 +1,17 @@
+function check(): void {
+    if (/* before */ true /* after */) {
+        write_line!(/* argument */ 'ok');
+    }
+
+    $total = /* left */ 1 /* middle */ + /* right */ 2;
+    $pair = vec[/* first */ 'a', 'b' /* last */];
+    $empty = compute(/* nothing to pass */);
+    $tail = vec[1, 2, /* after the comma */];
+}
+
+class Point {
+    public function __construct(
+        public int $x, // the horizontal offset
+        public int $y, /* the vertical offset */
+    ) {}
+}

@@ -1,0 +1,123 @@
+namespace Whim\File\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\File\LockType;
+use Whim\File\WriteHandle;
+use Whim\IO\SeekWhence;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\NonNegativeInt;
+
+/** Descriptor-backed implementation returned by the writable file factory. */
+final class WriteHandleImpl implements WriteHandle {
+  /** Wraps one open descriptor. This class is private standard-library API. */
+  #[AlwaysInline]
+  public function __construct(private State $state) {}
+
+  #[AlwaysInline]
+  public function getPath(): string {
+    return $this->state->getPath();
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    return $this->state->getFileDescriptor();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getSize(): int {
+    return $this->state->getSize();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+    return $this->state->seek($offset, $whence);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->state->waitUntilWritable($cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryWrite(string $bytes): int {
+    return $this->state->tryWrite($bytes);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return $this->state->write($bytes, $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function synchronize(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->state->synchronize($cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function truncate(
+    NonNegativeInt $length,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->state->truncate($length, $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  #[NeverInline]
+  public function tryLocked<T>(
+    LockType $type,
+    fn(static): T $function,
+  ): Option<T> {
+    if (!$this->state->acquire($type, false)) {
+      return new None();
+    }
+
+    try {
+      return new Some::<T>($function($this));
+    } finally {
+      $this->state->release();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  #[NeverInline]
+  public function locked<T>(
+    LockType $type,
+    fn(static): T $function,
+    null|CancellationToken $cancellation = null,
+  ): T {
+    $cancellation?->throwIfCancellationRequested();
+    $this->state->acquire($type, true);
+    try {
+      return $function($this);
+    } finally {
+      $this->state->release();
+    }
+  }
+}

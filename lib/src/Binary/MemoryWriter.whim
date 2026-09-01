@@ -1,0 +1,177 @@
+namespace Whim\Binary;
+
+use Whim\_Private\ByteBuffer;
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\Int16;
+use Whim\Refine\Int32;
+use Whim\Refine\Int8;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint16;
+use Whim\Refine\Uint32;
+use Whim\Refine\Uint8;
+
+/** Collects written values into a byte string. */
+final class MemoryWriter implements BufferedWriter, Default {
+  private readonly ByteBuffer $buffer;
+
+  #[AlwaysInline]
+  public function __construct(
+    string $buffer = '',
+    private readonly Endianness $endianness = Endianness::Big,
+  ) {
+    $this->buffer = ByteBuffer::fromString($buffer);
+  }
+
+  /** A writer holding nothing, in network byte order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new MemoryWriter();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function u8(Uint8 $value): static {
+    $this->buffer->appendInteger($value, 1, false);
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function u16(
+    Uint16 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    $this->buffer->appendInteger(
+      $value,
+      2,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function u32(
+    Uint32 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    $this->buffer->appendInteger(
+      $value,
+      4,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function u64(
+    NonNegativeInt $value,
+    null|Endianness $endianness = null,
+  ): static {
+    $this->buffer->appendInteger(
+      $value,
+      8,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function i8(Int8 $value): static {
+    $this->buffer->appendInteger($value, 1, false);
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function i16(
+    Int16 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    $this->buffer->appendInteger(
+      $value,
+      2,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function i32(
+    Int32 $value,
+    null|Endianness $endianness = null,
+  ): static {
+    $this->buffer->appendInteger(
+      $value,
+      4,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function i64(int $value, null|Endianness $endianness = null): static {
+    $this->buffer->appendInteger(
+      $value,
+      8,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function f32(
+    float $value,
+    null|Endianness $endianness = null,
+  ): static {
+    $this->buffer->appendFloat(
+      $value,
+      4,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function f64(
+    float $value,
+    null|Endianness $endianness = null,
+  ): static {
+    $this->buffer->appendFloat(
+      $value,
+      8,
+      ($endianness ?? $this->endianness) == Endianness::Little,
+    );
+
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function bytes(string $value): static {
+    $this->buffer->append($value);
+    return $this;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    return $this->buffer->toString();
+  }
+}

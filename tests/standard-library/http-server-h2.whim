@@ -1,0 +1,866 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\Async\SignalCancellationToken;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Context\Push;
+use Whim\HTTP\Server\Handler\FunctionHandler;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\_Private\H2Driver;
+use Whim\IP\Address;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\ShutdownDirection;
+use Whim\Network\Stream;
+use Whim\Str;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\URL\URL;
+use Whim\_Private\H2FrameDecoder;
+
+function decode_frames(string $bytes): vec<Frame\WeakendFrame> {
+  $decoder = H2FrameDecoder::create(16384);
+  $frames = vec[];
+  foreach ($decoder->push($bytes) as $raw) {
+    ($type, $flags, $stream, $payload) = $raw;
+    $frames[] = Frame\_Private\parse($type, $flags, $stream, $payload);
+  }
+
+  $decoder->finish();
+  return $frames;
+}
+
+final class HTTPServerH2ParityStream implements Stream<InternetEndpoint> {
+  private int $offset = 0;
+  private bool $closed = false;
+  private bool $allowEnd = false;
+  public string $written = '';
+
+  public function __construct(
+    private string $incoming,
+    private InternetEndpoint $localEndpoint,
+    private InternetEndpoint $peerEndpoint,
+  ) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+    Async\later();
+    $this->allowEnd = true;
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->allowEnd && $this->offset >= length!($this->incoming);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->offset >= length!($this->incoming)) {
+      return '';
+    }
+
+    $length = length!($this->incoming) - $this->offset;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->incoming, $this->offset, $length);
+    $this->offset += $length;
+    return $data;
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    $this->written .= $bytes;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return $this->tryWrite($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class HTTPServerH2DuplexStream implements Stream<InternetEndpoint> {
+  private string $incoming;
+  private int $offset = 0;
+  private bool $closed = false;
+  private bool $allowEnd = false;
+  private int $idleTurns = 0;
+  public vec<Event\WeakendEvent> $events = vec[];
+
+  public function __construct(
+    private H2\ClientConnection $client,
+    private InternetEndpoint $localEndpoint,
+    private InternetEndpoint $peerEndpoint,
+    private null|(fn(vec<Event\WeakendEvent>): void) $onEvents = null,
+  ) {
+    $this->incoming = $client->takeOutboundBytes();
+  }
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+    if ($this->offset < length!($this->incoming)) {
+      return;
+    }
+
+    Async\later();
+    if ($this->offset < length!($this->incoming)) {
+      $this->idleTurns = 0;
+      return;
+    }
+
+    $this->idleTurns++;
+    if ($this->idleTurns >= 2) {
+      $this->allowEnd = true;
+    }
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->allowEnd && $this->offset >= length!($this->incoming);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->offset >= length!($this->incoming)) {
+      return '';
+    }
+
+    $length = length!($this->incoming) - $this->offset;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->incoming, $this->offset, $length);
+    $this->offset += $length;
+    return $data;
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    $events = $this->client->receive($bytes);
+    foreach ($events as $event) {
+      $this->events[] = $event;
+    }
+
+    if ($this->onEvents != null) {
+      ($this->onEvents)($events);
+    }
+
+    $this->incoming .= $this->client->takeOutboundBytes();
+    $this->allowEnd = false;
+    $this->idleTurns = 0;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return $this->tryWrite($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class HTTPServerH2ParityExchange {
+  public function __construct(
+    public HTTPServerH2ParityStream $stream,
+    public vec<Event\WeakendEvent> $events,
+  ) {}
+}
+
+final class HTTPServerH2ParityState {
+  public int $calls = 0;
+  public int $pushSucceeded = 0;
+  public int $pushFailed = 0;
+  public vec<bool> $pushCapabilities = vec[];
+  public vec<string> $bodies = vec[];
+  public vec<null|string> $trailers = vec[];
+  public int $completed = 0;
+}
+
+final class HTTPServerH2FailingBody implements ReadHandle {
+  private int $reads = 0;
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return false;
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    return '';
+  }
+
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    $cancellation?->throwIfCancellationRequested();
+    $this->reads++;
+    if ($this->reads == 1) {
+      return 'partial';
+    }
+
+    throw new RuntimeException('response body failed');
+  }
+}
+
+function http_server_h2_exchange(
+  H2\ClientConnection $client,
+  Handler $handler,
+  Configuration $configuration = new Configuration(),
+): HTTPServerH2ParityExchange {
+  $stream = new HTTPServerH2ParityStream(
+    $client->takeOutboundBytes(),
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+  );
+
+  new H2Driver()->serve(
+    $stream,
+    true,
+    $handler,
+    $configuration,
+    new SignalCancellationToken(),
+    new SignalCancellationToken(),
+  );
+
+  return new HTTPServerH2ParityExchange(
+    $stream,
+    $client->receive($stream->written),
+  );
+}
+
+function http_server_h2_status(
+  vec<Event\WeakendEvent> $events,
+  H2\StreamId $streamId,
+): null|string {
+  foreach ($events as $event) {
+    if (!($event is Event\HeadersReceived) || $event[1] != $streamId) {
+      continue;
+    }
+
+    foreach ($event[2] as $header) {
+      if ($header[0] == ':status') {
+        return $header[1];
+      }
+    }
+  }
+
+  return null;
+}
+
+function http_server_h2_header(
+  vec<Event\WeakendEvent> $events,
+  H2\StreamId $streamId,
+  string $name,
+): null|string {
+  foreach ($events as $event) {
+    if (
+      !($event is Event\HeadersReceived)
+      || $event[1] != $streamId
+      || $event[4]
+    ) {
+      continue;
+    }
+
+    foreach ($event[2] as $header) {
+      if ($header[0] == $name) {
+        return $header[1];
+      }
+    }
+  }
+
+  return null;
+}
+
+function http_server_h2_body(
+  vec<Event\WeakendEvent> $events,
+  H2\StreamId $streamId,
+): string {
+  $body = '';
+  foreach ($events as $event) {
+    if ($event is Event\DataReceived && $event[1] == $streamId) {
+      $body .= $event[2];
+    }
+  }
+
+  return $body;
+}
+
+function http_server_h2_trailer(
+  vec<Event\WeakendEvent> $events,
+  H2\StreamId $streamId,
+  string $name,
+): null|string {
+  foreach ($events as $event) {
+    if (
+      !($event is Event\HeadersReceived)
+      || $event[1] != $streamId
+      || !$event[4]
+    ) {
+      continue;
+    }
+
+    foreach ($event[2] as $header) {
+      if ($header[0] == $name) {
+        return $header[1];
+      }
+    }
+  }
+
+  return null;
+}
+
+function http_server_h2_was_reset(
+  vec<Event\WeakendEvent> $events,
+  H2\StreamId $streamId,
+): bool {
+  foreach ($events as $event) {
+    if ($event is Event\StreamReset && $event[1] == $streamId) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+$client = new H2\ClientConnection();
+$streamId = $client->nextStreamId();
+$client->sendHeaders(
+  $streamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/resource', false),
+  ],
+  true,
+);
+
+$exchange = http_server_h2_exchange(
+  $client,
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => new Response(200, body: new MemoryHandle('hello')),
+  ),
+);
+
+assert!(http_server_h2_status($exchange->events, $streamId) == '200');
+assert!(http_server_h2_body($exchange->events, $streamId) == 'hello');
+assert!(
+  http_server_h2_header($exchange->events, $streamId, 'server') == 'Whim',
+);
+
+assert!(http_server_h2_header($exchange->events, $streamId, 'date') != null);
+
+$invalidClient = new H2\ClientConnection();
+$invalidStreamId = $invalidClient->nextStreamId();
+$invalidClient->sendHeaders(
+  $invalidStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'ftp', false),
+    (':authority', 'example.com', false),
+    (':path', '/', false),
+  ],
+  true,
+);
+
+$invalidScheme = http_server_h2_exchange(
+  $invalidClient,
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => new Response(200),
+  ),
+);
+
+assert!(
+  http_server_h2_status($invalidScheme->events, $invalidStreamId) == '400',
+);
+
+$state = new HTTPServerH2ParityState();
+$requestClient = new H2\ClientConnection();
+$requestStreamId = $requestClient->nextStreamId();
+$requestClient->sendHeaders(
+  $requestStreamId,
+  vec[
+    (':method', 'POST', false),
+    (':scheme', 'http', false),
+    (':authority', 'example.com', false),
+    (':path', '/upload', false),
+    ('content-length', '5', false),
+  ],
+);
+
+$requestClient->sendData($requestStreamId, 'hello');
+$requestClient->sendHeaders(
+  $requestStreamId,
+  vec[('x-checksum', '42', false)],
+  true,
+);
+
+$requestExchange = http_server_h2_exchange(
+  $requestClient,
+  new FunctionHandler(
+    function(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ) use ($state): Response {
+      $state->calls++;
+      $state->pushCapabilities[] = $context is Push;
+      $state->bodies[] = $request->body?->readAll() ?? '';
+      $state->trailers[] = $request->trailers?->await()->get('x-checksum');
+      $context->onResponseComplete(function() use ($state): void {
+        $state->completed++;
+      });
+
+      $trailers = new Deferred::<FieldMap>();
+      $trailers->complete(FieldMap::from(vec[('x-response-trailer', 'done')]));
+      return new Response(
+        200,
+        body: new MemoryHandle('accepted'),
+        trailers: $trailers->getFuture(),
+      );
+    },
+  ),
+);
+
+assert!(
+  http_server_h2_status($requestExchange->events, $requestStreamId) == '200',
+);
+
+assert!(
+  http_server_h2_body($requestExchange->events, $requestStreamId) == 'accepted',
+);
+
+assert!($state->calls == 1);
+assert!($state->pushCapabilities == vec[false]);
+assert!($state->bodies == vec['hello']);
+assert!($state->trailers == vec['42']);
+assert!($state->completed == 1);
+assert!(
+  http_server_h2_trailer(
+    $requestExchange->events,
+    $requestStreamId,
+    'x-response-trailer',
+  )
+  == 'done',
+);
+
+$pushState = new HTTPServerH2ParityState();
+$pushClient = new H2\ClientConnection();
+$pushStreamId = $pushClient->nextStreamId();
+$pushClient->sendHeaders(
+  $pushStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/', false),
+  ],
+  true,
+);
+
+discard!(
+  http_server_h2_exchange(
+    $pushClient,
+    new FunctionHandler(
+      function(
+        Context $context,
+        Request $request,
+        CancellationToken $cancellation,
+      ) use ($pushState): Response {
+        $pushState->pushCapabilities[] = $context is Push;
+        return new Response(204);
+      },
+    ),
+  ),
+);
+
+assert!($pushState->pushCapabilities == vec[true]);
+
+$noPushState = new HTTPServerH2ParityState();
+$noPushClient = new H2\ClientConnection(
+  new H2\Configuration(settings: dict[H2\Setting::EnablePush->value => 0]),
+);
+
+$noPushStreamId = $noPushClient->nextStreamId();
+$noPushClient->sendHeaders(
+  $noPushStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/', false),
+  ],
+  true,
+);
+
+discard!(
+  http_server_h2_exchange(
+    $noPushClient,
+    new FunctionHandler(
+      function(
+        Context $context,
+        Request $request,
+        CancellationToken $cancellation,
+      ) use ($noPushState): Response {
+        $noPushState->pushCapabilities[] = $context is Push;
+        return new Response(204);
+      },
+    ),
+  ),
+);
+
+assert!($noPushState->pushCapabilities == vec[false]);
+
+$invalidFinalClient = new H2\ClientConnection();
+$invalidFinalStreamId = $invalidFinalClient->nextStreamId();
+$invalidFinalClient->sendHeaders(
+  $invalidFinalStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/', false),
+  ],
+  true,
+);
+
+$invalidFinal = http_server_h2_exchange(
+  $invalidFinalClient,
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => new Response(103),
+  ),
+);
+
+assert!(
+  http_server_h2_status($invalidFinal->events, $invalidFinalStreamId) == '500',
+);
+
+$failingClient = new H2\ClientConnection();
+$failingStreamId = $failingClient->nextStreamId();
+$failingClient->sendHeaders(
+  $failingStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/fail', false),
+  ],
+  true,
+);
+
+$healthyStreamId = $failingClient->nextStreamId();
+$failingClient->sendHeaders(
+  $healthyStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/ok', false),
+  ],
+  true,
+);
+
+$failingState = new HTTPServerH2ParityState();
+$failingExchange = http_server_h2_exchange(
+  $failingClient,
+  new FunctionHandler(
+    function(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ) use ($failingState): Response {
+      $failingState->calls++;
+      if ($request->requestTarget == '/fail') {
+        return new Response(200, body: new HTTPServerH2FailingBody());
+      }
+
+      return new Response(200, body: new MemoryHandle('ok'));
+    },
+  ),
+);
+
+assert!(http_server_h2_was_reset($failingExchange->events, $failingStreamId));
+assert!(
+  http_server_h2_status($failingExchange->events, $healthyStreamId) == '200',
+);
+
+assert!(
+  http_server_h2_body($failingExchange->events, $healthyStreamId) == 'ok',
+);
+
+assert!($failingState->calls == 2);
+
+$headClient = new H2\ClientConnection();
+$headStreamId = $headClient->nextStreamId();
+$headClient->sendHeaders(
+  $headStreamId,
+  vec[
+    (':method', 'HEAD', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/', false),
+  ],
+  true,
+);
+
+$headExchange = http_server_h2_exchange(
+  $headClient,
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => (
+      new Response(
+        200,
+        headers: FieldMap::from(vec[('Content-Length', '5')]),
+        body: new MemoryHandle('hello'),
+      )
+    ),
+  ),
+);
+
+assert!(http_server_h2_status($headExchange->events, $headStreamId) == '200');
+assert!(
+  http_server_h2_header($headExchange->events, $headStreamId, 'content-length')
+  == '5',
+);
+
+assert!(http_server_h2_body($headExchange->events, $headStreamId) == '');
+
+$invalidPrefaceStream = new HTTPServerH2ParityStream(
+  "GET / HTTP/1.1\r\nHost: x\r\n",
+  new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
+  new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+);
+
+new H2Driver()->serve(
+  $invalidPrefaceStream,
+  true,
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => new Response(204),
+  ),
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+$sawGoAway = false;
+foreach (decode_frames($invalidPrefaceStream->written) as $frame) {
+  if (
+    $frame is Frame\GoAwayFrame
+    && $frame[2] == H2\ErrorCode::ProtocolError->value
+  ) {
+    $sawGoAway = true;
+  }
+}
+
+assert!($sawGoAway, 'an invalid HTTP/2 preface receives GOAWAY');
+
+$flowClient = new H2\ClientConnection(
+  new H2\Configuration(
+    settings: dict[H2\Setting::InitialWindowSize->value => 1],
+  ),
+);
+
+$flowStreamId = $flowClient->nextStreamId();
+$flowClient->sendHeaders(
+  $flowStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/flow', false),
+  ],
+  true,
+);
+
+$flowStream = new HTTPServerH2DuplexStream(
+  $flowClient,
+  new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
+  new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+);
+
+new H2Driver()->serve(
+  $flowStream,
+  true,
+  new FunctionHandler(
+    fn(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ): Response => (
+      new Response(200, body: new MemoryHandle(Str\join('', vec['X'; 50])))
+    ),
+  ),
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!(
+  http_server_h2_body($flowStream->events, $flowStreamId) == Str\join(
+    '',
+    vec['X'; 50],
+  ),
+);
+
+$flowFrames = 0;
+foreach ($flowStream->events as $event) {
+  if (
+    $event is Event\DataReceived
+    && $event[1] == $flowStreamId
+    && $event[2] != ''
+  ) {
+    $flowFrames++;
+  }
+}
+
+assert!($flowFrames >= 50, 'the server obeys a one-byte stream window');
+
+$pushLimitState = new HTTPServerH2ParityState();
+$pushLimitClient = new H2\ClientConnection();
+$pushLimitStreamId = $pushLimitClient->nextStreamId();
+$pushLimitClient->sendHeaders(
+  $pushLimitStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'https', false),
+    (':authority', 'example.com', false),
+    (':path', '/', false),
+  ],
+  true,
+);
+
+$pushLimitExchange = http_server_h2_exchange(
+  $pushLimitClient,
+  new FunctionHandler(
+    function(
+      Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ) use ($pushLimitState): Response {
+      $pushLimitState->calls++;
+      if ($request->requestTarget == '/' && $context is Push) {
+        $url = URL::parse('https://example.com/pushed') as URL;
+        try {
+          $context->push(Request::fromURL('GET', $url));
+          $pushLimitState->pushSucceeded++;
+        } catch (Throwable $_) {
+          $pushLimitState->pushFailed++;
+        }
+
+        try {
+          $context->push(Request::fromURL('GET', $url));
+          $pushLimitState->pushSucceeded++;
+        } catch (Throwable $_) {
+          $pushLimitState->pushFailed++;
+        }
+      }
+
+      return new Response(204);
+    },
+  ),
+  new Configuration(maximumServerPushes: 1),
+);
+
+$pushPromises = 0;
+foreach ($pushLimitExchange->events as $event) {
+  if ($event is Event\PushPromiseReceived) {
+    $pushPromises++;
+  }
+}
+
+assert!($pushLimitState->pushSucceeded == 1);
+assert!($pushLimitState->pushFailed == 1);
+assert!($pushLimitState->calls == 2);
+assert!($pushPromises == 1);
+
+assert!(Configuration::default()->h2->rateLimiter is H2\RateLimiter);

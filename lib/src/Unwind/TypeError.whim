@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a runtime type contract violation. */
+#[Stub]
+class TypeError extends Error {}

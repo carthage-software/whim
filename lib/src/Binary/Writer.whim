@@ -1,0 +1,115 @@
+namespace Whim\Binary;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Int16;
+use Whim\Refine\Int32;
+use Whim\Refine\Int8;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint16;
+use Whim\Refine\Uint32;
+use Whim\Refine\Uint8;
+
+/** Writes values into a binary destination, one after another. */
+interface Writer {
+  /** Writes an unsigned 8-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u8(Uint8 $value): static;
+
+  /** Writes an unsigned 16-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u16(
+    Uint16 $value,
+    null|Endianness $endianness = null,
+  ): static;
+
+  /** Writes an unsigned 32-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u32(
+    Uint32 $value,
+    null|Endianness $endianness = null,
+  ): static;
+
+  /** Writes an unsigned 64-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u64(
+    NonNegativeInt $value,
+    null|Endianness $endianness = null,
+  ): static;
+
+  /** Writes a signed 8-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i8(Int8 $value): static;
+
+  /** Writes a signed 16-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i16(Int16 $value, null|Endianness $endianness = null): static;
+
+  /** Writes a signed 32-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i32(Int32 $value, null|Endianness $endianness = null): static;
+
+  /** Writes a signed 64-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i64(int $value, null|Endianness $endianness = null): static;
+
+  /** Writes a single-precision floating-point value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function f32(float $value, null|Endianness $endianness = null): static;
+
+  /** Writes a double-precision floating-point value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function f64(float $value, null|Endianness $endianness = null): static;
+
+  /** Writes raw bytes. */
+  #[MustUse]
+  #[TrackCaller]
+  public function bytes(string $value): static;
+
+  /** Writes a byte string introduced by an unsigned 8-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u8PrefixedBytes(string $value): static {
+    return $this->u8(length!($value))->bytes($value);
+  }
+
+  /** Writes a byte string introduced by an unsigned 16-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u16PrefixedBytes(
+    string $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->u16(length!($value), $endianness)->bytes($value);
+  }
+
+  /** Writes a byte string introduced by an unsigned 32-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u32PrefixedBytes(
+    string $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->u32(length!($value), $endianness)->bytes($value);
+  }
+
+  /** Writes a byte string introduced by an unsigned 64-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u64PrefixedBytes(
+    string $value,
+    null|Endianness $endianness = null,
+  ): static {
+    return $this->u64(length!($value), $endianness)->bytes($value);
+  }
+}

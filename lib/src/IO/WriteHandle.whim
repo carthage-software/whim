@@ -1,0 +1,48 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\Str;
+
+/** Defines a destination to which bytes can be written. */
+interface WriteHandle extends Handle {
+  /** Waits until the handle can accept bytes. */
+  #[TrackCaller]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Attempts one non-blocking write. */
+  #[TrackCaller]
+  public function tryWrite(string $bytes): int;
+
+  /** Writes bytes, waiting when necessary. */
+  #[TrackCaller]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int;
+
+  /**
+   * Writes every requested byte or throws when the handle stalls.
+   *
+   * @throws Exception when the handle stalls with bytes remaining.
+   * @throws Whim\Async\CancelledException when the cancellation token is cancelled.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function writeAll(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    while ($bytes != '') {
+      $written = $this->write($bytes, $cancellation);
+      if ($written <= 0) {
+        throw new Exception('the write handle stalled with bytes remaining');
+      }
+
+      $bytes = Str\slice($bytes, $written);
+    }
+  }
+}

@@ -1,0 +1,155 @@
+namespace Whim\Async\_Private;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\Async\Future;
+use Whim\Marker\MustUse;
+use Whim\Reference\Strong;
+use Whim\Refine\Transform;
+use Whim\Unwind\Throwable;
+use Whim;
+
+/** Internal implementation of the public future capability. */
+final readonly class FutureImpl<T> implements Future<T> {
+  /** Creates an internal future backed by shared state. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private FutureState<T> $state) {}
+
+  /** Waits for the future to complete. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function await(null|CancellationToken $cancellation = null): T {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    if ($this->state->isComplete()) {
+      return $this->state->getResult();
+    }
+
+    $suspension = Whim\_Private\create_suspension::<T>();
+    $gate = new Strong::<bool>(false);
+    $cancellationId = null;
+    if ($cancellation != null) {
+      $cancellationId = $cancellation->register(fn(): void {
+        if ($gate->value) {
+          return;
+        }
+
+        $gate->value = true;
+        try {
+          $cancellation->throwIfCancellationRequested();
+        } catch (Throwable $error) {
+          $suspension->throw($error);
+        }
+      });
+    }
+
+    $stateId = $this->state->subscribe(
+      fn(null|Throwable $error, null|(T,) $result): void {
+        if ($cancellation != null && $cancellationId != null) {
+          $cancellation->unregister($cancellationId);
+        }
+
+        if ($gate->value) {
+          return;
+        }
+
+        $gate->value = true;
+        if ($error != null) {
+          $suspension->throw($error);
+        } else {
+          $suspension->resume(($result as (T,))[0]);
+        }
+      },
+    );
+
+    try {
+      return $suspension->suspend();
+    } finally {
+      $gate->value = true;
+      $this->state->unsubscribe($stateId);
+      if ($cancellation != null && $cancellationId != null) {
+        $cancellation->unregister($cancellationId);
+      }
+    }
+  }
+
+  /** Marks the future as intentionally unobserved. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function ignore(): static {
+    $this->state->ignore();
+    return $this;
+  }
+
+  /** Transforms the contained success value. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function map<U>(Transform<T, U> $success): Future<U> {
+    return $this->then::<U>(
+      $success,
+      fn(Throwable $error): never => throw $error,
+    );
+  }
+
+  /** Transforms either outcome of the asynchronous operation. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function then<U>(
+    Transform<T, U> $success,
+    Transform<Throwable, U> $failure,
+  ): Future<U> {
+    $deferred = new Deferred::<U>();
+    $this->state->subscribe(fn(null|Throwable $error, null|(T,) $result): void {
+      try {
+        if ($error != null) {
+          $deferred->complete($failure($error));
+        } else {
+          $deferred->complete($success(($result as (T,))[0]));
+        }
+      } catch (Throwable $raised) {
+        $deferred->error($raised);
+      }
+    });
+
+    return $deferred->getFuture();
+  }
+
+  /** Recovers from a failed asynchronous operation. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function catch<U>(Transform<Throwable, U> $failure): Future<T|U> {
+    return $this->then::<T|U>(fn(T $value): T|U => $value, $failure);
+  }
+
+  /** Runs a callback after either outcome. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function always(fn(): void $always): Future<T> {
+    $deferred = new Deferred::<T>();
+    $this->state->subscribe(fn(null|Throwable $error, null|(T,) $result): void {
+      try {
+        $always();
+        if ($error != null) {
+          $deferred->error($error);
+        } else {
+          $deferred->complete(($result as (T,))[0]);
+        }
+      } catch (Throwable $raised) {
+        $deferred->error($raised);
+      }
+    });
+
+    return $deferred->getFuture();
+  }
+}

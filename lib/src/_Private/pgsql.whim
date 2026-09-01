@@ -1,0 +1,179 @@
+namespace Whim\_Private;
+
+use Whim\Database\Blob;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Unwind\Error;
+
+/** Reports a failure from PostgreSQL. */
+#[Stub]
+final class PostgreSQLError extends Error {
+  private readonly null|string $sqlState;
+
+  private function __construct() {}
+
+  /** Returns the five-character SQLSTATE reported by PostgreSQL. */
+  #[MustUse]
+  public function getSQLState(): null|string {}
+}
+
+/** Represents one pending PostgreSQL operation. */
+#[Stub]
+final class PostgreSQLOperation {
+  private function __construct() {}
+
+  /** Suspends until the operation completes. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function wait(): void {}
+
+  /** Cancels the operation and closes its connection. */
+  public function cancel(): void {}
+}
+
+/** Owns one non-blocking PostgreSQL connection. */
+#[Stub]
+final class PostgreSQLConnection {
+  private function __construct() {}
+
+  /** Starts opening a connection. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function open(
+    #[SensitiveParameter] string $connectionString,
+  ): (PostgreSQLConnection, PostgreSQLOperation) {}
+
+  /** Starts a connection health check. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function ping(): PostgreSQLOperation {}
+
+  /** Starts preparing a statement. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function prepare(
+    string $sql,
+    bool $binaryResults,
+  ): (PostgreSQLStatement, PostgreSQLOperation) {}
+
+  /** Starts executing a statement. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function execute(
+    string $sql,
+    vec<null|bool|int|float|string|Blob> $parameters,
+    bool $binaryResults,
+  ): (PostgreSQLResult, PostgreSQLOperation) {}
+
+  /** Starts a transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function begin(
+    null|0..=3 $isolation,
+    bool $readOnly,
+  ): PostgreSQLOperation {}
+
+  /** Starts committing the active transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function commit(): PostgreSQLOperation {}
+
+  /** Starts rolling back the active transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function rollback(): PostgreSQLOperation {}
+
+  /** Reports whether this connection is ready and idle. */
+  #[MustUse]
+  public function isReusable(): bool {}
+
+  /** Reports whether this connection is closed. */
+  #[MustUse]
+  public function isClosed(): bool {}
+
+  /** Closes this connection. */
+  public function close(): void {}
+
+  /** Closes this connection when it is collected. */
+  public function __destruct(): void {}
+}
+
+/** Owns one prepared PostgreSQL statement. */
+#[Stub]
+final class PostgreSQLStatement {
+  private function __construct() {}
+
+  /** Starts executing this statement. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function execute(
+    vec<null|bool|int|float|string|Blob> $parameters,
+  ): (PostgreSQLResult, PostgreSQLOperation) {}
+
+  /** Releases this statement handle. */
+  public function close(): void {}
+}
+
+/** Streams rows produced by one PostgreSQL operation. */
+#[Stub]
+final class PostgreSQLResult {
+  private function __construct() {}
+
+  /** Returns raw column metadata. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function columns(): vec<(string, null|string)> {}
+
+  /** Returns the affected row count. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function affectedRows(): null|(0..) {}
+
+  /** Returns a ready row, null at the result end, or false when blocked. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function poll(): bool|null|vec<mixed> {}
+
+  /** Suspends until the next row or the end of the result. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function fetch(): null|vec<mixed> {}
+
+  /** Suspends until every remaining row is available. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function fetchAll(): vec<vec<mixed>> {}
+
+  /** Interrupts this result and closes its connection. */
+  public function interrupt(): void {}
+
+  /** Reports whether this result is closed. */
+  #[MustUse]
+  public function isClosed(): bool {}
+
+  /** Discards unread rows. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {}
+
+  /** Discards unread rows when this result is collected. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __destruct(): void {}
+}

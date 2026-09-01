@@ -1,0 +1,3 @@
+final enum Direction {
+  case North;
+}

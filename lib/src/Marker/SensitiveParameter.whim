@@ -1,0 +1,12 @@
+namespace Whim\Marker;
+
+use Whim\Marker\TrackCaller;
+use Whim\Attribute\Attribute;
+
+/** Redacts a parameter value from diagnostic traces. */
+#[Stub]
+#[Attribute(Attribute::TARGET_PARAMETER)]
+final class SensitiveParameter {
+  #[TrackCaller]
+  public function __construct() {}
+}

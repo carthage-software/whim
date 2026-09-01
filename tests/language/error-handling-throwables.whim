@@ -1,0 +1,251 @@
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\ArithmeticError;
+use Whim\Unwind\DivisionByZeroError;
+use Whim\Unwind\Error;
+use Whim\Unwind\Exception;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+
+$error = new Error('something failed', 42);
+$caught = null;
+$assertion_callable_1 = function() use ($error): void {
+  throw $error;
+};
+
+try {
+  $assertion_callable_1();
+} catch (Error $assertion_caught_1) {
+  $caught = $assertion_caught_1;
+  assert!(
+    Whim\Str\contains($assertion_caught_1->getMessage(), 'something failed'),
+  );
+}
+
+assert!($caught is Error);
+
+assert!($caught->getMessage() == 'something failed');
+assert!($caught->getCode() == 42);
+
+$assertion_value_4 = function(): void {
+  throw 5;
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (TypeError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is TypeError);
+
+$assertion_value_5 = function(): void {
+  throw 'oops';
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is TypeError);
+
+class PlainValue {}
+
+$assertion_value_6 = function(): void {
+  throw new PlainValue();
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (TypeError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is TypeError);
+
+class CustomError extends Error {}
+
+$assertion_value_7 = function(): void {
+  throw new CustomError('mine', 1);
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (CustomError $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+  assert!(Whim\Str\contains($assertion_caught_7->getMessage(), 'mine'));
+}
+
+assert!($assertion_error_7 is CustomError);
+
+$typeError = new TypeError('bad type');
+$runtimeException = new RuntimeException('runtime failure');
+
+assert!($typeError is Throwable);
+assert!($typeError is Error);
+assert!(!($typeError is Exception));
+
+assert!($runtimeException is Throwable);
+assert!($runtimeException is Exception);
+assert!(!($runtimeException is Error));
+
+class ApplicationException extends Exception {}
+
+$application = new ApplicationException('application failure');
+assert!($application is Throwable);
+assert!($application is Exception);
+
+assert!(new ArgumentCountError('arity') is TypeError);
+
+$caughtThrowable = null;
+$assertion_callable_17 = function() use ($typeError): void {
+  throw $typeError;
+};
+
+try {
+  $assertion_callable_17();
+} catch (Throwable $assertion_caught_17) {
+  $caughtThrowable = $assertion_caught_17;
+}
+
+assert!($caughtThrowable is Throwable);
+
+assert!($caughtThrowable is TypeError);
+
+$caughtApplication = null;
+$assertion_callable_19 = function() use ($application): void {
+  throw $application;
+};
+
+try {
+  $assertion_callable_19();
+} catch (Throwable $assertion_caught_19) {
+  $caughtApplication = $assertion_caught_19;
+}
+
+assert!($caughtApplication is Throwable);
+
+assert!($caughtApplication is ApplicationException);
+
+function build_error_pair(): (Error, Error) {
+  return (new Error('made early', 0), new Error('never thrown', 0));
+}
+
+function rethrow(Error $error): void {
+  throw $error;
+}
+
+$pair = build_error_pair();
+$captured = null;
+$assertion_callable_21 = function() use ($pair): void {
+  rethrow($pair[0]);
+};
+
+try {
+  $assertion_callable_21();
+} catch (Error $assertion_caught_21) {
+  $captured = $assertion_caught_21;
+  assert!(Whim\Str\contains($assertion_caught_21->getMessage(), 'made early'));
+}
+
+assert!($captured is Error);
+
+assert!($captured->getLine() == $pair[1]->getLine());
+assert!($captured->getTrace()[0]->function == 'build_error_pair');
+
+$assertion_value_24 = function(): void {
+  $x = 1 / 0;
+};
+
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (ArithmeticError $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is ArithmeticError);
+
+$assertion_value_25 = function(): void {
+  $x = 9223372036854775807 + 1;
+};
+
+$assertion_error_25 = null;
+try {
+  $assertion_value_25();
+} catch (ArithmeticError $assertion_caught_25) {
+  $assertion_error_25 = $assertion_caught_25;
+}
+
+assert!($assertion_error_25 is ArithmeticError);
+
+$assertion_value_26 = function(): void {
+  $x = (-9223372036854775807 - 1) - 1;
+};
+
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (ArithmeticError $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is ArithmeticError);
+
+$assertion_value_27 = function(): void {
+  $x = '5' + 5;
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (TypeError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is TypeError);
+
+$assertion_value_28 = function(): void {
+  $x = 1 / 0;
+};
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (Error $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is Error);
+
+$divisionByZero = new DivisionByZeroError('x', 0);
+assert!($divisionByZero is ArithmeticError);
+assert!(!($divisionByZero is TypeError));
+
+class ParseFailure extends TypeError {}
+
+$parseFailure = null;
+$assertion_callable_31 = function(): void {
+  throw new ParseFailure('bad token', 3);
+};
+
+try {
+  $assertion_callable_31();
+} catch (TypeError $assertion_caught_31) {
+  $parseFailure = $assertion_caught_31;
+  assert!(Whim\Str\contains($assertion_caught_31->getMessage(), 'bad token'));
+}
+
+assert!($parseFailure is TypeError);
+
+assert!($parseFailure is ParseFailure);
+assert!($parseFailure->getCode() == 3);
+
+assert!(new OutOfBoundsError('manual', 9)->getCode() == 9);

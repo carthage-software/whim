@@ -1,0 +1,4 @@
+namespace Whim\TCP;
+
+/** Marks a connector that reaches targets through a TCP proxy. */
+interface ProxyConnector extends Connector {}

@@ -1,0 +1,5 @@
+namespace Limits\self_bound_method;
+
+class C {
+  public function m<T: self>(): void {}
+}

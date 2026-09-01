@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a resource that escaped its required lifetime. */
+#[Stub]
+class LeakedResourceError extends Error {}

@@ -1,0 +1,13 @@
+namespace Whim\Process;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonNegativeInt;
+
+/** The real and effective group identifiers of a process. */
+final readonly class GroupIdentity {
+  #[AlwaysInline]
+  public function __construct(
+    public NonNegativeInt $real,
+    public NonNegativeInt $effective,
+  ) {}
+}

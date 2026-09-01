@@ -1,0 +1,87 @@
+namespace Whim\Database\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Column;
+use Whim\Database\Result;
+use Whim\Database\Row;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\NonNegativeInt;
+
+/** Keeps a pooled connection checked out while rows are streaming. */
+final class PooledResult implements Result, BatchResult {
+  private bool $closed = false;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private Lease $lease, private Result $result) {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getColumns(): vec<Column> {
+    return $this->result->getColumns();
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getAffectedRows(): null|NonNegativeInt {
+    return $this->result->getAffectedRows();
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function fetch(null|CancellationToken $cancellation = null): null|Row {
+    $row = $this->result->fetch($cancellation);
+    if ($row == null) {
+      $this->close();
+    }
+
+    return $row;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function fetchAll(
+    null|CancellationToken $cancellation = null,
+  ): vec<Row> {
+    if ($this->result is BatchResult) {
+      return $this->result->fetchAll($cancellation);
+    }
+
+    $rows = vec[];
+    while (true) {
+      $row = $this->result->fetch($cancellation) ?? return $rows;
+
+      $rows[] = $row;
+    }
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    try {
+      if (!$this->result->isClosed()) {
+        $this->result->close();
+      }
+    } finally {
+      $this->lease->release();
+    }
+  }
+}

@@ -1,0 +1,126 @@
+namespace Whim\Dict;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Option\Option;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Transform;
+use Whim\Refine\Iterable;
+use Whim;
+
+/** Transforms every value while preserving its key. */
+#[MustUse]
+#[TrackCaller]
+function map<K: ArrayKey, T, U>(
+  Iterable<K, T> $values,
+  Transform<T, U> $function,
+): dict<K, U> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    $result[$key] = $function($value);
+  }
+
+  return $result;
+}
+
+/** Transforms every value using its key and value. */
+#[MustUse]
+#[TrackCaller]
+function map_with_key<K: ArrayKey, T, U>(
+  Iterable<K, T> $values,
+  fn(K, T): U $function,
+): dict<K, U> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    $result[$key] = $function($key, $value);
+  }
+
+  return $result;
+}
+
+/** Transforms every key while preserving its value. */
+#[MustUse]
+#[TrackCaller]
+function map_keys<K: ArrayKey, L: ArrayKey, V>(
+  Iterable<K, V> $values,
+  Transform<K, L> $function,
+): dict<L, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    $result[$function($key)] = $value;
+  }
+
+  return $result;
+}
+
+/** Transforms values and omits results represented by None. */
+#[MustUse]
+#[TrackCaller]
+function map_nonnull<K: ArrayKey, T, U>(
+  Iterable<K, T> $values,
+  Transform<T, Option<U>> $function,
+): dict<K, U> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    $mapped = $function($value);
+    if ($mapped->isSome()) {
+      $result[$key] = $mapped->unwrap();
+    }
+  }
+
+  return $result;
+}
+
+/** Derives a key from every yielded value. */
+#[MustUse]
+#[TrackCaller]
+function reindex<L: ArrayKey, V>(
+  Iterable<_, V> $values,
+  Transform<V, L> $function,
+): dict<L, V> {
+  $result = dict[];
+  foreach ($values as $value) {
+    $result[$function($value)] = $value;
+  }
+
+  return $result;
+}
+
+/** Flattens one level of nested dicts. */
+#[MustUse]
+#[TrackCaller]
+function flatten<L: ArrayKey, V>(
+  Iterable<_, Iterable<L, V>> $values,
+): dict<L, V> {
+  if ($values is array<_, _>) {
+    $flattened = Whim\_Private\dict_flatten($values);
+    if ($flattened != null) {
+      return $flattened;
+    }
+  }
+
+  $result = dict[];
+  foreach ($values as $nested) {
+    foreach ($nested as $key => $value) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Exchanges the keys and values of a dict. */
+#[MustUse]
+#[TrackCaller]
+function flip<K: ArrayKey, V: ArrayKey>(Iterable<K, V> $values): dict<V, K> {
+  if ($values is array<_, _>) {
+    return Whim\_Private\dict_flip($values);
+  }
+
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    $result[$value] = $key;
+  }
+
+  return $result;
+}

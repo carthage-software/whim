@@ -1,0 +1,8 @@
+namespace Whim\HTTP\Router;
+
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Refine\NonEmptyString;
+
+/** One registered method, path pattern, and handler. */
+type Registration = (Method, NonEmptyString, Handler);

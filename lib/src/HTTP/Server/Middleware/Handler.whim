@@ -1,0 +1,28 @@
+namespace Whim\HTTP\Server\Middleware;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+
+/** A handler that wraps a middleware and the next handler in the chain. */
+final readonly class MiddlewareHandler implements Handler {
+  public function __construct(
+    private Middleware $middleware,
+    private Handler $next,
+  ) {}
+
+  public function handle(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response {
+    return $this->middleware->handle(
+      $context,
+      $request,
+      $this->next,
+      $cancellation,
+    );
+  }
+}

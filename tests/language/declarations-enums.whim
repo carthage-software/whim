@@ -1,0 +1,344 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\InstantiationError;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\ValueError;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+rejects(
+  $work,
+  'computed-duplicate-backing-value',
+  'enum E: int {'
+  . "\n"
+  . '    case A = 1;'
+  . "\n"
+  . '    case B = 1 + 0;'
+  . "\n"
+  . '}'
+  . "\n",
+  'is already used by E::A',
+);
+
+rejects(
+  $work,
+  'enum-cannot-declare-constructor',
+  'enum Suit: string {'
+  . "\n"
+  . '    case Hearts = "hearts";'
+  . "\n\n"
+  . '    public function __construct() {}'
+  . "\n"
+  . '}'
+  . "\n",
+  'an enum cannot declare a constructor',
+);
+
+rejects(
+  $work,
+  'enum-interface-conformance',
+  'interface Describable {'
+  . "\n"
+  . '    public function describe(): string;'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'enum Colour: string implements Describable {'
+  . "\n"
+  . '    case Red = "red";'
+  . "\n"
+  . '}'
+  . "\n",
+  'and does not provide describe',
+);
+
+rejects(
+  $work,
+  'enum-method-cannot-be-abstract',
+  'enum Suit: string {'
+  . "\n"
+  . '    case Hearts = "hearts";'
+  . "\n\n"
+  . '    public abstract function rank(): int;'
+  . "\n"
+  . '}'
+  . "\n",
+  'cannot be abstract',
+);
+
+rejects(
+  $work,
+  'backed-case-without-value',
+  'enum E: string { case A = "a"; case B; }' . "\n",
+  'has no value',
+);
+
+rejects(
+  $work,
+  'backing-type-is-not-int-or-string',
+  'enum Level: float {' . "\n" . '    case Low = 1.0;' . "\n" . '}' . "\n",
+  'an enum backing type must be `int` or `string`',
+);
+
+rejects(
+  $work,
+  'duplicate-backing-value',
+  'enum E: string { case A = "x"; case B = "x"; }' . "\n",
+  'is already used by another case',
+);
+
+rejects(
+  $work,
+  'enum-extends',
+  'class Base {}'
+  . "\n\n"
+  . 'enum Direction extends Base {'
+  . "\n"
+  . '    case North;'
+  . "\n"
+  . '}'
+  . "\n",
+  'unexpected `extends`; expected `{`',
+);
+
+rejects(
+  $work,
+  'generic-enum',
+  'enum Direction<T> {' . "\n" . '    case North;' . "\n" . '}' . "\n",
+  'generics are not allowed on enums',
+);
+
+rejects(
+  $work,
+  'unbacked-case-with-value',
+  'enum E { case A = 1; }' . "\n",
+  'declares no backing type',
+);
+
+rejects(
+  $work,
+  'negative-duplicate-backing-value',
+  'enum E: int {'
+  . "\n"
+  . '    case A = -1;'
+  . "\n"
+  . '    case B = -1;'
+  . "\n"
+  . '}'
+  . "\n",
+  'is already used by another case',
+);
+
+$redeclaration = $work . '/built-in-method-redeclaration.whim';
+File\write(
+  $redeclaration,
+  'enum Suit: int {'
+  . "\n"
+  . '    case Hearts = 1;'
+  . "\n\n"
+  . '    public static function cases(): vec<static> {'
+  . "\n"
+  . '        return vec[];'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$assertion_value_1 = function() use ($redeclaration): void {
+  require!($redeclaration);
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (CompilerError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is CompilerError);
+
+Filesystem\delete_directory($work, true);
+
+interface Describable {
+  public function describe(): string;
+}
+
+enum Colour: string implements Describable {
+  case Red = 'red';
+
+  public function describe(): string {
+    return 'the colour ' . $this->value;
+  }
+}
+
+assert!(Colour::Red->describe() == 'the colour red');
+
+enum CloneableDirection {
+  case North;
+  case South;
+}
+
+$assertion_value_3 = function(): void {
+  $copy = clone!(CloneableDirection::North);
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (TypeError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is TypeError);
+
+assert!(CloneableDirection::North == CloneableDirection::North);
+
+enum Direction {
+  case North;
+  case South;
+}
+
+enum Status: string {
+  case Ready = 'ready';
+  case Waiting = 'waiting';
+}
+
+enum Code: int {
+  case Ok = 200;
+  case Missing = 404;
+}
+
+assert!(Direction::North is Whim\Enum\UnitEnum);
+assert!(!(Direction::North is Whim\Enum\BackedEnum<_>));
+assert!(Direction::cases() is vec<Direction>);
+assert!(Direction::cases() == vec[Direction::North, Direction::South]);
+
+assert!(Status::Ready is Whim\Enum\UnitEnum);
+assert!(Status::Ready is Whim\Enum\BackedEnum<string>);
+assert!(!(Status::Ready is Whim\Enum\BackedEnum<int>));
+assert!(Status::Ready->name == 'Ready');
+assert!(Status::Ready->value == 'ready');
+assert!(Status::cases() is vec<Status>);
+assert!(Status::from('ready') == Status::Ready);
+assert!(Status::tryFrom('waiting') == Status::Waiting);
+assert!(Status::tryFrom('absent') == null);
+
+assert!(Code::Ok is Whim\Enum\BackedEnum<int>);
+assert!(Code::from(404) == Code::Missing);
+assert!(Code::tryFrom(500) == null);
+
+$assertion_value_21 = fn(): Status => Status::from('absent');
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (ValueError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is ValueError);
+
+type Identifier = int;
+type Name = string;
+
+enum AliasedStatus: Identifier {
+  case Pending = 1;
+  case Complete = 2;
+}
+
+enum AliasedFormat: Name {
+  case Json = 'json';
+  case Text = 'text';
+}
+
+assert!(AliasedStatus::Pending->value == 1);
+assert!(AliasedStatus::Complete->value is int);
+assert!(AliasedFormat::Json->value == 'json');
+assert!(AliasedFormat::Text->value is string);
+
+assert!(Direction::North == Direction::North);
+assert!(Direction::North != Direction::South);
+assert!(Direction::North->name == 'North');
+
+enum Suit: string {
+  case Hearts = 'H';
+  case Spades = 'S';
+}
+
+assert!(Suit::Hearts->name == 'Hearts');
+assert!(Suit::Hearts->value == 'H');
+assert!(Suit::Spades->value == 'S');
+
+enum Level: int {
+  case Low = 1;
+  case High = 10;
+
+  public function label(): string {
+    return match ($this) {
+      self::Low => 'low',
+      self::High => 'high',
+    };
+  }
+}
+
+$level = Level::High;
+assert!($level->label() == 'high');
+assert!($level is Level);
+$assertion_value_34 = function(): void {
+  $_ = new Direction();
+};
+
+$assertion_error_34 = null;
+try {
+  $assertion_value_34();
+} catch (InstantiationError $assertion_caught_34) {
+  $assertion_error_34 = $assertion_caught_34;
+}
+
+assert!($assertion_error_34 is InstantiationError);
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$debug_work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$debug_snippet = $debug_work . '/debug-rendering.whim';
+File\write(
+  $debug_snippet,
+  'enum Direction { case North; case South; }'
+  . "\n"
+  . 'enum Suit: string { case Hearts = \'H\'; case Spades = \'S\'; }'
+  . "\n"
+  . 'debug!(Direction::North, Direction::South, Suit::Hearts, '
+  . 'vec[Direction::North, Suit::Spades]);'
+  . "\n",
+);
+
+$debug_run = Command\run($binary, vec[$debug_snippet]);
+assert!($debug_run->isSuccess());
+assert!(length!($debug_run->standardOutput) == 0);
+assert!(
+  $debug_run->standardError
+  == '['
+  . Filesystem\canonicalize($debug_snippet)
+  . ':3:1] Direction::North,'
+  . "\n"
+  . 'Direction::South,'
+  . "\n"
+  . 'Suit::Hearts(string(1) "H"),'
+  . "\n"
+  . 'vec(2) ['
+  . "\n"
+  . '  Direction::North,'
+  . "\n"
+  . '  Suit::Spades(string(1) "S"),'
+  . "\n"
+  . ']'
+  . "\n",
+);
+
+Filesystem\delete_directory($debug_work, true);

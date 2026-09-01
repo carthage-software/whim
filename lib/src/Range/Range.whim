@@ -1,0 +1,35 @@
+namespace Whim\Range;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Defines the behavior of range values. */
+interface Range {
+  /** Reports whether the range contains a value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function contains(int $value): bool;
+
+  /** Adds or replaces the lower bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withLowerBound(int $lowerBound): LowerBoundRange;
+
+  /** Adds or replaces the upper bound and its inclusivity. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBound(
+    int $upperBound,
+    bool $upperInclusive,
+  ): UpperBoundRange;
+
+  /** Adds or replaces an inclusive upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundInclusive(int $upperBound): UpperBoundRange;
+
+  /** Adds or replaces an exclusive upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundExclusive(int $upperBound): UpperBoundRange;
+}

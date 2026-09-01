@@ -1,0 +1,49 @@
+use Whim\File;
+use Whim\Filesystem;
+
+class Painter {
+  public function work(): string {
+    return 'painting';
+  }
+}
+
+$painter = new Painter();
+$painted = $painter->work();
+
+use Studio\Easel;
+
+assert!($painted == 'painting');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+File\write(
+  $work . '/scalar-alias.whim',
+  'type Scalar = int|float|string|bool;'
+  . "\n\n"
+  . 'assert!(5 is Scalar);'
+  . "\n",
+);
+
+File\write(
+  $work . '/scalar-checks.whim',
+  'assert!(\'text\' is Scalar);' . "\n" . 'assert!(!(vec[] is Scalar));' . "\n",
+);
+
+$scalarAlias = $work . '/scalar-alias.whim';
+$scalarChecks = $work . '/scalar-checks.whim';
+require!($scalarAlias);
+require!($scalarChecks);
+
+File\write(
+  $work . '/base.whim',
+  'const BASE = 40;'
+  . "\n\n"
+  . 'function add_base(int $n): int { return $n + BASE; }'
+  . "\n",
+);
+
+$baseUnit = $work . '/base.whim';
+require!($baseUnit);
+assert!(add_base(2) == 42);
+
+Filesystem\delete_directory($work, true);

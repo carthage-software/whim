@@ -1,0 +1,165 @@
+namespace Whim\Reflection\Symbol;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\Attribute\DefinitionReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\Generic\TypeParameterReflection;
+use Whim\Reflection\Member\ClassConstantReflection;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Reflection\Member\PropertyReflection;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Symbol\SymbolKind;
+
+/** Describes one class declaration. */
+#[Stub]
+final class ClassReflection implements ClassLikeReflection {
+  private function __construct() {}
+
+  /** Returns where this class was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this class's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this class's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns the fully qualified class name. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the class name without its namespace. */
+  #[MustUse]
+  public function getShortName(): string {}
+
+  /** Returns the namespace name, or an empty string in the global namespace. */
+  #[MustUse]
+  public function getNamespaceName(): string {}
+
+  /** Returns the class symbol kind. */
+  #[MustUse]
+  public function getKind(): SymbolKind {}
+
+  /** Returns type parameters in declaration order. */
+  #[MustUse]
+  public function getTypeParameters(): vec<TypeParameterReflection> {}
+
+  /** Returns a type parameter by zero-based position or name. */
+  #[MustUse]
+  public function getTypeParameter(
+    int|string $parameter,
+  ): null|TypeParameterReflection {}
+
+  /** Returns this class applied to references to its own parameters. */
+  #[MustUse]
+  public function getType(): ClassTypeReflection {}
+
+  /** Returns directly declared parent and interface types. */
+  #[MustUse]
+  public function getDirectBaseTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns every transitive parent and interface specialization. */
+  #[MustUse]
+  public function getBaseTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns permitted direct subtype names, or null when not sealed. */
+  #[MustUse]
+  public function getPermittedSubtypeNames(): null|vec<string> {}
+
+  /** Returns methods declared directly by this class. */
+  #[MustUse]
+  public function getDeclaredMethods(): vec<MethodReflection> {}
+
+  /** Returns effective methods after inheritance and overriding. */
+  #[MustUse]
+  public function getMethods(): vec<MethodReflection> {}
+
+  /** Returns the effective method with the given name, when present. */
+  #[MustUse]
+  public function getMethod(string $name): null|MethodReflection {}
+
+  /** Returns properties declared directly by this class. */
+  #[MustUse]
+  public function getDeclaredProperties(): vec<PropertyReflection> {}
+
+  /** Returns the complete linked property layout. */
+  #[MustUse]
+  public function getProperties(): vec<PropertyReflection> {}
+
+  /** Returns the effective property with the given name, when present. */
+  #[MustUse]
+  public function getProperty(string $name): null|PropertyReflection {}
+
+  /** Returns constants declared directly by this class. */
+  #[MustUse]
+  public function getDeclaredConstants(): vec<ClassConstantReflection> {}
+
+  /** Returns effective constants after inheritance. */
+  #[MustUse]
+  public function getConstants(): vec<ClassConstantReflection> {}
+
+  /** Returns the effective constant with the given name, when present. */
+  #[MustUse]
+  public function getConstant(string $name): null|ClassConstantReflection {}
+
+  /** Reports whether this class may contain abstract methods. */
+  #[MustUse]
+  public function isAbstract(): bool {}
+
+  /** Reports whether this class forbids extension. */
+  #[MustUse]
+  public function isFinal(): bool {}
+
+  /** Reports whether every instance property is readonly. */
+  #[MustUse]
+  public function isReadonly(): bool {}
+
+  /** Reports whether ordinary code may instantiate this class. */
+  #[MustUse]
+  public function isInstantiable(): bool {}
+
+  /** Reports whether `clone!` accepts instances of this class. */
+  #[MustUse]
+  public function isCloneable(): bool {}
+
+  /** Returns this class's attribute contract, when it defines one. */
+  #[MustUse]
+  public function getAttributeDefinition(): null|DefinitionReflection {}
+
+  /** Returns the directly extended class type, when present. */
+  #[MustUse]
+  public function getParentType(): null|ClassTypeReflection {}
+
+  /** Returns interfaces named directly in the declaration. */
+  #[MustUse]
+  public function getDirectInterfaceTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns every interface specialization satisfied by this class. */
+  #[MustUse]
+  public function getInterfaceTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns the effective constructor, when present. */
+  #[MustUse]
+  public function getConstructor(): null|MethodReflection {}
+
+  /** Returns the effective destructor, when present. */
+  #[MustUse]
+  public function getDestructor(): null|MethodReflection {}
+}

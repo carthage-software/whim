@@ -1,0 +1,6 @@
+namespace Whim\URI;
+
+use Whim\Convert\ToString;
+
+/** Represents a valid URI host. */
+interface Host extends ToString for IPHost, IPvFutureHost, RegisteredNameHost {}

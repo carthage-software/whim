@@ -1,0 +1,206 @@
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedVariableError;
+
+$filled = vec['value'; 4];
+assert!($filled == vec['value', 'value', 'value', 'value']);
+assert!(vec[1; 0] == vec[]);
+
+final class FillCounter {
+  public int $evaluations = 0;
+
+  public function valueOnce(): int {
+    $this->evaluations++;
+    return 7;
+  }
+}
+
+$counter = new FillCounter();
+$repeated = vec[$counter->valueOnce(); 3];
+assert!($counter->evaluations == 1);
+assert!($repeated == vec[7, 7, 7]);
+
+$vector = vec[1, 2, 3];
+assert!(contains!($vector, 2));
+assert!(!contains!($vector, 4));
+assert!(contains_key!($vector, 0));
+assert!(contains_key!($vector, 2));
+assert!(!(contains_key!($vector, 3)));
+
+$mapping = dict['first' => 1, 'second' => 2];
+assert!(contains!($mapping, 2));
+assert!(!contains!($mapping, 'second'));
+assert!(contains_key!($mapping, 'second'));
+assert!(!(contains_key!($mapping, 'missing')));
+
+$tuple = ('first', 2);
+assert!(contains!($tuple, 'first'));
+assert!(!(contains!($tuple, 'missing')));
+assert!(contains_key!($tuple, 1));
+assert!(!(contains_key!($tuple, 2)));
+
+$lookup = dict['name' => 'ada', 7 => 'seven', true => 'yes', false => 'no'];
+assert!($lookup['name'] == 'ada');
+assert!($lookup[7] == 'seven');
+assert!($lookup[true] == 'yes');
+assert!($lookup[false] == 'no');
+assert!($lookup is dict<int|bool|string, string>);
+$assertion_value_23 = fn(): string => $lookup['missing'];
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (OutOfBoundsError $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is OutOfBoundsError);
+
+$assertion_value_24 = fn(): string => $lookup[1.5];
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (TypeError $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is TypeError);
+$lookup['name'] = 'grace';
+assert!($lookup['name'] == 'grace');
+$lookup['new'] = 'inserted';
+assert!($lookup['new'] == 'inserted');
+$assertion_value_27 = fn(): string => $lookup['absent'] ?? 'default';
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (OutOfBoundsError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is OutOfBoundsError);
+
+$pair = ('x', 'y');
+assert!($pair[0] == 'x');
+$assertion_value_29 = fn(): string => $pair[2];
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (OutOfBoundsError $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is OutOfBoundsError);
+$assertion_value_30 = function() use ($pair): void {
+  $pair[0] = 'z';
+};
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (TypeError $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is TypeError);
+
+$text = 'abc';
+$assertion_value_31 = $text[1];
+assert!($assertion_value_31 is string);
+assert!($assertion_value_31 == 'b');
+$assertion_value_32 = fn(): string => $text[9];
+$assertion_error_32 = null;
+try {
+  $assertion_value_32();
+} catch (OutOfBoundsError $assertion_caught_32) {
+  $assertion_error_32 = $assertion_caught_32;
+}
+
+assert!($assertion_error_32 is OutOfBoundsError);
+$assertion_value_33 = function() use ($text): void {
+  $text[0] = 'z';
+};
+
+$assertion_error_33 = null;
+try {
+  $assertion_value_33();
+} catch (TypeError $assertion_caught_33) {
+  $assertion_error_33 = $assertion_caught_33;
+}
+
+assert!($assertion_error_33 is TypeError);
+
+$letters = vec['a', 'b', 'c'];
+assert!($letters[0] == 'a');
+assert!($letters[2] == 'c');
+$assertion_value_36 = fn(): string => $letters[3];
+$assertion_error_36 = null;
+try {
+  $assertion_value_36();
+} catch (OutOfBoundsError $assertion_caught_36) {
+  $assertion_error_36 = $assertion_caught_36;
+}
+
+assert!($assertion_error_36 is OutOfBoundsError);
+$assertion_value_37 = fn(): string => $letters[-1];
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (OutOfBoundsError $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is OutOfBoundsError);
+$assertion_value_38 = fn(): string => $letters['0'];
+$assertion_error_38 = null;
+try {
+  $assertion_value_38();
+} catch (TypeError $assertion_caught_38) {
+  $assertion_error_38 = $assertion_caught_38;
+}
+
+assert!($assertion_error_38 is TypeError);
+$letters[1] = 'B';
+assert!($letters[1] == 'B');
+$assertion_value_40 = function() use ($letters): void {
+  $letters[3] = 'd';
+};
+
+$assertion_error_40 = null;
+try {
+  $assertion_value_40();
+} catch (OutOfBoundsError $assertion_caught_40) {
+  $assertion_error_40 = $assertion_caught_40;
+}
+
+assert!($assertion_error_40 is OutOfBoundsError);
+
+$letters[] = 'd';
+assert!($letters[3] == 'd');
+
+function match_definite(int $number): int {
+  match ($number) {
+    1 => $value = 10,
+    $_ => $value = 20,
+  };
+
+  return $value;
+}
+
+function unreachable_assignment(): int {
+  while (true) {
+    break;
+    $value = 5;
+  }
+
+  return $value;
+}
+
+assert!(match_definite(5) == 20);
+$assertion_value_43 = fn(): int => unreachable_assignment();
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (UndefinedVariableError $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is UndefinedVariableError);

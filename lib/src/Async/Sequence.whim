@@ -1,0 +1,58 @@
+namespace Whim\Async;
+
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Transform;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\Throwable;
+
+/** Serializes invocations of an asynchronous operation. */
+final readonly class Sequence<in Tin, out Tout> {
+  private Semaphore<Tin, Tout> $semaphore;
+
+  /** Creates a sequence around an operation. */
+  #[TrackCaller]
+  public function __construct(Transform<Tin, Tout> $operation) {
+    $this->semaphore = new Semaphore::<Tin, Tout>(1, $operation);
+  }
+
+  /** Runs an operation after all earlier invocations. */
+  #[TrackCaller]
+  public function waitFor(
+    Tin $input,
+    null|CancellationToken $cancellation = null,
+  ): Tout {
+    return $this->semaphore->waitFor($input, $cancellation);
+  }
+
+  /** Cancels pending work. */
+  #[TrackCaller]
+  public function cancel(Throwable $error): void {
+    $this->semaphore->cancel($error);
+  }
+
+  /** Waits until all earlier invocations have started. */
+  #[TrackCaller]
+  public function waitForPending(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->semaphore->waitForPending($cancellation);
+  }
+
+  /** Returns the number of invocations waiting to start. */
+  #[TrackCaller]
+  public function getPendingOperations(): NonNegativeInt {
+    return $this->semaphore->getPendingOperations();
+  }
+
+  /** Reports whether an invocation is running. */
+  #[TrackCaller]
+  public function hasOngoingOperations(): bool {
+    return $this->semaphore->hasOngoingOperations();
+  }
+
+  /** Reports whether an invocation is waiting to start. */
+  #[TrackCaller]
+  public function hasPendingOperations(): bool {
+    return $this->semaphore->hasPendingOperations();
+  }
+}

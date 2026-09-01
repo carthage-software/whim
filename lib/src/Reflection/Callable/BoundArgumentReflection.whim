@@ -1,0 +1,23 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one argument fixed by a partial callable application. */
+#[Stub]
+final class BoundArgumentReflection {
+  private function __construct() {}
+
+  /** Returns the original callable parameter. */
+  #[MustUse]
+  public function getParameter(): ParameterReflection {}
+
+  /** Returns the bound argument's runtime type. */
+  #[MustUse]
+  public function getType(): TypeReflection {}
+
+  /** Returns the bound value. */
+  #[MustUse]
+  public function getValue(): mixed {}
+}

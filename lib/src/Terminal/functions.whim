@@ -1,0 +1,48 @@
+namespace Whim\Terminal;
+
+use Whim;
+use Whim\IO\FileDescriptorHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\OS\FileDescriptor;
+use Whim\Refine\NonEmptyString;
+
+/** Whether a descriptor is attached to a terminal. */
+#[MustUse]
+#[TrackCaller]
+function attached(FileDescriptor|FileDescriptorHandle $descriptor): bool {
+  $descriptor = match ($descriptor) {
+    $descriptor @ FileDescriptor => $descriptor,
+    $handle @ FileDescriptorHandle => $handle->getFileDescriptor(),
+  };
+
+  return Whim\_Private\is_terminal($descriptor);
+}
+
+/** Returns a terminal's dimensions, or null when unavailable. */
+#[MustUse]
+#[TrackCaller]
+function size(FileDescriptor|FileDescriptorHandle $descriptor): null|Size {
+  $descriptor = match ($descriptor) {
+    $descriptor @ FileDescriptor => $descriptor,
+    $handle @ FileDescriptorHandle => $handle->getFileDescriptor(),
+  };
+
+  $size = Whim\_Private\terminal_size($descriptor) ?? return null;
+
+  return new Size($size[0], $size[1]);
+}
+
+/** Returns a terminal's path, or null when the descriptor is not a terminal. */
+#[MustUse]
+#[TrackCaller]
+function path(
+  FileDescriptor|FileDescriptorHandle $descriptor,
+): null|NonEmptyString {
+  $descriptor = match ($descriptor) {
+    $descriptor @ FileDescriptor => $descriptor,
+    $handle @ FileDescriptorHandle => $handle->getFileDescriptor(),
+  };
+
+  return Whim\_Private\terminal_path($descriptor);
+}

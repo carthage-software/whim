@@ -1,0 +1,88 @@
+[package]
+name = "whim-runtime"
+description = "The Whim runtime: values, bytecode, compiler, optimizer, linker, and virtual machine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+argon2 = { workspace = true }
+base16ct = { workspace = true }
+base32ct = { workspace = true }
+base64ct = { workspace = true }
+bcrypt = { workspace = true }
+bincode = { workspace = true }
+blake2 = { workspace = true }
+blake3 = { workspace = true }
+brotli = { workspace = true }
+bson = { workspace = true }
+bytes = { workspace = true }
+caseless = { workspace = true }
+constant_time_eq = { workspace = true }
+crc32c = { workspace = true }
+crc32fast = { workspace = true }
+csv-core = { workspace = true }
+data-encoding = { workspace = true }
+file-format = { workspace = true }
+flate2 = { workspace = true }
+foldhash = { workspace = true }
+getrandom = { workspace = true }
+hashbrown = { workspace = true }
+hmac = { workspace = true }
+htmlize = { workspace = true }
+httlib-hpack = { workspace = true }
+httparse = { workspace = true }
+idna = { workspace = true }
+imbl = { workspace = true }
+iri-string = { workspace = true }
+itoa = { workspace = true }
+jiff = { workspace = true }
+lexical-core = { workspace = true }
+libc = { workspace = true }
+mail-parser = { workspace = true }
+mailrs-rfc2047 = { workspace = true }
+md-5 = { workspace = true }
+memchr = { workspace = true }
+num-bigint = { workspace = true }
+pbkdf2 = { workspace = true }
+percent-encoding = { workspace = true }
+punycode = { workspace = true }
+quoted_printable = { workspace = true }
+regex = { workspace = true }
+ripemd = { workspace = true }
+rustix = { workspace = true }
+rustls = { workspace = true }
+rustls-native-certs = { workspace = true }
+rustls-pemfile = { workspace = true }
+ryu = { workspace = true }
+serde = { workspace = true }
+serde-seeded = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+signal-hook = { workspace = true }
+simd-adler32 = { workspace = true }
+sonic-rs = { workspace = true }
+target-guard = { workspace = true }
+tungstenite = { workspace = true }
+unicode-general-category = { workspace = true }
+uuid = { workspace = true }
+whim-loop = { workspace = true }
+whim-macros = { workspace = true }
+whim-pgsql = { workspace = true }
+whim-span = { workspace = true }
+whim-sqlite = { workspace = true }
+whim-syn = { workspace = true }
+x509-parser = { workspace = true }
+xxhash-rust = { workspace = true }
+zstd = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -1,0 +1,90 @@
+namespace Whim\Comparison;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Names the result of comparing two values. */
+enum Ordering: int {
+  /** The left value sorts before the right. */
+  case Less = -1;
+
+  /** The two values sort together. */
+  case Equal = 0;
+
+  /** The left value sorts after the right. */
+  case Greater = 1;
+
+  /** Whether the values sort together. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isEqual(): bool {
+    return $this == Ordering::Equal;
+  }
+
+  /** Whether the values do not sort together. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isNotEqual(): bool {
+    return $this != Ordering::Equal;
+  }
+
+  /** Whether the left value sorts before the right. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isLess(): bool {
+    return $this == Ordering::Less;
+  }
+
+  /** Whether the left value does not sort after the right. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isLessOrEqual(): bool {
+    return $this == Ordering::Less || $this == Ordering::Equal;
+  }
+
+  /** Whether the left value sorts after the right. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isGreater(): bool {
+    return $this == Ordering::Greater;
+  }
+
+  /** Whether the left value does not sort before the right. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isGreaterOrEqual(): bool {
+    return $this == Ordering::Greater || $this == Ordering::Equal;
+  }
+
+  /** Returns the ordering with the operands swapped. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function reverse(): Ordering {
+    return match ($this) {
+      Ordering::Less => Ordering::Greater,
+      Ordering::Equal => Ordering::Equal,
+      Ordering::Greater => Ordering::Less,
+    };
+  }
+
+  /** Returns the next ordering when this one is equal, keeping this one otherwise. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function then(Ordering $other): Ordering {
+    return match ($this) {
+      Ordering::Equal => $other,
+      $_ => $this,
+    };
+  }
+
+  /** Computes the next ordering only when this one is equal, keeping this one otherwise. */
+  #[MustUse]
+  #[TrackCaller]
+  public function thenWith((fn(): Ordering) $other): Ordering {
+    return match ($this) {
+      Ordering::Equal => $other(),
+      $_ => $this,
+    };
+  }
+}

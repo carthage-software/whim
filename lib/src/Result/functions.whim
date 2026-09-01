@@ -1,0 +1,17 @@
+namespace Whim\Result;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\Supplier;
+use Whim\Unwind\Throwable;
+
+/** Captures a matching thrown error as a result. */
+#[MustUse]
+#[TrackCaller]
+function attempt<T, E: Throwable>(Supplier<T> $callback): Ok<T>|Err<E> {
+  try {
+    return new Ok::<T>($callback());
+  } catch (E $error) {
+    return new Err::<E>($error);
+  }
+}

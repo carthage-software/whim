@@ -1,0 +1,12 @@
+namespace Whim\HTTP\Message;
+
+use Whim\Marker\AlwaysInline;
+
+/** Pairs one HTTP request with its response. */
+final readonly class Exchange {
+  #[AlwaysInline]
+  public function __construct(
+    public Request $request,
+    public Response $response,
+  ) {}
+}

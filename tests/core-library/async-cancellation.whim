@@ -1,0 +1,361 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\CompositeException;
+use Whim\Async\TimeoutException;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\RuntimeException;
+
+final class CancellationEventRecorder {
+  public vec<string> $events = vec[];
+}
+
+final class CancellationProbe {
+  public int $calls = 0;
+}
+
+$signalToken = new Async\SignalCancellationToken();
+$signalSleeper = Async\spawn::<string>(function() use ($signalToken): string {
+  try {
+    Async\sleep(Duration::fromSeconds(10), $signalToken);
+    return 'slept';
+  } catch (CancelledException $_) {
+    return 'cancelled';
+  }
+});
+
+Async\later();
+$signalToken->cancel();
+assert!($signalSleeper->await() == 'cancelled');
+
+$idleTimeoutToken = new Async\TimeoutCancellationToken(
+  Duration::fromSeconds(30),
+);
+
+$unresolvedDeferred = new Async\Deferred::<int>();
+$loneTimeoutToken = new Async\TimeoutCancellationToken(
+  Duration::fromMilliseconds(5),
+);
+
+$loneCancellation = null;
+$assertion_callable_2 = fn(): int => (
+  $unresolvedDeferred->getFuture()->await($loneTimeoutToken)
+);
+
+try {
+  $assertion_callable_2();
+} catch (CancelledException $assertion_caught_2) {
+  $loneCancellation = $assertion_caught_2;
+}
+
+assert!($loneCancellation is CancelledException);
+
+assert!($loneCancellation->getPrevious() is TimeoutException);
+
+$timedSleeper = Async\spawn::<string>(
+  function(): string {
+    $timeoutToken = new Async\TimeoutCancellationToken(
+      Duration::fromMilliseconds(20),
+    );
+
+    try {
+      Async\sleep(Duration::fromSeconds(10), $timeoutToken);
+      return 'slept';
+    } catch (CancelledException $error) {
+      return match ($error->getPrevious() is TimeoutException) {
+        true => 'timeout',
+        false => 'cancelled without a timeout cause',
+      };
+    }
+  },
+);
+
+assert!($timedSleeper->await() == 'timeout');
+
+$awaitToken = new Async\SignalCancellationToken();
+$neverToken = new Async\SignalCancellationToken();
+$neverEnding = Async\spawn::<string>(function() use ($neverToken): string {
+  try {
+    Async\sleep(Duration::fromSeconds(10), $neverToken);
+    return 'never';
+  } catch (CancelledException $_) {
+    return 'released';
+  }
+});
+
+$awaitWaiter = Async\spawn::<string>(
+  function() use ($neverEnding, $awaitToken): string {
+    try {
+      return $neverEnding->await($awaitToken);
+    } catch (CancelledException $_) {
+      return 'await cancelled';
+    }
+  },
+);
+
+Async\later();
+$awaitToken->cancel();
+assert!($awaitWaiter->await() == 'await cancelled');
+$neverToken->cancel();
+
+$linkedFirst = new Async\SignalCancellationToken();
+$linkedSecond = new Async\SignalCancellationToken();
+$linkedToken = new Async\LinkedCancellationToken(vec[
+  $linkedFirst,
+  $linkedSecond,
+]);
+
+assert!(!($linkedToken->isCancellationRequested()));
+$linkedSleeper = Async\spawn::<string>(function() use ($linkedToken): string {
+  try {
+    Async\sleep(Duration::fromSeconds(10), $linkedToken);
+    return 'slept';
+  } catch (CancelledException $_) {
+    return 'linked cancelled';
+  }
+});
+
+Async\later();
+$linkedSecond->cancel();
+assert!($linkedToken->isCancellationRequested());
+assert!($linkedSleeper->await() == 'linked cancelled');
+
+$assertion_value_9 = function(): void {
+  new Async\LinkedCancellationToken(vec[]);
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (InvalidArgumentException $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is InvalidArgumentException);
+
+$staleOrder = new CancellationEventRecorder();
+$staleToken = new Async\SignalCancellationToken();
+$staleWorker = Async\spawn::<int>(
+  function() use ($staleToken, $staleOrder): int {
+    try {
+      Async\sleep(Duration::fromMilliseconds(20), $staleToken);
+    } catch (CancelledException $_) {
+    }
+
+    Async\sleep(Duration::fromMilliseconds(80));
+    $staleOrder->events[] = 'worker';
+    return 0;
+  },
+);
+
+$staleMiddle = Async\spawn::<int>(function() use ($staleOrder): int {
+  Async\sleep(Duration::fromMilliseconds(40));
+  $staleOrder->events[] = 'mid';
+  return 0;
+});
+
+Async\later();
+$staleToken->cancel();
+$staleWorker->await();
+$staleMiddle->await();
+assert!($staleOrder->events == vec['mid', 'worker']);
+
+$callbackRecorder = new CancellationEventRecorder();
+$erroringToken = new Async\SignalCancellationToken();
+$erroringToken->register(function() use ($callbackRecorder): void {
+  $callbackRecorder->events[] = 'first';
+  throw new RuntimeException('first failed');
+});
+
+$erroringToken->register(function() use ($callbackRecorder): void {
+  $callbackRecorder->events[] = 'second';
+  throw new LogicException('second failed');
+});
+
+$erroringToken->register(function() use ($callbackRecorder): void {
+  $callbackRecorder->events[] = 'third';
+});
+
+$composite = null;
+$assertion_callable_11 = function() use ($erroringToken): void {
+  $erroringToken->cancel();
+};
+
+try {
+  $assertion_callable_11();
+} catch (CompositeException $assertion_caught_11) {
+  $composite = $assertion_caught_11;
+}
+
+assert!($composite is CompositeException);
+
+$reasons = $composite->getReasons();
+assert!(length!($reasons) == 2);
+assert!($reasons[0] is RuntimeException);
+assert!($reasons[0]->getMessage() == 'first failed');
+assert!($reasons[1] is LogicException);
+assert!($reasons[1]->getMessage() == 'second failed');
+assert!($erroringToken->isCancellationRequested());
+assert!($callbackRecorder->events == vec['first', 'second', 'third']);
+
+$erroringToken->cancel();
+assert!($callbackRecorder->events == vec['first', 'second', 'third']);
+
+$assertion_value_20 = function() use ($erroringToken): void {
+  $erroringToken->register(function(): void {
+    throw new RuntimeException('late failure');
+  });
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (RuntimeException $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+  assert!(
+    Whim\Str\contains($assertion_caught_20->getMessage(), 'late failure'),
+  );
+}
+
+assert!($assertion_error_20 is RuntimeException);
+
+$preCancelledToken = new Async\SignalCancellationToken();
+$preCancelledToken->cancel();
+
+$semaphoreProbe = new CancellationProbe();
+$probedSemaphore = new Async\Semaphore::<int, int>(
+  1,
+  function(int $value) use ($semaphoreProbe): int {
+    $semaphoreProbe->calls++;
+    return $value;
+  },
+);
+
+$assertion_value_21 = fn(): int => (
+  $probedSemaphore->waitFor(1, $preCancelledToken)
+);
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (CancelledException $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is CancelledException);
+
+assert!($semaphoreProbe->calls == 0);
+assert!($probedSemaphore->waitFor(2, null) == 2);
+
+$sequenceProbe = new CancellationProbe();
+$probedSequence = new Async\Sequence::<int, int>(
+  function(int $value) use ($sequenceProbe): int {
+    $sequenceProbe->calls++;
+    return $value;
+  },
+);
+
+$assertion_value_24 = fn(): int => (
+  $probedSequence->waitFor(3, $preCancelledToken)
+);
+
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (CancelledException $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is CancelledException);
+
+assert!($sequenceProbe->calls == 0);
+assert!($probedSequence->waitFor(4, null) == 4);
+
+$groupProbe = new CancellationProbe();
+$probedGroup = new Async\TaskGroup();
+$probedGroup->defer(function() use ($groupProbe): void {
+  $groupProbe->calls++;
+});
+
+$assertion_value_27 = function() use ($probedGroup, $preCancelledToken): void {
+  $probedGroup->awaitAll($preCancelledToken);
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (CancelledException $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is CancelledException);
+
+assert!($groupProbe->calls == 0);
+$probedGroup->awaitAll(null);
+assert!($groupProbe->calls == 1);
+
+$groupGate = new Async\Deferred::<null>();
+$waitingGroupProbe = new CancellationProbe();
+$waitingGroup = new Async\TaskGroup();
+$waitingGroup->defer(function() use ($groupGate, $waitingGroupProbe): void {
+  $groupGate->getFuture()->await();
+  $waitingGroupProbe->calls++;
+});
+
+$groupCancellationToken = new Async\SignalCancellationToken();
+$groupWaiter = Async\spawn::<string>(
+  function() use ($waitingGroup, $groupCancellationToken): string {
+    try {
+      $waitingGroup->awaitAll($groupCancellationToken);
+      return 'completed';
+    } catch (CancelledException $_) {
+      return 'cancelled';
+    }
+  },
+);
+
+Async\later();
+$groupCancellationToken->cancel();
+assert!($groupWaiter->await() == 'cancelled');
+assert!($waitingGroupProbe->calls == 0);
+$groupGate->complete(null);
+$waitingGroup->awaitAll();
+assert!($waitingGroupProbe->calls == 1);
+
+$queueGate = new Async\Deferred::<null>();
+$queuedProbe = new CancellationProbe();
+$queuedSemaphore = new Async\Semaphore::<int, int>(
+  1,
+  function(int $value) use ($queueGate, $queuedProbe): int {
+    $queuedProbe->calls++;
+    if ($value == 1) {
+      $queueGate->getFuture()->await();
+    }
+
+    return $value;
+  },
+);
+
+$firstQueued = Async\spawn::<int>(fn(): int => $queuedSemaphore->waitFor(1));
+$queuedCancellationToken = new Async\SignalCancellationToken();
+$secondQueued = Async\spawn::<int>(
+  function() use ($queuedSemaphore, $queuedCancellationToken): int {
+    try {
+      return $queuedSemaphore->waitFor(2, $queuedCancellationToken);
+    } catch (CancelledException $_) {
+      return -1;
+    }
+  },
+);
+
+Async\later();
+assert!($queuedSemaphore->getOngoingOperations() == 1);
+assert!($queuedSemaphore->getPendingOperations() == 1);
+$queuedCancellationToken->cancel();
+$queueGate->complete(null);
+assert!($firstQueued->await() == 1);
+assert!($secondQueued->await() == -1);
+assert!($queuedProbe->calls == 1);
+assert!($queuedSemaphore->getOngoingOperations() == 0);
+assert!($queuedSemaphore->getPendingOperations() == 0);

@@ -1,0 +1,36 @@
+namespace Whim\Range;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Creates a range with neither a lower nor an upper bound. */
+#[MustUse]
+#[TrackCaller]
+function full(): FullRange {
+  return new FullRange();
+}
+
+/** Creates a range with a lower bound and no upper bound. */
+#[MustUse]
+#[TrackCaller]
+function from(int $lowerBound): FromRange {
+  return new FromRange($lowerBound);
+}
+
+/** Creates a range with an upper bound and no lower bound. */
+#[MustUse]
+#[TrackCaller]
+function to(int $upperBound, bool $inclusive = false): ToRange {
+  return new ToRange($upperBound, $inclusive);
+}
+
+/** Creates a range bounded on both sides. */
+#[MustUse]
+#[TrackCaller]
+function between(
+  int $lowerBound,
+  int $upperBound,
+  bool $upperInclusive = false,
+): BetweenRange {
+  return new BetweenRange($lowerBound, $upperBound, $upperInclusive);
+}

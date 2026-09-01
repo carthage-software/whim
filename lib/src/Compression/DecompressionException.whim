@@ -1,0 +1,4 @@
+namespace Whim\Compression;
+
+/** Reports malformed or truncated compressed input. */
+final class DecompressionException extends Exception {}

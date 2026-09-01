@@ -1,0 +1,119 @@
+namespace Whim\HTTP\Session;
+
+use Whim\Json\Value;
+use Whim\Iterate\ArrayIterator;
+use Whim\Iterate\ToIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** Holds the mutable values and lifecycle of one HTTP session. */
+final class Session implements ToIterator<NonEmptyString, Value> {
+  private bool $dirty = false;
+  private bool $regenerationRequested = false;
+  private bool $destroyed = false;
+
+  /** Creates a clean session containing the given data. */
+  #[AlwaysInline]
+  public function __construct(private Data $data = dict[]) {}
+
+  /** Reports whether a key exists, including when its value is null. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(NonEmptyString $key): bool {
+    return contains_key!($this->data, $key);
+  }
+
+  /** Returns a stored value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function get(NonEmptyString $key): Value {
+    if (!contains_key!($this->data, $key)) {
+      throw new UnavailableItemException(
+        'the session does not contain the key `' . $key . '`',
+      );
+    }
+
+    return $this->data[$key];
+  }
+
+  /** Stores a value under a key. */
+  #[AlwaysInline]
+  public function set(NonEmptyString $key, Value $value): void {
+    $this->data[$key] = $value;
+    $this->dirty = true;
+  }
+
+  /** Removes a key when it exists. */
+  #[AlwaysInline]
+  public function remove(NonEmptyString $key): void {
+    if (!contains_key!($this->data, $key)) {
+      return;
+    }
+
+    remove!($this->data, $key);
+    $this->dirty = true;
+  }
+
+  /** Creates an iterator over a snapshot of the stored values. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toIterator(): ArrayIterator<NonEmptyString, Value> {
+    return new ArrayIterator::<NonEmptyString, Value>($this->data);
+  }
+
+  /** Returns a snapshot of all stored values. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toDict(): Data {
+    return $this->data;
+  }
+
+  /** Removes every stored value. */
+  #[AlwaysInline]
+  public function clear(): void {
+    if (length!($this->data) == 0) {
+      return;
+    }
+
+    $this->data = dict[];
+    $this->dirty = true;
+  }
+
+  /** Requests a fresh identifier while preserving the data. */
+  #[AlwaysInline]
+  public function regenerateIdentifier(): void {
+    $this->regenerationRequested = true;
+  }
+
+  /** Clears the data and requests removal of the persisted session. */
+  #[AlwaysInline]
+  public function destroy(): void {
+    $this->data = dict[];
+    $this->dirty = false;
+    $this->regenerationRequested = false;
+    $this->destroyed = true;
+  }
+
+  /** Reports whether the stored values changed. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isDirty(): bool {
+    return $this->dirty;
+  }
+
+  /** Reports whether a fresh identifier was requested. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isIdentifierRegenerationRequested(): bool {
+    return $this->regenerationRequested;
+  }
+
+  /** Reports whether persisted state must be removed. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isDestroyed(): bool {
+    return $this->destroyed;
+  }
+}

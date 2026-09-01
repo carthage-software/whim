@@ -1,0 +1,7 @@
+namespace Whim\SMTP;
+
+/** The action taken when an RFC 2852 delivery deadline expires. */
+enum DeliverByMode: string {
+  case Return = 'R';
+  case Notify = 'N';
+}

@@ -1,0 +1,45 @@
+namespace Whim\Async\_Private;
+
+use Whim\Async\CompositeException;
+use Whim\Async\Deferred;
+use Whim\Async\Future;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Unwind\Throwable;
+
+/** Collects the outcomes of one any() operation. */
+final class AnySelection<T> {
+  private Deferred<T> $winner;
+  private vec<Throwable> $errors = vec[];
+
+  public function __construct(private readonly int $count) {
+    $this->winner = new Deferred::<T>();
+  }
+
+  /** Records one future outcome. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function settle(Future<T> $future): void {
+    try {
+      $value = $future->await(null);
+      if (!$this->winner->isComplete()) {
+        $this->winner->complete($value);
+      }
+    } catch (Throwable $error) {
+      $this->errors[] = $error;
+      if (
+        length!($this->errors) == $this->count
+        && !$this->winner->isComplete()
+      ) {
+        $this->winner->error(new CompositeException($this->errors));
+      }
+    }
+  }
+
+  /** Waits for a successful outcome or the aggregate failure. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function await(): T {
+    return $this->winner->getFuture()->await(null);
+  }
+}

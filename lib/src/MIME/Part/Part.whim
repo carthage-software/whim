@@ -1,0 +1,14 @@
+namespace Whim\MIME\Part;
+
+use Whim\IO\ReadHandle;
+use Whim\MIME\Headers;
+use Whim\MIME\MediaType;
+
+/** A MIME body part with headers and a readable body. */
+interface Part {
+  public function mediaType(): MediaType;
+
+  public function headers(): Headers;
+
+  public function body(): ReadHandle;
+}

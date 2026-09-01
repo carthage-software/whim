@@ -1,0 +1,328 @@
+namespace Whim\Binary;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Int16;
+use Whim\Refine\Int32;
+use Whim\Refine\Int8;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint16;
+use Whim\Refine\Uint32;
+use Whim\Refine\Uint8;
+use Whim\Str;
+use Whim\Unwind\UnderflowException;
+use Whim;
+
+/** Reads values out of a byte string, advancing a cursor as it goes. */
+final class MemoryReader implements BufferedReader {
+  private NonNegativeInt $position = 0;
+  private readonly NonNegativeInt $size;
+
+  #[AlwaysInline]
+  public function __construct(
+    private readonly string $buffer,
+    private readonly Endianness $endianness = Endianness::Big,
+  ) {
+    $this->size = length!($buffer);
+  }
+
+  /** Takes the next bytes and advances past them. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function consume(NonNegativeInt $length): string {
+    if ($length == 0) {
+      return '';
+    }
+
+    if ($this->size - $this->position < $length) {
+      throw new UnderflowException(
+        'expected '
+        . $length
+        . ' bytes, got '
+        . ($this->size - $this->position),
+      );
+    }
+
+    $taken = Str\slice($this->buffer, $this->position, $length);
+    $this->position += $length;
+
+    return $taken;
+  }
+
+  /**
+   * Reads an unsigned 8-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u8(): Uint8 {
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      1,
+      false,
+      false,
+    );
+
+    $this->position++;
+
+    return $value;
+  }
+
+  /**
+   * Reads an unsigned 16-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u16(null|Endianness $endianness = null): Uint16 {
+    $endianness ??= $this->endianness;
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      2,
+      false,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 2;
+
+    return $value;
+  }
+
+  /**
+   * Reads an unsigned 32-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u32(null|Endianness $endianness = null): Uint32 {
+    $endianness ??= $this->endianness;
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      4,
+      false,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 4;
+
+    return $value;
+  }
+
+  /**
+   * Reads an unsigned 64-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   * @throws OverflowException when the value does not fit in a signed 64-bit integer.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u64(null|Endianness $endianness = null): NonNegativeInt {
+    $endianness ??= $this->endianness;
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      8,
+      false,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 8;
+
+    return $value;
+  }
+
+  /**
+   * Reads a signed 8-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i8(): Int8 {
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      1,
+      true,
+      false,
+    );
+
+    $this->position++;
+
+    return $value;
+  }
+
+  /**
+   * Reads a signed 16-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i16(null|Endianness $endianness = null): Int16 {
+    $endianness ??= $this->endianness;
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      2,
+      true,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 2;
+
+    return $value;
+  }
+
+  /**
+   * Reads a signed 32-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i32(null|Endianness $endianness = null): Int32 {
+    $endianness ??= $this->endianness;
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      4,
+      true,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 4;
+
+    return $value;
+  }
+
+  /**
+   * Reads a signed 64-bit integer.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i64(null|Endianness $endianness = null): int {
+    $endianness ??= $this->endianness;
+    $value = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      8,
+      true,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 8;
+
+    return $value;
+  }
+
+  /**
+   * Reads a single-precision floating-point value.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function f32(null|Endianness $endianness = null): float {
+    $endianness ??= $this->endianness;
+    $bits = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      4,
+      false,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 4;
+
+    return Whim\_Private\bits32_to_float($bits);
+  }
+
+  /**
+   * Reads a double-precision floating-point value.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function f64(null|Endianness $endianness = null): float {
+    $endianness ??= $this->endianness;
+    $bits = Whim\_Private\binary_decode(
+      $this->buffer,
+      $this->position,
+      8,
+      true,
+      $endianness == Endianness::Little,
+    );
+
+    $this->position += 8;
+
+    return Whim\_Private\bits_to_float($bits);
+  }
+
+  /**
+   * Reads a raw byte string of the given length.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function bytes(NonNegativeInt $length): string {
+    return $this->consume($length);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isConsumed(): bool {
+    return $this->position >= $this->size;
+  }
+
+  /**
+   * Advances past the given number of bytes.
+   *
+   * @throws UnderflowException when fewer bytes remain than the value needs.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function skip(NonNegativeInt $length): void {
+    if ($this->size - $this->position < $length) {
+      throw new UnderflowException(
+        'expected '
+        . $length
+        . ' bytes, got '
+        . ($this->size - $this->position),
+      );
+    }
+
+    $this->position += $length;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function cursor(): NonNegativeInt {
+    return $this->position;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function length(): NonNegativeInt {
+    return $this->size;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function remaining(): NonNegativeInt {
+    return $this->size - $this->position;
+  }
+}

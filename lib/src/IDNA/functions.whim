@@ -1,0 +1,42 @@
+namespace Whim\IDNA;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\EncodingException;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/**
+ * Converts a Unicode domain name to its IDNA ASCII form.
+ *
+ * @throws EncodingException when the domain name is not valid IDNA input.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function to_ascii(string $domain): string {
+  $ascii = Whim\_Private\idna_to_ascii($domain);
+  if ($ascii == null) {
+    throw new EncodingException('the domain name cannot be encoded using IDNA');
+  }
+
+  return $ascii;
+}
+
+/**
+ * Converts an IDNA domain name to Unicode.
+ *
+ * @throws DecodingException when the domain name is not valid IDNA input.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function to_unicode(string $domain): string {
+  $unicode = Whim\_Private\idna_to_unicode($domain);
+  if ($unicode == null) {
+    throw new DecodingException('the domain name is not valid IDNA');
+  }
+
+  return $unicode;
+}

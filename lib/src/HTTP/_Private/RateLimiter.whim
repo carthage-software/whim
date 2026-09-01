@@ -1,0 +1,61 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private\Frame\FrameType;
+use Whim\Marker\MustUse;
+use Whim\Refine\PositiveInt;
+use Whim\Time\Duration;
+use Whim\Time\Instant;
+
+/** Limits inbound control frames over sliding time windows. */
+final class RateLimiter {
+  public const EMPTY_DATA_FRAME = -1;
+
+  private dict<int, int> $counts = dict[];
+  private dict<int, Instant> $windowStarts = dict[];
+
+  public function __construct(
+    private dict<int, (PositiveInt, Duration)> $limits,
+  ) {}
+
+  /** Creates limits for common control-frame floods. */
+  #[MustUse]
+  public static function default(): RateLimiter {
+    $window = Duration::fromSeconds(10);
+    return new RateLimiter(dict[
+      FrameType::Settings->value => (100, $window),
+      FrameType::Ping->value => (50, $window),
+      FrameType::RstStream->value => (100, $window),
+      FrameType::Priority->value => (100, $window),
+      RateLimiter::EMPTY_DATA_FRAME => (100, $window),
+    ]);
+  }
+
+  /** Records one frame and rejects an exceeded limit. */
+  public function record(int $type): void {
+    if (!contains_key!($this->limits, $type)) {
+      return;
+    }
+
+    ($limit, $window) = $this->limits[$type];
+    $now = Instant::now();
+    if (!contains_key!($this->windowStarts, $type)) {
+      $this->windowStarts[$type] = $now;
+      $this->counts[$type] = 0;
+    } else if (
+      $now->durationSince(
+        $this->windowStarts[$type],
+      )->getTotalNanoseconds() >= $window->getTotalNanoseconds()
+    ) {
+      $this->windowStarts[$type] = $now;
+      $this->counts[$type] = 0;
+    }
+
+    $this->counts[$type]++;
+    if ($this->counts[$type] > $limit) {
+      throw new ProtocolException(
+        'the HTTP/2 control-frame rate limit was exceeded',
+        ErrorCode::EnhanceYourCalm->value,
+      );
+    }
+  }
+}

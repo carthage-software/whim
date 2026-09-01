@@ -1,0 +1,239 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\Regex;
+
+/** A parsed route pattern. */
+final readonly class Pattern {
+  private function __construct(public vec<Node> $nodes) {}
+
+  /** Parses and validates a route pattern. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(NonEmptyString $source): Pattern {
+    ($nodes, $offset) = Pattern::parseSequence($source, 0, null);
+    if ($offset != length!($source)) {
+      throw new InvalidArgumentException(
+        'the route pattern has trailing input',
+      );
+    }
+
+    $pattern = new Pattern($nodes);
+    $expression = '\A(?:' . $pattern->expression() . ')\z';
+    if (Regex::compile($expression) == null) {
+      throw new InvalidArgumentException(
+        'the route pattern contains an invalid regular expression',
+      );
+    }
+
+    return $pattern;
+  }
+
+  /** Returns the complete regular expression. */
+  #[MustUse]
+  public function expression(): string {
+    return nodes_expression($this->nodes);
+  }
+
+  /** Returns all route parameter names. */
+  #[MustUse]
+  public function parameterNames(): vec<string> {
+    return node_parameter_names($this->nodes);
+  }
+
+  /** Parses nodes until the requested closing byte. */
+  #[TrackCaller]
+  private static function parseSequence(
+    string $source,
+    int $offset,
+    null|string $closing,
+  ): (vec<Node>, int) {
+    $nodes = vec[];
+    $literal = '';
+    $length = length!($source);
+    while ($offset < $length) {
+      $byte = $source[$offset];
+      if ($closing != null && $byte == $closing) {
+        $nodes = Pattern::appendLiteral($nodes, $literal);
+        if ($nodes == vec[]) {
+          throw new InvalidArgumentException(
+            'an optional route-pattern sequence cannot be empty',
+          );
+        }
+
+        return ($nodes, $offset + 1);
+      }
+
+      if ($byte == '{') {
+        $nodes = Pattern::appendLiteral($nodes, $literal);
+        $literal = '';
+        ($parameter, $offset) = Pattern::parseParameter($source, $offset + 1);
+        $nodes[] = $parameter;
+        continue;
+      }
+
+      if ($byte == '[') {
+        $nodes = Pattern::appendLiteral($nodes, $literal);
+        $literal = '';
+        ($optional, $offset) = Pattern::parseSequence(
+          $source,
+          $offset + 1,
+          ']',
+        );
+
+        $nodes[] = new OptionalNode(new Pattern($optional));
+        continue;
+      }
+
+      if ($byte == '*') {
+        if ($offset + 1 != $length) {
+          throw new InvalidArgumentException(
+            'a route wildcard must terminate the pattern',
+          );
+        }
+
+        $nodes = Pattern::appendLiteral($nodes, $literal);
+        $nodes[] = new WildcardNode();
+        return ($nodes, $length);
+      }
+
+      if (
+        $byte == '\\'
+        && $offset + 1 < $length
+        && $source[$offset + 1] == '*'
+      ) {
+        $literal .= '*';
+        $offset += 2;
+        continue;
+      }
+
+      if ($byte == '}' || $byte == ']') {
+        throw new InvalidArgumentException(
+          'the route pattern contains an unmatched `' . $byte . '`',
+        );
+      }
+
+      $literal .= $byte;
+      $offset++;
+    }
+
+    if ($closing != null) {
+      throw new InvalidArgumentException(
+        'the route pattern is missing its closing `' . $closing . '`',
+      );
+    }
+
+    $nodes = Pattern::appendLiteral($nodes, $literal);
+    return ($nodes, $offset);
+  }
+
+  /** Parses one named parameter. */
+  #[TrackCaller]
+  private static function parseParameter(
+    string $source,
+    int $offset,
+  ): (ParameterNode, int) {
+    $length = length!($source);
+    $name = '';
+    while ($offset < $length) {
+      $byte = match ($source[$offset]) {
+        '}' | ':' => break,
+        $byte => $byte,
+      };
+
+      $name .= $byte;
+      $offset++;
+    }
+
+    if ($name == '') {
+      throw new InvalidArgumentException('a route parameter must have a name');
+    }
+
+    if ($offset >= $length) {
+      throw new InvalidArgumentException(
+        'a route parameter is missing its closing `}`',
+      );
+    }
+
+    if ($source[$offset] == '}') {
+      return (new ParameterNode($name as NonEmptyString, null), $offset + 1);
+    }
+
+    ($constraint, $offset) = Pattern::parseConstraint($source, $offset + 1);
+    if ($constraint == '') {
+      throw new InvalidArgumentException(
+        'a route parameter constraint cannot be empty',
+      );
+    }
+
+    return (
+      new ParameterNode($name as NonEmptyString, $constraint as NonEmptyString),
+      $offset,
+    );
+  }
+
+  /** Reads a regular expression until the parameter closes. */
+  #[TrackCaller]
+  private static function parseConstraint(
+    string $source,
+    int $offset,
+  ): (string, int) {
+    $constraint = '';
+    $depth = 0;
+    $escaped = false;
+    $characterClass = false;
+    $length = length!($source);
+    while ($offset < $length) {
+      $byte = $source[$offset];
+      if ($escaped) {
+        $constraint .= $byte;
+        $escaped = false;
+        $offset++;
+        continue;
+      }
+
+      if ($byte == '\\') {
+        $constraint .= $byte;
+        $escaped = true;
+        $offset++;
+        continue;
+      }
+
+      if ($byte == '[' && !$characterClass) {
+        $characterClass = true;
+      } else if ($byte == ']' && $characterClass) {
+        $characterClass = false;
+      } else if (!$characterClass && $byte == '{') {
+        $depth++;
+      } else if (!$characterClass && $byte == '}') {
+        if ($depth == 0) {
+          return ($constraint, $offset + 1);
+        }
+
+        $depth--;
+      }
+
+      $constraint .= $byte;
+      $offset++;
+    }
+
+    throw new InvalidArgumentException(
+      'a route parameter is missing its closing `}`',
+    );
+  }
+
+  /** Appends a non-empty literal node. */
+  private static function appendLiteral(
+    vec<Node> $nodes,
+    string $literal,
+  ): vec<Node> {
+    if ($literal != '') {
+      $nodes[] = new LiteralNode($literal as NonEmptyString);
+    }
+
+    return $nodes;
+  }
+}

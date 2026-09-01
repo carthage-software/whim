@@ -1,0 +1,6 @@
+namespace Whim\Json;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports text that is not valid JSON, or a decoded value of the wrong shape. */
+final class DecodingException extends InvalidArgumentException {}

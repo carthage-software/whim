@@ -1,0 +1,21 @@
+namespace Whim\Command;
+
+use Whim\_Private;
+
+/** Names the engine disposition a child's standard stream resolves to. */
+enum Disposition: int {
+  /** A pipe the parent holds the other end of. */
+  case Piped = _Private\STREAM_DISPOSITION_PIPE;
+
+  /** The parent's own stream. */
+  case Inherited = _Private\STREAM_DISPOSITION_INHERIT;
+
+  /** Nothing; reads and writes are discarded. */
+  case Discarded = _Private\STREAM_DISPOSITION_NULL;
+
+  /** A descriptor the caller already holds. */
+  case Attached = _Private\STREAM_DISPOSITION_DESCRIPTOR;
+
+  /** The controlling terminal. */
+  case Terminal = _Private\STREAM_DISPOSITION_TERMINAL;
+}

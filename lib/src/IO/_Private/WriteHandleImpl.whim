@@ -1,0 +1,95 @@
+namespace Whim\IO\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IO\BufferedWriteHandle;
+use Whim\IO\Exception;
+use Whim\IO\FileDescriptorHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+
+/** The descriptor-backed implementation returned by IO factories. */
+final class WriteHandleImpl implements
+  BufferedWriteHandle,
+  FileDescriptorHandle {
+  /** Wraps an owned descriptor. This class is private standard-library API. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private FileDescriptor $descriptor) {}
+
+  /**
+   * Returns the backing descriptor, or raises when the handle is closed.
+   *
+   * @throws Whim\IO\Exception when the IO handle is closed.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    if ($this->descriptor->isClosed()) {
+      throw new Exception('the IO handle is closed');
+    }
+
+    return $this->descriptor;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    wait_writable($this->descriptor, $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryWrite(string $bytes): int {
+    try {
+      return Whim\_Private\write_descriptor($this->descriptor, $bytes);
+    } catch (Whim\_Private\SystemError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    if ($bytes == '') {
+      return 0;
+    }
+
+    while (true) {
+      $written = $this->tryWrite($bytes);
+      if ($written > 0) {
+        return $written;
+      }
+
+      $this->waitUntilWritable($cancellation);
+    }
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function flush(null|CancellationToken $cancellation = null): void {
+    while (true) {
+      try {
+        Whim\_Private\flush_descriptor($this->descriptor);
+        return;
+      } catch (Whim\_Private\SystemError $error) {
+        if ($error->errno() != Whim\_Private\ERRNO_WOULD_BLOCK) {
+          failure($error);
+        }
+      }
+
+      $this->waitUntilWritable($cancellation);
+    }
+  }
+}

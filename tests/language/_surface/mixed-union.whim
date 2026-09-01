@@ -1,0 +1,3 @@
+function passthrough(null|mixed $value): mixed {
+  return $value;
+}

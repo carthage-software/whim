@@ -1,0 +1,239 @@
+use Whim\Command;
+use Whim\Command\Signalled;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Process;
+use Whim\Process\CpuTimes;
+use Whim\Process\GroupIdentity;
+use Whim\Process\Resource;
+use Whim\Process\ResourceLimit;
+use Whim\Process\Signal;
+use Whim\Process\UserIdentity;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\DiscardedResultError;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+
+const INVALID_PROCESS_ID = 2_147_483_648;
+const INVALID_POSIX_ID = 4_294_967_296;
+
+function expect_process_failure(fn(): void $operation): RuntimeException {
+  try {
+    $operation();
+  } catch (RuntimeException $error) {
+    assert!($error->getPrevious() is Whim\_Private\SystemError);
+    return $error;
+  }
+
+  panic!('expected the process operation to fail');
+}
+
+$id = Whim\Process\get_id();
+
+assert!($id > 0);
+assert!($id == Whim\_Private\getmypid());
+assert!(Process\get_parent_id() >= 0);
+assert!(Process\exists($id));
+assert!(!(Process\exists(2_147_483_647)));
+
+$cpuTimes = Process\cpu_times();
+assert!($cpuTimes is CpuTimes);
+assert!(!($cpuTimes->user->isNegative()));
+assert!(!($cpuTimes->system->isNegative()));
+assert!(!($cpuTimes->childrenUser->isNegative()));
+assert!(!($cpuTimes->childrenSystem->isNegative()));
+
+$user = Process\get_user_identity();
+assert!($user is UserIdentity);
+assert!($user->real >= 0);
+assert!($user->effective >= 0);
+Process\set_user_identity();
+$sameUser = Process\get_user_identity();
+assert!($sameUser->real == $user->real);
+assert!($sameUser->effective == $user->effective);
+
+$group = Process\get_group_identity();
+assert!($group is GroupIdentity);
+assert!($group->real >= 0);
+assert!($group->effective >= 0);
+Process\set_group_identity();
+$sameGroup = Process\get_group_identity();
+assert!($sameGroup->real == $group->real);
+assert!($sameGroup->effective == $group->effective);
+
+foreach (Process\get_supplementary_group_ids() as $groupId) {
+  assert!($groupId >= 0);
+}
+
+assert!(Process\get_session_id() == Process\get_session_id($id));
+assert!(Process\get_process_group_id() == Process\get_process_group_id($id));
+assert!(Process\get_priority() == Process\get_priority($id));
+
+foreach (vec[
+  Resource::CpuTime,
+  Resource::FileSize,
+  Resource::Data,
+  Resource::Stack,
+  Resource::Core,
+  Resource::OpenFiles,
+  Resource::AddressSpace,
+] as $resource) {
+  $limit = Process\get_resource_limit($resource);
+  assert!($limit is ResourceLimit);
+  assert!($limit->soft == null || $limit->soft >= 0);
+
+  assert!($limit->hard == null || $limit->hard >= 0);
+}
+
+$openFiles = Process\get_resource_limit(Resource::OpenFiles);
+Process\set_resource_limit(Resource::OpenFiles, $openFiles);
+$sameOpenFiles = Process\get_resource_limit(Resource::OpenFiles);
+assert!($sameOpenFiles->soft == $openFiles->soft);
+assert!($sameOpenFiles->hard == $openFiles->hard);
+
+discard!(expect_process_failure(function(): void {
+  Process\set_resource_limit(Resource::FileSize, new ResourceLimit(1, 0));
+}));
+
+discard!(expect_process_failure(function(): void {
+  Process\set_user_identity(INVALID_POSIX_ID);
+}));
+
+discard!(expect_process_failure(function(): void {
+  Process\set_group_identity(INVALID_POSIX_ID);
+}));
+
+discard!(expect_process_failure(function(): void {
+  Process\set_supplementary_group_ids(vec[INVALID_POSIX_ID]);
+}));
+
+discard!(expect_process_failure(function(): void {
+  Process\initialize_supplementary_group_ids(
+    'whim-invalid-user',
+    INVALID_POSIX_ID,
+  );
+}));
+
+discard!(expect_process_failure(function(): void {
+  discard!(Process\get_session_id(INVALID_PROCESS_ID));
+}));
+
+discard!(expect_process_failure(function(): void {
+  discard!(Process\get_process_group_id(INVALID_PROCESS_ID));
+}));
+
+discard!(expect_process_failure(function(): void {
+  Process\set_process_group_id(INVALID_PROCESS_ID);
+}));
+
+discard!(expect_process_failure(function(): void {
+  discard!(Process\get_priority(INVALID_POSIX_ID));
+}));
+
+discard!(expect_process_failure(function(): void {
+  Process\set_priority(0, INVALID_POSIX_ID);
+}));
+
+$shell = Process\find_executable('sh');
+assert!($shell != null);
+assert!(Filesystem\is_file($shell as NonEmptyString));
+
+assert!(Process\find_executable('whim-no-such-executable') == null);
+
+$uncatchableSignalError = null;
+try {
+  discard!(Process\watch_signal(Signal::Kill, function(): void {}));
+} catch (InvalidArgumentException $error) {
+  $uncatchableSignalError = $error;
+}
+
+assert!($uncatchableSignalError is InvalidArgumentException);
+
+$binary = Env\current_binary() as NonEmptyString;
+assert!(Process\find_executable($binary) == $binary);
+
+$replaceFailure = expect_process_failure(function(): void {
+  Process\replace('/definitely/not/a/whim-process-test-program');
+});
+
+assert!($replaceFailure->getMessage() != '');
+
+$sessionDirectory = Filesystem\create_temporary_directory(
+  null,
+  'whim-process-',
+);
+
+$sessionScript = $sessionDirectory . '/session.whim';
+$replaceScript = $sessionDirectory . '/replace.whim';
+$replaceInheritedScript = $sessionDirectory . '/replace-inherited.whim';
+File\write(
+  $sessionScript,
+  'use Whim\\Process;'
+  . "\n"
+  . 'assert!(Process\\start_session() == Process\\get_id());'
+  . "\n",
+);
+
+File\write(
+  $replaceScript,
+  'use Whim\\Process;'
+  . "\n"
+  . 'Process\\replace('
+  . '\'/bin/sh\','
+  . ' vec[\'-c\', \'printf "$WHIM_REPLACE_TEST"\'],'
+  . ' dict[\'WHIM_REPLACE_TEST\' => \'replaced\'],'
+  . ');'
+  . "\n",
+);
+
+File\write(
+  $replaceInheritedScript,
+  'use Whim\\Process;'
+  . "\n"
+  . 'Process\\replace('
+  . '\'/bin/sh\','
+  . ' vec[\'-c\', \'printf "$WHIM_REPLACE_TEST"\'],'
+  . ');'
+  . "\n",
+);
+
+try {
+  assert!(Command\create($binary, vec[$sessionScript])->succeeds());
+  assert!(Command\create($binary, vec[$replaceScript])->output() == 'replaced');
+  assert!(
+    Command\create($binary, vec[$replaceInheritedScript])->withVariable(
+      'WHIM_REPLACE_TEST',
+      'inherited',
+    )->output()
+    == 'inherited',
+  );
+} finally {
+  Filesystem\delete_directory($sessionDirectory, true);
+}
+
+$child = Command\create('sh', vec['-c', 'exec sleep 30'])->start();
+assert!(Process\exists($child->getId() as 1..));
+Process\signal($child->getId() as 1.., Signal::Terminate);
+assert!($child->wait() is Signalled);
+
+$group = Command\create(
+  'sh',
+  vec['-c', 'exec sleep 30'],
+)->withOwnProcessGroup()->start();
+
+Process\signal_group($group->getId() as 1.., Signal::Terminate);
+assert!($group->wait() is Signalled);
+
+$assertion_value_12 = function(): void {
+  Whim\_Private\getmypid();
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (DiscardedResultError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is DiscardedResultError);

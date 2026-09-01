@@ -1,0 +1,31 @@
+namespace Whim\Math;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\OverflowException;
+
+/**
+ * Performs integer division.
+ *
+ * @throws OverflowException when the exact quotient does not fit in an integer.
+ */
+#[NeverInline]
+#[TrackCaller]
+function div(int $numerator, int $denominator): int {
+  $value = Whim\_Private\math_div($numerator, $denominator);
+  if ($value == null) {
+    throw new OverflowException('integer division overflow');
+  }
+
+  return $value;
+}
+
+/** Formats a non-negative integer in the given base. */
+#[AlwaysInline]
+function to_base(NonNegativeInt $number, 2..=36 $base): NonEmptyString {
+  return Whim\_Private\math_to_base($number, $base);
+}

@@ -1,0 +1,13 @@
+[package]
+name = "whim-support"
+description = "The compile-time target guard for Whim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

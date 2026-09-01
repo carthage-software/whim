@@ -1,0 +1,13 @@
+namespace Whim\SMTP;
+
+/** Selects transport security for an SMTP connection. */
+enum Security {
+  /** Sends plaintext for the entire connection. */
+  case Plaintext;
+
+  /** Upgrades the connection with STARTTLS. */
+  case StartTls;
+
+  /** Starts TLS as soon as the TCP connection opens. */
+  case ImplicitTls;
+}

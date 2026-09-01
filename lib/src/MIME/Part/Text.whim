@@ -1,0 +1,66 @@
+namespace Whim\MIME\Part;
+
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\MIME\Headers;
+use Whim\MIME\MediaType;
+use Whim\MIME\Parameters;
+use Whim\MIME\TransferEncoding;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** A text MIME part with transfer encoding. */
+final readonly class Text implements Part {
+  public MediaType $mediaType;
+  public Headers $headers;
+  private ReadHandle $handle;
+
+  /** Creates a text part from bytes or a readable source. */
+  #[TrackCaller]
+  public function __construct(
+    string|ReadHandle $content,
+    string $subtype = 'plain',
+    string $charset = 'utf-8',
+    public TransferEncoding $encoding = TransferEncoding::QuotedPrintable,
+  ) {
+    $source = match ($content) {
+      $bytes @ string => new MemoryHandle($bytes),
+      $readHandle @ ReadHandle => $readHandle,
+    };
+
+    $this->mediaType = MediaType::fromParts(
+      'text',
+      $subtype,
+      Parameters::fromPairs(vec[('charset', $charset)]),
+    );
+
+    $this->headers = Headers::fromPairs(vec[
+      ('Content-Type', $this->mediaType->toString()),
+      ('Content-Transfer-Encoding', $encoding->value),
+    ]);
+
+    $this->handle = new _Private\EncodingReadHandle($source, $encoding);
+  }
+
+  /** Returns the text media type. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function mediaType(): MediaType {
+    return $this->mediaType;
+  }
+
+  /** Returns the part headers. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function headers(): Headers {
+    return $this->headers;
+  }
+
+  /** Returns the encoded body handle. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function body(): ReadHandle {
+    return $this->handle;
+  }
+}

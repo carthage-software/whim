@@ -1,0 +1,333 @@
+use Whim\Autoload;
+
+require_once!('_files.whim');
+require_once!('_process.whim');
+
+$s = '';
+$i = 0;
+while ($i < 2000) {
+  $s .= 'ab';
+  $i = $i + 1;
+}
+
+$snapshot = $s;
+$j = 0;
+while ($j < 2000) {
+  $s .= 'cd';
+  $j = $j + 1;
+}
+
+assert!(length!($snapshot) == 4000);
+assert!(length!($s) == 8000);
+$t = $s;
+$t .= '!';
+assert!(length!($s) == 8000);
+assert!(length!($t) == 8001);
+
+$doubled = 'abcdefghijklmnopqrstuvwxyz0123456789';
+$doubling = 0;
+while ($doubling < 6) {
+  $doubled .= $doubled;
+  $doubling = $doubling + 1;
+}
+
+assert!(length!($doubled) == 2304);
+
+prints(
+  'catchable-overflow',
+  'depth exceeded gracefully' . "\n",
+  dict['WHIM_CALL_DEPTH' => '512'],
+);
+
+function count_down(int $n): int {
+  if ($n <= 0) {
+    return 0;
+  }
+
+  return count_down($n - 1);
+}
+
+assert!(count_down(9000) == 0);
+assert!(count_down(5) == 0);
+assert!(count_down(1) == 0);
+
+$nested = vec[];
+$depth = 0;
+while ($depth < 100000) {
+  $nested = vec[$nested];
+  $depth = $depth + 1;
+}
+
+$nested = null;
+assert!($nested == null);
+assert!($depth == 100000);
+
+class Node {
+  public mixed $peer = null;
+}
+
+$cycles = 0;
+while ($cycles < 20000) {
+  $a = new Node();
+  $b = new Node();
+  $a->peer = $b;
+  $b->peer = $a;
+  $cycles = $cycles + 1;
+}
+
+assert!($cycles == 20000);
+
+require!('_hardening/switch-table.whim');
+
+/** Sums the widest parameter list a declaration or call site may write. */
+function total_of_sixty_four(
+  int $p0,
+  int $p1,
+  int $p2,
+  int $p3,
+  int $p4,
+  int $p5,
+  int $p6,
+  int $p7,
+  int $p8,
+  int $p9,
+  int $p10,
+  int $p11,
+  int $p12,
+  int $p13,
+  int $p14,
+  int $p15,
+  int $p16,
+  int $p17,
+  int $p18,
+  int $p19,
+  int $p20,
+  int $p21,
+  int $p22,
+  int $p23,
+  int $p24,
+  int $p25,
+  int $p26,
+  int $p27,
+  int $p28,
+  int $p29,
+  int $p30,
+  int $p31,
+  int $p32,
+  int $p33,
+  int $p34,
+  int $p35,
+  int $p36,
+  int $p37,
+  int $p38,
+  int $p39,
+  int $p40,
+  int $p41,
+  int $p42,
+  int $p43,
+  int $p44,
+  int $p45,
+  int $p46,
+  int $p47,
+  int $p48,
+  int $p49,
+  int $p50,
+  int $p51,
+  int $p52,
+  int $p53,
+  int $p54,
+  int $p55,
+  int $p56,
+  int $p57,
+  int $p58,
+  int $p59,
+  int $p60,
+  int $p61,
+  int $p62,
+  int $p63,
+): int {
+  return (
+    $p0
+    + $p1
+    + $p2
+    + $p3
+    + $p4
+    + $p5
+    + $p6
+    + $p7
+    + $p8
+    + $p9
+    + $p10
+    + $p11
+    + $p12
+    + $p13
+    + $p14
+    + $p15
+    + $p16
+    + $p17
+    + $p18
+    + $p19
+    + $p20
+    + $p21
+    + $p22
+    + $p23
+    + $p24
+    + $p25
+    + $p26
+    + $p27
+    + $p28
+    + $p29
+    + $p30
+    + $p31
+    + $p32
+    + $p33
+    + $p34
+    + $p35
+    + $p36
+    + $p37
+    + $p38
+    + $p39
+    + $p40
+    + $p41
+    + $p42
+    + $p43
+    + $p44
+    + $p45
+    + $p46
+    + $p47
+    + $p48
+    + $p49
+    + $p50
+    + $p51
+    + $p52
+    + $p53
+    + $p54
+    + $p55
+    + $p56
+    + $p57
+    + $p58
+    + $p59
+    + $p60
+    + $p61
+    + $p62
+    + $p63
+  );
+}
+
+assert!(
+  total_of_sixty_four(
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+  )
+  == 2016,
+);
+
+/** Sums values that arrive through one collection argument. */
+function total_of_values(vec $values): int {
+  $sum = 0;
+  foreach ($values as $value) {
+    $sum = $sum + $value;
+  }
+
+  return $sum;
+}
+
+$values = vec[];
+$index = 0;
+while ($index < 250) {
+  $values[] = $index;
+  $index = $index + 1;
+}
+
+assert!(total_of_values($values) == 31125);
+
+require!('_hardening/nested-finally.whim');
+
+Autoload\register(
+  new Autoload\Autoloader()->withSymbolFile(
+    'Lazy\Probe',
+    beside('_hardening/probe.whim'),
+  ),
+);
+
+$unwound = 0;
+$mismatched = 0;
+$attempt = 0;
+while ($attempt < 1000) {
+  try {
+    try {
+      throw new Whim\Unwind\Error('inner', 0);
+    } catch (Lazy\Probe $_) {
+      $mismatched = $mismatched + 1;
+    }
+  } catch (Whim\Unwind\Error $_) {
+    $unwound = $unwound + 1;
+  }
+
+  $attempt = $attempt + 1;
+}
+
+assert!($mismatched == 0);
+assert!($unwound == 1000);

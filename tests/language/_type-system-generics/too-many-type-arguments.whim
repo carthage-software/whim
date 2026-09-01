@@ -1,0 +1,3 @@
+class Box<T> {}
+
+function take(Box<int, string> $b): void {}

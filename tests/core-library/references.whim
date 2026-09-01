@@ -1,0 +1,198 @@
+use Whim\Reference\Weak;
+use Whim\Reference\WeakMap;
+use Whim\Unwind\DiscardedResultError;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\TypeError;
+
+class WeakConfig {
+  public int $n = 1;
+}
+
+$keptConfig = new WeakConfig();
+$weakConfig = new Weak::<WeakConfig>($keptConfig);
+assert!($weakConfig->get() == $keptConfig);
+
+function scoped_weak(): Weak<WeakConfig> {
+  return new Weak::<WeakConfig>(new WeakConfig());
+}
+
+$danglingConfig = scoped_weak();
+assert!($danglingConfig->get() == null);
+$fallbackConfig = $danglingConfig->get() ?? new WeakConfig();
+assert!($fallbackConfig->n == 1);
+
+class MapKey {}
+
+class MapPayload {}
+
+$map = new WeakMap::<MapKey, mixed>();
+$storedKey = new MapKey();
+$map->set($storedKey, 'stored');
+assert!($map->get($storedKey) == 'stored');
+assert!($map->has($storedKey));
+assert!($map->length() == 1);
+$map->set($storedKey, 'replaced');
+assert!($map->get($storedKey) == 'replaced');
+assert!($map->length() == 1);
+$map->remove($storedKey);
+assert!($map->length() == 0);
+$absentKey = new MapKey();
+$assertion_value_10 = fn(): mixed => $map->get($absentKey);
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (OutOfBoundsError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is OutOfBoundsError);
+
+$assertion_value_11 = function() use ($map, $absentKey): void {
+  $map->remove($absentKey);
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (OutOfBoundsError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is OutOfBoundsError);
+
+$assertion_value_12 = function() use ($map): void {
+  foreach ($map as $entry) {}
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (TypeError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is TypeError);
+
+$assertion_value_13 = function() use ($map, $storedKey): void {
+  $entry = $map[$storedKey];
+};
+
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (TypeError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is TypeError);
+
+$lifecycleMap = new WeakMap::<MapKey, mixed>();
+
+function fill_weak_map(WeakMap<MapKey, mixed> $map): Weak<MapKey> {
+  $key = new MapKey();
+  $map->set($key, new MapPayload());
+  assert!($map->length() == 1);
+  return new Weak::<MapKey>($key);
+}
+
+$keyWatch = fill_weak_map($lifecycleMap);
+assert!($lifecycleMap->length() == 0);
+assert!($keyWatch->get() == null);
+$livingKey = new MapKey();
+$payload = new MapPayload();
+$payloadWatch = new Weak::<MapPayload>($payload);
+$lifecycleMap->set($livingKey, $payload);
+$payload = null;
+assert!($payloadWatch->get() != null);
+$firstIdentityKey = new MapKey();
+$secondIdentityKey = new MapKey();
+$lifecycleMap->set($firstIdentityKey, 'a');
+assert!(!($lifecycleMap->has($secondIdentityKey)));
+
+$bulkMap = new WeakMap::<MapKey, int>();
+$bulkKeys = vec[];
+$index = 0;
+while ($index < 1_024) {
+  $key = new MapKey();
+  $bulkKeys[] = $key;
+  $bulkMap->set($key, $index);
+  $index++;
+}
+
+assert!($bulkMap->length() == 1_024);
+$index = 0;
+while ($index < 1_024) {
+  assert!($bulkMap->get($bulkKeys[$index]) == $index);
+  $index++;
+}
+
+$bulkKeys = vec[];
+assert!($bulkMap->length() == 1);
+$key = null;
+assert!($bulkMap->length() == 0);
+
+$assertion_value_19 = function() use ($weakConfig): void {
+  $weakConfig->get();
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (DiscardedResultError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is DiscardedResultError);
+
+$weakGetter = $weakConfig->get(...);
+$assertion_value_20 = function() use ($weakGetter): void {
+  $weakGetter();
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (DiscardedResultError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is DiscardedResultError);
+
+$assertion_value_21 = function() use ($lifecycleMap, $livingKey): void {
+  $lifecycleMap->get($livingKey);
+};
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (DiscardedResultError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is DiscardedResultError);
+
+$assertion_value_22 = function() use ($map, $storedKey): void {
+  $map->has($storedKey);
+};
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (DiscardedResultError $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is DiscardedResultError);
+
+$assertion_value_23 = function() use ($map): void {
+  $map->length();
+};
+
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (DiscardedResultError $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is DiscardedResultError);

@@ -1,0 +1,93 @@
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Symbol;
+use Whim\Unwind\UndefinedSymbolError;
+
+$assertion_value_1 = fn(): mixed => ghost_function();
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (UndefinedSymbolError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is UndefinedSymbolError);
+
+$assertion_value_2 = fn(): mixed => new Ghost\Widget();
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (UndefinedSymbolError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is UndefinedSymbolError);
+
+$assertion_value_3 = fn(): mixed => GHOST_CONSTANT;
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (UndefinedSymbolError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is UndefinedSymbolError);
+
+$assertion_value_4 = fn(): mixed => Ghost\Widget::AMOUNT;
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (UndefinedSymbolError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is UndefinedSymbolError);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+File\write(
+  $work . '/greet.whim',
+  'namespace AppMiss {'
+  . "\n"
+  . '    function greet(): string { return \'loaded on demand\'; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/widget.whim',
+  'namespace AppMiss {' . "\n" . '    class Widget {}' . "\n" . '}' . "\n",
+);
+
+$onMiss = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'AppMiss\greet' => $work . '/greet.whim',
+  'AppMiss\Widget' => $work . '/widget.whim',
+]);
+
+Autoload\register($onMiss);
+assert!(AppMiss\greet() == 'loaded on demand');
+assert!(new AppMiss\Widget() is AppMiss\Widget);
+$unknownMatches = null is Ghost\Never;
+assert!(!($unknownMatches));
+Autoload\unregister($onMiss);
+
+File\write(
+  $work . '/typed-widget.whim',
+  'namespace AppType {' . "\n" . '    class Widget {}' . "\n" . '}' . "\n",
+);
+
+$onType = new Autoload\Autoloader()->withSymbolFile(
+  'AppType\Widget',
+  $work . '/typed-widget.whim',
+);
+
+Autoload\register($onType);
+$checked = 5 is AppType\Widget;
+assert!(!($checked));
+assert!(Symbol\exists('AppType\Widget', false));
+assert!(new AppType\Widget() is AppType\Widget);
+Autoload\unregister($onType);
+
+Filesystem\delete_directory($work, true);

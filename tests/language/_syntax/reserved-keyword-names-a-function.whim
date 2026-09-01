@@ -1,0 +1,3 @@
+function match(): bool {
+  return true;
+}

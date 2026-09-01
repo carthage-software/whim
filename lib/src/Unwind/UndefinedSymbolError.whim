@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a reference to an undefined symbol. */
+#[Stub]
+class UndefinedSymbolError extends Error {}

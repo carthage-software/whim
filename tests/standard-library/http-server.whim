@@ -1,0 +1,759 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\Context;
+use Whim\HTTP\Server\Exception as ServerException;
+use Whim\HTTP\Server\Handler;
+use Whim\HTTP\Server\HTTPException;
+use Whim\HTTP\Server\Responder;
+use Whim\HTTP\Server\Server;
+use Whim\HTTP\Server\_Private as ServerPrivate;
+use Whim\IP\Address;
+use Whim\IO\MemoryHandle;
+use Whim\Network\ClosedException as NetworkClosedException;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Listener as NetworkListener;
+use Whim\Network\ShutdownDirection;
+use Whim\Network\Stream as NetworkStream;
+use Whim\Str;
+
+final class HTTPServerTestStream implements NetworkStream<InternetEndpoint> {
+  private bool $closed = false;
+
+  public function __construct(
+    private InternetEndpoint $localEndpoint,
+    private InternetEndpoint $peerEndpoint,
+  ) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->closed;
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    return '';
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return length!($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class HTTPServerTestListener implements
+  NetworkListener<InternetEndpoint> {
+  private bool $closed = false;
+  private int $index = 0;
+
+  public function __construct(
+    private InternetEndpoint $localEndpoint,
+    public vec<HTTPServerTestStream> $streams,
+  ) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  public function accept(
+    null|CancellationToken $cancellation = null,
+  ): NetworkStream<InternetEndpoint> {
+    $cancellation?->throwIfCancellationRequested();
+    if ($this->index >= length!($this->streams)) {
+      $this->closed = true;
+      throw new NetworkClosedException('the test listener is closed');
+    }
+
+    $stream = $this->streams[$this->index];
+    $this->index++;
+    return $stream;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class HTTPServerTestStreamDriver implements ServerPrivate\StreamDriver {
+  public int $served = 0;
+  public bool $observedDrain = false;
+
+  public function serve(
+    NetworkStream<_> $stream,
+    bool $enableH2c,
+    Handler\Handler $handler,
+    Configuration $configuration,
+    CancellationToken $draining,
+    CancellationToken $forced,
+  ): void {
+    $this->served++;
+    $this->observedDrain = $draining->isCancellationRequested();
+    assert!(!$forced->isCancellationRequested());
+  }
+}
+
+final class HTTPServerProtocolStream implements
+  NetworkStream<InternetEndpoint> {
+  private int $offset = 0;
+  private bool $closed = false;
+  public string $written = '';
+
+  public function __construct(
+    private string $incoming,
+    private InternetEndpoint $localEndpoint,
+    private InternetEndpoint $peerEndpoint,
+  ) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->offset >= length!($this->incoming);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->reachedEndOfDataSource()) {
+      return '';
+    }
+
+    $remaining = length!($this->incoming) - $this->offset;
+    $length = $remaining;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->incoming, $this->offset, $length);
+    $this->offset += $length;
+    return $data;
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    $this->written .= $bytes;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return $this->tryWrite($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class HTTPServerH2Stream implements NetworkStream<InternetEndpoint> {
+  private int $offset = 0;
+  private bool $closed = false;
+  private bool $allowEnd = false;
+  public string $written = '';
+
+  public function __construct(
+    private string $incoming,
+    private InternetEndpoint $localEndpoint,
+    private InternetEndpoint $peerEndpoint,
+  ) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+    Whim\Async\later();
+    $this->allowEnd = true;
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->allowEnd && $this->offset >= length!($this->incoming);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->offset >= length!($this->incoming)) {
+      return '';
+    }
+
+    $remaining = length!($this->incoming) - $this->offset;
+    $length = $remaining;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->incoming, $this->offset, $length);
+    $this->offset += $length;
+    return $data;
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    $this->written .= $bytes;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return $this->tryWrite($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class HTTPServerRequestState {
+  public null|Request $request = null;
+  public string $body = '';
+  public null|string $trailer = null;
+  public int $calls = 0;
+  public vec<string> $targets = vec[];
+}
+
+$configuration = Configuration::default();
+assert!($configuration->maximumConnections == 1_000);
+assert!($configuration->maximumHeaderSize == 16_384);
+assert!($configuration->h2 is H2\Configuration);
+
+$handler = new Handler\FunctionHandler(
+  fn(
+    Context\Context $_context,
+    Request $_request,
+    CancellationToken $_cancellation,
+  ): Response => new Response(204),
+);
+
+assert!($handler is Handler\Handler);
+
+$response = new Responder\Bare()->respond(500, null);
+assert!($response->status == 500);
+assert!($response->body == null);
+
+$debugError = new ServerException('debug failure');
+$response = new Responder\Debug()->respond(500, $debugError);
+assert!($response->status == 500);
+assert!(
+  $response->body?->readAll()
+  == '500 Internal Server Error' . "\n\n" . $debugError->toString() . "\n",
+);
+
+$response = new Responder\Debug()->respond(404, null);
+assert!($response->status == 404);
+assert!($response->body?->readAll() == "404 Not Found\n");
+
+$exception = new HTTPException(404, 'not found');
+assert!($exception->status == 404);
+assert!($exception->getMessage() == 'not found');
+
+$security = new Context\Security(serverName: 'example.com');
+assert!($security->serverName == 'example.com');
+assert!(!$security->earlyDataAccepted);
+
+$local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+$peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60000);
+$functionContext = new ServerPrivate\H1Context(
+  ProtocolVersion::V11,
+  $local,
+  $peer,
+  new HTTPServerTestStream($local, $peer),
+  new SignalCancellationToken(),
+);
+
+$functionRequest = Request::fromParts('GET');
+$functionCancellation = new SignalCancellationToken();
+$functionHandlers = vec[
+  new Handler\FunctionHandler(fn(): Response => new Response(200)),
+  new Handler\FunctionHandler(
+    fn(Context\Context $_context): Response => new Response(201),
+  ),
+  new Handler\FunctionHandler(
+    fn(Request $_request): Response => new Response(202),
+  ),
+  new Handler\FunctionHandler(
+    fn(CancellationToken $_cancellation): Response => new Response(203),
+  ),
+  new Handler\FunctionHandler(
+    fn(
+      Context\Context $_context,
+      Request $_request,
+    ): Response => new Response(204),
+  ),
+  new Handler\FunctionHandler(
+    fn(
+      Context\Context $_context,
+      CancellationToken $_cancellation,
+    ): Response => new Response(205),
+  ),
+  new Handler\FunctionHandler(
+    fn(
+      Request $_request,
+      CancellationToken $_cancellation,
+    ): Response => new Response(206),
+  ),
+  new Handler\FunctionHandler(
+    fn(
+      Context\Context $_context,
+      Request $_request,
+      CancellationToken $_cancellation,
+    ): Response => new Response(207),
+  ),
+];
+
+foreach ($functionHandlers as $index => $functionHandler) {
+  $response = $functionHandler->handle(
+    $functionContext,
+    $functionRequest,
+    $functionCancellation,
+  );
+
+  assert!($response->status == 200 + $index);
+}
+
+$first = new HTTPServerTestStream($local, $peer);
+$second = new HTTPServerTestStream($local, $peer);
+$listener = new HTTPServerTestListener($local, vec[$first, $second]);
+$driver = new HTTPServerTestStreamDriver();
+$server = new Server(
+  vec[new Whim\HTTP\Server\Binding\Stream($listener)],
+  new Configuration(maximumConnections: 1),
+  $driver,
+);
+
+$server->serve($handler);
+assert!($driver->served == 1, 'the global connection limit is enforced');
+assert!($driver->observedDrain, 'drivers receive the graceful drain signal');
+assert!($first->isClosed());
+assert!($second->isClosed());
+assert!($listener->isClosed());
+
+$servedTwice = false;
+try {
+  $server->serve($handler);
+} catch (ServerException $_) {
+  $servedTwice = true;
+}
+
+assert!($servedTwice, 'a server instance is single-use');
+
+$cancelledStream = new HTTPServerTestStream($local, $peer);
+$cancelledListener = new HTTPServerTestListener($local, vec[$cancelledStream]);
+$cancelledDriver = new HTTPServerTestStreamDriver();
+$cancelledServer = new Server(
+  vec[new Whim\HTTP\Server\Binding\Stream($cancelledListener)],
+  Configuration::default(),
+  $cancelledDriver,
+);
+
+$cancellation = new SignalCancellationToken();
+$cancellation->cancel();
+$cancelledServer->serve($handler, $cancellation);
+assert!($cancelledDriver->served == 0);
+assert!($cancelledListener->isClosed());
+
+$state = new HTTPServerRequestState();
+$protocolStream = new HTTPServerProtocolStream(
+  "POST /echo?q=1 HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello",
+  $local,
+  $peer,
+);
+
+$protocolHandler = new Handler\FunctionHandler(
+  function(
+    Context\Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ) use ($state): Response {
+    $state->request = $request;
+    $state->body = $request->body?->readAll() ?? '';
+    $state->calls++;
+    return new Response(
+      200,
+      headers: Whim\HTTP\Message\FieldMap::from(vec[('Content-Length', '5')]),
+      body: new MemoryHandle('world'),
+    );
+  },
+);
+
+new ServerPrivate\H1Driver()->serve(
+  $protocolStream,
+  false,
+  $protocolHandler,
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!($state->calls == 1);
+assert!($state->request?->method == 'POST');
+assert!($state->request?->requestTarget == '/echo?q=1');
+assert!($state->request?->url?->toString() == 'http://example.com/echo?q=1');
+assert!($state->body == 'hello');
+assert!(Str\search($protocolStream->written, "HTTP/1.1 200 OK\r\n") == 0);
+assert!(Str\search($protocolStream->written, "server: Whim\r\n") != null);
+assert!(Str\ends_with($protocolStream->written, "\r\n\r\nworld"));
+
+$pipelineState = new HTTPServerRequestState();
+$pipelineStream = new HTTPServerProtocolStream(
+  "GET /first HTTP/1.1\r\nHost: example.com\r\n\r\nGET /second HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
+  $local,
+  $peer,
+);
+
+$pipelineHandler = new Handler\FunctionHandler(
+  function(
+    Context\Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ) use ($pipelineState): Response {
+    $pipelineState->targets[] = $request->requestTarget;
+    $pipelineState->calls++;
+    return new Response(204);
+  },
+);
+
+new ServerPrivate\H1Driver()->serve(
+  $pipelineStream,
+  false,
+  $pipelineHandler,
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!($pipelineState->calls == 2, 'buffered pipelined requests are served');
+assert!($pipelineState->targets == vec['/first', '/second']);
+
+$chunkState = new HTTPServerRequestState();
+$chunkStream = new HTTPServerProtocolStream(
+  "POST /chunks HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5;name=value\r\nhello\r\n6\r\n world\r\n0\r\nX-Checksum: 42\r\n\r\n",
+  $local,
+  $peer,
+);
+
+$chunkHandler = new Handler\FunctionHandler(
+  function(
+    Context\Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ) use ($chunkState): Response {
+    $chunkState->body = $request->body?->readAll() ?? '';
+    $chunkState->trailer = $request->trailers?->await()->get('x-checksum');
+    $chunkState->calls++;
+    return new Response(204);
+  },
+);
+
+new ServerPrivate\H1Driver()->serve(
+  $chunkStream,
+  false,
+  $chunkHandler,
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!($chunkState->calls == 1);
+assert!($chunkState->body == 'hello world');
+assert!($chunkState->trailer == '42');
+assert!(Str\search($chunkStream->written, 'HTTP/1.1 204 No Content') == 0);
+
+$invalidState = new HTTPServerRequestState();
+$invalidStream = new HTTPServerProtocolStream(
+  "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: nope\r\n\r\n",
+  $local,
+  $peer,
+);
+
+$invalidHandler = new Handler\FunctionHandler(
+  function(
+    Context\Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ) use ($invalidState): Response {
+    $invalidState->calls++;
+    return new Response(200);
+  },
+);
+
+new ServerPrivate\H1Driver()->serve(
+  $invalidStream,
+  false,
+  $invalidHandler,
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!($invalidState->calls == 0);
+assert!(Str\search($invalidStream->written, 'HTTP/1.1 400 Bad Request') == 0);
+
+$shortH1State = new HTTPServerRequestState();
+$shortH1Stream = new HTTPServerProtocolStream(
+  "GET / HTTP/1.0\r\n\r\n",
+  $local,
+  $peer,
+);
+
+new ServerPrivate\StreamDriverImpl()->serve(
+  $shortH1Stream,
+  true,
+  new Handler\FunctionHandler(
+    function(
+      Context\Context $context,
+      Request $request,
+      CancellationToken $cancellation,
+    ) use ($shortH1State): Response {
+      $shortH1State->calls++;
+      return new Response(204);
+    },
+  ),
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!($shortH1State->calls == 1);
+assert!(Str\starts_with($shortH1Stream->written, 'HTTP/1.0 204 No Content'));
+
+$h2Client = new H2\ClientConnection();
+$h2StreamId = $h2Client->nextStreamId();
+$h2Client->sendHeaders(
+  $h2StreamId,
+  vec[
+    (':method', 'POST', false),
+    (':scheme', 'http', false),
+    (':authority', 'example.com', false),
+    (':path', '/h2', false),
+    ('content-length', '5', false),
+  ],
+);
+
+$h2Client->sendData($h2StreamId, 'hello', true);
+$h2State = new HTTPServerRequestState();
+$h2Stream = new HTTPServerH2Stream(
+  $h2Client->takeOutboundBytes(),
+  $local,
+  $peer,
+);
+
+$h2Handler = new Handler\FunctionHandler(
+  function(
+    Context\Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ) use ($h2State): Response {
+    $h2State->request = $request;
+    $h2State->body = $request->body?->readAll() ?? '';
+    $h2State->calls++;
+    return new Response(
+      200,
+      headers: Whim\HTTP\Message\FieldMap::from(vec[('Content-Length', '5')]),
+      body: new MemoryHandle('world'),
+    );
+  },
+);
+
+new ServerPrivate\StreamDriverImpl()->serve(
+  $h2Stream,
+  true,
+  $h2Handler,
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!($h2State->calls == 1);
+assert!(
+  $h2State->request?->protocolVersion == Whim\HTTP\Message\ProtocolVersion::V2,
+);
+
+assert!($h2State->request?->method == 'POST');
+assert!($h2State->request?->requestTarget == '/h2');
+assert!($h2State->body == 'hello');
+
+$h2Events = $h2Client->receive($h2Stream->written);
+$h2Status = null;
+$h2Body = '';
+foreach ($h2Events as $event) {
+  if ($event is H2\Event\HeadersReceived) {
+    foreach ($event[2] as $header) {
+      if ($header[0] == ':status') {
+        $h2Status = $header[1];
+      }
+    }
+  } else if ($event is H2\Event\DataReceived) {
+    $h2Body .= $event[2];
+  }
+}
+
+assert!($h2Status == '200');
+assert!($h2Body == 'world');
+
+$upgradeWire = new H2\ClientConnection();
+$upgradeDecoder = new H2\ClientConnection();
+$upgradeStreamId = $upgradeDecoder->nextStreamId();
+$upgradeDecoder->sendHeaders(
+  $upgradeStreamId,
+  vec[
+    (':method', 'GET', false),
+    (':scheme', 'http', false),
+    (':authority', 'example.com', false),
+    (':path', '/upgraded', false),
+  ],
+  true,
+);
+
+discard!($upgradeDecoder->takeOutboundBytes());
+$upgradeState = new HTTPServerRequestState();
+$upgradeStream = new HTTPServerH2Stream(
+  "GET /upgraded HTTP/1.1\r\nHost: example.com\r\nConnection: Upgrade, HTTP2-Settings\r\nUpgrade: h2c\r\nHTTP2-Settings: \r\n\r\n"
+  . $upgradeWire->takeOutboundBytes(),
+  $local,
+  $peer,
+);
+
+$upgradeHandler = new Handler\FunctionHandler(
+  function(
+    Context\Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ) use ($upgradeState): Response {
+    $upgradeState->request = $request;
+    $upgradeState->calls++;
+    return new Response(204);
+  },
+);
+
+new ServerPrivate\StreamDriverImpl()->serve(
+  $upgradeStream,
+  true,
+  $upgradeHandler,
+  Configuration::default(),
+  new SignalCancellationToken(),
+  new SignalCancellationToken(),
+);
+
+assert!($upgradeState->calls == 1);
+assert!(
+  $upgradeState->request?->protocolVersion
+  == Whim\HTTP\Message\ProtocolVersion::V2,
+);
+
+assert!($upgradeState->request?->requestTarget == '/upgraded');
+assert!(
+  Str\starts_with(
+    $upgradeStream->written,
+    "HTTP/1.1 101 Switching Protocols\r\n",
+  ),
+);
+
+$upgradeHeadEnd = Str\search($upgradeStream->written, "\r\n\r\n") as int;
+$upgradeEvents = $upgradeDecoder->receive(
+  Str\slice($upgradeStream->written, $upgradeHeadEnd + 4),
+);
+
+$upgradeStatus = null;
+foreach ($upgradeEvents as $event) {
+  if ($event is H2\Event\HeadersReceived) {
+    foreach ($event[2] as $header) {
+      if ($header[0] == ':status') {
+        $upgradeStatus = $header[1];
+      }
+    }
+  }
+}
+
+assert!($upgradeStatus == '204');

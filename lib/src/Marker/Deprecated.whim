@@ -1,0 +1,15 @@
+namespace Whim\Marker;
+
+use Whim\Marker\TrackCaller;
+use Whim\Attribute\Attribute;
+
+/** Marks a symbol as deprecated. */
+#[Stub]
+#[Attribute(Attribute::TARGET_ALL)]
+final class Deprecated {
+  public readonly string $version;
+  public readonly string $note;
+
+  #[TrackCaller]
+  public function __construct(string $version, null|string $note = null) {}
+}

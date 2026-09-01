@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports invalid coroutine lifecycle operations. */
+#[Stub]
+class CoroutineError extends Error {}

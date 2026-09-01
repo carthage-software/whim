@@ -1,0 +1,5 @@
+class ExactMembers {
+  public const VALUE = 1;
+
+  public function invalid(self::VALUE<int> $value): void {}
+}

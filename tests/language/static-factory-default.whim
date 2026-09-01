@@ -1,0 +1,8 @@
+namespace Probe;
+
+require!('_static-factory-default.whim');
+
+$direct = new Wrapped();
+$factory = Wrapped::none();
+assert!($direct->value == null);
+assert!($factory->value == null);

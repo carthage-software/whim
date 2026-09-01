@@ -1,0 +1,65 @@
+namespace Whim\UDP;
+
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\PositiveInt;
+
+/** Configures a UDP socket. */
+final readonly class BindConfiguration implements Default {
+  #[AlwaysInline]
+  public function __construct(
+    public bool $reuseAddress = false,
+    public bool $reusePort = false,
+    public bool $broadcast = false,
+    public bool $onlyIPv6 = true,
+    public null|PositiveInt $receiveBuffer = null,
+    public null|PositiveInt $sendBuffer = null,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withReuseAddress(bool $reuseAddress): BindConfiguration {
+    return clone!($this, reuseAddress: $reuseAddress);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withReusePort(bool $reusePort): BindConfiguration {
+    return clone!($this, reusePort: $reusePort);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBroadcast(bool $broadcast): BindConfiguration {
+    return clone!($this, broadcast: $broadcast);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withOnlyIPv6(bool $onlyIPv6): BindConfiguration {
+    return clone!($this, onlyIPv6: $onlyIPv6);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withReceiveBuffer(
+    null|PositiveInt $receiveBuffer,
+  ): BindConfiguration {
+    return clone!($this, receiveBuffer: $receiveBuffer);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSendBuffer(
+    null|PositiveInt $sendBuffer,
+  ): BindConfiguration {
+    return clone!($this, sendBuffer: $sendBuffer);
+  }
+}

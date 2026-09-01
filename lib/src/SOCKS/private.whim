@@ -1,0 +1,154 @@
+namespace Whim\SOCKS\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Binary;
+use Whim\IP\Address;
+use Whim\IP\Family;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Host;
+use Whim\Network\Port;
+use Whim\Refine\NonEmptyString;
+use Whim\SOCKS\AuthenticationException;
+use Whim\SOCKS\Configuration;
+use Whim\SOCKS\ConnectionException;
+use Whim\SOCKS\ProtocolException;
+use Whim\Str;
+use Whim\TCP\Stream;
+
+/** Completes SOCKS5 negotiation on an open proxy stream. */
+#[TrackCaller]
+function handshake(
+  Stream $stream,
+  Host $host,
+  Port $port,
+  Configuration $configuration,
+  null|CancellationToken $cancellation,
+): void {
+  $username = $configuration->username;
+  $password = $configuration->password;
+  if ($username != null && $password != null) {
+    $stream->writeAll("\x05\x02\x00\x02", $cancellation);
+  } else {
+    $stream->writeAll("\x05\x01\x00", $cancellation);
+  }
+
+  $selection = $stream->readFixedSize(2, $cancellation);
+  if (Str\ord($selection[0]) != 5) {
+    throw new ProtocolException(
+      'the SOCKS proxy returned an invalid protocol version',
+    );
+  }
+
+  $method = Str\ord($selection[1]);
+  if ($method == 255) {
+    throw new AuthenticationException(
+      'the SOCKS proxy rejected every authentication method',
+    );
+  }
+
+  if ($method == 2) {
+    if ($username == null || $password == null) {
+      throw new AuthenticationException('the SOCKS proxy requires credentials');
+    }
+
+    authenticate($stream, $username, $password, $cancellation);
+  } else if ($method != 0) {
+    throw new ProtocolException(
+      'the SOCKS proxy selected an unsupported authentication method',
+    );
+  }
+
+  $request = "\x05\x01\x00" . encode_host($host);
+  $request .= Binary\encode_u16($port);
+  $stream->writeAll($request, $cancellation);
+
+  $response = $stream->readFixedSize(4, $cancellation);
+  if (Str\ord($response[0]) != 5 || Str\ord($response[2]) != 0) {
+    throw new ProtocolException('the SOCKS proxy returned a malformed reply');
+  }
+
+  $status = Str\ord($response[1]);
+  if ($status != 0) {
+    throw new ConnectionException(reply_message($status));
+  }
+
+  read_bound_address($stream, Str\ord($response[3]), $cancellation);
+  discard!($stream->readFixedSize(2, $cancellation));
+}
+
+/** Completes RFC 1929 username and password authentication. */
+#[TrackCaller]
+function authenticate(
+  Stream $stream,
+  NonEmptyString $username,
+  #[SensitiveParameter] NonEmptyString $password,
+  null|CancellationToken $cancellation,
+): void {
+  $request = "\x01" . Str\chr(length!($username)) . $username;
+  $request .= Str\chr(length!($password)) . $password;
+  $stream->writeAll($request, $cancellation);
+
+  $response = $stream->readFixedSize(2, $cancellation);
+  if (Str\ord($response[0]) != 1 || Str\ord($response[1]) != 0) {
+    throw new AuthenticationException(
+      'the SOCKS proxy rejected the supplied credentials',
+    );
+  }
+}
+
+/** Encodes one SOCKS5 destination address. */
+function encode_host(Host $host): string {
+  return match ($host) {
+    $address @ Address => match ($address->family) {
+      Family::V4 => "\x01" . $address->toBytes(),
+      Family::V6 => "\x04" . $address->toBytes(),
+    },
+    $name @ string => match (length!($name) <= 255) {
+      true => "\x03" . Str\chr(length!($name)) . $name,
+      false => throw new ProtocolException(
+        'a SOCKS destination name cannot exceed 255 bytes',
+      ),
+    },
+  };
+}
+
+/** Consumes the bound address from a successful SOCKS reply. */
+#[TrackCaller]
+function read_bound_address(
+  Stream $stream,
+  int $type,
+  null|CancellationToken $cancellation,
+): void {
+  $length = match ($type) {
+    1 => 4,
+    4 => 16,
+    3 => Str\ord($stream->readFixedSize(1, $cancellation)),
+    $_ => throw new ProtocolException(
+      'the SOCKS proxy returned an unknown address type',
+    ),
+  };
+
+  if ($type == 3 && $length == 0) {
+    throw new ProtocolException(
+      'the SOCKS proxy returned an empty bound host name',
+    );
+  }
+
+  discard!($stream->readFixedSize($length, $cancellation));
+}
+
+/** Describes a SOCKS5 connection reply. */
+function reply_message(int $status): string {
+  return match ($status) {
+    1 => 'the SOCKS proxy reported a general failure',
+    2 => 'the SOCKS proxy denied the connection',
+    3 => 'the SOCKS proxy could not reach the network',
+    4 => 'the SOCKS proxy could not reach the host',
+    5 => 'the SOCKS destination refused the connection',
+    6 => 'the SOCKS connection expired',
+    7 => 'the SOCKS proxy does not support CONNECT',
+    8 => 'the SOCKS proxy does not support the destination address type',
+    $_ => 'the SOCKS proxy returned an unknown connection failure',
+  };
+}

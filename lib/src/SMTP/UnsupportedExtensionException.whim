@@ -1,0 +1,6 @@
+namespace Whim\SMTP;
+
+use Whim\Unwind\RuntimeException;
+
+/** Thrown when a requested delivery feature is not advertised by the server. */
+final class UnsupportedExtensionException extends RuntimeException {}

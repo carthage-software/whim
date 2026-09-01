@@ -1,0 +1,193 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Database;
+use Whim\Database\Blob;
+use Whim\Database\ConnectionPool;
+use Whim\Database\ConcurrentOperationException;
+use Whim\Database\PoolConfiguration;
+use Whim\Database\SQLite\Connector;
+use Whim\Reference\Strong;
+
+$connector = Connector::inMemory();
+$connection = $connector->connect();
+
+$created = $connection->execute(
+  'CREATE TABLE items ('
+  . 'id INTEGER PRIMARY KEY, '
+  . 'name TEXT NOT NULL, '
+  . 'enabled INTEGER NOT NULL, '
+  . 'payload BLOB NOT NULL'
+  . ')',
+);
+
+assert!($created->getAffectedRows() == 0);
+$created->close();
+
+$insert = $connection->prepare(
+  'INSERT INTO items (name, enabled, payload) VALUES ($1, $2, $3)',
+);
+
+$first = $insert->execute(vec['first', true, Blob("\x00\xff")]);
+assert!($first->getAffectedRows() == 1);
+$first->close();
+$second = $insert->execute(vec['second', false, Blob('bytes')]);
+assert!($second->getAffectedRows() == 1);
+$second->close();
+$insert->close();
+
+$selected = $connection->execute(
+  'SELECT id, name, enabled, payload FROM items ORDER BY id',
+);
+
+$columns = $selected->getColumns();
+assert!(length!($columns) == 4);
+assert!($columns[0]->name == 'id');
+assert!($columns[1]->typeName == 'TEXT');
+assert!($selected->fetch() == vec[1, 'first', 1, Blob("\x00\xff")]);
+assert!($selected->fetch() == vec[2, 'second', 0, Blob('bytes')]);
+assert!($selected->fetch() == null);
+assert!($selected->isClosed());
+
+$reordered = $connection->execute(
+  'SELECT id FROM items WHERE name = $2 AND id = $1',
+  vec[1, 'first'],
+);
+
+assert!($reordered->fetch() == vec[1]);
+assert!($reordered->fetch() == null);
+
+$repeated = $connection->prepare(
+  'SELECT id FROM items WHERE name = $2 AND id = $1 AND $1 = id',
+);
+
+$repeatedResult = $repeated->execute(vec[1, 'first']);
+assert!($repeatedResult->fetch() == vec[1]);
+assert!($repeatedResult->fetch() == null);
+$repeated->close();
+
+$transaction = $connection->begin();
+$rolledBack = $transaction->execute(
+  'INSERT INTO items (name, enabled, payload) VALUES ($1, $2, $3)',
+  vec['rolled-back', true, Blob('no')],
+);
+
+$rolledBack->close();
+$transaction->rollback();
+
+$count = Database\fetch_value(
+  $connection->execute('SELECT count(*) FROM items'),
+)->unwrap();
+
+assert!($count == 2);
+
+$slow = $connection->execute(
+  'WITH RECURSIVE counter(value) AS ('
+  . 'SELECT 1 UNION ALL '
+  . 'SELECT value + 1 FROM counter WHERE value < 1000000'
+  . ') SELECT sum(value) FROM counter',
+);
+
+$advanced = new Strong::<bool>(false);
+$ticker = Async\spawn::<null>(function() use ($advanced): null {
+  $advanced->value = true;
+  return null;
+});
+
+discard!($slow->fetch());
+assert!($advanced->value);
+$ticker->await();
+$slow->close();
+
+$cancelled = $connection->execute(
+  'WITH RECURSIVE counter(value) AS ('
+  . 'SELECT 1 UNION ALL '
+  . 'SELECT value + 1 FROM counter WHERE value < 50000000'
+  . ') SELECT sum(value) FROM counter',
+);
+
+$cancellation = new SignalCancellationToken();
+Async\spawn::<null>(function() use ($cancellation): null {
+  Async\later();
+  $cancellation->cancel();
+  return null;
+})->ignore();
+
+$assertion_value_17 = fn(): mixed => $cancelled->fetch($cancellation);
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (CancelledException $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is CancelledException);
+
+$cancelled->close();
+
+$connection->ping();
+assert!($connection->isReusable());
+$connection->close();
+assert!($connection->isClosed());
+
+$pool = new ConnectionPool(
+  Connector::inMemory(),
+  new PoolConfiguration(
+    maximumConnections: 1,
+    maximumIdleConnections: 1,
+    validationInterval: null,
+  ),
+);
+
+$pooled = $pool->connect();
+$iteration = 0;
+while ($iteration < 25) {
+  $result = $pooled->execute(
+    'WITH RECURSIVE counter(value) AS ('
+    . 'SELECT 1 UNION ALL '
+    . 'SELECT value + 1 FROM counter WHERE value < 1000000'
+    . ') SELECT value FROM counter',
+  );
+
+  $assertion_value_20 = function() use ($pooled): void {
+    $pooled->ping();
+  };
+
+  $assertion_error_20 = null;
+  try {
+    $assertion_value_20();
+  } catch (ConcurrentOperationException $assertion_caught_20) {
+    $assertion_error_20 = $assertion_caught_20;
+  }
+
+  assert!($assertion_error_20 is ConcurrentOperationException);
+
+  $result->close();
+  $pooled->ping();
+  $iteration++;
+}
+
+$pooled->close();
+assert!($pool->getIdleConnections() == 1);
+$pool->close();
+
+$connections = vec[];
+$futures = vec[];
+$index = 0;
+while ($index < 12) {
+  $pooled = Connector::inMemory()->connect();
+  $connections[] = $pooled;
+  $futures[] = Async\spawn::<int>(function() use ($pooled): int {
+    return Database\fetch_value($pooled->execute('SELECT 1'))->unwrap() as int;
+  });
+
+  $index++;
+}
+
+foreach ($futures as $future) {
+  assert!($future->await() == 1);
+}
+
+foreach ($connections as $pooled) {
+  $pooled->close();
+}

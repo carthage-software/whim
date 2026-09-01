@@ -1,0 +1,12 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\HTTP\_Private\Event\WeakendEvent;
+use Whim\Unwind\Throwable;
+
+/** Carries HTTP/2 events or a connection failure to one exchange. */
+final readonly class H2EventBatch {
+  public function __construct(
+    public vec<WeakendEvent> $events,
+    public null|Throwable $error = null,
+  ) {}
+}

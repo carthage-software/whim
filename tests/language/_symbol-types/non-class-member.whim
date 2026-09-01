@@ -1,0 +1,3 @@
+function exact_function(): void {}
+
+function invalid(exact_function::member $value): void {}

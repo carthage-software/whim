@@ -1,0 +1,25 @@
+use Whim\Float;
+use Whim\Int;
+
+assert!(Int\try_parse('42') == 42);
+assert!(Int\try_parse('-42') == -42);
+assert!(Int\try_parse('+42') == 42);
+assert!(Int\try_parse('9223372036854775807') == 9_223_372_036_854_775_807);
+assert!(Int\try_parse('-9223372036854775808') == -9_223_372_036_854_775_808);
+
+assert!(Int\try_parse('9223372036854775808') == null);
+assert!(Int\try_parse('') == null);
+assert!(Int\try_parse(' 42') == null);
+assert!(Int\try_parse('42.0') == null);
+assert!(Int\try_parse("\xff") == null);
+
+assert!(Float\try_parse('1.5') == 1.5);
+assert!(Float\try_parse('.5') == 0.5);
+assert!(Float\try_parse('1.') == 1.0);
+assert!(Float\try_parse('-1e3') == -1000.0);
+assert!(Float\is_nan(Float\try_parse('NaN') as float));
+assert!(Float\is_infinite(Float\try_parse('inf') as float));
+assert!(Float\try_parse(' 1.5') == null);
+assert!(Float\try_parse('1e') == null);
+assert!(Float\try_parse('one') == null);
+assert!(Float\try_parse("\xff") == null);

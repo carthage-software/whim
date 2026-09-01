@@ -1,0 +1,28 @@
+namespace Whim\IO;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+
+/** Represents a destination that discards every byte. */
+final class SinkWriteHandle implements WriteHandle {
+  /** Completes immediately because the destination is always writable. */
+  #[AlwaysInline]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  /** Discards every byte and reports all of them accepted. */
+  #[AlwaysInline]
+  public function tryWrite(string $bytes): int {
+    return length!($bytes);
+  }
+
+  /** Discards every byte and reports all of them written. */
+  #[AlwaysInline]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return length!($bytes);
+  }
+}

@@ -1,0 +1,13 @@
+namespace Whim\HTTP\Server\Context;
+
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\InformationalStatusCode;
+
+/** A context that can send informational responses. */
+interface Informational extends Context {
+  /** Sends an informational response before the final response. */
+  public function sendInformationalResponse(
+    InformationalStatusCode $status,
+    FieldMap $headers = FieldMap::default(),
+  ): void;
+}

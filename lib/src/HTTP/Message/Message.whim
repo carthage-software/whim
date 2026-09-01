@@ -1,0 +1,11 @@
+namespace Whim\HTTP\Message;
+
+use Whim\Async\Future;
+use Whim\IO\ReadHandle;
+/** Holds the parts shared by HTTP requests and responses. */
+abstract readonly class Message for Request, Response {
+  public ProtocolVersion $protocolVersion;
+  public FieldMap $headers;
+  public null|ReadHandle $body;
+  public null|Future<FieldMap> $trailers;
+}

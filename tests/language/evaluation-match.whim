@@ -1,0 +1,519 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\ParserError;
+use Whim\Unwind\UnhandledMatchError;
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+File\write(
+  $work . '/default-must-be-last.whim',
+  '$value = match (1) {'
+  . "\n"
+  . '    default => \'default\','
+  . "\n"
+  . '    1 => \'one\','
+  . "\n"
+  . '};'
+  . "\n",
+);
+
+$defaultMustBeLast = $work . '/default-must-be-last.whim';
+$assertion_value_1 = function() use ($defaultMustBeLast): void {
+  require!($defaultMustBeLast);
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (ParserError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is ParserError);
+
+File\write(
+  $work . '/duplicate-bindings.whim',
+  '$value = (\'left\', \'right\');'
+  . "\n\n"
+  . '$result = match ($value) {'
+  . "\n"
+  . '    ($name @ string, $name @ string) => $name,'
+  . "\n"
+  . '    $_ => \'other\','
+  . "\n"
+  . '};'
+  . "\n",
+);
+
+$duplicateBindings = $work . '/duplicate-bindings.whim';
+$assertion_value_2 = function() use ($duplicateBindings): void {
+  require!($duplicateBindings);
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (CompilerError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is CompilerError);
+
+File\write(
+  $work . '/irrefutable-mixed-must-be-last.whim',
+  '$value = match (\'value\') {'
+  . "\n"
+  . '    mixed => \'first\','
+  . "\n"
+  . '    $_ => \'unreachable\','
+  . "\n"
+  . '};'
+  . "\n",
+);
+
+$irrefutableMixed = $work . '/irrefutable-mixed-must-be-last.whim';
+$assertion_value_3 = function() use ($irrefutableMixed): void {
+  require!($irrefutableMixed);
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (CompilerError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is CompilerError);
+
+File\write(
+  $work . '/type-default-must-be-last.whim',
+  '$value = match (1) {'
+  . "\n"
+  . '    $_ => \'default\','
+  . "\n"
+  . '    $integer @ int => $integer,'
+  . "\n"
+  . '};'
+  . "\n",
+);
+
+$typeDefaultMustBeLast = $work . '/type-default-must-be-last.whim';
+$assertion_value_4 = function() use ($typeDefaultMustBeLast): void {
+  require!($typeDefaultMustBeLast);
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (CompilerError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is CompilerError);
+
+File\write(
+  $work . '/type-duplicate-default.whim',
+  '$value = match (1) {'
+  . "\n"
+  . '    $_ => \'first\','
+  . "\n"
+  . '    $_ => \'second\','
+  . "\n"
+  . '};'
+  . "\n",
+);
+
+$typeDuplicateDefault = $work . '/type-duplicate-default.whim';
+$assertion_value_5 = function() use ($typeDuplicateDefault): void {
+  require!($typeDuplicateDefault);
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (CompilerError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is CompilerError);
+
+File\write(
+  $work . '/standalone-wildcard.whim',
+  '$value = match (1) {' . "\n" . '    _ => \'fallback\',' . "\n" . '};' . "\n",
+);
+
+$standaloneWildcard = $work . '/standalone-wildcard.whim';
+$assertion_value_6 = function() use ($standaloneWildcard): void {
+  require!($standaloneWildcard);
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (CompilerError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is CompilerError);
+
+Filesystem\delete_directory($work, true);
+
+enum Color {
+  case Red;
+  case Green;
+  case Blue;
+
+  public function label(): string {
+    return match ($this) {
+      self::Red => 'red',
+      self::Green => 'green',
+      self::Blue => 'blue',
+    };
+  }
+}
+
+function color_name(Color $color): string {
+  return match ($color) {
+    Color::Red => 'red',
+    Color::Green => 'green',
+    Color::Blue => 'blue',
+  };
+}
+
+assert!(color_name(Color::Red) == 'red');
+assert!(color_name(Color::Green) == 'green');
+assert!(color_name(Color::Blue) == 'blue');
+assert!(Color::Red->label() == 'red');
+assert!(Color::Green->label() == 'green');
+assert!(Color::Blue->label() == 'blue');
+
+function describe_nested(mixed $value): string {
+  return match ($value) {
+    ($name @ string, $count @ int) => $name . ': ' . $count,
+    vec[$first @ int, ...string] => 'first: ' . $first . ' (and more strings)',
+    vec[$first @ int, ...int] => 'first: ' . $first . ' (and more ints)',
+    dict['name' => $name @ string, 'count' => $count @ int, ...] => $name
+    . ': '
+    . $count,
+    ($scalar @ int) | ($scalar @ string) => 'scalar: ' . $scalar,
+    $_ => 'something else',
+  };
+}
+
+assert!(describe_nested(('apples', 5)) == 'apples: 5');
+assert!(describe_nested(vec[1, 2, 3]) == 'first: 1 (and more ints)');
+assert!(
+  describe_nested(vec[1, 'two', 'three']) == 'first: 1 (and more strings)',
+);
+
+assert!(
+  describe_nested(dict['name' => 'oranges', 'count' => 3]) == 'oranges: 3',
+);
+
+assert!(describe_nested(42) == 'scalar: 42');
+assert!(describe_nested(false) == 'something else');
+
+final class MatchTrace {
+  public static vec<string> $events = vec[];
+}
+
+function match_subject(): int {
+  MatchTrace::$events[] = 'subject';
+  return 2;
+}
+
+function match_chosen(): string {
+  MatchTrace::$events[] = 'chosen';
+  return 'two';
+}
+
+function match_skipped(): string {
+  MatchTrace::$events[] = 'skipped';
+  return 'other';
+}
+
+$word = match (match_subject()) {
+  1 => match_skipped(),
+  2 => match_chosen(),
+  2 => match_skipped(),
+  $_ => match_skipped(),
+};
+
+assert!($word == 'two');
+assert!(MatchTrace::$events == vec['subject', 'chosen']);
+
+$fallback = match (99) {
+  1 => 'one',
+  $_ => 'anything else',
+};
+
+assert!($fallback == 'anything else');
+
+abstract class Shape {}
+
+final class Circle extends Shape {
+  public function __construct(public float $radius) {}
+}
+
+final class Rectangle extends Shape {
+  public function __construct(public float $width, public float $height) {}
+}
+
+final class EvaluationCount {
+  public int $value = 0;
+}
+
+function counted_circle(EvaluationCount $count): mixed {
+  $count->value++;
+  return new Circle(2.0);
+}
+
+function describe_typed(mixed $value): string {
+  return match ($value) {
+    $circle @ Circle => 'circle:' . $circle->radius,
+    $rectangle @ Rectangle => 'rectangle:'
+    . ($rectangle->width * $rectangle->height),
+    ($number, $_) @ (int, 5) => 'literal-tuple:' . $number,
+    (($number, $text), $flag) @ ((int, string), bool) => $text
+    . ':'
+    . $number
+    . ':'
+    . match ($flag) {
+      true => 'yes',
+      false => 'no',
+    },
+    ($head, ...$tail) @ vec<int> => 'vec:' . $head . ':' . length!($tail),
+    $scalar @ (int | string) => 'scalar:' . $scalar,
+    $_ => 'other',
+  };
+}
+
+$count = new EvaluationCount();
+assert!(describe_typed(counted_circle($count)) == 'circle:2.0');
+assert!($count->value == 1);
+assert!(describe_typed(new Rectangle(3.0, 4.0)) == 'rectangle:12.0');
+assert!(describe_typed((7, 5)) == 'literal-tuple:7');
+assert!(describe_typed(((3, 'item'), true)) == 'item:3:yes');
+assert!(describe_typed(vec[1, 2, 3]) == 'vec:1:2');
+assert!(describe_typed('hello') == 'scalar:hello');
+assert!(describe_typed(dict[]) == 'other');
+
+$integer_or_zero = fn(
+  mixed $value,
+): int => (
+  match ($value) {
+    $number @ int => $number,
+    $_ => 0,
+  }
+);
+
+assert!($integer_or_zero(9) == 9);
+assert!($integer_or_zero('nine') == 0);
+
+$assertion_value_31 = fn(): string => (
+  match (1.0) {
+    1 => 'a',
+  }
+);
+
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (UnhandledMatchError $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is UnhandledMatchError);
+
+$assertion_value_32 = fn(): string => (
+  match (5) {
+    1 => 'a',
+    2 => 'b',
+  }
+);
+
+$assertion_error_32 = null;
+try {
+  $assertion_value_32();
+} catch (UnhandledMatchError $assertion_caught_32) {
+  $assertion_error_32 = $assertion_caught_32;
+}
+
+assert!($assertion_error_32 is UnhandledMatchError);
+
+$negative = match (dict[-5 => 1]) {
+  dict[-5 => $_] => true,
+  $_ => false,
+};
+
+assert!($negative);
+
+$minimum = match (dict[-9223372036854775808 => 1]) {
+  dict[-9223372036854775808 => $_] => true,
+  $_ => false,
+};
+
+assert!($minimum);
+
+$outside = 'outside';
+$shadowed = match (1) {
+  $outside @ int => $outside,
+};
+
+assert!($shadowed == 1);
+assert!($outside == 'outside');
+
+function classify_literal(mixed $value): string {
+  return match ($value) {
+    true => 'true',
+    7 => 'int',
+    7.5 => 'float',
+    'seven' => 'string',
+    (true, false) => 'tuple',
+    vec[1, 2] => 'vec',
+    dict['left' => true, 'right' => false] => 'dict',
+    $_ => 'other',
+  };
+}
+
+assert!(classify_literal(true) == 'true');
+assert!(classify_literal(7) == 'int');
+assert!(classify_literal(7.5) == 'float');
+assert!(classify_literal('seven') == 'string');
+assert!(classify_literal((true, false)) == 'tuple');
+assert!(classify_literal(vec[1, 2]) == 'vec');
+assert!(classify_literal(dict['right' => false, 'left' => true]) == 'dict');
+assert!(classify_literal(null) == 'other');
+
+function classify_range(mixed $value): int {
+  return match ($value) {
+    0..=10 => 1,
+    5..=20 => 2,
+    42.. => 3,
+    $_ => 4,
+  };
+}
+
+assert!(classify_range(7) == 1);
+assert!(classify_range(15) == 2);
+assert!(classify_range(42) == 3);
+assert!(classify_range(41) == 4);
+assert!(classify_range('7') == 4);
+
+function classify_boolean(mixed $value): string {
+  return match ($value) {
+    true => 'true',
+    false => 'false',
+    $_ => 'other',
+  };
+}
+
+assert!(classify_boolean(true) == 'true');
+assert!(classify_boolean(false) == 'false');
+assert!(classify_boolean(0) == 'other');
+
+function classify_flags(bool $top, bool $bottom): int {
+  return match (($top, $bottom)) {
+    (true, true) => 1,
+    (true, false) => 2,
+    (false, true) => 3,
+    (false, false) => 4,
+  };
+}
+
+assert!(classify_flags(true, true) == 1);
+assert!(classify_flags(true, false) == 2);
+assert!(classify_flags(false, true) == 3);
+assert!(classify_flags(false, false) == 4);
+
+final class TupleMatchTrace {
+  public static vec<string> $events = vec[];
+}
+
+function traced_flag(string $name, bool $value): bool {
+  TupleMatchTrace::$events[] = $name;
+  return $value;
+}
+
+$flags = match ((traced_flag('top', true), traced_flag('bottom', false))) {
+  (true, true) => 1,
+  (true, false) => 2,
+  (false, true) => 3,
+  (false, false) => 4,
+};
+
+assert!($flags == 2);
+assert!(TupleMatchTrace::$events == vec['top', 'bottom']);
+
+function classify_pair(dict<string, bool> $value): int {
+  return match ($value) {
+    dict['left' => true, 'right' => true] => 1,
+    dict['left' => true, 'right' => false] => 2,
+    dict['left' => false, 'right' => true] => 3,
+    dict['left' => false, 'right' => false] => 4,
+    $_ => 5,
+  };
+}
+
+assert!(classify_pair(dict['left' => true, 'right' => true]) == 1);
+assert!(classify_pair(dict['right' => false, 'left' => true]) == 2);
+assert!(classify_pair(dict['left' => false, 'right' => true]) == 3);
+assert!(classify_pair(dict['left' => false, 'right' => false]) == 4);
+assert!(classify_pair(dict['left' => true]) == 5);
+assert!(
+  classify_pair(dict['left' => true, 'right' => false, 'extra' => true]) == 5,
+);
+
+function classify_position(mixed $value): string {
+  return match ($value) {
+    ($left @ int, $right @ int) => $left . ':' . $right,
+    $_ => 'other',
+  };
+}
+
+assert!(classify_position((1, 2)) == '1:2');
+assert!(classify_position(vec[1, 2]) == '1:2');
+assert!(classify_position((1, 2, 3)) == 'other');
+assert!(classify_position(vec[1]) == 'other');
+
+$bound_union = match (2) {
+  $value @ 1 | 2 => $value,
+  $_ => 0,
+};
+
+assert!($bound_union == 2);
+
+$missing_key = match (dict[]) {
+  dict['id' => $id, ...] @ dict<string, mixed> => $id,
+  $_ => 'missing',
+};
+
+assert!($missing_key == 'missing');
+
+$nested = match (dict['foo' => 2, 'bar' => 'value', 'baz' => 1.5]) {
+  dict['foo' => $foo @ 1 | 2, 'bar' => $bar @ !'', ...] @ dict['foo' => int, 'bar' => string, 'baz' => float, ...] => (
+    $foo,
+    $bar,
+  ),
+  $_ => null,
+};
+
+assert!($nested == (2, 'value'));
+
+$nested_alternative = match ((dict['right' => 42],)) {
+  (dict['left' => $found @ int] | dict['right' => $found @ int],) => $found,
+  $_ => 0,
+};
+
+assert!($nested_alternative == 42);
+
+$literal_values = vec[null, false, true, 0, 1, 2, 3, 4, 1.0, '1'];
+foreach ($literal_values as $value) {
+  assert!(($value is 1) == ($value == 1));
+  assert!(($value is 1|2|3) == ($value == 1 || $value == 2 || $value == 3));
+}
+
+assert!(!('15' is 10..=20));
+assert!(!(15.0 is 10..=20));
+assert!(15 is 10..=20);

@@ -1,0 +1,82 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\FlowControlException;
+use Whim\HTTP\_Private\StreamException;
+use Whim\HTTP\_Private\StreamId;
+
+/** Tracks connection and stream flow-control windows. */
+final class FlowController {
+  private int $connectionSendWindow = H2\DEFAULT_INITIAL_WINDOW_SIZE;
+  private int $connectionReceiveWindow = H2\DEFAULT_INITIAL_WINDOW_SIZE;
+
+  public function connectionSendWindow(): int {
+    return $this->connectionSendWindow;
+  }
+
+  public function available(StreamEntry $stream): int {
+    return match ($this->connectionSendWindow < $stream->sendWindow) {
+      true => $this->connectionSendWindow,
+      false => $stream->sendWindow,
+    };
+  }
+
+  public function consumeSend(StreamEntry $stream, int $size): void {
+    if ($size > $this->connectionSendWindow || $size > $stream->sendWindow) {
+      throw new FlowControlException('the HTTP/2 send window is exhausted');
+    }
+
+    $this->connectionSendWindow -= $size;
+    $stream->sendWindow -= $size;
+  }
+
+  public function consumeReceive(
+    StreamId $streamId,
+    StreamEntry $stream,
+    int $size,
+  ): void {
+    if ($size > $this->connectionReceiveWindow) {
+      throw new FlowControlException('the HTTP/2 receive window is exhausted');
+    }
+
+    if ($size > $stream->receiveWindow) {
+      throw new StreamException(
+        'the HTTP/2 stream receive window is exhausted',
+        $streamId,
+        H2\ErrorCode::FlowControlError->value,
+      );
+    }
+
+    $this->connectionReceiveWindow -= $size;
+    $stream->receiveWindow -= $size;
+  }
+
+  public function restoreConnectionReceive(int $size): void {
+    $this->connectionReceiveWindow += $size;
+  }
+
+  public function restoreStreamReceive(StreamEntry $stream, int $size): void {
+    $stream->receiveWindow += $size;
+  }
+
+  public function updateConnectionSend(int $increment): void {
+    if ($this->connectionSendWindow + $increment > H2\MAX_WINDOW_SIZE) {
+      throw new FlowControlException(
+        'the HTTP/2 connection send window overflowed',
+      );
+    }
+
+    $this->connectionSendWindow += $increment;
+  }
+
+  public function updateStreamSend(StreamEntry $stream, int $increment): void {
+    if ($stream->sendWindow + $increment > H2\MAX_WINDOW_SIZE) {
+      throw new FlowControlException(
+        'the HTTP/2 stream send window overflowed',
+      );
+    }
+
+    $stream->sendWindow += $increment;
+  }
+}

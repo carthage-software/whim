@@ -1,0 +1,1 @@
+function invalid_method_bound(LinkMethod::call<int> $method): void {}

@@ -1,0 +1,483 @@
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\ReadonlyError;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UninitializedPropertyError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_type-system-annotations/classname-of-int.whim',
+  '`classname<T>` requires an inner type that can contain a class-like type',
+);
+
+raises('_type-system-annotations/parent-without-parent.whim', 'has no parent');
+
+$assertion_value_1 = function(): void {
+  require!('_type-system-annotations/literal_mismatch.whim');
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (CompilerError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is CompilerError);
+
+$assertion_value_2 = function(): void {
+  require!('_type-system-annotations/alias_literal_mismatch.whim');
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (CompilerError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is CompilerError);
+
+$assertion_value_3 = function(): void {
+  require!('_type-system-annotations/computed_mismatch.whim');
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (LinkerError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is LinkerError);
+
+$assertion_value_4 = function(): void {
+  require!('_type-system-annotations/float_backing.whim');
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (CompilerError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is CompilerError);
+
+$assertion_value_5 = function(): void {
+  require!('_type-system-annotations/literal_case_mismatch.whim');
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (CompilerError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is CompilerError);
+
+$assertion_value_6 = function(): void {
+  require!('_type-system-annotations/computed_case_mismatch.whim');
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (LinkerError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is LinkerError);
+
+$assertion_value_7 = function(): void {
+  require!('_type-system-annotations/void_gate.whim');
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (CompilerError $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is CompilerError);
+
+$assertion_value_8 = function(): void {
+  require!('_type-system-annotations/never_gate.whim');
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (CompilerError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is CompilerError);
+
+class Fine {
+  public const int COUNT = 40 + 2;
+  public const int|string LABEL = 'ok';
+}
+
+type Ident = int|string;
+
+class Aliased {
+  public const Ident ID = 5;
+}
+
+assert!(Fine::COUNT == 42);
+assert!(Fine::LABEL == 'ok');
+assert!(Aliased::ID == 5);
+
+enum Answer: int {
+  case Computed = 40 + 2;
+  case Plain = 7;
+}
+
+enum Label: string {
+  case Ok = 'ok';
+}
+
+assert!(Answer::Computed->value == 42);
+assert!(Answer::Plain->value == 7);
+assert!(Label::Ok->value == 'ok');
+
+$assertion_value_15 = fn(): bool => Whim\Float\is_nan(5);
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (TypeError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is TypeError);
+
+function enforced_label(int $n): string {
+  return 'n=' . $n;
+}
+
+function enforced_lies(): int {
+  return 'not an int';
+}
+
+$assertion_value_16 = fn(): mixed => enforced_label('wrong');
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (TypeError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is TypeError);
+$assertion_value_17 = fn(): mixed => enforced_lies();
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (TypeError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is TypeError);
+
+class Holder {
+  public int $slot = 0;
+  public static vec<int> $shared = vec[1];
+}
+
+$holder = new Holder();
+$assertion_value_18 = function() use ($holder): void {
+  $holder->slot = 'text';
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is TypeError);
+
+$assertion_value_19 = function(): void {
+  Holder::$shared = vec[1, 'text'];
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is TypeError);
+
+function nothing(): void {}
+
+$nothingResult = nothing();
+assert!($nothingResult == null);
+
+class DictionaryHolder {
+  public function __construct(public dict<int, int> $values) {}
+
+  public function put(mixed $key, mixed $value): void {
+    $this->values[$key] = $value;
+  }
+}
+
+$dictionaryHolder = new DictionaryHolder(dict[1 => 10]);
+$dictionaryHolder->put(2, 20);
+$dictionaryHolder->put(1, 11);
+assert!($dictionaryHolder->values == dict[1 => 11, 2 => 20]);
+
+$assertion_value_22 = function() use ($dictionaryHolder): void {
+  $dictionaryHolder->put(3, 'wrong');
+};
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (TypeError $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is TypeError);
+
+assert!($dictionaryHolder->values == dict[1 => 11, 2 => 20]);
+
+$assertion_value_24 = function() use ($dictionaryHolder): void {
+  $dictionaryHolder->put('wrong', 30);
+};
+
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (TypeError $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is TypeError);
+
+assert!($dictionaryHolder->values == dict[1 => 11, 2 => 20]);
+
+class NestedDictionaryHolder {
+  public function __construct(public dict<int, dict<int, int>> $values) {}
+
+  public function put(mixed $outer, mixed $inner, mixed $value): void {
+    $this->values[$outer][$inner] = $value;
+  }
+}
+
+$nestedHolder = new NestedDictionaryHolder(dict[1 => dict[1 => 10]]);
+$nestedHolder->put(1, 2, 20);
+assert!($nestedHolder->values == dict[1 => dict[1 => 10, 2 => 20]]);
+
+$assertion_value_27 = function() use ($nestedHolder): void {
+  $nestedHolder->put(1, 3, false);
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (TypeError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is TypeError);
+
+assert!($nestedHolder->values == dict[1 => dict[1 => 10, 2 => 20]]);
+
+class CounterBag {
+  public dict<int, int> $values = dict[0 => 1];
+
+  public function increment(int $key): void {
+    $this->values[$key]++;
+  }
+}
+
+$bag = new CounterBag();
+$bagAlias = $bag->values;
+$bag->increment(0);
+assert!($bag->values == dict[0 => 2]);
+assert!($bagAlias == dict[0 => 1]);
+
+class LiteralCounterBag {
+  public dict<int, 1> $values = dict[0 => 1];
+
+  public function increment(): void {
+    $this->values[0]++;
+  }
+}
+
+$literalBag = new LiteralCounterBag();
+$assertion_value_31 = function() use ($literalBag): void {
+  $literalBag->increment();
+};
+
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (TypeError $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is TypeError);
+
+assert!($literalBag->values == dict[0 => 1]);
+
+readonly class ReadonlyCounterBag {
+  public function __construct(public dict<int, int> $values) {}
+
+  public function increment(int $key): void {
+    $this->values[$key]++;
+  }
+}
+
+$readonlyBag = new ReadonlyCounterBag(dict[0 => 1]);
+$assertion_value_33 = function() use ($readonlyBag): void {
+  $readonlyBag->increment(1);
+};
+
+$assertion_error_33 = null;
+try {
+  $assertion_value_33();
+} catch (OutOfBoundsError $assertion_caught_33) {
+  $assertion_error_33 = $assertion_caught_33;
+}
+
+assert!($assertion_error_33 is OutOfBoundsError);
+
+assert!($readonlyBag->values == dict[0 => 1]);
+
+$assertion_value_35 = function() use ($readonlyBag): void {
+  $readonlyBag->increment(0);
+};
+
+$assertion_error_35 = null;
+try {
+  $assertion_value_35();
+} catch (ReadonlyError $assertion_caught_35) {
+  $assertion_error_35 = $assertion_caught_35;
+}
+
+assert!($assertion_error_35 is ReadonlyError);
+
+assert!($readonlyBag->values == dict[0 => 1]);
+
+class ScalarStats {
+  public int $count = 5;
+  public float $energy = 1.5;
+
+  public function increment(): void {
+    $this->count++;
+  }
+
+  public function retreat(): void {
+    $this->count += -2;
+  }
+
+  public function addEnergy(int|float $amount): void {
+    $this->energy += $amount;
+  }
+}
+
+$stats = new ScalarStats();
+$stats->increment();
+$stats->retreat();
+$stats->addEnergy(2);
+$stats->addEnergy(0.25);
+assert!($stats->count == 4);
+assert!($stats->energy == 3.75);
+
+class LiteralProperty {
+  public 1 $value = 1;
+
+  public function increment(): void {
+    $this->value++;
+  }
+}
+
+$literalProperty = new LiteralProperty();
+$assertion_value_39 = function() use ($literalProperty): void {
+  $literalProperty->increment();
+};
+
+$assertion_error_39 = null;
+try {
+  $assertion_value_39();
+} catch (TypeError $assertion_caught_39) {
+  $assertion_error_39 = $assertion_caught_39;
+}
+
+assert!($assertion_error_39 is TypeError);
+
+assert!($literalProperty->value == 1);
+
+readonly class FixedProperty {
+  public function __construct(public int $value) {}
+
+  public function add(mixed $amount): void {
+    $this->value += $amount;
+  }
+
+  public function increment(): void {
+    $this->value++;
+  }
+}
+
+$fixedProperty = new FixedProperty(3);
+$assertion_value_41 = function() use ($fixedProperty): void {
+  $fixedProperty->add('not numeric');
+};
+
+$assertion_error_41 = null;
+try {
+  $assertion_value_41();
+} catch (IncompatibleOperandsError $assertion_caught_41) {
+  $assertion_error_41 = $assertion_caught_41;
+}
+
+assert!($assertion_error_41 is IncompatibleOperandsError);
+
+assert!($fixedProperty->value == 3);
+
+$assertion_value_43 = function() use ($fixedProperty): void {
+  $fixedProperty->increment();
+};
+
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (ReadonlyError $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is ReadonlyError);
+
+assert!($fixedProperty->value == 3);
+
+class LateProperty {
+  public int $value;
+
+  public function increment(): void {
+    $this->value++;
+  }
+}
+
+$lateProperty = new LateProperty();
+$assertion_value_45 = function() use ($lateProperty): void {
+  $lateProperty->increment();
+};
+
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (UninitializedPropertyError $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is UninitializedPropertyError);

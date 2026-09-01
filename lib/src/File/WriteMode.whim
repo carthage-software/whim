@@ -1,0 +1,18 @@
+namespace Whim\File;
+
+use Whim\_Private;
+
+/** Selects how a whole-file write opens its destination, as operating-system flags. */
+enum WriteMode: int {
+  /** Opens or creates a file without truncating existing contents. */
+  case OpenOrCreate = _Private\OPEN_FLAG_CREATE;
+
+  /** Creates a missing file and truncates an existing file. */
+  case Truncate = _Private\OPEN_FLAG_CREATE | _Private\OPEN_FLAG_TRUNCATE;
+
+  /** Creates a missing file and appends to an existing file. */
+  case Append = _Private\OPEN_FLAG_CREATE | _Private\OPEN_FLAG_APPEND;
+
+  /** Creates a new file and refuses to replace an existing node. */
+  case MustCreate = _Private\OPEN_FLAG_CREATE | _Private\OPEN_FLAG_EXCLUSIVE;
+}

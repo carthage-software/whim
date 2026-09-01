@@ -1,0 +1,583 @@
+#!/usr/bin/env whim
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\Command;
+use Whim\Env;
+use Whim\Filesystem;
+use Whim\IO;
+use Whim\Math;
+use Whim\Str;
+use Whim\Terminal;
+use Whim\Time\Duration;
+use Whim\Time\Instant;
+use Whim\Unwind\Throwable;
+use Whim\Vec;
+
+const TEST_TIMEOUT_SECONDS = 180;
+
+/** Reports a fatal runner error on standard error and ends the run. */
+function fail(string $message): never {
+  write_error_line!('error: ' . $message);
+  exit!(1);
+}
+
+/** Applies ANSI styling when color output is enabled. */
+function paint(bool $color, string $text, string $sequence): string {
+  if (!$color) {
+    return $text;
+  }
+
+  return $sequence . $text . "\e[0m";
+}
+
+/** Renders a millisecond count compactly. */
+function elapsed(float $milliseconds): string {
+  if ($milliseconds < 1000.0) {
+    return Str\strip_suffix('' . Math\round($milliseconds, 0), '.0') . 'ms';
+  }
+
+  return Math\round($milliseconds / 1000.0, 2) . 's';
+}
+
+/** Reads a float tally entry, defaulting to zero. */
+function tally(dict<string, float> $values, string $key): float {
+  if (contains_key!($values, $key)) {
+    return $values[$key];
+  }
+
+  return 0.0;
+}
+
+/** Reads an int tally entry, defaulting to zero. */
+function count_of(dict<string, int> $values, string $key): int {
+  if (contains_key!($values, $key)) {
+    return $values[$key];
+  }
+
+  return 0;
+}
+
+/** Reads a string entry, defaulting to a dash. */
+function name_of(dict<string, string> $values, string $key): string {
+  if (contains_key!($values, $key)) {
+    return $values[$key];
+  }
+
+  return '-';
+}
+
+/** Collects every test file beneath a directory, recursively. */
+function discover(string $directory, string $prefix): vec<string> {
+  $found = vec[];
+  foreach (Filesystem\read_directory($directory) as $entry) {
+    $name = $entry->name;
+    $path = $directory . '/' . $name;
+    $relative = $name;
+    if ($prefix != '') {
+      $relative = $prefix . '/' . $name;
+    }
+
+    if (Filesystem\is_directory($path)) {
+      if (Str\starts_with($name, '_')) {
+        continue;
+      }
+
+      foreach (discover($path, $relative) as $nested) {
+        $found[] = $nested;
+      }
+
+      continue;
+    }
+
+    if (
+      Str\ends_with($name, '.whim')
+      && $relative != 'run.whim'
+      && !Str\starts_with($name, '_')
+    ) {
+      $found[] = $relative;
+    }
+  }
+
+  return $found;
+}
+
+/**
+ * Files whose run time says nothing about the optimizer: the fuzzer builds a
+ * different program every time.
+ */
+function paces_itself(string $test): bool {
+  return Str\contains($test, 'compiler-fuzz');
+}
+
+/**
+ * Reports when an optimized run took more than twice its unoptimized one.
+ *
+ * Optimizing is allowed to cost something, never to dominate: a program that
+ * runs for a moment must not spend seconds being prepared. Runs under
+ * `FLOOR` are all startup and say nothing either way.
+ */
+function optimization_overhead(
+  string $test,
+  dict<string, float> $timings,
+): null|string {
+  $floor = 50.0;
+  $budget = 2.0;
+  if (paces_itself($test)) {
+    return null;
+  }
+
+  $optimized = tally($timings, 'optimized');
+  $unoptimized = tally($timings, 'unoptimized');
+  if ($optimized < $floor || $unoptimized <= 0.0) {
+    return null;
+  }
+
+  $ratio = $optimized / $unoptimized;
+  if ($ratio <= $budget) {
+    return null;
+  }
+
+  return (
+    $test
+    . ' (optimized) took '
+    . elapsed($optimized)
+    . ' against '
+    . elapsed($unoptimized)
+    . ' unoptimized: '
+    . Math\round(($ratio - 1.0) * 100.0, 0)
+    . '% slower, over the 100% budget'
+  );
+}
+
+/** Runs one test file in one mode, returning null or a failure report. */
+function execute(
+  string $binary,
+  string $file,
+  string $mode,
+  string $optimizations,
+  vec<string> $arguments,
+): null|string {
+  $child = Command\Command::create($binary)
+    ->withArguments($arguments)
+    ->withVariable('WHIM_OPTIMIZATIONS', $optimizations)
+    ->withVariable('WHIM_LOG', 'error')
+    ->withOwnProcessGroup()
+    ->start();
+
+  try {
+    $output = $child->join(
+      new TimeoutCancellationToken(Duration::fromSeconds(TEST_TIMEOUT_SECONDS)),
+    );
+  } catch (CancelledException $_) {
+    $child->kill();
+    return (
+      $file . ' (' . $mode . '): timed out after ' . TEST_TIMEOUT_SECONDS . 's'
+    );
+  }
+
+  if (!$output->isSuccess()) {
+    return $file . ' (' . $mode . ') failed:' . "\n" . $output->standardError;
+  }
+
+  if ($output->standardOutput != '') {
+    return (
+      $file
+      . ' ('
+      . $mode
+      . ') wrote to standard output: ['
+      . $output->standardOutput
+      . ']'
+    );
+  }
+
+  if ($output->standardError != '') {
+    return (
+      $file
+      . ' ('
+      . $mode
+      . ') wrote to standard error: ['
+      . $output->standardError
+      . ']'
+    );
+  }
+
+  return null;
+}
+
+$script = Env\current_script();
+if ($script == null) {
+  fail('the runner cannot locate its own directory');
+}
+
+$directory = '.';
+$slash = Str\search_last($script, '/');
+if ($slash != null) {
+  $directory = Str\slice($script, 0, $slash);
+}
+
+$binary = Env\current_binary();
+if ($binary == null) {
+  fail('the runner cannot locate the interpreter that runs it');
+}
+
+$filter = null;
+$parallelism = 10;
+$quiet = false;
+$serial = false;
+$console = IO\write_handle();
+$noColor = Env\get_variable('NO_COLOR');
+$color = ($noColor == null || $noColor == '') && Terminal\attached($console);
+$positional = 0;
+foreach (Env\get_arguments() as $argument) {
+  if ($argument == '--quiet' || $argument == '-q') {
+    $quiet = true;
+    continue;
+  }
+
+  if ($argument == '--no-color') {
+    $color = false;
+    continue;
+  }
+
+  if ($argument == '--serial') {
+    $serial = true;
+    continue;
+  }
+
+  if ($positional == 0) {
+    $positional++;
+    if ($argument != '') {
+      $filter = $argument;
+    }
+
+    continue;
+  }
+
+  if ($positional == 1) {
+    $positional++;
+    try {
+      $parallelism = Math\from_base($argument, 10);
+    } catch (Throwable $_) {
+      fail('parallelism must be a positive integer, got ' . $argument);
+    }
+
+    continue;
+  }
+
+  fail('unexpected argument ' . $argument);
+}
+
+if ($parallelism < 1) {
+  fail('parallelism must be at least 1');
+}
+
+if ($serial) {
+  $parallelism = 1;
+}
+
+$modes = vec[('unoptimized', 'off'), ('optimized', 'on')];
+$tests = Vec\sort::<string>(discover($directory, ''));
+if ($filter != null) {
+  $selected = vec[];
+  foreach ($tests as $test) {
+    if (Str\contains($test, $filter)) {
+      $selected[] = $test;
+    }
+  }
+
+  if (length!($selected) == 0) {
+    fail('no test matches ' . $filter);
+  }
+
+  $tests = $selected;
+}
+
+$started = Instant::now();
+$width = 0;
+foreach ($tests as $test) {
+  if (length!($test) > $width) {
+    $width = length!($test);
+  }
+}
+
+if (!$quiet) {
+  $console->write(
+    paint($color, 'Running', "\e[1m")
+    . ' '
+    . length!($tests)
+    . ' test file(s) x '
+    . length!($modes)
+    . ' mode(s) (optimized, unoptimized), '
+    . $parallelism
+    . ' file(s) at a time'
+    . "\n\n",
+  );
+
+  $console->flush();
+}
+
+$run = function(
+  string $test,
+) use ($directory, $binary, $modes, $quiet, $color, $console, $width): vec<
+  (string, null|string, null|string, float),
+> {
+  $file = $directory . '/' . $test;
+  $results = vec[];
+  $timings = dict[];
+  $successful = true;
+  foreach ($modes as ($mode, $optimizations)) {
+    $arguments = vec[$file];
+    $clock = Instant::now();
+    $failure = execute($binary, $test, $mode, $optimizations, $arguments);
+    if ($failure != null) {
+      $successful = false;
+    }
+
+    $elapsed = $clock->elapsed()->getTotalMilliseconds();
+    $timings[$mode] = $elapsed;
+    $results[] = ($mode, $failure, null, $elapsed);
+  }
+
+  $overhead = optimization_overhead($test, $timings);
+  if ($overhead != null && $successful) {
+    $repaired = vec[];
+    foreach ($results as ($mode, $failure, $_warning, $milliseconds)) {
+      $warning = null;
+      if ($mode == 'optimized' && $failure == null) {
+        $warning = $overhead;
+      }
+
+      $repaired[] = ($mode, $failure, $warning, $milliseconds);
+    }
+
+    $results = $repaired;
+  }
+
+  if (!$quiet) {
+    $fastest = -1.0;
+    foreach ($results as ($_mode, $_failure, $_warning, $milliseconds)) {
+      if ($fastest < 0.0 || $milliseconds < $fastest) {
+        $fastest = $milliseconds;
+      }
+    }
+
+    $verdict = paint($color, 'PASS', "\e[32;1m");
+
+    $timings = '';
+    foreach ($results as ($mode, $failure, $warning, $milliseconds)) {
+      $heat = "\e[93m";
+      if ($milliseconds <= $fastest) {
+        $heat = "\e[92m";
+      }
+
+      $duration = paint($color, Str\pad_left(elapsed($milliseconds), 6), $heat);
+
+      $label = $mode . ' ' . $duration;
+      if ($failure != null) {
+        $label = paint($color, $mode, "\e[31;1m") . ' ' . $duration;
+
+        $verdict = paint($color, 'FAIL', "\e[31;1m");
+      } else if ($warning != null) {
+        $label = paint($color, $mode, "\e[93;1m") . ' ' . $duration;
+
+        $verdict = paint($color, 'WARN', "\e[93;1m");
+      }
+
+      if ($timings != '') {
+        $timings = $timings . paint($color, ' | ', "\e[2m");
+      }
+
+      $timings = $timings . $label;
+    }
+
+    $console->write(
+      '  '
+      . $verdict
+      . ' '
+      . Str\pad_right($test, $width)
+      . '  '
+      . $timings
+      . "\n",
+    );
+
+    $console->flush();
+  }
+
+  return $results;
+};
+
+$semaphore = new Async\Semaphore::<
+  string,
+  vec<(string, null|string, null|string, float)>,
+>($parallelism, $run);
+
+$futures = dict[];
+foreach (Vec\shuffle::<string>($tests) as $test) {
+  $futures[$test] = Async\spawn::<
+    vec<(string, null|string, null|string, float)>,
+  >(
+    function() use ($semaphore, $test): vec<
+      (string, null|string, null|string, float),
+    > {
+      return $semaphore->waitFor($test);
+    },
+  );
+}
+
+$outcomes = Async\all::<string, vec<(string, null|string, null|string, float)>>(
+  $futures,
+);
+
+$executed = 0;
+$failures = vec[];
+$warnings = vec[];
+$modeTotals = dict[];
+$modePassed = dict[];
+$modeSlowest = dict[];
+$modeSlowestFile = dict[];
+$fileTotals = dict[];
+foreach ($tests as $test) {
+  $executed++;
+  $fileTotal = 0.0;
+  foreach ($outcomes[$test] as ($mode, $failure, $warning, $milliseconds)) {
+    $fileTotal = $fileTotal + $milliseconds;
+    $modeTotals[$mode] = tally($modeTotals, $mode) + $milliseconds;
+    if ($failure == null) {
+      $modePassed[$mode] = count_of($modePassed, $mode) + 1;
+    } else {
+      $failures[] = $failure;
+    }
+
+    if ($warning != null) {
+      $warnings[] = $warning;
+    }
+
+    if ($milliseconds > tally($modeSlowest, $mode)) {
+      $modeSlowest[$mode] = $milliseconds;
+      $modeSlowestFile[$mode] = $test;
+    }
+  }
+
+  $fileTotals[$test] = $fileTotal;
+}
+
+if ($executed != length!($tests)) {
+  fail('executed ' . $executed . ' of ' . length!($tests) . ' test file(s)');
+}
+
+foreach ($failures as $failure) {
+  $console->write(
+    "\n" . paint($color, 'FAIL', "\e[31;1m") . ' ' . $failure . "\n",
+  );
+}
+
+$console->write("\n");
+$console->write(paint($color, 'modes', "\e[1m") . "\n");
+foreach ($modes as ($mode, $_optimizations)) {
+  $passed = count_of($modePassed, $mode);
+  $status = paint($color, $passed . ' passed', "\e[32m");
+
+  if ($passed < $executed) {
+    $status =
+      $status
+      . paint($color, ' | ' . ($executed - $passed) . ' failed', "\e[31;1m");
+  }
+
+  $console->write(
+    '  '
+    . Str\pad_right($mode, 14)
+    . $status
+    . paint(
+      $color,
+      ' | total '
+      . elapsed(tally($modeTotals, $mode))
+      . ' | slowest '
+      . name_of($modeSlowestFile, $mode)
+      . ' '
+      . elapsed(tally($modeSlowest, $mode)),
+      "\e[2m",
+    )
+    . "\n",
+  );
+}
+
+if (!$quiet) {
+  $ranked = Vec\sort::<string>(
+    Vec\keys::<string>($fileTotals),
+    fn(
+      string $left,
+      string $right,
+    ): Whim\Comparison\Ordering => (
+      Whim\Comparison\Ordering::from(
+        tally($fileTotals, $right) <=> tally($fileTotals, $left),
+      )
+    ),
+  );
+
+  $console->write("\n");
+  $console->write(paint($color, 'slowest files', "\e[1m") . "\n");
+  $shown = 0;
+  foreach ($ranked as $test) {
+    if ($shown >= 5) {
+      break;
+    }
+
+    $console->write(
+      '  '
+      . Str\pad_right(elapsed(tally($fileTotals, $test)), 14)
+      . $test
+      . "\n",
+    );
+
+    $shown++;
+  }
+}
+
+foreach ($warnings as $warning) {
+  $console->write(
+    "\n" . paint($color, 'WARN', "\e[93;1m") . ' ' . $warning . "\n",
+  );
+}
+
+$total = length!($tests) * length!($modes);
+$timing = paint(
+  $color,
+  'in ' . elapsed($started->elapsed()->getTotalMilliseconds()),
+  "\e[2m",
+);
+
+if (length!($failures) > 0) {
+  $console->write(
+    "\n"
+    . paint($color, 'FAILED', "\e[31;1m")
+    . ': '
+    . length!($failures)
+    . ' of '
+    . $total
+    . ' run(s) across '
+    . $executed
+    . ' file(s) '
+    . $timing
+    . "\n",
+  );
+
+  $console->flush();
+  exit!(1);
+}
+
+$console->write(
+  "\n"
+  . paint($color, 'ok', "\e[32;1m")
+  . ': '
+  . $executed
+  . ' file(s), '
+  . $total
+  . ' run(s) passed across '
+  . length!($modes)
+  . ' mode(s) '
+  . $timing
+  . "\n",
+);
+
+$console->flush();

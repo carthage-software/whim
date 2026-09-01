@@ -1,0 +1,3 @@
+class ConstantLiteralBad {
+  public const int X = 'text';
+}

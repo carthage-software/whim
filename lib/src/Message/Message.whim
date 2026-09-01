@@ -1,0 +1,264 @@
+namespace Whim\Message;
+
+use Whim\DateTime\Formatter;
+use Whim\DateTime\ZonedDateTime;
+use Whim\Encoding\EncodedWord;
+use Whim\IO\MemoryHandle;
+use Whim\MIME\Headers;
+use Whim\MIME\Part\Part;
+use Whim\MIME\Part\RawPart;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Message\Address\AddressList;
+use Whim\Message\Address\Mailbox;
+
+/** An immutable RFC 5322 Internet message. */
+final readonly class Message {
+  #[AlwaysInline]
+  private function __construct(
+    public Headers $headers,
+    public null|AddressList $from,
+    public null|Mailbox $sender,
+    public null|AddressList $to,
+    public null|AddressList $cc,
+    public null|AddressList $bcc,
+    public null|AddressList $replyTo,
+    public null|ZonedDateTime $date,
+    public null|MessageId $messageId,
+    public null|string $subject,
+    public vec<MessageId> $references,
+    public vec<MessageId> $inReplyTo,
+    public Part $content,
+  ) {}
+
+  /** Creates an empty message. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function create(null|Part $content = null): Message {
+    $content = $content ?? new RawPart(Headers::default(), new MemoryHandle());
+    return new Message(
+      Headers::default(),
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      vec[],
+      vec[],
+      $content,
+    );
+  }
+
+  /** Creates a message and derives its structured fields from headers. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromHeaders(Headers $headers, Part $content): Message {
+    $from = Message::parseAddresses($headers->get('from'));
+    $sender = Message::parseMailbox($headers->get('sender'));
+    $to = Message::parseAddresses($headers->get('to'));
+    $cc = Message::parseAddresses($headers->get('cc'));
+    $bcc = Message::parseAddresses($headers->get('bcc'));
+    $replyTo = Message::parseAddresses($headers->get('reply-to'));
+    $date = Message::parseDate($headers->get('date'));
+    $messageId = Message::parseIdentifier($headers->get('message-id'));
+    $subject = $headers->get('subject');
+    if ($subject != null) {
+      $subject = EncodedWord\decode($subject);
+    }
+
+    return new Message(
+      $headers,
+      $from,
+      $sender,
+      $to,
+      $cc,
+      $bcc,
+      $replyTo,
+      $date,
+      $messageId,
+      $subject,
+      _Private\parse_message_ids($headers->get('references')),
+      _Private\parse_message_ids($headers->get('in-reply-to')),
+      $content,
+    );
+  }
+
+  /** Returns a copy with new author addresses. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withFrom(AddressList $from): Message {
+    return clone!($this, from: $from, headers: $this->headers->with(
+      'From',
+      $from->toString(),
+    ));
+  }
+
+  /** Returns a copy with a new sender. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSender(Mailbox $sender): Message {
+    return clone!($this, sender: $sender, headers: $this->headers->with(
+      'Sender',
+      $sender->toString(),
+    ));
+  }
+
+  /** Returns a copy with primary recipients. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTo(AddressList $to): Message {
+    return clone!($this, to: $to, headers: $this->headers->with(
+      'To',
+      $to->toString(),
+    ));
+  }
+
+  /** Returns a copy with carbon-copy recipients. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withCc(AddressList $cc): Message {
+    return clone!($this, cc: $cc, headers: $this->headers->with(
+      'Cc',
+      $cc->toString(),
+    ));
+  }
+
+  /** Returns a copy with blind-copy recipients. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBcc(AddressList $bcc): Message {
+    return clone!($this, bcc: $bcc, headers: $this->headers->with(
+      'Bcc',
+      $bcc->toString(),
+    ));
+  }
+
+  /** Returns a copy with reply destinations. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withReplyTo(AddressList $replyTo): Message {
+    return clone!($this, replyTo: $replyTo, headers: $this->headers->with(
+      'Reply-To',
+      $replyTo->toString(),
+    ));
+  }
+
+  /** Returns a copy with an origination date. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withDate(ZonedDateTime $date): Message {
+    return clone!($this, date: $date, headers: $this->headers->with(
+      'Date',
+      $date->format(Formatter::rfc2822()),
+    ));
+  }
+
+  /** Returns a copy with a Message-ID. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMessageId(MessageId $messageId): Message {
+    return clone!($this, messageId: $messageId, headers: $this->headers->with(
+      'Message-ID',
+      $messageId->toString(),
+    ));
+  }
+
+  /** Returns a copy with a decoded subject. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSubject(string $subject): Message {
+    return clone!($this, subject: $subject, headers: $this->headers->with(
+      'Subject',
+      EncodedWord\encode($subject),
+    ));
+  }
+
+  /** Returns a copy with reference identifiers. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withReferences(vec<MessageId> $references): Message {
+    return clone!($this, references: $references, headers: $this->headers->with(
+      'References',
+      _Private\serialize_message_ids($references),
+    ));
+  }
+
+  /** Returns a copy with reply identifiers. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withInReplyTo(vec<MessageId> $inReplyTo): Message {
+    return clone!($this, inReplyTo: $inReplyTo, headers: $this->headers->with(
+      'In-Reply-To',
+      _Private\serialize_message_ids($inReplyTo),
+    ));
+  }
+
+  /** Returns a copy with a new MIME body. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withContent(Part $content): Message {
+    return clone!($this, content: $content);
+  }
+
+  /** Returns a copy with a checked raw header. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withHeader(string $name, string $value): Message {
+    return Message::fromHeaders(
+      $this->headers->with($name, $value),
+      $this->content,
+    );
+  }
+
+  /** Returns a copy without a raw header. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withoutHeader(string $name): Message {
+    return Message::fromHeaders($this->headers->without($name), $this->content);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private static function parseAddresses(null|string $value): null|AddressList {
+    if ($value == null) {
+      return null;
+    }
+
+    return AddressList::parse($value);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private static function parseMailbox(null|string $value): null|Mailbox {
+    if ($value == null) {
+      return null;
+    }
+
+    return Mailbox::parse($value);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private static function parseDate(null|string $value): null|ZonedDateTime {
+    if ($value == null) {
+      return null;
+    }
+
+    return ZonedDateTime::parseRfc2822($value);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private static function parseIdentifier(null|string $value): null|MessageId {
+    if ($value == null) {
+      return null;
+    }
+
+    return MessageId::parse($value);
+  }
+}

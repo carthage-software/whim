@@ -1,0 +1,21 @@
+namespace Whim\Database;
+
+use Whim\IO\CloseHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Represents one active database transaction. */
+interface Transaction extends Executor, CloseHandle {
+  /** Reports whether this transaction may still execute work. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isActive(): bool;
+
+  /** Commits this transaction. */
+  #[TrackCaller]
+  public function commit(): void;
+
+  /** Rolls this transaction back. */
+  #[TrackCaller]
+  public function rollback(): void;
+}

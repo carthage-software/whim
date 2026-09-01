@@ -1,0 +1,68 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\_Private\TaskId;
+use Whim\_Private\cancel_task;
+use Whim\_Private\repeat_task;
+use Whim\_Private\unreference_task;
+use Whim\DateTime\Formatter;
+use Whim\DateTime\TimeZone;
+use Whim\Marker\AlwaysInline;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+
+/** Shares one current HTTP date across every server connection. */
+final class DateHeader {
+  private static string $value = '';
+  private static null|TaskId $task = null;
+  private static int $registrations = 0;
+
+  private function __construct() {}
+
+  /** Starts refreshing the shared date while a server is running. */
+  public static function register(): void {
+    DateHeader::$registrations++;
+    if (DateHeader::$task != null) {
+      return;
+    }
+
+    DateHeader::update();
+    $task = repeat_task(new Duration(1, 0), fn(): void {
+      DateHeader::update();
+    });
+
+    unreference_task($task);
+    DateHeader::$task = $task;
+  }
+
+  /** Stops refreshing the shared date. */
+  public static function unregister(): void {
+    if (DateHeader::$registrations == 0) {
+      return;
+    }
+
+    DateHeader::$registrations--;
+    if (DateHeader::$registrations != 0 || DateHeader::$task == null) {
+      return;
+    }
+
+    cancel_task(DateHeader::$task);
+    DateHeader::$task = null;
+  }
+
+  /** Returns the current HTTP date. */
+  #[AlwaysInline]
+  public static function getValue(): string {
+    if (DateHeader::$value == '') {
+      DateHeader::update();
+    }
+
+    return DateHeader::$value;
+  }
+
+  /** Refreshes the current HTTP date. */
+  public static function update(): void {
+    DateHeader::$value = Formatter::httpDate()->formatZonedDateTime(
+      TimeZone::utc()->at(SystemTime::now()),
+    );
+  }
+}

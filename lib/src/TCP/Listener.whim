@@ -1,0 +1,18 @@
+namespace Whim\TCP;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\FileDescriptorHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Listener as NetworkListener;
+
+/** A TCP listener. */
+interface Listener extends
+  NetworkListener<InternetEndpoint>,
+  FileDescriptorHandle {
+  /** Waits for and accepts the next TCP connection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function accept(null|CancellationToken $cancellation = null): Stream;
+}

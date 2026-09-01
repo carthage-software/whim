@@ -1,0 +1,4 @@
+namespace Whim\IO;
+
+/** An operation exceeded its configured byte limit. */
+final class LimitExceededException extends Exception {}

@@ -1,0 +1,108 @@
+namespace Whim\Vec;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Option\Option;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\Predicate;
+use Whim\Refine\Transform;
+
+/** Retains values accepted by a predicate. */
+#[MustUse]
+#[TrackCaller]
+function filter<T>(Iterable<_, T> $values, Predicate<T> $predicate): vec<T> {
+  $result = vec[];
+  foreach ($values as $value) {
+    if ($predicate($value)) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains values accepted using both their key and value. */
+#[MustUse]
+#[TrackCaller]
+function filter_with_key<K, T>(
+  Iterable<K, T> $values,
+  fn(K, T): bool $predicate,
+): vec<T> {
+  $result = vec[];
+  foreach ($values as $key => $value) {
+    if ($predicate($key, $value)) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains values whose keys are accepted by a predicate. */
+#[MustUse]
+#[TrackCaller]
+function filter_keys<K, T>(
+  Iterable<K, T> $values,
+  Predicate<K> $predicate,
+): vec<T> {
+  $result = vec[];
+  foreach ($values as $key => $value) {
+    if ($predicate($key)) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Removes null values. */
+#[MustUse]
+#[TrackCaller]
+function filter_nulls<T>(Iterable<_, null|T> $values): vec<T> {
+  $result = vec[];
+  foreach ($values as $value) {
+    if ($value != null) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains values whose transform produces Some. */
+#[MustUse]
+#[TrackCaller]
+function filter_nonnull_by<T, U>(
+  Iterable<_, T> $values,
+  Transform<T, Option<U>> $function,
+): vec<T> {
+  $result = vec[];
+  foreach ($values as $value) {
+    if ($function($value)->isSome()) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Splits values according to a predicate. */
+#[MustUse]
+#[TrackCaller]
+function partition<T>(
+  Iterable<_, T> $values,
+  Predicate<T> $predicate,
+): (vec<T>, vec<T>) {
+  $matches = vec[];
+  $rejects = vec[];
+  foreach ($values as $value) {
+    if ($predicate($value)) {
+      $matches[] = $value;
+    } else {
+      $rejects[] = $value;
+    }
+  }
+
+  return ($matches, $rejects);
+}

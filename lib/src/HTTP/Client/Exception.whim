@@ -1,0 +1,6 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Unwind\RuntimeException;
+
+/** The root of HTTP client failures. */
+class Exception extends RuntimeException {}

@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports an invalid number of call arguments. */
+#[Stub]
+class ArgumentCountError extends TypeError {}

@@ -1,0 +1,17 @@
+[package]
+name = "whim-sqlite"
+description = "The non-blocking SQLite driver used by Whim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rusqlite = { workspace = true }
+target-guard = { workspace = true }

@@ -1,0 +1,12 @@
+namespace Whim\Comparison;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Defines semantic equality with values of type T. */
+#[Stub]
+interface Equal<in T> {
+  /** Whether this value equals another. */
+  #[MustUse]
+  public function equals(T $other): bool;
+}

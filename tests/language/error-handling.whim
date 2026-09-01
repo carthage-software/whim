@@ -1,0 +1,307 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\Error;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\TypeError;
+
+require!('_reject.whim');
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+rejects(
+  $work,
+  'try-needs-a-handler',
+  'try {' . "\n" . '    write_line!("guarded");' . "\n" . '}' . "\n",
+  'a `try` needs a `catch`, `else`, or `finally`',
+);
+
+$bypass = $work . '/exit-bypasses.whim';
+File\write(
+  $bypass,
+  'try {'
+  . "\n"
+  . '    exit!(9);'
+  . "\n"
+  . '} catch (Whim\Unwind\Error $error) {'
+  . "\n"
+  . '    write_line!(\'caught\');'
+  . "\n"
+  . '} finally {'
+  . "\n"
+  . '    write_line!(\'finally ran\');'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$bypassed = Command\run($binary, vec[$bypass]);
+assert!($bypassed->status is Command\Exited);
+assert!(($bypassed->status as Command\Exited)->code == 9);
+assert!(length!($bypassed->standardOutput) == 0);
+assert!(length!($bypassed->standardError) == 0);
+
+Filesystem\delete_directory($work, true);
+
+final class TryElseLog {
+  public vec<string> $events = vec[];
+}
+
+function returning_through_finally(TryElseLog $log): int {
+  try {
+    $log->events[] = 'return-try';
+
+    return 7;
+  } else {
+    $log->events[] = 'return-else';
+  } finally {
+    $log->events[] = 'return-finally';
+  }
+}
+
+$events = vec[];
+
+try {
+  $events[] = 'success-try';
+} else {
+  $events[] = 'success-else';
+}
+
+try {
+  $events[] = 'caught-try';
+  throw new RuntimeException('caught');
+} catch (RuntimeException $error) {
+  $events[] = 'caught-catch';
+} else {
+  $events[] = 'caught-else';
+} finally {
+  $events[] = 'caught-finally';
+}
+
+try {
+  try {
+    $events[] = 'unmatched-try';
+    throw new LogicException('unmatched');
+  } catch (RuntimeException $error) {
+    $events[] = 'unmatched-catch';
+  } else {
+    $events[] = 'unmatched-else';
+  } finally {
+    $events[] = 'unmatched-finally';
+  }
+} catch (LogicException $error) {
+  $events[] = 'unmatched-outer';
+}
+
+try {
+  try {
+    $events[] = 'else-throw-try';
+  } catch (LogicException $error) {
+    $events[] = 'else-throw-sibling-catch';
+  } else {
+    $events[] = 'else-throw-else';
+    throw new LogicException('from else');
+  } finally {
+    $events[] = 'else-throw-finally';
+  }
+} catch (LogicException $error) {
+  $events[] = 'else-throw-outer';
+}
+
+$returnLog = new TryElseLog();
+assert!(returning_through_finally($returnLog) == 7);
+assert!($returnLog->events == vec['return-try', 'return-finally']);
+
+while (true) {
+  try {
+    $events[] = 'break-try';
+    break;
+  } else {
+    $events[] = 'break-else';
+  } finally {
+    $events[] = 'break-finally';
+  }
+}
+
+$iteration = 0;
+while ($iteration < 2) {
+  $iteration++;
+  try {
+    $events[] = 'continue-try-' . $iteration;
+    continue;
+  } else {
+    $events[] = 'continue-else';
+  } finally {
+    $events[] = 'continue-finally-' . $iteration;
+  }
+}
+
+$fromTry = null;
+try {
+  $fromTry = 'defined';
+} else {
+  assert!($fromTry == 'defined');
+  $events[] = 'defined-in-else';
+}
+
+try {
+  try {
+    $events[] = 'else-only-throw';
+    throw new RuntimeException('else only');
+  } else {
+    $events[] = 'else-only-unreachable';
+  }
+} catch (RuntimeException $error) {
+  $events[] = 'else-only-outer';
+}
+
+assert!(
+  $events == vec[
+    'success-try',
+    'success-else',
+    'caught-try',
+    'caught-catch',
+    'caught-finally',
+    'unmatched-try',
+    'unmatched-finally',
+    'unmatched-outer',
+    'else-throw-try',
+    'else-throw-else',
+    'else-throw-finally',
+    'else-throw-outer',
+    'break-try',
+    'break-finally',
+    'continue-try-1',
+    'continue-finally-1',
+    'continue-try-2',
+    'continue-finally-2',
+    'defined-in-else',
+    'else-only-throw',
+    'else-only-outer',
+  ],
+);
+
+class FinallyTimeout extends Error {}
+class FinallyNetworkError extends Error {}
+
+final class FinallyLog {
+  public vec<string> $events = vec[];
+}
+
+function finally_path(int $which, FinallyLog $log): string {
+  try {
+    if ($which == 1) {
+      return 'normal completion';
+    }
+
+    if ($which == 2) {
+      throw new FinallyTimeout('x', 0);
+    }
+
+    throw new FinallyNetworkError('y', 0);
+  } catch (FinallyTimeout $error) {
+    return 'after catch';
+  } finally {
+    $log->events[] = 'finally';
+  }
+}
+
+$finallyLog = new FinallyLog();
+assert!(finally_path(1, $finallyLog) == 'normal completion');
+assert!(finally_path(2, $finallyLog) == 'after catch');
+$assertion_value_12 = function() use ($finallyLog): void {
+  finally_path(3, $finallyLog);
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (FinallyNetworkError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is FinallyNetworkError);
+
+assert!($finallyLog->events == vec['finally', 'finally', 'finally']);
+
+class ReplacedError extends Error {}
+class ReplacementError extends Error {}
+
+$assertion_value_14 = function(): void {
+  try {
+    throw new ReplacedError('first', 0);
+  } finally {
+    throw new ReplacementError('second', 0);
+  }
+};
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (ReplacementError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+  assert!(Whim\Str\contains($assertion_caught_14->getMessage(), 'second'));
+}
+
+assert!($assertion_error_14 is ReplacementError);
+
+final class FinallyRunCounts {
+  public int $inner = 0;
+  public int $outer = 0;
+  public int $empty = 0;
+}
+
+function invalid_return_value(FinallyRunCounts $runs): int {
+  try {
+    try {
+      return 'wrong';
+    } finally {
+      $runs->inner = $runs->inner + 1;
+    }
+  } finally {
+    $runs->outer = $runs->outer + 1;
+  }
+}
+
+function invalid_empty_return(FinallyRunCounts $runs): int {
+  try {
+    return;
+  } finally {
+    $runs->empty = $runs->empty + 1;
+  }
+}
+
+$counts = new FinallyRunCounts();
+$assertion_value_15 = function() use ($counts): void {
+  invalid_return_value($counts);
+};
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (TypeError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is TypeError);
+
+assert!($counts->inner == 1);
+assert!($counts->outer == 1);
+$assertion_value_18 = function() use ($counts): void {
+  invalid_empty_return($counts);
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is TypeError);
+
+assert!($counts->empty == 1);

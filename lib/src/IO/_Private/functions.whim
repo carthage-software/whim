@@ -1,0 +1,123 @@
+namespace Whim\IO\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IO\TransportException;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\Unwind\Throwable;
+use Whim\_Private\SystemError;
+use Whim\_Private\arm_readable;
+use Whim\_Private\arm_writable;
+use Whim\_Private\cancel_task;
+use Whim\_Private\create_suspension;
+use Whim\_Private\park_readable;
+use Whim\_Private\park_writable;
+use Whim\_Private\watch_readable;
+use Whim\_Private\watch_writable;
+
+/**
+ * Converts a raw descriptor failure into the public IO exception family.
+ *
+ * @throws Whim\IO\TransportException always, carrying the errno as the code.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function failure(SystemError $error): never {
+  throw new TransportException(
+    'the '
+    . $error->call()
+    . ' system call failed with errno '
+    . $error->errno(),
+    $error->errno(),
+  );
+}
+
+/** Waits until a descriptor is readable, respecting cancellation. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function wait_readable(
+  FileDescriptor $descriptor,
+  null|CancellationToken $cancellation,
+): void {
+  if ($cancellation == null && park_readable($descriptor)) {
+    return;
+  }
+
+  $cancellation?->throwIfCancellationRequested();
+  $suspension = create_suspension::<null>();
+  $cancellationId = $cancellation?->register(fn(): void {
+    try {
+      $cancellation->throwIfCancellationRequested();
+    } catch (Throwable $error) {
+      $suspension->throw($error);
+    }
+  });
+
+  try {
+    $cancellation?->throwIfCancellationRequested();
+    if (arm_readable($descriptor)) {
+      $suspension->suspend();
+      return;
+    }
+
+    $task = watch_readable($descriptor, fn(): void {
+      $suspension->resume(null);
+    });
+
+    try {
+      $suspension->suspend();
+    } finally {
+      cancel_task($task);
+    }
+  } finally {
+    $cancellation?->unregister($cancellationId);
+  }
+}
+
+/** Waits until a descriptor is writable, respecting cancellation. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function wait_writable(
+  FileDescriptor $descriptor,
+  null|CancellationToken $cancellation,
+): void {
+  if ($cancellation == null && park_writable($descriptor)) {
+    return;
+  }
+
+  $cancellation?->throwIfCancellationRequested();
+  $suspension = create_suspension::<null>();
+  $cancellationId = $cancellation?->register(fn(): void {
+    try {
+      $cancellation->throwIfCancellationRequested();
+    } catch (Throwable $error) {
+      $suspension->throw($error);
+    }
+  });
+
+  try {
+    $cancellation?->throwIfCancellationRequested();
+    if (arm_writable($descriptor)) {
+      $suspension->suspend();
+      return;
+    }
+
+    $task = watch_writable($descriptor, fn(): void {
+      $suspension->resume(null);
+    });
+
+    try {
+      $suspension->suspend();
+    } finally {
+      cancel_task($task);
+    }
+  } finally {
+    $cancellation?->unregister($cancellationId);
+  }
+}

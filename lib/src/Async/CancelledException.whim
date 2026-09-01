@@ -1,0 +1,6 @@
+namespace Whim\Async;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports a cancelled failure. */
+class CancelledException extends RuntimeException {}

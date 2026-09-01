@@ -1,0 +1,254 @@
+namespace Whim\DataStructure;
+
+use Whim\Comparison\Ordering;
+use Whim\DataStructure\_Private;
+use Whim\Iterate\ToIterator;
+use Whim\Iterate\ArrayIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\Comparator;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\LogicException;
+
+/**
+ * Stores values ordered by separate priorities.
+ *
+ * A priority that compares as `Ordering::Less` is removed first. Equal
+ * priorities have no defined relative order.
+ */
+final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
+  private vec<(T, P)> $entries = vec[];
+  private Comparator<P> $comparator;
+  private bool $comparing = false;
+
+  /** Creates a priority queue using bottom-up heapification. */
+  #[TrackCaller]
+  public function __construct(
+    Comparator<P> $comparator,
+    Iterable<_, (T, P)> $entries = vec[],
+  ) {
+    $this->comparator = $comparator;
+    foreach ($entries as $entry) {
+      $this->entries[] = $entry;
+    }
+
+    $this->heapify();
+  }
+
+  /** Adds a value with its priority. */
+  #[TrackCaller]
+  public function enqueue(T $value, P $priority): void {
+    $this->assertMutable();
+
+    $index = length!($this->entries);
+    $path = $this->upwardPath($priority, $index);
+    $entry = ($value, $priority);
+
+    $this->entries[] = $entry;
+    $current = $index;
+    foreach ($path as $parent) {
+      $this->entries[$current] = $this->entries[$parent];
+      $current = $parent;
+    }
+
+    $this->entries[$current] = $entry;
+  }
+
+  /** Removes and returns the value and priority that sort first. */
+  #[TrackCaller]
+  public function dequeue(): Option<(T, P)> {
+    $this->assertMutable();
+    if (length!($this->entries) == 0) {
+      return new None();
+    }
+
+    return new Some::<(T, P)>($this->removeRoot());
+  }
+
+  /** Returns the first value and priority without removing them. */
+  #[AlwaysInline]
+  public function peek(): Option<(T, P)> {
+    if (length!($this->entries) == 0) {
+      return new None();
+    }
+
+    return new Some::<(T, P)>($this->entries[0]);
+  }
+
+  /** Returns the number of stored values. */
+  #[AlwaysInline]
+  public function count(): NonNegativeInt {
+    return length!($this->entries);
+  }
+
+  /** Reports whether the queue contains no values. */
+  #[AlwaysInline]
+  public function isEmpty(): bool {
+    return length!($this->entries) == 0;
+  }
+
+  /** Removes every stored value. */
+  #[TrackCaller]
+  public function clear(): void {
+    $this->assertMutable();
+    $this->entries = vec[];
+  }
+
+  /** Returns the entries in removal order without changing the queue. */
+  #[TrackCaller]
+  public function toVec(): vec<(T, P)> {
+    $copy = clone!($this);
+    $entries = vec[];
+    while (!$copy->isEmpty()) {
+      $entries[] = $copy->removeRoot();
+    }
+
+    return $entries;
+  }
+
+  /** Creates a snapshot iterator in removal order. */
+  #[TrackCaller]
+  public function toIterator(): ArrayIterator<int, (T, P)> {
+    return new ArrayIterator::<int, (T, P)>($this->toVec());
+  }
+
+  /** Restores heap order throughout the initial entries. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function heapify(): void {
+    $count = length!($this->entries);
+    if ($count < 2) {
+      return;
+    }
+
+    $index = ($count - 2) >> 1;
+    while (true) {
+      $entry = $this->entries[$index];
+      $path = $this->downwardPath($entry[1], $index, $count);
+      $current = $index;
+      foreach ($path as $child) {
+        $this->entries[$current] = $this->entries[$child];
+        $current = $child;
+      }
+
+      $this->entries[$current] = $entry;
+      if ($index == 0) {
+        return;
+      }
+
+      $index--;
+    }
+  }
+
+  /** Finds the parent path a new priority must cross. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function upwardPath(P $priority, int $index): vec<int> {
+    $path = vec[];
+    while ($index > 0) {
+      $parent = ($index - 1) >> 1;
+      if (
+        $this->compare($priority, $this->entries[$parent][1]) != Ordering::Less
+      ) {
+        break;
+      }
+
+      $path[] = $parent;
+      $index = $parent;
+    }
+
+    return $path;
+  }
+
+  /** Finds the child path a replacement priority must cross. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function downwardPath(P $priority, int $index, int $limit): vec<int> {
+    $path = vec[];
+    while (true) {
+      $left = $index * 2 + 1;
+      if ($left >= $limit) {
+        return $path;
+      }
+
+      $right = $left + 1;
+      $first = $left;
+      if (
+        $right < $limit
+        && $this->compare($this->entries[$right][1], $this->entries[$left][1])
+        == Ordering::Less
+      ) {
+        $first = $right;
+      }
+
+      if (
+        $this->compare($this->entries[$first][1], $priority) != Ordering::Less
+      ) {
+        return $path;
+      }
+
+      $path[] = $first;
+      $index = $first;
+    }
+  }
+
+  /** Removes the root from a known non-empty queue. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function removeRoot(): (T, P) {
+    $count = length!($this->entries);
+    $root = $this->entries[0];
+    if ($count == 1) {
+      $this->entries = vec[];
+      return $root;
+    }
+
+    $entry = $this->entries[$count - 1];
+    $path = $this->downwardPath($entry[1], 0, $count - 1);
+
+    remove_last!($this->entries);
+    $current = 0;
+    foreach ($path as $child) {
+      $this->entries[$current] = $this->entries[$child];
+      $current = $child;
+    }
+
+    $this->entries[$current] = $entry;
+    return $root;
+  }
+
+  /** Runs the comparator without allowing reentrant mutation. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function compare(P $left, P $right): Ordering {
+    if ($this->comparing) {
+      throw new LogicException(
+        'a priority queue comparator cannot re-enter comparison',
+      );
+    }
+
+    $this->comparing = true;
+    $comparator = $this->comparator;
+    try {
+      return $comparator($left, $right);
+    } finally {
+      $this->comparing = false;
+    }
+  }
+
+  /** Rejects mutation from inside the comparator. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function assertMutable(): void {
+    if ($this->comparing) {
+      throw new LogicException(
+        'a priority queue comparator cannot mutate its queue',
+      );
+    }
+  }
+}

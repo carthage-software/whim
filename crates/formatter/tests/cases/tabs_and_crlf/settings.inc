@@ -1,0 +1,1 @@
+FormatSettings { use_tabs: true, end_of_line: EndOfLine::Crlf, ..FormatSettings::default() }

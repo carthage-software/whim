@@ -1,0 +1,18 @@
+namespace Whim\Async\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim;
+
+/** Represents a waiter. */
+final class Waiter<T> {
+  /** The active value. */
+  public bool $active = true;
+
+  /** Creates a waiter. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    public readonly Whim\_Private\Suspension<T> $suspension,
+  ) {}
+}

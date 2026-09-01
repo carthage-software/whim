@@ -1,0 +1,430 @@
+use Whim\_Private;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Str;
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedSymbolError;
+use Whim\Vec;
+
+function double(int $n): int {
+  return $n * 2;
+}
+
+class Greeter {
+  public function __construct(private string $name) {}
+
+  public function greet(string $prefix): string {
+    return $prefix . $this->name;
+  }
+}
+
+$double = double(...);
+assert!($double(21) == 42);
+$greet = new Greeter('ada')->greet(...);
+assert!($greet('hi ') == 'hi ada');
+
+function join3(string $a, string $b, string $c): string {
+  return $a . $b . $c;
+}
+
+$mid = join3(?, '-', ?);
+assert!($mid('x', 'y') == 'x-y');
+$tail = join3('(', ?, ')');
+assert!($tail('inner') == '(inner)');
+
+$exclaimed = join3(?, ?, '!');
+$started = $exclaimed('go', ?);
+assert!($started('al') == 'goal!');
+
+function shape(string $kind, int $size = 1, string $mode = 'flat'): string {
+  return $kind . ':' . $size . ':' . $mode;
+}
+
+$sized = shape(?, mode: 'deep');
+assert!($sized('cube') == 'cube:1:deep');
+$open = shape(?, mode: 'deep', ...);
+assert!($open('cone', 4) == 'cone:4:deep');
+$assertion_value_8 = function() use ($sized): void {
+  $_ = $sized('cone', 4);
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (ArgumentCountError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is ArgumentCountError);
+
+function format(int $id, string $label, bool $loud): string {
+  return $label . ':' . $id;
+}
+
+function invoke(fn(int, string): string $callback): string {
+  return $callback(7, 'item');
+}
+
+$format = format(label: ?, loud: true, id: ?);
+assert!($format is fn(string, int): string);
+assert!($format('item', 7) == 'item:7');
+$assertion_value_11 = function() use ($format): void {
+  $_ = invoke($format);
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (TypeError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is TypeError);
+
+function tag(string $name, string $value): string {
+  return $name . '=' . $value;
+}
+
+$assertion_value_12 = function(): void {
+  $_ = tag(value: ?);
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (ArgumentCountError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is ArgumentCountError);
+
+$named = tag(value: ?, ...);
+assert!($named('color', 'red') == 'red=color');
+
+function need(int $a, int $b): int {
+  return $a + $b;
+}
+
+$one = need(?, 2);
+$assertion_value_14 = function() use ($one): void {
+  $_ = $one();
+};
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (ArgumentCountError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is ArgumentCountError);
+
+function box(string $label, int $width = 3, int $height = 1): string {
+  return $label . $width . $height;
+}
+
+class Panel {
+  public static function draw(int $width, int $height = 2): string {
+    return 'p' . $width . $height;
+  }
+
+  public function tag(string $name, int $level = 0): string {
+    return $name . $level;
+  }
+}
+
+class Point {
+  public function __construct(public int $x, public int $y = 5) {}
+}
+
+final class ReusedOptionalFrame {
+  public function __construct(public null|bool $value = null) {}
+
+  public function read(null|bool $value = null): null|bool {
+    return $value;
+  }
+
+  public static function readStatic(null|bool $value = null): null|bool {
+    return $value;
+  }
+}
+
+assert!(box('b', height: 9) == 'b39');
+assert!(Panel::draw(width: 7) == 'p72');
+$panel = new Panel();
+assert!(
+  $panel->tag(
+    level: 2,
+    name: 't',
+  )
+  == 't2',
+);
+
+function named_order_one(int $first, int $second): int {
+  return ($first * 10) + $second;
+}
+
+function named_order_two(int $second, int $first): int {
+  return ($first * 100) + $second;
+}
+
+function invoke_named_order(fn(int, int): int $callable): int {
+  return $callable(
+    second: 2,
+    first: 1,
+  );
+}
+
+assert!(invoke_named_order(named_order_one(...)) == 12);
+assert!(invoke_named_order(named_order_two(...)) == 102);
+assert!(invoke_named_order(named_order_one(...)) == 12);
+
+$point = new Point(
+  y: 8,
+  x: 1,
+);
+
+assert!($point->x == 1);
+assert!($point->y == 8);
+$optional = new ReusedOptionalFrame();
+assert!($optional->read(true));
+assert!($optional->read() == null);
+assert!(ReusedOptionalFrame::readStatic(true));
+assert!(ReusedOptionalFrame::readStatic() == null);
+assert!(new ReusedOptionalFrame(true)->value);
+assert!(new ReusedOptionalFrame()->value == null);
+
+function only_a(int $a): int {
+  return $a;
+}
+
+$assertion_value_26 = function(): void {
+  $_ = only_a(missing: 1);
+};
+
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (ArgumentCountError $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is ArgumentCountError);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$sample = $work . '/built-in-named-gap.txt';
+File\write($sample, 'abcdefgh');
+$previous = new RuntimeException('inner');
+$error = new RuntimeException('outer', previous: $previous);
+assert!($error->getCode() == 0);
+assert!($error->getPrevious() == $previous);
+assert!(File\read($sample, length: 5) == 'abcde');
+Filesystem\delete_directory($work, true);
+
+$memchr_error = null;
+$assertion_callable_30 = function(): void {
+  $_ = _Private\memchr(
+    needle: 97,
+    offset: 0,
+  );
+};
+
+try {
+  $assertion_callable_30();
+} catch (ArgumentCountError $assertion_caught_30) {
+  $memchr_error = $assertion_caught_30;
+}
+
+assert!($memchr_error is ArgumentCountError);
+
+$assertion_value_31 = $memchr_error->getMessage();
+assert!(Whim\Str\contains($assertion_value_31, 'required parameter $haystack'));
+assert!(Whim\Str\contains($assertion_value_31, 'Whim\_Private\memchr'));
+
+function gather(string $first, vec<int> $rest = vec[]): string {
+  $rendered = $first;
+  foreach ($rest as $n) {
+    $rendered = $rendered . $n;
+  }
+
+  return $rendered . '#' . length!($rest);
+}
+
+assert!(gather('x') == 'x#0');
+assert!(gather('x', vec[1, 2, 3]) == 'x123#3');
+
+class Kit {
+  public static function open(string $key): string {
+    return 'open:' . $key;
+  }
+}
+
+$bound = Kit::open(?);
+assert!($bound('a') == 'open:a');
+$class = 'Kit';
+assert!($class::open('b') == 'open:b');
+$instance = new $class();
+assert!($instance is Kit);
+$assertion_value_37 = function(): void {
+  $missing = 'Missing';
+  $_ = new $missing();
+};
+
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (UndefinedSymbolError $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is UndefinedSymbolError);
+
+$assertion_value_38 = function(): void {
+  $number = 5;
+  $_ = new $number();
+};
+
+$assertion_error_38 = null;
+try {
+  $assertion_value_38();
+} catch (TypeError $assertion_caught_38) {
+  $assertion_error_38 = $assertion_caught_38;
+}
+
+assert!($assertion_error_38 is TypeError);
+
+class Counter {
+  private int $value = 0;
+
+  public function incrementer(): mixed {
+    return fn(): int => $this->value + 1;
+  }
+
+  public function set(int $value): void {
+    $this->value = $value;
+  }
+}
+
+$counter = new Counter();
+$increment = $counter->incrementer();
+$counter->set(41);
+assert!($increment() == 42);
+
+function make(): fn(): string {
+  return fn() => 1;
+}
+
+$assertion_value_40 = function(): void {
+  $_ = make();
+};
+
+$assertion_error_40 = null;
+try {
+  $assertion_value_40();
+} catch (TypeError $assertion_caught_40) {
+  $assertion_error_40 = $assertion_caught_40;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_40->getMessage(),
+      'make must return fn(): string, fn(): mixed returned',
+    ),
+  );
+}
+
+assert!($assertion_error_40 is TypeError);
+
+$float = 1.5;
+$float++;
+assert!($float == 2.5);
+$grid = vec[10];
+$grid[0]++;
+assert!($grid[0] == 11);
+
+class StepCounter {
+  public static int $count = 5;
+}
+
+StepCounter::$count--;
+assert!(StepCounter::$count == 4);
+$assertion_value_44 = function(): void {
+  $letter = 'x';
+  $letter++;
+};
+
+$assertion_error_44 = null;
+try {
+  $assertion_value_44();
+} catch (IncompatibleOperandsError $assertion_caught_44) {
+  $assertion_error_44 = $assertion_caught_44;
+}
+
+assert!($assertion_error_44 is IncompatibleOperandsError);
+
+assert!(
+  Str\replace_every('hello world', dict['hello' => 'world', 'world' => 'hello'])
+  == 'world hello',
+);
+
+assert!(Str\replace_every('abab', dict['a' => 'b', 'b' => 'a']) == 'baba');
+
+assert!(Str\replace_every_ci('AbAB', dict['ab' => 'x']) == 'xx');
+
+assert!(Str\join(', ', vec['Ada', 'Grace']) == 'Ada, Grace');
+assert!(Str\join(', ', dict['a' => 'Ada', 'b' => 'Grace']) == 'Ada, Grace');
+
+assert!(Str\join(', ', vec[]) == '');
+
+$assertion_value_51 = function(): void {
+  $_ = Str\chr(256);
+};
+
+$assertion_error_51 = null;
+try {
+  $assertion_value_51();
+} catch (TypeError $assertion_caught_51) {
+  $assertion_error_51 = $assertion_caught_51;
+}
+
+assert!($assertion_error_51 is TypeError);
+
+$assertion_value_52 = function(): void {
+  $_ = Str\ord('');
+};
+
+$assertion_error_52 = null;
+try {
+  $assertion_value_52();
+} catch (TypeError $assertion_caught_52) {
+  $assertion_error_52 = $assertion_caught_52;
+}
+
+assert!($assertion_error_52 is TypeError);
+
+assert!(Str\contains('abc', ''));
+assert!(Str\starts_with('abc', ''));
+assert!(Str\starts_with('', ''));
+assert!(Str\ends_with('abc', ''));
+assert!(Str\ends_with('', ''));
+assert!(Str\starts_with_ci('abc', ''));
+assert!(Str\ends_with_ci('abc', ''));
+assert!(Str\search('abc', '') == 0);
+assert!(Str\search_ci('abc', '') == 0);
+assert!(Str\search_last('abc', '') == 3);
+assert!(Str\search_last_ci('abc', '') == 3);
+
+$assertion_value_64 = function(): void {
+  $_ = Vec\range(1, 1, 0);
+};
+
+$assertion_error_64 = null;
+try {
+  $assertion_value_64();
+} catch (LogicException $assertion_caught_64) {
+  $assertion_error_64 = $assertion_caught_64;
+}
+
+assert!($assertion_error_64 is LogicException);

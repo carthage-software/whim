@@ -1,0 +1,36 @@
+namespace Whim\TLS;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\Endpoint;
+use Whim\Network\Stream as NetworkStream;
+
+/** Performs server handshakes over accepted byte streams. */
+final readonly class Acceptor<TEndpoint: Endpoint> {
+  private Whim\_Private\TlsServerConfiguration $configuration;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(ServerConfiguration $configuration) {
+    $this->configuration = _Private\server_configuration($configuration);
+  }
+
+  /** Encrypts an accepted stream after completing a server handshake. */
+  #[MustUse]
+  #[TrackCaller]
+  public function accept(
+    NetworkStream<TEndpoint> $stream,
+    null|CancellationToken $cancellation = null,
+  ): Stream<TEndpoint> {
+    $connection = _Private\establish_server::<TEndpoint>(
+      $stream,
+      $this->configuration,
+      $cancellation,
+    );
+
+    return new _Private\StreamImpl::<TEndpoint>($stream, $connection);
+  }
+}

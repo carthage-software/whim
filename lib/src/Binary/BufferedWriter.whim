@@ -1,0 +1,13 @@
+namespace Whim\Binary;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Convert\ToString;
+
+/** Collects written values in memory. */
+interface BufferedWriter extends Writer, ToString {
+  /** The bytes written so far. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string;
+}

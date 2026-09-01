@@ -1,0 +1,484 @@
+namespace Whim\HTTP\Server\Handler;
+
+use Whim\Async\CancellationToken;
+use Whim\DateTime\Formatter;
+use Whim\DateTime\TimeZone;
+use Whim\DateTime\ZonedDateTime;
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\Url\decode;
+use Whim\File\_Private\ReadHandleImpl;
+use Whim\File\_Private\State;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\METHOD_GET;
+use Whim\HTTP\Message\METHOD_HEAD;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\STATUS_BAD_REQUEST;
+use Whim\HTTP\Message\STATUS_METHOD_NOT_ALLOWED;
+use Whim\HTTP\Message\STATUS_NOT_FOUND;
+use Whim\HTTP\Message\STATUS_NOT_MODIFIED;
+use Whim\HTTP\Message\STATUS_OK;
+use Whim\HTTP\Message\STATUS_PARTIAL_CONTENT;
+use Whim\HTTP\Message\STATUS_RANGE_NOT_SATISFIABLE;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\HTTPException;
+use Whim\IO\ReadHandle;
+use Whim\IO\TruncatedReadHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\OS\FileDescriptor;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Str\contains;
+use Whim\Str\ends_with;
+use Whim\Str\lowercase;
+use Whim\Str\ord;
+use Whim\Str\search;
+use Whim\Str\search_last;
+use Whim\Str\slice;
+use Whim\Str\split;
+use Whim\Str\starts_with;
+use Whim\Str\trim;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\open_directory_descriptor;
+use Whim\_Private\open_regular_file_beneath;
+
+/** Serves regular files rooted beneath one directory. */
+final readonly class StaticFiles implements Handler {
+  private const int MAX_INT = 9_223_372_036_854_775_807;
+
+  public NonEmptyString $root;
+  public NonEmptyString $prefix;
+  public null|NonEmptyString $index;
+  public FieldMap $headers;
+  public null|string $cacheControl;
+  private FileDescriptor $directory;
+
+  /** Opens a static directory and configures its URL mount. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    NonEmptyString $root,
+    NonEmptyString $prefix = '/',
+    null|NonEmptyString $index = 'index.html',
+    FieldMap $headers = FieldMap::default(),
+    null|string $cacheControl = null,
+  ) {
+    if (
+      !starts_with($prefix, '/')
+      || contains($prefix, '?')
+      || contains($prefix, '#')
+    ) {
+      throw new InvalidArgumentException(
+        'a static-file prefix must be an absolute URL path',
+      );
+    }
+
+    while (length!($prefix) > 1 && ends_with($prefix, '/')) {
+      $prefix = slice($prefix, 0, length!($prefix) - 1) as NonEmptyString;
+    }
+
+    if ($index != null && !$this->validRelativePath($index)) {
+      throw new InvalidArgumentException(
+        'a static-file index must be a safe relative path',
+      );
+    }
+
+    $directory = open_directory_descriptor($root);
+    if ($directory == null) {
+      throw new InvalidArgumentException(
+        'the static-file root must be a readable directory without symbolic links',
+      );
+    }
+
+    $this->root = $root;
+    $this->prefix = $prefix;
+    $this->index = $index;
+    $this->headers = $headers;
+    $this->cacheControl = $cacheControl;
+    $this->directory = $directory;
+  }
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response {
+    if ($request->method != METHOD_GET && $request->method != METHOD_HEAD) {
+      return new Response(
+        STATUS_METHOD_NOT_ALLOWED,
+        $request->protocolVersion,
+        FieldMap::from(vec[('Allow', 'GET, HEAD')]),
+      );
+    }
+
+    $relative = $this->relativePath($this->requestPath($request));
+    if ($relative == null) {
+      throw new HTTPException(STATUS_NOT_FOUND);
+    }
+
+    try {
+      $relative = decode($relative);
+    } catch (DecodingException $error) {
+      throw new HTTPException(
+        STATUS_BAD_REQUEST,
+        'invalid percent escape in static-file path',
+        previous: $error,
+      );
+    }
+
+    if ($relative == '' || ends_with($relative, '/')) {
+      if ($this->index == null) {
+        throw new HTTPException(STATUS_NOT_FOUND);
+      }
+
+      $relative .= $this->index;
+    }
+
+    $opened = open_regular_file_beneath($this->directory, $relative);
+    if ($opened == null) {
+      throw new HTTPException(STATUS_NOT_FOUND);
+    }
+
+    ($descriptor, $metadata) = $opened;
+    $size = $metadata[4] as NonNegativeInt;
+    $modifiedSeconds = $metadata[11];
+    $modifiedNanoseconds = $metadata[12];
+    $etag = $this->etag($metadata);
+    $lastModified = Formatter::httpDate()->formatZonedDateTime(
+      TimeZone::utc()->at(
+        SystemTime::fromUnixTimestamp($modifiedSeconds, $modifiedNanoseconds),
+      ),
+    );
+
+    $headers = $this->responseHeaders($relative, $size, $etag, $lastModified);
+
+    if ($this->notModified($request, $etag, $modifiedSeconds)) {
+      return new Response(
+        STATUS_NOT_MODIFIED,
+        $request->protocolVersion,
+        $headers->without('Content-Length'),
+      );
+    }
+
+    $range = null as null|false|(int, int);
+    $rangeFields = $request->headers->getAll('Range');
+    if (
+      $rangeFields != vec[]
+      && $this->ifRangeMatches($request, $modifiedSeconds)
+    ) {
+      $range = match (length!($rangeFields)) {
+        1 => $this->parseRange($rangeFields[0], $size),
+        $_ => false,
+      };
+    }
+
+    if ($range == false) {
+      return new Response(
+        STATUS_RANGE_NOT_SATISFIABLE,
+        $request->protocolVersion,
+        $headers->without('Content-Length')->with(
+          'Content-Range',
+          'bytes */' . $size,
+        ),
+      );
+    }
+
+    $handle = new ReadHandleImpl(
+      new State($descriptor, $this->root . '/' . $relative),
+    );
+
+    $body = $handle as ReadHandle;
+    $status = STATUS_OK;
+    if ($range is (int, int)) {
+      ($start, $end) = $range;
+      $length = $end - $start + 1;
+      $handle->seek($start);
+      $body = new TruncatedReadHandle($handle, $length);
+      $status = STATUS_PARTIAL_CONTENT;
+      $headers = $headers->with('Content-Length', '' . $length)->with(
+        'Content-Range',
+        'bytes ' . $start . '-' . $end . '/' . $size,
+      );
+    }
+
+    return new Response($status, $request->protocolVersion, $headers, $body);
+  }
+
+  /** Returns the request path without a query. */
+  #[MustUse]
+  private function requestPath(Request $request): string {
+    if ($request->url != null) {
+      return match ($request->url->path) {
+        '' => '/',
+        $path @ string => $path,
+      };
+    }
+
+    $target = $request->requestTarget;
+    $query = search($target, '?') ?? return $target;
+
+    return slice($target, 0, $query);
+  }
+
+  /** Removes the configured mount from a request path. */
+  #[MustUse]
+  private function relativePath(string $path): null|string {
+    if ($this->prefix == '/') {
+      if (!starts_with($path, '/')) {
+        return null;
+      }
+
+      return slice($path, 1);
+    }
+
+    if ($path == $this->prefix) {
+      return '';
+    }
+
+    $mount = $this->prefix . '/';
+    if (!starts_with($path, $mount)) {
+      return null;
+    }
+
+    return slice($path, length!($mount));
+  }
+
+  /** Builds representation fields for a regular file. */
+  private function responseHeaders(
+    string $path,
+    NonNegativeInt $size,
+    string $etag,
+    string $lastModified,
+  ): FieldMap {
+    $headers = $this
+      ->headers
+      ->with('Content-Length', '' . $size)
+      ->with('ETag', $etag)
+      ->with('Last-Modified', $lastModified)
+      ->with('Accept-Ranges', 'bytes');
+
+    if (!$headers->has('Content-Type')) {
+      $headers = $headers->with('Content-Type', $this->contentType($path));
+    }
+
+    if (!$headers->has('X-Content-Type-Options')) {
+      $headers = $headers->with('X-Content-Type-Options', 'nosniff');
+    }
+
+    if ($this->cacheControl != null) {
+      $headers = $headers->with('Cache-Control', $this->cacheControl);
+    }
+
+    return $headers;
+  }
+
+  /** Builds a weak validator from stable file metadata. */
+  #[MustUse]
+  private function etag(vec<int> $metadata): string {
+    return (
+      'W/"'
+      . $metadata[7]
+      . '-'
+      . $metadata[8]
+      . '-'
+      . $metadata[4]
+      . '-'
+      . $metadata[11]
+      . '-'
+      . $metadata[12]
+      . '"'
+    );
+  }
+
+  /** Reports whether a request validator matches the file. */
+  private function notModified(
+    Request $request,
+    string $etag,
+    int $modifiedSeconds,
+  ): bool {
+    $validators = $request->headers->getAll('If-None-Match');
+    if ($validators != vec[]) {
+      foreach ($validators as $field) {
+        foreach (split($field, ',') as $candidate) {
+          $candidate = trim($candidate);
+          if (
+            $candidate == '*'
+            || $this->weakTag($candidate) == $this->weakTag($etag)
+          ) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
+    $field = $request->headers->get('If-Modified-Since') ?? return false;
+
+    $date = ZonedDateTime::parseRfc2822($field);
+    return $date != null && $modifiedSeconds <= $date->systemTime->seconds;
+  }
+
+  /** Reports whether an If-Range date permits a range response. */
+  private function ifRangeMatches(
+    Request $request,
+    int $modifiedSeconds,
+  ): bool {
+    $field = $request->headers->get('If-Range') ?? return true;
+
+    $date = ZonedDateTime::parseRfc2822($field);
+    return $date != null && $modifiedSeconds <= $date->systemTime->seconds;
+  }
+
+  /** Parses one byte range, returning false when it is unsatisfiable. */
+  private function parseRange(
+    string $field,
+    NonNegativeInt $size,
+  ): null|false|(int, int) {
+    $field = trim($field);
+    if (!starts_with($field, 'bytes=')) {
+      return null;
+    }
+
+    $value = trim(slice($field, 6));
+    if ($value == '' || contains($value, ',')) {
+      return false;
+    }
+
+    $parts = split($value, '-');
+    if (length!($parts) != 2 || $size == 0) {
+      return false;
+    }
+
+    $first = trim($parts[0]);
+    $last = trim($parts[1]);
+    if ($first == '') {
+      $suffix = $this->decimal($last);
+      if ($suffix == null || $suffix == 0) {
+        return false;
+      }
+
+      if ($suffix > $size) {
+        $suffix = $size;
+      }
+
+      return ($size - $suffix, $size - 1);
+    }
+
+    $start = $this->decimal($first);
+    if ($start == null || $start >= $size) {
+      return false;
+    }
+
+    if ($last == '') {
+      return ($start, $size - 1);
+    }
+
+    $end = $this->decimal($last);
+    if ($end == null || $end < $start) {
+      return false;
+    }
+
+    if ($end >= $size) {
+      $end = $size - 1;
+    }
+
+    return ($start, $end);
+  }
+
+  /** Parses an unsigned decimal that fits in an integer. */
+  private function decimal(string $value): null|int {
+    if ($value == '') {
+      return null;
+    }
+
+    $result = 0;
+    $index = 0;
+    while ($index < length!($value)) {
+      $byte = ord($value[$index] as NonEmptyString);
+      if (!($byte is 48..=57)) {
+        return null;
+      }
+
+      $digit = $byte - 48;
+      if ($result > (StaticFiles::MAX_INT - $digit) / 10) {
+        return null;
+      }
+
+      $result = $result * 10 + $digit;
+      $index++;
+    }
+
+    return $result;
+  }
+
+  /** Removes the weakness marker from an entity tag. */
+  #[MustUse]
+  private function weakTag(string $etag): string {
+    return match (starts_with($etag, 'W/')) {
+      true => slice($etag, 2),
+      false => $etag,
+    };
+  }
+
+  /** Reports whether an index path is safe beneath the root. */
+  private function validRelativePath(string $path): bool {
+    if ($path == '' || starts_with($path, '/') || contains($path, "\x00")) {
+      return false;
+    }
+
+    foreach (split($path, '/') as $component) {
+      if ($component == '' || $component == '.' || $component == '..') {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /** Returns a media type inferred from a file extension. */
+  #[MustUse]
+  private function contentType(string $path): NonEmptyString {
+    $dot = search_last($path, '.');
+    $slash = search_last($path, '/');
+    if ($dot == null || ($slash != null && $dot < $slash)) {
+      return 'application/octet-stream';
+    }
+
+    $extension = lowercase(slice($path, $dot + 1));
+    return match ($extension) {
+      'html' => 'text/html; charset=utf-8',
+      'htm' => 'text/html; charset=utf-8',
+      'css' => 'text/css; charset=utf-8',
+      'js' => 'text/javascript; charset=utf-8',
+      'mjs' => 'text/javascript; charset=utf-8',
+      'json' => 'application/json',
+      'map' => 'application/json',
+      'txt' => 'text/plain; charset=utf-8',
+      'xml' => 'application/xml',
+      'svg' => 'image/svg+xml',
+      'png' => 'image/png',
+      'jpg' => 'image/jpeg',
+      'jpeg' => 'image/jpeg',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      'avif' => 'image/avif',
+      'ico' => 'image/x-icon',
+      'woff' => 'font/woff',
+      'woff2' => 'font/woff2',
+      'ttf' => 'font/ttf',
+      'otf' => 'font/otf',
+      'pdf' => 'application/pdf',
+      'wasm' => 'application/wasm',
+      'mp3' => 'audio/mpeg',
+      'mp4' => 'video/mp4',
+      'webm' => 'video/webm',
+      'ogg' => 'application/ogg',
+      $_ => 'application/octet-stream',
+    };
+  }
+}

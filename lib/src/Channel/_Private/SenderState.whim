@@ -1,0 +1,23 @@
+namespace Whim\Channel\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Async\CancellationToken;
+
+/** Defines the behavior of sender state values. */
+interface SenderState<in T> extends ChannelState {
+  /** Waits until a value can be sent. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilSendable(null|CancellationToken $cancellation): void;
+
+  /** Sends a value, waiting until the channel can accept it. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function send(T $value, null|CancellationToken $cancellation): void;
+
+  /** Attempts to send a value without waiting. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function trySend(T $value): void;
+}

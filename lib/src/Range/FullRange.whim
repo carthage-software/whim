@@ -1,0 +1,46 @@
+namespace Whim\Range;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Represents a full range. */
+final class FullRange implements Range {
+  /** Reports whether the range contains a value. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(int $value): bool {
+    return true;
+  }
+
+  /** Returns a copy with lower bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withLowerBound(int $lowerBound): FromRange {
+    return new FromRange($lowerBound);
+  }
+
+  /** Returns a copy with upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBound(
+    int $upperBound,
+    bool $upperInclusive,
+  ): ToRange {
+    return new ToRange($upperBound, $upperInclusive);
+  }
+
+  /** Returns a copy with upper bound inclusive. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundInclusive(int $upperBound): ToRange {
+    return new ToRange($upperBound, true);
+  }
+
+  /** Returns a copy with upper bound exclusive. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundExclusive(int $upperBound): ToRange {
+    return new ToRange($upperBound, false);
+  }
+}

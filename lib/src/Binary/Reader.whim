@@ -1,0 +1,112 @@
+namespace Whim\Binary;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Int16;
+use Whim\Refine\Int32;
+use Whim\Refine\Int8;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint16;
+use Whim\Refine\Uint32;
+use Whim\Refine\Uint8;
+
+/** Reads values out of a binary source, advancing as it goes. */
+interface Reader {
+  /** Reads an unsigned 8-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u8(): Uint8;
+
+  /** Reads an unsigned 16-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u16(null|Endianness $endianness = null): Uint16;
+
+  /** Reads an unsigned 32-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u32(null|Endianness $endianness = null): Uint32;
+
+  /** Reads an unsigned 64-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u64(null|Endianness $endianness = null): NonNegativeInt;
+
+  /** Reads a signed 8-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i8(): Int8;
+
+  /** Reads a signed 16-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i16(null|Endianness $endianness = null): Int16;
+
+  /** Reads a signed 32-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i32(null|Endianness $endianness = null): Int32;
+
+  /** Reads a signed 64-bit integer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function i64(null|Endianness $endianness = null): int;
+
+  /** Reads a single-precision floating-point value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function f32(null|Endianness $endianness = null): float;
+
+  /** Reads a double-precision floating-point value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function f64(null|Endianness $endianness = null): float;
+
+  /** Reads a fixed number of raw bytes. */
+  #[MustUse]
+  #[TrackCaller]
+  public function bytes(NonNegativeInt $length): string;
+
+  /** Whether every byte has been consumed. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isConsumed(): bool;
+
+  /** Advances past a number of bytes without returning them. */
+  #[TrackCaller]
+  public function skip(NonNegativeInt $length): void {
+    if ($length == 0) {
+      return;
+    }
+
+    discard!($this->bytes($length));
+  }
+
+  /** Reads a byte string introduced by an unsigned 8-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u8PrefixedBytes(): string {
+    return $this->bytes($this->u8());
+  }
+
+  /** Reads a byte string introduced by an unsigned 16-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u16PrefixedBytes(null|Endianness $endianness = null): string {
+    return $this->bytes($this->u16($endianness));
+  }
+
+  /** Reads a byte string introduced by an unsigned 32-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u32PrefixedBytes(null|Endianness $endianness = null): string {
+    return $this->bytes($this->u32($endianness));
+  }
+
+  /** Reads a byte string introduced by an unsigned 64-bit length. */
+  #[MustUse]
+  #[TrackCaller]
+  public function u64PrefixedBytes(null|Endianness $endianness = null): string {
+    return $this->bytes($this->u64($endianness));
+  }
+}

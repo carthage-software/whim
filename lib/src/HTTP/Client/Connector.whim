@@ -1,0 +1,18 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Opens protocol-ready HTTP connections. */
+interface Connector {
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    Origin $origin,
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Connection;
+}

@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports a recoverable failure during execution. */
+class RuntimeException extends Exception {}

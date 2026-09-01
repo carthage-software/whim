@@ -1,0 +1,15 @@
+namespace Whim\Marker;
+
+use Whim\Marker\TrackCaller;
+
+/** Holds a value that must be redacted from diagnostics. */
+#[Stub]
+final class SensitiveParameterValue {
+  private readonly mixed $value;
+
+  #[TrackCaller]
+  public function __construct(mixed $value) {}
+
+  #[TrackCaller]
+  public function getValue(): mixed {}
+}

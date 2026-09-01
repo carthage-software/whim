@@ -1,0 +1,15 @@
+namespace Whim\Network;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Defines a socket that accepts connected streams. */
+interface Listener<out TEndpoint: Endpoint> extends Socket<TEndpoint> {
+  /** Waits for and accepts the next connection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function accept(
+    null|CancellationToken $cancellation = null,
+  ): Stream<TEndpoint>;
+}

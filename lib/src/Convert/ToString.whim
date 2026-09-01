@@ -1,0 +1,12 @@
+namespace Whim\Convert;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Represents a type that can be converted into a string representation. */
+#[Stub]
+interface ToString {
+  /** Converts this value into a string representation. */
+  #[MustUse]
+  public function toString(): string;
+}

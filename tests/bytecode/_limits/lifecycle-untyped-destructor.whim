@@ -1,0 +1,5 @@
+namespace Limits\lifecycle_untyped_destructor;
+
+class C {
+  public function __destruct() {}
+}

@@ -1,0 +1,32 @@
+namespace Whim\Database;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+
+/** Base class for database failures. */
+class Exception extends RuntimeException {
+  private readonly null|string $sqlState;
+
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    string $message,
+    int $code = 0,
+    null|Throwable $previous = null,
+    null|string $sqlState = null,
+  ) {
+    parent::__construct($message, $code, $previous);
+    $this->sqlState = $sqlState;
+  }
+
+  /** Returns the five-character SQLSTATE reported by the database. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getSQLState(): null|string {
+    return $this->sqlState;
+  }
+}

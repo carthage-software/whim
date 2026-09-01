@@ -1,0 +1,132 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\HTTP\_Private\StreamId;
+use Whim\Refine\NonNegativeInt;
+
+/** Reassembles HEADERS and PUSH_PROMISE continuation sequences. */
+final class HeaderBlockAssembler {
+  private null|HeaderBlockKind $kind = null;
+  private null|StreamId $streamId = null;
+  private string $bytes = '';
+  private bool $endStream = false;
+  private null|StreamId $promisedStreamId = null;
+
+  public function __construct(private NonNegativeInt $maximumSize) {}
+
+  public function active(): bool {
+    return $this->kind != null;
+  }
+
+  public function headers(
+    StreamId $streamId,
+    string $bytes,
+    bool $endStream,
+    bool $endHeaders,
+  ): null|CompletedHeaderBlock {
+    return $this->start(
+      HeaderBlockKind::Headers,
+      $streamId,
+      $bytes,
+      $endStream,
+      null,
+      $endHeaders,
+    );
+  }
+
+  public function pushPromise(
+    StreamId $streamId,
+    StreamId $promisedStreamId,
+    string $bytes,
+    bool $endHeaders,
+  ): null|CompletedHeaderBlock {
+    return $this->start(
+      HeaderBlockKind::PushPromise,
+      $streamId,
+      $bytes,
+      false,
+      $promisedStreamId,
+      $endHeaders,
+    );
+  }
+
+  private function start(
+    HeaderBlockKind $kind,
+    StreamId $streamId,
+    string $bytes,
+    bool $endStream,
+    null|StreamId $promisedStreamId,
+    bool $endHeaders,
+  ): null|CompletedHeaderBlock {
+    if ($this->active()) {
+      throw new ProtocolException('an HTTP/2 header block was interrupted');
+    }
+
+    $this->guardSize(length!($bytes));
+    if ($endHeaders) {
+      return new CompletedHeaderBlock(
+        $kind,
+        $streamId,
+        $bytes,
+        $endStream,
+        $promisedStreamId,
+      );
+    }
+
+    $this->kind = $kind;
+    $this->streamId = $streamId;
+    $this->bytes = $bytes;
+    $this->endStream = $endStream;
+    $this->promisedStreamId = $promisedStreamId;
+    return null;
+  }
+
+  public function continuation(
+    StreamId $streamId,
+    string $bytes,
+    bool $endHeaders,
+  ): null|CompletedHeaderBlock {
+    if ($this->kind == null || $this->streamId == null) {
+      throw new ProtocolException(
+        'a CONTINUATION frame has no open header block',
+      );
+    }
+
+    if ($streamId != $this->streamId) {
+      throw new ProtocolException(
+        'a CONTINUATION frame changed stream identifier',
+      );
+    }
+
+    $this->guardSize(length!($this->bytes) + length!($bytes));
+    $this->bytes .= $bytes;
+    if (!$endHeaders) {
+      return null;
+    }
+
+    $completed = new CompletedHeaderBlock(
+      $this->kind,
+      $streamId,
+      $this->bytes,
+      $this->endStream,
+      $this->promisedStreamId,
+    );
+
+    $this->kind = null;
+    $this->streamId = null;
+    $this->bytes = '';
+    $this->endStream = false;
+    $this->promisedStreamId = null;
+    return $completed;
+  }
+
+  private function guardSize(int $size): void {
+    if ($this->maximumSize != 0 && $size > $this->maximumSize) {
+      throw new ProtocolException(
+        'the compressed HTTP/2 header block exceeds its configured limit',
+        Whim\HTTP\_Private\ErrorCode::CompressionError->value,
+      );
+    }
+  }
+}

@@ -1,0 +1,19 @@
+namespace Whim\TLS;
+
+use Whim\_Private;
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Selects how a TLS server authenticates clients. */
+enum ClientAuthentication: int implements Default {
+  case None = _Private\TLS_CLIENT_AUTHENTICATION_NONE;
+  case Optional = _Private\TLS_CLIENT_AUTHENTICATION_OPTIONAL;
+  case Required = _Private\TLS_CLIENT_AUTHENTICATION_REQUIRED;
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return static::None;
+  }
+}

@@ -1,0 +1,4 @@
+namespace Whim\SOCKS;
+
+/** Reports a SOCKS proxy connection refusal. */
+final class ConnectionException extends Exception {}

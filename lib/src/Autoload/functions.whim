@@ -1,0 +1,38 @@
+namespace Whim\Autoload;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Symbol;
+use Whim\Symbol\SymbolKind;
+
+/** Registers an autoloader. */
+#[TrackCaller]
+function register(Autoloader $autoloader): void {
+  _Private\Registry::register($autoloader);
+}
+
+/** Unregisters an autoloader. */
+#[AlwaysInline]
+function unregister(Autoloader $autoloader): void {
+  _Private\Registry::unregister($autoloader);
+}
+
+/** Returns the registered autoloaders in invocation order. */
+#[AlwaysInline]
+#[MustUse]
+function get_autoloaders(): vec<Autoloader> {
+  return _Private\Registry::all();
+}
+
+/** Attempts to autoload one symbol, by the path the engine itself takes. */
+#[TrackCaller]
+function load_symbol(SymbolKind $kind, string $symbol_name): bool {
+  Whim\_Private\run_symbol_autoload($kind->value, $symbol_name);
+  if (!Symbol\exists($symbol_name, false)) {
+    return false;
+  }
+
+  return Symbol\get_kind($symbol_name) == $kind;
+}

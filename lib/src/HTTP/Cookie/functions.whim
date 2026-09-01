@@ -1,0 +1,12 @@
+namespace Whim\HTTP\Cookie;
+
+use Whim\HTTP\Message\Response;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Adds one Set-Cookie field to an HTTP response. */
+#[AlwaysInline]
+#[MustUse]
+function add(Response $response, SetCookie $cookie): Response {
+  return $response->withAddedHeader('Set-Cookie', $cookie->toString());
+}

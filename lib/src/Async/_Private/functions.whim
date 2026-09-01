@@ -1,0 +1,60 @@
+namespace Whim\Async\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Async;
+use Whim\Async\Deferred;
+use Whim\Async\Future;
+use Whim\Unwind\Throwable;
+
+/** Waits for the first future to settle and returns its index. */
+#[TrackCaller]
+#[TraceBoundary]
+function select_future<T>(vec<Future<T>> $futures): int {
+  $winner = new Deferred::<int>();
+  $count = length!($futures);
+  $start = Selection::$offset % $count;
+  Selection::$offset = ($start + 1) % $count;
+  $position = 0;
+  while ($position < $count) {
+    $index = ($start + $position) % $count;
+    $future = $futures[$index];
+    Async\spawn::<null>(fn(): null {
+      try {
+        $future->await(null);
+      } catch (Throwable $_) {
+      }
+
+      if (!$winner->isComplete()) {
+        $winner->complete($index);
+      }
+
+      return null;
+    })->ignore();
+
+    $position++;
+  }
+
+  return $winner->getFuture()->await(null);
+}
+
+/** Waits for the first future to succeed. */
+#[TrackCaller]
+#[TraceBoundary]
+function select_successful_future<T>(vec<Future<T>> $futures): T {
+  $selection = new AnySelection::<T>(length!($futures));
+  $count = length!($futures);
+  $start = Selection::$offset % $count;
+  Selection::$offset = ($start + 1) % $count;
+  $position = 0;
+  while ($position < $count) {
+    $future = $futures[($start + $position) % $count];
+    Async\launch(fn(): void {
+      $selection->settle($future);
+    });
+
+    $position++;
+  }
+
+  return $selection->await();
+}

@@ -1,0 +1,122 @@
+use Whim\Filesystem;
+use Whim\Iterate\Iterator;
+use Whim\Iterate\ToIterator;
+use Whim\Unwind\TypeError;
+
+require!('../language/_reject.whim');
+
+final class Countdown implements Iterator<int, int> {
+  private int $emitted = 0;
+
+  public function __construct(private int $remaining) {}
+
+  public function next(): null|(int, int) {
+    if ($this->remaining == 0) {
+      return null;
+    }
+
+    $entry = ($this->emitted, $this->remaining);
+    $this->emitted += 1;
+    $this->remaining -= 1;
+    return $entry;
+  }
+}
+
+$countdown = new Countdown(3);
+$firstPass = vec[];
+foreach ($countdown as $key => $value) {
+  $firstPass[] = $key . ':' . $value;
+  if ($value == 2) {
+    break;
+  }
+}
+
+assert!($firstPass == vec['0:3', '1:2']);
+$secondPass = vec[];
+foreach ($countdown as $key => $value) {
+  $secondPass[] = $key . ':' . $value;
+}
+
+assert!($secondPass == vec['2:1']);
+
+class PlainObject {}
+
+$assertion_value_3 = function(): void {
+  foreach (new PlainObject() as $entry) {}
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (TypeError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is TypeError);
+
+final class FreshRangeIterator implements Iterator<int, int> {
+  private int $key = 0;
+
+  public function __construct(private int $current, private readonly int $to) {}
+
+  public function next(): null|(int, int) {
+    if ($this->current > $this->to) {
+      return null;
+    }
+
+    $entry = ($this->key, $this->current);
+    $this->key += 1;
+    $this->current += 1;
+    return $entry;
+  }
+}
+
+final class FreshRange implements ToIterator<int, int> {
+  public function __construct(
+    private readonly int $from,
+    private readonly int $to,
+  ) {}
+
+  public function toIterator(): Iterator<int, int> {
+    return new FreshRangeIterator($this->from, $this->to);
+  }
+}
+
+$collected = vec[];
+foreach (new FreshRange(1, 3) as $index => $number) {
+  $collected[] = $number;
+}
+
+assert!($collected == vec[1, 2, 3]);
+$freshRange = new FreshRange(7, 8);
+$firstWalk = vec[];
+foreach ($freshRange as $number) {
+  $firstWalk[] = $number;
+}
+
+$secondWalk = vec[];
+foreach ($freshRange as $number) {
+  $secondWalk[] = $number;
+}
+
+assert!($firstWalk == vec[7, 8]);
+assert!($secondWalk == vec[7, 8]);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+rejects(
+  $work,
+  'iterator-generic-contract',
+  'final class BrokenIterator implements Whim\Iterate\Iterator<int, string> {'
+  . "\n"
+  . '    public function next(): null|(int, int) {'
+  . "\n"
+  . '        return null;'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n",
+  'its return type is not covariant',
+);
+
+Filesystem\delete_directory($work, true);

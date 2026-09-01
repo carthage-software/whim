@@ -1,0 +1,86 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\IO\CloseHandle;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+
+/** Reads one fixed-length HTTP/1 response body. */
+final class FixedLengthBody implements ReadHandle {
+  private int $remaining;
+
+  public function __construct(
+    private ReadHandle $reader,
+    private CloseHandle $transport,
+    int $length,
+    private bool $closeAtEnd,
+  ) {
+    $this->remaining = $length;
+    if ($length == 0 && $this->closeAtEnd) {
+      $this->transport->close();
+    }
+  }
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->remaining > 0) {
+      $this->reader->waitUntilReadable($cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->remaining == 0;
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->remaining == 0) {
+      return '';
+    }
+
+    $limit = $this->limit($maxBytes);
+    $data = $this->reader->tryRead($limit);
+    $this->consume($data);
+    return $data;
+  }
+
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($this->remaining == 0) {
+      return '';
+    }
+
+    $data = $this->reader->read($this->limit($maxBytes), $cancellation);
+    if ($data == '' && $this->reader->reachedEndOfDataSource()) {
+      $this->transport->close();
+      throw new ProtocolException(
+        'the response ended before its declared content length',
+      );
+    }
+
+    $this->consume($data);
+    return $data;
+  }
+
+  private function limit(null|int $maximum): int {
+    if ($maximum == null || $maximum < 0 || $maximum > $this->remaining) {
+      return $this->remaining;
+    }
+
+    return $maximum;
+  }
+
+  private function consume(string $data): void {
+    $this->remaining -= length!($data);
+    if ($this->remaining == 0 && $this->closeAtEnd) {
+      $this->transport->close();
+    }
+  }
+}

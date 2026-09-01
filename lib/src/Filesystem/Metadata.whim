@@ -1,0 +1,44 @@
+namespace Whim\Filesystem;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint32;
+use Whim\Time\SystemTime;
+
+/** Describes a filesystem node as reported by the operating system. */
+final readonly class Metadata {
+  #[AlwaysInline]
+  public function __construct(
+    public NodeKind $kind,
+    public Uint32 $permissions,
+    public NonNegativeInt $size,
+    public int $user,
+    public int $group,
+    public SystemTime $accessedAt,
+    public SystemTime $modifiedAt,
+    public SystemTime $changedAt,
+    public NonNegativeInt $hardLinkCount,
+    public int $device,
+    public int $inode,
+    public NonNegativeInt $blockSize,
+    public NonNegativeInt $blockCount,
+  ) {}
+
+  /** Whether the node is a regular file. */
+  #[AlwaysInline]
+  public function isFile(): bool {
+    return $this->kind == NodeKind::File;
+  }
+
+  /** Whether the node is a directory. */
+  #[AlwaysInline]
+  public function isDirectory(): bool {
+    return $this->kind == NodeKind::Directory;
+  }
+
+  /** Whether the node is a symbolic link. */
+  #[AlwaysInline]
+  public function isSymbolicLink(): bool {
+    return $this->kind == NodeKind::SymbolicLink;
+  }
+}

@@ -1,0 +1,30 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Server\Context\Secure;
+use Whim\HTTP\Server\Context\Security;
+use Whim\Network\Endpoint;
+
+/** Adds TLS metadata and server push to an HTTP/2 request context. */
+final class H2SecurePushContext extends H2PushContext implements Secure {
+  public function __construct(
+    ProtocolVersion $protocolVersion,
+    Endpoint $localEndpoint,
+    Endpoint $peerEndpoint,
+    H2Session $session,
+    StreamId $streamId,
+    CancellationToken $cancellation,
+    public readonly Security $security,
+  ) {
+    parent::__construct(
+      $protocolVersion,
+      $localEndpoint,
+      $peerEndpoint,
+      $session,
+      $streamId,
+      $cancellation,
+    );
+  }
+}

@@ -1,0 +1,3 @@
+$f = fn<
+  T = (int, int, int, int, int, int, int, int, int, int, int, int, int),
+>(): int => 1;

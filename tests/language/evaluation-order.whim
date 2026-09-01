@@ -1,0 +1,384 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\UninitializedPropertyError;
+
+final class Trace {
+  public static vec<string> $events = vec[];
+}
+
+function tap(string $label, int $value): int {
+  Trace::$events[] = $label;
+  return $value;
+}
+
+function take_three(int $a, int $b, int $c): int {
+  return $a + $b + $c;
+}
+
+Trace::$events = vec[];
+$sum = take_three(tap('1', 1), tap('2', 2), tap('3', 3));
+assert!($sum == 6);
+assert!(Trace::$events == vec['1', '2', '3']);
+
+Trace::$events = vec[];
+$keyed = dict[];
+$keyed['k' . tap('T', 1)] = tap('V', 2);
+assert!(Trace::$events == vec['T', 'V']);
+assert!($keyed['k1'] == 2);
+
+Trace::$events = vec[];
+$slots = vec[0, 0];
+$slots[tap('I', 1)] = tap('W', 9);
+assert!(Trace::$events == vec['I', 'W']);
+assert!($slots[1] == 9);
+
+final class DeferredPropertyWrites {
+  public dict<int, int> $indexed;
+  public vec<int> $appended;
+  public dict<int, dict<int, int>> $nested;
+}
+
+final class DirectPropertyWrites {
+  public dict<int, int> $indexed = dict[];
+  public vec<int> $appended = vec[];
+}
+
+function assignment_receiver(
+  DeferredPropertyWrites $writes,
+): DeferredPropertyWrites {
+  Trace::$events[] = 'O';
+  return $writes;
+}
+
+$deferredWrites = new DeferredPropertyWrites();
+Trace::$events = vec[];
+$assertion_value_7 = function() use ($deferredWrites): void {
+  assignment_receiver($deferredWrites)->indexed[tap('I', 0)] = tap('V', 1);
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (UninitializedPropertyError $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is UninitializedPropertyError);
+
+assert!(Trace::$events == vec['O', 'I', 'V']);
+
+Trace::$events = vec[];
+$assertion_value_9 = function() use ($deferredWrites): void {
+  assignment_receiver($deferredWrites)->appended[] = tap('V', 1);
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (UninitializedPropertyError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is UninitializedPropertyError);
+
+assert!(Trace::$events == vec['O', 'V']);
+
+Trace::$events = vec[];
+$assertion_value_11 = function() use ($deferredWrites): void {
+  assignment_receiver($deferredWrites)->nested[tap('I1', 0)][tap(
+    'I2',
+    0,
+  )] = tap('V', 1);
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (UninitializedPropertyError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is UninitializedPropertyError);
+
+assert!(Trace::$events == vec['O', 'I1', 'I2', 'V']);
+
+$directWrites = new DirectPropertyWrites();
+Trace::$events = vec[];
+assert!(($directWrites->indexed[tap('I', 0)] = tap('V', 9)) == 9);
+assert!(Trace::$events == vec['I', 'V']);
+assert!($directWrites->indexed == dict[0 => 9]);
+
+Trace::$events = vec[];
+assert!(($directWrites->appended[] = tap('V', 7)) == 7);
+assert!(Trace::$events == vec['V']);
+assert!($directWrites->appended == vec[7]);
+
+$hotWrites = new DirectPropertyWrites();
+$hotIterations = 1200000;
+$hotIndex = 0;
+while ($hotIndex < $hotIterations) {
+  $hotWrites->indexed[$hotIndex % 256] = $hotIndex;
+  $hotIndex++;
+}
+
+$lastHotIndex = $hotIterations - 1;
+assert!(length!($hotWrites->indexed) == 256);
+assert!($hotWrites->indexed[$lastHotIndex % 256] == $lastHotIndex);
+
+final class CompoundPropertyWrite {
+  public dict<int, int> $values = dict[0 => 10];
+}
+
+function replace_compound_value(CompoundPropertyWrite $write): int {
+  Trace::$events[] = 'V';
+  $write->values[0] = 100;
+  return 100;
+}
+
+$compoundWrite = new CompoundPropertyWrite();
+Trace::$events = vec[];
+$compoundWrite->values[tap('I', 0)] += replace_compound_value($compoundWrite);
+assert!(Trace::$events == vec['I', 'V']);
+assert!($compoundWrite->values[0] == 200);
+
+$compoundLocal = 10;
+$compoundLocal += ($compoundLocal = 100);
+assert!($compoundLocal == 200);
+
+Trace::$events = vec[];
+$added = tap('L', 1) + tap('R', 2);
+assert!($added == 3);
+assert!(Trace::$events == vec['L', 'R']);
+
+Trace::$events = vec[];
+$product = tap('a', 2) * tap('b', 3) - tap('c', 1);
+assert!($product == 5);
+assert!(Trace::$events == vec['a', 'b', 'c']);
+
+function produce_callee(): fn(int): int {
+  Trace::$events[] = 'C';
+  return fn(int $n): int => $n;
+}
+
+function pick_index(): int {
+  Trace::$events[] = 'I';
+  return 0;
+}
+
+Trace::$events = vec[];
+$called = produce_callee()(tap('A', 1));
+assert!($called == 1);
+assert!(Trace::$events == vec['C', 'A']);
+
+Trace::$events = vec[];
+$holder = vec[fn(int $n): int => $n + 1];
+$indexed = $holder[pick_index()](tap('A', 2));
+assert!($indexed == 3);
+assert!(Trace::$events == vec['I', 'A']);
+
+class Pair {
+  public function __construct(public int $a, public int $b) {}
+}
+
+Trace::$events = vec[];
+$pair = new Pair(tap('1', 1), tap('2', 2));
+assert!($pair->a == 1);
+assert!($pair->b == 2);
+assert!(Trace::$events == vec['1', '2']);
+
+Trace::$events = vec[];
+$literal = vec[tap('a', 1), tap('b', 2), tap('c', 3)];
+assert!($literal == vec[1, 2, 3]);
+assert!(Trace::$events == vec['a', 'b', 'c']);
+
+Trace::$events = vec[];
+$entry = dict['x' . tap('K', 1) => tap('V', 2)];
+assert!($entry['x1'] == 2);
+assert!(Trace::$events == vec['K', 'V']);
+
+Trace::$events = vec[];
+$tuple = (tap('l', 1), tap('r', 2));
+assert!($tuple[0] == 1);
+assert!($tuple[1] == 2);
+assert!(Trace::$events == vec['l', 'r']);
+
+class Sink {
+  public function take(int $n): int {
+    return $n;
+  }
+}
+
+function make_receiver(): Sink {
+  Trace::$events[] = 'R';
+  return new Sink();
+}
+
+Trace::$events = vec[];
+$got = make_receiver()->take(tap('A', 4));
+assert!($got == 4);
+assert!(Trace::$events == vec['R', 'A']);
+
+final class WindowRecord {
+  public static vec<vec<int>> $vecs = vec[];
+  public static vec<dict<int, int>> $dicts = vec[];
+}
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$sizes = vec[254, 255, 256, 300];
+foreach ($sizes as $size) {
+  $vecElements = '';
+  $dictPairs = '';
+  $count = 0;
+  while ($count < $size) {
+    $vecElements = $vecElements . '  $i = $i + 1,' . "\n";
+    $dictPairs = $dictPairs . '  ($j = $j + 1) => $j,' . "\n";
+    $count = $count + 1;
+  }
+
+  $unit = $work . '/window-' . $size . '.whim';
+  File\write(
+    $unit,
+    '$i = 0;'
+    . "\n"
+    . '$v = vec['
+    . "\n"
+    . $vecElements
+    . '];'
+    . "\n"
+    . 'WindowRecord::$vecs[] = $v;'
+    . "\n"
+    . '$j = 0;'
+    . "\n"
+    . '$d = dict['
+    . "\n"
+    . $dictPairs
+    . '];'
+    . "\n"
+    . 'WindowRecord::$dicts[] = $d;'
+    . "\n",
+  );
+
+  require!($unit);
+}
+
+Filesystem\delete_directory($work, true);
+
+$index = 0;
+foreach ($sizes as $size) {
+  $expectedVec = vec[];
+  $expectedDict = dict[];
+  $value = 1;
+  while ($value <= $size) {
+    $expectedVec[] = $value;
+    $expectedDict[$value] = $value;
+    $value = $value + 1;
+  }
+
+  $recordedVec = WindowRecord::$vecs[$index];
+  assert!(length!($recordedVec) == $size);
+  assert!($recordedVec[0] == 1);
+  assert!($recordedVec[$size - 1] == $size);
+  assert!($recordedVec == $expectedVec);
+
+  $recordedDict = WindowRecord::$dicts[$index];
+  assert!(length!($recordedDict) == $size);
+  assert!($recordedDict[1] == 1);
+  assert!($recordedDict[$size] == $size);
+  assert!($recordedDict == $expectedDict);
+  $index = $index + 1;
+}
+
+function pipe_increment(int $value): int {
+  return $value + 1;
+}
+
+function pipe_add(int $left, int $right): int {
+  return $left + $right;
+}
+
+function pipe_double(int $value): int {
+  return $value * 2;
+}
+
+final class PipeProbe {
+  public int $leftEvaluations = 0;
+  public int $rightEvaluations = 0;
+
+  public function value(): int {
+    $this->leftEvaluations++;
+    return 4;
+  }
+
+  public function step(): fn(int): int {
+    $this->rightEvaluations++;
+    return pipe_increment(...);
+  }
+}
+
+assert!(1 |> pipe_increment(...) |> pipe_double(...) == 4);
+assert!(3 |> pipe_add(?, 4) == 7);
+assert!(3 |> (fn(int $value): int => $value * 3) == 9);
+assert!(1 + 2 |> pipe_double(...) == 6);
+assert!(null ?? 2 |> pipe_double(...) == 4);
+
+$probe = new PipeProbe();
+assert!($probe->value() |> $probe->step() == 5);
+assert!($probe->leftEvaluations == 1);
+assert!($probe->rightEvaluations == 1);
+
+$greedy = fn(int $value): int => $value |> pipe_increment(...);
+assert!($greedy(4) == 5);
+
+function boom_bool(): bool {
+  Trace::$events[] = 'boom';
+  return true;
+}
+
+function boom_string(): string {
+  Trace::$events[] = 'boom';
+  return 'right';
+}
+
+function boom_int(): int {
+  Trace::$events[] = 'boom';
+  return 1;
+}
+
+Trace::$events = vec[];
+$and = false && boom_bool();
+assert!(!($and));
+assert!(length!(Trace::$events) == 0);
+
+$or = true || boom_bool();
+assert!($or);
+assert!(length!(Trace::$events) == 0);
+
+$evaluated = true && false;
+assert!(!($evaluated));
+
+Trace::$events = vec[];
+$kept = 'left' ?? boom_string();
+assert!($kept == 'left');
+$zero = 0 ?? boom_string();
+assert!($zero == 0);
+$flag = false ?? boom_string();
+assert!(!($flag));
+assert!(length!(Trace::$events) == 0);
+$fell = null ?? boom_string();
+assert!($fell == 'right');
+assert!(Trace::$events == vec['boom']);
+
+class NullsafeNode {
+  public function id(int $n): int {
+    return $n;
+  }
+}
+
+Trace::$events = vec[];
+$missing = null;
+$skipped = $missing?->id(boom_int());
+assert!($skipped == null);
+assert!(length!(Trace::$events) == 0);
+
+$node = new NullsafeNode();
+assert!($node?->id(7) == 7);

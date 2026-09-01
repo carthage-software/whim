@@ -1,0 +1,43 @@
+namespace Whim\BSON;
+
+use Whim\Comparison\Equal;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Refine\Uint8;
+use Whim\UUID\UUID;
+
+/** A BSON binary value and its subtype. */
+#[Stub]
+final readonly class Binary implements Equal<Binary> {
+  public const int GENERIC = 0x00;
+  public const int FUNCTION = 0x01;
+  public const int OLD_BINARY = 0x02;
+  public const int OLD_UUID = 0x03;
+  public const int UUID = 0x04;
+  public const int MD5 = 0x05;
+  public const int ENCRYPTED = 0x06;
+  public const int COLUMN = 0x07;
+  public const int SENSITIVE = 0x08;
+  public const int VECTOR = 0x09;
+
+  #[AlwaysInline]
+  public function __construct(
+    public string $bytes,
+    public Uint8 $subtype = Binary::GENERIC,
+  ) {}
+
+  /** Builds standard UUID binary data. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromUUID(UUID $uuid): Binary {}
+
+  /** Returns the UUID carried by standard UUID binary data. */
+  #[MustUse]
+  public function toUUID(): null|UUID {}
+
+  /** Reports whether two binary values have the same bytes and subtype. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Binary $other): bool {}
+}

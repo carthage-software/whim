@@ -1,0 +1,6 @@
+namespace Whim\Filesystem;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports an operation denied by filesystem permissions. */
+final class PermissionDeniedException extends RuntimeException {}

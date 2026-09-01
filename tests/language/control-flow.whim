@@ -1,0 +1,349 @@
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UnhandledMatchError;
+
+$items = vec[1, 2, 3];
+$sum = 0;
+foreach ($items as $item) {
+  remove_last!($items);
+  $sum = $sum + $item;
+}
+
+assert!($sum == 6);
+assert!(length!($items) == 0);
+
+$bindings = vec[];
+foreach (vec['a', 'b'] as $index => $letter) {
+  $bindings[] = $index . $letter;
+}
+
+foreach (dict['x' => 1, 'y' => 2] as $key => $number) {
+  $bindings[] = $key . $number;
+}
+
+foreach ((7, 8) as $position => $element) {
+  $bindings[] = $position . $element;
+}
+
+assert!($bindings == vec['0a', '1b', 'x1', 'y2', '07', '18']);
+
+$products = vec[];
+foreach (vec[1, 2] as $left) {
+  foreach (vec[10, 20] as $right) {
+    $products[] = $left * $right;
+  }
+}
+
+assert!($products == vec[10, 20, 20, 40]);
+
+class Box {}
+
+$assertion_value_5 = function(): void {
+  foreach (5 as $x) {
+    $_ = $x;
+  }
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is TypeError);
+
+$assertion_value_6 = function(): void {
+  foreach (new Box() as $x) {
+    $_ = $x;
+  }
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (TypeError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is TypeError);
+
+function label(mixed $code): string {
+  return match ($code) {
+    0 => 'zero',
+    1 | 2 | 3 => 'small',
+    $_ => 'other',
+  };
+}
+
+assert!(label(0) == 'zero');
+assert!(label(2) == 'small');
+assert!(label(9) == 'other');
+assert!(label('nope') == 'other');
+
+function tone(mixed $name): int {
+  return match ($name) {
+    'a' => 1,
+    'b' => 2,
+    $_ => 0,
+  };
+}
+
+assert!(tone('a') == 1);
+assert!(tone('b') == 2);
+assert!(tone('z') == 0);
+assert!(tone(5) == 0);
+
+function word(mixed $value): int {
+  return match ($value) {
+    'zulu' => 1,
+    'alpha' => 2,
+    'middle' => 3,
+    $_ => 0,
+  };
+}
+
+assert!(word('alpha') == 2);
+assert!(word('middle') == 3);
+assert!(word('zulu') == 1);
+assert!(word('missing') == 0);
+assert!(word(1) == 0);
+
+$assertion_value_15 = fn(): string => (
+  match (42) {
+    1 => 'one',
+  }
+);
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (UnhandledMatchError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_15->getMessage(),
+      'unhandled match subject: 42',
+    ),
+  );
+}
+
+assert!($assertion_error_15 is UnhandledMatchError);
+
+$assertion_value_16 = fn(): int => (
+  match ('blue') {
+    'red' => 1,
+  }
+);
+
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (UnhandledMatchError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_16->getMessage(),
+      "unhandled match subject: 'blue'",
+    ),
+  );
+}
+
+assert!($assertion_error_16 is UnhandledMatchError);
+
+$value = dict[-1 => 'below zero'];
+$labelled = match ($value) {
+  dict[-1 => $bound @ string] => 'got: ' . $bound,
+  $_ => 'fallback',
+};
+
+assert!($labelled == 'got: below zero');
+
+$config = dict['legacy_id' => 42];
+$id = match ($config) {
+  dict['id' => $found @ int] | dict['legacy_id' => $found @ int] => $found,
+  $_ => 0,
+};
+
+assert!($id == 42);
+
+$fallthrough = match ((1, 2, 3)) {
+  ($first, $second) @ (...int) => 'matched',
+  $_ => 'fallback',
+};
+
+assert!($fallthrough == 'fallback');
+
+$rest = match (vec[1, 2, 3]) {
+  vec[...$values @ int] => length!($values),
+  $_ => 0,
+};
+
+assert!($rest == 3);
+
+$first_of_vec = match (vec[1]) {
+  vec[$first @ int, ...] => $first,
+  $_ => 0,
+};
+
+assert!($first_of_vec == 1);
+
+$empty_vec_matches = match (vec[]) {
+  vec[...] => true,
+  $_ => false,
+};
+
+assert!($empty_vec_matches);
+
+$first_of_tuple = match ((1,)) {
+  ($first @ int, ...) => $first,
+  $_ => 0,
+};
+
+assert!($first_of_tuple == 1);
+
+$id_of_dict = match (dict['id' => 1]) {
+  dict['id' => $bound_id @ int, ...] => $bound_id,
+  $_ => 0,
+};
+
+assert!($id_of_dict == 1);
+
+$break_values = vec[];
+for ($index = 0; $index < 5; $index++) {
+  $break_values[] = $index;
+  $value = match ($index) {
+    2 => break,
+    $_ => $index + 10,
+  };
+
+  $break_values[] = $value;
+}
+
+assert!($break_values == vec[0, 10, 1, 11, 2]);
+
+$continue_values = vec[];
+for ($index = 0; $index < 5; $index++) {
+  $value = match ($index) {
+    1 | 3 => continue,
+    $_ => $index,
+  };
+
+  $continue_values[] = $value;
+}
+
+assert!($continue_values == vec[0, 2, 4]);
+
+function return_from_match(bool $early): int {
+  $value = match ($early) {
+    true => return 41,
+    false => 42,
+  };
+
+  return $value;
+}
+
+assert!(return_from_match(true) == 41);
+assert!(return_from_match(false) == 42);
+
+final class ReturnExpressionState {
+  public int $visits = 0;
+}
+
+function return_without_value_from_match(
+  bool $early,
+  ReturnExpressionState $state,
+): void {
+  discard!(
+    match ($early) {
+      true => return,
+      false => null,
+    },
+  );
+
+  $state->visits++;
+}
+
+$return_expression_state = new ReturnExpressionState();
+return_without_value_from_match(true, $return_expression_state);
+return_without_value_from_match(false, $return_expression_state);
+assert!($return_expression_state->visits == 1);
+
+$nested_break = vec[];
+for ($outer = 0; $outer < 3; $outer++) {
+  for ($inner = 0; $inner < 3; $inner++) {
+    $nested_break[] = ($outer, $inner);
+    discard!(
+      match (($outer, $inner)) {
+        (1, 1) => break 2,
+        $_ => null,
+      },
+    );
+  }
+}
+
+assert!($nested_break == vec[(0, 0), (0, 1), (0, 2), (1, 0), (1, 1)]);
+
+$nested_continue = vec[];
+for ($outer = 0; $outer < 3; $outer++) {
+  for ($inner = 0; $inner < 3; $inner++) {
+    discard!(
+      match (($outer, $inner)) {
+        (1, 1) => continue 2,
+        $_ => null,
+      },
+    );
+
+    $nested_continue[] = ($outer, $inner);
+  }
+}
+
+assert!(
+  $nested_continue == vec[
+    (0, 0),
+    (0, 1),
+    (0, 2),
+    (1, 0),
+    (2, 0),
+    (2, 1),
+    (2, 2),
+  ],
+);
+
+$while_condition = 0;
+$while_bodies = 0;
+while (
+  match ($while_condition++) {
+    0 => continue,
+    2 => break,
+    $_ => true,
+  }
+) {
+  $while_bodies++;
+}
+
+assert!($while_condition == 3);
+assert!($while_bodies == 1);
+
+$do_condition = 0;
+$do_bodies = 0;
+do {
+  $do_bodies++;
+} while (match ($do_condition++) {
+  0 => continue,
+  $_ => false,
+});
+
+assert!($do_condition == 2);
+assert!($do_bodies == 1);
+
+$for_bodies = 0;
+for ($for_index = 0; match ($for_index) {
+  0 => continue,
+  2 => break,
+  $_ => true,
+}; $for_index++) {
+  $for_bodies++;
+}
+
+assert!($for_index == 2);
+assert!($for_bodies == 1);

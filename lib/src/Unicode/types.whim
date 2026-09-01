@@ -1,0 +1,7 @@
+namespace Whim\Unicode;
+
+/** Any Unicode code point, including surrogates. */
+type CodePoint = 0..=0x10ffff;
+
+/** A Unicode code point excluding surrogates. */
+type ScalarValue = (0..=0xd7ff)|(0xe000..=0x10ffff);

@@ -1,0 +1,38 @@
+namespace Whim\TLS;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonEmptyVec;
+
+/** A certificate chain and its private key. */
+final readonly class Identity {
+  #[AlwaysInline]
+  private function __construct(
+    public NonEmptyVec<Certificate> $certificateChain,
+    #[SensitiveParameter] public NonEmptyString $privateKey,
+  ) {}
+
+  /** Decodes a PEM or DER certificate chain and private key. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function from(
+    string $certificateChain,
+    #[SensitiveParameter] string $privateKey,
+  ): Identity {
+    $certificates = Certificate::decode($certificateChain);
+    try {
+      $privateKey = Whim\_Private\tls_decode_private_key($privateKey);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    return new Identity(
+      $certificates as NonEmptyVec<Certificate>,
+      $privateKey as NonEmptyString,
+    );
+  }
+}

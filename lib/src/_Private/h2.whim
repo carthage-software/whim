@@ -1,0 +1,40 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Incrementally splits an HTTP/2 byte stream into raw frames. */
+#[Stub]
+final class H2FrameDecoder {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function create(int $maximumFrameSize): H2FrameDecoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(string $bytes): vec<(int, int, int, string)> {}
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function finish(): void {}
+}
+
+/** Encodes one raw HTTP/2 frame. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function h2_encode_frame(
+  int $type,
+  int $flags,
+  int $stream,
+  string $payload,
+): string {}

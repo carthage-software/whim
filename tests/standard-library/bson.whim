@@ -1,0 +1,332 @@
+use Whim\BSON;
+use Whim\BSON\Binary;
+use Whim\BSON\DBPointer;
+use Whim\BSON\Decimal128;
+use Whim\BSON\DecodingException;
+use Whim\BSON\Document;
+use Whim\BSON\EncodingException;
+use Whim\BSON\FromBson;
+use Whim\BSON\Int32;
+use Whim\BSON\JavaScript;
+use Whim\BSON\JavaScriptWithScope;
+use Whim\BSON\Marker;
+use Whim\BSON\ObjectId;
+use Whim\BSON\RegularExpression;
+use Whim\BSON\Symbol;
+use Whim\BSON\Timestamp;
+use Whim\BSON\ToBson;
+use Whim\Async\CancellationToken;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Math;
+use Whim\Str;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+function rejects_bson(string $bytes): void {
+  $error = null;
+  try {
+    BSON\decode($bytes);
+  } catch (DecodingException $caught) {
+    $error = $caught;
+  }
+
+  assert!($error is DecodingException);
+}
+
+function rejects_bson_value(BSON\Value $value): void {
+  $error = null;
+  try {
+    BSON\encode(dict['value' => $value]);
+  } catch (EncodingException $caught) {
+    $error = $caught;
+  }
+
+  assert!($error is EncodingException);
+}
+
+final class ChunkedBsonReadHandle implements ReadHandle {
+  private int $offset = 0;
+
+  public function __construct(private readonly string $bytes) {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->offset >= length!($this->bytes);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->reachedEndOfDataSource()) {
+      return '';
+    }
+
+    $length = 3;
+    if ($maxBytes != null && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $remaining = length!($this->bytes) - $this->offset;
+    if ($remaining < $length) {
+      $length = $remaining;
+    }
+
+    $bytes = Str\slice($this->bytes, $this->offset, $length);
+    $this->offset += $length;
+    return $bytes;
+  }
+}
+
+final class RecordingBsonWriteHandle implements WriteHandle {
+  public string $bytes = '';
+  public int $writes = 0;
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  public function tryWrite(string $bytes): int {
+    return $this->record($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return $this->record($bytes);
+  }
+
+  private function record(string $bytes): int {
+    $this->bytes .= $bytes;
+    $this->writes++;
+    return length!($bytes);
+  }
+}
+
+assert!(BSON\encode(dict[]) == "\x05\x00\x00\x00\x00");
+assert!(BSON\decode("\x05\x00\x00\x00\x00") == dict[]);
+
+$hello =
+  "\x16\x00\x00\x00" . "\x02hello\x00" . "\x06\x00\x00\x00world\x00" . "\x00";
+
+assert!(BSON\encode(dict['hello' => 'world']) == $hello);
+assert!(BSON\decode($hello) == dict['hello' => 'world']);
+
+assert!(
+  BSON\encode(dict['i' => Int32(42)])
+  == "\x0c\x00\x00\x00\x10i\x00\x2a\x00\x00\x00\x00",
+);
+
+assert!(
+  BSON\encode(dict['i' => 42])
+  == "\x10\x00\x00\x00\x12i\x00\x2a\x00\x00\x00\x00\x00\x00\x00\x00",
+);
+
+assert!(BSON\encode(dict['b' => true]) == "\x09\x00\x00\x00\x08b\x00\x01\x00");
+assert!(BSON\encode(dict['n' => null]) == "\x08\x00\x00\x00\x0an\x00\x00");
+
+$identifier = ObjectId::from('0123456789abcdef01234567');
+assert!($identifier->toString() == '0123456789abcdef01234567');
+assert!(ObjectId::parse('0123456789ABCDEF01234567') == null);
+assert!(ObjectId::parse('short') == null);
+assert!(ObjectId::isValid('0123456789abcdef01234567'));
+assert!(!ObjectId::isValid('0123456789ABCDEF01234567'));
+assert!(ObjectId::fromBytes($identifier->toBytes())->equals($identifier));
+$generated = ObjectId::generate();
+assert!(length!($generated->toBytes()) == 12);
+assert!(!$generated->equals(ObjectId::generate()));
+
+$regularExpression = RegularExpression::fromParts('^whim$', 'xmi');
+assert!($regularExpression->options == 'imx');
+
+$uuid = Whim\UUID\UUID::from('123e4567-e89b-42d3-a456-426614174000');
+$uuidBinary = Binary::fromUUID($uuid);
+assert!($uuidBinary->subtype == Binary::UUID);
+assert!(($uuidBinary->toUUID() as Whim\UUID\UUID)->equals($uuid));
+assert!(new Binary('not a uuid')->toUUID() == null);
+
+$decimalBytes =
+  "\x00\x01\x02\x03\x04\x05\x06\x07" . "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f";
+
+$decimal = Decimal128::fromBytes($decimalBytes);
+assert!($decimal->toBytes() == $decimalBytes);
+
+$time = SystemTime::fromUnixTimestamp(-1, 999_000_000);
+$values = dict[
+  'double' => 1.5,
+  'string' => 'Whim',
+  'document' => dict['answer' => Int32(42)],
+  'array' => vec[null, true, 7],
+  'binary' => new Binary("\x00\xff", 0x80),
+  'old_binary' => new Binary('old', Binary::OLD_BINARY),
+  'undefined' => Marker::Undefined,
+  'object_id' => $identifier,
+  'boolean' => false,
+  'datetime' => $time,
+  'null' => null,
+  'regex' => $regularExpression,
+  'pointer' => new DBPointer('archive.users', $identifier),
+  'javascript' => JavaScript('return value;'),
+  'symbol' => Symbol('legacy'),
+  'scoped' => new JavaScriptWithScope('return n;', dict['n' => Int32(3)]),
+  'int32' => Int32(-7),
+  'timestamp' => new Timestamp(1_700_000_000, 7),
+  'int64' => Math\INT_MAX,
+  'decimal' => $decimal,
+  'max' => Marker::MaxKey,
+  'min' => Marker::MinKey,
+];
+
+$encoded = BSON\encode($values);
+$decoded = BSON\decode($encoded);
+assert!(BSON\encode($decoded) == $encoded);
+assert!($decoded['int32'] is Int32);
+assert!($decoded['int64'] is int && !($decoded['int64'] is Int32));
+
+assert!($decoded['datetime'] is SystemTime);
+assert!(($decoded['datetime'] as SystemTime)->equals($time));
+assert!($decoded['object_id'] is ObjectId);
+assert!(($decoded['object_id'] as ObjectId)->equals($identifier));
+assert!($decoded['regex'] is RegularExpression);
+assert!(($decoded['regex'] as RegularExpression)->equals($regularExpression));
+assert!($decoded['timestamp'] is Timestamp);
+assert!(
+  ($decoded['timestamp'] as Timestamp)->equals(new Timestamp(1_700_000_000, 7)),
+);
+
+assert!($decoded['decimal'] is Decimal128);
+assert!(($decoded['decimal'] as Decimal128)->equals($decimal));
+
+$minimumDatetime =
+  "\x10\x00\x00\x00\x09d\x00" . "\x00\x00\x00\x00\x00\x00\x00\x80\x00";
+
+$maximumDatetime =
+  "\x10\x00\x00\x00\x09d\x00" . "\xff\xff\xff\xff\xff\xff\xff\x7f\x00";
+
+assert!(BSON\encode(BSON\decode($minimumDatetime)) == $minimumDatetime);
+assert!(BSON\encode(BSON\decode($maximumDatetime)) == $maximumDatetime);
+
+final readonly class BsonPoint implements ToBson, FromBson {
+  public function __construct(public int $x, public int $y) {}
+
+  public function toBson(): Document {
+    return dict['x' => $this->x, 'y' => $this->y];
+  }
+
+  public static function fromBson(Document $document): static {
+    return match ($document) {
+      dict['x' => $x @ int, 'y' => $y @ int] => new static($x, $y),
+      $_ => throw new DecodingException('a point needs x and y fields'),
+    };
+  }
+}
+
+$pointBytes = BSON\encode(new BsonPoint(3, 4));
+$point = BSON\decode_as::<BsonPoint>($pointBytes);
+assert!($point->x == 3);
+assert!($point->y == 4);
+
+$handle = new MemoryHandle($encoded . $pointBytes);
+$reader = new BSON\Reader($handle);
+$readValues = $reader->read() as Document;
+assert!(BSON\encode($readValues) == $encoded);
+$readPoint = $reader->read() as Document;
+assert!($readPoint == dict['x' => 3, 'y' => 4]);
+assert!($reader->read() == null);
+
+$output = new MemoryHandle();
+new BSON\Writer($output)->write($values);
+assert!($output->toString() == $encoded);
+
+$chunked = new ChunkedBsonReadHandle($encoded . $pointBytes);
+$chunkedReader = new BSON\Reader($chunked);
+$chunkedValues = $chunkedReader->read() as Document;
+assert!(BSON\encode($chunkedValues) == $encoded);
+assert!($chunkedReader->read() == dict['x' => 3, 'y' => 4]);
+assert!($chunkedReader->read() == null);
+
+$recording = new RecordingBsonWriteHandle();
+$writer = new BSON\Writer($recording);
+$writer->write($values);
+assert!($recording->bytes == $encoded);
+assert!($recording->writes == 1);
+
+rejects_bson('');
+rejects_bson("\x05\x00\x00\x00");
+rejects_bson("\x04\x00\x00\x00");
+rejects_bson("\x06\x00\x00\x00\x00");
+rejects_bson("\x05\x00\x00\x00\x01");
+rejects_bson("\x05\x00\x00\x00\x00trailing");
+rejects_bson("\x08\x00\x00\x00\x42x\x00\x00");
+rejects_bson("\x09\x00\x00\x00\x08b\x00\x02\x00");
+rejects_bson("\x0d\x00\x00\x00\x0br\x00x\x00mi\x00\x00");
+rejects_bson("\x0e\x00\x00\x00\x02x\x00\x02\x00\x00\x00\xff\x00\x00");
+rejects_bson(
+  "\x13\x00\x00\x00\x10x\x00\x01\x00\x00\x00" . "\x10x\x00\x02\x00\x00\x00\x00",
+);
+
+rejects_bson(
+  "\x12\x00\x00\x00\x04a\x00\x0a\x00\x00\x00"
+  . "\x10one\x00\x01\x00\x00\x00\x00\x00",
+);
+
+$nestedBytes = "\x05\x00\x00\x00\x00";
+$level = 0;
+while ($level < 129) {
+  $nestedBytes =
+    Whim\Binary\encode_i32(
+      length!($nestedBytes) + 8,
+      Whim\Binary\Endianness::Little,
+    )
+    . "\x03x\x00"
+    . $nestedBytes
+    . "\x00";
+
+  $level++;
+}
+
+rejects_bson($nestedBytes);
+
+$nestedValue = dict[];
+$level = 0;
+while ($level < 129) {
+  $nestedValue = dict['x' => $nestedValue];
+  $level++;
+}
+
+rejects_bson_value($nestedValue);
+
+rejects_bson_value(Str\chr(0xff));
+rejects_bson_value(SystemTime::fromUnixTimestamp(Math\INT_MAX, 999_999_999));
+
+$regexError = null;
+try {
+  RegularExpression::fromParts('pattern', 'ii');
+} catch (InvalidArgumentException $caught) {
+  $regexError = $caught;
+}
+
+assert!($regexError is InvalidArgumentException);
+
+$shortInput = new MemoryHandle("\x05\x00");
+$shortError = null;
+try {
+  new BSON\Reader($shortInput)->read();
+} catch (DecodingException $caught) {
+  $shortError = $caught;
+}
+
+assert!($shortError is DecodingException);
+
+$largeInput = new MemoryHandle($hello);
+$largeError = null;
+try {
+  new BSON\Reader($largeInput, 5)->read();
+} catch (DecodingException $caught) {
+  $largeError = $caught;
+}
+
+assert!($largeError is DecodingException);

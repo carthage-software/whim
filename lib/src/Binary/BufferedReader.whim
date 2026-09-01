@@ -1,0 +1,23 @@
+namespace Whim\Binary;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Reads values out of a byte string held in memory. */
+interface BufferedReader extends Reader {
+  /** How many bytes have been consumed. */
+  #[MustUse]
+  #[TrackCaller]
+  public function cursor(): NonNegativeInt;
+
+  /** How many bytes the buffer holds. */
+  #[MustUse]
+  #[TrackCaller]
+  public function length(): NonNegativeInt;
+
+  /** How many bytes remain unread. */
+  #[MustUse]
+  #[TrackCaller]
+  public function remaining(): NonNegativeInt;
+}

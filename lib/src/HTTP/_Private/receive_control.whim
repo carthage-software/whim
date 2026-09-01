@@ -1,0 +1,100 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\ErrorCode;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\FlowControlException;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\HTTP\_Private\StreamException;
+use Whim\HTTP\_Private\StreamState;
+
+function receive_priority(
+  State $state,
+  Frame\PriorityFrame $frame,
+): vec<Event\WeakendEvent> {
+  if ($frame[1] == $frame[2]) {
+    stream_error($frame[1], 'an HTTP/2 stream cannot depend on itself');
+  }
+
+  return vec[];
+}
+
+function receive_reset(
+  State $state,
+  Frame\RstStreamFrame $frame,
+): vec<Event\WeakendEvent> {
+  $streamState = stream_state($state, $frame[1]);
+  if ($streamState == StreamState::Idle) {
+    throw new ProtocolException('`RST_STREAM` cannot target an idle stream');
+  }
+
+  if ($streamState == StreamState::Closed) {
+    return vec[];
+  }
+
+  close_stream($state, $frame[1]);
+  return vec[(7, $frame[1], $frame[2]), (8, $frame[1])];
+}
+
+function receive_ping(
+  State $state,
+  Frame\PingFrame $frame,
+): vec<Event\WeakendEvent> {
+  if (!$frame[2]) {
+    queue_frame($state, (6, $frame[1], true));
+  }
+
+  return vec[];
+}
+
+function receive_go_away(
+  State $state,
+  Frame\GoAwayFrame $frame,
+): vec<Event\WeakendEvent> {
+  if ($state->receivedGoAway != null && $frame[1] > $state->receivedGoAway) {
+    throw new ProtocolException(
+      'an HTTP/2 GOAWAY last stream identifier increased',
+    );
+  }
+
+  $state->receivedGoAway = $frame[1];
+  $state->connected = false;
+  return vec[(6, $frame[1], $frame[2], $frame[3])];
+}
+
+function receive_window_update(
+  State $state,
+  Frame\WindowUpdateFrame $frame,
+): vec<Event\WeakendEvent> {
+  if ($frame[1] == 0) {
+    $state->flow->updateConnectionSend($frame[2]);
+  } else {
+    $streamState = stream_state($state, $frame[1]);
+    if ($streamState == StreamState::Idle) {
+      throw new ProtocolException(
+        '`WINDOW_UPDATE` cannot target an idle stream',
+      );
+    }
+
+    if ($streamState == StreamState::Closed) {
+      return vec[(10, $frame[1], $frame[2])];
+    }
+
+    $entry = $state->streams->get($frame[1]);
+    if ($entry == null) {
+      throw new ProtocolException('the HTTP/2 stream state was lost');
+    }
+
+    try {
+      $state->flow->updateStreamSend($entry, $frame[2]);
+    } catch (FlowControlException $error) {
+      throw new StreamException(
+        $error->getMessage(),
+        $frame[1],
+        ErrorCode::FlowControlError->value,
+      );
+    }
+  }
+
+  return vec[(10, $frame[1], $frame[2])];
+}

@@ -1,0 +1,476 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\StreamException;
+use Whim\HTTP\_Private\StreamId;
+use Whim\Str;
+
+/** Validates one decoded HTTP/2 field section. */
+final class HeaderValidator {
+  public static function validateRequest(
+    StreamId $streamId,
+    vec<Header> $headers,
+    bool $extendedConnectEnabled,
+  ): (null|int, string, string, string, string, vec<(string, string)>) {
+    $regular = false;
+    $contentLength = null;
+    $method = null;
+    $scheme = null;
+    $authority = null;
+    $path = null;
+    $protocol = null;
+    $fields = vec[];
+    foreach ($headers as $header) {
+      $name = $header[0];
+      $value = $header[1];
+      if (!Whim\_Private\http_valid_lowercase_field_name($name)) {
+        fail($streamId, 'an HTTP/2 field name is malformed');
+      }
+
+      if (!Whim\_Private\http_valid_compressed_field_value($value)) {
+        fail($streamId, 'an HTTP/2 field value is malformed');
+      }
+
+      if ($name[0] == ':') {
+        if ($regular) {
+          fail(
+            $streamId,
+            'an HTTP/2 pseudo-field appeared after a regular field',
+          );
+        }
+
+        if ($name == ':method') {
+          if ($method != null) {
+            fail($streamId, 'an HTTP/2 pseudo-field was repeated');
+          }
+
+          $method = $value;
+        } else if ($name == ':scheme') {
+          if ($scheme != null) {
+            fail($streamId, 'an HTTP/2 pseudo-field was repeated');
+          }
+
+          $scheme = $value;
+        } else if ($name == ':authority') {
+          if ($authority != null) {
+            fail($streamId, 'an HTTP/2 pseudo-field was repeated');
+          }
+
+          $authority = $value;
+        } else if ($name == ':path') {
+          if ($path != null) {
+            fail($streamId, 'an HTTP/2 pseudo-field was repeated');
+          }
+
+          $path = $value;
+        } else if ($name == ':protocol') {
+          if ($protocol != null) {
+            fail($streamId, 'an HTTP/2 pseudo-field was repeated');
+          }
+
+          $protocol = $value;
+        } else {
+          fail($streamId, 'an unknown request pseudo-field was received');
+        }
+      } else {
+        $regular = true;
+        validate_regular($streamId, $name, $value);
+        $fields[] = ($name, $value);
+      }
+
+      if ($name == 'content-length') {
+        $parsed = parse_length($streamId, $value);
+        if ($contentLength != null && $contentLength != $parsed) {
+          fail($streamId, 'conflicting HTTP/2 content-length fields');
+        }
+
+        $contentLength = $parsed;
+      }
+    }
+
+    if ($method == null) {
+      fail($streamId, 'the HTTP/2 field section is missing :method');
+    }
+
+    if ($method == 'CONNECT') {
+      if ($authority == null || $authority == '') {
+        fail($streamId, 'the HTTP/2 :authority field must not be empty');
+      }
+
+      if ($protocol != null) {
+        if (!$extendedConnectEnabled) {
+          fail($streamId, 'extended CONNECT was not enabled');
+        }
+
+        if ($scheme == null) {
+          fail($streamId, 'the HTTP/2 field section is missing :scheme');
+        }
+
+        if ($path == null) {
+          fail($streamId, 'the HTTP/2 field section is missing :path');
+        }
+
+        if (
+          !Whim\_Private\http_valid_request_pseudo_fields(
+            $method,
+            $scheme,
+            $path,
+          )
+          || !Whim\_Private\http_valid_token($protocol)
+        ) {
+          fail($streamId, 'the HTTP/2 request pseudo-fields are malformed');
+        }
+      } else if ($scheme != null || $path != null) {
+        fail($streamId, 'a CONNECT request must omit :scheme and :path');
+      }
+    } else {
+      if ($protocol != null) {
+        fail($streamId, ':protocol requires the CONNECT method');
+      }
+
+      if ($scheme == null) {
+        fail($streamId, 'the HTTP/2 field section is missing :scheme');
+      }
+
+      if ($path == null) {
+        fail($streamId, 'the HTTP/2 field section is missing :path');
+      }
+
+      if (
+        !Whim\_Private\http_valid_request_pseudo_fields($method, $scheme, $path)
+      ) {
+        fail($streamId, 'the HTTP/2 request pseudo-fields are malformed');
+      }
+    }
+
+    return (
+      $contentLength,
+      $method,
+      $scheme ?? '',
+      $authority ?? '',
+      $path ?? '',
+      $fields,
+    );
+  }
+
+  public static function validate(
+    StreamId $streamId,
+    vec<Header> $headers,
+    Role $receiver,
+    bool $trailers,
+    bool $pushPromise,
+    bool $extendedConnectEnabled,
+  ): null|int {
+    $regular = false;
+    $pseudo = dict[];
+    $contentLength = null;
+    foreach ($headers as $header) {
+      $name = $header[0];
+      if (!Whim\_Private\http_valid_lowercase_field_name($name)) {
+        fail($streamId, 'an HTTP/2 field name is malformed');
+      }
+
+      if (!Whim\_Private\http_valid_compressed_field_value($header[1])) {
+        fail($streamId, 'an HTTP/2 field value is malformed');
+      }
+
+      $isPseudo = $name[0] == ':';
+      if ($isPseudo) {
+        if ($regular || $trailers) {
+          fail(
+            $streamId,
+            'an HTTP/2 pseudo-field appeared after a regular field',
+          );
+        }
+
+        if (contains_key!($pseudo, $name)) {
+          fail($streamId, 'an HTTP/2 pseudo-field was repeated');
+        }
+
+        validate_pseudo($streamId, $name, $receiver, $pushPromise);
+        $pseudo[$name] = $header[1];
+      } else {
+        $regular = true;
+        validate_regular($streamId, $name, $header[1]);
+      }
+
+      if ($name == 'content-length') {
+        $parsed = parse_length($streamId, $header[1]);
+        if ($contentLength != null && $contentLength != $parsed) {
+          fail($streamId, 'conflicting HTTP/2 content-length fields');
+        }
+
+        $contentLength = $parsed;
+      }
+    }
+
+    if (!$trailers) {
+      if ($receiver == Role::Server || $pushPromise) {
+        validate_request_pseudo_fields(
+          $streamId,
+          $pseudo,
+          $pushPromise,
+          $extendedConnectEnabled,
+        );
+
+        if ($pushPromise) {
+          validate_push_request($streamId, $pseudo, $contentLength);
+        }
+      } else {
+        require_pseudo($streamId, $pseudo, ':status');
+        parse_status($streamId, $pseudo[':status']);
+      }
+    }
+
+    return $contentLength;
+  }
+
+  public static function requestMethod(
+    StreamId $streamId,
+    vec<Header> $headers,
+  ): string {
+    foreach ($headers as $header) {
+      if ($header[0] == ':method') {
+        return $header[1];
+      }
+    }
+
+    fail($streamId, 'the HTTP/2 field section is missing :method');
+  }
+
+  public static function responseStatus(
+    StreamId $streamId,
+    vec<Header> $headers,
+  ): 100..=599 {
+    foreach ($headers as $header) {
+      if ($header[0] == ':status') {
+        return parse_status($streamId, $header[1]);
+      }
+    }
+
+    fail($streamId, 'the HTTP/2 field section is missing :status');
+  }
+
+  public static function expectedResponseContentLength(
+    StreamId $streamId,
+    null|string $requestMethod,
+    100..=599 $status,
+    null|int $contentLength,
+  ): null|int {
+    $tunnel = $requestMethod == 'CONNECT' && $status is 200..=299;
+    if ($status is 100..=199|204 || $tunnel) {
+      if ($contentLength != null) {
+        fail($streamId, 'content-length is forbidden on this HTTP/2 response');
+      }
+
+      return match ($tunnel) {
+        true => null,
+        false => 0,
+      };
+    }
+
+    if ($requestMethod == 'HEAD' || $status == 304) {
+      return 0;
+    }
+
+    if ($status == 205) {
+      if ($contentLength != null && $contentLength != 0) {
+        fail($streamId, 'a 205 HTTP/2 response must have no content');
+      }
+
+      return 0;
+    }
+
+    return $contentLength;
+  }
+}
+
+function validate_push_request(
+  StreamId $streamId,
+  dict<string, string> $pseudo,
+  null|int $contentLength,
+): void {
+  require_pseudo($streamId, $pseudo, ':authority');
+  if ($pseudo[':authority'] == '') {
+    fail($streamId, 'an HTTP/2 push promise has an empty :authority field');
+  }
+
+  if (!($pseudo[':method'] is 'GET'|'HEAD')) {
+    fail($streamId, 'an HTTP/2 push promise must use GET or HEAD');
+  }
+
+  if ($contentLength != null && $contentLength != 0) {
+    fail($streamId, 'an HTTP/2 push promise cannot include content');
+  }
+}
+
+function validate_regular(
+  StreamId $streamId,
+  string $name,
+  string $value,
+): void {
+  if (
+    $name is 'connection'
+      | 'keep-alive'
+      | 'proxy-connection'
+      | 'transfer-encoding'
+      | 'upgrade'
+  ) {
+    fail($streamId, 'a connection-specific field is forbidden in HTTP/2');
+  }
+
+  if ($name == 'te' && Str\lowercase($value) != 'trailers') {
+    fail($streamId, 'the HTTP/2 TE field may only contain trailers');
+  }
+}
+
+function validate_pseudo(
+  StreamId $streamId,
+  string $name,
+  Role $receiver,
+  bool $pushPromise,
+): void {
+  if ($receiver == Role::Server || $pushPromise) {
+    if (!($name is ':method'|':scheme'|':authority'|':path'|':protocol')) {
+      fail($streamId, 'an unknown request pseudo-field was received');
+    }
+  } else if ($name != ':status') {
+    fail($streamId, 'an unknown response pseudo-field was received');
+  }
+}
+
+function validate_request_pseudo_fields(
+  StreamId $streamId,
+  dict<string, string> $pseudo,
+  bool $pushPromise,
+  bool $extendedConnectEnabled,
+): void {
+  require_pseudo($streamId, $pseudo, ':method');
+  $method = $pseudo[':method'];
+  if ($method == 'CONNECT') {
+    if ($pushPromise) {
+      fail($streamId, 'an HTTP/2 push promise cannot use CONNECT');
+    }
+
+    require_pseudo($streamId, $pseudo, ':authority');
+    if ($pseudo[':authority'] == '') {
+      fail($streamId, 'the HTTP/2 :authority field must not be empty');
+    }
+
+    if (contains_key!($pseudo, ':protocol')) {
+      if (!$extendedConnectEnabled) {
+        fail($streamId, 'extended CONNECT was not enabled');
+      }
+
+      require_pseudo($streamId, $pseudo, ':scheme');
+      require_pseudo($streamId, $pseudo, ':path');
+      validate_request_control($streamId, $pseudo);
+      if (!Whim\_Private\http_valid_token($pseudo[':protocol'])) {
+        fail($streamId, 'the HTTP/2 :protocol field is malformed');
+      }
+    } else if (
+      contains_key!($pseudo, ':scheme')
+      || contains_key!($pseudo, ':path')
+    ) {
+      fail($streamId, 'a CONNECT request must omit :scheme and :path');
+    }
+
+    return;
+  }
+
+  if (contains_key!($pseudo, ':protocol')) {
+    fail($streamId, ':protocol requires the CONNECT method');
+  }
+
+  require_pseudo($streamId, $pseudo, ':scheme');
+  require_pseudo($streamId, $pseudo, ':path');
+  validate_request_control($streamId, $pseudo);
+}
+
+function validate_request_control(
+  StreamId $streamId,
+  dict<string, string> $pseudo,
+): void {
+  if (
+    !Whim\_Private\http_valid_request_pseudo_fields(
+      $pseudo[':method'],
+      $pseudo[':scheme'],
+      $pseudo[':path'],
+    )
+  ) {
+    fail($streamId, 'the HTTP/2 request pseudo-fields are malformed');
+  }
+}
+
+function require_pseudo(
+  StreamId $streamId,
+  dict<string, string> $pseudo,
+  string $name,
+): void {
+  if (!contains_key!($pseudo, $name)) {
+    fail($streamId, 'the HTTP/2 field section is missing ' . $name);
+  }
+}
+
+function parse_length(StreamId $streamId, string $value): int {
+  if ($value == '') {
+    fail($streamId, 'the HTTP/2 content-length field is malformed');
+  }
+
+  $length = 0;
+  $index = 0;
+  while ($index < length!($value)) {
+    $digit = Str\ord($value[$index]);
+    if (!($digit is 48..=57)) {
+      fail($streamId, 'the HTTP/2 content-length field is malformed');
+    }
+
+    $digit -= 48;
+    if (
+      $length > 922337203685477580
+      || ($length == 922337203685477580 && $digit > 7)
+    ) {
+      fail($streamId, 'the HTTP/2 content-length field is too large');
+    }
+
+    $length = $length * 10 + $digit;
+
+    $index++;
+  }
+
+  return $length;
+}
+
+function parse_status(StreamId $streamId, string $value): 100..=599 {
+  if (length!($value) != 3) {
+    fail($streamId, 'the HTTP/2 :status field is malformed');
+  }
+
+  $status = 0;
+  $index = 0;
+  while ($index < 3) {
+    $digit = Str\ord($value[$index]);
+    if (!($digit is 48..=57)) {
+      fail($streamId, 'the HTTP/2 :status field is malformed');
+    }
+
+    $status = $status * 10 + $digit - 48;
+    $index++;
+  }
+
+  if (!($status is 100..=599) || $status == 101) {
+    fail($streamId, 'the HTTP/2 :status field is invalid');
+  }
+
+  return $status;
+}
+
+function fail(StreamId $streamId, string $message): never {
+  throw new StreamException(
+    $message,
+    $streamId,
+    Whim\HTTP\_Private\ErrorCode::ProtocolError->value,
+  );
+}

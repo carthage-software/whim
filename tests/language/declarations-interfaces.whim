@@ -1,0 +1,331 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\LinkerError;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+rejects(
+  $work,
+  'constructor-requirement-is-enforced',
+  'interface Buildable {'
+  . "\n"
+  . '    public function __construct(int $identifier, int $revision);'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'class Widget implements Buildable {'
+  . "\n"
+  . '    public function __construct(public int $identifier) {}'
+  . "\n"
+  . '}'
+  . "\n",
+  'is not compatible with Buildable::__construct',
+);
+
+rejects(
+  $work,
+  'implements-nothing',
+  'interface I { public function m(): int; }'
+  . "\n"
+  . 'class C implements I {}'
+  . "\n"
+  . '$c = new C();'
+  . "\n",
+  'does not provide m',
+);
+
+rejects(
+  $work,
+  'invariant-readonly-property',
+  'interface HasName {'
+  . "\n"
+  . '  public readonly string $name;'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'final class WrongType implements HasName {'
+  . "\n"
+  . '  public readonly mixed $name;'
+  . "\n"
+  . '}'
+  . "\n",
+  'WrongType::$name is not compatible with HasName::$name: property types are invariant',
+);
+
+rejects(
+  $work,
+  'missing-readonly-property',
+  'interface HasName {'
+  . "\n"
+  . '  public readonly string $name;'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'final class Missing implements HasName {}'
+  . "\n",
+  'does not provide the readonly property $name',
+);
+
+rejects(
+  $work,
+  'writable-readonly-property',
+  'interface HasName {'
+  . "\n"
+  . '  public readonly string $name;'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'final class Writable implements HasName {'
+  . "\n"
+  . '  public string $name = \'\';'
+  . "\n"
+  . '}'
+  . "\n",
+  'Writable::$name must be readonly to satisfy HasName::$name',
+);
+
+rejects(
+  $work,
+  'readonly-writable-property',
+  'interface MutableName {'
+  . "\n"
+  . '  public string $name;'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'final class ImmutableName implements MutableName {'
+  . "\n"
+  . '  public readonly string $name;'
+  . "\n"
+  . '  public function __construct() {'
+  . "\n"
+  . '    $this->name = \'Whim\';'
+  . "\n"
+  . '  }'
+  . "\n"
+  . '}'
+  . "\n",
+  'ImmutableName::$name must be writable to satisfy MutableName::$name',
+);
+
+rejects(
+  $work,
+  'wrong-staticness',
+  'interface I { public function m(): int; }'
+  . "\n"
+  . 'class C implements I { public static function m(): int { return 1; } }'
+  . "\n",
+  'is static and the required method is not',
+);
+
+rejects(
+  $work,
+  'conflicting-interface-constants',
+  'interface A { public const int X = 1; }'
+  . "\n"
+  . 'interface B { public const int X = 2; }'
+  . "\n"
+  . 'class C implements A, B {}'
+  . "\n",
+  'conflicting declarations of the constant X',
+);
+
+rejects(
+  $work,
+  'redeclared-interface-constant',
+  'interface I { public const int X = 7; }'
+  . "\n"
+  . 'class C implements I { public const int X = 8; }'
+  . "\n",
+  'redeclares the constant X',
+);
+
+$sealed = $work . '/sealed-permission.whim';
+File\write(
+  $sealed,
+  'interface Shape for Circle {}'
+  . "\n\n"
+  . 'class Circle implements Shape {}'
+  . "\n"
+  . 'class Square implements Shape {}'
+  . "\n",
+);
+
+$assertion_value_1 = function() use ($sealed): void {
+  require!($sealed);
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (CompilerError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is CompilerError);
+
+$transitive = $work . '/transitive-sealed-permission.whim';
+File\write(
+  $transitive,
+  'interface TransitiveVehicle for TransitiveMotorized {}'
+  . "\n"
+  . 'interface TransitiveMotorized extends TransitiveVehicle for TransitiveCar {}'
+  . "\n\n"
+  . 'final class TransitiveCar implements TransitiveMotorized {}'
+  . "\n"
+  . 'final class TransitiveBoat implements TransitiveMotorized {}'
+  . "\n",
+);
+
+$assertion_value_2 = function() use ($transitive): void {
+  require!($transitive);
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (CompilerError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is CompilerError);
+
+interface Vehicle for Motorized, Towed {}
+interface Motorized extends Vehicle for Car {}
+interface Towed extends Vehicle for Trailer {}
+
+interface MutableValue {
+  public int $value;
+}
+
+final class MutableValueImpl implements MutableValue {
+  public int $value = 0;
+}
+
+function update_mutable_value(MutableValue $value): void {
+  $value->value = 42;
+}
+
+$mutableValue = new MutableValueImpl();
+update_mutable_value($mutableValue);
+assert!($mutableValue->value == 42);
+
+final class Car implements Motorized {}
+final class Trailer implements Towed {}
+
+assert!(new Car() is Motorized);
+assert!(new Car() is Vehicle);
+assert!(new Trailer() is Towed);
+assert!(new Trailer() is Vehicle);
+
+$rogue_implementor = $work . '/rogue-implementor.whim';
+File\write(
+  $rogue_implementor,
+  'final class Boat implements Motorized {}' . "\n",
+);
+
+$assertion_value_8 = function() use ($rogue_implementor): void {
+  require!($rogue_implementor);
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (LinkerError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is LinkerError);
+
+$rogue_interface = $work . '/rogue-interface.whim';
+File\write($rogue_interface, 'interface Flying extends Vehicle {}' . "\n");
+$assertion_value_9 = function() use ($rogue_interface): void {
+  require!($rogue_interface);
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (LinkerError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is LinkerError);
+
+Filesystem\delete_directory($work, true);
+
+interface Buildable {
+  public function __construct(int $identifier, int $revision);
+}
+
+class Widget implements Buildable {
+  public function __construct(public int $identifier, public int $revision) {}
+}
+
+$widget = new Widget(1, 2);
+assert!($widget->identifier == 1);
+assert!($widget->revision == 2);
+
+interface HasValue<out T> {
+  public readonly T $value;
+}
+
+final class Box<T> implements HasValue<T> {
+  public function __construct(public readonly T $value) {}
+}
+
+$box = new Box::<int>(42);
+assert!($box->value == 42);
+
+interface Maker {
+  public function copy(): self;
+}
+
+class Copy implements Maker {
+  public function copy(): self {
+    return $this;
+  }
+}
+
+$copy = new Copy()->copy();
+assert!($copy is Copy);
+
+class ParentCopy {
+  public function copy(): self {
+    return $this;
+  }
+}
+
+class ChildCopy extends ParentCopy {
+  public function copy(): self {
+    return $this;
+  }
+}
+
+$child = new ChildCopy()->copy();
+assert!($child is ChildCopy);
+
+interface GenericMaker<T> {
+  public function copy(): self;
+
+  public function value(): T;
+}
+
+final class GenericCopy<T> implements GenericMaker<T> {
+  public function __construct(private T $value) {}
+
+  public function copy(): self {
+    return $this;
+  }
+
+  public function value(): T {
+    return $this->value;
+  }
+}
+
+$generic = new GenericCopy::<string>('value')->copy();
+assert!($generic is GenericCopy<string>);
+assert!($generic->value() == 'value');

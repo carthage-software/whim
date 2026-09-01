@@ -1,0 +1,77 @@
+use Whim\Comparison\Ordering;
+use Whim\Time\Duration;
+use Whim\Unwind\DiscardedResultError;
+
+$d = new Duration(1, 500_000_000);
+assert!($d->seconds == 1);
+assert!($d->nanoseconds == 500_000_000);
+assert!(!($d->isZero()));
+assert!($d->isPositive());
+
+$carry = new Duration(0, 1_500_000_000);
+assert!($carry->seconds == 1);
+assert!($carry->nanoseconds == 500_000_000);
+
+$negative = $d->invert();
+assert!($negative->isNegative());
+assert!($negative->seconds == -1);
+assert!($negative->nanoseconds == -500_000_000);
+
+$mixed = new Duration(1, -500_000_000);
+assert!($mixed->seconds == 0);
+assert!($mixed->nanoseconds == 500_000_000);
+
+assert!(Duration::fromSeconds(2)->seconds == 2);
+assert!(Duration::fromMinutes(1)->seconds == 60);
+assert!(Duration::fromHours(1)->seconds == 3600);
+assert!(Duration::fromDays(1)->seconds == 86400);
+assert!(Duration::fromMilliseconds(1500)->seconds == 1);
+assert!(Duration::fromMilliseconds(1500)->nanoseconds == 500_000_000);
+
+assert!(Duration::zero()->isZero());
+assert!(Duration::second()->seconds == 1);
+
+$sum = Duration::fromSeconds(1)->plus(Duration::fromMilliseconds(500));
+assert!($sum->seconds == 1);
+assert!($sum->nanoseconds == 500_000_000);
+
+$difference = Duration::fromSeconds(2)->minus(Duration::fromSeconds(3));
+assert!($difference->seconds == -1);
+
+assert!(Duration::fromSeconds(1)->isLessThan(Duration::fromSeconds(2)));
+
+assert!(Duration::fromSeconds(2)->isGreaterThan(Duration::fromSeconds(1)));
+
+assert!(Duration::fromSeconds(1)->equals(Duration::fromSeconds(1)));
+assert!(
+  Duration::fromSeconds(1)->compare(Duration::fromSeconds(2)) == Ordering::Less,
+);
+
+assert!(Duration::fromSeconds(90)->getTotalMinutes() == 1.5);
+assert!(Duration::fromMilliseconds(2500)->getTotalSeconds() == 2.5);
+
+$assertion_value_29 = function(): void {
+  Duration::zero();
+};
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (DiscardedResultError $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is DiscardedResultError);
+
+$assertion_value_30 = function() use ($d): void {
+  $d->plus(Duration::second());
+};
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (DiscardedResultError $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is DiscardedResultError);

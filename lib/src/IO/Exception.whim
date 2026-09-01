@@ -1,0 +1,6 @@
+namespace Whim\IO;
+
+use Whim\Unwind\RuntimeException;
+
+/** A failure while reading, writing, seeking, or closing an IO handle. */
+class Exception extends RuntimeException {}

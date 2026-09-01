@@ -1,0 +1,43 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\Stub;
+
+/** The root of recoverable runtime exceptions. */
+#[Stub]
+class Exception implements Throwable {
+  protected string $message;
+  protected int $code;
+  protected string $file;
+  protected int $line;
+  protected vec<TraceFrame> $trace;
+  protected null|Throwable $previous;
+
+  #[TrackCaller]
+  public function __construct(
+    string $message,
+    int $code = 0,
+    null|Throwable $previous = null,
+  ) {}
+
+  #[TrackCaller]
+  public function getMessage(): string {}
+
+  #[TrackCaller]
+  public function getCode(): int {}
+
+  #[TrackCaller]
+  public function getFile(): string {}
+
+  #[TrackCaller]
+  public function getLine(): int {}
+
+  #[TrackCaller]
+  public function getTrace(): vec<TraceFrame> {}
+
+  #[TrackCaller]
+  public function getPrevious(): null|Throwable {}
+
+  #[TrackCaller]
+  public function toString(): string {}
+}

@@ -1,0 +1,504 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\TypeError;
+
+class TransformBase {
+  public function transform(int $value): int|string {
+    return $value;
+  }
+}
+
+class WiderInputNarrowerOutput extends TransformBase {
+  public function transform(mixed $value): int {
+    return 1;
+  }
+}
+
+interface Maker<T> {
+  public function make(): T;
+}
+
+class IntMaker implements Maker<int> {
+  public function make(): int {
+    return 1;
+  }
+}
+
+interface ValueConsumer<T> {
+  public function consume(T $value): mixed;
+}
+
+class IntValueConsumer implements ValueConsumer<int> {
+  public function consume(mixed $value): mixed {
+    return $value;
+  }
+}
+
+assert!(new WiderInputNarrowerOutput()->transform('accepted') == 1);
+assert!(new IntMaker()->make() == 1);
+assert!(new IntValueConsumer()->consume('accepted') == 'accepted');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+File\write(
+  $work . '/narrowed-parameter.whim',
+  'class NarrowBase { public function transform(int $value): mixed { return $value; } }'
+  . "\n\n"
+  . 'class NarrowBroken extends NarrowBase {'
+  . "\n"
+  . '    public function transform(string $value): mixed { return $value; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$narrowedParameter = $work . '/narrowed-parameter.whim';
+$assertion_value_4 = function() use ($narrowedParameter): void {
+  require!($narrowedParameter);
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (LinkerError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_4->getMessage(),
+      'parameter 1 is not contravariant',
+    ),
+  );
+}
+
+assert!($assertion_error_4 is LinkerError);
+
+File\write(
+  $work . '/widened-return.whim',
+  'class WideBase { public function value(): int { return 1; } }'
+  . "\n\n"
+  . 'class WideBroken extends WideBase { public function value(): mixed { return 1; } }'
+  . "\n",
+);
+
+$widenedReturn = $work . '/widened-return.whim';
+$assertion_value_5 = function() use ($widenedReturn): void {
+  require!($widenedReturn);
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (LinkerError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_5->getMessage(),
+      'return type is not covariant',
+    ),
+  );
+}
+
+assert!($assertion_error_5 is LinkerError);
+
+File\write(
+  $work . '/wrong-specialization.whim',
+  'interface SpecMaker<T> { public function make(): T; }'
+  . "\n\n"
+  . 'class SpecBroken implements SpecMaker<int> { public function make(): string { return \'x\'; } }'
+  . "\n",
+);
+
+$wrongSpecialization = $work . '/wrong-specialization.whim';
+$assertion_value_6 = function() use ($wrongSpecialization): void {
+  require!($wrongSpecialization);
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (LinkerError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_6->getMessage(),
+      'return type is not covariant',
+    ),
+  );
+}
+
+assert!($assertion_error_6 is LinkerError);
+
+File\write(
+  $work . '/direct-specializations.whim',
+  'interface DirectHolder<T> { public function value(): T; }'
+  . "\n\n"
+  . 'class DirectBoth implements DirectHolder<int>, DirectHolder<string> {'
+  . "\n"
+  . '    public function value(): int { return 1; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$directSpecializations = $work . '/direct-specializations.whim';
+$assertion_value_7 = function() use ($directSpecializations): void {
+  require!($directSpecializations);
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (LinkerError $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_7->getMessage(),
+      'inherits incompatible specializations of DirectHolder',
+    ),
+  );
+}
+
+assert!($assertion_error_7 is LinkerError);
+
+File\write(
+  $work . '/inherited-specializations.whim',
+  'interface RouteHolder<T> { public function value(): T; }'
+  . "\n\n"
+  . 'interface RouteIntegers extends RouteHolder<int> {}'
+  . "\n\n"
+  . 'interface RouteStrings extends RouteHolder<string> {}'
+  . "\n\n"
+  . 'class RouteBoth implements RouteIntegers, RouteStrings {'
+  . "\n"
+  . '    public function value(): int { return 1; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$inheritedSpecializations = $work . '/inherited-specializations.whim';
+$assertion_value_8 = function() use ($inheritedSpecializations): void {
+  require!($inheritedSpecializations);
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (LinkerError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_8->getMessage(),
+      'inherits incompatible specializations of RouteHolder',
+    ),
+  );
+}
+
+assert!($assertion_error_8 is LinkerError);
+
+interface UnionConsumer<in T> {
+  public function consume(T $value): void;
+}
+
+class FooConsumer implements
+  UnionConsumer<int>,
+  UnionConsumer<string>,
+  UnionConsumer<vec<string>> {
+  public function consume(int|string|vec<string> $value): void {}
+}
+
+$consumer = new FooConsumer();
+assert!($consumer is UnionConsumer<int>);
+assert!($consumer is UnionConsumer<string>);
+assert!($consumer is UnionConsumer<vec<string>>);
+assert!($consumer is UnionConsumer<int|string|vec<string>>);
+
+class StringOnlyConsumer implements UnionConsumer<string> {
+  public function consume(string $value): void {}
+}
+
+class ChildUnionConsumer extends StringOnlyConsumer implements
+  UnionConsumer<int> {
+  public function consume(int|string $value): void {}
+}
+
+$childConsumer = new ChildUnionConsumer();
+assert!($childConsumer is UnionConsumer<int>);
+assert!($childConsumer is UnionConsumer<string>);
+assert!($childConsumer is UnionConsumer<int|string>);
+
+interface IntersectionProducer<out T> {
+  public function produce(): T;
+}
+
+class EmptyProducer implements
+  IntersectionProducer<int>,
+  IntersectionProducer<string> {
+  public function produce(): never {
+    throw new Whim\Unwind\Error('no value');
+  }
+}
+
+$producer = new EmptyProducer();
+assert!($producer is IntersectionProducer<int>);
+assert!($producer is IntersectionProducer<string>);
+
+interface LinkMarker {}
+
+class LinkMarked implements LinkMarker {}
+
+class LinkBase<T: LinkMarker> {}
+
+class LinkConcrete extends LinkBase<LinkMarked> {}
+
+class LinkGeneric<U: LinkMarker> extends LinkBase<U> {}
+
+assert!(new LinkConcrete() is LinkBase<LinkMarked>);
+assert!(new LinkGeneric::<LinkMarked>() is LinkBase<LinkMarked>);
+
+File\write(
+  $work . '/inheritance-bound.whim',
+  'interface OtherMarker {}'
+  . "\n\n"
+  . 'class OtherThing {}'
+  . "\n\n"
+  . 'class OtherBase<T: OtherMarker> {}'
+  . "\n\n"
+  . 'class OtherBroken extends OtherBase<OtherThing> {}'
+  . "\n",
+);
+
+$inheritanceBound = $work . '/inheritance-bound.whim';
+$assertion_value_20 = function() use ($inheritanceBound): void {
+  require!($inheritanceBound);
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (LinkerError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_20->getMessage(),
+      'does not satisfy the bound',
+    ),
+  );
+}
+
+assert!($assertion_error_20 is LinkerError);
+
+type Deep<T> = vec<(T, dict<string, T>)>;
+
+class AliasBox<T> {}
+
+class IntAliasBox extends AliasBox<int> {}
+
+class StringAliasBox extends AliasBox<string> {}
+
+/** Accepts only class names that specialize AliasBox<int>. */
+function class_name(classname<AliasBox<int>> $name): string {
+  return $name;
+}
+
+$deep = vec[(1, dict['one' => 1])];
+assert!($deep is Deep<int>);
+$deep[] = (2, dict['two' => 'wrong']);
+assert!(!($deep is Deep<int>));
+assert!(class_name('AliasBox<int>') == 'AliasBox<int>');
+assert!(class_name('IntAliasBox') == 'IntAliasBox');
+$assertion_value_25 = function(): void {
+  class_name('StringAliasBox');
+};
+
+$assertion_error_25 = null;
+try {
+  $assertion_value_25();
+} catch (TypeError $assertion_caught_25) {
+  $assertion_error_25 = $assertion_caught_25;
+}
+
+assert!($assertion_error_25 is TypeError);
+
+$assertion_value_26 = function(): void {
+  class_name('MissingAliasBox');
+};
+
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (TypeError $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is TypeError);
+
+$wide = function(mixed $value): int {
+  return 1;
+};
+
+assert!($wide is fn(int): int|string);
+assert!(!($wide is fn(mixed): 1));
+
+class WildBox<T> {
+  public function __construct(public T $value) {}
+}
+
+class WildPair<A, B> {
+  public function __construct(public A $first, public B $second) {}
+}
+
+$wildBox = new WildBox::<string>('x');
+$wildPair = new WildPair::<string, int>('x', 1);
+assert!($wildBox is WildBox);
+assert!($wildBox is WildBox<_>);
+assert!(!($wildBox is WildBox<mixed>));
+assert!($wildPair is WildPair<_, int>);
+assert!(!($wildPair is WildPair<_, string>));
+assert!(('x', 1, false) is (string, int, _));
+assert!(vec[1, 'x'] is vec<_>);
+$wildCallable = fn(string $value): int => length!($value);
+assert!($wildCallable is fn(_): int);
+
+final class DeclaredPair<A, B> {
+  public function __construct(public A $first, public B $second) {}
+}
+
+/** Projects the second slot through a wildcard first slot. */
+function second_of<T>(DeclaredPair<_, T> $pair): T {
+  return $pair->second;
+}
+
+/** Collects values through a wildcard key slot. */
+function values_of<T>(array<_, T> $items): vec<T> {
+  $result = vec[];
+  foreach ($items as $item) {
+    $result[] = $item;
+  }
+
+  return $result;
+}
+
+$declaredPair = new DeclaredPair::<string, int>('answer', 42);
+assert!(second_of::<int>($declaredPair) == 42);
+assert!(values_of::<int>(dict['one' => 1, 'two' => 2]) == vec[1, 2]);
+assert!(values_of::<int>(vec[3, 4]) == vec[3, 4]);
+
+final class AliasClient {
+  public function request(): string {
+    return 'ok';
+  }
+}
+
+type LegacyClient = AliasClient;
+
+$legacy = new LegacyClient();
+assert!($legacy is AliasClient);
+assert!($legacy is LegacyClient);
+assert!($legacy->request() == 'ok');
+
+final class QuadBox<A, B, C, D> {
+  public function __construct(public C $value) {}
+}
+
+type Special<T> = QuadBox<int, string, T, (T, int)>;
+
+$special = new Special::<float>(1.5);
+assert!($special is QuadBox<int, string, float, (float, int)>);
+
+assert!($special is Special<float>);
+assert!($special->value == 1.5);
+
+class ArityPair<A, B> {}
+
+class ArityBox<T> {}
+
+$arityPair = new ArityPair::<int, string>();
+$assertion_value_46 = function() use ($arityPair): void {
+  $_ = $arityPair is ArityPair<_>;
+};
+
+$assertion_error_46 = null;
+try {
+  $assertion_value_46();
+} catch (TypeError $assertion_caught_46) {
+  $assertion_error_46 = $assertion_caught_46;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_46->getMessage(),
+      'expects exactly 2 type argument(s), 1 provided',
+    ),
+  );
+}
+
+assert!($assertion_error_46 is TypeError);
+
+$arityBox = new ArityBox::<int>();
+$assertion_value_47 = function() use ($arityBox): void {
+  $_ = $arityBox ?as ArityBox<string, string, int>;
+};
+
+$assertion_error_47 = null;
+try {
+  $assertion_value_47();
+} catch (TypeError $assertion_caught_47) {
+  $assertion_error_47 = $assertion_caught_47;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_47->getMessage(),
+      'expects at most 1 type argument(s), 3 provided',
+    ),
+  );
+}
+
+assert!($assertion_error_47 is TypeError);
+
+File\write(
+  $work . '/debug-render.whim',
+  'class DebugBox<T> {'
+  . "\n"
+  . '    public function __construct(public T $value) {}'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'function debug_id<T>(T $value): T { return $value; }'
+  . "\n\n"
+  . '$box = new DebugBox::<string>(\'x\');'
+  . "\n"
+  . 'debug!($box, debug_id::<int>(...));'
+  . "\n",
+);
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$debugRender = Command\run($binary, vec[$work . '/debug-render.whim']);
+assert!($debugRender->isSuccess());
+assert!(length!($debugRender->standardOutput) == 0);
+assert!(
+  $debugRender->standardError
+  == '['
+  . Filesystem\canonicalize($work . '/debug-render.whim')
+  . ':8:1] DebugBox<string> {'
+  . "\n"
+  . '  public string $value = string(1) "x";'
+  . "\n"
+  . '},'
+  . "\n"
+  . 'fn(int): int {'
+  . "\n"
+  . '  target = debug_id;'
+  . "\n"
+  . '  presets(1) ['
+  . "\n"
+  . '    <hole 0>,'
+  . "\n"
+  . '  ];'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+Filesystem\delete_directory($work, true);

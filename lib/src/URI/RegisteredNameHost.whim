@@ -1,0 +1,54 @@
+namespace Whim\URI;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Represents an ASCII registered-name host. */
+final readonly class RegisteredNameHost implements Host {
+  #[AlwaysInline]
+  private function __construct(public string $name) {}
+
+  /** Parses a registered name, or returns null when it is invalid. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function parse(string $name): null|RegisteredNameHost {
+    $parts = Whim\_Private\uri_parse_authority($name);
+    if (
+      $parts == null
+      || $parts[0] != null
+      || $parts[1] != 'name'
+      || $parts[2] != $name
+      || $parts[3] != null
+    ) {
+      return null;
+    }
+
+    return new RegisteredNameHost($name);
+  }
+
+  /** Parses a registered name. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $name): RegisteredNameHost {
+    $host = RegisteredNameHost::parse($name);
+    if ($host == null) {
+      throw new InvalidArgumentException(
+        'invalid URI registered name: `' . $name . '`',
+      );
+    }
+
+    return $host;
+  }
+
+  /** Returns the encoded host text. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    return $this->name;
+  }
+}

@@ -1,0 +1,4 @@
+class C {
+  public function value(): void {}
+  public const int value = 1;
+}

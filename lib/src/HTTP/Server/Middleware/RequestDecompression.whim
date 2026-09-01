@@ -1,0 +1,98 @@
+namespace Whim\HTTP\Server\Middleware;
+
+use Whim\Async\CancellationToken;
+use Whim\Compression\DecompressionException;
+use Whim\Compression\Registry;
+use Whim\Compression\TransformReadHandle;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\STATUS_BAD_REQUEST;
+use Whim\HTTP\Message\STATUS_CONTENT_TOO_LARGE;
+use Whim\HTTP\Message\STATUS_UNSUPPORTED_MEDIA_TYPE;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\IO\LimitExceededException;
+use Whim\IO\MemoryHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Str\join;
+use Whim\Vec\reverse;
+
+/** Decompresses encoded request bodies before dispatch. */
+final readonly class RequestDecompression implements Middleware {
+  public function __construct(
+    public Registry $codecs,
+    public NonNegativeInt $maximumDecodedBytes = 10_485_760,
+  ) {}
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    Handler $next,
+    CancellationToken $cancellation,
+  ): Response {
+    $fields = match ($request->headers->getAll('Content-Encoding')) {
+      vec[] => return $next->handle($context, $request, $cancellation),
+      $fields => $fields,
+    };
+
+    $codings =
+      _Private\content_codings($fields)
+      ?? return new Response(STATUS_BAD_REQUEST, $request->protocolVersion);
+
+    foreach ($codings as $coding) {
+      if ($coding != 'identity' && !$this->codecs->contains($coding)) {
+        return new Response(
+          STATUS_UNSUPPORTED_MEDIA_TYPE,
+          $request->protocolVersion,
+          FieldMap::default()->with(
+            'Accept-Encoding',
+            join(', ', $this->codecs->codings()),
+          ),
+        );
+      }
+    }
+
+    $remaining = 0;
+    foreach ($codings as $coding) {
+      if ($coding != 'identity') {
+        $remaining++;
+      }
+    }
+
+    $body = $request->body;
+    if ($remaining > 0) {
+      $body = $body ?? new MemoryHandle();
+      foreach (reverse::<NonEmptyString>($codings) as $coding) {
+        if ($coding == 'identity') {
+          continue;
+        }
+
+        $remaining--;
+        $body = new TransformReadHandle(
+          $body,
+          $this->codecs->get($coding)->createDecompressor(),
+          match ($remaining) {
+            0 => $this->maximumDecodedBytes,
+            $_ => null,
+          },
+        );
+      }
+    }
+
+    $request = $request->withHeaders(
+      $request->headers->without('Content-Encoding')->without('Content-Length'),
+    )->withBody($body);
+
+    try {
+      return $next->handle($context, $request, $cancellation);
+    } catch (LimitExceededException $_) {
+      return new Response(STATUS_CONTENT_TOO_LARGE, $request->protocolVersion);
+    } catch (DecompressionException $_) {
+      return new Response(STATUS_BAD_REQUEST, $request->protocolVersion);
+    }
+  }
+}

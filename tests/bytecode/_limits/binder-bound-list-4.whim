@@ -1,0 +1,5 @@
+namespace Limits\binder_bound_list_4;
+
+class C {
+  public function m<T: Countable + Traversable>(): void {}
+}

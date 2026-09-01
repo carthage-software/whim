@@ -1,0 +1,7 @@
+namespace Whim\HTTP\_Private;
+
+/** The frame which began a continued header block. */
+enum HeaderBlockKind {
+  case Headers;
+  case PushPromise;
+}

@@ -1,0 +1,30 @@
+namespace Whim\BSON;
+
+use Whim\Comparison\Equal;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+
+/** A BSON regular expression and its MongoDB options. */
+#[Stub]
+final readonly class RegularExpression implements Equal<RegularExpression> {
+  #[AlwaysInline]
+  private function __construct(
+    public string $pattern,
+    public string $options,
+  ) {}
+
+  /** Creates a regular expression and sorts its options. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromParts(
+    string $pattern,
+    string $options = '',
+  ): RegularExpression {}
+
+  /** Reports whether two expressions have the same pattern and options. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(RegularExpression $other): bool {}
+}

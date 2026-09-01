@@ -1,0 +1,46 @@
+namespace Whim\Database\SQLite\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\QueryException;
+use Whim\Database\Result;
+use Whim\Database\Statement;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** Implements a cached SQLite statement. */
+final class StatementImpl implements Statement {
+  private bool $closed = false;
+
+  /** Creates a prepared statement wrapper. */
+  public function __construct(
+    private ConnectionImpl $connection,
+    private NonEmptyString $sql,
+  ) {}
+
+  /** Executes this statement. */
+  #[MustUse]
+  #[TrackCaller]
+  public function execute(
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    if ($this->closed) {
+      throw new QueryException('the SQLite statement is closed');
+    }
+
+    return $this->connection->execute($this->sql, $parameters, $cancellation);
+  }
+
+  /** Reports whether this statement is closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  /** Releases this statement wrapper. */
+  public function close(): void {
+    $this->closed = true;
+  }
+}

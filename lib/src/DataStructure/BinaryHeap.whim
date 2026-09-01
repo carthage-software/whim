@@ -1,0 +1,248 @@
+namespace Whim\DataStructure;
+
+use Whim\Comparison\Ordering;
+use Whim\DataStructure\_Private;
+use Whim\Iterate\ToIterator;
+use Whim\Iterate\ArrayIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\Comparator;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\LogicException;
+
+/**
+ * Stores values in binary-heap order.
+ *
+ * A value that compares as `Ordering::Less` is removed first.
+ */
+final class BinaryHeap<T> implements ToIterator<int, T> {
+  private vec<T> $values = vec[];
+  private Comparator<T> $comparator;
+  private bool $comparing = false;
+
+  /** Creates a heap using bottom-up heapification. */
+  #[TrackCaller]
+  public function __construct(
+    Comparator<T> $comparator,
+    Iterable<_, T> $values = vec[],
+  ) {
+    $this->comparator = $comparator;
+    foreach ($values as $value) {
+      $this->values[] = $value;
+    }
+
+    $this->heapify();
+  }
+
+  /** Adds a value. */
+  #[TrackCaller]
+  public function push(T $value): void {
+    $this->assertMutable();
+
+    $index = length!($this->values);
+    $path = $this->upwardPath($value, $index);
+
+    $this->values[] = $value;
+    $current = $index;
+    foreach ($path as $parent) {
+      $this->values[$current] = $this->values[$parent];
+      $current = $parent;
+    }
+
+    $this->values[$current] = $value;
+  }
+
+  /** Removes and returns the first value in comparator order. */
+  #[TrackCaller]
+  public function pop(): Option<T> {
+    $this->assertMutable();
+    if (length!($this->values) == 0) {
+      return new None();
+    }
+
+    return new Some::<T>($this->removeRoot());
+  }
+
+  /** Returns the first value in comparator order without removing it. */
+  #[AlwaysInline]
+  public function peek(): Option<T> {
+    if (length!($this->values) == 0) {
+      return new None();
+    }
+
+    return new Some::<T>($this->values[0]);
+  }
+
+  /** Returns the number of stored values. */
+  #[AlwaysInline]
+  public function count(): NonNegativeInt {
+    return length!($this->values);
+  }
+
+  /** Reports whether the heap contains no values. */
+  #[AlwaysInline]
+  public function isEmpty(): bool {
+    return length!($this->values) == 0;
+  }
+
+  /** Removes every stored value. */
+  #[TrackCaller]
+  public function clear(): void {
+    $this->assertMutable();
+    $this->values = vec[];
+  }
+
+  /** Returns the values in removal order without changing the heap. */
+  #[TrackCaller]
+  public function toVec(): vec<T> {
+    $copy = clone!($this);
+    $values = vec[];
+    while (!$copy->isEmpty()) {
+      $values[] = $copy->removeRoot();
+    }
+
+    return $values;
+  }
+
+  /** Creates a snapshot iterator in removal order. */
+  #[TrackCaller]
+  public function toIterator(): ArrayIterator<int, T> {
+    return new ArrayIterator::<int, T>($this->toVec());
+  }
+
+  /** Restores heap order throughout the initial values. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function heapify(): void {
+    $count = length!($this->values);
+    if ($count < 2) {
+      return;
+    }
+
+    $index = ($count - 2) >> 1;
+    while (true) {
+      $value = $this->values[$index];
+      $path = $this->downwardPath($value, $index, $count);
+      $current = $index;
+      foreach ($path as $child) {
+        $this->values[$current] = $this->values[$child];
+        $current = $child;
+      }
+
+      $this->values[$current] = $value;
+      if ($index == 0) {
+        return;
+      }
+
+      $index--;
+    }
+  }
+
+  /** Finds the parent path a new value must cross. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function upwardPath(T $value, int $index): vec<int> {
+    $path = vec[];
+    while ($index > 0) {
+      $parent = ($index - 1) >> 1;
+      if ($this->compare($value, $this->values[$parent]) != Ordering::Less) {
+        break;
+      }
+
+      $path[] = $parent;
+      $index = $parent;
+    }
+
+    return $path;
+  }
+
+  /** Finds the child path a replacement value must cross. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function downwardPath(T $value, int $index, int $limit): vec<int> {
+    $path = vec[];
+    while (true) {
+      $left = $index * 2 + 1;
+      if ($left >= $limit) {
+        return $path;
+      }
+
+      $right = $left + 1;
+      $first = $left;
+      if (
+        $right < $limit
+        && $this->compare($this->values[$right], $this->values[$left])
+        == Ordering::Less
+      ) {
+        $first = $right;
+      }
+
+      if ($this->compare($this->values[$first], $value) != Ordering::Less) {
+        return $path;
+      }
+
+      $path[] = $first;
+      $index = $first;
+    }
+  }
+
+  /** Removes the root from a known non-empty heap. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function removeRoot(): T {
+    $count = length!($this->values);
+    $root = $this->values[0];
+    if ($count == 1) {
+      $this->values = vec[];
+      return $root;
+    }
+
+    $value = $this->values[$count - 1];
+    $path = $this->downwardPath($value, 0, $count - 1);
+
+    remove_last!($this->values);
+    $current = 0;
+    foreach ($path as $child) {
+      $this->values[$current] = $this->values[$child];
+      $current = $child;
+    }
+
+    $this->values[$current] = $value;
+    return $root;
+  }
+
+  /** Runs the comparator without allowing reentrant mutation. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function compare(T $left, T $right): Ordering {
+    if ($this->comparing) {
+      throw new LogicException(
+        'a binary heap comparator cannot re-enter comparison',
+      );
+    }
+
+    $this->comparing = true;
+    $comparator = $this->comparator;
+    try {
+      return $comparator($left, $right);
+    } finally {
+      $this->comparing = false;
+    }
+  }
+
+  /** Rejects mutation from inside the comparator. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function assertMutable(): void {
+    if ($this->comparing) {
+      throw new LogicException(
+        'a binary heap comparator cannot mutate its heap',
+      );
+    }
+  }
+}

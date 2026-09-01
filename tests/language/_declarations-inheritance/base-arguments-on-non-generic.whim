@@ -1,0 +1,2 @@
+interface I {}
+class C implements I<int> {}

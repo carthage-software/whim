@@ -1,0 +1,10 @@
+namespace Whim\Reference;
+
+/** Represents a strong reference to a value. */
+final class Strong<T> {
+  /** Creates a strong reference. */
+  public function __construct(
+    /** The value to reference. */
+    public T $value,
+  ) {}
+}

@@ -1,0 +1,277 @@
+namespace Whim\HTTP\WebSocket\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\LinkedCancellationToken;
+use Whim\HTTP\WebSocket\BinaryMessage;
+use Whim\HTTP\WebSocket\CloseMessage;
+use Whim\HTTP\WebSocket\Connection;
+use Whim\HTTP\WebSocket\Exception;
+use Whim\HTTP\WebSocket\Message;
+use Whim\HTTP\WebSocket\TextMessage;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\PositiveInt;
+use Whim\Unwind\Throwable;
+use Whim\_Private\WebSocketCodec;
+
+/** Adapts byte handles to a WebSocket connection. */
+abstract class ConnectionImpl implements Connection {
+  private bool $closing = false;
+  private bool $terminated = false;
+  private bool $inputFinished = false;
+  private null|int $closeCode = null;
+  private null|string $closeReason = null;
+  private null|Message $pendingMessage = null;
+
+  protected function __construct(
+    private ReadHandle $read,
+    private WriteHandle $write,
+    private null|CancellationToken $cancellation,
+    private WebSocketCodec $codec,
+    private PositiveInt $readSize,
+    private null|string $subprotocol,
+  ) {}
+
+  #[MustUse]
+  public function getSubprotocol(): null|string {
+    return $this->subprotocol;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function receive(
+    null|CancellationToken $cancellation = null,
+  ): null|Message {
+    if ($this->pendingMessage != null) {
+      $message = $this->pendingMessage;
+      $this->pendingMessage = null;
+      return $message;
+    }
+
+    if ($this->terminated) {
+      return null;
+    }
+
+    $cancellation = $this->combineCancellation($cancellation);
+    while (true) {
+      $message = $this->tryReceiveUnbuffered();
+      if ($message != null) {
+        return $message;
+      }
+
+      if ($this->terminated) {
+        return null;
+      }
+
+      $this->read->waitUntilReadable($cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReceivable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->pendingMessage != null || $this->terminated) {
+      return;
+    }
+
+    $cancellation = $this->combineCancellation($cancellation);
+    while (true) {
+      $message = $this->tryReceiveUnbuffered();
+      if ($message != null) {
+        $this->pendingMessage = $message;
+        return;
+      }
+
+      if ($this->terminated) {
+        return;
+      }
+
+      $this->read->waitUntilReadable($cancellation);
+    }
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryReceive(): null|Message {
+    if ($this->pendingMessage != null) {
+      $message = $this->pendingMessage;
+      $this->pendingMessage = null;
+      return $message;
+    }
+
+    if ($this->terminated) {
+      return null;
+    }
+
+    return $this->tryReceiveUnbuffered();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendText(string $text): void {
+    try {
+      $this->codec->sendText($text);
+    } finally {
+      $this->flush();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendBinary(string $bytes): void {
+    try {
+      $this->codec->sendBinary($bytes);
+    } finally {
+      $this->flush();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function ping(string $payload = ''): void {
+    try {
+      $this->codec->ping($payload);
+    } finally {
+      $this->flush();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(null|int $code = null, string $reason = ''): void {
+    if ($this->closing || $this->terminated) {
+      return;
+    }
+
+    try {
+      $this->codec->close($code, $reason);
+      $this->closing = true;
+      $this->closeCode = $code;
+      $this->closeReason = $reason;
+    } finally {
+      $this->flush();
+    }
+  }
+
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->closing || $this->terminated || $this->codec->isClosed();
+  }
+
+  #[MustUse]
+  public function getCloseCode(): null|int {
+    return $this->closeCode;
+  }
+
+  #[MustUse]
+  public function getCloseReason(): null|string {
+    return $this->closeReason;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function finishInput(): void {
+    if (!$this->inputFinished) {
+      $this->codec->finishInput();
+      $this->inputFinished = true;
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function flush(): void {
+    $bytes = $this->codec->takeOutput();
+    if ($bytes != '') {
+      $this->write->writeAll($bytes, $this->cancellation);
+    }
+  }
+
+  #[MustUse]
+  private function combineCancellation(
+    null|CancellationToken $cancellation,
+  ): null|CancellationToken {
+    if ($this->cancellation == null) {
+      return $cancellation;
+    }
+
+    if ($cancellation == null) {
+      return $this->cancellation;
+    }
+
+    return new LinkedCancellationToken(vec[$this->cancellation, $cancellation]);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function tryReceiveUnbuffered(): null|Message {
+    while (true) {
+      try {
+        $event = $this->codec->nextEvent();
+      } catch (Throwable $error) {
+        $this->terminated = true;
+        throw $error;
+      } finally {
+        $this->flush();
+      }
+
+      if ($event != null) {
+        return match ($event[0]) {
+          1 => TextMessage($event[1]),
+          2 => BinaryMessage($event[1]),
+          8 => $this->closeMessage($event[1], $event[2]),
+          $_ => $this->invalidEvent(),
+        };
+      }
+
+      if ($this->codec->isClosed()) {
+        $this->terminated = true;
+        return null;
+      }
+
+      if ($this->read->reachedEndOfDataSource()) {
+        $this->finishInput();
+        continue;
+      }
+
+      $bytes = $this->read->tryRead($this->readSize);
+      if ($bytes == '') {
+        if ($this->read->reachedEndOfDataSource()) {
+          $this->finishInput();
+          continue;
+        }
+
+        return null;
+      }
+
+      $this->codec->push($bytes);
+    }
+  }
+
+  #[MustUse]
+  private function closeMessage(string $reason, int $code): CloseMessage {
+    $this->closing = true;
+    $this->terminated = true;
+    $this->closeCode = match ($code) {
+      0 => null,
+      $_ => $code,
+    };
+
+    $this->closeReason = $reason;
+
+    return CloseMessage(($this->closeCode, $reason));
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function invalidEvent(): never {
+    throw new Exception('the WebSocket codec returned an invalid event');
+  }
+}

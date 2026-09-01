@@ -1,0 +1,62 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\StreamId;
+
+function receive_data(
+  State $state,
+  Frame\DataFrame $frame,
+): vec<Event\WeakendEvent> {
+  $entry = receive_entry($state, $frame[1]);
+  if (!$entry->receivedInitialHeaders) {
+    stream_error($frame[1], 'HTTP/2 DATA preceded final fields');
+  }
+
+  $flowSize = length!($frame[2]) + $frame[4];
+  if ($frame[4] > 0) {
+    $flowSize++;
+  }
+
+  $state->flow->consumeReceive($frame[1], $entry, $flowSize);
+  $entry->receivedContentLength += length!($frame[2]);
+  if (
+    $entry->expectedContentLength != null
+    && $entry->receivedContentLength > $entry->expectedContentLength
+  ) {
+    stream_error($frame[1], 'the received HTTP/2 content length was exceeded');
+  }
+
+  if ($flowSize > 0) {
+    $state->flow->restoreConnectionReceive($flowSize);
+    $state->flow->restoreStreamReceive($entry, $flowSize);
+    queue_frame($state, (8, 0, $flowSize));
+    queue_frame($state, (8, $frame[1], $flowSize));
+  }
+
+  $events = vec[(1, $frame[1], $frame[2], $frame[3])];
+
+  if ($frame[3]) {
+    verify_received_content_length($frame[1], $entry);
+    if (end_remote($state, $frame[1], $entry)) {
+      $events[] = (8, $frame[1]);
+    }
+  }
+
+  return $events;
+}
+
+function verify_received_content_length(
+  StreamId $streamId,
+  StreamEntry $entry,
+): void {
+  if (
+    $entry->expectedContentLength != null
+    && $entry->receivedContentLength != $entry->expectedContentLength
+  ) {
+    stream_error(
+      $streamId,
+      'the received HTTP/2 content length does not match',
+    );
+  }
+}

@@ -1,0 +1,147 @@
+use Whim\Attribute\Attribute;
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\Error;
+
+#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
+final class Deprecated {
+  public function __construct(public readonly string $reason = '') {}
+}
+
+#[Deprecated('use send() instead')]
+function deliver(): string {
+  return 'delivered';
+}
+
+assert!(deliver() == 'delivered');
+assert!(Attribute::TARGET_CLASS == 1);
+assert!(Attribute::TARGET_FUNCTION == 2);
+assert!(Attribute::TARGET_METHOD == 4);
+assert!(Attribute::TARGET_PROPERTY == 8);
+assert!(Attribute::TARGET_CLASS_CONSTANT == 16);
+assert!(Attribute::TARGET_PARAMETER == 32);
+assert!(Attribute::TARGET_TYPE_ALIAS == 128);
+assert!(Attribute::TARGET_ALL == 959);
+assert!(Attribute::IS_REPEATABLE == 64);
+
+#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
+final class Tag {
+  public function __construct(public readonly string $label = 'default') {}
+}
+
+#[Attribute(Attribute::TARGET_CLASS)]
+final class Only {
+  public function __construct() {}
+}
+
+#[Attribute(Attribute::TARGET_CLASS)]
+final class Absent {}
+
+#[Tag('first')]
+#[Tag(label: 'second')]
+#[Only]
+class Post {}
+
+function accept_attribute_probe(
+  (fn(object): vec<object>) $probe,
+  object $object,
+): void {
+  assert!(length!($probe($object)) == 3);
+}
+
+$post = new Post();
+assert!(Whim\Attribute\has_attribute($post, 'Tag'));
+assert!(!(Whim\Attribute\has_attribute($post, 'Absent')));
+$labels = vec[];
+foreach (Whim\Attribute\get_attribute::<Tag>($post) as $tag) {
+  $labels[] = $tag->label;
+}
+
+assert!($labels == vec['first', 'second']);
+assert!(length!(Whim\Attribute\get_attribute::<Absent>($post)) == 0);
+assert!(length!(Whim\Attribute\get_attributes($post)) == 3);
+accept_attribute_probe(Whim\Attribute\get_attributes(...), $post);
+
+final class LazyConstructionLog {
+  public static int $constructions = 0;
+}
+
+#[Attribute(Attribute::TARGET_CLASS)]
+final class Loud {
+  public function __construct(public int $seen = 0) {
+    LazyConstructionLog::$constructions =
+      LazyConstructionLog::$constructions + 1;
+  }
+}
+
+#[Loud]
+class LoudTarget {}
+
+$loudTarget = new LoudTarget();
+assert!(LazyConstructionLog::$constructions == 0);
+$firstInspection = Whim\Attribute\get_attribute::<Loud>($loudTarget);
+assert!(LazyConstructionLog::$constructions == 1);
+$secondInspection = Whim\Attribute\get_attribute::<Loud>($loudTarget);
+assert!(LazyConstructionLog::$constructions == 2);
+assert!($firstInspection[0] != $secondInspection[0]);
+$firstInspection[0]->seen = 99;
+$thirdInspection = Whim\Attribute\get_attribute::<Loud>($loudTarget);
+assert!(LazyConstructionLog::$constructions == 3);
+assert!($thirdInspection[0]->seen == 0);
+
+#[Whim\Marker\Deprecated('2.0', 'use send() instead')]
+class Mailer {
+  public function deliver(): string {
+    return 'still works';
+  }
+}
+
+$mailer = new Mailer();
+assert!($mailer->deliver() == 'still works');
+$deprecations = Whim\Attribute\get_attribute::<Whim\Marker\Deprecated>($mailer);
+assert!(length!($deprecations) == 1);
+assert!($deprecations[0]->version == '2.0');
+assert!($deprecations[0]->note == 'use send() instead');
+
+$assertion_value_27 = function(): void {
+  new Whim\Marker\SensitiveParameterValue();
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (ArgumentCountError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is ArgumentCountError);
+
+assert!(new Whim\Marker\SensitiveParameterValue(null)->getValue() == null);
+
+function login(
+  string $user,
+  #[Whim\Marker\SensitiveParameter] string $password,
+): bool {
+  throw new Error('denied', 0);
+}
+
+$denied = null;
+$assertion_callable_29 = function(): void {
+  login('ada', 'hunter2');
+};
+
+try {
+  $assertion_callable_29();
+} catch (Error $assertion_caught_29) {
+  $denied = $assertion_caught_29;
+  assert!(Whim\Str\contains($assertion_caught_29->getMessage(), 'denied'));
+}
+
+assert!($denied is Error);
+
+$deniedArguments = $denied->getTrace()[0]->arguments;
+assert!($deniedArguments[0] == 'ada');
+$wrappedPassword = $deniedArguments[1];
+assert!($wrappedPassword is Whim\Marker\SensitiveParameterValue);
+
+assert!($wrappedPassword->getValue() == 'hunter2');
+assert!(!Whim\Str\contains($denied->toString(), 'hunter2'));

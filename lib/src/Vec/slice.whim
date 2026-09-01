@@ -1,0 +1,120 @@
+namespace Whim\Vec;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim;
+
+/** Returns the first requested values. */
+#[MustUse]
+#[TrackCaller]
+function take<T>(Iterable<_, T> $values, NonNegativeInt $count): vec<T> {
+  $result = vec[];
+  foreach ($values as $value) {
+    if (length!($result) == $count) {
+      break;
+    }
+
+    $result[] = $value;
+  }
+
+  return $result;
+}
+
+/** Removes the first requested values. */
+#[MustUse]
+#[TrackCaller]
+function drop<T>(Iterable<_, T> $values, NonNegativeInt $count): vec<T> {
+  $result = vec[];
+  $index = 0;
+  foreach ($values as $value) {
+    if ($index >= $count) {
+      $result[] = $value;
+    }
+
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Extracts a contiguous range of values. */
+#[MustUse]
+#[TrackCaller]
+function slice<T>(
+  Iterable<_, T> $values,
+  NonNegativeInt $start,
+  null|NonNegativeInt $length = null,
+): vec<T> {
+  if ($values is vec<_>) {
+    return Whim\_Private\vec_slice($values, $start, $length);
+  }
+
+  $result = vec[];
+  $index = 0;
+  foreach ($values as $value) {
+    if ($index >= $start && ($length == null || length!($result) < $length)) {
+      $result[] = $value;
+    }
+
+    if ($length != null && length!($result) == $length) {
+      break;
+    }
+
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Splits values into fixed-size vecs. */
+#[MustUse]
+#[TrackCaller]
+function chunk<T>(Iterable<_, T> $values, PositiveInt $size): vec<vec<T>> {
+  if ($values is vec<_>) {
+    return Whim\_Private\vec_chunk($values, $size);
+  }
+
+  $result = vec[];
+  $chunk = vec[];
+  foreach ($values as $value) {
+    $chunk[] = $value;
+    if (length!($chunk) == $size) {
+      $result[] = $chunk;
+      $chunk = vec[];
+    }
+  }
+
+  if (length!($chunk) != 0) {
+    $result[] = $chunk;
+  }
+
+  return $result;
+}
+
+/** Splits entries into fixed-size dicts. */
+#[MustUse]
+#[TrackCaller]
+function chunk_with_keys<K: ArrayKey, T>(
+  Iterable<K, T> $values,
+  PositiveInt $size,
+): vec<dict<K, T>> {
+  $result = vec[];
+  $chunk = dict[];
+  foreach ($values as $key => $value) {
+    $chunk[$key] = $value;
+    if (length!($chunk) == $size) {
+      $result[] = $chunk;
+      $chunk = dict[];
+    }
+  }
+
+  if (length!($chunk) != 0) {
+    $result[] = $chunk;
+  }
+
+  return $result;
+}

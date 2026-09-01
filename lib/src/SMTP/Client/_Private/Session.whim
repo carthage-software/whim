@@ -1,0 +1,33 @@
+namespace Whim\SMTP\Client\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Stream;
+use Whim\SMTP\Client\Connection;
+use Whim\Time\Duration;
+use Whim\Time\Instant;
+
+/** Owns one initialized SMTP connection. */
+final class Session {
+  private Instant $idleSince;
+
+  #[AlwaysInline]
+  public function __construct(
+    public readonly Stream<InternetEndpoint> $stream,
+    public readonly Connection $connection,
+  ) {
+    $this->idleSince = Instant::now();
+  }
+
+  #[AlwaysInline]
+  public function markIdle(): void {
+    $this->idleSince = Instant::now();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isExpired(Duration $timeout): bool {
+    return $this->idleSince->elapsed()->compare($timeout)->isGreaterOrEqual();
+  }
+}

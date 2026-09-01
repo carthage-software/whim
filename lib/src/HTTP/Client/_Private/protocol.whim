@@ -1,0 +1,178 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\ConnectionException;
+use Whim\HTTP\Client\ConnectionMetadata;
+use Whim\HTTP\Client\Origin;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\Network;
+use Whim\Network\Endpoint;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Stream;
+use Whim\Refine\NonEmptyString;
+use Whim\TLS;
+use Whim\URI\IPHost;
+use Whim\URI\RegisteredNameHost;
+
+/** Returns the network host and TLS server name for an origin. */
+function origin_host(Origin $origin): (Network\Host, NonEmptyString) {
+  return match ($origin->host) {
+    $host @ IPHost => (
+      $host->address,
+      $host->address->toString() as NonEmptyString,
+    ),
+    $host @ RegisteredNameHost => ($host->name, $host->name as NonEmptyString),
+    $_ => throw new ConnectionException(
+      'an IPvFuture host cannot serve as a network endpoint',
+    ),
+  };
+}
+
+/** Resolves the protocol versions allowed for one request. */
+function resolve_protocol_versions(
+  Request $request,
+  Configuration $configuration,
+): vec<ProtocolVersion> {
+  $versions = $configuration->protocolVersions;
+  if (length!($versions) == 0) {
+    throw new ProtocolException('no HTTP protocol version is enabled');
+  }
+
+  $requested = $request->protocolVersion;
+  if ($requested == ProtocolVersion::V11) {
+    return $versions;
+  }
+
+  if (!contains!($versions, $requested)) {
+    throw new ProtocolException(
+      'the requested HTTP protocol version is not enabled',
+    );
+  }
+
+  return vec[$requested];
+}
+
+/** Returns the preferred enabled HTTP/1 version. */
+function preferred_h1_protocol(
+  vec<ProtocolVersion> $versions,
+): null|ProtocolVersion {
+  foreach ($versions as $version) {
+    if ($version is ProtocolVersion::V10|ProtocolVersion::V11) {
+      return $version;
+    }
+  }
+
+  return null;
+}
+
+/** Builds ALPN choices without crossing a preferred HTTP/1.0 fallback. */
+function alpn_protocols(vec<ProtocolVersion> $versions): vec<string> {
+  $protocols = vec[];
+  foreach ($versions as $version) {
+    if ($version == ProtocolVersion::V10) {
+      break;
+    }
+
+    if ($version == ProtocolVersion::V2 && !contains!($protocols, 'h2')) {
+      $protocols[] = 'h2';
+    } else if (
+      $version == ProtocolVersion::V11
+      && !contains!($protocols, 'http/1.1')
+    ) {
+      $protocols[] = 'http/1.1';
+    }
+  }
+
+  return $protocols;
+}
+
+/** Applies the response header limit to HTTP/2 settings. */
+function h2_configuration(Configuration $configuration): H2\Configuration {
+  $settings = $configuration->h2->settings;
+  $limit = $configuration->maximumResponseHeaderSize;
+  if ($limit > 4294967295) {
+    $limit = 4294967295;
+  }
+
+  $setting = H2\Setting::MaxHeaderListSize->value;
+  if (contains_key!($settings, $setting) && $settings[$setting] < $limit) {
+    $limit = $settings[$setting];
+  }
+
+  $settings[$setting] = $limit as H2\SettingValue;
+  return $configuration->h2->withSettings($settings);
+}
+
+/** Establishes TLS and selects an enabled HTTP protocol. */
+function connect_secure<TEndpoint: Endpoint>(
+  Stream<TEndpoint> $stream,
+  NonEmptyString $serverName,
+  null|InternetEndpoint $destination,
+  vec<ProtocolVersion> $versions,
+  Configuration $configuration,
+  null|CancellationToken $cancellation,
+  bool $proxied = false,
+): Connection {
+  $stream = new TLS\Connector::<TEndpoint>(
+    $configuration->tls->withAlpnProtocols(alpn_protocols($versions)),
+  )->connect($stream, $serverName, $cancellation);
+
+  $state = $stream->getConnectionState();
+  if ($state->alpnProtocol == 'h2') {
+    return new H2Connection(
+      $stream,
+      new ConnectionMetadata(
+        $stream->getLocalEndpoint(),
+        $stream->getPeerEndpoint(),
+        ProtocolVersion::V2,
+        $state,
+        $destination,
+        $proxied,
+      ),
+      h2_configuration($configuration),
+    );
+  }
+
+  if (
+    $state->alpnProtocol == 'http/1.1'
+    && contains!($versions, ProtocolVersion::V11)
+  ) {
+    return new H1Connection(
+      $stream,
+      new ConnectionMetadata(
+        $stream->getLocalEndpoint(),
+        $stream->getPeerEndpoint(),
+        ProtocolVersion::V11,
+        $state,
+        $destination,
+        $proxied,
+      ),
+    );
+  }
+
+  $h1 = preferred_h1_protocol($versions);
+  if ($state->alpnProtocol == null && $h1 != null) {
+    return new H1Connection(
+      $stream,
+      new ConnectionMetadata(
+        $stream->getLocalEndpoint(),
+        $stream->getPeerEndpoint(),
+        $h1,
+        $state,
+        $destination,
+        $proxied,
+      ),
+    );
+  }
+
+  $stream->close();
+  throw new ConnectionException(
+    'the TLS peer did not negotiate an enabled HTTP protocol',
+    previous: $previous,
+  );
+}

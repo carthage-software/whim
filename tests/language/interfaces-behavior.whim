@@ -1,0 +1,98 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\LinkerError;
+
+interface Sealed for Other {}
+
+interface Other extends Sealed for A {}
+
+class A implements Other {}
+
+assert!(new A() is Sealed);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+$violation = $work . '/sealed-violation.whim';
+File\write($violation, 'class Y implements Other {}' . "\n");
+$assertion_value_2 = function() use ($violation): void {
+  require!($violation);
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (LinkerError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+  assert!(
+    Whim\Str\contains($assertion_caught_2->getMessage(), 'Other is sealed'),
+  );
+}
+
+assert!($assertion_error_2 is LinkerError);
+
+interface Comparable {
+  public function compareTo(mixed $other): int;
+
+  public function isEqual(mixed $other): bool {
+    return $this->compareTo($other) == 0;
+  }
+}
+
+class Num implements Comparable {
+  public function __construct(private int $n) {}
+
+  public function compareTo(mixed $other): int {
+    return $this->n <=> $other->raw();
+  }
+
+  public function raw(): int {
+    return $this->n;
+  }
+}
+
+$left = new Num(3);
+$right = new Num(3);
+assert!($left->isEqual($right));
+assert!($left is Comparable);
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$conflict = $work . '/conflicting-defaults.whim';
+File\write(
+  $conflict,
+  'interface Greeter {'
+  . "\n"
+  . '    public function greet(): string {'
+  . "\n"
+  . '        return \'from Greeter\';'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'interface Saluter {'
+  . "\n"
+  . '    public function greet(): string {'
+  . "\n"
+  . '        return \'from Saluter\';'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'class Bilingual implements Greeter, Saluter {}'
+  . "\n",
+);
+
+$run = Command\run($binary, vec[$conflict]);
+assert!(!($run->isSuccess()));
+$assertion_value_7 = $run->standardError;
+assert!(
+  Whim\Str\contains($assertion_value_7, 'conflicting default implementations'),
+);
+
+assert!(Whim\Str\contains($assertion_value_7, $conflict . ':11:1'));
+
+Filesystem\delete_directory($work, true);

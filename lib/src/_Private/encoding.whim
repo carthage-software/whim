@@ -1,0 +1,172 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Replaces malformed UTF-8 sequences with the replacement character. */
+#[Stub]
+#[MustUse]
+function utf8_lossy(string $bytes): string {}
+
+/** Encodes a UTF-8 MIME header value with RFC 2047 when needed. */
+#[Stub]
+#[MustUse]
+function mime_encoded_word_encode(string $value): string {}
+
+/** Decodes RFC 2047 encoded words into UTF-8. */
+#[Stub]
+#[MustUse]
+function mime_encoded_word_decode(string $value): string {}
+
+/** Encodes bytes with MIME quoted-printable encoding. */
+#[Stub]
+#[MustUse]
+function mime_quoted_printable_encode(string $bytes, bool $binary): string {}
+
+/** Decodes MIME quoted-printable bytes, or returns null when invalid. */
+#[Stub]
+#[MustUse]
+function mime_quoted_printable_decode(
+  string $encoded,
+  bool $strict,
+): null|string {}
+
+/** Encodes bytes with the RFC 4648 standard base64 table. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_encode_standard(string $bytes, bool $padding): string {}
+
+/** Decodes standard base64, or null when the input is not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_decode_standard(string $encoded, bool $padding): null|string {}
+
+/** Encodes bytes with the URL and filename safe base64 table. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_encode_url_safe(string $bytes, bool $padding): string {}
+
+/** Decodes URL-safe base64, or null when the input is not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_decode_url_safe(string $encoded, bool $padding): null|string {}
+
+/** Encodes bytes with the crypt dot-slash base64 table. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_encode_dot_slash(string $bytes, bool $padding): string {}
+
+/** Decodes dot-slash base64, or null when the input is not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_decode_dot_slash(string $encoded, bool $padding): null|string {}
+
+/** Encodes bytes with the byte-ordered crypt base64 table. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_encode_dot_slash_ordered(
+  string $bytes,
+  bool $padding,
+): string {}
+
+/** Decodes byte-ordered crypt base64, or null when the input is not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base64_decode_dot_slash_ordered(
+  string $encoded,
+  bool $padding,
+): null|string {}
+
+/** Encodes bytes with the RFC 4648 standard base32 table, uppercase. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base32_encode_standard(string $bytes, bool $padding): string {}
+
+/** Decodes standard base32 of either case, or null when not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base32_decode_standard(string $encoded, bool $padding): null|string {}
+
+/** Encodes bytes with the RFC 4648 extended hex base32 table, uppercase. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base32_encode_hex(string $bytes, bool $padding): string {}
+
+/** Decodes extended hex base32 of either case, or null when not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function base32_decode_hex(string $encoded, bool $padding): null|string {}
+
+/** Encodes bytes as lowercase hexadecimal text. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function hex_encode(string $bytes): string {}
+
+/** Decodes hexadecimal text of either case, or null when not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function hex_decode(string $encoded): null|string {}
+
+/** Percent-encodes bytes, sparing RFC 3986 unreserved bytes. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function url_encode(string $bytes): string {}
+
+/** Decodes percent escapes strictly, or null on a malformed escape. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function url_decode(string $encoded): null|string {}
+
+/** Encodes a URI while preserving syntax and valid percent escapes. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function uri_encode(string $bytes): string {}
+
+/** Decodes non-reserved URI escapes, or returns null when malformed. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function uri_decode(string $encoded): null|string {}
+
+/** Percent-encodes bytes as a form field, writing a space as `+`. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function url_encode_form(string $bytes): string {}
+
+/** Decodes a form field reading `+` as a space, or null when malformed. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function url_decode_form(string $encoded): null|string {}
+
+/** Encodes Unicode text as Punycode, or null when it cannot be. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function punycode_encode(string $input): null|string {}
+
+/** Decodes Punycode into Unicode text, or null when the input is not valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function punycode_decode(string $input): null|string {}

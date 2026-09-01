@@ -1,0 +1,27 @@
+namespace Whim\HTTP\Message;
+
+use Whim\Refine\NonEmptyString;
+
+/** A valid HTTP status code. */
+type StatusCode = 100..=999;
+
+/** A status code for an informational response. */
+type InformationalStatusCode = 100..=199;
+
+/** A status code for an error response. */
+type ErrorStatusCode = 400..=599;
+
+/** A non-empty HTTP method token. */
+type Method = NonEmptyString;
+
+/** A non-empty HTTP request target. */
+type RequestTarget = NonEmptyString;
+
+/** An HTTP field name. */
+type FieldName = NonEmptyString;
+
+/** An HTTP field value. */
+type FieldValue = string;
+
+/** One ordered HTTP field entry. */
+type Field = (FieldName, FieldValue);

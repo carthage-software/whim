@@ -1,0 +1,190 @@
+namespace Whim\DateTime;
+
+use Whim;
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable system time viewed in a timezone. */
+final readonly class ZonedDateTime implements Order<ZonedDateTime>, ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public SystemTime $systemTime,
+    public TimeZone $timezone,
+    public DateTime $dateTime,
+    public OffsetSeconds $offsetSeconds,
+    public string $abbreviation,
+  ) {}
+
+  /** Creates a value from fields checked by the date-time engine. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    SystemTime $systemTime,
+    TimeZone $timezone,
+    DateTime $dateTime,
+    int $offsetSeconds,
+    string $abbreviation,
+  ): ZonedDateTime {
+    return new ZonedDateTime(
+      $systemTime,
+      $timezone,
+      $dateTime,
+      $offsetSeconds as OffsetSeconds,
+      $abbreviation,
+    );
+  }
+
+  /** Views a system time in a timezone. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromSystemTime(
+    SystemTime $time,
+    TimeZone $timezone,
+  ): ZonedDateTime {
+    return $timezone->at($time);
+  }
+
+  /** Resolves a civil date and time in a timezone. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromDateTime(
+    DateTime $dateTime,
+    TimeZone $timezone,
+    Disambiguation $disambiguation = Disambiguation::Compatible,
+  ): ZonedDateTime {
+    return $timezone->resolve($dateTime, $disambiguation);
+  }
+
+  /** Returns the current system time in a timezone. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function now(TimeZone $timezone): ZonedDateTime {
+    return $timezone->at(SystemTime::now());
+  }
+
+  /** Parses a Temporal-style zoned date and time, or returns null. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $value): null|ZonedDateTime {
+    $parts = Whim\_Private\date_time_parse_zoned($value) ?? return null;
+
+    $timezone = TimeZone::parse($parts[2]) ?? return null;
+
+    return $timezone->at(SystemTime::fromUnixTimestamp($parts[0], $parts[1]));
+  }
+
+  /** Parses a Temporal-style zoned date and time. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $value): ZonedDateTime {
+    $dateTime = ZonedDateTime::parse($value);
+    if ($dateTime == null) {
+      throw new InvalidArgumentException(
+        'invalid zoned date and time: `' . $value . '`',
+      );
+    }
+
+    return $dateTime;
+  }
+
+  /** Parses an RFC 2822 date and time with a fixed UTC offset. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parseRfc2822(string $value): null|ZonedDateTime {
+    $parts = Whim\_Private\date_time_parse_rfc2822($value) ?? return null;
+
+    return TimeZone::fixedOffset($parts[2])->at(
+      SystemTime::fromUnixTimestamp($parts[0], $parts[1]),
+    );
+  }
+
+  /** Returns this instant in another timezone. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withTimeZone(TimeZone $timezone): ZonedDateTime {
+    return $timezone->at($this->systemTime);
+  }
+
+  /** Adds an exact elapsed duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function plusDuration(Duration $duration): ZonedDateTime {
+    return $this->timezone->at($this->systemTime->plus($duration));
+  }
+
+  /** Subtracts an exact elapsed duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minusDuration(Duration $duration): ZonedDateTime {
+    return $this->timezone->at($this->systemTime->minus($duration));
+  }
+
+  /** Adds calendar units in local time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function plusPeriod(
+    Period $period,
+    Overflow $overflow = Overflow::Constrain,
+    Disambiguation $disambiguation = Disambiguation::Compatible,
+  ): ZonedDateTime {
+    return $this->timezone->resolve(
+      $this->dateTime->plusPeriod($period, $overflow),
+      $disambiguation,
+    );
+  }
+
+  /** Subtracts calendar units in local time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minusPeriod(
+    Period $period,
+    Overflow $overflow = Overflow::Constrain,
+    Disambiguation $disambiguation = Disambiguation::Compatible,
+  ): ZonedDateTime {
+    return $this->plusPeriod($period->invert(), $overflow, $disambiguation);
+  }
+
+  /** Returns this value's UTC offset. */
+  #[MustUse]
+  #[TrackCaller]
+  public function offset(): Duration {
+    return Duration::fromSeconds($this->offsetSeconds);
+  }
+
+  /** Formats this zoned date and time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function format(Formatter $formatter): string {
+    return $formatter->formatZonedDateTime($this);
+  }
+
+  /** Returns this value in Temporal zoned form. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    return Formatter::temporal()->formatZonedDateTime($this);
+  }
+
+  /** Compares the represented system times. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(ZonedDateTime $other): Ordering {
+    return $this->systemTime->compare($other->systemTime);
+  }
+
+  /** Reports whether two values represent the same system time. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(ZonedDateTime $other): bool {
+    return $this->systemTime->equals($other->systemTime);
+  }
+}

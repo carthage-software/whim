@@ -1,0 +1,56 @@
+namespace Whim\MIME;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+
+/** A MIME Content-Transfer-Encoding value. */
+enum TransferEncoding: string {
+  case Base64 = 'base64';
+  case QuotedPrintable = 'quoted-printable';
+  case SevenBit = '7bit';
+  case EightBit = '8bit';
+  case Binary = 'binary';
+
+  /** Chooses an encoding from the content's byte profile. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function detect(string $content): TransferEncoding {
+    $high = 0;
+    $control = 0;
+    $line = 0;
+    $longLine = false;
+    $index = 0;
+    while ($index < length!($content)) {
+      $byte = Str\ord($content[$index]);
+      if ($byte == 10) {
+        $longLine = $longLine || $line > 998;
+        $line = 0;
+      } else if ($byte != 13) {
+        $line++;
+        if ($byte > 127) {
+          $high++;
+        } else if ($byte < 32 && $byte != 9) {
+          $control++;
+        }
+      }
+
+      $index++;
+    }
+
+    $longLine = $longLine || $line > 998;
+    if ($control > 0) {
+      return TransferEncoding::Base64;
+    }
+
+    if ($high == 0 && !$longLine) {
+      return TransferEncoding::SevenBit;
+    }
+
+    if (!$longLine && $high * 10 <= length!($content) * 3) {
+      return TransferEncoding::QuotedPrintable;
+    }
+
+    return TransferEncoding::Base64;
+  }
+}

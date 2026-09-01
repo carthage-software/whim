@@ -1,0 +1,18 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Sends HTTP requests. */
+interface Client {
+  #[MustUse]
+  #[TrackCaller]
+  public function send(
+    Request $request,
+    SendConfiguration $configuration = new SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): Transaction;
+}

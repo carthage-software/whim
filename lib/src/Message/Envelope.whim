@@ -1,0 +1,61 @@
+namespace Whim\Message;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Message\Address\Mailbox;
+use Whim\Refine\NonEmptyVec;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An SMTP transport envelope. */
+final readonly class Envelope {
+  /** Creates an envelope with at least one recipient. */
+  #[AlwaysInline]
+  private function __construct(
+    public null|Mailbox $sender,
+    public NonEmptyVec<Mailbox> $recipients,
+  ) {}
+
+  /** Creates a checked SMTP envelope. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    null|Mailbox $sender,
+    vec<Mailbox> $recipients,
+  ): Envelope {
+    if ($recipients == vec[]) {
+      throw new InvalidArgumentException('an SMTP envelope needs a recipient');
+    }
+
+    return new Envelope($sender, $recipients as NonEmptyVec<Mailbox>);
+  }
+
+  /** Derives transport sender and recipients from a message. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromMessage(Message $message): Envelope {
+    $sender = $message->sender;
+    if ($sender == null && $message->from != null) {
+      $mailboxes = $message->from->mailboxes();
+      if ($mailboxes != vec[]) {
+        $sender = $mailboxes[0];
+      }
+    }
+
+    $recipients = vec[];
+    foreach (vec[$message->to, $message->cc, $message->bcc] as $addresses) {
+      if ($addresses == null) {
+        continue;
+      }
+
+      foreach ($addresses->mailboxes() as $mailbox) {
+        $recipients[] = $mailbox;
+      }
+    }
+
+    return Envelope::fromParts($sender, $recipients);
+  }
+}

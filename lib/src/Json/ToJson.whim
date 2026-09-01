@@ -1,0 +1,10 @@
+namespace Whim\Json;
+
+use Whim\Marker\MustUse;
+
+/** Defines a value's JSON representation. */
+interface ToJson {
+  /** Converts this value into its JSON representation. */
+  #[MustUse]
+  public function toJson(): Value;
+}

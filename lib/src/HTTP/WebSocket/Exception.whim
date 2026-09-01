@@ -1,0 +1,6 @@
+namespace Whim\HTTP\WebSocket;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports an invalid WebSocket operation or peer message. */
+class Exception extends RuntimeException {}

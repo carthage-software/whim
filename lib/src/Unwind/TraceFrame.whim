@@ -1,0 +1,21 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\Stub;
+
+/** Describes one captured call-frame in a throwable trace. */
+#[Stub]
+final class TraceFrame {
+  public readonly string $function;
+  public readonly string $file;
+  public readonly int $line;
+  public readonly vec<mixed> $arguments;
+
+  #[TrackCaller]
+  public function __construct(
+    string $function,
+    string $file,
+    int $line,
+    vec<mixed> $arguments,
+  ) {}
+}

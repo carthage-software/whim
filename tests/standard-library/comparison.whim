@@ -1,0 +1,146 @@
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+use Whim\Vec;
+
+assert!(Ordering::Less->value == -1);
+assert!(Ordering::Equal->value == 0);
+assert!(Ordering::Greater->value == 1);
+assert!(Ordering::from(1 <=> 2) == Ordering::Less);
+assert!(Ordering::from(2 <=> 2) == Ordering::Equal);
+assert!(Ordering::from(3 <=> 2) == Ordering::Greater);
+
+assert!(Ordering::Less->isLess());
+assert!(Ordering::Less->isLessOrEqual());
+assert!(!(Ordering::Less->isEqual()));
+assert!(Ordering::Less->isNotEqual());
+assert!(Ordering::Equal->isEqual());
+assert!(Ordering::Equal->isLessOrEqual());
+assert!(Ordering::Equal->isGreaterOrEqual());
+assert!(Ordering::Greater->isGreater());
+assert!(Ordering::Greater->isGreaterOrEqual());
+
+assert!(Ordering::Less->reverse() == Ordering::Greater);
+assert!(Ordering::Greater->reverse() == Ordering::Less);
+assert!(Ordering::Equal->reverse() == Ordering::Equal);
+
+assert!(Ordering::Less->then(Ordering::Greater) == Ordering::Less);
+assert!(Ordering::Equal->then(Ordering::Greater) == Ordering::Greater);
+
+$evaluated = false;
+assert!(Ordering::Less->thenWith(function() use ($evaluated): Ordering {
+  $evaluated = true;
+  return Ordering::Greater;
+}) == Ordering::Less);
+
+assert!(!($evaluated));
+assert!(
+  Ordering::Equal->thenWith(fn(): Ordering => Ordering::Greater)
+  == Ordering::Greater,
+);
+
+final readonly class Version implements Order<Version> {
+  public function __construct(public int $major, public int $minor) {}
+
+  public function equals(Version $other): bool {
+    return $this->compare($other)->isEqual();
+  }
+
+  public function compare(Version $other): Ordering {
+    return Ordering::from($this->major <=> $other->major)->then(
+      Ordering::from($this->minor <=> $other->minor),
+    );
+  }
+}
+
+$one_two = new Version(1, 2);
+$one_nine = new Version(1, 9);
+$two_zero = new Version(2, 0);
+
+assert!($one_two->compare($one_nine) == Ordering::Less);
+assert!($one_nine->compare($one_two) == Ordering::Greater);
+assert!($one_two->compare(new Version(1, 2)) == Ordering::Equal);
+assert!($one_two->equals(new Version(1, 2)));
+assert!(!($one_two->equals($one_nine)));
+
+assert!($one_two->isLessThan($one_nine));
+assert!($one_two->isLessThanOrEqual($one_nine));
+assert!($one_two->isLessThanOrEqual(new Version(1, 2)));
+assert!($two_zero->isGreaterThan($one_nine));
+assert!($two_zero->isGreaterThanOrEqual($two_zero));
+assert!(!($one_two->isGreaterThan($one_nine)));
+
+assert!($one_two->minimum($one_nine) == $one_two);
+assert!($one_nine->minimum($one_two) == $one_two);
+assert!($one_two->maximum($one_nine) == $one_nine);
+assert!($two_zero->maximum($one_two) == $two_zero);
+
+assert!($one_two->clamp($one_nine, $two_zero) == $one_nine);
+assert!($two_zero->clamp($one_two, $one_nine) == $one_nine);
+assert!($one_nine->clamp($one_two, $two_zero) == $one_nine);
+
+$assertion_value_42 = fn(): Version => $one_nine->clamp($two_zero, $one_two);
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (InvalidArgumentException $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+}
+
+assert!($assertion_error_42 is InvalidArgumentException);
+
+final readonly class Broken implements Order<Broken> {
+  public function equals(Broken $other): bool {
+    return false;
+  }
+
+  public function compare(Broken $other): Ordering {
+    throw new RuntimeException('the comparison is broken');
+  }
+}
+
+$propagated = null;
+$assertion_callable_43 = fn(): bool => new Broken()->isLessThan(new Broken());
+try {
+  $assertion_callable_43();
+} catch (RuntimeException $assertion_caught_43) {
+  $propagated = $assertion_caught_43;
+}
+
+assert!($propagated is RuntimeException);
+
+assert!($propagated->getMessage() == 'the comparison is broken');
+
+$sorted = Vec\sort::<Version>(
+  vec[$two_zero, $one_two, $one_nine],
+  fn(Version $left, Version $right): Ordering => $left->compare($right),
+);
+
+assert!($sorted[0] == $one_two);
+assert!($sorted[1] == $one_nine);
+assert!($sorted[2] == $two_zero);
+
+$durations = Vec\sort::<Duration>(
+  vec[
+    Duration::fromSeconds(3),
+    Duration::fromSeconds(1),
+    Duration::fromSeconds(2),
+  ],
+  fn(Duration $left, Duration $right): Ordering => $left->compare($right),
+);
+
+assert!($durations[0]->equals(Duration::fromSeconds(1)));
+assert!($durations[2]->equals(Duration::fromSeconds(3)));
+assert!(
+  Duration::fromSeconds(1)->minimum(Duration::fromSeconds(2))->equals(
+    Duration::fromSeconds(1),
+  ),
+);
+
+assert!(
+  Duration::fromSeconds(1)->maximum(Duration::fromSeconds(2))->equals(
+    Duration::fromSeconds(2),
+  ),
+);

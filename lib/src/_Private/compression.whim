@@ -1,0 +1,89 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** A Rust-backed compression stream. */
+#[Stub]
+final class CompressionEncoder {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function gzip(0..=9 $level): null|CompressionEncoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function deflate(0..=9 $level): null|CompressionEncoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function brotli(0..=11 $quality): null|CompressionEncoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function zstandard(
+    -131_072..=22 $level,
+  ): null|CompressionEncoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(string $bytes): null|string {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function flush(): null|string {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function finish(): null|string {}
+}
+
+/** A Rust-backed decompression stream. */
+#[Stub]
+final class CompressionDecoder {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function gzip(): null|CompressionDecoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function deflate(): null|CompressionDecoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function brotli(): null|CompressionDecoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function zstandard(): null|CompressionDecoder {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(string $bytes): null|string {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function finish(): null|string {}
+}

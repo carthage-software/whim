@@ -1,0 +1,35 @@
+namespace Whim\TCP;
+
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Network\InternetEndpoint;
+
+/** Configures an outbound TCP connection. */
+final readonly class ConnectConfiguration implements Default {
+  #[AlwaysInline]
+  public function __construct(
+    public bool $noDelay = false,
+    public null|InternetEndpoint $bindTo = null,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withNoDelay(bool $noDelay): ConnectConfiguration {
+    return clone!($this, noDelay: $noDelay);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBindTo(
+    null|InternetEndpoint $bindTo,
+  ): ConnectConfiguration {
+    return clone!($this, bindTo: $bindTo);
+  }
+}

@@ -1,0 +1,156 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "[0-9]*.[0-9]*.[0-9]*"
+      - "v[0-9]*.[0-9]*.[0-9]*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: package
+        name: Read package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --locked --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "whim") | .version')"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [[ "$tag_version" != "$version" ]]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match Cargo version $version."
+              exit 1
+            fi
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-verify
+          cache-on-failure: true
+      - run: cargo test --locked --workspace --all-features
+      - run: cargo build --locked --release --bin whim
+      - run: target/release/whim tests/run.whim '' 2
+
+  build:
+    name: ${{ matrix.target }}
+    needs: [metadata, verify]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      # id-token: write
+      # attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-14
+            builder: cargo
+          - target: aarch64-apple-darwin
+            os: macos-14
+            builder: cargo
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+            builder: cargo
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            builder: cargo
+          - target: riscv64gc-unknown-linux-gnu
+            os: ubuntu-latest
+            builder: cross
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.0
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+          cache-on-failure: true
+      - if: matrix.builder == 'cross'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross@0.2.5
+      - name: Build
+        shell: bash
+        run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim
+      - id: package
+        name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="whim-${{ needs.metadata.outputs.version }}-${{ matrix.target }}"
+          archive="${package}.tar.gz"
+          mkdir -p "dist/${package}"
+          cp "target/${{ matrix.target }}/release/whim" "dist/${package}/whim"
+          cp README.md CONTRIBUTING.md SECURITY.md LICENSE-APACHE LICENSE-MIT "dist/${package}/"
+          tar -czf "dist/${archive}" -C dist "${package}"
+          (
+            cd dist
+            shasum -a 256 "${archive}" > "${archive}.sha256"
+          )
+          echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
+      # - uses: actions/attest-build-provenance@v3
+      #   with:
+      #     subject-path: ${{ steps.package.outputs.archive }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whim-${{ matrix.target }}
+          path: |
+            ${{ steps.package.outputs.archive }}
+            ${{ steps.package.outputs.archive }}.sha256
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [metadata, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # id-token: write
+      # attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: whim-*
+          path: release
+          merge-multiple: true
+      - name: Write checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release
+          sha256sum -- *.tar.gz > SHA256SUMS
+      # - uses: actions/attest-build-provenance@v3
+      #   with:
+      #     subject-path: release/SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Whim ${{ needs.metadata.outputs.version }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release/*.tar.gz
+            release/*.sha256
+            release/SHA256SUMS

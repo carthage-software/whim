@@ -1,0 +1,40 @@
+namespace Whim\Vec\_Private;
+
+use Whim\Math;
+use Whim\Marker\AlwaysInline;
+
+/** Builds a validated inclusive integer sequence. */
+#[AlwaysInline]
+function integer_range(
+  int $start,
+  int $end,
+  int $step,
+  bool $ascending,
+): vec<int> {
+  $result = vec[];
+  $value = $start;
+  if ($ascending) {
+    if ($end < Math\INT_MIN + $step) {
+      return vec[$start];
+    }
+
+    $last = $end - $step;
+    while ($value <= $last) {
+      $result[] = $value;
+      $value += $step;
+    }
+  } else {
+    if ($end > Math\INT_MAX + $step) {
+      return vec[$start];
+    }
+
+    $last = $end - $step;
+    while ($value >= $last) {
+      $result[] = $value;
+      $value += $step;
+    }
+  }
+
+  $result[] = $value;
+  return $result;
+}

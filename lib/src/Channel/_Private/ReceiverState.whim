@@ -1,0 +1,25 @@
+namespace Whim\Channel\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Async\CancellationToken;
+
+/** Defines the behavior of receiver state values. */
+interface ReceiverState<out T> extends ChannelState {
+  /** Waits until a value can be received. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReceivable(
+    null|CancellationToken $cancellation,
+  ): void;
+
+  /** Receives a value, waiting until one is available. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function receive(null|CancellationToken $cancellation): T;
+
+  /** Attempts to receive a value without waiting. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryReceive(): T;
+}

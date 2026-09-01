@@ -1,0 +1,67 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\Origin;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\Marker\MustUse;
+use Whim\Str;
+
+/** Stores one reusable connection and its compatibility key. */
+final readonly class PoolEntry {
+  public function __construct(
+    public Origin $origin,
+    public Configuration $configuration,
+    public Connection $connection,
+  ) {}
+
+  #[MustUse]
+  public function matches(
+    Origin $origin,
+    Configuration $configuration,
+    vec<ProtocolVersion> $versions,
+  ): bool {
+    return (
+      pool_key_matches(
+        $this->origin,
+        $this->configuration,
+        $origin,
+        $configuration,
+      )
+      && contains!($versions, $this->connection->getMetadata()->protocolVersion)
+    );
+  }
+
+  #[MustUse]
+  public function hasOrigin(Origin $origin): bool {
+    return pool_origin_matches($this->origin, $origin);
+  }
+}
+
+function pool_origin_matches(Origin $left, Origin $right): bool {
+  return (
+    Str\lowercase($left->scheme) == Str\lowercase($right->scheme)
+    && Str\lowercase($left->host->toString()) == Str\lowercase(
+      $right->host->toString(),
+    )
+    && $left->port == $right->port
+  );
+}
+
+function pool_key_matches(
+  Origin $leftOrigin,
+  Configuration $leftConfiguration,
+  Origin $rightOrigin,
+  Configuration $rightConfiguration,
+): bool {
+  return (
+    pool_origin_matches($leftOrigin, $rightOrigin)
+    && $leftConfiguration->maximumResponseHeaderSize
+    == $rightConfiguration->maximumResponseHeaderSize
+    && $leftConfiguration->protocolVersions
+    == $rightConfiguration->protocolVersions
+    && $leftConfiguration->tls == $rightConfiguration->tls
+    && $leftConfiguration->h2 == $rightConfiguration->h2
+    && $leftConfiguration->proxy == $rightConfiguration->proxy
+  );
+}

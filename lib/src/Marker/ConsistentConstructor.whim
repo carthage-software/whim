@@ -1,0 +1,8 @@
+namespace Whim\Marker;
+
+use Whim\Attribute\Attribute;
+
+/** Requires constructor overrides in a class hierarchy to remain compatible. */
+#[Stub]
+#[Attribute(Attribute::TARGET_CLASS)]
+final class ConsistentConstructor {}

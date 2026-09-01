@@ -1,0 +1,59 @@
+namespace Whim\Env;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\Stub;
+
+/** Returns the arguments passed to the current process. */
+#[Stub]
+#[TrackCaller]
+function get_arguments(): vec<string> {}
+
+/** Returns one environment variable when it exists. */
+#[Stub]
+#[TrackCaller]
+function get_variable(string $name): null|string {}
+
+/** Sets an environment variable. */
+#[Stub]
+#[TrackCaller]
+function set_variable(string $name, string $value): bool {}
+
+/** Removes an environment variable. */
+#[Stub]
+#[TrackCaller]
+function remove_variable(string $name): bool {}
+
+/** Returns the current environment. */
+#[Stub]
+#[TrackCaller]
+function get_variables(): dict<string, string> {}
+
+/** Returns the current working directory when available. */
+#[Stub]
+#[TrackCaller]
+function current_directory(): null|string {}
+
+/** Changes the current working directory. */
+#[Stub]
+#[TrackCaller]
+function set_current_directory(string $directory): bool {}
+
+/** Returns the current user's home directory when available. */
+#[Stub]
+#[TrackCaller]
+function home_directory(): null|string {}
+
+/** Returns the platform temporary directory when available. */
+#[Stub]
+#[TrackCaller]
+function temporary_directory(): null|string {}
+
+/** Returns the current executable path. */
+#[Stub]
+#[TrackCaller]
+function current_binary(): string {}
+
+/** Returns the current script path when one exists. */
+#[Stub]
+#[TrackCaller]
+function current_script(): null|string {}

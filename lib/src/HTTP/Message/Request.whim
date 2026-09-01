@@ -1,0 +1,219 @@
+namespace Whim\HTTP\Message;
+
+use Whim;
+use Whim\Async\Future;
+use Whim\IO\ReadHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\URL\URL;
+
+/** Represents an immutable HTTP request. */
+final readonly class Request extends Message {
+  #[AlwaysInline]
+  private function __construct(
+    public Method $method,
+    public RequestTarget $requestTarget = '/',
+    public null|URL $url = null,
+    ProtocolVersion $protocolVersion = ProtocolVersion::V11,
+    FieldMap $headers = FieldMap::default(),
+    null|ReadHandle $body = null,
+    null|Future<FieldMap> $trailers = null,
+  ) {
+    $this->protocolVersion = $protocolVersion;
+    $this->headers = $headers;
+    $this->body = $body;
+    $this->trailers = $trailers;
+  }
+
+  /** Creates and validates an HTTP request. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    Method $method,
+    RequestTarget $requestTarget = '/',
+    null|URL $url = null,
+    ProtocolVersion $protocolVersion = ProtocolVersion::V11,
+    FieldMap $headers = FieldMap::default(),
+    null|ReadHandle $body = null,
+    null|Future<FieldMap> $trailers = null,
+  ): Request {
+    if (!Whim\_Private\http_valid_token($method)) {
+      throw new InvalidArgumentException(
+        'invalid HTTP method: `' . $method . '`',
+      );
+    }
+
+    if (!Whim\_Private\http_valid_request_target($requestTarget)) {
+      throw new InvalidArgumentException(
+        'invalid HTTP request target: `' . $requestTarget . '`',
+      );
+    }
+
+    return new Request(
+      $method,
+      $requestTarget,
+      $url,
+      $protocolVersion,
+      $headers,
+      $body,
+      $trailers,
+    );
+  }
+
+  /** Creates a request from prevalidated message parts. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    Method $method,
+    RequestTarget $requestTarget,
+    null|URL $url,
+    ProtocolVersion $protocolVersion,
+    FieldMap $headers,
+    null|ReadHandle $body = null,
+    null|Future<FieldMap> $trailers = null,
+  ): Request {
+    return new Request(
+      $method,
+      $requestTarget,
+      $url,
+      $protocolVersion,
+      $headers,
+      $body,
+      $trailers,
+    );
+  }
+
+  /** Creates an HTTP request and derives its target from a URL. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromURL(
+    Method $method,
+    URL $url,
+    ProtocolVersion $protocolVersion = ProtocolVersion::V11,
+    FieldMap $headers = FieldMap::default(),
+    null|ReadHandle $body = null,
+    null|Future<FieldMap> $trailers = null,
+  ): Request {
+    $requestTarget = match ($url->path == '') {
+      true => '/',
+      false => $url->path,
+    };
+
+    if ($url->query != null) {
+      $requestTarget .= '?' . $url->query;
+    }
+
+    return Request::fromParts(
+      $method,
+      $requestTarget,
+      $url,
+      $protocolVersion,
+      $headers,
+      $body,
+      $trailers,
+    );
+  }
+
+  /** Returns a copy with a new method. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function withMethod(Method $method): Request {
+    if (!Whim\_Private\http_valid_token($method)) {
+      throw new InvalidArgumentException(
+        'invalid HTTP method: `' . $method . '`',
+      );
+    }
+
+    return clone!($this, method: $method);
+  }
+
+  /** Returns a copy with a new URL and its derived request target. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withURL(null|URL $url): Request {
+    if ($url == null) {
+      return clone!($this, url: null);
+    }
+
+    $requestTarget = match ($url->path == '') {
+      true => '/',
+      false => $url->path,
+    };
+
+    if ($url->query != null) {
+      $requestTarget .= '?' . $url->query;
+    }
+
+    return clone!($this, url: $url, requestTarget: $requestTarget);
+  }
+
+  /** Returns a copy with an explicit request target. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function withRequestTarget(RequestTarget $requestTarget): Request {
+    if (!Whim\_Private\http_valid_request_target($requestTarget)) {
+      throw new InvalidArgumentException(
+        'invalid HTTP request target: `' . $requestTarget . '`',
+      );
+    }
+
+    return clone!($this, requestTarget: $requestTarget);
+  }
+
+  /** Returns a copy with a new protocol version. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withProtocolVersion(
+    ProtocolVersion $protocolVersion,
+  ): Request {
+    return clone!($this, protocolVersion: $protocolVersion);
+  }
+
+  /** Returns a copy with a new field map. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withHeaders(FieldMap $headers): Request {
+    return clone!($this, headers: $headers);
+  }
+
+  /** Returns a copy with one field value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withHeader(FieldName $name, FieldValue $value): Request {
+    return clone!($this, headers: $this->headers->with($name, $value));
+  }
+
+  /** Returns a copy with one field entry appended. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withAddedHeader(FieldName $name, FieldValue $value): Request {
+    return clone!($this, headers: $this->headers->withAdded($name, $value));
+  }
+
+  /** Returns a copy without fields of the requested name. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withoutHeader(FieldName $name): Request {
+    return clone!($this, headers: $this->headers->without($name));
+  }
+
+  /** Returns a copy with a new body. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBody(null|ReadHandle $body): Request {
+    return clone!($this, body: $body);
+  }
+
+  /** Returns a copy with new trailing fields. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTrailers(null|Future<FieldMap> $trailers): Request {
+    return clone!($this, trailers: $trailers);
+  }
+}

@@ -1,0 +1,131 @@
+namespace Whim\Dict;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Option\Option;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\Predicate;
+use Whim\Refine\Transform;
+
+/** Retains values accepted by a predicate. */
+#[MustUse]
+#[TrackCaller]
+function filter<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  Predicate<V> $predicate,
+): dict<K, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if ($predicate($value)) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains entries accepted using both their key and value. */
+#[MustUse]
+#[TrackCaller]
+function filter_with_key<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  fn(K, V): bool $predicate,
+): dict<K, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if ($predicate($key, $value)) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains entries whose keys are accepted by a predicate. */
+#[MustUse]
+#[TrackCaller]
+function filter_keys<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  Predicate<K> $predicate,
+): dict<K, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if ($predicate($key)) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Removes entries whose value is null. */
+#[MustUse]
+#[TrackCaller]
+function filter_nulls<K: ArrayKey, V>(Iterable<K, null|V> $values): dict<K, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if ($value != null) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains values whose transform produces Some. */
+#[MustUse]
+#[TrackCaller]
+function filter_nonnull_by<K: ArrayKey, T, U>(
+  Iterable<K, T> $values,
+  Transform<T, Option<U>> $function,
+): dict<K, T> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if ($function($value)->isSome()) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Splits entries according to a value predicate. */
+#[MustUse]
+#[TrackCaller]
+function partition<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  Predicate<V> $predicate,
+): (dict<K, V>, dict<K, V>) {
+  $matches = dict[];
+  $rejects = dict[];
+  foreach ($values as $key => $value) {
+    if ($predicate($value)) {
+      $matches[$key] = $value;
+    } else {
+      $rejects[$key] = $value;
+    }
+  }
+
+  return ($matches, $rejects);
+}
+
+/** Splits entries according to a key-and-value predicate. */
+#[MustUse]
+#[TrackCaller]
+function partition_with_key<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  fn(K, V): bool $predicate,
+): (dict<K, V>, dict<K, V>) {
+  $matches = dict[];
+  $rejects = dict[];
+  foreach ($values as $key => $value) {
+    if ($predicate($key, $value)) {
+      $matches[$key] = $value;
+    } else {
+      $rejects[$key] = $value;
+    }
+  }
+
+  return ($matches, $rejects);
+}

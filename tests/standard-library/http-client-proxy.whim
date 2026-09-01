@@ -1,0 +1,365 @@
+use Whim\Async;
+use Whim\HTTP\Client;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Transaction;
+use Whim\IP\Address;
+use Whim\IO\Reader;
+use Whim\Network\InternetEndpoint;
+use Whim\Str;
+use Whim\TCP;
+use Whim\URL\URL;
+
+final class ProxyTestConnection implements Client\Connection {
+  private bool $closed = false;
+
+  public function __construct(private Client\ConnectionMetadata $metadata) {}
+
+  public function getMetadata(): Client\ConnectionMetadata {
+    return $this->metadata;
+  }
+
+  public function isReusable(): bool {
+    return !$this->closed;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+
+  public function exchange(
+    Request $request,
+    Client\Configuration $configuration,
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): Transaction {
+    return new Transaction(vec[], null, new Response(Message\STATUS_OK));
+  }
+}
+
+final readonly class ProxyTestHandler implements Client\Handler {
+  public function handle(
+    Client\Connection $connection,
+    Request $request,
+    Client\Configuration $configuration,
+    null|Whim\Async\CancellationToken $cancellation = null,
+  ): Transaction {
+    return $connection->exchange($request, $configuration, $cancellation);
+  }
+}
+
+$loopback = Address::v4('127.0.0.1');
+$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$proxyEndpoint = $listener->getLocalEndpoint();
+$proxyURL = URL::from('http://' . $proxyEndpoint->toString());
+$proxy = new Client\ProxyConfiguration(
+  $proxyURL,
+  authorization: 'Basic cHJveHk6c2VjcmV0',
+);
+
+$server = Async\spawn::<string>(function() use ($listener): string {
+  $stream = $listener->accept();
+  $reader = new Reader($stream);
+  $head = $reader->readUntilBounded("\r\n\r\n", 8192);
+  assert!($head != null);
+  $stream->writeAll(
+    "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok",
+  );
+
+  $stream->close();
+  return $head;
+});
+
+$client = new Client\DefaultClient(
+  new Client\DirectConnector(),
+  new Client\Configuration(
+    protocolVersions: vec[Message\ProtocolVersion::V11],
+    proxy: $proxy,
+  ),
+);
+
+$transaction = $client->send(
+  Request::fromURL(
+    Message\METHOD_GET,
+    URL::from('http://example.com:8080/path?q=1#ignored'),
+  ),
+);
+
+$body = $transaction->response->body;
+assert!($body != null);
+assert!($body->readAll() == 'ok');
+$head = $server->await();
+$listener->close();
+assert!(
+  Str\starts_with($head, "GET http://example.com:8080/path?q=1 HTTP/1.1\r\n"),
+);
+
+assert!(Str\contains($head, "Host: example.com:8080\r\n"));
+assert!(Str\contains($head, "Proxy-Authorization: Basic cHJveHk6c2VjcmV0\r\n"));
+
+assert!(!Str\contains($head, '#ignored'));
+
+$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$proxyEndpoint = $listener->getLocalEndpoint();
+$proxy = new Client\ProxyConfiguration(
+  URL::from('http://' . $proxyEndpoint->toString()),
+  authorization: 'Basic cHJveHk6c2VjcmV0',
+);
+
+$server = Async\spawn::<string>(function() use ($listener): string {
+  $stream = $listener->accept();
+  $reader = new Reader($stream);
+  $head = $reader->readUntilBounded("\r\n\r\n", 8192);
+  assert!($head != null);
+  $stream->writeAll("HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
+
+  $stream->close();
+  return $head;
+});
+
+$client = new Client\DefaultClient(
+  new Client\DirectConnector(),
+  new Client\Configuration(
+    protocolVersions: vec[Message\ProtocolVersion::V11],
+    proxy: $proxy,
+  ),
+);
+
+assert!(
+  $client->send(
+    Request::fromURL(
+      Message\METHOD_GET,
+      URL::from('http://example.com/'),
+      headers: Message\FieldMap::from(vec[
+        ('Proxy-Authorization', 'Bearer request-token'),
+      ]),
+    ),
+  )->response->status
+  == Message\STATUS_NO_CONTENT,
+);
+
+$head = $server->await();
+$listener->close();
+assert!(Str\contains($head, "Proxy-Authorization: Bearer request-token\r\n"));
+
+assert!(!Str\contains($head, 'Basic cHJveHk6c2VjcmV0'));
+
+$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$proxyEndpoint = $listener->getLocalEndpoint();
+$proxy = new Client\ProxyConfiguration(
+  URL::from('http://' . $proxyEndpoint->toString()),
+  authorization: 'Bearer tunnel-token',
+);
+
+$server = Async\spawn::<string>(function() use ($listener): string {
+  $stream = $listener->accept();
+  $reader = new Reader($stream);
+  $head = $reader->readUntilBounded("\r\n\r\n", 8192);
+  assert!($head != null);
+  $stream->writeAll(
+    "HTTP/1.1 100 Continue\r\n\r\nHTTP/1.1 200 Connection Established\r\n\r\n",
+  );
+
+  assert!($stream->readFixedSize(4) == 'ping');
+  $stream->writeAll('pong');
+  $stream->close();
+  return $head;
+});
+
+$stream = TCP\connect($proxyEndpoint->address, $proxyEndpoint->port);
+Client\_Private\establish_tunnel(
+  $stream,
+  Client\Origin::fromURL(URL::from('https://example.com:8443/')),
+  $proxy,
+  8192,
+  null,
+);
+
+$stream->writeAll('ping');
+assert!($stream->readFixedSize(4) == 'pong');
+$stream->close();
+$head = $server->await();
+$listener->close();
+assert!(Str\starts_with($head, "CONNECT example.com:8443 HTTP/1.1\r\n"));
+
+assert!(Str\contains($head, "Host: example.com:8443\r\n"));
+assert!(Str\contains($head, "Proxy-Authorization: Bearer tunnel-token\r\n"));
+
+$bypass = new Client\ProxyConfiguration(
+  URL::from('http://127.0.0.1:8080'),
+  bypass: vec['example.com'],
+);
+
+assert!(
+  !Client\_Private\should_use_proxy(
+    Client\Origin::fromURL(URL::from('http://example.com/')),
+    $bypass,
+  ),
+);
+
+assert!(
+  !Client\_Private\should_use_proxy(
+    Client\Origin::fromURL(URL::from('http://api.example.com/')),
+    $bypass,
+  ),
+);
+
+assert!(
+  Client\_Private\should_use_proxy(
+    Client\Origin::fromURL(URL::from('http://notexample.com/')),
+    $bypass,
+  ),
+);
+
+$assertion_value_5 = fn(): Client\ProxyConfiguration => (
+  new Client\ProxyConfiguration(URL::from('ftp://proxy.example.com/'))
+);
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is Whim\Unwind\InvalidArgumentException);
+
+$assertion_value_6 = fn(): Client\ProxyConfiguration => (
+  $proxy->withAuthorization("Basic safe\r\nInjected: yes")
+);
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is Whim\Unwind\InvalidArgumentException);
+
+$assertion_value_7 = fn(): Client\ProxyConfiguration => (
+  new Client\ProxyConfiguration(URL::from('http://proxy.example.com/path'))
+);
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is Whim\Unwind\InvalidArgumentException);
+
+$assertion_value_8 = fn(): Client\ProxyConfiguration => (
+  new Client\ProxyConfiguration(
+    URL::from('http://proxy.example.com/'),
+    authorization: "Basic safe\r\nInjected: yes",
+  )
+);
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is Whim\Unwind\InvalidArgumentException);
+
+$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$proxyEndpoint = $listener->getLocalEndpoint();
+$proxy = new Client\ProxyConfiguration(
+  URL::from('http://' . $proxyEndpoint->toString()),
+);
+
+$server = Async\spawn::<null>(function() use ($listener): null {
+  $stream = $listener->accept();
+  $reader = new Reader($stream);
+  discard!($reader->readUntilBounded("\r\n\r\n", 8192));
+  $stream->writeAll(
+    "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n",
+  );
+
+  $stream->close();
+  return null;
+});
+
+$stream = TCP\connect($proxyEndpoint->address, $proxyEndpoint->port);
+$assertion_value_9 = function() use ($stream, $proxy): void {
+  Client\_Private\establish_tunnel(
+    $stream,
+    Client\Origin::fromURL(URL::from('https://example.com/')),
+    $proxy,
+    8192,
+    null,
+  );
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (Client\ProtocolException $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is Client\ProtocolException);
+
+assert!($stream->isClosed());
+$server->await();
+$listener->close();
+
+$request = Request::fromURL(
+  Message\METHOD_GET,
+  URL::from('https://example.com/'),
+);
+
+$configuration = new Client\Configuration();
+$middleware = Client\DeniedDestinationsMiddleware::publicOnly();
+$handler = new ProxyTestHandler();
+$proxyPeer = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+$publicDestination = new InternetEndpoint(Address::v4('8.8.8.8'), 443);
+$known = new ProxyTestConnection(
+  new Client\ConnectionMetadata(
+    $proxyPeer,
+    $proxyPeer,
+    Message\ProtocolVersion::V11,
+    destinationEndpoint: $publicDestination,
+    proxied: true,
+  ),
+);
+
+assert!(
+  $middleware->process(
+    $known,
+    $request,
+    $configuration,
+    $handler,
+  )->response->status
+  == Message\STATUS_OK,
+);
+
+$unknown = new ProxyTestConnection(
+  new Client\ConnectionMetadata(
+    $proxyPeer,
+    $proxyPeer,
+    Message\ProtocolVersion::V11,
+    proxied: true,
+  ),
+);
+
+$assertion_value_12 = fn(): Transaction => (
+  $middleware->process($unknown, $request, $configuration, $handler)
+);
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (Client\DestinationDeniedException $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is Client\DestinationDeniedException);

@@ -1,0 +1,57 @@
+namespace Whim\URL;
+
+use Whim;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Str;
+
+/** Parses an application/x-www-form-urlencoded query. */
+#[MustUse]
+#[TrackCaller]
+function parse_query(string $query): dict<string, vec<string>> {
+  if ($query == '') {
+    return dict[];
+  }
+
+  $parameters = dict[];
+  foreach (Str\split($query, '&') as $field) {
+    $separator = Str\search($field, '=');
+    if ($separator == null) {
+      $name = $field;
+      $value = '';
+    } else {
+      $name = Str\slice($field, 0, $separator);
+      $value = Str\slice($field, $separator + 1);
+    }
+
+    $name = Whim\Encoding\Url\decode_form($name);
+    $value = Whim\Encoding\Url\decode_form($value);
+    if (contains_key!($parameters, $name)) {
+      $values = $parameters[$name];
+      $values[] = $value;
+      $parameters[$name] = $values;
+    } else {
+      $parameters[$name] = vec[$value];
+    }
+  }
+
+  return $parameters;
+}
+
+/** Builds an application/x-www-form-urlencoded query. */
+#[MustUse]
+#[TrackCaller]
+function build_query(
+  Iterable<string, Iterable<_, string>> $parameters,
+): string {
+  $fields = vec[];
+  foreach ($parameters as $name => $values) {
+    $name = Whim\Encoding\Url\encode_form($name);
+    foreach ($values as $value) {
+      $fields[] = $name . '=' . Whim\Encoding\Url\encode_form($value);
+    }
+  }
+
+  return Str\join('&', $fields);
+}

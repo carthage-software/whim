@@ -1,0 +1,71 @@
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Str;
+
+/** Extracts the quoted entries of a one-line TOML array setting. */
+function toml_array(string $manifest, string $setting): vec<string> {
+  $position = Str\search($manifest, $setting . ' = [');
+  assert!($position is int);
+
+  $open = $position + length!($setting) + 4;
+  $close = Str\search($manifest, ']', $open);
+  assert!($close is int);
+
+  $body = Str\slice($manifest, $open, $close - $open);
+  $entries = vec[];
+  foreach (Str\split($body, ',') as $entry) {
+    $entry = Str\trim($entry, " \t\n\"");
+    if ($entry != '') {
+      $entries[] = $entry;
+    }
+  }
+
+  return $entries;
+}
+
+/** Extracts the package name a member manifest declares. */
+function package_name(string $manifest): string {
+  $position = Str\search($manifest, 'name = "');
+  assert!($position is int);
+
+  $start = $position + 8;
+  $end = Str\search($manifest, '"', $start);
+  assert!($end is int);
+
+  return Str\slice($manifest, $start, $end - $start);
+}
+
+$script = Env\current_script();
+assert!($script is string);
+$script = Filesystem\canonicalize($script);
+
+$root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as int);
+
+$manifest = File\read($root . '/Cargo.toml');
+$members = toml_array($manifest, 'default-members');
+assert!($members != vec[]);
+
+$built = vec[];
+foreach ($members as $member) {
+  $path = $root . '/' . $member . '/Cargo.toml';
+  if ($member == '.') {
+    $path = $root . '/Cargo.toml';
+  }
+
+  $built[] = package_name(File\read($path));
+}
+
+$chapter = File\read($root . '/docs/src/usage/installation.md');
+assert!($built == vec['whim']);
+assert!(
+  Whim\Str\contains($chapter, 'The build produces the `whim` executable'),
+);
+
+assert!(Whim\Str\contains($chapter, "cargo build --locked --release\n"));
+assert!(
+  Whim\Str\contains(
+    File\read($root . '/README.md'),
+    "cargo build --locked --release\n",
+  ),
+);

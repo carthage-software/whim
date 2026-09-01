@@ -1,0 +1,14 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private\StreamId;
+
+/** A complete compressed header block. */
+final readonly class CompletedHeaderBlock {
+  public function __construct(
+    public HeaderBlockKind $kind,
+    public StreamId $streamId,
+    public string $bytes,
+    public bool $endStream,
+    public null|StreamId $promisedStreamId,
+  ) {}
+}

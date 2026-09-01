@@ -1,0 +1,89 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\ConnectionMetadata;
+use Whim\HTTP\Client\MultiplexedConnection;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Returns a checked-out connection to its pool at a safe boundary. */
+final class PooledConnection implements Connection {
+  public function __construct(private PoolLease $lease) {}
+
+  public function __destruct(): void {}
+
+  #[MustUse]
+  public function getMetadata(): ConnectionMetadata {
+    return $this->lease->connection()->getMetadata();
+  }
+
+  #[MustUse]
+  public function isReusable(): bool {
+    return $this->lease->connection()->isReusable();
+  }
+
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->lease->connection()->isClosed();
+  }
+
+  #[TrackCaller]
+  public function close(): void {
+    $this->lease->release(false);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function exchange(
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $connection = $this->lease->connection();
+    try {
+      $transaction = $connection->exchange(
+        $request,
+        $configuration,
+        $cancellation,
+      );
+    } catch (Throwable $error) {
+      $this->lease->release(
+        $connection is MultiplexedConnection
+        && $connection->isReusable(),
+      );
+
+      throw $error;
+    }
+
+    $version = $connection->getMetadata()->protocolVersion;
+    if ($version is ProtocolVersion::V10|ProtocolVersion::V11) {
+      $body = $transaction->response->body;
+      if ($body == null || $body->reachedEndOfDataSource()) {
+        $this->lease->release($connection->isReusable());
+        return $transaction;
+      }
+
+      return new Transaction(
+        $transaction->informational,
+        $transaction->pushed,
+        $transaction->response->withBody(new PoolBody($body, $this->lease)),
+      );
+    }
+
+    if (!$connection->isReusable()) {
+      $this->lease->release(false);
+      return $transaction;
+    }
+
+    $this->lease->release(true);
+    return $transaction;
+  }
+}

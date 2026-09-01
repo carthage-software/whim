@@ -1,0 +1,20 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Wraps an HTTP exchange after a connection is acquired. */
+interface Middleware {
+  #[MustUse]
+  #[TrackCaller]
+  public function process(
+    Connection $connection,
+    Request $request,
+    Configuration $configuration,
+    Handler $next,
+    null|CancellationToken $cancellation = null,
+  ): Transaction;
+}

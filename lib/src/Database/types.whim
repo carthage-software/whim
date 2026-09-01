@@ -1,0 +1,10 @@
+namespace Whim\Database;
+
+/** Binary database data distinct from textual strings. */
+newtype Blob = string;
+
+/** A portable database value. */
+type Value = null|bool|int|float|string|Blob;
+
+/** One positional database row. */
+type Row = vec<Value>;

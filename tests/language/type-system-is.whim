@@ -1,0 +1,372 @@
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_type-system-is/alias-bare-builtin-requires-arity.whim',
+  'the built-in type `vec` expects exactly 1 type argument in a runtime check',
+);
+
+raises(
+  '_type-system-is/array-wrong-arity.whim',
+  'the built-in type `array` expects exactly 2 type arguments',
+);
+
+raises(
+  '_type-system-is/bare-array-requires-arity.whim',
+  'the built-in type `array` expects exactly 2 type arguments in a runtime check',
+);
+
+raises(
+  '_type-system-is/bare-builtin-requires-arity.whim',
+  'the built-in type `vec` expects exactly 1 type argument in a runtime check',
+);
+
+raises(
+  '_type-system-is/bare-never-is-rejected.whim',
+  '`never` contains no values and cannot be used as a standalone checked type',
+);
+
+raises(
+  '_type-system-is/bare-void-is-rejected.whim',
+  '`void` is return-only and cannot be used as a checked type',
+);
+
+raises(
+  '_type-system-is/generic-alias-requires-arity.whim',
+  '`Pair` expects exactly 2 type argument(s), but 0 were supplied',
+);
+
+assert!(5 is int);
+assert!(!(5.0 is int));
+assert!(5.0 is float);
+assert!(!(5 is float));
+assert!('x' is string);
+assert!(!(5 is string));
+assert!(true is bool);
+assert!(!(0 is bool));
+
+assert!(5 is 5);
+assert!(!(5 is 6));
+assert!(5.0 is 5.0);
+assert!(!(5.5 is 5.0));
+assert!(!(5 is 5.0));
+assert!(!(5.0 is 5));
+assert!('abc' is 'abc');
+assert!(!('abd' is 'abc'));
+
+assert!(true is true);
+assert!(false is false);
+assert!(!(false is true));
+assert!(!(true is false));
+assert!(!(1 is true));
+
+assert!(null is null);
+assert!(!(0 is null));
+assert!(!('' is null));
+assert!(!(false is null));
+
+class MixedWidget {}
+
+assert!(null is mixed);
+assert!(false is mixed);
+assert!(0 is mixed);
+assert!('' is mixed);
+assert!(vec[] is mixed);
+assert!(new MixedWidget() is mixed);
+
+class ObjectWidget {}
+
+enum ObjectSuit {
+  case Hearts;
+}
+
+assert!(new ObjectWidget() is object);
+assert!(ObjectSuit::Hearts is object);
+assert!(!(5 is object));
+assert!(!(vec[] is object));
+assert!(!((fn(): int => 1) is object));
+
+assert!(5 is int|string);
+assert!('x' is int|string);
+assert!(!(5.0 is int|string));
+assert!(null is null|string);
+
+interface Shape {}
+
+interface Extended extends Shape {}
+
+class Circle implements Extended {}
+
+class Plain {}
+
+assert!(new Circle() is Extended);
+assert!(new Circle() is Shape);
+assert!(!(new Plain() is Shape));
+
+interface IntersectionShape {}
+
+interface IntersectionNamed {}
+
+class IntersectionCircle implements IntersectionShape, IntersectionNamed {}
+
+class IntersectionAnonymous implements IntersectionShape {}
+
+assert!(new IntersectionCircle() is IntersectionShape&IntersectionNamed);
+
+assert!(!(new IntersectionAnonymous() is IntersectionShape&IntersectionNamed));
+
+class Base {}
+
+class Derived extends Base {}
+
+class Unrelated {}
+
+assert!(new Base() is Base);
+assert!(new Derived() is Base);
+assert!(!(new Base() is Derived));
+assert!(!(new Unrelated() is Base));
+assert!(!(5 is Base));
+
+enum Suit {
+  case Hearts;
+  case Spades;
+}
+
+enum Color {
+  case Red;
+}
+
+class EnumWidget {}
+
+assert!(Suit::Hearts is Suit);
+assert!(Suit::Spades is Suit);
+assert!(!(Color::Red is Suit));
+assert!(!(new EnumWidget() is Suit));
+
+enum Colour {
+  case Red;
+  case Blue;
+}
+
+function accepts_red(Colour::Red $colour): void {
+  assert!($colour is Colour::Red);
+}
+
+$red = Colour::Red;
+$blue = Colour::Blue;
+
+assert!($red is Colour::Red);
+assert!(!($blue is Colour::Red));
+assert!($red is Colour);
+assert!($red is Colour::Red|Colour::Blue);
+
+accepts_red($red);
+
+class ProbeBase {
+  public function isSelf(mixed $x): bool {
+    return $x is self;
+  }
+
+  public function isStatic(mixed $x): bool {
+    return $x is static;
+  }
+}
+
+class ProbeChild extends ProbeBase {
+  public function isParent(mixed $x): bool {
+    return $x is parent;
+  }
+}
+
+$probeBase = new ProbeBase();
+$probeChild = new ProbeChild();
+assert!($probeBase->isSelf($probeBase));
+assert!($probeBase->isSelf($probeChild));
+assert!(!($probeBase->isSelf(5)));
+assert!($probeChild->isParent($probeBase));
+assert!($probeChild->isParent($probeChild));
+assert!(!($probeChild->isParent(5)));
+assert!($probeChild->isStatic($probeChild));
+assert!(!($probeChild->isStatic($probeBase)));
+
+assert!((1, 'a') is (int, string));
+assert!(!((1, 'a') is (int, int)));
+assert!(!((1, 'a', true) is (int, string)));
+assert!((1, (2, 3)) is (int, (int, int)));
+assert!((1, vec[]) is (int, vec<_>));
+assert!(!(vec[1, 2] is (int, int)));
+
+assert!(vec[1] is vec<_>);
+assert!(vec[] is vec<_>);
+assert!(dict[] is dict<_, _>);
+assert!(dict['a' => 1] is dict<_, _>);
+assert!(!(vec[] is dict<_, _>));
+assert!(!(dict[] is vec<_>));
+assert!(!((1, 2) is vec<_>));
+
+function accepts_pair(vec[int, string] $pair): void {}
+
+function accepts_record(dict['id' => int, 'name' => string] $record): void {}
+
+$pair = vec[42, 'answer'];
+$record = dict['id' => 42, 'name' => 'answer'];
+
+assert!($pair is vec[int, string]);
+assert!($pair is vec[int, string, ...float]);
+assert!($record is dict['id' => int, 'name' => string]);
+assert!(!($record is dict['id' => string, 'name' => string]));
+
+accepts_pair($pair);
+accepts_record($record);
+
+$openPair = vec[1, 'two', 3.0, 4.0];
+assert!($openPair is vec[int, string, ...float]);
+
+$openRecord = dict['id' => 1, 'name' => 'one', 'score' => 2.5];
+assert!(
+  $openRecord is dict['id' => int, 'name' => string, ...<string, float|int>],
+);
+
+function collection_length<K: int|string|bool, V>(array<K, V> $values): int {
+  return length!($values);
+}
+
+final readonly class Box<out T> {
+  public function __construct(public T $value) {}
+}
+
+$vector = vec[1, 2];
+$dictionary = dict['one' => 1, 'two' => 2];
+$booleans = dict[true => 'yes', false => 'no'];
+$tuple = (1, 'two');
+
+assert!($vector is array<0.., int>);
+assert!($vector is array<int, int>);
+assert!(!($vector is array<string, int>));
+assert!($dictionary is array<string, int>);
+assert!(!($dictionary is array<int, int>));
+assert!($booleans is array<bool, string>);
+assert!($tuple is array<0..=1, int|string>);
+assert!(!($tuple is array<int, int>));
+
+$box = new Box::<vec<int>>($vector);
+assert!($box is Box<array<int, int>>);
+
+assert!(vec[] is array<string, object>);
+assert!(dict[] is array<bool, object>);
+
+assert!(collection_length::<int, int>($vector) == 2);
+assert!(collection_length::<string, int>($dictionary) == 2);
+assert!(collection_length::<int, int|string>($tuple) == 2);
+
+type Port = 1..=65535;
+type Percentage = 0..=100;
+type Negative = ..0;
+
+final class Measurement {
+  public const 0..=100 MAX = 100;
+
+  public function __construct(
+    public Percentage $percentage,
+    public -10..10 $delta,
+  ) {}
+}
+
+function identity<T>(T $value): T {
+  return $value;
+}
+
+function bounded<T: 0..=10>(T $value): T {
+  return $value;
+}
+
+function port(Port $port): Port {
+  return $port;
+}
+
+function invalid_percentage(): Percentage {
+  return 101;
+}
+
+$measurement = new Measurement(75, -3);
+
+assert!($measurement->percentage == 75);
+assert!($measurement->delta == -3);
+assert!(Measurement::MAX == 100);
+assert!(port(8080) == 8080);
+
+$assertion_value_105 = fn(): mixed => port(70000);
+$assertion_error_105 = null;
+try {
+  $assertion_value_105();
+} catch (TypeError $assertion_caught_105) {
+  $assertion_error_105 = $assertion_caught_105;
+}
+
+assert!($assertion_error_105 is TypeError);
+$assertion_value_106 = fn(): mixed => invalid_percentage();
+$assertion_error_106 = null;
+try {
+  $assertion_value_106();
+} catch (TypeError $assertion_caught_106) {
+  $assertion_error_106 = $assertion_caught_106;
+}
+
+assert!($assertion_error_106 is TypeError);
+
+assert!(1 is 1..10);
+assert!(9 is 1..10);
+assert!(!(10 is 1..10));
+assert!(10 is 1..=10);
+assert!(-1 is Negative);
+assert!(0 is ..=0);
+assert!(!(0 is ..0));
+assert!(9223372036854775807 is 0..);
+assert!(-9223372036854775808 is ..=0);
+
+assert!(!(1 is 1..1));
+assert!(!(2 is 2..1));
+assert!(!(2 is 2..=1));
+assert!(1 is 1..=1);
+
+assert!(8080 as Port == 8080);
+assert!(70000 ?as Port == null);
+assert!(identity::<1..=10>(5) == 5);
+assert!(bounded::<5>(5) == 5);
+assert!(bounded::<2..=8>(5) == 5);
+
+$rangeValues = vec[-2, -1, 0, 1, 2];
+assert!($rangeValues is vec<-2..=2>);
+assert!(!($rangeValues is vec<-1..=2>));
+
+assert!(5 is 0..=10);
+assert!(5 is -10..=10);
+assert!(!(5 is !0..=10));
+
+type Ordering = -1|0|1;
+
+final class Sample {
+  public function __construct(public Ordering $ordering, public -1.5 $ratio) {}
+}
+
+function compare(int $left, int $right): Ordering {
+  return $left <=> $right;
+}
+
+$sample = new Sample(compare(1, 2), -1.5);
+
+assert!($sample->ordering == -1);
+assert!($sample->ordering is -1);
+assert!($sample->ratio is -1.5);
+assert!(!($sample->ordering is 1));
+assert!(-1 as -1 == -1);
+assert!(1 ?as -1 == null);
+assert!(identity::<-1>(-1) == -1);
+assert!(-9223372036854775808 is -9223372036854775808);
+
+$untouched = vec[1, 2];
+assert!(!($untouched is string));
+assert!(!(null is int));
+assert!(length!($untouched) == 2);
+assert!($untouched[0] == 1);

@@ -1,0 +1,50 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\Async\Future;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Origin;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Shares one connection attempt with compatible callers. */
+final class PoolPending {
+  private Deferred<null|PoolEntry> $deferred;
+  private Future<null|PoolEntry> $future;
+
+  public function __construct(
+    private Origin $origin,
+    private Configuration $configuration,
+  ) {
+    $this->deferred = new Deferred::<null|PoolEntry>();
+    $this->future = $this->deferred->getFuture()->ignore();
+  }
+
+  #[MustUse]
+  public function matches(Origin $origin, Configuration $configuration): bool {
+    return pool_key_matches(
+      $this->origin,
+      $this->configuration,
+      $origin,
+      $configuration,
+    );
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function await(null|CancellationToken $cancellation): null|PoolEntry {
+    return $this->future->await($cancellation);
+  }
+
+  #[TrackCaller]
+  public function complete(null|PoolEntry $entry): void {
+    $this->deferred->complete($entry);
+  }
+
+  #[TrackCaller]
+  public function fail(Throwable $error): void {
+    $this->deferred->error($error);
+  }
+}

@@ -1,0 +1,255 @@
+namespace Whim\SMTP\Client\_Private;
+
+use Whim\DateTime\Formatter;
+use Whim\Encoding\Hex;
+use Whim\IDNA;
+use Whim\Message\Address\Mailbox;
+use Whim\Message\Address\_Private\is_valid_mailbox;
+use Whim\Message\Envelope;
+use Whim\SMTP\Capability;
+use Whim\SMTP\Client\Connection;
+use Whim\SMTP\Client\SendConfiguration;
+use Whim\SMTP\Command;
+use Whim\SMTP\DeliveryStatusNotification;
+use Whim\SMTP\Reply;
+use Whim\SMTP\TransmissionException;
+use Whim\SMTP\UnsupportedExtensionException;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Returns a duration rounded up to positive whole seconds. */
+function duration_seconds(Duration $duration): int {
+  $seconds = $duration->seconds;
+  if ($duration->nanoseconds > 0) {
+    $seconds++;
+  }
+
+  return $seconds;
+}
+
+/** Reports whether bytes contain non-ASCII data. */
+function requires_utf8(string $bytes): bool {
+  $index = 0;
+  while ($index < length!($bytes)) {
+    if (Str\ord($bytes[$index]) > 127) {
+      return true;
+    }
+
+    $index++;
+  }
+
+  return false;
+}
+
+/** Encodes a mailbox for an SMTP path. */
+function encode_mailbox(Mailbox $mailbox): string {
+  if (!is_valid_mailbox($mailbox->localPart, $mailbox->domain)) {
+    throw new InvalidArgumentException(
+      'the mailbox is not valid for SMTP transport',
+    );
+  }
+
+  $domain = IDNA\to_ascii($mailbox->domain);
+
+  return $mailbox->localPart . '@' . $domain;
+}
+
+/** Encodes an RFC 3461 xtext value. */
+function encode_xtext(string $value): string {
+  $encoded = '';
+  $index = 0;
+  while ($index < length!($value)) {
+    $byte = Str\ord($value[$index]);
+    if ($byte >= 33 && $byte <= 126 && $byte != 43 && $byte != 61) {
+      $encoded .= $value[$index];
+    } else {
+      $encoded .= '+' . Str\uppercase(Hex\encode($value[$index]));
+    }
+
+    $index++;
+  }
+
+  return $encoded;
+}
+
+/** Requires an extension requested by a send configuration. */
+function require_capability(
+  Connection $connection,
+  Capability $capability,
+): void {
+  if (!$connection->supportsCapability($capability)) {
+    throw new UnsupportedExtensionException(
+      'the SMTP server does not advertise ' . $capability->value,
+    );
+  }
+}
+
+/** Returns the RFC 3461 NOTIFY parameter. */
+function delivery_status_notifications(
+  vec<DeliveryStatusNotification> $notifications,
+): null|string {
+  if ($notifications == vec[]) {
+    return null;
+  }
+
+  $parts = vec[];
+  $never = false;
+  foreach ($notifications as $notification) {
+    if ($notification == DeliveryStatusNotification::Never) {
+      $never = true;
+    }
+
+    if (!contains!($parts, $notification->value)) {
+      $parts[] = $notification->value;
+    }
+  }
+
+  if ($never && length!($parts) != 1) {
+    throw new InvalidArgumentException(
+      '`NEVER` cannot be combined with other SMTP delivery notifications',
+    );
+  }
+
+  return Str\join(',', $parts);
+}
+
+/** Reports whether an envelope requires SMTPUTF8. */
+function envelope_requires_utf8(Envelope $envelope): bool {
+  if (
+    $envelope->sender != null
+    && requires_utf8($envelope->sender->localPart)
+  ) {
+    return true;
+  }
+
+  foreach ($envelope->recipients as $recipient) {
+    if (requires_utf8($recipient->localPart)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Builds a checked MAIL FROM command. */
+function mail_from_command(
+  Connection $connection,
+  Envelope $envelope,
+  SendConfiguration $configuration,
+): Command {
+  $address = match ($envelope->sender) {
+    null => '',
+    $sender @ Mailbox => encode_mailbox($sender),
+  };
+
+  $parameters = '';
+  if (envelope_requires_utf8($envelope)) {
+    require_capability($connection, Capability::SmtpUtf8);
+    $parameters .= ' SMTPUTF8';
+  }
+
+  if (
+    $configuration->deliveryStatusReturn != null
+    || $configuration->envelopeIdentifier != null
+  ) {
+    require_capability($connection, Capability::DeliveryStatusNotification);
+    if ($configuration->deliveryStatusReturn != null) {
+      $parameters .= ' RET=' . $configuration->deliveryStatusReturn->value;
+    }
+
+    if ($configuration->envelopeIdentifier != null) {
+      $parameters .=
+        ' ENVID=' . encode_xtext($configuration->envelopeIdentifier);
+    }
+  }
+
+  if ($configuration->requireTls) {
+    require_capability($connection, Capability::RequireTls);
+    $parameters .= ' REQUIRETLS';
+  }
+
+  if ($configuration->priority != null) {
+    require_capability($connection, Capability::MessageTransferPriority);
+    $parameters .= ' MT-PRIORITY=' . $configuration->priority->value;
+  }
+
+  if ($configuration->deliverBy != null) {
+    require_capability($connection, Capability::DeliverBy);
+    $parameters .=
+      ' BY='
+      . duration_seconds($configuration->deliverBy->deadline)
+      . ';'
+      . $configuration->deliverBy->mode->value;
+  }
+
+  if ($configuration->futureRelease != null) {
+    require_capability($connection, Capability::FutureRelease);
+    if ($configuration->futureRelease->delay != null) {
+      $parameters .=
+        ' HOLDFOR=' . duration_seconds($configuration->futureRelease->delay);
+    } else if ($configuration->futureRelease->dateTime != null) {
+      $parameters .=
+        ' HOLDUNTIL='
+        . $configuration->futureRelease->dateTime->format(Formatter::rfc3339());
+    }
+  }
+
+  return Command::fromParts('MAIL', 'FROM:<' . $address . '>' . $parameters);
+}
+
+/** Builds a checked RCPT TO command. */
+function recipient_command(
+  Connection $connection,
+  Mailbox $recipient,
+  SendConfiguration $configuration,
+): Command {
+  $parameters = '';
+  $notifications = delivery_status_notifications(
+    $configuration->deliveryStatusNotifications,
+  );
+
+  if ($notifications != null) {
+    require_capability($connection, Capability::DeliveryStatusNotification);
+    $parameters = ' NOTIFY=' . $notifications;
+  }
+
+  return Command::fromParts(
+    'RCPT',
+    'TO:<' . encode_mailbox($recipient) . '>' . $parameters,
+  );
+}
+
+/** Builds a sender rejection. */
+function sender_rejected(string $sender, Reply $reply): never {
+  throw new TransmissionException(
+    'the SMTP server rejected sender `'
+    . $sender
+    . '` with '
+    . $reply->code
+    . ': '
+    . $reply->message,
+  );
+}
+
+/** Builds a recipient rejection. */
+function recipient_rejected(Mailbox $recipient, Reply $reply): never {
+  throw new TransmissionException(
+    'the SMTP server rejected recipient `'
+    . $recipient->address
+    . '` with '
+    . $reply->code
+    . ': '
+    . $reply->message,
+  );
+}
+
+/** Builds a message-data rejection. */
+function data_rejected(Reply $reply): never {
+  throw new TransmissionException(
+    'the SMTP server rejected message data with '
+    . $reply->code
+    . ': '
+    . $reply->message,
+  );
+}

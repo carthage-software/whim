@@ -1,0 +1,142 @@
+namespace Whim\TCP;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IP\Address;
+use Whim\IP\Family;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\ConnectionException;
+use Whim\Network\Host;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Port;
+use Whim\TLS\ClientConfiguration;
+
+/** Connects to a TCP host. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function connect(
+  Host $host,
+  Port $port,
+  ConnectConfiguration $configuration = new ConnectConfiguration(),
+  null|CancellationToken $cancellation = null,
+): Stream {
+  $addresses = Whim\Network\_Private\resolve_host_addresses(
+    $host,
+    $cancellation,
+  );
+
+  $last = null;
+  foreach ($addresses as $address) {
+    try {
+      return _Private\connect_endpoint(
+        new InternetEndpoint($address, $port),
+        $configuration,
+        $cancellation,
+      );
+    } catch (ConnectionException $error) {
+      $last = $error;
+    }
+  }
+
+  throw new ConnectionException(
+    'failed to connect to the TCP host',
+    previous: $last,
+  );
+}
+
+/** Connects to a TCP host and completes a client TLS handshake. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function secure_connect(
+  Host $host,
+  Port $port,
+  ClientConfiguration $configuration = new ClientConfiguration(),
+  null|CancellationToken $cancellation = null,
+): SecureStream {
+  return new SecureConnector(configuration: $configuration)->connect(
+    $host,
+    $port,
+    $cancellation,
+  );
+}
+
+/** Starts a TCP listener. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function listen(
+  InternetEndpoint $endpoint = new InternetEndpoint(
+    Address::v4('127.0.0.1'),
+    0,
+  ),
+  ListenConfiguration $configuration = new ListenConfiguration(),
+): Listener {
+  $descriptor = Whim\Network\_Private\create_socket(
+    Whim\Network\_Private\socket_family($endpoint->address->family),
+    Whim\_Private\SOCKET_KIND_STREAM,
+  );
+
+  try {
+    $reuseAddress = 0;
+    if ($configuration->reuseAddress) {
+      $reuseAddress = 1;
+    }
+
+    Whim\_Private\set_socket_option(
+      $descriptor,
+      Whim\_Private\SOCKET_LEVEL_SOCKET,
+      Whim\_Private\SOCKET_OPTION_REUSE_ADDRESS,
+      $reuseAddress,
+    );
+
+    $reusePort = 0;
+    if ($configuration->reusePort) {
+      $reusePort = 1;
+    }
+
+    Whim\_Private\set_socket_option(
+      $descriptor,
+      Whim\_Private\SOCKET_LEVEL_SOCKET,
+      Whim\_Private\SOCKET_OPTION_REUSE_PORT,
+      $reusePort,
+    );
+
+    if ($endpoint->address->family == Family::V6) {
+      $onlyIPv6 = 0;
+      if ($configuration->onlyIPv6) {
+        $onlyIPv6 = 1;
+      }
+
+      Whim\_Private\set_socket_option(
+        $descriptor,
+        Whim\_Private\SOCKET_LEVEL_INET6,
+        Whim\_Private\SOCKET_OPTION_ONLY_INET6,
+        $onlyIPv6,
+      );
+    }
+
+    Whim\_Private\bind_socket(
+      $descriptor,
+      $endpoint->address->toString(),
+      $endpoint->port,
+    );
+
+    Whim\_Private\listen_socket($descriptor, $configuration->backlog);
+    $local = Whim\Network\_Private\internet_endpoint(
+      Whim\_Private\socket_address($descriptor),
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    $descriptor->close();
+    Whim\Network\_Private\failure($error);
+  }
+
+  return new _Private\ListenerImpl(
+    $descriptor,
+    $local,
+    $configuration->noDelay,
+  );
+}

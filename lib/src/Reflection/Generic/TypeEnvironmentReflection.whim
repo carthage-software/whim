@@ -1,0 +1,21 @@
+namespace Whim\Reflection\Generic;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Holds reified bindings keyed by exact type-parameter declarations. */
+#[Stub]
+final class TypeEnvironmentReflection {
+  private function __construct() {}
+
+  /** Returns every binding in declaration and ancestry order. */
+  #[MustUse]
+  public function getBindings(): vec<TypeBindingReflection> {}
+
+  /** Returns the argument bound to the exact parameter, when present. */
+  #[MustUse]
+  public function get(
+    TypeParameterReflection $parameter,
+  ): null|TypeReflection {}
+}

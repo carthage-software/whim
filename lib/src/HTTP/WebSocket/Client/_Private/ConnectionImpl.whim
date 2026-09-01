@@ -1,0 +1,59 @@
+namespace Whim\HTTP\WebSocket\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\WebSocket\_Private\ConnectionImpl as BaseConnection;
+use Whim\HTTP\WebSocket\Client\Configuration;
+use Whim\HTTP\WebSocket\Client\Connection;
+use Whim\IO\Reader;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Stream;
+use Whim\TLS\ConnectionState;
+use Whim\URL\URL;
+use Whim\_Private\WebSocketCodec;
+
+/** A client-side WebSocket connection. */
+final class ConnectionImpl extends BaseConnection implements Connection {
+  public function __construct(
+    private URL $url,
+    private FieldMap $responseHeaders,
+    private Stream<InternetEndpoint> $stream,
+    Reader $reader,
+    null|CancellationToken $cancellation,
+    Configuration $configuration,
+    null|string $subprotocol,
+    private null|ConnectionState $tlsState,
+  ) {
+    parent::__construct(
+      $reader,
+      $stream,
+      $cancellation,
+      WebSocketCodec::client(
+        $configuration->maximumMessageSize,
+        $configuration->maximumFrameSize,
+      ),
+      $configuration->readSize,
+      $subprotocol,
+    );
+  }
+
+  public function getURL(): URL {
+    return $this->url;
+  }
+
+  public function getResponseHeaders(): FieldMap {
+    return $this->responseHeaders;
+  }
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->stream->getLocalEndpoint();
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->stream->getPeerEndpoint();
+  }
+
+  public function getTLSState(): null|ConnectionState {
+    return $this->tlsState;
+  }
+}

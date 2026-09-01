@@ -1,0 +1,93 @@
+namespace Whim\MIME\Part;
+
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\MIME\ContentDisposition;
+use Whim\MIME\ContentId;
+use Whim\MIME\Headers;
+use Whim\MIME\MediaType;
+use Whim\MIME\TransferEncoding;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** A base64-encoded binary MIME part. */
+final readonly class Data implements Part {
+  public MediaType $mediaType;
+  public ContentDisposition $disposition;
+  public Headers $headers;
+  private string|ReadHandle $source;
+  private ReadHandle $handle;
+
+  /** Creates an attachment or inline binary part. */
+  #[TrackCaller]
+  public function __construct(
+    string|ReadHandle $content,
+    public null|string $filename = null,
+    null|MediaType $mediaType = null,
+    null|ContentDisposition $disposition = null,
+    public null|ContentId $contentId = null,
+  ) {
+    $this->source = $content;
+    $source = match ($content) {
+      $bytes @ string => new MemoryHandle($bytes),
+      $readHandle @ ReadHandle => $readHandle,
+    };
+
+    $this->mediaType =
+      $mediaType ?? MediaType::fromParts('application', 'octet-stream');
+
+    $this->disposition =
+      $disposition ?? ContentDisposition::attachment($filename);
+
+    $headers = vec[
+      ('Content-Type', $this->mediaType->toString()),
+      ('Content-Disposition', $this->disposition->toString()),
+      ('Content-Transfer-Encoding', TransferEncoding::Base64->value),
+    ];
+
+    if ($contentId != null) {
+      $headers[] = ('Content-ID', $contentId->toString());
+    }
+
+    $this->headers = Headers::fromPairs($headers);
+    $this->handle = new _Private\EncodingReadHandle(
+      $source,
+      TransferEncoding::Base64,
+    );
+  }
+
+  /** Returns a copy intended for inline use under a content ID. */
+  #[MustUse]
+  #[TrackCaller]
+  public function asInline(ContentId $id): Data {
+    return new Data(
+      $this->source,
+      $this->filename,
+      $this->mediaType,
+      ContentDisposition::inline($this->filename),
+      $id,
+    );
+  }
+
+  /** Returns the binary media type. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function mediaType(): MediaType {
+    return $this->mediaType;
+  }
+
+  /** Returns the part headers. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function headers(): Headers {
+    return $this->headers;
+  }
+
+  /** Returns the encoded body handle. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function body(): ReadHandle {
+    return $this->handle;
+  }
+}

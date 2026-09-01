@@ -1,0 +1,4 @@
+namespace Whim\HTTP\Client;
+
+/** Reports an invalid request. */
+final class RequestException extends Exception {}

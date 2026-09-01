@@ -1,0 +1,26 @@
+use Whim\Result;
+use Whim\Result\Err;
+use Whim\Result\Ok;
+use Whim\Unwind\Error;
+
+$ok = new Ok::<int>(21);
+assert!($ok->isOk());
+assert!(!($ok->isErr()));
+assert!($ok->unwrap() == 21);
+$doubled = $ok->map::<int>(fn(int $x): int => $x * 2);
+assert!($doubled->unwrap() == 42);
+assert!($ok->mapOr::<int>(0, fn(int $x): int => $x + 1) == 22);
+
+$err = new Err::<string>('boom');
+assert!($err->isErr());
+assert!(!($err->isOk()));
+assert!($err->unwrapErr() == 'boom');
+$loud = $err->mapErr::<string>(fn(string $error): string => $error . '!');
+assert!($loud->unwrapErr() == 'boom!');
+assert!($err->unwrapOr::<int>(99) == 99);
+
+$caught = Result\attempt::<int, Error>(fn(): int => 7);
+$assertion_value_11 = $caught;
+assert!($assertion_value_11 is Whim\Result\Ok<int>);
+$assertion_inner_11 = $assertion_value_11->value;
+assert!($assertion_inner_11 == 7);

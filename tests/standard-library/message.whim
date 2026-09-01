@@ -1,0 +1,156 @@
+use Whim\DateTime\TimeZone;
+use Whim\Message\Address\AddressList;
+use Whim\Message\Address\Group;
+use Whim\Message\Address\Mailbox;
+use Whim\Message\Envelope;
+use Whim\Message\Message;
+use Whim\Message\MessageId;
+use Whim\Message\parse;
+use Whim\Message\serialize;
+use Whim\MIME\Part\Text;
+use Whim\MIME\TransferEncoding;
+use Whim\IO\MemoryHandle;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+$mailbox = Mailbox::from('"Jane Doe" <jane@example.com> (author)');
+assert!($mailbox->localPart == 'jane');
+assert!($mailbox->domain == 'example.com');
+assert!($mailbox->displayName == 'Jane Doe');
+assert!($mailbox->comment == 'author');
+
+$unicode = Mailbox::fromParts('rene', 'example.com', 'René');
+assert!(Mailbox::from($unicode->toString())->displayName == 'René');
+
+$assertion_value_6 = fn(): Mailbox => (
+  Mailbox::fromParts('invalid..local', 'example.com')
+);
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (InvalidArgumentException $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is InvalidArgumentException);
+
+$assertion_value_7 = fn(): Mailbox => (
+  Mailbox::fromParts('valid', 'invalid..example.com')
+);
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (InvalidArgumentException $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is InvalidArgumentException);
+
+assert!(Mailbox::parse('lenient local@example.com') != null);
+
+$group = Group::from('Team: jane@example.com, john@example.com;');
+assert!(length!($group->mailboxes) == 2);
+
+$addresses = AddressList::from(
+  '"Jane Doe" <jane@example.com>, Team: john@example.com;',
+);
+
+assert!($addresses->count() == 2);
+assert!(length!($addresses->mailboxes()) == 2);
+
+$date = TimeZone::utc()->at(SystemTime::unixEpoch());
+$messageId = MessageId::from('<message@example.com>');
+$message = Message::create(
+  new Text('hello world', 'plain', 'utf-8', TransferEncoding::SevenBit),
+)
+  ->withFrom(new AddressList(vec[$mailbox]))
+  ->withTo(new AddressList(vec[Mailbox::from('john@example.com')]))
+  ->withBcc(new AddressList(vec[Mailbox::from('hidden@example.com')]))
+  ->withDate($date)
+  ->withMessageId($messageId)
+  ->withSubject('Hello, été');
+
+$envelope = Envelope::fromMessage($message);
+assert!($envelope->sender == $mailbox);
+assert!(length!($envelope->recipients) == 2);
+
+$serialized = serialize($message)->readAll();
+assert!(Whim\Str\contains($serialized, 'MIME-Version: 1.0'));
+assert!(
+  Whim\Str\contains($serialized, 'Content-Type: text/plain; charset=utf-8'),
+);
+
+assert!(!Whim\Str\contains($serialized, "\r\nBcc:"));
+assert!(Whim\Str\contains($serialized, "\r\n\r\nhello world"));
+
+$parsed = parse($serialized);
+assert!($parsed->subject == 'Hello, été');
+assert!(($parsed->messageId as MessageId)->id == $messageId->id);
+assert!($parsed->date != null);
+assert!($parsed->content->body()->readAll() == 'hello world');
+
+$parsedFromHandle = parse(new MemoryHandle($serialized));
+assert!($parsedFromHandle->headers->toVec() == $parsed->headers->toVec());
+assert!($parsedFromHandle->content->body()->readAll() == 'hello world');
+
+$sources = vec[
+  "X-Test: value\r\n\r\nbody",
+  "x-Mixed-Case:\t value \t\r\nFolded: one\r\n two\t\r\n\r\nbody\r\n",
+  "Empty:\r\n continuation\r\n\r\n",
+  "First: one\nSecond: two\n\nbody",
+  'No-Separator: value',
+];
+
+foreach ($sources as $source) {
+  $fromString = parse($source);
+  $fromHandle = parse(new MemoryHandle($source));
+  assert!($fromString->headers->toVec() == $fromHandle->headers->toVec());
+  assert!(
+    $fromString->content->body()->readAll() == $fromHandle->content->body()->readAll(),
+  );
+}
+
+$malformed = "Valid: value\r\nbroken\r\n\r\nbody";
+$assertion_value_26 = fn(): Message => parse($malformed);
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (InvalidArgumentException $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is InvalidArgumentException);
+$assertion_value_27 = fn(): Message => parse(new MemoryHandle($malformed));
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (InvalidArgumentException $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is InvalidArgumentException);
+
+$leadingWhitespace = " Invalid: value\r\n\r\nbody";
+$assertion_value_28 = fn(): Message => parse($leadingWhitespace);
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (InvalidArgumentException $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is InvalidArgumentException);
+$assertion_value_29 = fn(): Message => (
+  parse(new MemoryHandle($leadingWhitespace))
+);
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (InvalidArgumentException $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is InvalidArgumentException);

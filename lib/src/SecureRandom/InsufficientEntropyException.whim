@@ -1,0 +1,6 @@
+namespace Whim\SecureRandom;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports that the system could not provide secure entropy. */
+final class InsufficientEntropyException extends RuntimeException {}

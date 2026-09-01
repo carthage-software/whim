@@ -1,0 +1,58 @@
+namespace Whim\Database\PostgreSQL\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\QueryException;
+use Whim\Database\Result;
+use Whim\Database\Statement;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+use Whim\_Private\PostgreSQLStatement;
+
+/** Implements a prepared PostgreSQL statement. */
+final class StatementImpl implements Statement {
+  private bool $closed = false;
+
+  /** Creates a prepared statement wrapper. */
+  public function __construct(private PostgreSQLStatement $statement) {}
+
+  /** Executes this statement. */
+  #[MustUse]
+  #[TrackCaller]
+  public function execute(
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    if ($this->closed) {
+      throw new QueryException('the PostgreSQL statement is closed');
+    }
+
+    $execution = $this->statement->execute($parameters);
+    $result = $execution[0];
+    try {
+      await_query($execution[1], $cancellation);
+    } catch (Throwable $error) {
+      $result->close();
+      throw $error;
+    }
+
+    return new ResultImpl($result);
+  }
+
+  /** Reports whether this statement is closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  /** Releases this statement wrapper. */
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->statement->close();
+    $this->closed = true;
+  }
+}

@@ -1,0 +1,13 @@
+namespace Whim\Filesystem;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonEmptyString;
+
+/** Names one node inside a directory listing. */
+final readonly class DirectoryEntry {
+  #[AlwaysInline]
+  public function __construct(
+    public NonEmptyString $name,
+    public NodeKind $kind,
+  ) {}
+}

@@ -1,0 +1,77 @@
+namespace Whim\DateTime;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** A month in the Gregorian calendar. */
+enum Month: int {
+  case January = 1;
+  case February = 2;
+  case March = 3;
+  case April = 4;
+  case May = 5;
+  case June = 6;
+  case July = 7;
+  case August = 8;
+  case September = 9;
+  case October = 10;
+  case November = 11;
+  case December = 12;
+
+  /** Returns the preceding month, wrapping at January. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function previous(): Month {
+    return match ($this) {
+      Month::January => Month::December,
+      Month::February => Month::January,
+      Month::March => Month::February,
+      Month::April => Month::March,
+      Month::May => Month::April,
+      Month::June => Month::May,
+      Month::July => Month::June,
+      Month::August => Month::July,
+      Month::September => Month::August,
+      Month::October => Month::September,
+      Month::November => Month::October,
+      Month::December => Month::November,
+    };
+  }
+
+  /** Returns the following month, wrapping at December. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function next(): Month {
+    return match ($this) {
+      Month::January => Month::February,
+      Month::February => Month::March,
+      Month::March => Month::April,
+      Month::April => Month::May,
+      Month::May => Month::June,
+      Month::June => Month::July,
+      Month::July => Month::August,
+      Month::August => Month::September,
+      Month::September => Month::October,
+      Month::October => Month::November,
+      Month::November => Month::December,
+      Month::December => Month::January,
+    };
+  }
+
+  /** Returns this month's length in a year. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function daysIn(Year $year): DaysInMonth {
+    return match ($this) {
+      Month::February => match (is_leap_year($year)) {
+        true => 29,
+        false => 28,
+      },
+      Month::April => 30,
+      Month::June => 30,
+      Month::September => 30,
+      Month::November => 30,
+      $_ => 31,
+    };
+  }
+}

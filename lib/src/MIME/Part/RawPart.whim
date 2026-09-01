@@ -1,0 +1,57 @@
+namespace Whim\MIME\Part;
+
+use Whim\IO\ReadHandle;
+use Whim\MIME\Headers;
+use Whim\MIME\MediaType;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** A MIME part backed by raw headers and a read handle. */
+final readonly class RawPart implements Part {
+  public MediaType $mediaType;
+
+  /** Creates a raw MIME part. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    public Headers $headers,
+    private ReadHandle $handle,
+  ) {
+    $contentType = $headers->get('content-type');
+    if ($contentType == null) {
+      $this->mediaType = MediaType::fromParts('text', 'plain');
+      return;
+    }
+
+    $mediaType = MediaType::parse($contentType);
+    if ($mediaType == null) {
+      throw new InvalidArgumentException('invalid MIME Content-Type header');
+    }
+
+    $this->mediaType = $mediaType;
+  }
+
+  /** Returns the parsed media type. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function mediaType(): MediaType {
+    return $this->mediaType;
+  }
+
+  /** Returns the part headers. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function headers(): Headers {
+    return $this->headers;
+  }
+
+  /** Returns the raw body handle. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function body(): ReadHandle {
+    return $this->handle;
+  }
+}

@@ -1,0 +1,2 @@
+class Box<T> {}
+$f = function<U: Box<int, string>>(): void {};

@@ -1,0 +1,3 @@
+interface Factory {
+  public function make<out T>(T $value): T;
+}

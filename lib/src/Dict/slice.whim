@@ -1,0 +1,164 @@
+namespace Whim\Dict;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Predicate;
+use Whim\Refine\Transform;
+
+/** Builds a dict by deriving a key and value from each value. */
+#[MustUse]
+#[TrackCaller]
+function pull<T, L: ArrayKey, V>(
+  Iterable<_, T> $values,
+  Transform<T, V> $valueFunction,
+  Transform<T, L> $keyFunction,
+): dict<L, V> {
+  $result = dict[];
+  foreach ($values as $value) {
+    $result[$keyFunction($value)] = $valueFunction($value);
+  }
+
+  return $result;
+}
+
+/** Builds a dict by deriving entries from each original entry. */
+#[MustUse]
+#[TrackCaller]
+function pull_with_key<K: ArrayKey, T, L: ArrayKey, V>(
+  Iterable<K, T> $values,
+  fn(K, T): V $valueFunction,
+  fn(K, T): L $keyFunction,
+): dict<L, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    $result[$keyFunction($key, $value)] = $valueFunction($key, $value);
+  }
+
+  return $result;
+}
+
+/** Returns the first requested entries. */
+#[MustUse]
+#[TrackCaller]
+function take<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  NonNegativeInt $count,
+): dict<K, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if (length!($result) == $count) {
+      break;
+    }
+
+    $result[$key] = $value;
+  }
+
+  return $result;
+}
+
+/** Removes the first requested entries. */
+#[MustUse]
+#[TrackCaller]
+function drop<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  NonNegativeInt $count,
+): dict<K, V> {
+  $result = dict[];
+  $index = 0;
+  foreach ($values as $key => $value) {
+    if ($index >= $count) {
+      $result[$key] = $value;
+    }
+
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Returns the leading entries accepted by a predicate. */
+#[MustUse]
+#[TrackCaller]
+function take_while<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  Predicate<V> $predicate,
+): dict<K, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if (!$predicate($value)) {
+      break;
+    }
+
+    $result[$key] = $value;
+  }
+
+  return $result;
+}
+
+/** Removes leading entries while a predicate accepts them. */
+#[MustUse]
+#[TrackCaller]
+function drop_while<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  Predicate<V> $predicate,
+): dict<K, V> {
+  $result = dict[];
+  $dropping = true;
+  foreach ($values as $key => $value) {
+    if ($dropping && !$predicate($value)) {
+      $dropping = false;
+    }
+
+    if (!$dropping) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Extracts a contiguous range of entries. */
+#[MustUse]
+#[TrackCaller]
+function slice<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  NonNegativeInt $start,
+  null|NonNegativeInt $length = null,
+): dict<K, V> {
+  $result = dict[];
+  $index = 0;
+  foreach ($values as $key => $value) {
+    if ($index >= $start && ($length == null || length!($result) < $length)) {
+      $result[$key] = $value;
+    }
+
+    if ($length != null && length!($result) == $length) {
+      break;
+    }
+
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Selects entries in the requested key order. */
+#[MustUse]
+#[TrackCaller]
+function select_keys<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  Iterable<_, K> $keys,
+): dict<K, V> {
+  $values = from_iterable::<K, V>($values);
+  $result = dict[];
+  foreach ($keys as $wanted) {
+    if (contains_key!($values, $wanted)) {
+      $result[$wanted] = $values[$wanted];
+    }
+  }
+
+  return $result;
+}

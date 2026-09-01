@@ -1,0 +1,96 @@
+namespace Whim\CSV;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\Iterate\Iterator;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\CSVReader;
+use Whim\_Private\string_slice;
+
+/** Streams CSV records from any readable handle. */
+final class Reader implements Iterator<int, vec<string>> {
+  private CSVReader $reader;
+  private int $index = 0;
+  private string $buffer = '';
+  private bool $finished = false;
+
+  /** Creates a CSV reader for a one-byte delimiter and enclosure. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    private ReadHandle $handle,
+    NonEmptyString $delimiter = ',',
+    NonEmptyString $enclosure = '"',
+    private null|CancellationToken $cancellation = null,
+  ) {
+    if (
+      length!($delimiter) != 1
+      || length!($enclosure) != 1
+      || $delimiter == $enclosure
+      || ($delimiter is "\r"|"\n")
+      || ($enclosure is "\r"|"\n")
+    ) {
+      throw new InvalidArgumentException(
+        'the CSV delimiter and enclosure must be distinct, non-newline bytes',
+      );
+    }
+
+    $this->reader = CSVReader::create($delimiter, $enclosure);
+  }
+
+  /** Reads the next CSV record. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function next(): null|(int, vec<string>) {
+    while (true) {
+      if ($this->buffer != '' || $this->finished) {
+        ($consumed, $record, $error) = $this->reader->read($this->buffer);
+        $this->throwMalformed($error);
+        if ($consumed != 0) {
+          $this->buffer = string_slice(
+            $this->buffer,
+            $consumed,
+            length!($this->buffer) - $consumed,
+          );
+        }
+
+        if ($record != null) {
+          return ($this->index++, $record);
+        }
+
+        if ($this->finished) {
+          return null;
+        }
+      }
+
+      $this->buffer = $this->handle->read(null, $this->cancellation);
+      if ($this->buffer == '') {
+        $this->finished = true;
+      }
+    }
+  }
+
+  #[TrackCaller]
+  private function throwMalformed(int $error): void {
+    if ($error == 1) {
+      throw new MalformedCSVException('unterminated quoted CSV field');
+    }
+
+    if ($error == 2) {
+      throw new MalformedCSVException(
+        'a closing CSV enclosure must precede a delimiter or line ending',
+      );
+    }
+
+    if ($error == 3) {
+      throw new MalformedCSVException(
+        'a CSV enclosure may only begin at the start of a field',
+      );
+    }
+  }
+}

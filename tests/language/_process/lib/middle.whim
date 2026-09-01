@@ -1,0 +1,2 @@
+write_line!('middle');
+require!('deep/inner.whim');

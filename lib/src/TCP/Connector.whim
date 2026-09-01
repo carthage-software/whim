@@ -1,0 +1,19 @@
+namespace Whim\TCP;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Host;
+use Whim\Network\Port;
+
+/** Defines a strategy for establishing TCP connections. */
+interface Connector {
+  /** Connects to a host and port. */
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    Host $host,
+    Port $port,
+    null|CancellationToken $cancellation = null,
+  ): Stream;
+}

@@ -1,0 +1,59 @@
+namespace Whim\Process;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\Throwable;
+use Whim\_Private\TaskId;
+
+/** Watches one process signal and calls a callback each time it arrives. */
+final class SignalWatcher {
+  private null|TaskId $task = null;
+
+  /** Starts watching a catchable signal. */
+  #[TrackCaller]
+  public function __construct(Signal $signal, fn(): void $callback) {
+    if (!$signal->isSupported()) {
+      throw new InvalidArgumentException(
+        'the signal is not supported by the running system',
+      );
+    }
+
+    if (!$signal->isCatchable()) {
+      throw new InvalidArgumentException('the signal cannot be watched');
+    }
+
+    try {
+      $this->task = Whim\_Private\watch_signal($signal->value, $callback);
+    } catch (Whim\_Private\SystemError $error) {
+      _Private\failure($error, 'watch the process signal');
+    }
+  }
+
+  /** Stops watching the signal. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function close(): void {
+    $task = $this->task ?? return;
+    $this->task = null;
+    Whim\_Private\cancel_task($task);
+  }
+
+  /** Reports whether this watcher has been closed. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->task == null;
+  }
+
+  /** Stops watching the signal when this object is collected. */
+  public function __destruct(): void {
+    try {
+      $this->close();
+    } catch (Throwable $_) {
+    }
+  }
+}

@@ -1,0 +1,503 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Marker\MustUse;
+use Whim\Marker\TraceBoundary;
+use Whim\Unwind\DiscardedResultError;
+use Whim\Unwind\Exception;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$binary = Env\current_binary();
+assert!($binary is string);
+
+rejects(
+  $work,
+  'attribute-carrier-required-on-class',
+  'class NotAnAttribute {}'
+  . "\n"
+  . '#[NotAnAttribute]'
+  . "\n"
+  . 'class Broken {}'
+  . "\n",
+  'does not carry #[Whim\Attribute\Attribute]',
+);
+
+$wrong_target_file = $work . '/method-only-on-class.whim';
+File\write(
+  $wrong_target_file,
+  'use Whim\Attribute\Attribute;'
+  . "\n"
+  . '#[Attribute(Attribute::TARGET_METHOD)]'
+  . "\n"
+  . 'class MethodOnly {'
+  . "\n"
+  . '    public function __construct() {}'
+  . "\n"
+  . '}'
+  . "\n"
+  . '#[MethodOnly]'
+  . "\n"
+  . 'class Broken {}'
+  . "\n",
+);
+
+$wrong_target = Command\run($binary, vec[$wrong_target_file]);
+assert!($wrong_target->status is Command\Exited);
+assert!(($wrong_target->status as Command\Exited)->code == 255);
+assert!(length!($wrong_target->standardOutput) == 0);
+$assertion_value_5 = $wrong_target->standardError;
+assert!(Whim\Str\contains($assertion_value_5, 'does not target classes'));
+assert!(Whim\Str\contains($assertion_value_5, $wrong_target_file . ':6:3'));
+
+rejects(
+  $work,
+  'class-only-on-closure',
+  'use Whim\Attribute\Attribute;'
+  . "\n"
+  . '#[Attribute(Attribute::TARGET_CLASS)]'
+  . "\n"
+  . 'final class ClassOnly {}'
+  . "\n"
+  . '#[ClassOnly]'
+  . "\n"
+  . 'function (): void {};'
+  . "\n",
+  'does not target functions',
+);
+
+accepts(
+  $work,
+  'stub-declarations-validate-without-replacing',
+  'namespace Whim\_Private;'
+  . "\n"
+  . 'use Whim\Marker\Stub;'
+  . "\n"
+  . '#[Stub]'
+  . "\n"
+  . 'const OS = OS;'
+  . "\n"
+  . 'namespace Whim\GC;'
+  . "\n"
+  . 'use Whim;'
+  . "\n"
+  . 'use Whim\Marker\Stub;'
+  . "\n"
+  . '#[Stub]'
+  . "\n"
+  . 'function collect_cycles(): int { return $this; }'
+  . "\n"
+  . 'assert!(Whim\_Private\OS is string);'
+  . "\n"
+  . 'assert!(Whim\_Private\OS != \'\');'
+  . "\n"
+  . 'assert!(collect_cycles() is int);'
+  . "\n",
+);
+
+rejects(
+  $work,
+  'stub-symbol-must-exist',
+  'use Whim\Marker\Stub;'
+  . "\n"
+  . '#[Stub]'
+  . "\n"
+  . 'function missing(): void {}'
+  . "\n",
+  'the symbol is not registered',
+);
+
+rejects(
+  $work,
+  'stub-signature-must-match',
+  'namespace Whim\GC;'
+  . "\n"
+  . 'use Whim\Marker\Stub;'
+  . "\n"
+  . '#[Stub]'
+  . "\n"
+  . 'function collect_cycles(string $unexpected): int {}'
+  . "\n",
+  'the signature does not match',
+);
+
+type ExistingAlias = string;
+newtype TokenAlias = string;
+
+$stub_backings_file = $work . '/stub-alias-backings.whim';
+File\write(
+  $stub_backings_file,
+  'use Whim\Marker\Stub;'
+  . "\n"
+  . '#[Stub]'
+  . "\n"
+  . 'type ExistingAlias = ExistingAlias;'
+  . "\n"
+  . '#[Stub]'
+  . "\n"
+  . 'newtype TokenAlias = TokenAlias;'
+  . "\n",
+);
+
+require!($stub_backings_file);
+assert!('still linked' is ExistingAlias);
+
+#[MustUse('keep this value')]
+function kept_value(): int {
+  return 1;
+}
+
+$kept_markers = Whim\Attribute\get_function_attributes('kept_value');
+$kept = $kept_markers[0];
+assert!($kept is MustUse);
+assert!($kept->note == 'keep this value');
+
+rejects(
+  $work,
+  'never-inline-does-not-target-classes',
+  '#[Whim\Marker\NeverInline]' . "\n" . 'final class WrongTarget {}' . "\n",
+  'does not target classes',
+);
+
+rejects(
+  $work,
+  'inlining-markers-conflict',
+  '#[Whim\Marker\AlwaysInline]'
+  . "\n"
+  . '#[Whim\Marker\NeverInline]'
+  . "\n"
+  . 'function impossible(): int { return 1; }'
+  . "\n",
+  'conflicts with Whim\Marker\NeverInline',
+);
+
+rejects(
+  $work,
+  'must-use-rejects-void',
+  '#[Whim\Marker\MustUse] function unusable(): void { exit!(1); }' . "\n",
+  'because its result can never be used',
+);
+
+rejects(
+  $work,
+  'must-use-rejects-never',
+  '#[Whim\Marker\MustUse] function unusable(): never { exit!(1); }' . "\n",
+  'because its result can never be used',
+);
+
+$frameless_file = $work . '/frameless-literal.whim';
+File\write(
+  $frameless_file,
+  '#[Whim\Marker\Frameless]'
+  . "\n"
+  . '#[Whim\Marker\MustUse]'
+  . "\n"
+  . 'function answer(): true { return true; }'
+  . "\n"
+  . '#[Whim\Marker\NeverInline]'
+  . "\n"
+  . 'function exercise(Whim\Option\Option<int> $some): void {'
+  . "\n"
+  . '    assert!(answer());'
+  . "\n"
+  . '    assert!($some->isSome());'
+  . "\n"
+  . '    assert!(!$some->isNone());'
+  . "\n"
+  . '}'
+  . "\n"
+  . '$some = new Whim\Option\Some::<int>(1);'
+  . "\n"
+  . 'discard!(exercise($some));'
+  . "\n",
+);
+
+$frameless_runs = vec['on', 'off'];
+
+foreach ($frameless_runs as $optimizations) {
+  $frameless_run = Command\Command::create($binary)
+    ->withArgument($frameless_file)
+    ->withVariable('WHIM_CALL_DEPTH', '2')
+    ->withVariable('WHIM_OPTIMIZATIONS', $optimizations)
+    ->run();
+
+  assert!(length!($frameless_run->standardError) == 0);
+  assert!($frameless_run->isSuccess());
+  assert!(length!($frameless_run->standardOutput) == 0);
+}
+
+rejects(
+  $work,
+  'frameless-requires-a-literal-body',
+  '#[Whim\Marker\Frameless]'
+  . "\n"
+  . 'function not_literal(int $value): int { return $value; }'
+  . "\n",
+  'requires a non-constructor with zero parameters and a body that returns'
+  . ' exactly one literal satisfying its declared return type',
+);
+
+#[Whim\Marker\Frameless]
+#[MustUse('consume it')]
+function frameless_answer(): int {
+  return 42;
+}
+
+$frameless_discarded = null;
+$assertion_callable_12 = function(): void {
+  frameless_answer();
+};
+
+try {
+  $assertion_callable_12();
+} catch (DiscardedResultError $assertion_caught_12) {
+  $frameless_discarded = $assertion_caught_12;
+}
+
+assert!($frameless_discarded is DiscardedResultError);
+
+assert!(
+  $frameless_discarded->getMessage()
+  == 'the result of frameless_answer was discarded: consume it',
+);
+
+final class MustUseValues {
+  public static int $calls = 0;
+
+  #[MustUse('keep the computed value')]
+  public function instance(): int {
+    self::$calls++;
+    return 1;
+  }
+
+  #[MustUse]
+  public static function staticValue(): int {
+    self::$calls++;
+    return 2;
+  }
+}
+
+#[MustUse('keep the answer')]
+function must_use_answer(int $value = 42): int {
+  MustUseValues::$calls++;
+  return $value;
+}
+
+$answer_discarded = null;
+$assertion_callable_14 = function(): void {
+  must_use_answer();
+};
+
+try {
+  $assertion_callable_14();
+} catch (DiscardedResultError $assertion_caught_14) {
+  $answer_discarded = $assertion_caught_14;
+}
+
+assert!($answer_discarded is DiscardedResultError);
+
+assert!(
+  $answer_discarded->getMessage()
+  == 'the result of must_use_answer was discarded: keep the answer',
+);
+
+$must_use_values = new MustUseValues();
+$assertion_value_16 = function() use ($must_use_values): void {
+  $must_use_values->instance();
+};
+
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (DiscardedResultError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is DiscardedResultError);
+
+$assertion_value_17 = function(): void {
+  MustUseValues::staticValue();
+};
+
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (DiscardedResultError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is DiscardedResultError);
+
+$answer_callable = must_use_answer(...);
+$assertion_value_18 = function() use ($answer_callable): void {
+  $answer_callable();
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (DiscardedResultError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is DiscardedResultError);
+
+$assertion_value_19 = function() use ($answer_callable): void {
+  $answer_callable(value: 7);
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (DiscardedResultError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is DiscardedResultError);
+
+$used_answer = must_use_answer();
+discard!(must_use_answer());
+$assertion_value_20 = function(): void {
+  Whim\Vec\sort::<int>(vec[3, 1, 2]);
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (DiscardedResultError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is DiscardedResultError);
+
+assert!($used_answer == 42);
+assert!(MustUseValues::$calls == 7);
+
+function boundary_fail(): never {
+  throw new Exception('failed');
+}
+
+#[TraceBoundary]
+function boundary_hidden(fn(): void $callback): void {
+  $callback();
+}
+
+function boundary_entry(): void {
+  boundary_hidden(boundary_fail(...));
+}
+
+$boundary_error = null;
+$assertion_callable_23 = function(): void {
+  boundary_entry();
+};
+
+try {
+  $assertion_callable_23();
+} catch (Exception $assertion_caught_23) {
+  $boundary_error = $assertion_caught_23;
+  assert!(Whim\Str\contains($assertion_caught_23->getMessage(), 'failed'));
+}
+
+assert!($boundary_error is Exception);
+
+$boundary_functions = vec[];
+foreach ($boundary_error->getTrace() as $boundary_frame) {
+  $boundary_functions[] = $boundary_frame->function;
+}
+
+assert!(contains!($boundary_functions, 'boundary_fail'));
+assert!(contains!($boundary_functions, 'boundary_entry'));
+assert!(!contains!($boundary_functions, 'boundary_hidden'));
+
+$boundary_file = $work . '/full-trace-boundary.whim';
+File\write(
+  $boundary_file,
+  'function fail(): never { throw new Whim\Unwind\Exception(\'failed\'); }'
+  . "\n"
+  . '#[Whim\Marker\TraceBoundary]'
+  . "\n"
+  . 'function hidden(fn(): void $callback): void { $callback(); }'
+  . "\n"
+  . 'function public_entry(): void { hidden(fail(...)); }'
+  . "\n"
+  . 'try { public_entry(); } catch (Whim\Unwind\Exception $error) {'
+  . "\n"
+  . '    foreach ($error->getTrace() as $frame) { write_line!($frame->function); }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$full_trace = Command\Command::create($binary)
+  ->withArgument($boundary_file)
+  ->withVariable('WHIM_FULL_TRACE', 'true')
+  ->run();
+
+assert!(length!($full_trace->standardError) == 0);
+assert!($full_trace->isSuccess());
+assert!(Whim\Str\contains($full_trace->standardOutput, 'hidden' . "\n"));
+
+$track_caller_file =
+  Filesystem\canonicalize($work) . '/track-caller-explicit.whim';
+
+File\write(
+  $track_caller_file,
+  '#[Whim\Marker\TrackCaller]'
+  . "\n"
+  . 'function inner(): never {'
+  . "\n"
+  . '    throw new Whim\Unwind\Exception(\'failed\');'
+  . "\n"
+  . '}'
+  . "\n"
+  . '#[Whim\Marker\TrackCaller]'
+  . "\n"
+  . 'function outer(): never { inner(); }'
+  . "\n"
+  . 'outer();'
+  . "\n",
+);
+
+$relocated = Command\run($binary, vec[$track_caller_file]);
+assert!($relocated->status is Command\Exited);
+assert!(($relocated->status as Command\Exited)->code == 255);
+$assertion_value_32 = $relocated->standardError;
+assert!(Whim\Str\contains($assertion_value_32, '7 | outer();'));
+assert!(
+  Whim\Str\contains(
+    $assertion_value_32,
+    'note: raised inside inner (' . $track_caller_file . ':3)',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_32, "\n" . ' 0  inner' . "\n"));
+assert!(Whim\Str\contains($assertion_value_32, "\n" . ' 1  outer' . "\n"));
+
+$violation_file = $work . '/track-caller-violation.whim';
+File\write(
+  $violation_file,
+  '#[Whim\Marker\TrackCaller]'
+  . "\n"
+  . 'function broken(): int {'
+  . "\n"
+  . '    return \'not an int\';'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'broken();'
+  . "\n",
+);
+
+$violation = Command\run($binary, vec[$violation_file]);
+assert!($violation->status is Command\Exited);
+assert!(($violation->status as Command\Exited)->code == 255);
+$assertion_value_35 = $violation->standardError;
+assert!(
+  Whim\Str\contains($assertion_value_35, '3 |     return \'not an int\';'),
+);
+
+assert!(!Whim\Str\contains($assertion_value_35, 'note: raised inside'));
+
+Filesystem\delete_directory($work, true);

@@ -1,0 +1,13 @@
+namespace Whim\Network;
+
+use Whim\IO\CloseHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Defines a socket with a typed local endpoint. */
+interface Socket<out TEndpoint: Endpoint> extends CloseHandle {
+  /** Returns the socket's local endpoint. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getLocalEndpoint(): TEndpoint;
+}

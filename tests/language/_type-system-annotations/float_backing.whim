@@ -1,0 +1,3 @@
+enum BackingFloatBad: float {
+  case A = 1.5;
+}

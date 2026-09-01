@@ -1,0 +1,57 @@
+namespace Whim\BSON;
+
+use Whim\Comparison\Equal;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** A 12-byte BSON object identifier. */
+#[Stub]
+final readonly class ObjectId implements Equal<ObjectId>, ToString {
+  #[AlwaysInline]
+  private function __construct(private NonEmptyString $bytes) {}
+
+  /** Generates an object identifier. */
+  #[MustUse]
+  public static function generate(): ObjectId {}
+
+  /** Parses canonical lowercase hexadecimal text, or returns null. */
+  #[MustUse]
+  public static function parse(string $value): null|ObjectId {}
+
+  /** Parses canonical lowercase hexadecimal text. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $value): ObjectId {}
+
+  /** Reports whether text is a canonical object identifier. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function isValid(string $value): bool {}
+
+  /** Creates an object identifier from exactly 12 bytes. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromBytes(string $bytes): ObjectId {}
+
+  /** Returns the 12 raw bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toBytes(): NonEmptyString {}
+
+  /** Returns canonical lowercase hexadecimal text. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): NonEmptyString {}
+
+  /** Reports whether two identifiers contain the same bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(ObjectId $other): bool {}
+}

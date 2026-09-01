@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a read from an undefined variable. */
+#[Stub]
+class UndefinedVariableError extends Error {}

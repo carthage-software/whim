@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports an invalid function call. */
+class BadFunctionCallException extends LogicException {}

@@ -1,0 +1,54 @@
+namespace Whim\Hash;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\RuntimeException;
+
+/** Computes a digest incrementally. */
+final class Hasher {
+  #[AlwaysInline]
+  private function __construct(
+    private readonly Whim\_Private\HashState $state,
+  ) {}
+
+  /** Begins a digest of the given algorithm. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function create(Algorithm $algorithm): Hasher {
+    return new Hasher(Whim\_Private\create_hash_state($algorithm->value));
+  }
+
+  /**
+   * Feeds bytes into the digest.
+   *
+   * @throws RuntimeException when the digest is already finished.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function update(#[SensitiveParameter] string $bytes): void {
+    if (!Whim\_Private\update_hash_state($this->state, $bytes)) {
+      throw new RuntimeException('the digest is already finished');
+    }
+  }
+
+  /**
+   * Ends the digest and returns its bytes; the hasher is finished for good.
+   *
+   * @throws RuntimeException when the digest is already finished.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function finish(): string {
+    $digest = Whim\_Private\finish_hash_state($this->state);
+    if ($digest == null) {
+      throw new RuntimeException('the digest is already finished');
+    }
+
+    return $digest;
+  }
+}

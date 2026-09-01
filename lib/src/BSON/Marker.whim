@@ -1,0 +1,17 @@
+namespace Whim\BSON;
+
+use Whim\Enum\UnitEnum;
+use Whim\Marker\Stub;
+
+/** BSON values with no payload. */
+#[Stub]
+enum Marker implements UnitEnum {
+  /** The deprecated undefined value. */
+  case Undefined;
+
+  /** A value that sorts before every other BSON value. */
+  case MinKey;
+
+  /** A value that sorts after every other BSON value. */
+  case MaxKey;
+}

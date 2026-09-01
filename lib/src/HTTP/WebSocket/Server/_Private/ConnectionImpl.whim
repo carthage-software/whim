@@ -1,0 +1,31 @@
+namespace Whim\HTTP\WebSocket\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\WebSocket\_Private\ConnectionImpl as BaseConnection;
+use Whim\HTTP\WebSocket\Server\Configuration;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\_Private\WebSocketCodec;
+
+/** A server-side WebSocket connection. */
+final class ConnectionImpl extends BaseConnection {
+  public function __construct(
+    ReadHandle $read,
+    WriteHandle $write,
+    CancellationToken $cancellation,
+    Configuration $configuration,
+    null|string $subprotocol,
+  ) {
+    parent::__construct(
+      $read,
+      $write,
+      $cancellation,
+      WebSocketCodec::server(
+        $configuration->maximumMessageSize,
+        $configuration->maximumFrameSize,
+      ),
+      $configuration->readSize,
+      $subprotocol,
+    );
+  }
+}

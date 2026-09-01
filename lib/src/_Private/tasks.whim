@@ -1,0 +1,117 @@
+namespace Whim\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\Stub;
+use Whim\Time\Duration;
+use Whim\Unwind\Throwable;
+
+/** Suspends the current task until it receives a value or throwable. */
+#[Stub]
+final class Suspension<T> {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /**
+   * Parks the current task until a value or throwable arrives.
+   *
+   * @throws Whim\Unwind\RuntimeException when the event loop drains without resolving it.
+   */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function suspend(): T {}
+
+  /**
+   * Resumes the parked task with a value.
+   *
+   * @throws Whim\Unwind\RuntimeException when the suspension is already resolved.
+   */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function resume(T $value): void {}
+
+  /** Resumes the parked task before ordinary queued work. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function resumeEagerly(T $value): void {}
+
+  /**
+   * Resumes the parked task with a throwable.
+   *
+   * @throws Whim\Unwind\RuntimeException when the suspension is already resolved.
+   */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function throw(Throwable $error): void {}
+}
+
+/** Identifies a task scheduled on the engine event loop. */
+#[Stub]
+final readonly class TaskId {
+  public int $id;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct(int $id) {}
+}
+
+/** Drains the event loop; unreferenced tasks do not keep it alive. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function drain(): void {}
+
+/** Creates a typed suspension for the current task. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_suspension<T>(): Suspension<T> {}
+
+/** Schedules a callback after a duration. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function delay_task(Duration $duration, (fn(): void) $callback): TaskId {}
+
+/** Schedules a callback repeatedly at a duration. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function repeat_task(Duration $duration, (fn(): void) $callback): TaskId {}
+
+/** Defers a callback to a future event-loop turn. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function defer_task((fn(): void) $callback): TaskId {}
+
+/** Queues a callback as a microtask. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function queue_task((fn(): void) $callback): TaskId {}
+
+/** Cancels a scheduled task. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function cancel_task(TaskId $task): void {}
+
+/** Allows the loop to drain without waiting for a task. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function unreference_task(TaskId $task): void {}
+
+/** Records an unobserved task failure. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function record_unhandled(Throwable $error): int {}
+
+/** Removes a recorded task failure. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function forget_unhandled(int $id): void {}

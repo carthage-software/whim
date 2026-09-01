@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports operands whose types cannot participate in an operation. */
+#[Stub]
+class IncompatibleOperandsError extends TypeError {}

@@ -1,0 +1,139 @@
+namespace Whim\HTTP\Cookie;
+
+use Whim\Convert\ToString;
+use Whim\HTTP\Cookie\_Private;
+use Whim\HTTP\Message\FieldMap;
+use Whim\Iterate\ArrayIterator;
+use Whim\Iterate\ToIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+use Whim;
+
+/** An immutable, ordered collection of Cookie header pairs. */
+final readonly class Collection implements ToIterator<int, Pair>, ToString {
+  private vec<Pair> $pairs;
+  private dict<string, vec<string>> $values;
+
+  private function __construct(
+    vec<Pair> $pairs,
+    dict<string, vec<string>> $values,
+  ) {
+    $this->pairs = $pairs;
+    $this->values = $values;
+  }
+
+  /** Creates a checked collection of cookie pairs. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(Iterable<_, Pair> $pairs): Collection {
+    $entries = vec[];
+    $values = dict[];
+    foreach ($pairs as ($name, $value)) {
+      if (
+        !Whim\_Private\http_valid_token($name)
+        || !_Private\valid_value($value)
+      ) {
+        throw new InvalidArgumentException('invalid HTTP cookie pair');
+      }
+
+      $entries[] = ($name, $value);
+      if (!contains_key!($values, $name)) {
+        $values[$name] = vec[];
+      }
+
+      $values[$name][] = $value;
+    }
+
+    return new Collection($entries, $values);
+  }
+
+  /** Creates a collection from trusted pairs and their exact-name index. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    vec<Pair> $pairs,
+    dict<string, vec<string>> $values,
+  ): Collection {
+    return new Collection($pairs, $values);
+  }
+
+  /** Parses one Cookie field value, ignoring malformed pairs. */
+  #[MustUse]
+  public static function parse(string $value): Collection {
+    return Collection::fromParts(_Private\parse_pairs($value));
+  }
+
+  /** Parses all Cookie fields from an HTTP message field map. */
+  #[MustUse]
+  public static function fromHeaders(FieldMap $headers): Collection {
+    $pairs = vec[];
+    foreach ($headers->getAll('Cookie') as $value) {
+      foreach (_Private\parse_pairs($value) as $pair) {
+        $pairs[] = $pair;
+      }
+    }
+
+    return Collection::fromParts($pairs);
+  }
+
+  /** Reports whether an exact cookie name is present. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function has(NonEmptyString $name): bool {
+    return contains_key!($this->values, $name);
+  }
+
+  /** Returns the first value for an exact cookie name. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function get(NonEmptyString $name): null|string {
+    if (!contains_key!($this->values, $name)) {
+      return null;
+    }
+
+    return $this->values[$name][0];
+  }
+
+  /** Returns every value for an exact cookie name. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getAll(NonEmptyString $name): vec<string> {
+    if (!contains_key!($this->values, $name)) {
+      return vec[];
+    }
+
+    return $this->values[$name];
+  }
+
+  /** Returns all pairs in header order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toVec(): vec<Pair> {
+    return $this->pairs;
+  }
+
+  /** Serializes this collection as one Cookie field value. */
+  #[MustUse]
+  public function toString(): string {
+    $parts = vec[];
+    foreach ($this->pairs as ($name, $value)) {
+      $parts[] = $name . '=' . $value;
+    }
+
+    return Str\join('; ', $parts);
+  }
+
+  /** Returns an iterator over the stored pairs. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toIterator(): ArrayIterator<int, Pair> {
+    return new ArrayIterator::<int, Pair>($this->pairs);
+  }
+}

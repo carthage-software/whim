@@ -1,0 +1,2 @@
+class Box<T> {}
+$f = fn<U: Box<int, string>>(): int => 1;

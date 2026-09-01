@@ -1,0 +1,198 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Channel;
+use Whim\Env;
+use Whim\IO;
+use Whim\Time\Duration;
+
+$boundedPair = Channel\bounded::<int>(2);
+$boundedSender = $boundedPair[0];
+$boundedReceiver = $boundedPair[1];
+assert!($boundedSender->getCapacity() == 2);
+Async\spawn::<int>(function() use ($boundedSender): int {
+  for ($i = 1; $i <= 5; $i = $i + 1) {
+    $boundedSender->send($i);
+  }
+
+  $boundedSender->close();
+  return 0;
+})->ignore();
+
+$received = vec[];
+for ($j = 0; $j < 5; $j = $j + 1) {
+  Async\sleep(Duration::fromMilliseconds(5));
+  $received[] = $boundedReceiver->receive();
+}
+
+assert!($received == vec[1, 2, 3, 4, 5]);
+$assertion_value_3 = fn(): int => $boundedReceiver->receive();
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (Channel\ClosedException $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is Channel\ClosedException);
+
+$unboundedPair = Channel\unbounded::<int>();
+$unboundedSender = $unboundedPair[0];
+$unboundedReceiver = $unboundedPair[1];
+assert!($unboundedSender->getCapacity() == null);
+for ($k = 1; $k <= 50; $k = $k + 1) {
+  $unboundedSender->send($k);
+}
+
+assert!($unboundedSender->count() == 50);
+assert!($unboundedReceiver->receive() == 1);
+
+$tinyPair = Channel\bounded::<int>(1);
+$tinySender = $tinyPair[0];
+$tinyReceiver = $tinyPair[1];
+$tinySender->trySend(7);
+$assertion_value_7 = function() use ($tinySender): void {
+  $tinySender->trySend(8);
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (Channel\FullException $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is Channel\FullException);
+
+assert!($tinyReceiver->tryReceive() == 7);
+$assertion_value_9 = fn(): int => $tinyReceiver->tryReceive();
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (Channel\EmptyException $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is Channel\EmptyException);
+
+$preCancelledToken = new Async\SignalCancellationToken();
+$preCancelledToken->cancel();
+$cancelledSendPair = Channel\bounded::<int>(1);
+$cancelledSender = $cancelledSendPair[0];
+$cancelledSender->trySend(1);
+$assertion_value_10 = function() use (
+  $cancelledSender,
+  $preCancelledToken,
+): void {
+  $cancelledSender->send(2, $preCancelledToken);
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (CancelledException $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is CancelledException);
+
+assert!($cancelledSender->count() == 1);
+$cancelledReceivePair = Channel\bounded::<int>(1);
+$cancelledReceiver = $cancelledReceivePair[1];
+$assertion_value_12 = function() use (
+  $cancelledReceiver,
+  $preCancelledToken,
+): void {
+  $cancelledReceiver->receive($preCancelledToken);
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (CancelledException $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is CancelledException);
+
+function accept_arguments_probe((fn(): vec<string>) $probe): void {}
+
+function accept_variable_probe((fn(string): null|string) $probe): void {}
+
+function accept_variables_probe((fn(): dict<string, string>) $probe): void {}
+
+function accept_nullable_path_probe((fn(): null|string) $probe): void {}
+
+function accept_binary_probe((fn(): string) $probe): void {}
+
+accept_arguments_probe(Env\get_arguments(...));
+accept_variable_probe(Env\get_variable(...));
+accept_variables_probe(Env\get_variables(...));
+accept_nullable_path_probe(Env\current_directory(...));
+accept_nullable_path_probe(Env\home_directory(...));
+accept_nullable_path_probe(Env\temporary_directory(...));
+accept_nullable_path_probe(Env\current_script(...));
+accept_binary_probe(Env\current_binary(...));
+
+assert!(length!(Env\get_arguments()) == 0);
+assert!(Env\get_arguments() is vec<string>);
+assert!(Env\set_variable('WHIM_TEST_ENVIRONMENT', 'value'));
+
+assert!(Env\get_variable('WHIM_TEST_ENVIRONMENT') == 'value');
+assert!(Env\get_variables()['WHIM_TEST_ENVIRONMENT'] == 'value');
+assert!(Env\remove_variable('WHIM_TEST_ENVIRONMENT'));
+assert!(Env\get_variable('WHIM_TEST_ENVIRONMENT') == null);
+assert!(!(Env\remove_variable('WHIM_TEST_ENVIRONMENT')));
+assert!(!(Env\set_variable('BAD=NAME', 'x')));
+assert!(!(Env\set_variable('', 'x')));
+
+$rawName = "WHIM_RAW_TEST_\xFF";
+$rawValue = "\xFF";
+$rawSet = Env\set_variable($rawName, $rawValue);
+if ($rawSet) {
+  assert!(Env\get_variable($rawName) == $rawValue);
+  assert!(Env\get_variables()[$rawName] == $rawValue);
+}
+
+Env\remove_variable($rawName);
+
+assert!(Env\get_variables() is dict<string, string>);
+assert!(Env\current_directory() != null);
+assert!(Env\temporary_directory() != null);
+assert!(Env\current_binary() != '');
+
+($emptyReader, $emptyWriter) = IO\pipe();
+assert!($emptyWriter->write('') == 0);
+assert!($emptyWriter->tryWrite('') == 0);
+$emptyReader->close();
+$emptyWriter->close();
+
+$streamPair = IO\pipe();
+$streamReader = $streamPair[0];
+$streamWriter = $streamPair[1];
+Async\spawn::<int>(function() use ($streamWriter): int {
+  Async\sleep(Duration::fromMilliseconds(10));
+  $streamWriter->writeAll('hello ');
+  $streamWriter->writeAll('async ');
+  $streamWriter->writeAll('pipe');
+  $streamWriter->close();
+  return 0;
+})->ignore();
+
+assert!($streamReader->readAll() == 'hello async pipe');
+$streamReader->close();
+
+$copyPair = IO\pipe();
+$copySource = $copyPair[0];
+$copyDrain = $copyPair[1];
+$copySink = new IO\MemoryHandle();
+Async\spawn::<int>(function() use ($copyDrain): int {
+  Async\sleep(Duration::fromMilliseconds(10));
+  $copyDrain->writeAll('copied via reactor');
+  $copyDrain->close();
+  return 0;
+})->ignore();
+
+assert!(IO\copy($copySource, $copySink) == 18);
+$copySource->close();
+$copySink->seek(0);
+assert!($copySink->readAll() == 'copied via reactor');

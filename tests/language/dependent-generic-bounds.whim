@@ -1,0 +1,9 @@
+type Weakend<T: W, W> = W;
+type Event = (int, string);
+type RuntimeEvent = Weakend<Event, (int, ...)>;
+
+function tag(RuntimeEvent $event): int {
+  return $event[0];
+}
+
+assert!(tag((1, 'ok')) == 1);

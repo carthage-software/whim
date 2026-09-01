@@ -1,0 +1,8 @@
+namespace Whim\Marker;
+
+use Whim\Attribute\Attribute;
+
+/** Hides an implementation-detail callable from ordinary trace renderings. */
+#[Stub]
+#[Attribute(Attribute::TARGET_FUNCTION | Attribute::TARGET_METHOD)]
+final class TraceBoundary {}

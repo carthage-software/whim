@@ -1,0 +1,55 @@
+namespace Whim\Hash;
+
+use Whim;
+use Whim\Hash\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+
+/** Digests one byte string in a single call. */
+#[AlwaysInline]
+#[MustUse]
+function digest(
+  Algorithm $algorithm,
+  #[SensitiveParameter] string $bytes,
+): string {
+  return Whim\_Private\hash_digest($algorithm->value, $bytes);
+}
+
+/**
+ * Authenticates one message with a keyed hash in a single call.
+ *
+ * @throws InvalidArgumentException when the algorithm is not cryptographic.
+ */
+#[MustUse]
+#[TrackCaller]
+function hmac(
+  Algorithm $algorithm,
+  #[SensitiveParameter] string $key,
+  #[SensitiveParameter] string $message,
+): string {
+  _Private\require_cryptographic($algorithm);
+  return Whim\_Private\hash_hmac($algorithm->value, $key, $message);
+}
+
+/** Derives 32 bytes with PBKDF2-HMAC-SHA-256. */
+#[AlwaysInline]
+#[MustUse]
+function pbkdf2_sha256(
+  #[SensitiveParameter] string $password,
+  string $salt,
+  1..=1_000_000 $iterations,
+): string {
+  return Whim\_Private\pbkdf2_sha256($password, $salt, $iterations);
+}
+
+/** Compares two digests in time independent of their contents. */
+#[AlwaysInline]
+#[MustUse]
+function equals(
+  #[SensitiveParameter] string $known,
+  #[SensitiveParameter] string $given,
+): bool {
+  return Whim\_Private\constant_time_string_equals($known, $given);
+}

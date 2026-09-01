@@ -1,0 +1,29 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Escapes text for an HTML text node. */
+#[Stub]
+#[MustUse]
+function html_escape_text(string $text): string {}
+
+/** Escapes text for a double-quoted HTML attribute. */
+#[Stub]
+#[MustUse]
+function html_escape_attribute(string $text): string {}
+
+/** Decodes WHATWG character references in HTML text. */
+#[Stub]
+#[MustUse]
+function html_decode(string $html): string {}
+
+/** Decodes WHATWG character references in an HTML attribute. */
+#[Stub]
+#[MustUse]
+function html_decode_attribute(string $html): string {}
+
+/** Returns the expansion of a WHATWG named character reference. */
+#[Stub]
+#[MustUse]
+function html_entity(string $name): null|(string&!'') {}

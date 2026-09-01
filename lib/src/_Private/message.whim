@@ -1,0 +1,11 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Parses a complete RFC 5322 header block and returns its body. */
+#[Stub]
+#[MustUse]
+function message_parse_headers(
+  string $bytes,
+): null|(vec<(string, string)>, string) {}

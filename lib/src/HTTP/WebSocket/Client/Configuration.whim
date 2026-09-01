@@ -1,0 +1,154 @@
+namespace Whim\HTTP\WebSocket\Client;
+
+use Whim\Default\Default;
+use Whim\HTTP\Message\FieldMap;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\PositiveInt;
+use Whim\Str;
+use Whim\TLS\ClientConfiguration;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\http_valid_field_value;
+use Whim\_Private\http_valid_token;
+
+/** Configures a WebSocket client handshake and message limits. */
+final readonly class Configuration implements Default {
+  private const vec<string> RESERVED_HEADERS = vec[
+    'host',
+    'connection',
+    'upgrade',
+    'sec-websocket-key',
+    'sec-websocket-version',
+    'sec-websocket-protocol',
+    'sec-websocket-extensions',
+    'origin',
+  ];
+
+  #[TrackCaller]
+  public function __construct(
+    public PositiveInt $maximumMessageSize = 16_777_216,
+    public PositiveInt $maximumFrameSize = 1_048_576,
+    public PositiveInt $maximumResponseHeaderSize = 8192,
+    public PositiveInt $readSize = 16_384,
+    public vec<string> $subprotocols = vec[],
+    public FieldMap $headers = FieldMap::default(),
+    public null|NonEmptyString $origin = null,
+    public ClientConfiguration $tls = new ClientConfiguration(),
+  ) {
+    $seen = dict[];
+    foreach ($subprotocols as $subprotocol) {
+      if (!http_valid_token($subprotocol)) {
+        throw new InvalidArgumentException(
+          'invalid WebSocket subprotocol: `' . $subprotocol . '`',
+        );
+      }
+
+      if (contains_key!($seen, $subprotocol)) {
+        throw new InvalidArgumentException(
+          'duplicate WebSocket subprotocol: `' . $subprotocol . '`',
+        );
+      }
+
+      $seen[$subprotocol] = true;
+    }
+
+    foreach ($headers as ($name, $_value)) {
+      if (contains!(self::RESERVED_HEADERS, Str\lowercase($name))) {
+        throw new InvalidArgumentException(
+          'the WebSocket client controls the `' . $name . '` field',
+        );
+      }
+    }
+
+    if ($origin != null && !http_valid_field_value($origin)) {
+      throw new InvalidArgumentException('invalid WebSocket origin');
+    }
+  }
+
+  /** Creates the default client configuration. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  /** Returns a copy with a new message-size limit. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumMessageSize(PositiveInt $size): Configuration {
+    return clone!($this, maximumMessageSize: $size);
+  }
+
+  /** Returns a copy with a new frame-size limit. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumFrameSize(PositiveInt $size): Configuration {
+    return clone!($this, maximumFrameSize: $size);
+  }
+
+  /** Returns a copy with a new response-head limit. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumResponseHeaderSize(
+    PositiveInt $size,
+  ): Configuration {
+    return clone!($this, maximumResponseHeaderSize: $size);
+  }
+
+  /** Returns a copy with new subprotocol preferences. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withSubprotocols(vec<string> $subprotocols): Configuration {
+    return new Configuration(
+      $this->maximumMessageSize,
+      $this->maximumFrameSize,
+      $this->maximumResponseHeaderSize,
+      $this->readSize,
+      $subprotocols,
+      $this->headers,
+      $this->origin,
+      $this->tls,
+    );
+  }
+
+  /** Returns a copy with additional handshake fields. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withHeaders(FieldMap $headers): Configuration {
+    return new Configuration(
+      $this->maximumMessageSize,
+      $this->maximumFrameSize,
+      $this->maximumResponseHeaderSize,
+      $this->readSize,
+      $this->subprotocols,
+      $headers,
+      $this->origin,
+      $this->tls,
+    );
+  }
+
+  /** Returns a copy with a new Origin field value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withOrigin(null|NonEmptyString $origin): Configuration {
+    return new Configuration(
+      $this->maximumMessageSize,
+      $this->maximumFrameSize,
+      $this->maximumResponseHeaderSize,
+      $this->readSize,
+      $this->subprotocols,
+      $this->headers,
+      $origin,
+      $this->tls,
+    );
+  }
+
+  /** Returns a copy with new TLS settings. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTLS(ClientConfiguration $tls): Configuration {
+    return clone!($this, tls: $tls);
+  }
+}

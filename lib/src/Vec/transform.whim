@@ -1,0 +1,119 @@
+namespace Whim\Vec;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Option\Option;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\Reducer;
+use Whim\Refine\Transform;
+
+/** Transforms every yielded value into a vec. */
+#[MustUse]
+#[TrackCaller]
+function map<T, U>(Iterable<_, T> $values, Transform<T, U> $function): vec<U> {
+  $result = vec[];
+  foreach ($values as $value) {
+    $result[] = $function($value);
+  }
+
+  return $result;
+}
+
+/** Transforms every value using its key and value. */
+#[MustUse]
+#[TrackCaller]
+function map_with_key<K, T, U>(
+  Iterable<K, T> $values,
+  fn(K, T): U $function,
+): vec<U> {
+  $result = vec[];
+  foreach ($values as $key => $value) {
+    $result[] = $function($key, $value);
+  }
+
+  return $result;
+}
+
+/** Transforms values and omits results represented by None. */
+#[MustUse]
+#[TrackCaller]
+function map_nonnull<T, U>(
+  Iterable<_, T> $values,
+  Transform<T, Option<U>> $function,
+): vec<U> {
+  $result = vec[];
+  foreach ($values as $value) {
+    $mapped = $function($value);
+    if ($mapped->isSome()) {
+      $result[] = $mapped->unwrap();
+    }
+  }
+
+  return $result;
+}
+
+/** Transforms values into iterables and flattens one level. */
+#[MustUse]
+#[TrackCaller]
+function flat_map<T, U>(
+  Iterable<_, T> $values,
+  Transform<T, Iterable<_, U>> $function,
+): vec<U> {
+  $result = vec[];
+  foreach ($values as $value) {
+    foreach ($function($value) as $mapped) {
+      $result[] = $mapped;
+    }
+  }
+
+  return $result;
+}
+
+/** Pairs every value with its sequential index. */
+#[MustUse]
+#[TrackCaller]
+function enumerate<T>(Iterable<_, T> $values): vec<(int, T)> {
+  $result = vec[];
+  $index = 0;
+  foreach ($values as $value) {
+    $result[] = ($index, $value);
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Returns every intermediate value produced by a reduction. */
+#[MustUse]
+#[TrackCaller]
+function reductions<T, R>(
+  Iterable<_, T> $values,
+  Reducer<T, R> $function,
+  R $initial,
+): vec<R> {
+  $result = vec[];
+  $carry = $initial;
+  foreach ($values as $value) {
+    $carry = $function($carry, $value);
+    $result[] = $carry;
+  }
+
+  return $result;
+}
+
+/** Reduces yielded values into one accumulated value. */
+#[MustUse]
+#[TrackCaller]
+function reduce<T, R>(
+  Iterable<_, T> $values,
+  Reducer<T, R> $function,
+  R $initial,
+): R {
+  $carry = $initial;
+  foreach ($values as $value) {
+    $carry = $function($carry, $value);
+  }
+
+  return $carry;
+}

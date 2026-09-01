@@ -1,0 +1,5 @@
+error: unexpected positional argument
+ --> tests/ui/constant_extra_argument.rs:3:37
+  |
+3 | #[whim_constant("Ui\\VALUE", "int", "extra")]
+  |                                     ^^^^^^^

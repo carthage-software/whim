@@ -1,0 +1,16 @@
+namespace Whim\Encoding\Base64;
+
+/** Names a base64 character table. */
+enum Alphabet {
+  /** The RFC 4648 table: `A..Z`, `a..z`, `0..9`, `+`, `/`. */
+  case Standard;
+
+  /** The RFC 4648 URL and filename safe table: `+` and `/` become `-` and `_`. */
+  case UrlSafe;
+
+  /** The crypt table: `.`, `/`, `A..Z`, `a..z`, `0..9`. */
+  case DotSlash;
+
+  /** The byte-ordered crypt table: `.`, `/`, `0..9`, `A..Z`, `a..z`. */
+  case DotSlashOrdered;
+}

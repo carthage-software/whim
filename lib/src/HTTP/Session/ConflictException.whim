@@ -1,0 +1,6 @@
+namespace Whim\HTTP\Session;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports a session record changed by another request. */
+final class ConflictException extends RuntimeException {}

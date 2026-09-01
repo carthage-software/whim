@@ -1,0 +1,18 @@
+namespace Whim\Network;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** Identifies a Unix-domain socket path or an anonymous socket. */
+final readonly class UnixEndpoint implements Endpoint {
+  #[AlwaysInline]
+  public function __construct(public null|NonEmptyString $path) {}
+
+  /** Returns the path or an anonymous-socket label. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): NonEmptyString {
+    return $this->path ?? '<anonymous>';
+  }
+}

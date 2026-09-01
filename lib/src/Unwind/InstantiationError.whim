@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports an attempt to instantiate a non-instantiable class-like. */
+#[Stub]
+class InstantiationError extends Error {}

@@ -1,0 +1,65 @@
+namespace Whim\Regex;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\_Private\Regex as BuiltInRegex;
+
+/** A compiled byte-oriented regular expression. */
+final readonly class Pattern {
+  #[AlwaysInline]
+  private function __construct(
+    public string $source,
+    private BuiltInRegex $compiled,
+  ) {}
+
+  /** Compiles a regular expression. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function compile(string $source): Pattern {
+    $compiled = BuiltInRegex::compile($source);
+    if ($compiled == null) {
+      throw new InvalidPatternException('invalid regular expression');
+    }
+
+    return new Pattern($source, $compiled);
+  }
+
+  /** Reports whether the subject contains a match. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function matches(string $subject, NonNegativeInt $offset = 0): bool {
+    return $this->compiled->find($subject, $offset) != null;
+  }
+
+  /** Returns the first match at or after the byte offset. */
+  #[MustUse]
+  public function find(
+    string $subject,
+    NonNegativeInt $offset = 0,
+  ): null|MatchResult {
+    $match = $this->compiled->find($subject, $offset) ?? return null;
+
+    ($start, $end, $captures) = $match;
+    return new MatchResult($subject, $start, $end, $captures);
+  }
+
+  /** Replaces matches with literal bytes, optionally limiting their count. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function replaceAll(
+    string $subject,
+    string $replacement,
+    null|NonNegativeInt $limit = null,
+  ): string {
+    return $this->compiled->replaceLiteral($subject, $replacement, $limit);
+  }
+
+  /** Splits bytes around every match. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function split(string $subject): vec<string> {
+    return $this->compiled->split($subject);
+  }
+}

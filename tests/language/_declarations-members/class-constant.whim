@@ -1,0 +1,5 @@
+$value = 7;
+
+class Example {
+  public const VALUE = $value;
+}

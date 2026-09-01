@@ -1,0 +1,57 @@
+use Whim\Type;
+use Whim\Type\TypeId;
+use Whim\Unwind\ValueError;
+
+final readonly class TypeBox<T> {
+  public function __construct(public T $value) {}
+}
+
+final class T {}
+
+newtype TypeUserId = int;
+type TypeInteger = int;
+
+/** Returns the identity of its reified type argument. */
+function reified_type_id<T>(): TypeId {
+  return Type\id::<T>();
+}
+
+assert!(Type\of(1) == Type\id::<int>());
+assert!(Type\of('value') == Type\id::<string>());
+assert!(Type\of(vec[1, 2]) == Type\id::<vec<int>>());
+assert!(Type\of((1, 'value')) == Type\id::<(int, string)>());
+
+$integerBox = new TypeBox::<int>(1);
+$stringBox = new TypeBox::<string>('value');
+assert!(Type\of($integerBox) == Type\id::<TypeBox<int>>());
+assert!(Type\of($integerBox) != Type\of($stringBox));
+
+assert!(Type\of(TypeUserId(1)) == Type\id::<TypeUserId>());
+assert!(Type\of(TypeUserId(1)) != Type\id::<int>());
+assert!(Type\id::<TypeInteger>() == Type\id::<int>());
+
+assert!(reified_type_id::<int>() == Type\id::<int>());
+assert!(reified_type_id::<int>() != Type\id::<T>());
+
+$registry = dict[] as dict<int, string>;
+$registry[Type\id::<TypeBox<int>>()] = 'integer';
+assert!($registry[Type\of($integerBox)] == 'integer');
+
+assert!(Type\to_debug_string(Type\id::<int>()) == 'int');
+assert!(Type\to_debug_string(Type\id::<TypeBox<int>>()) == 'TypeBox<int>');
+assert!(Type\to_debug_string(Type\of($integerBox)) == 'TypeBox<int>');
+$functionType = Type\to_debug_string(Type\id::<fn(int): string>());
+assert!($functionType == 'fn(int): string');
+
+$firstBoxType = Type\to_debug_string(Type\id::<TypeBox<int>>());
+$secondBoxType = Type\to_debug_string(Type\id::<TypeBox<int>>());
+assert!($firstBoxType == $secondBoxType);
+
+$invalidRejected = false;
+try {
+  discard!(Type\to_debug_string(TypeId(0)));
+} catch (ValueError $_) {
+  $invalidRejected = true;
+}
+
+assert!($invalidRejected);

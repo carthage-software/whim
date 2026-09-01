@@ -1,0 +1,6 @@
+namespace Whim\CSV;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Thrown when CSV input violates the selected dialect. */
+class MalformedCSVException extends InvalidArgumentException {}

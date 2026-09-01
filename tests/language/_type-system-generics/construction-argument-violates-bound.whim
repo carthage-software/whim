@@ -1,0 +1,13 @@
+interface Comparable {}
+
+class Box<T: Comparable> {
+  public function __construct(public T $value) {}
+}
+
+class NotItem {}
+
+function main(): void {
+  $box = new Box::<NotItem>(new NotItem());
+}
+
+main();

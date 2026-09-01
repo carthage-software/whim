@@ -1,0 +1,4 @@
+namespace Whim\Database;
+
+/** Reports a database transaction failure. */
+class TransactionException extends Exception {}

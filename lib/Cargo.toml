@@ -1,0 +1,23 @@
+[package]
+name = "whim-lib"
+description = "The Whim standard library as a precompiled artifact"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+path = "lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+target-guard = { workspace = true }
+whim-runtime = { workspace = true }
+
+[build-dependencies]
+whim-runtime = { workspace = true }

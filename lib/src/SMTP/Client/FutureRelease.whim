@@ -1,0 +1,39 @@
+namespace Whim\SMTP\Client;
+
+use Whim\DateTime\ZonedDateTime;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An RFC 4865 delayed-delivery request. */
+final readonly class FutureRelease {
+  #[AlwaysInline]
+  private function __construct(
+    public null|Duration $delay,
+    public null|ZonedDateTime $dateTime,
+  ) {}
+
+  /** Requests delivery after a positive delay. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function after(Duration $delay): FutureRelease {
+    if (!$delay->isPositive()) {
+      throw new InvalidArgumentException(
+        'an SMTP future-release delay must be positive',
+      );
+    }
+
+    return new FutureRelease($delay, null);
+  }
+
+  /** Requests delivery no earlier than a date and time. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function at(ZonedDateTime $dateTime): FutureRelease {
+    return new FutureRelease(null, $dateTime);
+  }
+}

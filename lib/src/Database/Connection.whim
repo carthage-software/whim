@@ -1,0 +1,36 @@
+namespace Whim\Database;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\CloseHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** Represents one database connection. */
+interface Connection extends Executor, CloseHandle {
+  /** Reports whether this connection can safely execute more work. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isReusable(): bool;
+
+  /** Checks that this connection can communicate with its database. */
+  #[TrackCaller]
+  public function ping(null|CancellationToken $cancellation = null): void;
+
+  /** Prepares one raw SQL statement. */
+  #[MustUse]
+  #[TrackCaller]
+  public function prepare(
+    NonEmptyString $sql,
+    null|CancellationToken $cancellation = null,
+  ): Statement;
+
+  /** Begins a transaction using the database default when isolation is null. */
+  #[MustUse]
+  #[TrackCaller]
+  public function begin(
+    null|TransactionIsolation $isolation = null,
+    bool $readOnly = false,
+    null|CancellationToken $cancellation = null,
+  ): Transaction;
+}

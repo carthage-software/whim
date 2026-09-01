@@ -1,0 +1,105 @@
+namespace Whim\HTTP\Client;
+
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Response;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Time\Duration;
+use Whim\TLS;
+use Whim\URL\URL;
+
+/** Overrides client settings for one request. */
+final readonly class SendConfiguration {
+  #[AlwaysInline]
+  public function __construct(
+    public null|PositiveInt $maximumResponseHeaderSize = null,
+    public null|PositiveInt $maximumResponseBodySize = null,
+    public null|NonNegativeInt $maximumInformationalResponses = null,
+    public null|URL $baseURL = null,
+    public null|TLS\ClientConfiguration $tls = null,
+    public null|H2\Configuration $h2 = null,
+    public null|vec<ProtocolVersion> $protocolVersions = null,
+    public null|fn(Response): void $onInformationalResponse = null,
+    public null|fn(ConnectionMetadata): void $onConnection = null,
+    public null|Duration $connectionTimeout = null,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumResponseHeaderSize(
+    null|PositiveInt $size,
+  ): SendConfiguration {
+    return clone!($this, maximumResponseHeaderSize: $size);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumResponseBodySize(
+    null|PositiveInt $size,
+  ): SendConfiguration {
+    return clone!($this, maximumResponseBodySize: $size);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumInformationalResponses(
+    null|NonNegativeInt $maximum,
+  ): SendConfiguration {
+    return clone!($this, maximumInformationalResponses: $maximum);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBaseURL(null|URL $baseURL): SendConfiguration {
+    return clone!($this, baseURL: $baseURL);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTLS(
+    null|TLS\ClientConfiguration $tls,
+  ): SendConfiguration {
+    return clone!($this, tls: $tls);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withH2(null|H2\Configuration $h2): SendConfiguration {
+    return clone!($this, h2: $h2);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withProtocolVersions(
+    null|vec<ProtocolVersion> $protocolVersions,
+  ): SendConfiguration {
+    return clone!($this, protocolVersions: $protocolVersions);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withInformationalResponseHandler(
+    null|fn(Response): void $handler,
+  ): SendConfiguration {
+    return clone!($this, onInformationalResponse: $handler);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withConnectionHandler(
+    null|fn(ConnectionMetadata): void $handler,
+  ): SendConfiguration {
+    return clone!($this, onConnection: $handler);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withConnectionTimeout(
+    null|Duration $timeout,
+  ): SendConfiguration {
+    return clone!($this, connectionTimeout: $timeout);
+  }
+}

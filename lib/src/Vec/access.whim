@@ -1,0 +1,39 @@
+namespace Whim\Vec;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim;
+
+/** Returns the yielded values as a vec. */
+#[MustUse]
+#[TrackCaller]
+function values<T>(Iterable<_, T> $values): vec<T> {
+  if ($values is vec<_>) {
+    return $values;
+  }
+
+  if ($values is array<_, _>) {
+    return Whim\_Private\vec_from_array($values);
+  }
+
+  $result = vec[];
+  foreach ($values as $value) {
+    $result[] = $value;
+  }
+
+  return $result;
+}
+
+/** Returns the yielded keys as a vec. */
+#[MustUse]
+#[TrackCaller]
+function keys<K>(Iterable<K, _> $values): vec<K> {
+  $result = vec[];
+  foreach ($values as $key => $_) {
+    $result[] = $key;
+  }
+
+  return $result;
+}

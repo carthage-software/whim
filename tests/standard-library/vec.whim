@@ -1,0 +1,302 @@
+use Whim\Comparison\Equal;
+use Whim\Comparison\Ordering;
+use Whim\Math;
+use Whim\Option;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\TypeError;
+use Whim\Vec;
+
+final readonly class VecEqualValue implements Equal<VecEqualValue> {
+  public function __construct(public int $value) {}
+
+  public function equals(VecEqualValue $other): bool {
+    return $this->value == $other->value;
+  }
+}
+
+assert!(Vec\equals::<VecEqualValue>(vec[], vec[]));
+assert!(
+  Vec\equals::<VecEqualValue>(
+    vec[new VecEqualValue(1), new VecEqualValue(2)],
+    vec[new VecEqualValue(1), new VecEqualValue(2)],
+  ),
+);
+
+assert!(
+  !(
+    Vec\equals::<VecEqualValue>(
+      vec[new VecEqualValue(1), new VecEqualValue(2)],
+      vec[new VecEqualValue(1), new VecEqualValue(3)],
+    )
+  ),
+);
+
+assert!(
+  !(
+    Vec\equals::<VecEqualValue>(
+      vec[new VecEqualValue(1)],
+      vec[new VecEqualValue(1), new VecEqualValue(2)],
+    )
+  ),
+);
+
+assert!(Vec\sort::<int>(vec[3, 1, 2]) == vec[1, 2, 3]);
+assert!(
+  Vec\sort::<string>(vec['pear', 'apple', 'fig']) == vec[
+    'apple',
+    'fig',
+    'pear',
+  ],
+);
+
+assert!(length!(Vec\sort::<int>(vec[])) == 0);
+assert!(
+  Vec\sort::<int>(
+    vec[1, 3, 2],
+    fn(int $left, int $right): Ordering => Ordering::from($right <=> $left),
+  ) == vec[3, 2, 1],
+);
+
+$assertion_value_9 = fn(): vec<mixed> => Vec\sort::<mixed>(vec[1, 'a']);
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (TypeError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is TypeError);
+
+assert!(Vec\values::<int>(vec[1, 2]) == vec[1, 2]);
+assert!(Vec\values::<int>(dict['a' => 7, 'b' => 8]) == vec[7, 8]);
+assert!(Vec\keys::<string>(dict['a' => 1, 'b' => 2]) == vec['a', 'b']);
+
+assert!(Vec\reverse::<int>(vec[1, 2, 3]) == vec[3, 2, 1]);
+assert!(Vec\unique::<int>(vec[1, 2, 1, 3, 2]) == vec[1, 2, 3]);
+assert!(
+  Vec\unique_by::<string, int>(
+    vec['a', 'bb', 'c', 'ddd', 'ee'],
+    fn(string $value): int => length!($value),
+  ) == vec['a', 'bb', 'ddd'],
+);
+
+assert!(Vec\reverse::<int>(dict['a' => 1, 'b' => 2]) == vec[2, 1]);
+
+$sharedUniqueObject = new VecEqualValue(1);
+$otherUniqueObject = new VecEqualValue(1);
+assert!(
+  Vec\unique::<mixed>(vec[
+    null,
+    null,
+    true,
+    true,
+    1,
+    1,
+    1.0,
+    1.0,
+    'value',
+    'value',
+    $sharedUniqueObject,
+    $sharedUniqueObject,
+    $otherUniqueObject,
+    vec[1],
+    vec[1],
+  ]) == vec[
+    null,
+    true,
+    1,
+    1.0,
+    'value',
+    $sharedUniqueObject,
+    $otherUniqueObject,
+    vec[1],
+  ],
+);
+
+$firstNestedDict = dict['a' => vec[1, 2], 'b' => (3, 4)];
+$reorderedNestedDict = dict['b' => (3, 4), 'a' => vec[1, 2]];
+$nestedUnique = Vec\unique::<mixed>(vec[
+  vec[dict['x' => 1], vec[2]],
+  vec[dict['x' => 1], vec[2]],
+  $firstNestedDict,
+  $reorderedNestedDict,
+  (vec[5], dict['y' => 6]),
+  (vec[5], dict['y' => 6]),
+]);
+
+assert!(length!($nestedUnique) == 3);
+assert!($nestedUnique[0] == vec[dict['x' => 1], vec[2]]);
+assert!($nestedUnique[1] == $firstNestedDict);
+assert!($nestedUnique[2] == (vec[5], dict['y' => 6]));
+
+$assertion_value_15 = Vec\map::<int, string>(
+  vec[1, 2, 3],
+  fn(int $value): string => 'v=' . $value,
+);
+
+assert!($assertion_value_15 is vec<string>);
+assert!($assertion_value_15 == vec['v=1', 'v=2', 'v=3']);
+
+assert!(
+  Vec\map_with_key::<string, int, string>(
+    dict['a' => 1, 'b' => 2],
+    fn(string $key, int $value): string => $key . $value,
+  ) == vec['a1', 'b2'],
+);
+
+$nullableMapped = Vec\map_nonnull::<int, null>(
+  vec[1],
+  fn(int $value): Option\Option<null> => new Option\Some::<null>(null),
+);
+
+$assertion_value_17 = $nullableMapped;
+assert!($assertion_value_17 is vec<null>);
+assert!(length!($assertion_value_17) == 1);
+assert!($nullableMapped[0] == null);
+
+assert!(Vec\filter_nulls::<int>(vec[1, null, 2]) == vec[1, 2]);
+assert!(Vec\take::<int>(vec[1, 2, 3], 2) == vec[1, 2]);
+assert!(Vec\drop::<int>(vec[1, 2, 3], 1) == vec[2, 3]);
+assert!(
+  Vec\concat::<int>(vec[1, 2], vec[vec[3], vec[4, 5]]) == vec[1, 2, 3, 4, 5],
+);
+
+assert!(Vec\flatten::<int>(vec[vec[1, 2], vec[3]]) == vec[1, 2, 3]);
+assert!(
+  Vec\reduce::<int, int>(
+    vec[12, 7, 25, 3],
+    fn(int $carry, int $value): int => $carry + $value,
+    0,
+  )
+  == 47,
+);
+
+assert!(
+  Vec\reduce::<int, int>(
+    vec[],
+    fn(int $carry, int $value): int => $carry + $value,
+    0,
+  )
+  == 0,
+);
+
+assert!(Vec\fill::<string>(3, 'x') == vec['x', 'x', 'x']);
+assert!(Vec\zip::<int, string>(vec[1, 2], vec['a', 'b']) is vec<(int, string)>);
+
+assert!(Vec\chunk::<int>(vec[1, 2, 3], 2) == vec[vec[1, 2], vec[3]]);
+assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 1, 2) == vec[2, 3]);
+assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 2) == vec[3, 4]);
+assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 9) == vec[]);
+
+class SortKeyCounter {
+  public int $calls = 0;
+}
+
+$sort_key_counter = new SortKeyCounter();
+$sorted_by = Vec\sort_by::<int, int>(
+  vec[3, 1, 2],
+  function(int $value) use ($sort_key_counter): int {
+    $sort_key_counter->calls++;
+    return $value;
+  },
+);
+
+assert!($sorted_by == vec[1, 2, 3]);
+assert!($sort_key_counter->calls == 3);
+
+assert!(Vec\range(1, 4) == vec[1, 2, 3, 4]);
+assert!(Vec\range(4, 1) == vec[4, 3, 2, 1]);
+$assertion_value_33 = fn(): vec<int> => Vec\range(1, 1, 0);
+$assertion_error_33 = null;
+try {
+  $assertion_value_33();
+} catch (LogicException $assertion_caught_33) {
+  $assertion_error_33 = $assertion_caught_33;
+}
+
+assert!($assertion_error_33 is LogicException);
+
+assert!(
+  Vec\range(Math\INT_MIN, Math\INT_MAX, Math\INT_MAX) == vec[
+    Math\INT_MIN,
+    -1,
+    Math\INT_MAX - 1,
+  ],
+);
+
+assert!(
+  Vec\range(Math\INT_MAX, Math\INT_MIN, Math\INT_MIN) == vec[Math\INT_MAX, -1],
+);
+
+$assertion_value_36 = fn(): vec<int> => Vec\range(0.0, 1.0, 0.1);
+$assertion_error_36 = null;
+try {
+  $assertion_value_36();
+} catch (TypeError $assertion_caught_36) {
+  $assertion_error_36 = $assertion_caught_36;
+}
+
+assert!($assertion_error_36 is TypeError);
+
+$assertion_value_37 = fn(): vec<int> => Vec\range(1, 4, -1);
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (LogicException $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is LogicException);
+
+final class VecTestIterator implements Whim\Iterate\Iterator<string, int> {
+  private int $offset = 0;
+
+  public function next(): null|(string, int) {
+    $entry = match ($this->offset) {
+      0 => ('a', 1),
+      1 => ('b', 2),
+      $_ => null,
+    };
+
+    $this->offset++;
+
+    return $entry;
+  }
+}
+
+final class VecTestToIterator implements Whim\Iterate\ToIterator<string, int> {
+  public function toIterator(): Whim\Iterate\Iterator<string, int> {
+    return new VecTestIterator();
+  }
+}
+
+assert!(Vec\values::<int>(new VecTestToIterator()) == vec[1, 2]);
+assert!(
+  Vec\map::<int, int>(
+    new VecTestToIterator(),
+    fn(int $value): int => $value * 2,
+  ) == vec[2, 4],
+);
+
+assert!(
+  Vec\flat_map::<int, int>(
+    new VecTestToIterator(),
+    fn(int $value): vec<int> => vec[$value, $value],
+  ) == vec[1, 1, 2, 2],
+);
+
+assert!(Vec\keys::<string>(new VecTestToIterator()) == vec['a', 'b']);
+
+assert!(
+  Vec\filter_with_key::<string, int>(
+    new VecTestToIterator(),
+    fn(string $key, int $_): bool => $key == 'b',
+  ) == vec[2],
+);
+
+assert!(
+  Vec\map_with_key::<string, int, string>(
+    new VecTestToIterator(),
+    fn(string $key, int $value): string => $key . $value,
+  ) == vec['a1', 'b2'],
+);

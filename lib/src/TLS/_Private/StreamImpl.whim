@@ -1,0 +1,331 @@
+namespace Whim\TLS\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\Endpoint;
+use Whim\Network\ShutdownDirection;
+use Whim\Network\Stream as NetworkStream;
+use Whim\Refine\PositiveInt;
+use Whim\Str;
+use Whim\TLS\ConnectionState;
+use Whim\TLS\Stream;
+
+/** Implements TLS over an existing byte stream. */
+class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
+  private string $readBuffer = '';
+  private string $writeBuffer = '';
+  private bool $reachedEnd = false;
+  private bool $receivedEnd = false;
+  private bool $sentCloseNotify = false;
+  private readonly ConnectionState $connectionState;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private NetworkStream<TEndpoint> $stream,
+    private Whim\_Private\TlsConnection $connection,
+  ) {
+    $this->connectionState = connection_state($connection);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getConnectionState(): ConnectionState {
+    return $this->connectionState;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLocalEndpoint(): TEndpoint {
+    return $this->stream->getLocalEndpoint();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getPeerEndpoint(): TEndpoint {
+    return $this->stream->getPeerEndpoint();
+  }
+
+  #[AlwaysInline]
+  public function isClosed(): bool {
+    return $this->stream->isClosed();
+  }
+
+  #[AlwaysInline]
+  public function reachedEndOfDataSource(): bool {
+    return $this->reachedEnd;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->reachedEnd) {
+      return;
+    }
+
+    if ($this->readBuffer != '') {
+      return;
+    }
+
+    $plaintext = $this->readPlaintext(65536);
+    if ($plaintext == null) {
+      $this->reachedEnd = true;
+      return;
+    }
+
+    if ($plaintext != '') {
+      $this->readBuffer = $plaintext;
+      return;
+    }
+
+    $this->flushNonBlocking();
+    $this->stream->waitUntilReadable($cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryRead(null|int $maxBytes = null): string {
+    $maximum = $maxBytes ?? 65536;
+    if ($maximum <= 0) {
+      return '';
+    }
+
+    if ($maximum > 65536) {
+      $maximum = 65536;
+    }
+
+    if ($this->reachedEnd) {
+      return '';
+    }
+
+    if ($this->readBuffer != '') {
+      if ($maximum >= length!($this->readBuffer)) {
+        $plaintext = $this->readBuffer;
+        $this->readBuffer = '';
+        return $plaintext;
+      }
+
+      $plaintext = Str\slice($this->readBuffer, 0, $maximum);
+      $this->readBuffer = Str\slice($this->readBuffer, $maximum);
+      return $plaintext;
+    }
+
+    while (true) {
+      $plaintext = $this->readPlaintext($maximum as PositiveInt);
+      if ($plaintext == null) {
+        $this->reachedEnd = true;
+        return '';
+      }
+
+      if ($plaintext != '') {
+        return $plaintext;
+      }
+
+      $ciphertext = $this->stream->tryRead(65536);
+      if ($ciphertext == '') {
+        if ($this->stream->reachedEndOfDataSource()) {
+          $this->receiveEnd();
+          continue;
+        }
+
+        return '';
+      }
+
+      $this->receiveCiphertext($ciphertext);
+      $this->flushNonBlocking();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->flushNonBlocking();
+    if ($this->writeBuffer == '') {
+      return;
+    }
+
+    $this->stream->waitUntilWritable($cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryWrite(string $bytes): int {
+    if ($bytes == '') {
+      return 0;
+    }
+
+    $this->flushNonBlocking();
+    if ($this->writeBuffer != '') {
+      return 0;
+    }
+
+    $written = $this->writePlaintext($bytes);
+    $this->flushNonBlocking();
+    return $written;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    if ($bytes == '') {
+      return 0;
+    }
+
+    $this->flush($cancellation);
+    $written = $this->writePlaintext($bytes);
+    $this->flush($cancellation);
+    return $written;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {
+    if ($direction != ShutdownDirection::Read) {
+      $this->sendCloseNotify();
+      $this->flush(null);
+    }
+
+    $this->stream->shutdown($direction);
+    if ($direction != ShutdownDirection::Write) {
+      $this->reachedEnd = true;
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    if ($this->isClosed()) {
+      return;
+    }
+
+    try {
+      $this->sendCloseNotify();
+      $this->flushNonBlocking();
+    } finally {
+      $this->stream->close();
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function readPlaintext(PositiveInt $maximum): null|string {
+    try {
+      return $this->connection->readPlaintext($maximum);
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function writePlaintext(string $bytes): int {
+    try {
+      return $this->connection->writePlaintext($bytes);
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function receiveCiphertext(string $bytes): void {
+    try {
+      $this->connection->receiveCiphertext($bytes);
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function receiveEnd(): void {
+    if ($this->receivedEnd) {
+      return;
+    }
+
+    try {
+      $this->connection->receiveEnd();
+      $this->receivedEnd = true;
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function sendCloseNotify(): void {
+    if ($this->sentCloseNotify) {
+      return;
+    }
+
+    try {
+      $this->connection->sendCloseNotify();
+      $this->sentCloseNotify = true;
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function nextCiphertext(): string {
+    try {
+      return $this->connection->transmitCiphertext(65536);
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function flushNonBlocking(): void {
+    while (true) {
+      if ($this->writeBuffer == '') {
+        $this->writeBuffer = $this->nextCiphertext();
+        if ($this->writeBuffer == '') {
+          return;
+        }
+      }
+
+      $written = $this->stream->tryWrite($this->writeBuffer);
+      if ($written <= 0) {
+        return;
+      }
+
+      if ($written == length!($this->writeBuffer)) {
+        $this->writeBuffer = '';
+      } else {
+        $this->writeBuffer = Str\slice($this->writeBuffer, $written);
+      }
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function flush(null|CancellationToken $cancellation): void {
+    while (true) {
+      if ($this->writeBuffer == '') {
+        $this->writeBuffer = $this->nextCiphertext();
+        if ($this->writeBuffer == '') {
+          return;
+        }
+      }
+
+      $this->stream->writeAll($this->writeBuffer, $cancellation);
+      $this->writeBuffer = '';
+    }
+  }
+}

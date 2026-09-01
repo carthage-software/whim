@@ -1,0 +1,12 @@
+namespace Whim\Iterate;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+
+/** Creates a fresh iterator over a sequence of entries. */
+#[Stub]
+interface ToIterator<out K, out V> {
+  /** Creates an iterator positioned before its first entry. */
+  #[TrackCaller]
+  public function toIterator(): Iterator<K, V>;
+}

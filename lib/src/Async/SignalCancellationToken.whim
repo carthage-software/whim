@@ -1,0 +1,88 @@
+namespace Whim\Async;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+use Whim\_Private\CallbackRegistry;
+
+/** Represents a signal cancellation token. */
+final class SignalCancellationToken implements CancellationToken {
+  private bool $cancelled = false;
+  private null|CancelledException $exception = null;
+  private CallbackRegistry $callbacks;
+
+  public function __construct() {
+    $this->callbacks = new CallbackRegistry();
+  }
+
+  /**
+   * Cancels pending work.
+   *
+   * @throws CompositeException when more than one cancellation callback fails; a single failure is rethrown as itself.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function cancel(null|Throwable $cause = null): void {
+    if ($this->cancelled) {
+      return;
+    }
+
+    $this->cancelled = true;
+    $this->exception = new CancelledException(
+      'the operation was cancelled',
+      0,
+      $cause,
+    );
+
+    $callbacks = $this->callbacks->drain();
+    $errors = vec[];
+    foreach ($callbacks as $callback) {
+      try {
+        $callback();
+      } catch (Throwable $error) {
+        $errors[] = $error;
+      }
+    }
+
+    if (length!($errors) == 1) {
+      throw $errors[0];
+    }
+
+    if (length!($errors) > 1) {
+      throw new CompositeException($errors);
+    }
+  }
+
+  /** Registers a callback for cancellation. */
+  #[TrackCaller]
+  public function register(fn(): void $callback): int {
+    if ($this->cancelled) {
+      $callback();
+      return -1;
+    }
+
+    return $this->callbacks->insert($callback);
+  }
+
+  /** Removes a registered cancellation callback. */
+  #[TrackCaller]
+  public function unregister(int $id): void {
+    $this->callbacks->remove($id);
+  }
+
+  /** Reports whether cancellation was requested. */
+  #[AlwaysInline]
+  public function isCancellationRequested(): bool {
+    return $this->cancelled;
+  }
+
+  /** Throws when cancellation was requested. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function throwIfCancellationRequested(): void {
+    if ($this->exception != null) {
+      throw $this->exception;
+    }
+  }
+}

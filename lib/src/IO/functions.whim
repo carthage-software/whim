@@ -1,0 +1,92 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\IO\_Private;
+use Whim;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Creates a connected readable and writable pipe. */
+#[TrackCaller]
+function pipe(
+): (ReadHandle&FileDescriptorHandle, WriteHandle&FileDescriptorHandle) {
+  ($read, $write) = Whim\_Private\create_pipe();
+  Whim\_Private\set_descriptor_non_blocking($read, true);
+  Whim\_Private\set_descriptor_non_blocking($write, true);
+
+  return (
+    new _Private\ReadHandleImpl($read),
+    new _Private\WriteHandleImpl($write),
+  );
+}
+
+/** Returns the process's C standard output stream: libc owns the buffering, `flush` is `fflush`. */
+#[TrackCaller]
+function write_handle(): BufferedWriteHandle&FileDescriptorHandle {
+  ($_input, $output, $_error) = Whim\_Private\standard_descriptors();
+  return new _Private\WriteHandleImpl($output);
+}
+
+/** Returns the process's C standard input stream: libc owns the buffering, reads are `fread`. */
+#[TrackCaller]
+function input_handle(): ReadHandle&FileDescriptorHandle {
+  ($input, $_output, $_error) = Whim\_Private\standard_descriptors();
+  return new _Private\ReadHandleImpl($input);
+}
+
+/** Returns the process's C standard error stream: libc owns the buffering, `flush` is `fflush`. */
+#[TrackCaller]
+function error_handle(): BufferedWriteHandle&FileDescriptorHandle {
+  ($_input, $_output, $error) = Whim\_Private\standard_descriptors();
+  return new _Private\WriteHandleImpl($error);
+}
+
+/** Copies every byte from a readable handle to a writable handle. */
+#[TrackCaller]
+function copy(
+  ReadHandle $reader,
+  WriteHandle $writer,
+  null|CancellationToken $cancellation = null,
+): int {
+  return copy_chunked($reader, $writer, 8192, $cancellation);
+}
+
+/**
+ * Copies bytes between handles using a caller-selected chunk size.
+ *
+ * @throws InvalidArgumentException when the chunk size is not positive.
+ * @throws Whim\Async\CancelledException when the cancellation token is cancelled.
+ */
+#[NeverInline]
+#[TrackCaller]
+function copy_chunked(
+  ReadHandle $reader,
+  WriteHandle $writer,
+  int $chunkSize,
+  null|CancellationToken $cancellation = null,
+): int {
+  if ($chunkSize <= 0) {
+    throw new InvalidArgumentException('$chunkSize must be greater than zero');
+  }
+
+  $copied = 0;
+  while (true) {
+    $data = match ($reader->read($chunkSize, $cancellation)) {
+      '' => match ($reader->reachedEndOfDataSource()) {
+        true => break,
+        false => continue,
+      },
+      $data => $data,
+    };
+
+    $writer->writeAll($data, $cancellation);
+    $copied += length!($data);
+  }
+
+  if ($writer is BufferedWriteHandle) {
+    $writer->flush($cancellation);
+  }
+
+  return $copied;
+}

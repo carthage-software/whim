@@ -1,0 +1,6 @@
+namespace Whim\File;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports a file that does not exist. */
+final class NotFoundException extends InvalidArgumentException {}

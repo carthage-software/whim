@@ -1,0 +1,23 @@
+namespace Whim\Compression;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** Creates streaming compressors and decompressors for one content coding. */
+interface Codec {
+  /** Returns the HTTP content-coding name. */
+  #[MustUse]
+  #[TrackCaller]
+  public function coding(): NonEmptyString;
+
+  /** Creates a fresh compression stream. */
+  #[MustUse]
+  #[TrackCaller]
+  public function createCompressor(): Compressor;
+
+  /** Creates a fresh decompression stream. */
+  #[MustUse]
+  #[TrackCaller]
+  public function createDecompressor(): Decompressor;
+}

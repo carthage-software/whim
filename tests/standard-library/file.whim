@@ -1,0 +1,168 @@
+use Whim\Env;
+use Whim\File;
+use Whim\File\WriteMode;
+use Whim\Filesystem;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\InvalidArgumentException;
+
+assert!(Env\current_script() is string);
+
+$directory = Filesystem\create_temporary_directory(null, 'whim-test-');
+$file = $directory . '/file.data';
+
+$temporaryFile = Filesystem\create_temporary_file($directory);
+assert!(Filesystem\is_file($temporaryFile));
+Filesystem\delete_file($temporaryFile);
+
+$invalidTemporaryFilePrefix = null;
+try {
+  Filesystem\create_temporary_file($directory, '../escaped-');
+} catch (InvalidArgumentException $error) {
+  $invalidTemporaryFilePrefix = $error;
+}
+
+assert!($invalidTemporaryFilePrefix is InvalidArgumentException);
+
+$invalidTemporaryDirectoryPrefix = null;
+try {
+  Filesystem\create_temporary_directory($directory, 'nested/prefix-');
+} catch (InvalidArgumentException $error) {
+  $invalidTemporaryDirectoryPrefix = $error;
+}
+
+assert!($invalidTemporaryDirectoryPrefix is InvalidArgumentException);
+
+File\write($file, 'abcdef');
+assert!(File\read($file) == 'abcdef');
+File\write($file, 'XY');
+assert!(File\read($file) == 'XYcdef');
+
+File\write($file, '++', WriteMode::Append);
+assert!(File\read($file) == 'XYcdef++');
+assert!(File\read($file, 2, 4) == 'cdef');
+assert!(File\read($file, 6) == '++');
+
+File\write($file, "fresh\x00bytes", WriteMode::Truncate);
+assert!(File\read($file) == "fresh\x00bytes");
+
+$appended = $directory . '/file.append';
+File\write($appended, 'tail', WriteMode::Append);
+assert!(File\read($appended) == 'tail');
+
+$created = $directory . '/file.created';
+File\write($created, 'new', WriteMode::MustCreate);
+assert!(File\read($created) == 'new');
+
+$assertion_value_10 = function() use ($created): void {
+  File\write($created, 'again', WriteMode::MustCreate);
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (File\AlreadyCreatedException $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is File\AlreadyCreatedException);
+assert!($assertion_error_10 is Whim\Unwind\RuntimeException);
+
+$missing = null;
+$assertion_callable_11 = fn(): string => (
+  File\read($directory . '/file.missing')
+);
+
+try {
+  $assertion_callable_11();
+} catch (File\NotFoundException $assertion_caught_11) {
+  $missing = $assertion_caught_11;
+}
+
+assert!($missing is File\NotFoundException);
+assert!($missing is Whim\Unwind\InvalidArgumentException);
+
+$frame = $missing->getTrace()[0];
+assert!($frame->function == 'Whim\File\read');
+assert!($frame->file == '<std>/File/functions.whim');
+assert!($frame->line > 0);
+
+assert!(Env\current_directory() is string);
+$assertion_value_16 = fn(): string => File\read($directory);
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (File\NotFileException $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is File\NotFileException);
+
+$assertion_value_17 = function(): void {
+  File\write('', 'no path');
+};
+
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (TypeError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is TypeError);
+
+$assertion_value_18 = fn(): string => File\read($file, -1);
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is TypeError);
+$assertion_value_19 = fn(): string => File\read($file, 0, 0);
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is TypeError);
+
+$assertion_value_20 = function() use ($file): void {
+  File\write($file, 'invalid', null);
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (TypeError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is TypeError);
+
+Filesystem\delete_directory($directory, true);
+
+$maskDirectory = Filesystem\create_temporary_directory(null, 'whim-mask-');
+$originalMask = Filesystem\exchange_creation_mask(0o077);
+try {
+  assert!(Filesystem\exchange_creation_mask(0o027) == 0o077);
+  assert!(Filesystem\exchange_creation_mask(0o077) == 0o027);
+
+  $maskedFile = $maskDirectory . '/masked';
+  Filesystem\create_file($maskedFile, 0o666);
+  assert!(Filesystem\metadata($maskedFile)->permissions == 0o600);
+
+  $maskError = null;
+  try {
+    discard!(Filesystem\exchange_creation_mask(0o1000));
+  } catch (TypeError $error) {
+    $maskError = $error;
+  }
+
+  assert!($maskError is TypeError);
+} finally {
+  discard!(Filesystem\exchange_creation_mask($originalMask));
+  Filesystem\delete_directory($maskDirectory, true);
+}

@@ -1,0 +1,109 @@
+assert!(Whim\_Private\SIGNAL_INTERRUPT > 0);
+assert!(Whim\_Private\ERRNO_NOT_FOUND > 0);
+assert!(Whim\_Private\OPEN_FLAG_READ_ONLY is int);
+assert!(Whim\_Private\SEEK_ORIGIN_START is int);
+assert!(Whim\_Private\FILE_TYPE_DIRECTORY is int);
+assert!(Whim\_Private\RESOURCE_LIMIT_OPEN_FILES is int);
+assert!(Whim\_Private\LOCK_KIND_EXCLUSIVE is int);
+assert!(Whim\_Private\STREAM_DISPOSITION_PIPE is int);
+assert!(Whim\_Private\SOCKET_FAMILY_INET is int);
+assert!(Whim\_Private\SOCKET_KIND_STREAM is int);
+assert!(Whim\_Private\SOCKET_LEVEL_SOCKET is int);
+assert!(Whim\_Private\SOCKET_OPTION_REUSE_ADDRESS is int);
+$directory = Whim\_Private\create_temporary_directory(
+  Whim\_Private\temporary_directory(),
+  'whim-syscall-',
+);
+
+$path = $directory . '/data';
+$openOperation = Whim\_Private\FileOperation::open(
+  $path,
+  Whim\_Private\OPEN_FLAG_READ_WRITE
+  | Whim\_Private\OPEN_FLAG_CREATE
+  | Whim\_Private\OPEN_FLAG_EXCLUSIVE,
+  384,
+);
+
+$openOperation->wait();
+$descriptor = $openOperation->takeDescriptor() as Whim\OS\FileDescriptor;
+
+assert!(!($descriptor->isClosed()));
+assert!($descriptor->toInt() >= 0);
+assert!(Whim\_Private\write_descriptor($descriptor, 'abcdef') == 6);
+assert!(Whim\Filesystem\metadata($path)->size == 6);
+assert!(Whim\_Private\path_exists($path, true));
+assert!(Whim\_Private\check_access($path, true, true, false, false));
+
+$link = $directory . '/link';
+Whim\_Private\create_symbolic_link('data', $link);
+assert!(Whim\_Private\read_symbolic_link($link) == 'data');
+assert!(Whim\_Private\path_exists($link, false));
+assert!(Whim\_Private\resolve_path($link) == Whim\_Private\resolve_path($path));
+
+$entries = Whim\_Private\read_directory($directory);
+assert!(length!($entries) == 2);
+assert!(Whim\_Private\filesystem_space($directory)[0] > 0);
+
+($read, $write) = Whim\_Private\create_pipe();
+assert!(Whim\_Private\write_descriptor($write, 'pipe') == 4);
+assert!(Whim\_Private\read_descriptor($read, 4) == 'pipe');
+$read->close();
+$write->close();
+
+($left, $right) = Whim\_Private\create_socket_pair();
+assert!(Whim\_Private\write_descriptor($left, 'socket') == 6);
+assert!(Whim\_Private\read_descriptor($right, 6) == 'socket');
+$left->close();
+$right->close();
+
+assert!(Whim\_Private\parent_process_id() > 0);
+assert!(Whim\_Private\process_user() is (int, int));
+assert!(Whim\_Private\process_group() is (int, int));
+assert!(Whim\_Private\process_supplementary_groups() is vec<int>);
+
+assert!(Whim\_Private\session_id(0) > 0);
+assert!(Whim\_Private\process_group_id(0) > 0);
+assert!(Whim\_Private\process_priority(0) is int);
+assert!(
+  Whim\_Private\resource_limit(Whim\_Private\RESOURCE_LIMIT_OPEN_FILES) is (
+      int,
+      int,
+    ),
+);
+
+$resolution = Whim\_Private\HostResolutionOperation::start(
+  'localhost',
+  Whim\_Private\SOCKET_FAMILY_INET,
+);
+
+$resolution->wait();
+$resolved = $resolution->take() as vec<(int, (string&!''))>;
+assert!(length!($resolved) > 0);
+
+$openError = null;
+$assertion_callable_59 = function() use ($directory): mixed {
+  $operation = Whim\_Private\FileOperation::open(
+    $directory . '/missing',
+    Whim\_Private\OPEN_FLAG_READ_ONLY,
+    0,
+  );
+
+  $operation->wait();
+  return $operation->takeDescriptor();
+};
+
+try {
+  $assertion_callable_59();
+} catch (Whim\_Private\SystemError $assertion_caught_59) {
+  $openError = $assertion_caught_59;
+}
+
+assert!($openError is Whim\_Private\SystemError);
+
+assert!($openError->call() == 'open');
+assert!($openError->errno() == Whim\_Private\ERRNO_NOT_FOUND);
+
+$descriptor->close();
+Whim\_Private\remove_file($link);
+Whim\_Private\remove_file($path);
+Whim\_Private\remove_directory($directory);

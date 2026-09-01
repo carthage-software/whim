@@ -1,0 +1,16 @@
+namespace Whim\TLS;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Endpoint;
+use Whim\Network\Listener as NetworkListener;
+
+/** Wraps a listener so each accepted stream completes a TLS handshake. */
+#[MustUse]
+#[TrackCaller]
+function listen<TEndpoint: Endpoint>(
+  NetworkListener<TEndpoint> $listener,
+  ServerConfiguration $configuration,
+): Listener<TEndpoint> {
+  return new _Private\ListenerImpl::<TEndpoint>($listener, $configuration);
+}

@@ -1,0 +1,14 @@
+namespace Whim\TLS;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Network\Endpoint;
+use Whim\Network\Stream as NetworkStream;
+
+/** An encrypted stream over any connected byte transport. */
+interface Stream<out TEndpoint: Endpoint> extends NetworkStream<TEndpoint> {
+  /** Returns the negotiated TLS state. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getConnectionState(): ConnectionState;
+}

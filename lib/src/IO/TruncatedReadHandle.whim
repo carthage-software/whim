@@ -1,0 +1,64 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Presents at most a configured number of bytes from another source. */
+final class TruncatedReadHandle implements ReadHandle {
+  private int $consumed = 0;
+
+  /**
+   * Creates a truncated view over a readable handle.
+   *
+   * @throws InvalidArgumentException when the limit is negative.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(private ReadHandle $handle, private int $limit) {
+    if ($limit < 0) {
+      throw new InvalidArgumentException(
+        'the truncation limit cannot be negative',
+      );
+    }
+  }
+
+  /** Waits for the source while bytes remain inside the truncation. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->consumed < $this->limit) {
+      $this->handle->waitUntilReadable($cancellation);
+    }
+  }
+
+  /** Reports the truncation or underlying source as exhausted. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    if ($this->consumed >= $this->limit) {
+      return true;
+    }
+
+    return $this->handle->reachedEndOfDataSource();
+  }
+
+  /** Attempts a read without crossing the truncation boundary. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    $remaining = $this->limit - $this->consumed;
+    if ($remaining <= 0) {
+      return '';
+    }
+
+    $wanted = $remaining;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $remaining) {
+      $wanted = $maxBytes;
+    }
+
+    $data = $this->handle->tryRead($wanted);
+    $this->consumed += length!($data);
+    return $data;
+  }
+}

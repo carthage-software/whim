@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** The root of arithmetic execution errors. */
+#[Stub]
+class ArithmeticError extends Error {}

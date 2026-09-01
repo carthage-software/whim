@@ -1,0 +1,33 @@
+namespace Whim\File;
+
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\IO\FileDescriptorHandle;
+use Whim\IO\SeekHandle;
+use Whim\Option\Option;
+
+/** Defines the common capabilities of an open file handle. */
+interface Handle extends SeekHandle, FileDescriptorHandle {
+  /** Returns the path used to open the file. */
+  #[TrackCaller]
+  public function getPath(): string;
+
+  /** Returns the current file size in bytes. */
+  #[TrackCaller]
+  public function getSize(): int;
+
+  /** Attempts to run a callback while holding an advisory lock. */
+  #[TrackCaller]
+  public function tryLocked<T>(
+    LockType $type,
+    fn(static): T $function,
+  ): Option<T>;
+
+  /** Runs a callback while holding an advisory lock. */
+  #[TrackCaller]
+  public function locked<T>(
+    LockType $type,
+    fn(static): T $function,
+    null|CancellationToken $cancellation = null,
+  ): T;
+}

@@ -1,0 +1,129 @@
+use Whim;
+use Whim\IP\Address;
+use Whim\IRI\Authority;
+use Whim\IRI\IPHost;
+use Whim\IRI\IPvFutureHost;
+use Whim\IRI\IRI;
+use Whim\IRI\RegisteredNameHost;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\URI\URI;
+
+$iri = IRI::from('https://usér@例え.テスト:8443/café/東京?q=élissa#résumé');
+assert!($iri->scheme == 'https');
+assert!($iri->path == '/café/東京');
+assert!($iri->query == 'q=élissa');
+assert!($iri->fragment == 'résumé');
+assert!($iri->isAbsolute());
+assert!(
+  $iri->toString() == 'https://usér@例え.テスト:8443/café/東京?q=élissa#résumé',
+);
+
+$authority = $iri->authority as Authority;
+assert!($authority->userInfo == 'usér');
+assert!($authority->port == '8443');
+assert!($authority->host is RegisteredNameHost);
+assert!($authority->host->toString() == '例え.テスト');
+
+$relative = IRI::from('../画像/猫?名前=ミケ#写真');
+assert!($relative->scheme == null);
+assert!($relative->authority == null);
+assert!(!($relative->isAbsolute()));
+assert!($relative->toString() == '../画像/猫?名前=ミケ#写真');
+
+$empty = IRI::from('scheme://host:?#');
+assert!(($empty->authority as Authority)->port == '');
+assert!($empty->query == '');
+assert!($empty->fragment == '');
+
+$ipv4 = Authority::from('192.0.2.1')->host;
+assert!($ipv4 is IPHost);
+assert!(($ipv4 as IPHost)->address->equals(Address::v4('192.0.2.1')));
+
+$ipv6 = Authority::from('[2001:db8::1]:443');
+assert!($ipv6->host is IPHost);
+assert!($ipv6->host->toString() == '[2001:db8::1]');
+
+$future = Authority::from('[v1.fe80]')->host;
+assert!($future is IPvFutureHost);
+assert!($future->toString() == '[v1.fe80]');
+
+assert!(RegisteredNameHost::parse('bad host') == null);
+assert!(IPvFutureHost::parse('v.not-hex') == null);
+assert!(IRI::parse('http://[not-an-ip]/') == null);
+assert!(IRI::parse('http://example.com/%zz') == null);
+assert!(IRI::parse("http://example.com/line\nbreak") == null);
+$assertion_value_29 = fn(): IRI => IRI::from('http://[not-an-ip]/');
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (InvalidArgumentException $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is InvalidArgumentException);
+
+$built = IRI::fromComponents(
+  'https',
+  Authority::fromParts(
+    RegisteredNameHost::from('münich.example'),
+    '使用者',
+    '443',
+  ),
+  '/資料',
+  '頁=1',
+  '先頭',
+);
+
+assert!(
+  $built->toString() == 'https://使用者@münich.example:443/資料?頁=1#先頭',
+);
+
+$assertion_value_31 = fn(): IRI => (
+  IRI::fromComponents(null, Authority::from('example.com'), 'relative')
+);
+
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (InvalidArgumentException $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is InvalidArgumentException);
+
+$uri = $iri->toURI();
+assert!(
+  $uri->toString()
+  == 'https://us%C3%A9r@xn--r8jz45g.xn--zckzah:8443/caf%C3%A9/%E6%9D%B1%E4%BA%AC?q=%C3%A9lissa#r%C3%A9sum%C3%A9',
+);
+
+assert!(IRI::fromURI($uri)->toString() == $iri->toString());
+
+$escaped = IRI::fromURI(
+  URI::from('https://xn--mnich-kva.example/a%20b/%C3%A9/%2F?q=%E6%9D%B1'),
+);
+
+assert!($escaped->toString() == 'https://münich.example/a%20b/é/%2F?q=東');
+
+assert!(
+  IRI::from(
+    'HTTP://Example.COM/%7euser/../café/./資料',
+  )->normalize()->toString()
+  == 'http://example.com/café/資料',
+);
+
+$base = IRI::from('http://例え.テスト/a/b/c?q');
+assert!(
+  Whim\IRI\resolve($base, IRI::from('../画像'))->toString()
+  == 'http://例え.テスト/a/画像',
+);
+
+$changed = $iri
+  ->withScheme('http')
+  ->withAuthority(Authority::from('example.net'))
+  ->withPath('/new')
+  ->withQuery(null)
+  ->withFragment(null);
+
+assert!($changed->toString() == 'http://example.net/new');
+assert!($changed->equals(IRI::from('http://example.net/new')));

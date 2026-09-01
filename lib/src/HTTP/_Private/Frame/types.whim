@@ -1,0 +1,69 @@
+namespace Whim\HTTP\_Private\Frame;
+
+use Whim\HTTP\_Private\ConnectionStreamId;
+use Whim\HTTP\_Private\ErrorCodeValue;
+use Whim\HTTP\_Private\SettingId;
+use Whim\HTTP\_Private\SettingValue;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\_Private\WindowIncrement;
+use Whim\Refine\Uint8;
+use Whim\Refine\Weakend;
+
+/** Application bytes carried on a stream. */
+type DataFrame = (0, StreamId, string, bool, Uint8);
+
+/** An HPACK fragment which opens or continues a message section. */
+type HeadersFrame = (
+  1,
+  StreamId,
+  string,
+  bool,
+  bool,
+  null|ConnectionStreamId,
+  null|(1..=256),
+  bool,
+  Uint8,
+);
+
+/** A deprecated stream dependency signal which receivers still parse. */
+type PriorityFrame = (2, StreamId, ConnectionStreamId, 1..=256, bool);
+
+/** Abruptly ends one stream. */
+type RstStreamFrame = (3, StreamId, ErrorCodeValue);
+
+/** Changes peer constraints or acknowledges a prior change. */
+type SettingsFrame = (4, dict<SettingId, SettingValue>, bool);
+
+/** Reserves a server-initiated stream. */
+type PushPromiseFrame = (5, StreamId, StreamId, string, bool, Uint8);
+
+/** An eight-byte liveness probe or acknowledgment. */
+type PingFrame = (6, string, bool);
+
+/** Starts graceful connection shutdown. */
+type GoAwayFrame = (7, ConnectionStreamId, ErrorCodeValue, string);
+
+/** Increases a stream or connection receive window. */
+type WindowUpdateFrame = (8, ConnectionStreamId, WindowIncrement);
+
+/** Continues an unfinished HPACK block. */
+type ContinuationFrame = (9, StreamId, string, bool);
+
+/** An extension frame unknown to this implementation. */
+type UnknownFrame = (10, Uint8, Uint8, ConnectionStreamId, string);
+
+/** A decoded HTTP/2 frame. */
+type Frame = DataFrame
+| HeadersFrame
+| PriorityFrame
+| RstStreamFrame
+| SettingsFrame
+| PushPromiseFrame
+| PingFrame
+| GoAwayFrame
+| WindowUpdateFrame
+| ContinuationFrame
+| UnknownFrame;
+
+/** An HTTP/2 frame checked only for its common tagged-tuple shape. */
+type WeakendFrame = Weakend<Frame, (int, ...)>;

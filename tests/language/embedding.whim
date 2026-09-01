@@ -1,0 +1,79 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+
+$work = Filesystem\create_temporary_directory(null, 'whim-embed-');
+$expected = "alpha\x00beta\r\n\xff";
+File\write($work . '/payload.bin', $expected);
+File\write(
+  $work . '/embedded.whim',
+  'const EMBED_TEST_CONSTANT = embed!(\'./payload.bin\');'
+  . "\n"
+  . 'final class EmbedTestHolder {'
+  . "\n"
+  . '  public string $value = embed!(\'./payload.bin\');'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'function embed_test_default('
+  . "\n"
+  . '  string $value = embed!(\'./payload.bin\'),'
+  . "\n"
+  . '): string {'
+  . "\n"
+  . '  return $value;'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'function embed_test_read(): string {'
+  . "\n"
+  . '  return embed!(\'./payload.bin\');'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'Whim\\File\\write(directory!() . \'/payload.bin\', \'changed-value\');'
+  . "\n",
+);
+
+require!($work . '/embedded.whim');
+assert!(EMBED_TEST_CONSTANT == $expected);
+assert!(new EmbedTestHolder()->value == $expected);
+assert!(embed_test_default() == $expected);
+assert!(embed_test_read() == $expected);
+assert!(File\read($work . '/payload.bin') == 'changed-value');
+
+File\write($work . '/missing.whim', '$value = embed!(\'./absent\');' . "\n");
+$missing = null;
+try {
+  require!($work . '/missing.whim');
+} catch (CompilerError $error) {
+  $missing = $error;
+}
+
+assert!($missing is CompilerError);
+
+File\write(
+  $work . '/absolute.whim',
+  '$value = embed!(\'/tmp/whim-embed-forbidden\');' . "\n",
+);
+
+$absolute = null;
+try {
+  require!($work . '/absolute.whim');
+} catch (CompilerError $error) {
+  $absolute = $error;
+}
+
+assert!($absolute is CompilerError);
+
+File\write($work . '/directory.whim', '$value = embed!(\'.\');' . "\n");
+$directory = null;
+try {
+  require!($work . '/directory.whim');
+} catch (CompilerError $error) {
+  $directory = $error;
+}
+
+assert!($directory is CompilerError);
+
+Filesystem\delete_directory($work, true);

@@ -1,0 +1,360 @@
+use Whim\Unwind\Exception;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+
+class UnwrapException extends Exception {
+  public function __construct(string $message, public mixed $cause = null) {
+    parent::__construct($message);
+  }
+}
+
+interface Result<out T, out E> for Ok, Err {
+  public function isOk(): bool;
+
+  public function isErr(): bool;
+
+  public function unwrap(): T;
+
+  public function unwrapErr(): E;
+
+  public function unwrapOr<D>(D $default): T|D;
+
+  public function unwrapOrElse<D>(fn(E): D $fallback): T|D;
+
+  public function map<U>(fn(T): U $function): Result<U, E>;
+
+  public function mapErr<F>(fn(E): F $function): Result<T, F>;
+
+  public function mapOr<U>(U $default, fn(T): U $function): U;
+
+  public function andThen<U, F>(fn(T): Result<U, F> $function): Result<U, E|F>;
+
+  public function orElse<V, F>(fn(E): Result<V, F> $function): Result<T|V, F>;
+
+  public function ok(): null|T;
+
+  public function err(): null|E;
+
+  public function inspect(fn(T): void $function): Result<T, E>;
+
+  public function inspectErr(fn(E): void $function): Result<T, E>;
+}
+
+final readonly class Ok<out T> implements Result<T, never> {
+  public function __construct(public T $value) {}
+
+  public function isOk(): bool {
+    return true;
+  }
+
+  public function isErr(): bool {
+    return false;
+  }
+
+  public function unwrap(): T {
+    return $this->value;
+  }
+
+  public function unwrapErr(): never {
+    throw new UnwrapException('called unwrapErr() on an Ok');
+  }
+
+  public function unwrapOr<D>(D $default): T {
+    return $this->value;
+  }
+
+  public function unwrapOrElse<D>(fn(never): D $fallback): T {
+    return $this->value;
+  }
+
+  public function map<U>(fn(T): U $function): Result<U, never> {
+    return new Ok::<U>($function($this->value));
+  }
+
+  public function mapErr<F>(fn(never): F $function): Result<T, F> {
+    return $this;
+  }
+
+  public function mapOr<U>(U $default, fn(T): U $function): U {
+    return $function($this->value);
+  }
+
+  public function andThen<U, F>(fn(T): Result<U, F> $function): Result<U, F> {
+    return $function($this->value);
+  }
+
+  public function orElse<V, F>(
+    fn(never): Result<V, F> $function,
+  ): Result<T, never> {
+    return $this;
+  }
+
+  public function ok(): T {
+    return $this->value;
+  }
+
+  public function err(): null {
+    return null;
+  }
+
+  public function inspect(fn(T): void $function): Result<T, never> {
+    $function($this->value);
+    return $this;
+  }
+
+  public function inspectErr(fn(never): void $function): Result<T, never> {
+    return $this;
+  }
+}
+
+final readonly class Err<out E> implements Result<never, E> {
+  public function __construct(public E $error) {}
+
+  public function isOk(): bool {
+    return false;
+  }
+
+  public function isErr(): bool {
+    return true;
+  }
+
+  public function unwrap(): never {
+    throw new UnwrapException('called unwrap() on an Err', $this->error);
+  }
+
+  public function unwrapErr(): E {
+    return $this->error;
+  }
+
+  public function unwrapOr<D>(D $default): D {
+    return $default;
+  }
+
+  public function unwrapOrElse<D>(fn(E): D $fallback): D {
+    return $fallback($this->error);
+  }
+
+  public function map<U>(fn(never): U $function): Result<never, E> {
+    return $this;
+  }
+
+  public function mapErr<F>(fn(E): F $function): Result<never, F> {
+    return new Err::<F>($function($this->error));
+  }
+
+  public function mapOr<U>(U $default, fn(never): U $function): U {
+    return $default;
+  }
+
+  public function andThen<U, F>(
+    fn(never): Result<U, F> $function,
+  ): Result<never, E> {
+    return $this;
+  }
+
+  public function orElse<V, F>(fn(E): Result<V, F> $function): Result<V, F> {
+    return $function($this->error);
+  }
+
+  public function ok(): null {
+    return null;
+  }
+
+  public function err(): E {
+    return $this->error;
+  }
+
+  public function inspect(fn(never): void $function): Result<never, E> {
+    return $this;
+  }
+
+  public function inspectErr(fn(E): void $function): Result<never, E> {
+    $function($this->error);
+    return $this;
+  }
+}
+
+function attempt<T, E: Throwable>(fn(): T $callback): Result<T, E> {
+  try {
+    return new Ok::<T>($callback());
+  } catch (E $error) {
+    return new Err::<E>($error);
+  }
+}
+
+function parse_length(string $value): Result<int, string> {
+  if ($value == '') {
+    return new Err::<string>('empty');
+  }
+
+  return new Ok::<int>(length!($value));
+}
+
+function divide_hundred(int $value): Result<int, string> {
+  if ($value == 0) {
+    return new Err::<string>('division by zero');
+  }
+
+  return new Ok::<int>(100 / $value);
+}
+
+function recover_retryable(string $error): Result<int, string> {
+  if ($error == 'retryable') {
+    return new Ok::<int>(0);
+  }
+
+  return new Err::<string>('fatal: ' . $error);
+}
+
+$ok = new Ok::<int>(42);
+assert!($ok is Ok<int>);
+assert!($ok is Result<int, never>);
+assert!($ok is Result<int, string>);
+assert!($ok->isOk());
+assert!(!($ok->isErr()));
+assert!($ok->unwrap() == 42);
+assert!($ok->unwrapOr::<string>('fallback') == 42);
+assert!($ok->unwrapOr::<string>('fallback') is int|string);
+
+$err = new Err::<string>('boom');
+assert!($err is Err<string>);
+assert!($err is Result<never, string>);
+assert!($err is Result<int, string>);
+assert!(!($err->isOk()));
+assert!($err->isErr());
+assert!($err->unwrapErr() == 'boom');
+assert!($err->unwrapOr::<int>(7) == 7);
+assert!($err->unwrapOr::<int>(7) is int|string);
+
+$thrown = attempt::<never, UnwrapException>(fn(): never => $err->unwrap());
+assert!($thrown is Err<UnwrapException>);
+assert!($thrown->unwrapErr() is UnwrapException);
+
+$thrown = attempt::<never, UnwrapException>(fn(): never => $ok->unwrapErr());
+assert!($thrown is Err<UnwrapException>);
+
+assert!($ok->unwrapOrElse::<string>(fn(never $_): string => 'unused') == 42);
+
+assert!(
+  $err->unwrapOrElse::<int>(fn(string $message): int => length!($message)) == 4,
+);
+
+$mapped = $ok->map::<int>(fn(int $value): int => $value * 2);
+assert!($mapped is Ok<int>);
+assert!($mapped->unwrap() == 84);
+
+$mapped = $ok->map::<string>(fn(int $value): string => 'n=' . $value);
+assert!($mapped is Result<string, never>);
+assert!($mapped->unwrap() == 'n=42');
+
+$untouched = $err->map::<int>(fn(never $value): int => 0);
+assert!($untouched is Err<string>);
+assert!($untouched->unwrapErr() == 'boom');
+
+$adapted = $err->mapErr::<int>(fn(string $value): int => length!($value));
+assert!($adapted is Result<never, int>);
+assert!($adapted->unwrapErr() == 4);
+
+$untouched = $ok->mapErr::<string>(fn(never $value): string => 'unused');
+assert!($untouched is Ok<int>);
+assert!($untouched->unwrap() == 42);
+
+assert!($ok->mapOr::<int>(-1, fn(int $value): int => $value + 1) == 43);
+
+assert!($err->mapOr::<int>(-1, fn(never $value): int => 0) == -1);
+
+$chained = new Ok::<string>('abc')->andThen::<int, string>(parse_length(...));
+assert!($chained is Ok<int>);
+assert!($chained->unwrap() == 3);
+
+$shorted = new Err::<string>('upstream')->andThen::<int, string>(
+  fn(never $value): Result<int, string> => new Ok::<int>(0),
+);
+
+assert!($shorted is Err<string>);
+assert!($shorted->unwrapErr() == 'upstream');
+
+$to_error = new Ok::<string>('')->andThen::<int, string>(parse_length(...));
+assert!($to_error is Err<string>);
+assert!($to_error->unwrapErr() == 'empty');
+
+$skipped = new Ok::<int>(1)->orElse::<int, string>(
+  fn(never $error): Result<int, string> => new Err::<string>('unused'),
+);
+
+assert!($skipped is Ok<int>);
+assert!($skipped->unwrap() == 1);
+
+$recovered = new Err::<string>('retryable')->orElse::<int, string>(
+  recover_retryable(...),
+);
+
+assert!($recovered is Ok<int>);
+assert!($recovered->unwrap() == 0);
+
+$still_error = new Err::<string>('boom')->orElse::<int, string>(
+  recover_retryable(...),
+);
+
+assert!($still_error is Err<string>);
+assert!($still_error->unwrapErr() == 'fatal: boom');
+
+assert!($ok->ok() == 42);
+assert!($ok->err() == null);
+assert!($err->ok() == null);
+assert!($err->err() == 'boom');
+
+class Observation {
+  public mixed $value = null;
+}
+
+$observation = new Observation();
+$same = $ok->inspect(function(int $value) use ($observation): void {
+  $observation->value = $value;
+});
+
+assert!($same is Ok<int>);
+assert!($same->unwrap() == 42);
+assert!($observation->value == 42);
+
+$observation->value = null;
+$same = $err->inspectErr(function(string $error) use ($observation): void {
+  $observation->value = $error;
+});
+
+assert!($same is Err<string>);
+assert!($observation->value == 'boom');
+
+$good = attempt::<int, RuntimeException>(fn(): int => 1 + 1);
+assert!($good is Ok<int>);
+assert!($good->unwrap() == 2);
+
+$bad = attempt::<int, RuntimeException>(
+  fn(): int => throw new RuntimeException('kaboom'),
+);
+
+assert!($bad is Err<RuntimeException>);
+assert!($bad->unwrapErr()->getMessage() == 'kaboom');
+
+$escaped = attempt::<never, LogicException>(
+  fn(): never => (
+    attempt::<int, TypeError>(
+      fn(): int => throw new LogicException('leak'),
+    )->unwrap()
+  ),
+);
+
+assert!($escaped is Err<LogicException>);
+
+$pipeline = new Ok::<int>(5)
+  ->map::<int>(fn(int $value): int => $value - 5)
+  ->andThen::<int, string>(divide_hundred(...))
+  ->orElse::<int, never>(
+    fn(string $error): Result<int, never> => new Ok::<int>(-1),
+  )
+  ->unwrapOr::<int>(0);
+
+assert!($pipeline == -1);
+assert!($pipeline is int);

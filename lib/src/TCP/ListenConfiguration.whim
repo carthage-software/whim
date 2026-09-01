@@ -1,0 +1,54 @@
+namespace Whim\TCP;
+
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\PositiveInt;
+
+/** Configures a TCP listener. */
+final readonly class ListenConfiguration implements Default {
+  #[AlwaysInline]
+  public function __construct(
+    public bool $noDelay = false,
+    public bool $reuseAddress = false,
+    public bool $reusePort = false,
+    public bool $onlyIPv6 = true,
+    public PositiveInt $backlog = 512,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withNoDelay(bool $noDelay): ListenConfiguration {
+    return clone!($this, noDelay: $noDelay);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withReuseAddress(bool $reuseAddress): ListenConfiguration {
+    return clone!($this, reuseAddress: $reuseAddress);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withReusePort(bool $reusePort): ListenConfiguration {
+    return clone!($this, reusePort: $reusePort);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withOnlyIPv6(bool $onlyIPv6): ListenConfiguration {
+    return clone!($this, onlyIPv6: $onlyIPv6);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBacklog(PositiveInt $backlog): ListenConfiguration {
+    return clone!($this, backlog: $backlog);
+  }
+}

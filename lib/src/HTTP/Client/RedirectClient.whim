@@ -1,0 +1,194 @@
+namespace Whim\HTTP\Client;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\IO\Exception as IOException;
+use Whim\IO\ReadHandle;
+use Whim\IO\SeekHandle;
+use Whim\IO\SeekWhence;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\NetworkException;
+use Whim\Refine\NonNegativeInt;
+use Whim\Str;
+use Whim\URI\URI;
+use Whim\URL\URL;
+
+/** Follows safe HTTP redirects through another client. */
+final readonly class RedirectClient implements Client {
+  public function __construct(
+    private Client $client,
+    private NonNegativeInt $maximumRedirects = 10,
+    private bool $automaticReferrer = true,
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function send(
+    Request $request,
+    SendConfiguration $configuration = new SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $redirects = 0;
+    $body = $request->body;
+    $bodyOffset = null;
+    if ($body is SeekHandle) {
+      $bodyOffset = $body->seek(0, SeekWhence::Current);
+    }
+
+    while (true) {
+      $transaction = $this->client->send(
+        $request,
+        $configuration,
+        $cancellation,
+      );
+
+      $response = $transaction->response;
+      if (!($response->status is 301|302|303|307|308)) {
+        return $transaction;
+      }
+
+      $locations = $response->headers->getAll('location');
+      if (length!($locations) != 1 || $locations[0] == '') {
+        return $transaction;
+      }
+
+      $redirects++;
+      $this->discardBody($response->body, $cancellation);
+      if ($redirects > $this->maximumRedirects) {
+        throw new TooManyRedirectsException(
+          'the request exceeded ' . $this->maximumRedirects . ' redirects',
+        );
+      }
+
+      $originalURL = $request->url;
+      $targetURL = $this->resolveLocation($locations[0], $originalURL);
+      $request = $request->withURL($targetURL);
+
+      $rewriteToGet = match ($response->status) {
+        301 | 302 => $request->method == Message\METHOD_POST,
+        303 => $request->method != Message\METHOD_GET
+        && $request->method != Message\METHOD_HEAD,
+        $_ => false,
+      };
+
+      if ($rewriteToGet) {
+        $request = $request
+          ->withMethod(Message\METHOD_GET)
+          ->withBody(null)
+          ->withTrailers(null)
+          ->withoutHeader('content-length')
+          ->withoutHeader('content-type')
+          ->withoutHeader('transfer-encoding');
+
+        $body = null;
+        $bodyOffset = null;
+      }
+
+      if ($request->body != null) {
+        if (!($body is SeekHandle) || $bodyOffset == null) {
+          throw new RequestException(
+            'the request body cannot be replayed across a redirect',
+          );
+        }
+
+        discard!($body->seek($bodyOffset));
+      }
+
+      if (
+        $originalURL != null
+        && !$this->sameOrigin($originalURL, $targetURL)
+      ) {
+        $request = $request
+          ->withoutHeader('authorization')
+          ->withoutHeader('cookie')
+          ->withoutHeader('host')
+          ->withoutHeader('proxy-authorization');
+      }
+
+      if ($this->automaticReferrer && $originalURL != null) {
+        if ($originalURL->scheme != 'https' || $targetURL->scheme == 'https') {
+          $request = $request->withHeader(
+            'referer',
+            $this->referrer($originalURL),
+          );
+        } else {
+          $request = $request->withoutHeader('referer');
+        }
+      }
+    }
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function resolveLocation(string $location, null|URL $base): URL {
+    $reference = URI::parse($location);
+    if ($reference == null) {
+      throw new ProtocolException('invalid redirect URL: `' . $location . '`');
+    }
+
+    $target = match ($base) {
+      null => URL::parseURI($reference),
+      $url @ URL => URL::parseURI(Whim\URI\resolve($url->toURI(), $reference)),
+    };
+
+    if ($target == null) {
+      throw new ProtocolException('invalid redirect URL: `' . $location . '`');
+    }
+
+    return $target;
+  }
+
+  #[MustUse]
+  private function sameOrigin(URL $left, URL $right): bool {
+    $leftOrigin = Origin::fromURL($left);
+    $rightOrigin = Origin::fromURL($right);
+    return (
+      Str\lowercase($leftOrigin->scheme) == Str\lowercase($rightOrigin->scheme)
+      && Str\lowercase($leftOrigin->host->toString()) == Str\lowercase(
+        $rightOrigin->host->toString(),
+      )
+      && $leftOrigin->port == $rightOrigin->port
+    );
+  }
+
+  #[MustUse]
+  private function referrer(URL $url): string {
+    $referrer = $url->scheme . '://' . $url->authority->host->toString();
+    if ($url->authority->port != null) {
+      $referrer .= ':' . $url->authority->port;
+    }
+
+    $referrer .= $url->path;
+    if ($url->query != null) {
+      $referrer .= '?' . $url->query;
+    }
+
+    return $referrer;
+  }
+
+  #[TrackCaller]
+  private function discardBody(
+    null|ReadHandle $body,
+    null|CancellationToken $cancellation,
+  ): void {
+    if ($body == null) {
+      return;
+    }
+
+    try {
+      while (!$body->reachedEndOfDataSource()) {
+        if ($body->read(8192, $cancellation) == '') {
+          return;
+        }
+      }
+    } catch (IOException|NetworkException $_) {
+    }
+  }
+}

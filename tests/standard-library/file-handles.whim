@@ -1,0 +1,224 @@
+use Whim;
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\File;
+use Whim\File\LockType;
+use Whim\File\WriteMode;
+use Whim\Filesystem;
+use Whim\IO;
+use Whim\OS\FileDescriptor;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+use Whim\_Private\FileOperation;
+
+($pipeReader, $pipeWriter) = Whim\_Private\create_pipe();
+$operation = FileOperation::read($pipeReader, 1);
+$producer = Async\spawn::<null>(function() use ($pipeWriter): null {
+  discard!(Whim\_Private\write_descriptor($pipeWriter, 'x'));
+  return null;
+});
+
+$operation->wait();
+assert!($operation->takeBytes() == 'x');
+$producer->await();
+$pipeReader->close();
+$pipeWriter->close();
+
+$directory = Filesystem\create_temporary_directory(null, 'whim-test-');
+$path = $directory . '/handles.data';
+$bytes = "hello\x00world";
+
+$writer = File\open_write_only($path, WriteMode::Truncate);
+assert!($writer is File\WriteHandle);
+assert!($writer is File\Handle);
+assert!($writer is IO\WriteHandle);
+assert!($writer is IO\FileDescriptorHandle);
+assert!($writer->getFileDescriptor() is FileDescriptor);
+assert!($writer->getFileDescriptor()->toInt() >= 0);
+$writer->writeAll($bytes);
+$writer->synchronize();
+$writer->truncate(11);
+
+$writeCancellation = new SignalCancellationToken();
+$writeCancellation->cancel();
+$assertion_value_8 = fn(): int => $writer->write('changed', $writeCancellation);
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (CancelledException $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is CancelledException);
+
+assert!($writer->getPath() == $path);
+$writer->close();
+$assertion_value_10 = fn(): FileDescriptor => $writer->getFileDescriptor();
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (RuntimeException $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is RuntimeException);
+
+$reader = File\open_read_only($path);
+assert!($reader is File\ReadHandle);
+assert!($reader is IO\ReadHandle);
+assert!($reader is IO\FileDescriptorHandle);
+assert!($reader->getFileDescriptor() is FileDescriptor);
+assert!($reader->readAll() == $bytes);
+assert!($reader->reachedEndOfDataSource());
+$reader->close();
+
+$reader = File\open_read_only($path);
+assert!($reader->getSize() == 11);
+
+$assertion_value_18 = fn(): string => $reader->tryRead(-1);
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (InvalidArgumentException $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is InvalidArgumentException);
+
+$cancelled = new SignalCancellationToken();
+$cancelled->cancel();
+$assertion_value_19 = fn(): int => (
+  $reader->locked::<int>(LockType::Shared, fn($handle): int => 1, $cancelled)
+);
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (CancelledException $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is CancelledException);
+
+$reader->close();
+
+$reader = File\open_read_only($path);
+assert!($reader->readFixedSize(5) == 'hello');
+$reader->close();
+
+$reader = File\open_read_only($path);
+$reader->close();
+$assertion_value_21 = fn(): string => $reader->readAll();
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (RuntimeException $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is RuntimeException);
+
+$reader = File\open_read_only($path);
+$value = $reader->locked::<int>(LockType::Shared, fn($handle): int => 7);
+assert!($value == 7);
+
+$maybe = $reader->tryLocked::<int>(LockType::Exclusive, fn($handle): int => 9);
+$assertion_value_23 = $maybe;
+assert!($assertion_value_23 is Whim\Option\Some<int>);
+$assertion_inner_23 = $assertion_value_23->value;
+assert!($assertion_inner_23 == 9);
+$reader->close();
+
+$handle = File\open_read_write($path, WriteMode::Truncate);
+assert!($handle is File\ReadHandle);
+assert!($handle is File\WriteHandle);
+assert!($handle is IO\FileDescriptorHandle);
+assert!($handle->getFileDescriptor() is FileDescriptor);
+$handle->writeAll('roundtrip');
+$handle->seek(0);
+assert!($handle->readAll() == 'roundtrip');
+assert!($handle->getSize() == 9);
+$handle->waitUntilReadable();
+$handle->waitUntilWritable();
+$handle->close();
+
+$assertion_value_30 = function() use ($handle): void {
+  $handle->waitUntilReadable();
+};
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (RuntimeException $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is RuntimeException);
+
+$assertion_value_31 = function() use ($handle): void {
+  $handle->waitUntilWritable();
+};
+
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (RuntimeException $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is RuntimeException);
+
+$resizePath = $directory . '/resize.data';
+$resize = File\open_read_write($resizePath, WriteMode::Truncate);
+$resize->writeAll('abc');
+$resize->synchronize();
+assert!($resize->getSize() == 3);
+
+$resize->truncate(6);
+assert!($resize->getSize() == 6);
+$resize->seek(0);
+assert!($resize->readAll() == "abc\x00\x00\x00");
+assert!($resize->reachedEndOfDataSource());
+
+$resize->truncate(7);
+assert!(!$resize->reachedEndOfDataSource());
+assert!($resize->readAll() == "\x00");
+
+$resize->truncate(1);
+assert!($resize->getSize() == 1);
+$resize->seek(0);
+assert!($resize->readAll() == 'a');
+
+$operationCancellation = new SignalCancellationToken();
+$operationCancellation->cancel();
+$synchronizeError = null;
+try {
+  $resize->synchronize($operationCancellation);
+} catch (CancelledException $error) {
+  $synchronizeError = $error;
+}
+
+assert!($synchronizeError is CancelledException);
+
+$truncateError = null;
+try {
+  $resize->truncate(0, $operationCancellation);
+} catch (CancelledException $error) {
+  $truncateError = $error;
+}
+
+assert!($truncateError is CancelledException);
+assert!($resize->getSize() == 1);
+$resize->close();
+
+$closedTruncateError = null;
+try {
+  $resize->truncate(0);
+} catch (RuntimeException $error) {
+  $closedTruncateError = $error;
+}
+
+assert!($closedTruncateError is RuntimeException);
+
+Filesystem\delete_directory($directory, true);

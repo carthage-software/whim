@@ -1,0 +1,7 @@
+namespace Whim\HTTP\_Private;
+
+/** Which endpoint owns a connection. */
+enum Role {
+  case Client;
+  case Server;
+}

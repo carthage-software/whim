@@ -1,0 +1,8 @@
+namespace Whim\Network;
+
+/** Selects which direction of a stream to shut down. */
+enum ShutdownDirection: int {
+  case Read = 0;
+  case Write = 1;
+  case Both = 2;
+}

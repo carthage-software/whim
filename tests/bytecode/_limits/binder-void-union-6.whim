@@ -1,0 +1,1 @@
+$f = fn<T = int|void>(): int => 1;

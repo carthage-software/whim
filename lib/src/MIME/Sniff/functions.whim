@@ -1,0 +1,33 @@
+namespace Whim\MIME\Sniff;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\IO\SeekHandle;
+use Whim\IO\SeekWhence;
+use Whim\MIME\MediaType;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Detects a media type from bytes. */
+#[MustUse]
+function from_string(string $content): MediaType {
+  return MediaType::from(Whim\_Private\mime_sniff($content));
+}
+
+/** Detects a media type without changing a seekable handle's position. */
+#[MustUse]
+#[TrackCaller]
+function from_handle(
+  ReadHandle&SeekHandle $handle,
+  null|CancellationToken $cancellation = null,
+): MediaType {
+  $position = $handle->seek(0, SeekWhence::Current);
+  try {
+    $content = $handle->readAll(4096, $cancellation);
+  } finally {
+    $handle->seek($position);
+  }
+
+  return from_string($content);
+}

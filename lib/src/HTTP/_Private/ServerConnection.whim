@@ -1,0 +1,60 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private\Event\WeakendEvent;
+use Whim\HTTP\_Private\SettingId;
+use Whim\HTTP\_Private\SettingValue;
+use Whim\Marker\TrackCaller;
+
+/** A server-side sans-I/O HTTP/2 connection. */
+final class ServerConnection extends ConnectionImpl {
+  public function __construct(null|Configuration $configuration = null) {
+    parent::__construct(Role::Server, $configuration ?? new Configuration());
+  }
+
+  /** Seeds stream one after an HTTP/1.1 to HTTP/2 upgrade. */
+  #[TrackCaller]
+  public function acceptUpgradeRequest(
+    vec<Header> $headers,
+    dict<SettingId, SettingValue> $settings,
+  ): vec<WeakendEvent> {
+    return Whim\HTTP\_Private\accept_upgrade_request(
+      $this->state,
+      $headers,
+      $settings,
+    );
+  }
+
+  /** Reserves a server stream and sends its promised request fields. */
+  #[TrackCaller]
+  public function sendPushPromise(
+    StreamId $streamId,
+    StreamId $promisedStreamId,
+    vec<Header> $headers,
+  ): void {
+    Whim\HTTP\_Private\send_push_promise(
+      $this->state,
+      $streamId,
+      $promisedStreamId,
+      $headers,
+    );
+  }
+
+  #[TrackCaller]
+  public function sendResponseHeaders(
+    StreamId $streamId,
+    vec<Header> $headers,
+    100..=599 $status,
+    null|int $contentLength,
+    bool $endStream,
+  ): void {
+    send_response_headers(
+      $this->state,
+      $streamId,
+      $headers,
+      $status,
+      $contentLength,
+      $endStream,
+    );
+  }
+}

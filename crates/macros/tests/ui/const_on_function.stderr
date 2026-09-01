@@ -1,0 +1,5 @@
+error: expected `const`
+ --> tests/ui/const_on_function.rs:6:1
+  |
+6 | fn not_a_constant() {}
+  | ^^

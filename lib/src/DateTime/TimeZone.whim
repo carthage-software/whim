@@ -1,0 +1,209 @@
+namespace Whim\DateTime;
+
+use Whim;
+use Whim\_Private\DateTimeZone as DateTimeZoneImpl;
+use Whim\Comparison\Equal;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+
+/** An immutable IANA timezone or fixed UTC offset. */
+final readonly class TimeZone implements Equal<TimeZone> {
+  #[AlwaysInline]
+  private function __construct(private DateTimeZoneImpl $inner) {}
+
+  /** Parses an IANA timezone name or fixed offset, or returns null. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $identifier): null|TimeZone {
+    $inner = DateTimeZoneImpl::parse($identifier) ?? return null;
+
+    return new TimeZone($inner);
+  }
+
+  /** Parses an IANA timezone name or fixed offset. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $identifier): TimeZone {
+    $timezone = TimeZone::parse($identifier);
+    if ($timezone == null) {
+      throw new InvalidArgumentException(
+        'invalid timezone: `' . $identifier . '`',
+      );
+    }
+
+    return $timezone;
+  }
+
+  /** Returns UTC. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function utc(): TimeZone {
+    return TimeZone::fixedOffset(0);
+  }
+
+  /** Creates a fixed UTC offset measured in seconds. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fixedOffset(OffsetSeconds $seconds): TimeZone {
+    $inner = DateTimeZoneImpl::fixedOffset($seconds);
+    if ($inner == null) {
+      throw new InvalidArgumentException('invalid UTC offset');
+    }
+
+    return new TimeZone($inner);
+  }
+
+  /** Detects the system timezone. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function system(): TimeZone {
+    $inner = DateTimeZoneImpl::system();
+    if ($inner == null) {
+      throw new RuntimeException('unable to detect the system timezone');
+    }
+
+    return new TimeZone($inner);
+  }
+
+  /** Returns the canonical timezone identifier. */
+  #[MustUse]
+  #[TrackCaller]
+  public function identifier(): string {
+    return $this->inner->identifier();
+  }
+
+  /** Returns the UTC offset at a system time. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function offsetAt(SystemTime $time): Duration {
+    $offset = $this->inner->offsetAt($time->seconds, $time->nanoseconds);
+    if ($offset == null) {
+      throw new InvalidArgumentException(
+        'the system time is outside the supported date-time range',
+      );
+    }
+
+    return Duration::fromSeconds($offset);
+  }
+
+  /** Returns the timezone abbreviation at a system time. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function abbreviationAt(SystemTime $time): string {
+    $abbreviation = $this->inner->abbreviationAt(
+      $time->seconds,
+      $time->nanoseconds,
+    );
+
+    if ($abbreviation == null) {
+      throw new InvalidArgumentException(
+        'the system time is outside the supported date-time range',
+      );
+    }
+
+    return $abbreviation;
+  }
+
+  /** Returns the prior offset transition. */
+  #[MustUse]
+  #[TrackCaller]
+  public function previousTransition(SystemTime $time): null|SystemTime {
+    $transition =
+      $this->inner->previousTransition($time->seconds, $time->nanoseconds)
+      ?? return null;
+
+    return SystemTime::fromUnixTimestamp($transition[0], $transition[1]);
+  }
+
+  /** Returns the next offset transition. */
+  #[MustUse]
+  #[TrackCaller]
+  public function nextTransition(SystemTime $time): null|SystemTime {
+    $transition =
+      $this->inner->nextTransition($time->seconds, $time->nanoseconds)
+      ?? return null;
+
+    return SystemTime::fromUnixTimestamp($transition[0], $transition[1]);
+  }
+
+  /** Converts a system time to this timezone. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function at(SystemTime $time): ZonedDateTime {
+    $parts = Whim\_Private\date_time_localize(
+      $this->inner,
+      $time->seconds,
+      $time->nanoseconds,
+    );
+
+    if ($parts == null) {
+      throw new InvalidArgumentException(
+        'the system time is outside the supported date-time range',
+      );
+    }
+
+    return ZonedDateTime::fromPartsUnsafe(
+      $time,
+      $this,
+      DateTime::fromPartsUnsafe(
+        $parts[0],
+        $parts[1],
+        $parts[2],
+        $parts[3],
+        $parts[4],
+        $parts[5],
+        $parts[6],
+      ),
+      $parts[7],
+      $parts[8],
+    );
+  }
+
+  /** Resolves a local date and time in this timezone. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function resolve(
+    DateTime $dateTime,
+    Disambiguation $disambiguation = Disambiguation::Compatible,
+  ): ZonedDateTime {
+    $resolved = Whim\_Private\date_time_resolve(
+      $this->inner,
+      $dateTime->date->year,
+      $dateTime->date->month->value,
+      $dateTime->date->day,
+      $dateTime->time->hour,
+      $dateTime->time->minute,
+      $dateTime->time->second,
+      $dateTime->time->nanosecond,
+      $disambiguation->value,
+    );
+
+    if ($resolved == null) {
+      throw new InvalidArgumentException(
+        'the local time cannot be resolved in this timezone',
+      );
+    }
+
+    return $this->at(SystemTime::fromUnixTimestamp($resolved[0], $resolved[1]));
+  }
+
+  /** Reports whether two timezones have the same identifier. */
+  #[MustUse]
+  #[TrackCaller]
+  public function equals(TimeZone $other): bool {
+    return $this->identifier() == $other->identifier();
+  }
+}

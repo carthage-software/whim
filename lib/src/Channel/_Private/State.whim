@@ -1,0 +1,283 @@
+namespace Whim\Channel\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Async\CancellationToken;
+use Whim\Async\_Private as AsyncPrivate;
+use Whim\Channel\ClosedException;
+use Whim\Channel\EmptyException;
+use Whim\Channel\FullException;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Unwind\Throwable;
+use Whim\_Private\RingBuffer;
+use Whim;
+
+/** Represents a state. */
+final class State<T> implements ReceiverState<T>, SenderState<T> {
+  private RingBuffer<T> $buffer;
+  private bool $closed = false;
+  private RingBuffer<AsyncPrivate\Waiter<null>> $sendWaiters;
+  private RingBuffer<AsyncPrivate\Waiter<null>> $receiveWaiters;
+
+  /** Creates a state. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private readonly null|PositiveInt $capacity) {
+    $this->buffer = new RingBuffer::<T>();
+    $this->sendWaiters = new RingBuffer::<AsyncPrivate\Waiter<null>>();
+    $this->receiveWaiters = new RingBuffer::<AsyncPrivate\Waiter<null>>();
+  }
+
+  /** Returns the channel capacity when it is bounded. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getCapacity(): null|NonNegativeInt {
+    return $this->capacity;
+  }
+
+  /** Closes the resource to further operations. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    while (!$this->sendWaiters->isEmpty()) {
+      $waiter = $this->sendWaiters->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+      }
+    }
+
+    while (!$this->receiveWaiters->isEmpty()) {
+      $waiter = $this->receiveWaiters->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+      }
+    }
+  }
+
+  /** Reports whether the resource is closed. */
+  #[AlwaysInline]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  /** Returns the number of buffered values. */
+  #[AlwaysInline]
+  public function count(): NonNegativeInt {
+    return $this->buffer->count();
+  }
+
+  /** Reports whether the channel buffer is full. */
+  #[AlwaysInline]
+  public function isFull(): bool {
+    return $this->capacity != null && $this->buffer->count() >= $this->capacity;
+  }
+
+  /** Reports whether the channel buffer is empty. */
+  #[AlwaysInline]
+  public function isEmpty(): bool {
+    return $this->buffer->isEmpty();
+  }
+
+  /** Attempts to send a value without waiting. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function trySend(T $value): void {
+    if ($this->closed) {
+      throw new ClosedException('the channel is closed');
+    }
+
+    if ($this->isFull()) {
+      throw new FullException('the channel is full');
+    }
+
+    $this->buffer->pushBack($value);
+    $this->wakeReceiver();
+  }
+
+  /** Waits until a value can be sent. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilSendable(
+    null|CancellationToken $cancellation,
+  ): void {
+    while (true) {
+      if ($cancellation != null) {
+        $cancellation->throwIfCancellationRequested();
+      }
+
+      if ($this->closed) {
+        throw new ClosedException('the channel is closed');
+      }
+
+      if (!$this->isFull()) {
+        return;
+      }
+
+      $this->wait(true, $cancellation);
+    }
+  }
+
+  /** Sends a value, waiting until the channel can accept it. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function send(T $value, null|CancellationToken $cancellation): void {
+    while (true) {
+      if ($cancellation != null) {
+        $cancellation->throwIfCancellationRequested();
+      }
+
+      if ($this->closed) {
+        throw new ClosedException('the channel is closed');
+      }
+
+      if (!$this->isFull()) {
+        $this->buffer->pushBack($value);
+        $this->wakeReceiver();
+        return;
+      }
+
+      $this->wait(true, $cancellation);
+    }
+  }
+
+  /** Attempts to receive a value without waiting. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryReceive(): T {
+    if (!$this->isEmpty()) {
+      $value = $this->buffer->popFrontUnsafe();
+      $this->wakeSender();
+      return $value;
+    }
+
+    if ($this->closed) {
+      throw new ClosedException('the channel is closed');
+    }
+
+    throw new EmptyException('the channel is empty');
+  }
+
+  /** Waits until a value can be received. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReceivable(
+    null|CancellationToken $cancellation,
+  ): void {
+    while (true) {
+      if ($cancellation != null) {
+        $cancellation->throwIfCancellationRequested();
+      }
+
+      if (!$this->isEmpty()) {
+        return;
+      }
+
+      if ($this->closed) {
+        throw new ClosedException('the channel is closed');
+      }
+
+      $this->wait(false, $cancellation);
+    }
+  }
+
+  /** Receives a value, waiting until one is available. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function receive(null|CancellationToken $cancellation): T {
+    while (true) {
+      if ($cancellation != null) {
+        $cancellation->throwIfCancellationRequested();
+      }
+
+      if (!$this->isEmpty()) {
+        $value = $this->buffer->popFrontUnsafe();
+        $this->wakeSender();
+        return $value;
+      }
+
+      if ($this->closed) {
+        throw new ClosedException('the channel is closed');
+      }
+
+      $this->wait(false, $cancellation);
+    }
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function wait(
+    bool $sending,
+    null|CancellationToken $cancellation,
+  ): void {
+    $suspension = Whim\_Private\create_suspension::<null>();
+    $waiter = new AsyncPrivate\Waiter::<null>($suspension);
+
+    if ($sending) {
+      $this->sendWaiters->pushBack($waiter);
+    } else {
+      $this->receiveWaiters->pushBack($waiter);
+    }
+
+    $id = null;
+    if ($cancellation != null) {
+      $id = $cancellation->register(fn(): void {
+        if (!$waiter->active) {
+          return;
+        }
+
+        $waiter->active = false;
+        try {
+          $cancellation->throwIfCancellationRequested();
+        } catch (Throwable $error) {
+          $waiter->suspension->throw($error);
+        }
+      });
+    }
+
+    try {
+      $suspension->suspend();
+    } finally {
+      $waiter->active = false;
+      if ($cancellation != null && $id != null) {
+        $cancellation->unregister($id);
+      }
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function wakeSender(): void {
+    while (!$this->sendWaiters->isEmpty()) {
+      $waiter = $this->sendWaiters->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+        return;
+      }
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function wakeReceiver(): void {
+    while (!$this->receiveWaiters->isEmpty()) {
+      $waiter = $this->receiveWaiters->popFrontUnsafe();
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+        return;
+      }
+    }
+  }
+}

@@ -1,0 +1,107 @@
+namespace Whim\Option;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\Frameless;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Consumer;
+use Whim\Refine\Predicate;
+use Whim\Refine\Supplier;
+use Whim\Refine\Transform;
+use Whim\Result\Ok;
+
+/** Represents an option containing a value. */
+final readonly class Some<out T> implements Option<T> {
+  /** Creates an option containing a value. */
+  #[AlwaysInline]
+  public function __construct(public T $value) {}
+
+  /** Reports whether the option contains a value. */
+  #[Frameless]
+  #[MustUse]
+  public function isSome(): true {
+    return true;
+  }
+
+  /** Reports whether the option contains no value. */
+  #[Frameless]
+  #[MustUse]
+  public function isNone(): false {
+    return false;
+  }
+
+  /** Returns the contained success value or fails. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function unwrap(): T {
+    return $this->value;
+  }
+
+  /** Returns the contained value or the supplied default. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function unwrapOr<D>(D $default): T {
+    return $this->value;
+  }
+
+  /** Returns the contained value or computes a fallback. */
+  #[MustUse]
+  #[TrackCaller]
+  public function unwrapOrElse<D>(Supplier<D> $fallback): T {
+    return $this->value;
+  }
+
+  /** Transforms the contained success value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function map<U>(Transform<T, U> $function): Some<U> {
+    return new Some::<U>($function($this->value));
+  }
+
+  /** Transforms the contained value or returns a default. */
+  #[MustUse]
+  #[TrackCaller]
+  public function mapOr<U>(U $default, Transform<T, U> $function): U {
+    return $function($this->value);
+  }
+
+  /** Chains another operation after a successful value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function andThen<U>(Transform<T, Option<U>> $function): Option<U> {
+    return $function($this->value);
+  }
+
+  /** Recovers from an error or absent value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function orElse<V>(Supplier<Option<V>> $function): Some<T> {
+    return $this;
+  }
+
+  /** Retains a contained value only when it matches. */
+  #[MustUse]
+  #[TrackCaller]
+  public function filter(Predicate<T> $predicate): Some<T>|None {
+    if ($predicate($this->value)) {
+      return $this;
+    }
+
+    return new None();
+  }
+
+  /** Converts an option into a result. */
+  #[MustUse]
+  #[TrackCaller]
+  public function okOr<E>(E $error): Ok<T> {
+    return new Ok::<T>($this->value);
+  }
+
+  /** Observes a contained success value without changing it. */
+  #[MustUse]
+  #[TrackCaller]
+  public function inspect(Consumer<T> $function): Some<T> {
+    $function($this->value);
+    return $this;
+  }
+}

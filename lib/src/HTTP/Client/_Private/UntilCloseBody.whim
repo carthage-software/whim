@@ -1,0 +1,54 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+
+/** Reads an HTTP/1 response body delimited by transport close. */
+final class UntilCloseBody implements ReadHandle {
+  private int $readBytes = 0;
+
+  public function __construct(
+    private ReadHandle $reader,
+    private int $maximumBytes,
+  ) {}
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->reader->waitUntilReadable($cancellation);
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->reader->reachedEndOfDataSource();
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    $data = $this->reader->tryRead($maxBytes);
+    $this->account($data);
+    return $data;
+  }
+
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    $data = $this->reader->read($maxBytes, $cancellation);
+    $this->account($data);
+    return $data;
+  }
+
+  private function account(string $data): void {
+    $this->readBytes += length!($data);
+    if ($this->readBytes > $this->maximumBytes) {
+      throw new ProtocolException(
+        'the response body exceeds its configured limit',
+      );
+    }
+  }
+}

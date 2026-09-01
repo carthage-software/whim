@@ -1,0 +1,96 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Defines a source from which bytes can be read. */
+interface ReadHandle extends Handle {
+  /** Waits until the handle can produce bytes or reaches its end. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Reports whether the source has reached its end. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool;
+
+  /** Attempts one non-blocking read. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string;
+
+  /** Reads bytes, waiting when necessary. */
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($maxBytes == 0) {
+      return '';
+    }
+
+    while (!$this->reachedEndOfDataSource()) {
+      $data = $this->tryRead($maxBytes);
+      if ($data != '') {
+        return $data;
+      }
+
+      $this->waitUntilReadable($cancellation);
+    }
+
+    return '';
+  }
+
+  /** Reads until the source ends or a byte bound is reached. */
+  #[TrackCaller]
+  public function readAll(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    $result = '';
+    while ($maxBytes == null || length!($result) < $maxBytes) {
+      $remaining = null;
+      if ($maxBytes != null) {
+        $remaining = $maxBytes - length!($result);
+      }
+
+      $chunk = match ($this->read($remaining, $cancellation)) {
+        '' => break,
+        $chunk => $chunk,
+      };
+
+      $result .= $chunk;
+    }
+
+    return $result;
+  }
+
+  /**
+   * Reads exactly the requested number of bytes.
+   *
+   * @throws InvalidArgumentException when the size is negative.
+   * @throws Exception when the source ends before the size is reached.
+   * @throws Whim\Async\CancelledException when the cancellation token is cancelled.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function readFixedSize(
+    int $size,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($size < 0) {
+      throw new InvalidArgumentException('$size must be non-negative');
+    }
+
+    $data = $this->readAll($size, $cancellation);
+    if (length!($data) < $size) {
+      throw new Exception(
+        'the data source ended before the requested number of bytes was read',
+      );
+    }
+
+    return $data;
+  }
+}

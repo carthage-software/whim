@@ -1,0 +1,213 @@
+namespace Whim\HTTP\Session\Storage;
+
+use Whim\Async\CancellationToken;
+use Whim\Database;
+use Whim\Database\Connection;
+use Whim\Database\Connector;
+use Whim\Database\QueryException;
+use Whim\Database\Row;
+use Whim\HTTP\Session\ConflictException;
+use Whim\HTTP\Session\Data;
+use Whim\Json;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Stores sessions in any supported SQL database. */
+final readonly class DatabaseStore implements Store {
+  /** Creates the session table when needed. */
+  #[TrackCaller]
+  public function __construct(private Connector $connector) {
+    using ($connection = $connector->connect()) {
+      using (
+        $_ = $connection->execute(
+          'CREATE TABLE IF NOT EXISTS whim_http_sessions ('
+          . 'identifier TEXT PRIMARY KEY, '
+          . 'data TEXT NOT NULL, '
+          . 'revision BIGINT NOT NULL, '
+          . 'expires_at_seconds BIGINT NOT NULL, '
+          . 'expires_at_nanoseconds BIGINT NOT NULL'
+          . ')',
+        ),
+      ) {}
+    }
+  }
+
+  /** Loads an unexpired record, or null when none exists. */
+  #[MustUse]
+  #[TrackCaller]
+  public function load(
+    NonEmptyString $identifier,
+    null|CancellationToken $cancellation = null,
+  ): null|Record {
+    $now = SystemTime::now();
+    using ($connection = $this->connector->connect($cancellation)) {
+      $row = Database\fetch_one(
+        $connection->execute(
+          'SELECT data, revision FROM whim_http_sessions '
+          . 'WHERE identifier = $1 AND ('
+          . 'expires_at_seconds > $2 OR ('
+          . 'expires_at_seconds = $2 AND expires_at_nanoseconds > $3'
+          . '))',
+          vec[$identifier, $now->seconds, $now->nanoseconds],
+          $cancellation,
+        ),
+        $cancellation,
+      );
+
+      if ($row == null) {
+        $this->deleteExpired($connection, $identifier, $now, $cancellation);
+        return null;
+      }
+
+      $row = $row as Row;
+      $encoded = $row[0] as NonEmptyString;
+      $revision = $row[1] as NonNegativeInt;
+      $data = Json\decode($encoded);
+      if (!($data is Data)) {
+        throw new QueryException('the database returned invalid session data');
+      }
+
+      return new Record($data as Data, $revision);
+    }
+  }
+
+  /** Creates a record that does not already exist. */
+  #[TrackCaller]
+  public function create(
+    NonEmptyString $identifier,
+    Data $data,
+    Duration $ttl,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->validateTtl($ttl);
+    $now = SystemTime::now();
+    $expiresAt = $now->plus($ttl);
+
+    using ($connection = $this->connector->connect($cancellation)) {
+      using (
+        $result = $connection->execute(
+          'INSERT INTO whim_http_sessions ('
+          . 'identifier, data, revision, '
+          . 'expires_at_seconds, expires_at_nanoseconds'
+          . ') VALUES ($1, $2, 0, $3, $4) '
+          . 'ON CONFLICT (identifier) DO UPDATE SET '
+          . 'data = excluded.data, revision = 0, '
+          . 'expires_at_seconds = excluded.expires_at_seconds, '
+          . 'expires_at_nanoseconds = excluded.expires_at_nanoseconds '
+          . 'WHERE whim_http_sessions.expires_at_seconds < $5 OR ('
+          . 'whim_http_sessions.expires_at_seconds = $5 AND '
+          . 'whim_http_sessions.expires_at_nanoseconds <= $6'
+          . ')',
+          vec[
+            $identifier,
+            Json\encode($data),
+            $expiresAt->seconds,
+            $expiresAt->nanoseconds,
+            $now->seconds,
+            $now->nanoseconds,
+          ],
+          $cancellation,
+        ),
+      ) {
+        if ($result->getAffectedRows() != 1) {
+          throw new ConflictException('the session record already exists');
+        }
+      }
+    }
+  }
+
+  /** Replaces a record only when its revision still matches. */
+  #[TrackCaller]
+  public function replace(
+    NonEmptyString $identifier,
+    NonNegativeInt $revision,
+    Data $data,
+    Duration $ttl,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->validateTtl($ttl);
+    $now = SystemTime::now();
+    $expiresAt = $now->plus($ttl);
+
+    using ($connection = $this->connector->connect($cancellation)) {
+      using (
+        $result = $connection->execute(
+          'UPDATE whim_http_sessions SET '
+          . 'data = $1, revision = revision + 1, '
+          . 'expires_at_seconds = $2, expires_at_nanoseconds = $3 '
+          . 'WHERE identifier = $4 AND revision = $5 AND ('
+          . 'expires_at_seconds > $6 OR ('
+          . 'expires_at_seconds = $6 AND expires_at_nanoseconds > $7'
+          . '))',
+          vec[
+            Json\encode($data),
+            $expiresAt->seconds,
+            $expiresAt->nanoseconds,
+            $identifier,
+            $revision,
+            $now->seconds,
+            $now->nanoseconds,
+          ],
+          $cancellation,
+        ),
+      ) {
+        if ($result->getAffectedRows() != 1) {
+          throw new ConflictException('the session record has changed');
+        }
+      }
+    }
+  }
+
+  /** Deletes a record when it exists. */
+  #[TrackCaller]
+  public function delete(
+    NonEmptyString $identifier,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    using ($connection = $this->connector->connect($cancellation)) {
+      using (
+        $_ = $connection->execute(
+          'DELETE FROM whim_http_sessions WHERE identifier = $1',
+          vec[$identifier],
+          $cancellation,
+        ),
+      ) {}
+    }
+  }
+
+  /** Removes one expired record. */
+  #[TrackCaller]
+  private function deleteExpired(
+    Connection $connection,
+    NonEmptyString $identifier,
+    SystemTime $now,
+    null|CancellationToken $cancellation,
+  ): void {
+    using (
+      $_ = $connection->execute(
+        'DELETE FROM whim_http_sessions '
+        . 'WHERE identifier = $1 AND ('
+        . 'expires_at_seconds < $2 OR ('
+        . 'expires_at_seconds = $2 AND expires_at_nanoseconds <= $3'
+        . '))',
+        vec[$identifier, $now->seconds, $now->nanoseconds],
+        $cancellation,
+      ),
+    ) {}
+  }
+
+  /** Rejects a non-positive expiry duration. */
+  #[TrackCaller]
+  private function validateTtl(Duration $ttl): void {
+    if (!$ttl->isPositive()) {
+      throw new InvalidArgumentException(
+        'the session storage TTL must be positive',
+      );
+    }
+  }
+}

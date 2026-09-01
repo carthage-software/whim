@@ -1,0 +1,37 @@
+namespace Whim\Reflection;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Symbol\ClassReflection;
+
+/** Describes one applied attribute without constructing its instance. */
+#[Stub]
+final class AttributeReflection<out T: object> {
+  private function __construct() {}
+
+  /** Returns the attribute class. */
+  #[MustUse]
+  public function getClass(): ClassReflection {}
+
+  /** Returns the reflected declaration carrying this attribute. */
+  #[MustUse]
+  public function getTarget(): DeclarationReflection {}
+
+  /** Returns positional constructor arguments in source order. */
+  #[MustUse]
+  public function getArguments(): vec<mixed> {}
+
+  /** Returns named constructor arguments in source order. */
+  #[MustUse]
+  public function getNamedArguments(): dict<string, mixed> {}
+
+  /** Returns the source span of this attribute application. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Constructs the attribute instance. */
+  #[MustUse]
+  #[TrackCaller]
+  public function newInstance(): T {}
+}

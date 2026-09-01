@@ -1,0 +1,61 @@
+namespace Whim\Filesystem;
+
+use Whim;
+use Whim\Filesystem\_Private;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/**
+ * Deletes the file, symbolic link, or other non-directory node at a path.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws NotFileException when the path points to a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function delete_file(NonEmptyString $path): void {
+  try {
+    Whim\_Private\remove_file($path);
+  } catch (Whim\_Private\SystemError $error) {
+    $denied =
+      $error->errno() == Whim\_Private\ERRNO_PERMISSION_DENIED
+      || $error->errno() == Whim\_Private\ERRNO_OPERATION_NOT_PERMITTED;
+
+    if ($denied && _Private\is_existing_directory($path, false)) {
+      throw new NotFileException(
+        'path `' . $path . '` does not point to a file',
+        $error->errno(),
+      );
+    }
+
+    _Private\failure($error, $path, 'delete file');
+  }
+}
+
+/**
+ * Deletes a directory, descending into its entries when `$recursive` is set.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws NotEmptyException when the directory has entries and `$recursive` is not set.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function delete_directory(NonEmptyString $path, bool $recursive = false): void {
+  if ($recursive) {
+    _Private\delete_directory_recursively($path);
+    return;
+  }
+
+  try {
+    Whim\_Private\remove_directory($path);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'delete directory');
+  }
+}

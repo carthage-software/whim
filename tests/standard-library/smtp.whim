@@ -1,0 +1,529 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\Reader;
+use Whim\IO\WriteHandle;
+use Whim\IP\Address;
+use Whim\Message\Address\Mailbox;
+use Whim\Message\Envelope;
+use Whim\Message\Message;
+use Whim\MIME\Headers;
+use Whim\MIME\Part\RawPart;
+use Whim\Network\InternetEndpoint;
+use Whim\SMTP\Command;
+use Whim\SMTP\Client;
+use Whim\SMTP\Client\Authentication;
+use Whim\SMTP\Client\Authentication\CramMd5Authenticator;
+use Whim\SMTP\Client\Authentication\LoginAuthenticator;
+use Whim\SMTP\Client\Authentication\PlainAuthenticator;
+use Whim\SMTP\Client\Authentication\XOAuth2Authenticator;
+use Whim\SMTP\Client\Connection;
+use Whim\SMTP\Client\DefaultTransport;
+use Whim\SMTP\Client\DeliveryReport;
+use Whim\SMTP\Client\FutureRelease;
+use Whim\SMTP\Client\SendConfiguration;
+use Whim\SMTP\Client\TransportConfiguration;
+use Whim\SMTP\AuthenticationException;
+use Whim\SMTP\DeliverBy;
+use Whim\SMTP\DeliveryStatusNotification;
+use Whim\SMTP\DeliveryStatusReturn;
+use Whim\SMTP\EnhancedStatusCode;
+use Whim\SMTP\Priority;
+use Whim\SMTP\ProtocolException;
+use Whim\SMTP\Reply;
+use Whim\SMTP\Security;
+use Whim\SMTP\_Private\DotStuffingReadHandle;
+use Whim\SMTP\_Private\parse_decimal;
+use Whim\Str;
+use Whim\TCP;
+use Whim\TCP\Listener;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+final class ScriptedDuplex implements ReadHandle, WriteHandle {
+  private MemoryHandle $input;
+  public string $output = '';
+
+  public function __construct(string $input) {
+    $this->input = new MemoryHandle($input);
+  }
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->input->waitUntilReadable($cancellation);
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->input->reachedEndOfDataSource();
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    return $this->input->tryRead($maxBytes);
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {}
+
+  public function tryWrite(string $bytes): int {
+    $this->output .= $bytes;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return $this->tryWrite($bytes);
+  }
+}
+
+function smtp_receive_data_message(Listener $listener): string {
+  $stream = $listener->accept();
+  $reader = new Reader($stream);
+  $stream->writeAll("220 smtp.example ESMTP ready\r\n");
+
+  assert!($reader->readLine() == 'EHLO client.example');
+  $stream->writeAll("250 smtp.example\r\n");
+
+  assert!($reader->readLine() == 'MAIL FROM:<sender@example.com>');
+  $stream->writeAll("250 2.1.0 sender accepted\r\n");
+
+  assert!($reader->readLine() == 'RCPT TO:<receiver@example.com>');
+  $stream->writeAll("250 2.1.5 recipient accepted\r\n");
+
+  assert!($reader->readLine() == 'DATA');
+  $stream->writeAll("354 send message\r\n");
+
+  $payload = $reader->readUntilBounded("\r\n.\r\n", 65536);
+  assert!($payload != null);
+  $stream->writeAll("250 2.0.0 queued\r\n");
+
+  assert!($reader->readLine() == 'RSET');
+  $stream->writeAll("250 2.0.0 reset\r\n");
+  $stream->close();
+  return $payload;
+}
+
+$command = Command::from('mail from:<sender@example.com>');
+assert!($command->verb == 'MAIL');
+assert!($command->argument == 'from:<sender@example.com>');
+assert!($command->toString() == 'MAIL from:<sender@example.com>');
+
+$assertion_value_9 = fn(): Command => (
+  Command::from("DATA\r\nRCPT TO:<victim@example.com>")
+);
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (InvalidArgumentException $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is InvalidArgumentException);
+
+$status = EnhancedStatusCode::from('5.1.1');
+assert!($status->class == 5);
+assert!($status->subject == 1);
+assert!($status->detail == 1);
+assert!($status->isPermanentFailure() == true);
+assert!($status->toString() == '5.1.1');
+assert!(EnhancedStatusCode::parse('5.1000.1') == null);
+
+$success = new Reply(250, EnhancedStatusCode::from('2.1.0'), 'accepted');
+assert!($success->isPositiveCompletion() == true);
+assert!($success->toString() == '250 2.1.0 accepted');
+
+$intermediate = new Reply(354, null, 'continue');
+assert!($intermediate->isPositiveIntermediate() == true);
+assert!($intermediate->isPositiveCompletion() == false);
+
+$duplex = new ScriptedDuplex(
+  "220 smtp.example ESMTP ready\r\n"
+  . "250-smtp.example\r\n"
+  . "250-SIZE 1048576\r\n"
+  . "250 AUTH PLAIN LOGIN\r\n"
+  . "250 2.0.0 reset\r\n",
+);
+
+$connection = new Connection($duplex);
+assert!($connection->readGreeting()->code == 220);
+assert!($connection->ehlo('client.example')->code == 250);
+assert!($connection->supportsCapability('size') == true);
+assert!($connection->capability('AUTH') == 'PLAIN LOGIN');
+assert!($connection->maximumMessageSize() == 1048576);
+assert!(
+  $connection->sendCommand('RSET')->enhancedStatus?->toString() == '2.0.0',
+);
+
+assert!($duplex->output == "EHLO client.example\r\nRSET\r\n");
+
+$malformed = new Connection(new ScriptedDuplex("250-first\r\n251 final\r\n"));
+
+$assertion_value_27 = fn(): Reply => $malformed->readReply();
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (ProtocolException $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is ProtocolException);
+
+$stuffed = new DotStuffingReadHandle(
+  new MemoryHandle(".first\r\n..second\r\nlast"),
+);
+
+assert!($stuffed->readAll() == "..first\r\n...second\r\nlast\r\n.\r\n");
+
+$plainDuplex = new ScriptedDuplex(
+  "250-smtp.example\r\n" . "250 AUTH PLAIN\r\n" . "235 2.7.0 authenticated\r\n",
+);
+
+$plainConnection = new Connection($plainDuplex);
+assert!($plainConnection->ehlo('client.example')->code == 250);
+new PlainAuthenticator('user', 'secret')->authenticate($plainConnection);
+assert!(
+  $plainDuplex->output
+  == "EHLO client.example\r\nAUTH PLAIN AHVzZXIAc2VjcmV0\r\n",
+);
+
+$noAuthenticationConnection = new Connection(
+  new ScriptedDuplex("250 smtp.example\r\n"),
+);
+
+discard!($noAuthenticationConnection->ehlo('client.example'));
+assert!($noAuthenticationConnection->capability('AUTH') == null);
+$assertion_value_32 = function() use ($noAuthenticationConnection): void {
+  new PlainAuthenticator('user', 'secret')->authenticate(
+    $noAuthenticationConnection,
+  );
+};
+
+$assertion_error_32 = null;
+try {
+  $assertion_value_32();
+} catch (AuthenticationException $assertion_caught_32) {
+  $assertion_error_32 = $assertion_caught_32;
+}
+
+assert!($assertion_error_32 is AuthenticationException);
+
+$loginDuplex = new ScriptedDuplex(
+  "250-smtp.example\r\n"
+  . "250 AUTH LOGIN\r\n"
+  . "334 VXNlcm5hbWU6\r\n"
+  . "334 UGFzc3dvcmQ6\r\n"
+  . "235 2.7.0 authenticated\r\n",
+);
+
+$loginConnection = new Connection($loginDuplex);
+assert!($loginConnection->ehlo('client.example')->code == 250);
+new LoginAuthenticator('user', 'secret')->authenticate($loginConnection);
+assert!(
+  $loginDuplex->output
+  == "EHLO client.example\r\n"
+  . "AUTH LOGIN\r\n"
+  . "dXNlcg==\r\n"
+  . "c2VjcmV0\r\n",
+);
+
+$xoauthDuplex = new ScriptedDuplex(
+  "250-smtp.example\r\n"
+  . "250 AUTH XOAUTH2\r\n"
+  . "235 2.7.0 authenticated\r\n",
+);
+
+$xoauthConnection = new Connection($xoauthDuplex);
+assert!($xoauthConnection->ehlo('client.example')->code == 250);
+new XOAuth2Authenticator('user', 'token')->authenticate($xoauthConnection);
+assert!(
+  $xoauthDuplex->output
+  == "EHLO client.example\r\n"
+  . 'AUTH XOAUTH2 '
+  . Base64\encode("user=user\x01auth=Bearer token\x01\x01")
+  . "\r\n",
+);
+
+$cramDuplex = new ScriptedDuplex(
+  "250-smtp.example\r\n"
+  . "250 AUTH CRAM-MD5\r\n"
+  . "334 PDEyM0BleGFtcGxlPg==\r\n"
+  . "235 2.7.0 authenticated\r\n",
+);
+
+$cramConnection = new Connection($cramDuplex);
+assert!($cramConnection->ehlo('client.example')->code == 250);
+new CramMd5Authenticator('user', 'secret')->authenticate($cramConnection);
+assert!(
+  $cramDuplex->output
+  == "EHLO client.example\r\n"
+  . "AUTH CRAM-MD5\r\n"
+  . "dXNlciAyY2VhODdkZWI4ZTkyNjg3MWMxZjllMTkzMzNlNmY4Zg==\r\n",
+);
+
+$assertion_value_41 = fn(): (string, string, int) => (
+  Authentication\_Private\parse_server_first('s=c2FsdA==,i=1', 'client-nonce')
+);
+
+$assertion_error_41 = null;
+try {
+  $assertion_value_41();
+} catch (AuthenticationException $assertion_caught_41) {
+  $assertion_error_41 = $assertion_caught_41;
+}
+
+assert!($assertion_error_41 is AuthenticationException);
+
+$assertion_value_42 = fn(): string => (
+  Authentication\_Private\parse_server_verification('e=invalid-proof')
+);
+
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (AuthenticationException $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+}
+
+assert!($assertion_error_42 is AuthenticationException);
+
+$sendConfiguration = new SendConfiguration(
+  DeliveryStatusReturn::Headers,
+  'message-1',
+  vec[DeliveryStatusNotification::Failure, DeliveryStatusNotification::Delay],
+  true,
+  Priority::Urgent,
+  DeliverBy::after(Duration::fromMinutes(10)),
+  FutureRelease::after(Duration::fromHours(2)),
+);
+
+assert!(
+  $sendConfiguration->deliveryStatusReturn == DeliveryStatusReturn::Headers,
+);
+
+assert!($sendConfiguration->deliverBy?->deadline->seconds == 600);
+assert!($sendConfiguration->futureRelease?->delay?->seconds == 7200);
+$assertion_value_46 = fn(): DeliverBy => DeliverBy::after(Duration::zero());
+$assertion_error_46 = null;
+try {
+  $assertion_value_46();
+} catch (InvalidArgumentException $assertion_caught_46) {
+  $assertion_error_46 = $assertion_caught_46;
+}
+
+assert!($assertion_error_46 is InvalidArgumentException);
+
+$transportConfiguration = new TransportConfiguration();
+assert!($transportConfiguration->security == Security::StartTls);
+assert!($transportConfiguration->port == null);
+assert!($transportConfiguration->maximumIdleConnections == 1);
+assert!(new DeliveryReport()->hasRejections() == false);
+
+$extensionDuplex = new ScriptedDuplex(
+  "250-smtp.example\r\n"
+  . "250-SMTPUTF8\r\n"
+  . "250-DSN\r\n"
+  . "250-REQUIRETLS\r\n"
+  . "250-MT-PRIORITY\r\n"
+  . "250-DELIVERBY\r\n"
+  . "250 FUTURERELEASE\r\n",
+);
+
+$extensionConnection = new Connection($extensionDuplex);
+assert!($extensionConnection->ehlo('client.example')->code == 250);
+$envelope = Envelope::fromParts(
+  Mailbox::from('ü@täst.de'),
+  vec[Mailbox::from('receiver@example.com')],
+);
+
+assert!(
+  Client\_Private\mail_from_command(
+    $extensionConnection,
+    $envelope,
+    $sendConfiguration,
+  )->toString()
+  == 'MAIL FROM:<ü@xn--tst-qla.de>'
+  . ' SMTPUTF8 RET=HDRS ENVID=message-1 REQUIRETLS'
+  . ' MT-PRIORITY=4 BY=600;R HOLDFOR=7200',
+);
+
+assert!(
+  Client\_Private\recipient_command(
+    $extensionConnection,
+    $envelope->recipients[0],
+    $sendConfiguration,
+  )->toString()
+  == 'RCPT TO:<receiver@example.com> NOTIFY=FAILURE,DELAY',
+);
+
+assert!(Client\_Private\encode_xtext("a+b=c\n") == 'a+2Bb+3Dc+0A');
+
+$assertion_value_55 = fn(): string => (
+  Client\_Private\encode_mailbox(Mailbox::from('invalid local@example.com'))
+);
+
+$assertion_error_55 = null;
+try {
+  $assertion_value_55();
+} catch (InvalidArgumentException $assertion_caught_55) {
+  $assertion_error_55 = $assertion_caught_55;
+}
+
+assert!($assertion_error_55 is InvalidArgumentException);
+
+$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$endpoint = $listener->getLocalEndpoint();
+$server = Async\spawn::<(string, string)>(
+  function() use ($listener): (string, string) {
+    return (
+      smtp_receive_data_message($listener),
+      smtp_receive_data_message($listener),
+    );
+  },
+);
+
+$transport = new DefaultTransport(
+  new TransportConfiguration(
+    host: $endpoint->address,
+    port: $endpoint->port,
+    security: Security::Plaintext,
+    localHostname: 'client.example',
+    pipelining: false,
+    chunking: false,
+  ),
+);
+
+$report = $transport->send(
+  Envelope::fromParts(
+    Mailbox::from('sender@example.com'),
+    vec[Mailbox::from('receiver@example.com')],
+  ),
+  Message::create(
+    new RawPart(Headers::default(), new MemoryHandle(".hello\r\nworld")),
+  ),
+);
+
+assert!($report->hasRejections() == false);
+
+$report = $transport->send(
+  Envelope::fromParts(
+    Mailbox::from('sender@example.com'),
+    vec[Mailbox::from('receiver@example.com')],
+  ),
+  Message::create(
+    new RawPart(Headers::default(), new MemoryHandle('second message')),
+  ),
+);
+
+assert!($report->hasRejections() == false);
+$transport->close();
+($payload, $secondPayload) = $server->await();
+$listener->close();
+assert!(Str\contains($payload, "\r\n\r\n..hello\r\nworld") == true);
+assert!(Str\contains($secondPayload, "\r\n\r\nsecond message") == true);
+
+$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$endpoint = $listener->getLocalEndpoint();
+$server = Async\spawn::<string>(function() use ($listener): string {
+  $stream = $listener->accept();
+  $reader = new Reader($stream);
+  $stream->writeAll("220 smtp.example ESMTP ready\r\n");
+  $commands = ($reader->readLine() as string) . "\n";
+  $stream->writeAll("250-smtp.example\r\n250-PIPELINING\r\n250 CHUNKING\r\n");
+
+  $round = 0;
+  while ($round < 3) {
+    if ($round > 0) {
+      $noop = $reader->readLine() as string;
+      assert!($noop == 'NOOP');
+      $commands .= $noop . "\n";
+      $stream->writeAll("250 2.0.0 connection alive\r\n");
+    }
+
+    $commands .= ($reader->readLine() as string) . "\n";
+    $commands .= ($reader->readLine() as string) . "\n";
+
+    if ($round == 2) {
+      $stream->writeAll(
+        "250 2.1.0 sender accepted\r\n550 5.1.1 recipient rejected\r\n",
+      );
+
+      $commands .= ($reader->readLine() as string) . "\n";
+      $stream->writeAll("250 2.0.0 reset\r\n");
+      $round++;
+      continue;
+    }
+
+    $stream->writeAll(
+      "250 2.1.0 sender accepted\r\n250 2.1.5 recipient accepted\r\n",
+    );
+
+    $payload = '';
+    $last = false;
+    while (!$last) {
+      $line = $reader->readLine() as string;
+      $commands .= $line . "\n";
+      $parts = Str\split($line, ' ');
+      $size = parse_decimal($parts[1]);
+      assert!($size != null);
+      $payload .= $reader->readFixedSize($size);
+      $last = length!($parts) == 3 && $parts[2] == 'LAST';
+      $stream->writeAll("250 2.0.0 queued\r\n");
+    }
+
+    $commands .= ($reader->readLine() as string) . "\n";
+    $stream->writeAll("250 2.0.0 reset\r\n");
+    $round++;
+  }
+
+  $stream->close();
+  return $commands;
+});
+
+$transport = new DefaultTransport(
+  new TransportConfiguration(
+    host: $endpoint->address,
+    port: $endpoint->port,
+    security: Security::Plaintext,
+    localHostname: 'client.example',
+    allowPartialSuccess: true,
+  ),
+);
+
+$envelope = Envelope::fromParts(
+  Mailbox::from('sender@example.com'),
+  vec[Mailbox::from('receiver@example.com')],
+);
+
+$message = Message::create(
+  new RawPart(Headers::default(), new MemoryHandle('hello')),
+);
+
+assert!($transport->send($envelope, $message)->hasRejections() == false);
+
+$message = Message::create(
+  new RawPart(Headers::default(), new MemoryHandle('hello')),
+);
+
+assert!($transport->send($envelope, $message)->hasRejections() == false);
+
+$message = Message::create(
+  new RawPart(Headers::default(), new MemoryHandle('rejected')),
+);
+
+$rejectedReport = $transport->send($envelope, $message);
+assert!($rejectedReport->hasRejections() == true);
+assert!(length!($rejectedReport->rejectedRecipients) == 1);
+assert!($rejectedReport->rejectedRecipients[0][1]->code == 550);
+
+$transport->close();
+$commands = $server->await();
+assert!(Str\starts_with($commands, "EHLO client.example\n") == true);
+assert!(Str\contains($commands, 'BDAT ') == true);
+assert!(Str\contains($commands, " LAST\nRSET\n") == true);
+$listener->close();

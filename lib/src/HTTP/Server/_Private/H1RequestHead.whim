@@ -1,0 +1,25 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\RequestTarget;
+use Whim\Marker\AlwaysInline;
+
+/** Holds one parsed HTTP/1 request head. */
+final readonly class H1RequestHead {
+  #[AlwaysInline]
+  public function __construct(
+    public Method $method,
+    public RequestTarget $target,
+    public ProtocolVersion $protocolVersion,
+    public FieldMap $headers,
+    public null|int $contentLength,
+    public bool $chunked,
+    public bool $connectionClose,
+    public bool $connectionKeepAlive,
+    public bool $expectContinue,
+    public null|string $host,
+    public null|string $upgrade,
+  ) {}
+}

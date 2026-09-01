@@ -1,0 +1,110 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+
+/** Reports whether a string is an HTTP token. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http_valid_token(string $token): bool {}
+
+/** Reports whether a string is a safe HTTP field value. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http_valid_field_value(string $value): bool {}
+
+/** Reports whether an HTTP/2 field name is valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http_valid_lowercase_field_name(string $name): bool {}
+
+/** Reports whether an HTTP/2 field value is valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http_valid_compressed_field_value(string $value): bool {}
+
+/** Reports whether a string is a safe HTTP request target. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http_valid_request_target(string $target): bool {}
+
+/** Reports whether HTTP/2 request control fields are valid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http_valid_request_pseudo_fields(
+  string $method,
+  string $scheme,
+  string $path,
+): bool {}
+
+/** Validates and indexes ordered HTTP fields. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http_index_fields(
+  vec<(string, string)> $fields,
+): null|dict<string, vec<string>> {}
+
+/** Parses an HTTP/1 request head into primitive values. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http1_parse_request_head(
+  string $block,
+): int
+| (
+  string,
+  string,
+  int,
+  vec<(string, string)>,
+  dict<string, vec<string>>,
+  null|int,
+  bool,
+  bool,
+  bool,
+  bool,
+  null|string,
+  null|string,
+) {}
+
+/** Parses an HTTP/1 response head into primitive values. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http1_parse_response_head(
+  string $block,
+): null|(int, int, vec<(string, string)>, dict<string, vec<string>>) {}
+
+/** Serializes an HTTP/1 request head. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http1_serialize_request_head(
+  string $method,
+  string $target,
+  string $version,
+  vec<(string, string)> $fields,
+): string {}
+
+/** Serializes an HTTP/1 response head. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function http1_serialize_response_head(
+  string $version,
+  100..=599 $status,
+  string $reason,
+  vec<(string, string)> $fields,
+  bool $bodyAllowed,
+  bool $chunked,
+  bool $addContentLength,
+  bool $close,
+  string $date,
+): string {}

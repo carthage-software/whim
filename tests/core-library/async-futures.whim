@@ -1,0 +1,470 @@
+use Whim\_Private;
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\CompositeException;
+use Whim\Async\Future;
+use Whim\Reference\Strong;
+use Whim\Refine\Transform;
+use Whim\Time\Duration;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+
+final class FutureEventRecorder {
+  public vec<string> $events = vec[];
+  public bool $finished = false;
+}
+
+final class EventLoopRecorder {
+  public vec<string> $order = vec[];
+  public int $repetitions = 0;
+  public null|_Private\TaskId $repeating = null;
+}
+
+final class TrackedFuture implements Future<int> {
+  public int $ignores = 0;
+  public int $awaits = 0;
+
+  public function __construct(private Future<int> $future) {}
+
+  public function await(null|CancellationToken $cancellation = null): int {
+    $this->awaits++;
+    return $this->future->await($cancellation);
+  }
+
+  public function ignore(): static {
+    $this->ignores++;
+    $this->future->ignore();
+    return $this;
+  }
+
+  public function map<U>(Transform<int, U> $success): Future<U> {
+    return $this->future->map::<U>($success);
+  }
+
+  public function then<U>(
+    Transform<int, U> $success,
+    Transform<Throwable, U> $failure,
+  ): Future<U> {
+    return $this->future->then::<U>($success, $failure);
+  }
+
+  public function catch<U>(Transform<Throwable, U> $failure): Future<int|U> {
+    return $this->future->catch::<U>($failure);
+  }
+
+  public function always(fn(): void $always): Future<int> {
+    return $this->future->always($always);
+  }
+}
+
+$launched = new Strong::<bool>(false);
+Async\launch(function() use ($launched): void {
+  $launched->value = true;
+});
+
+assert!(!$launched->value);
+Async\later();
+assert!($launched->value);
+
+$failedLaunch = new Strong::<bool>(false);
+Async\launch(function() use ($failedLaunch): void {
+  $failedLaunch->value = true;
+  throw new RuntimeException('ignored launch failure');
+});
+
+Async\later();
+assert!($failedLaunch->value);
+
+$observation = new FutureEventRecorder();
+$lazySource = Async\spawn::<int>(function() use ($observation): int {
+  $observation->events[] = 'task';
+  return 1;
+});
+
+$mapped = $lazySource->map::<int>(function(int $value) use ($observation): int {
+  $observation->events[] = 'mapped';
+  return $value + 1;
+});
+
+assert!(length!($observation->events) == 0);
+assert!($mapped->await() == 2);
+assert!($observation->events == vec['task', 'mapped']);
+
+$observation->events = vec[];
+$thenSource = Async\spawn::<int>(function() use ($observation): int {
+  $observation->events[] = 'then source';
+  return 2;
+});
+
+$then = $thenSource->then::<int>(function(int $value) use ($observation): int {
+  $observation->events[] = 'then success';
+  return $value + 1;
+}, function(Throwable $_) use ($observation): int {
+  $observation->events[] = 'then failure';
+  return 0;
+});
+
+assert!(length!($observation->events) == 0);
+assert!($then->await() == 3);
+assert!($observation->events == vec['then source', 'then success']);
+
+$observation->events = vec[];
+$catchSource = Async\spawn::<int>(function() use ($observation): int {
+  $observation->events[] = 'catch source';
+  throw new RuntimeException('failed');
+});
+
+$caught = $catchSource->catch::<int>(
+  function(Throwable $_) use ($observation): int {
+    $observation->events[] = 'catch failure';
+    return 4;
+  },
+);
+
+assert!(length!($observation->events) == 0);
+assert!($caught->await() == 4);
+assert!($observation->events == vec['catch source', 'catch failure']);
+
+$observation->events = vec[];
+$alwaysSource = Async\spawn::<int>(function() use ($observation): int {
+  $observation->events[] = 'always source';
+  return 5;
+});
+
+$always = $alwaysSource->always(function() use ($observation): void {
+  $observation->events[] = 'always callback';
+});
+
+assert!(length!($observation->events) == 0);
+assert!($always->await() == 5);
+assert!($observation->events == vec['always source', 'always callback']);
+
+$mainCancellationToken = new Async\SignalCancellationToken();
+$pendingWork = Async\spawn::<int>(function() use ($observation): int {
+  Async\later();
+  Async\later();
+  $observation->finished = true;
+  return 42;
+});
+
+Async\spawn::<null>(fn(): null => $mainCancellationToken->cancel())->ignore();
+$assertion_value_13 = fn(): int => $pendingWork->await($mainCancellationToken);
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (CancelledException $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is CancelledException);
+
+assert!(!($observation->finished));
+
+$allResults = Async\all::<string, int>(dict[
+  'a' => Async\spawn::<int>(fn(): int => 1),
+  'b' => Async\spawn::<int>(fn(): int => 2),
+  'c' => Async\spawn::<int>(fn(): int => 3),
+]);
+
+assert!($allResults == dict['a' => 1, 'b' => 2, 'c' => 3]);
+
+$anyWinner = Async\any::<string>(vec[Async\spawn::<string>(function(): string {
+  Async\sleep(Duration::fromMilliseconds(5));
+  throw new RuntimeException('fast fail');
+}), Async\spawn::<string>(function(): string {
+  Async\sleep(Duration::fromMilliseconds(30));
+  return 'winner';
+})]);
+
+assert!($anyWinner == 'winner');
+
+$dictionaryWinner = Async\any::<string>(dict[
+  'only' => Async\spawn::<string>(fn(): string => 'dict'),
+]);
+
+assert!($dictionaryWinner == 'dict');
+
+$assertion_value_18 = fn(): string => (
+  Async\first::<string>(vec[Async\spawn::<string>(function(): string {
+    Async\sleep(Duration::fromMilliseconds(5));
+    throw new RuntimeException('settled first');
+  }), Async\spawn::<string>(function(): string {
+    Async\sleep(Duration::fromMilliseconds(30));
+    return 'too slow';
+  })])
+);
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (RuntimeException $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+  assert!(
+    Whim\Str\contains($assertion_caught_18->getMessage(), 'settled first'),
+  );
+}
+
+assert!($assertion_error_18 is RuntimeException);
+
+$tupleWinner = Async\first::<string>((
+  Async\spawn::<string>(fn(): string => 'tuple'),
+));
+
+assert!($tupleWinner == 'tuple');
+
+$firstLeft = new TrackedFuture(Async\spawn::<int>(fn(): int => 10));
+$firstRight = new TrackedFuture(Async\spawn::<int>(fn(): int => 20));
+discard!(Async\first::<int>(vec[$firstLeft, $firstRight]));
+assert!($firstLeft->ignores == 0);
+assert!($firstRight->ignores == 0);
+assert!($firstLeft->await() == 10);
+assert!($firstRight->await() == 20);
+
+$anyLeft = new TrackedFuture(Async\spawn::<int>(fn(): int => 30));
+$anyRight = new TrackedFuture(Async\spawn::<int>(fn(): int => 40));
+discard!(Async\any::<int>(vec[$anyLeft, $anyRight]));
+assert!($anyLeft->ignores == 0);
+assert!($anyRight->ignores == 0);
+assert!($anyLeft->await() == 30);
+assert!($anyRight->await() == 40);
+
+$anyFairLeft = 0;
+$anyFairRight = 0;
+$anyRound = 0;
+while ($anyRound < 20) {
+  $winner = Async\any::<int>(vec[
+    Async\spawn::<int>(fn(): int => 0),
+    Async\spawn::<int>(fn(): int => 1),
+  ]);
+
+  if ($winner == 0) {
+    $anyFairLeft++;
+  } else {
+    $anyFairRight++;
+  }
+
+  $anyRound++;
+}
+
+assert!($anyFairLeft == 10);
+assert!($anyFairRight == 10);
+
+$failedFutures = vec[];
+$trackedFailures = vec[];
+$failureIndex = 0;
+while ($failureIndex < 32) {
+  $tracked = new TrackedFuture(Async\spawn::<int>(function(): int {
+    throw new RuntimeException('failed selection');
+  }));
+
+  $failedFutures[] = $tracked;
+  $trackedFailures[] = $tracked;
+  $failureIndex++;
+}
+
+$selectionFailure = null;
+try {
+  discard!(Async\any::<int>($failedFutures));
+} catch (CompositeException $error) {
+  $selectionFailure = $error;
+}
+
+assert!($selectionFailure is CompositeException);
+assert!(length!($selectionFailure->getReasons()) == 32);
+foreach ($trackedFailures as $tracked) {
+  assert!($tracked->awaits == 1);
+}
+
+$fairLeft = 0;
+$fairRight = 0;
+$round = 0;
+while ($round < 20) {
+  $winner = Async\first::<int>(vec[
+    Async\spawn::<int>(fn(): int => 0),
+    Async\spawn::<int>(fn(): int => 1),
+  ]);
+
+  if ($winner == 0) {
+    $fairLeft++;
+  } else {
+    $fairRight++;
+  }
+
+  $round++;
+}
+
+assert!($fairLeft == 10);
+assert!($fairRight == 10);
+
+$concurrentResults = Async\concurrently::<int, int>(dict[0 => function(): int {
+  Async\sleep(Duration::fromMilliseconds(10));
+  return 7;
+}, 1 => function(): int {
+  Async\sleep(Duration::fromMilliseconds(10));
+  return 8;
+}]);
+
+assert!($concurrentResults == dict[0 => 7, 1 => 8]);
+
+$seriesRecorder = new FutureEventRecorder();
+$seriesResults = Async\series::<int, int>(dict[
+  0 => function() use ($seriesRecorder): int {
+    $seriesRecorder->events[] = 'first task';
+    return 10;
+  },
+  1 => function() use ($seriesRecorder): int {
+    $seriesRecorder->events[] = 'second task';
+    return 20;
+  },
+]);
+
+assert!($seriesRecorder->events == vec['first task', 'second task']);
+assert!($seriesResults == dict[0 => 10, 1 => 20]);
+
+$singleFailure = null;
+$assertion_callable_33 = function(): void {
+  Async\all::<int, int>(dict[
+    0 => Async\spawn::<int>(fn(): int => 1),
+    1 => Async\spawn::<int>(function(): int {
+      throw new RuntimeException('single');
+    }),
+  ]);
+};
+
+try {
+  $assertion_callable_33();
+} catch (RuntimeException $assertion_caught_33) {
+  $singleFailure = $assertion_caught_33;
+  assert!(Whim\Str\contains($assertion_caught_33->getMessage(), 'single'));
+}
+
+assert!($singleFailure is RuntimeException);
+
+assert!(!($singleFailure is CompositeException));
+
+$doubleFailure = null;
+$assertion_callable_35 = function(): void {
+  Async\all::<int, int>(dict[0 => Async\spawn::<int>(function(): int {
+    throw new RuntimeException('e1');
+  }), 1 => Async\spawn::<int>(function(): int {
+    throw new RuntimeException('e2');
+  })]);
+};
+
+try {
+  $assertion_callable_35();
+} catch (CompositeException $assertion_caught_35) {
+  $doubleFailure = $assertion_caught_35;
+}
+
+assert!($doubleFailure is CompositeException);
+
+assert!(length!($doubleFailure->getReasons()) == 2);
+
+$selectRecorder = new FutureEventRecorder();
+$selectWorker = Async\spawn::<int>(function() use ($selectRecorder): int {
+  $selectWinner = Async\spawn::<string>(function(): string {
+    Async\sleep(Duration::fromMilliseconds(5));
+    return 'w';
+  });
+
+  $selectLoser = Async\spawn::<string>(function(): string {
+    Async\sleep(Duration::fromMilliseconds(50));
+    return 'l';
+  });
+
+  Async\first::<string>(vec[$selectWinner, $selectLoser]);
+  Async\sleep(Duration::fromMilliseconds(70));
+  $selectRecorder->events[] = 'worker';
+  return 0;
+});
+
+$selectMiddle = Async\spawn::<int>(function() use ($selectRecorder): int {
+  Async\sleep(Duration::fromMilliseconds(60));
+  $selectRecorder->events[] = 'mid';
+  return 0;
+});
+
+$selectWorker->await();
+$selectMiddle->await();
+assert!($selectRecorder->events == vec['mid', 'worker']);
+
+$loopRecorder = new EventLoopRecorder();
+$deferredTask = _Private\defer_task(function() use ($loopRecorder): void {
+  $loopRecorder->order[] = 'deferred';
+});
+
+$queuedTask = _Private\queue_task(function() use ($loopRecorder): void {
+  $loopRecorder->order[] = 'queued';
+});
+
+assert!($deferredTask is _Private\TaskId);
+assert!($queuedTask is _Private\TaskId);
+assert!($deferredTask->id != $queuedTask->id);
+
+$cancelledTask = _Private\defer_task(function() use ($loopRecorder): void {
+  $loopRecorder->order[] = 'cancelled';
+});
+
+_Private\cancel_task($cancelledTask);
+
+$delayedTask = _Private\delay_task(
+  Duration::fromMilliseconds(1),
+  function() use ($loopRecorder): void {
+    $loopRecorder->order[] = 'delayed';
+  },
+);
+
+assert!($delayedTask is _Private\TaskId);
+
+$loopRecorder->repeating = _Private\repeat_task(
+  Duration::fromMilliseconds(1),
+  function() use ($loopRecorder): void {
+    $loopRecorder->repetitions++;
+    if ($loopRecorder->repetitions == 2) {
+      _Private\cancel_task($loopRecorder->repeating as _Private\TaskId);
+    }
+  },
+);
+
+$unreferencedFired = new Strong::<bool>(false);
+$unreferencedTask = _Private\delay_task(
+  Duration::fromSeconds(30),
+  function() use ($unreferencedFired): void {
+    $unreferencedFired->value = true;
+  },
+);
+
+_Private\unreference_task($unreferencedTask);
+
+Async\drain();
+assert!($loopRecorder->order == vec['queued', 'deferred', 'delayed']);
+
+assert!($loopRecorder->repetitions == 2);
+assert!(!($unreferencedFired->value));
+
+$resumedSuspension = _Private\create_suspension::<int>();
+_Private\defer_task(function() use ($resumedSuspension): void {
+  $resumedSuspension->resume(42);
+});
+
+assert!($resumedSuspension->suspend() == 42);
+
+$thrownSuspension = _Private\create_suspension::<int>();
+_Private\defer_task(function() use ($thrownSuspension): void {
+  $thrownSuspension->throw(new RuntimeException('suspension failed'));
+});
+
+$assertion_value_46 = fn(): int => $thrownSuspension->suspend();
+$assertion_error_46 = null;
+try {
+  $assertion_value_46();
+} catch (RuntimeException $assertion_caught_46) {
+  $assertion_error_46 = $assertion_caught_46;
+  assert!(
+    Whim\Str\contains($assertion_caught_46->getMessage(), 'suspension failed'),
+  );
+}
+
+assert!($assertion_error_46 is RuntimeException);

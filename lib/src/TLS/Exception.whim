@@ -1,0 +1,6 @@
+namespace Whim\TLS;
+
+use Whim\Unwind\RuntimeException;
+
+/** The root of recoverable TLS failures. */
+class Exception extends RuntimeException {}

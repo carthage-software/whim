@@ -1,0 +1,23 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Provides read-only access to one capture of a callable value. */
+#[Stub]
+final class CaptureValueReflection {
+  private function __construct() {}
+
+  /** Returns the capture declaration represented by this value. */
+  #[MustUse]
+  public function getCapture(): CaptureReflection {}
+
+  /** Returns the captured value's runtime type. */
+  #[MustUse]
+  public function getType(): TypeReflection {}
+
+  /** Returns the captured value without permitting replacement. */
+  #[MustUse]
+  public function getValue(): mixed {}
+}

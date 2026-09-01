@@ -1,0 +1,9 @@
+namespace Probe;
+
+final readonly class Wrapped {
+  public function __construct(public null|int $value = null) {}
+
+  public static function none(): Wrapped {
+    return new Wrapped();
+  }
+}

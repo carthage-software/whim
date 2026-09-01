@@ -1,0 +1,6 @@
+namespace Whim\File;
+
+use Whim\IO\ReadHandle as IOReadHandle;
+
+/** Defines the capabilities of a readable file handle. */
+interface ReadHandle extends Handle, IOReadHandle {}

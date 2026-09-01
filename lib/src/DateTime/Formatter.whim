@@ -1,0 +1,166 @@
+namespace Whim\DateTime;
+
+use Whim\_Private\DateTimeFormatter as DateTimeFormatterImpl;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** A reusable Jiff date-time formatter. */
+final readonly class Formatter {
+  private const int ISO_DATE = 0;
+  private const int ISO_TIME = 1;
+  private const int ISO_DATE_TIME = 2;
+  private const int RFC_3339 = 3;
+  private const int RFC_2822 = 4;
+  private const int TEMPORAL = 5;
+  private const int HTTP_DATE = 6;
+
+  #[TrackCaller]
+  private function __construct(private DateTimeFormatterImpl $inner) {}
+
+  /** Parses a Jiff strftime pattern. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromPattern(string $pattern): Formatter {
+    $inner = DateTimeFormatterImpl::fromPattern($pattern);
+    if ($inner == null) {
+      throw new InvalidArgumentException(
+        'invalid date-time format: `' . $pattern . '`',
+      );
+    }
+
+    return new Formatter($inner);
+  }
+
+  /** Returns the ISO date formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function isoDate(): Formatter {
+    return Formatter::standard(Formatter::ISO_DATE);
+  }
+
+  /** Returns the ISO time formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function isoTime(): Formatter {
+    return Formatter::standard(Formatter::ISO_TIME);
+  }
+
+  /** Returns the ISO civil date-time formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function isoDateTime(): Formatter {
+    return Formatter::standard(Formatter::ISO_DATE_TIME);
+  }
+
+  /** Returns the RFC 3339 formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function rfc3339(): Formatter {
+    return Formatter::standard(Formatter::RFC_3339);
+  }
+
+  /** Returns the RFC 2822 formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function rfc2822(): Formatter {
+    return Formatter::standard(Formatter::RFC_2822);
+  }
+
+  /** Returns the Temporal zoned date-time formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function temporal(): Formatter {
+    return Formatter::standard(Formatter::TEMPORAL);
+  }
+
+  /** Returns the RFC 9110 HTTP date formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function httpDate(): Formatter {
+    return Formatter::standard(Formatter::HTTP_DATE);
+  }
+
+  /** Formats a civil date. */
+  #[MustUse]
+  #[TrackCaller]
+  public function formatDate(Date $date): string {
+    return $this->require(
+      $this->inner->formatDate($date->year, $date->month->value, $date->day),
+    );
+  }
+
+  /** Formats a civil time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function formatTime(Time $time): string {
+    return $this->require(
+      $this->inner->formatTime(
+        $time->hour,
+        $time->minute,
+        $time->second,
+        $time->nanosecond,
+      ),
+    );
+  }
+
+  /** Formats a civil date and time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function formatDateTime(DateTime $dateTime): string {
+    return $this->require(
+      $this->inner->formatDateTime(
+        $dateTime->date->year,
+        $dateTime->date->month->value,
+        $dateTime->date->day,
+        $dateTime->time->hour,
+        $dateTime->time->minute,
+        $dateTime->time->second,
+        $dateTime->time->nanosecond,
+      ),
+    );
+  }
+
+  /** Formats a zoned date and time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function formatZonedDateTime(ZonedDateTime $dateTime): string {
+    return $this->require(
+      $this->inner->formatZonedDateTime(
+        $dateTime->dateTime->date->year,
+        $dateTime->dateTime->date->month->value,
+        $dateTime->dateTime->date->day,
+        $dateTime->dateTime->time->hour,
+        $dateTime->dateTime->time->minute,
+        $dateTime->dateTime->time->second,
+        $dateTime->dateTime->time->nanosecond,
+        $dateTime->offsetSeconds,
+        $dateTime->timezone->identifier(),
+        $dateTime->abbreviation,
+      ),
+    );
+  }
+
+  /** Creates a standard formatter. */
+  #[MustUse]
+  #[TrackCaller]
+  private static function standard(int $kind): Formatter {
+    return new Formatter(DateTimeFormatterImpl::standard($kind));
+  }
+
+  /** Returns a successful formatting result. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function require(null|string $result): string {
+    if ($result == null) {
+      throw new InvalidArgumentException(
+        'the format cannot represent this date-time value',
+      );
+    }
+
+    return $result;
+  }
+}

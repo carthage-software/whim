@@ -1,0 +1,45 @@
+namespace Whim\Reflection\Generic;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Type\TypeParameterTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one reified type parameter and its declaration-time contract. */
+#[Stub]
+final class TypeParameterReflection {
+  private function __construct() {}
+
+  /** Returns the parameter name. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the zero-based position in its declaration. */
+  #[MustUse]
+  public function getPosition(): 0.. {}
+
+  /** Returns the declaration that owns this parameter. */
+  #[MustUse]
+  public function getDeclaringDeclaration(): GenericDeclarationReflection {}
+
+  /** Returns the declared variance. */
+  #[MustUse]
+  public function getVariance(): Variance {}
+
+  /** Returns every declared upper bound in source order. */
+  #[MustUse]
+  public function getBounds(): vec<TypeReflection> {}
+
+  /** Returns the default type, or null when none was declared. */
+  #[MustUse]
+  public function getDefault(): null|TypeReflection {}
+
+  /** Returns a type expression that refers to this parameter. */
+  #[MustUse]
+  public function getType(): TypeParameterTypeReflection {}
+
+  /** Returns the source span of this parameter. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+}

@@ -1,0 +1,149 @@
+($process, $input, $output, $error) = Whim\_Private\spawn_process(
+  '/bin/sh',
+  vec['-c', 'printf child'],
+  null,
+  null,
+  vec[
+    (Whim\_Private\STREAM_DISPOSITION_PIPE, null),
+    (Whim\_Private\STREAM_DISPOSITION_PIPE, null),
+    (Whim\_Private\STREAM_DISPOSITION_PIPE, null),
+  ],
+  vec[],
+  -1,
+);
+
+$input = $input as Whim\OS\FileDescriptor;
+$output = $output as Whim\OS\FileDescriptor;
+$error = $error as Whim\OS\FileDescriptor;
+$input->close();
+
+$processStatus = Whim\_Private\create_suspension::<int>();
+$processTask = Whim\_Private\watch_process(
+  $process,
+  function(int $status) use ($processStatus): void {
+    $processStatus->resume($status);
+  },
+);
+
+assert!($processStatus->suspend() == 0);
+Whim\_Private\cancel_task($processTask);
+assert!(Whim\_Private\read_descriptor($output, 16) == 'child');
+assert!(Whim\_Private\read_descriptor($error, 16) == '');
+$output->close();
+$error->close();
+
+$signalReceived = Whim\_Private\create_suspension::<null>();
+$signalWatcher = Whim\Process\watch_signal(
+  Whim\Process\Signal::UserDefined1,
+  function() use ($signalReceived): void {
+    $signalReceived->resume(null);
+  },
+);
+
+Whim\Process\signal(Whim\Process\get_id(), Whim\Process\Signal::UserDefined1);
+
+$signalReceived->suspend();
+$signalWatcher->close();
+assert!($signalWatcher->isClosed());
+$signalWatcher->close();
+
+$receiver = Whim\_Private\create_socket(
+  Whim\_Private\SOCKET_FAMILY_INET,
+  Whim\_Private\SOCKET_KIND_DATAGRAM,
+);
+
+Whim\_Private\set_socket_option(
+  $receiver,
+  Whim\_Private\SOCKET_LEVEL_SOCKET,
+  Whim\_Private\SOCKET_OPTION_REUSE_ADDRESS,
+  1,
+);
+
+Whim\_Private\bind_socket($receiver, '127.0.0.1', 0);
+($host, $port) = Whim\_Private\socket_address($receiver);
+assert!($host == '127.0.0.1');
+assert!($port > 0);
+
+$sender = Whim\_Private\create_socket(
+  Whim\_Private\SOCKET_FAMILY_INET,
+  Whim\_Private\SOCKET_KIND_DATAGRAM,
+);
+
+$readable = Whim\_Private\create_suspension::<null>();
+$readableTask = Whim\_Private\watch_readable(
+  $receiver,
+  function() use ($readable): void {
+    $readable->resume(null);
+  },
+);
+
+assert!(Whim\_Private\send_to($sender, 'datagram', $host, $port) == 8);
+
+$readable->suspend();
+Whim\_Private\cancel_task($readableTask);
+$received = Whim\_Private\receive_message($receiver, 16, $port)
+  as (string, (string, int), (string, int), int, int, bool);
+
+assert!($received[0] == 'datagram');
+assert!($received[1][0] == '127.0.0.1');
+assert!($received[1][1] > 0);
+$receiver->close();
+$sender->close();
+
+$receiver = Whim\_Private\create_socket(
+  Whim\_Private\SOCKET_FAMILY_INET,
+  Whim\_Private\SOCKET_KIND_DATAGRAM,
+);
+
+Whim\_Private\bind_socket($receiver, '0.0.0.0', 0);
+($_host, $port) = Whim\_Private\socket_address($receiver);
+Whim\_Private\enable_message_metadata($receiver);
+
+$sender = Whim\_Private\create_socket(
+  Whim\_Private\SOCKET_FAMILY_INET,
+  Whim\_Private\SOCKET_KIND_DATAGRAM,
+);
+
+$readable = Whim\_Private\create_suspension::<null>();
+$readableTask = Whim\_Private\watch_readable(
+  $receiver,
+  function() use ($readable): void {
+    $readable->resume(null);
+  },
+);
+
+assert!(
+  Whim\_Private\send_message(
+    $sender,
+    'message',
+    '127.0.0.1',
+    $port,
+    '127.0.0.1',
+    0,
+    1,
+  )
+  == 7,
+);
+
+$readable->suspend();
+Whim\_Private\cancel_task($readableTask);
+
+$received = Whim\_Private\receive_message($receiver, 16, $port)
+  as (string, (string, int), (string, int), int, int, bool);
+
+assert!($received[0] == 'message');
+assert!($received[1][0] == '127.0.0.1');
+assert!($received[1][1] > 0);
+assert!($received[2][0] == '127.0.0.1');
+assert!($received[2][1] == $port);
+assert!($received[3] == 1);
+assert!($received[4] >= 0);
+assert!(!($received[5]));
+$receiver->close();
+$sender->close();
+
+($_input, $output, $_error) = Whim\_Private\standard_descriptors();
+assert!(Whim\_Private\is_terminal($output) is bool);
+assert!(Whim\Terminal\path($output) is null|string);
+
+assert!(Whim\_Private\terminal_size($output) is null|(int, int));

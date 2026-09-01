@@ -1,0 +1,22 @@
+namespace Whim\Marker;
+
+use Whim\Attribute\Attribute;
+use Whim\Marker\TrackCaller;
+
+/** Declares the shape of a symbol whose definition lives elsewhere. */
+#[Stub]
+#[Attribute(Attribute::TARGET_SYMBOL)]
+final class Stub {
+  /** Describes why this declaration is only a stub. */
+  public readonly string $reason;
+
+  /** Identifies the optimization issue for speed-only built-in code. */
+  public readonly null|string $issue;
+
+  /** Records whether the real definition is required or temporary. */
+  #[TrackCaller]
+  public function __construct(
+    string $reason = 'built-in',
+    null|string $issue = null,
+  ) {}
+}

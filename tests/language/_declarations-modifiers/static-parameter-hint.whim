@@ -1,0 +1,5 @@
+class Item {
+  public function same(static $other): bool {
+    return true;
+  }
+}

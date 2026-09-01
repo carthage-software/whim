@@ -1,0 +1,6 @@
+namespace Whim\IRI;
+
+use Whim\Convert\ToString;
+
+/** Represents a valid IRI host. */
+interface Host extends ToString for IPHost, IPvFutureHost, RegisteredNameHost {}

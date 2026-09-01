@@ -1,0 +1,69 @@
+namespace Whim\Unix\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\ClosedException;
+use Whim\Network\UnixEndpoint;
+use Whim\OS\FileDescriptor;
+
+/** Implements a Unix-domain listener. */
+final class ListenerImpl implements Whim\Unix\Listener {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private FileDescriptor $descriptor,
+    private UnixEndpoint $localEndpoint,
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    if ($this->descriptor->isClosed()) {
+      throw new ClosedException('the Unix listener is closed');
+    }
+
+    return $this->descriptor;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLocalEndpoint(): UnixEndpoint {
+    return $this->localEndpoint;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function accept(
+    null|CancellationToken $cancellation = null,
+  ): Whim\Unix\Stream {
+    while (true) {
+      try {
+        $accepted = Whim\_Private\accept_socket($this->getFileDescriptor());
+      } catch (Whim\_Private\SystemError $error) {
+        Whim\Network\_Private\failure($error);
+      }
+
+      if ($accepted == null) {
+        Whim\Network\_Private\wait_readable(
+          $this->getFileDescriptor(),
+          $cancellation,
+        );
+
+        continue;
+      }
+
+      ($descriptor, $path, $port) = $accepted;
+      $peer = Whim\Network\_Private\unix_endpoint(($path, $port));
+
+      return new StreamImpl($descriptor, $this->localEndpoint, $peer);
+    }
+  }
+}

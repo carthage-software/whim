@@ -1,0 +1,298 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\Binary;
+use Whim\Encoding\Base64;
+use Whim\Encoding\Base64\Alphabet;
+use Whim\Encoding\DecodingException;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Message\ErrorStatusCode;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\RequestTarget;
+use Whim\HTTP\Server\HTTPException;
+use Whim\IO\BufferedReadHandle;
+use Whim\IO\LimitExceededException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\Unwind\OverflowException;
+use Whim\URL\Authority;
+use Whim\URL\URL;
+use Whim\_Private\http1_parse_request_head;
+use Whim\_Private\uri_parse_reference;
+use Whim\_Private\string_lowercase;
+use Whim\_Private\string_ord;
+use Whim\_Private\string_split;
+use Whim\_Private\string_trim;
+
+/** Creates a cancellation token with an optional timeout. */
+#[TrackCaller]
+#[TraceBoundary]
+function h1_cancellation(
+  CancellationToken $forced,
+  null|Duration $timeout,
+): CancellationToken {
+  if ($timeout == null) {
+    return $forced;
+  }
+
+  return new TimeoutCancellationToken($timeout, $forced);
+}
+
+/** Parses one HTTP/1 request head. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function h1_read_request_head(
+  BufferedReadHandle $reader,
+  int $maximumBytes,
+  CancellationToken $cancellation,
+): null|H1RequestHead {
+  try {
+    $block = $reader->readUntilBounded(
+      "\r\n\r\n",
+      $maximumBytes,
+      $cancellation,
+    );
+  } catch (LimitExceededException $error) {
+    throw new HTTPException(
+      431,
+      'the request head exceeds its configured limit',
+      previous: $error,
+    );
+  }
+
+  if ($block == null) {
+    return null;
+  }
+
+  $parsed = http1_parse_request_head($block);
+  if ($parsed is int) {
+    throw new HTTPException(
+      $parsed as ErrorStatusCode,
+      match ($parsed) {
+        417 => 'the request expectation is unsupported',
+        505 => 'the HTTP version is unsupported',
+        $_ => 'the request head is invalid',
+      },
+    );
+  }
+
+  (
+    $method,
+    $target,
+    $version,
+    $fields,
+    $fieldIndex,
+    $contentLength,
+    $chunked,
+    $connectionClose,
+    $connectionKeepAlive,
+    $expectContinue,
+    $host,
+    $upgrade,
+  ) = $parsed;
+
+  $headers = FieldMap::fromPartsUnsafe($fields, $fieldIndex);
+
+  return new H1RequestHead(
+    $method as Method,
+    $target as RequestTarget,
+    match ($version) {
+      10 => ProtocolVersion::V10,
+      11 => ProtocolVersion::V11,
+      $_ => ProtocolVersion::V11,
+    },
+    $headers,
+    $contentLength,
+    $chunked,
+    $connectionClose,
+    $connectionKeepAlive,
+    $expectContinue,
+    $host,
+    $upgrade,
+  );
+}
+
+/** Parses comma-separated field tokens. */
+#[AlwaysInline]
+function h1_field_tokens(string $field): vec<string> {
+  $tokens = vec[];
+  foreach (string_split($field, ',', 0) as $token) {
+    $token = string_lowercase(string_trim($token, " \t", 1));
+
+    if ($token != '') {
+      $tokens[] = $token;
+    }
+  }
+
+  return $tokens;
+}
+
+/** Parses repeated comma-separated field tokens. */
+#[TrackCaller]
+#[TraceBoundary]
+function h1_tokens(FieldMap $headers, string $name): vec<string> {
+  $tokens = vec[];
+  foreach ($headers->getAll($name) as $field) {
+    foreach (h1_field_tokens($field) as $token) {
+      $tokens[] = $token;
+    }
+  }
+
+  return $tokens;
+}
+
+/** Parses strict, repeated Content-Length values. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function h1_content_length(FieldMap $headers): null|int {
+  $fields = $headers->getAll('content-length');
+  if (length!($fields) == 0) {
+    return null;
+  }
+
+  if (length!($fields) == 1 && !Str\contains($fields[0], ',')) {
+    return h1_decimal($fields[0]);
+  }
+
+  $values = vec[];
+  foreach ($fields as $field) {
+    foreach (string_split($field, ',', 0) as $value) {
+      $values[] = string_trim($value, " \t", 1);
+    }
+  }
+
+  $first = h1_decimal($values[0]);
+  foreach ($values as $value) {
+    if (h1_decimal($value) != $first) {
+      throw new HTTPException(
+        400,
+        'the request has conflicting content lengths',
+      );
+    }
+  }
+
+  return $first;
+}
+
+/** Parses one unsigned decimal integer. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function h1_decimal(string $value): int {
+  if ($value == '') {
+    throw new HTTPException(400, 'the request content length is empty');
+  }
+
+  $index = 0;
+  while ($index < length!($value)) {
+    if (!(string_ord($value[$index]) is 48..=57)) {
+      throw new HTTPException(400, 'the request content length is invalid');
+    }
+
+    $index++;
+  }
+
+  try {
+    return Math\from_base($value, 10);
+  } catch (OverflowException $error) {
+    throw new HTTPException(
+      400,
+      'the request content length is too large',
+      previous: $error,
+    );
+  }
+}
+
+/** Builds an absolute URL when a request target has an origin form. */
+function h1_url(string $scheme, null|string $host, string $target): null|URL {
+  if ($host != null && $target != '' && $target[0] == '/') {
+    $authority = Authority::parse($host);
+    $components = uri_parse_reference($target);
+    if ($authority == null || $components == null) {
+      return null;
+    }
+
+    return URL::fromPartsUnsafe(
+      $scheme,
+      $authority,
+      $components[2],
+      $components[3],
+      $components[4],
+    );
+  }
+
+  return URL::parse($target);
+}
+
+/** Decodes the settings of a valid HTTP/1.1 h2c upgrade request. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function h1_h2c_settings(
+  H1RequestHead $head,
+): dict<H2\SettingId, H2\SettingValue> {
+  if ($head->protocolVersion != ProtocolVersion::V11) {
+    throw new HTTPException(400, 'h2c requires HTTP/1.1');
+  }
+
+  $connections = h1_tokens($head->headers, 'connection');
+  if (
+    !contains!($connections, 'upgrade')
+    || !contains!($connections, 'http2-settings')
+  ) {
+    throw new HTTPException(
+      400,
+      'an h2c upgrade requires Upgrade and HTTP2-Settings connection tokens',
+    );
+  }
+
+  $values = $head->headers->getAll('http2-settings');
+  if (length!($values) != 1) {
+    throw new HTTPException(
+      400,
+      'an h2c upgrade requires one HTTP2-Settings field',
+    );
+  }
+
+  try {
+    $payload = Base64\decode($values[0], Alphabet::UrlSafe, false);
+  } catch (DecodingException $error) {
+    throw new HTTPException(
+      400,
+      'the HTTP2-Settings field is malformed',
+      previous: $error,
+    );
+  }
+
+  if ((length!($payload) % 6) != 0) {
+    throw new HTTPException(400, 'the HTTP2-Settings payload is malformed');
+  }
+
+  $settings = dict[];
+  $offset = 0;
+  while ($offset < length!($payload)) {
+    $id = Binary\decode_u16(Str\slice($payload, $offset, 2));
+    if ($id == 0) {
+      throw new HTTPException(
+        400,
+        'an HTTP/2 setting identifier cannot be zero',
+      );
+    }
+
+    $value = Binary\decode_u32(Str\slice($payload, $offset + 2, 4));
+    $settings[$id as H2\SettingId] = $value as H2\SettingValue;
+    $offset += 6;
+  }
+
+  return $settings;
+}

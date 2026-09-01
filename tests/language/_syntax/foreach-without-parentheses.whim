@@ -1,0 +1,4 @@
+$v = vec[1];
+foreach $v as $x {
+  write_line!('y');
+}

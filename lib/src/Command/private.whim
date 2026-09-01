@@ -1,0 +1,397 @@
+namespace Whim\Command\_Private;
+
+use Whim;
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Command\AttachedInput;
+use Whim\Command\AttachedOutput;
+use Whim\Command\Child;
+use Whim\Command\Command as Definition;
+use Whim\Command\Discarded;
+use Whim\Command\Exited;
+use Whim\Command\ExitStatus;
+use Whim\Command\Inherited;
+use Whim\Command\Output;
+use Whim\Command\OutputStream;
+use Whim\Command\Piped;
+use Whim\Command\Signalled;
+use Whim\Command\StartFailedException;
+use Whim\Command\InputStream;
+use Whim\Command\Stream;
+use Whim\Command\StreamUnavailableException;
+use Whim\Command\Terminal;
+use Whim\Command\UnsupportedSignalException;
+use Whim\Dict;
+use Whim\Env;
+use Whim\IO\FileDescriptorHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\IO\_Private\ReadHandleImpl;
+use Whim\IO\_Private\WriteHandleImpl;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\Process\Signal;
+use Whim\Refine\NonNegativeInt;
+use Whim\Time\Duration;
+
+/** Turns a stream choice into the engine's disposition and descriptor. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function disposition(Stream $stream): (int, null|FileDescriptor) {
+  $descriptor = match ($stream) {
+    $attached @ AttachedInput => $attached->handle->getFileDescriptor(),
+    $attached @ AttachedOutput => $attached->handle->getFileDescriptor(),
+    $_ => null,
+  };
+
+  return ($stream->getDisposition()->value, $descriptor);
+}
+
+/** The environment the child should see. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function environment(Definition $command): null|dict<string, string> {
+  if ($command->inheritsEnvironment && $command->environment == dict[]) {
+    return null;
+  }
+
+  if (!$command->inheritsEnvironment) {
+    return $command->environment;
+  }
+
+  return Dict\merge::<string, string>(
+    Env\get_variables(),
+    vec[$command->environment],
+  );
+}
+
+/**
+ * Starts a command and hands back the running child.
+ *
+ * @throws StartFailedException when the program cannot be started.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function start(Definition $command): Child {
+  $streams = vec[
+    disposition($command->standardInput),
+    disposition($command->standardOutput),
+    disposition($command->standardError),
+  ];
+
+  try {
+    ($id, $input, $output, $error) = Whim\_Private\spawn_process(
+      $command->program,
+      $command->arguments,
+      environment($command),
+      $command->directory,
+      $streams,
+      vec[],
+      match ($command->ownsProcessGroup) {
+        true => 0,
+        false => -1,
+      },
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    throw new StartFailedException(
+      'failed to start ' . $command->program . ': ' . $error->getMessage(),
+      previous: $error,
+    );
+  }
+
+  $inputHandle = null;
+  if ($input != null) {
+    $inputHandle = new WriteHandleImpl($input);
+  }
+
+  $outputHandle = null;
+  if ($output != null) {
+    $outputHandle = new ReadHandleImpl($output);
+  }
+
+  $errorHandle = null;
+  if ($error != null) {
+    $errorHandle = new ReadHandleImpl($error);
+  }
+
+  return new ChildImpl(
+    $id,
+    $inputHandle,
+    $outputHandle,
+    $errorHandle,
+    $command->ownsProcessGroup,
+  );
+}
+
+/**
+ * Reads a raw wait status into an exit status.
+ *
+ * The layout is the one every system in this family uses: the low seven
+ * bits name a signal, and a value of zero there means the child chose its
+ * own code, which sits in the next eight.
+ */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function exit_status(int $status): ExitStatus {
+  $signal = $status & 127;
+  if ($signal == 0) {
+    return new Exited(($status >> 8) & 255);
+  }
+
+  return new Signalled(signal_of($signal), ($status & 128) != 0);
+}
+
+/**
+ * The number this system gives a signal.
+ *
+ * @throws UnsupportedSignalException when this system has no such signal.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function number_of(Signal $signal): int {
+  if (!$signal->isSupported()) {
+    throw new UnsupportedSignalException(
+      'this system has no signal named ' . $signal->name,
+    );
+  }
+
+  return $signal->value;
+}
+
+/** The signal a number names, or `Terminate` because something ended the child. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function signal_of(int $number): Signal {
+  return Signal::tryFrom($number) ?? Signal::Terminate;
+}
+
+/**
+ * A child the engine started.
+ *
+ * The engine is the only thing that collects a child, so the status is
+ * asked for once, kept, and handed to everyone who asks again. Two waiters
+ * would otherwise race, and whichever arrived second would find nothing.
+ */
+final class ChildImpl implements Child {
+  private null|ExitStatus $status = null;
+  private Async\Future<ExitStatus> $waiting;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private readonly NonNegativeInt $id,
+    private readonly null|WriteHandle&FileDescriptorHandle $input,
+    private readonly null|ReadHandle&FileDescriptorHandle $output,
+    private readonly null|ReadHandle&FileDescriptorHandle $error,
+    private readonly bool $ownsProcessGroup,
+  ) {
+    $this->waiting = $this->createWatcher();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getId(): NonNegativeInt {
+    return $this->id;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isRunning(): bool {
+    return $this->status == null;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getStandardInput(): WriteHandle&FileDescriptorHandle {
+    $handle = $this->input;
+    if ($handle == null) {
+      throw new StreamUnavailableException(
+        'the command did not pipe the child\'s standard input',
+      );
+    }
+
+    return $handle;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getStandardOutput(): ReadHandle&FileDescriptorHandle {
+    $handle = $this->output;
+    if ($handle == null) {
+      throw new StreamUnavailableException(
+        'the command did not pipe the child\'s standard output',
+      );
+    }
+
+    return $handle;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getStandardError(): ReadHandle&FileDescriptorHandle {
+    $handle = $this->error;
+    if ($handle == null) {
+      throw new StreamUnavailableException(
+        'the command did not pipe the child\'s standard error',
+      );
+    }
+
+    return $handle;
+  }
+
+  /** Signals the child, and does nothing once it has ended. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function signal(Signal $signal): void {
+    if ($this->status != null) {
+      return;
+    }
+
+    $target = match ($this->ownsProcessGroup) {
+      true => -$this->id,
+      false => $this->id,
+    };
+
+    Whim\_Private\send_signal($target, number_of($signal));
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function wait(
+    null|CancellationToken $cancellation = null,
+  ): ExitStatus {
+    $settled = $this->status;
+    if ($settled != null) {
+      return $settled;
+    }
+
+    return $this->waiting->await($cancellation);
+  }
+
+  /**
+   * Starts the one watcher that owns collection of this child.
+   *
+   * Every later waiter awaits the same future, so cancelling one wait does
+   * not take the status away from another.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function createWatcher(): Async\Future<ExitStatus> {
+    $deferred = new Async\Deferred::<ExitStatus>();
+    $task = Whim\_Private\watch_process($this->id, fn(int $raw): void {
+      $status = exit_status($raw);
+      $this->status = $status;
+      $deferred->complete($status);
+    });
+
+    $future = $deferred->getFuture()->always(fn(): void {
+      Whim\_Private\cancel_task($task);
+    });
+
+    return $future;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function join(null|CancellationToken $cancellation = null): Output {
+    // Both streams are drained at once. Reading one to its end first would
+    // leave the child blocked writing to the other once its pipe filled.
+    $output = $this->output;
+    $error = $this->error;
+
+    $readers = dict[];
+    if ($output != null) {
+      $readers['output'] = fn(): string {
+        return $output->readAll(null, $cancellation);
+      };
+    }
+
+    if ($error != null) {
+      $readers['error'] = fn(): string {
+        return $error->readAll(null, $cancellation);
+      };
+    }
+
+    $collected = Async\concurrently::<string, string>($readers);
+    $status = $this->wait($cancellation);
+
+    $standardOutput = '';
+    if (contains_key!($collected, 'output')) {
+      $standardOutput = $collected['output'];
+    }
+
+    $standardError = '';
+    if (contains_key!($collected, 'error')) {
+      $standardError = $collected['error'];
+    }
+
+    return new Output($status, $standardOutput, $standardError);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function terminate(null|Duration $grace = null): ExitStatus {
+    $settled = $this->status;
+    if ($settled != null) {
+      return $settled;
+    }
+
+    $this->signal(Signal::Terminate);
+
+    // Without a grace the caller asked to terminate, not to kill, so this
+    // waits as long as the child takes. A grace is what turns the request
+    // into an escalation.
+    if ($grace == null) {
+      return $this->waiting->await();
+    }
+
+    try {
+      return $this->waiting->await(new Async\TimeoutCancellationToken($grace));
+    } catch (Async\CancelledException $cancelled) {
+      if (!($cancelled->getPrevious() is Async\TimeoutException)) {
+        throw $cancelled;
+      }
+
+      return $this->kill();
+    }
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function kill(): ExitStatus {
+    $settled = $this->status;
+    if ($settled != null) {
+      return $settled;
+    }
+
+    $this->signal(Signal::Kill);
+
+    return $this->waiting->await();
+  }
+}

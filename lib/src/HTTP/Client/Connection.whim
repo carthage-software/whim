@@ -1,0 +1,25 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\IO\CloseHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Performs exchanges over one protocol-ready connection. */
+interface Connection extends CloseHandle {
+  #[MustUse]
+  public function getMetadata(): ConnectionMetadata;
+
+  /** Reports whether another exchange may use this connection. */
+  public function isReusable(): bool;
+
+  #[MustUse]
+  #[TrackCaller]
+  public function exchange(
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction;
+}

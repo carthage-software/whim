@@ -1,0 +1,5 @@
+error: duplicate option `must_use`
+ --> tests/ui/function_duplicate_option.rs:3:47
+  |
+3 | #[whim_function("Ui\\value(): int", must_use, must_use)]
+  |                                               ^^^^^^^^

@@ -1,0 +1,403 @@
+namespace Whim\MIME\MultiPart\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\IO\SpoolHandle;
+use Whim\IO\SeekWhence;
+use Whim\Iterate\Iterator;
+use Whim\MIME\Header;
+use Whim\MIME\Headers;
+use Whim\MIME\MultiPartException;
+use Whim\MIME\Part\Part;
+use Whim\MIME\Part\RawPart;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\memmem;
+use Whim\_Private\string_slice;
+
+/** Lazily parses one multipart part per iterator advance. */
+final class ParserIterator implements Iterator<int, Part> {
+  private const int CHUNK_SIZE = 8_192;
+  private const int SUFFIX_INCOMPLETE = 0;
+  private const int SUFFIX_VALID = 1;
+  private const int SUFFIX_INVALID = 2;
+
+  private string $buffer = '';
+  private bool $sourceEnded = false;
+  private bool $initialized = false;
+  private bool $done = false;
+  private int $index = 0;
+  private int $partSize = 0;
+
+  /** Creates parser state over one source handle. */
+  public function __construct(
+    private ReadHandle $source,
+    private string $delimiter,
+    private NonNegativeInt $spoolThreshold,
+    private NonNegativeInt $maximumParts,
+    private NonNegativeInt $maximumPartSize,
+    private NonNegativeInt $maximumHeaderSize,
+    private null|CancellationToken $cancellation,
+  ) {}
+
+  /** Parses and returns the next complete part. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function next(): null|(int, Part) {
+    if (!$this->initialized) {
+      $this->initialize();
+    }
+
+    if ($this->done) {
+      return null;
+    }
+
+    if ($this->maximumParts > 0 && $this->index >= $this->maximumParts) {
+      throw new MultiPartException(
+        'the multipart body exceeds the maximum part count of '
+        . $this->maximumParts,
+      );
+    }
+
+    $headers = $this->readHeaders();
+    $spool = new SpoolHandle($this->spoolThreshold);
+    $this->partSize = 0;
+    $this->done = $this->readBody($spool);
+    $spool->seek(0, SeekWhence::Set);
+
+    $part = new RawPart($headers, $spool);
+    $index = $this->index;
+    $this->index++;
+    return ($index, $part);
+  }
+
+  /** Finds and consumes the first delimiter line. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function initialize(): void {
+    while (true) {
+      $line = $this->readLine(0);
+      if ($line == null) {
+        throw new MultiPartException(
+          'the multipart body does not contain its opening boundary',
+        );
+      }
+
+      $line = Str\trim_right($line, " \t");
+      if ($line == $this->delimiter) {
+        $this->initialized = true;
+        return;
+      }
+
+      if ($line == $this->delimiter . '--') {
+        $this->initialized = true;
+        $this->done = true;
+        return;
+      }
+    }
+  }
+
+  /** Parses one RFC 5322-style header section. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function readHeaders(): Headers {
+    $pairs = vec[];
+    $currentName = null;
+    $currentValue = '';
+    $size = 0;
+
+    while (true) {
+      $line = $this->readLine($this->maximumHeaderSize);
+      if ($line == null) {
+        throw new MultiPartException(
+          'the multipart part headers are incomplete',
+        );
+      }
+
+      $size += length!($line) + 1;
+      if ($this->maximumHeaderSize > 0 && $size > $this->maximumHeaderSize) {
+        throw new MultiPartException(
+          'the multipart part headers exceed the maximum size of '
+          . $this->maximumHeaderSize
+          . ' bytes',
+        );
+      }
+
+      if ($line == '') {
+        if ($currentName != null) {
+          $pairs[] = ($currentName, $currentValue);
+        }
+
+        try {
+          return Headers::fromPairs($pairs as vec<Header>);
+        } catch (InvalidArgumentException $error) {
+          throw new MultiPartException(
+            'the multipart part contains an invalid header',
+            previous: $error,
+          );
+        }
+      }
+
+      if ($currentName != null && ($line[0] == ' ' || $line[0] == "\t")) {
+        $currentValue .= ' ' . Str\trim($line);
+        continue;
+      }
+
+      if ($currentName != null) {
+        $pairs[] = ($currentName, $currentValue);
+      }
+
+      $colon = memmem($line, ':', 0, false);
+      if ($colon == null) {
+        throw new MultiPartException(
+          'the multipart part contains a header without a colon',
+        );
+      }
+
+      $currentName = Str\trim(string_slice($line, 0, $colon));
+      $valueOffset = $colon + 1;
+      $currentValue = Str\trim(
+        string_slice($line, $valueOffset, length!($line) - $valueOffset),
+      );
+    }
+  }
+
+  /** Streams one body into its spool and reports a closing delimiter. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function readBody(SpoolHandle $spool): bool {
+    $marker = "\n" . $this->delimiter;
+    $tailSize = length!($marker) + 5;
+
+    while (true) {
+      $searchOffset = 0;
+      $needMore = false;
+      while (true) {
+        $position =
+          memmem($this->buffer, $marker, $searchOffset, false) ?? break;
+
+        $after = $position + length!($marker);
+        ($status, $closing, $consumed) = $this->inspectSuffix($after);
+        if ($status == self::SUFFIX_VALID) {
+          $bodyEnd = $this->bodyEnd($position);
+          $this->writeBody($spool, string_slice($this->buffer, 0, $bodyEnd));
+
+          $this->buffer = string_slice(
+            $this->buffer,
+            $consumed,
+            length!($this->buffer) - $consumed,
+          );
+
+          return $closing;
+        }
+
+        if ($status == self::SUFFIX_INCOMPLETE) {
+          $bodyEnd = $this->bodyEnd($position);
+          if ($bodyEnd > 0) {
+            $this->writeBody($spool, $this->consume($bodyEnd));
+          }
+
+          $needMore = true;
+          break;
+        }
+
+        $searchOffset = $position + 1;
+      }
+
+      if ($needMore) {
+        if (!$this->fill()) {
+          throw new MultiPartException(
+            'the multipart body is missing its closing delimiter',
+          );
+        }
+
+        continue;
+      }
+
+      $safeLength = length!($this->buffer) - $tailSize;
+      if ($safeLength > 0) {
+        if ($this->buffer[$safeLength - 1] == "\r") {
+          $safeLength--;
+        }
+
+        if ($safeLength > 0) {
+          $this->writeBody($spool, $this->consume($safeLength));
+        }
+      }
+
+      if (!$this->fill()) {
+        throw new MultiPartException(
+          'the multipart body is missing its closing delimiter',
+        );
+      }
+    }
+  }
+
+  /** Checks the bytes following a delimiter candidate. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function inspectSuffix(int $offset): (int, bool, int) {
+    $length = length!($this->buffer);
+    if ($offset >= $length) {
+      return match ($this->sourceEnded) {
+        true => (self::SUFFIX_INVALID, false, 0),
+        false => (self::SUFFIX_INCOMPLETE, false, 0),
+      };
+    }
+
+    $closing = false;
+    if ($this->buffer[$offset] == '-') {
+      if ($offset + 1 >= $length) {
+        return match ($this->sourceEnded) {
+          true => (self::SUFFIX_INVALID, false, 0),
+          false => (self::SUFFIX_INCOMPLETE, false, 0),
+        };
+      }
+
+      if ($this->buffer[$offset + 1] != '-') {
+        return (self::SUFFIX_INVALID, false, 0);
+      }
+
+      $closing = true;
+      $offset += 2;
+    }
+
+    while (
+      $offset < $length
+      && ($this->buffer[$offset] == ' ' || $this->buffer[$offset] == "\t")
+    ) {
+      $offset++;
+    }
+
+    if ($offset == $length) {
+      if ($closing && $this->sourceEnded) {
+        return (self::SUFFIX_VALID, true, $offset);
+      }
+
+      return match ($this->sourceEnded) {
+        true => (self::SUFFIX_INVALID, false, 0),
+        false => (self::SUFFIX_INCOMPLETE, false, 0),
+      };
+    }
+
+    if ($this->buffer[$offset] == "\n") {
+      return (self::SUFFIX_VALID, $closing, $offset + 1);
+    }
+
+    if ($this->buffer[$offset] != "\r") {
+      return (self::SUFFIX_INVALID, false, 0);
+    }
+
+    if ($offset + 1 >= $length) {
+      return match ($this->sourceEnded) {
+        true => (self::SUFFIX_INVALID, false, 0),
+        false => (self::SUFFIX_INCOMPLETE, false, 0),
+      };
+    }
+
+    if ($this->buffer[$offset + 1] != "\n") {
+      return (self::SUFFIX_INVALID, false, 0);
+    }
+
+    return (self::SUFFIX_VALID, $closing, $offset + 2);
+  }
+
+  /** Returns the body end before a delimiter's line break. */
+  private function bodyEnd(NonNegativeInt $position): NonNegativeInt {
+    if ($position > 0 && $this->buffer[$position - 1] == "\r") {
+      return $position - 1;
+    }
+
+    return $position;
+  }
+
+  /** Writes one safe body prefix while enforcing its size limit. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function writeBody(SpoolHandle $spool, string $bytes): void {
+    if ($bytes == '') {
+      return;
+    }
+
+    $size = $this->partSize + length!($bytes);
+    if ($this->maximumPartSize > 0 && $size > $this->maximumPartSize) {
+      throw new MultiPartException(
+        'the multipart part body exceeds the maximum size of '
+        . $this->maximumPartSize
+        . ' bytes',
+      );
+    }
+
+    $spool->writeAll($bytes, $this->cancellation);
+    $this->partSize = $size;
+  }
+
+  /** Reads one line without its ending. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function readLine(NonNegativeInt $maximum): null|string {
+    while (true) {
+      $position = memmem($this->buffer, "\n", 0, false);
+      if ($position != null) {
+        $line = $this->consume($position + 1);
+        $length = length!($line) - 1;
+        if ($length > 0 && $line[$length - 1] == "\r") {
+          $length--;
+        }
+
+        return string_slice($line, 0, $length);
+      }
+
+      if ($maximum > 0 && length!($this->buffer) > $maximum) {
+        throw new MultiPartException(
+          'the multipart part headers exceed the maximum size of '
+          . $maximum
+          . ' bytes',
+        );
+      }
+
+      if (!$this->fill()) {
+        if ($this->buffer == '') {
+          return null;
+        }
+
+        $line = $this->buffer;
+        $this->buffer = '';
+        return $line;
+      }
+    }
+  }
+
+  /** Reads another source chunk into the parser buffer. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function fill(): bool {
+    if ($this->sourceEnded) {
+      return false;
+    }
+
+    $chunk = $this->source->read(self::CHUNK_SIZE, $this->cancellation);
+    if ($chunk == '') {
+      $this->sourceEnded = true;
+      return false;
+    }
+
+    $this->buffer .= $chunk;
+    return true;
+  }
+
+  /** Removes and returns a prefix of the parser buffer. */
+  private function consume(NonNegativeInt $length): string {
+    $result = string_slice($this->buffer, 0, $length);
+    $this->buffer = string_slice(
+      $this->buffer,
+      $length,
+      length!($this->buffer) - $length,
+    );
+
+    return $result;
+  }
+}

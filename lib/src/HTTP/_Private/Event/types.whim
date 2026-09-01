@@ -1,0 +1,68 @@
+namespace Whim\HTTP\_Private\Event;
+
+use Whim\HTTP\_Private\ConnectionStreamId;
+use Whim\HTTP\_Private\ErrorCodeValue;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\_Private\SettingId;
+use Whim\HTTP\_Private\SettingValue;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\_Private\WindowIncrement;
+use Whim\Refine\Weakend;
+
+/** Application bytes received on a stream. */
+type DataReceived = (1, StreamId, string, bool);
+
+/** A complete decoded header section. */
+type HeadersReceived = (2, StreamId, vec<Header>, bool, bool, bool);
+
+/** Peer settings. */
+type SettingsReceived = (3, dict<SettingId, SettingValue>);
+
+/** An acknowledgment of local settings. */
+type SettingsAcknowledged = (4, null);
+
+/** A complete server push promise. */
+type PushPromiseReceived = (5, StreamId, StreamId, vec<Header>);
+
+/** A peer's graceful shutdown boundary. */
+type GoAwayReceived = (6, ConnectionStreamId, ErrorCodeValue, string);
+
+/** A stream reset by the peer. */
+type StreamReset = (7, StreamId, ErrorCodeValue);
+
+/** A stream that reached its final state. */
+type StreamClosed = (8, StreamId);
+
+/** A peer violation which failed one stream. */
+type StreamFailed = (9, StreamId, ErrorCodeValue, string);
+
+/** A peer increased a send window. */
+type WindowUpdated = (10, ConnectionStreamId, WindowIncrement);
+
+/** A validated request field section. */
+type RequestHeadersReceived = (
+  11,
+  StreamId,
+  string,
+  string,
+  string,
+  string,
+  vec<(string, string)>,
+  bool,
+);
+
+/** An event produced by an HTTP/2 connection. */
+type Event = DataReceived
+| HeadersReceived
+| SettingsReceived
+| SettingsAcknowledged
+| PushPromiseReceived
+| GoAwayReceived
+| StreamReset
+| StreamClosed
+| StreamFailed
+| WindowUpdated
+| RequestHeadersReceived;
+
+/** An HTTP/2 event without a runtime union check. */
+type WeakendEvent = Weakend<Event, (int, ...)>;

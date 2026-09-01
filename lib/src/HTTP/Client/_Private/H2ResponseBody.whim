@@ -1,0 +1,166 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Message\FieldMap;
+use Whim\IO\CloseHandle;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Unwind\Throwable;
+
+/** Streams one HTTP/2 response body. */
+final class H2ResponseBody implements ReadHandle, CloseHandle {
+  private string $buffer = '';
+  private bool $complete = false;
+  private bool $closed = false;
+  private null|Throwable $error = null;
+
+  public function __construct(
+    private H2Connection $connection,
+    private H2\StreamId $streamId,
+    private H2Exchange $exchange,
+    private Deferred<FieldMap> $trailers,
+  ) {}
+
+  public function __destruct(): void {
+    try {
+      $this->close();
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->throwIfError();
+    if ($this->buffer == '' && !$this->complete && !$this->closed) {
+      $this->process($this->exchange->receive($cancellation));
+    }
+
+    $this->throwIfError();
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    $this->drain();
+    $this->throwIfError();
+    $ended = $this->buffer == '' && ($this->complete || $this->closed);
+    if ($ended) {
+      $this->close();
+    }
+
+    return $ended;
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($maxBytes == 0) {
+      return '';
+    }
+
+    $this->drain();
+    $this->throwIfError();
+    if ($this->buffer == '') {
+      if ($this->complete) {
+        $this->close();
+      }
+
+      return '';
+    }
+
+    $length = length!($this->buffer);
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->buffer, 0, $length);
+    $this->buffer = Str\slice($this->buffer, $length);
+    if ($this->buffer == '' && $this->complete) {
+      $this->close();
+    }
+
+    return $data;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    $this->connection->releaseResponse($this->streamId, !$this->complete);
+  }
+
+  private function drain(): void {
+    while (!$this->complete && !$this->closed) {
+      $batch = $this->exchange->tryReceive() ?? return;
+
+      $this->process($batch);
+    }
+  }
+
+  private function process(H2EventBatch $batch): void {
+    if ($batch->error != null) {
+      $this->fail($batch->error);
+      return;
+    }
+
+    foreach ($batch->events as $event) {
+      if ($event[0] == 1) {
+        $this->buffer .= $event[2];
+        if ($event[3]) {
+          $this->complete = true;
+        }
+      } else if ($event[0] == 2 && $event[4]) {
+        $fields = vec[];
+        foreach ($event[2] as $header) {
+          $fields[] = ($header[0], $header[1]);
+        }
+
+        if (!$this->trailers->isComplete()) {
+          $this->trailers->complete(FieldMap::from($fields));
+        }
+
+        if ($event[3]) {
+          $this->complete = true;
+        }
+      } else if ($event[0] == 7) {
+        if (!$this->complete || $event[2] != H2\ErrorCode::NoError->value) {
+          $this->fail(
+            new ProtocolException('the HTTP/2 response stream was reset'),
+          );
+        }
+      } else if ($event[0] == 8) {
+        $this->complete = true;
+        if (!$this->trailers->isComplete()) {
+          $this->trailers->complete(FieldMap::default());
+        }
+      }
+    }
+  }
+
+  private function fail(Throwable $error): void {
+    $this->error = $error;
+    $this->complete = true;
+    if (!$this->trailers->isComplete()) {
+      $this->trailers->error($error);
+    }
+
+    $this->close();
+  }
+
+  private function throwIfError(): void {
+    if ($this->error != null) {
+      throw $this->error;
+    }
+  }
+}

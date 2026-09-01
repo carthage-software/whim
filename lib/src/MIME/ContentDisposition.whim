@@ -1,0 +1,131 @@
+namespace Whim\MIME;
+
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** A MIME Content-Disposition value. */
+final readonly class ContentDisposition implements ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public string $type,
+    public Parameters $parameters,
+  ) {}
+
+  /** Creates a checked content disposition. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    string $type,
+    Parameters $parameters = Parameters::default(),
+  ): ContentDisposition {
+    $type = Str\lowercase($type);
+    if (!_Private\is_token($type)) {
+      throw new InvalidArgumentException(
+        'invalid MIME content disposition: `' . $type . '`',
+      );
+    }
+
+    return new ContentDisposition($type, $parameters);
+  }
+
+  /** Parses a content disposition, or returns null when malformed. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $input): null|ContentDisposition {
+    $input = Str\trim($input);
+    $semicolon = Str\search($input, ';');
+    if ($semicolon == null) {
+      if (!_Private\is_token(Str\lowercase($input))) {
+        return null;
+      }
+
+      return ContentDisposition::fromParts($input);
+    }
+
+    $type = Str\trim(Str\slice($input, 0, $semicolon));
+    $parameters = Parameters::parse(Str\slice($input, $semicolon + 1));
+    if ($parameters == null || !_Private\is_token(Str\lowercase($type))) {
+      return null;
+    }
+
+    return ContentDisposition::fromParts($type, $parameters);
+  }
+
+  /** Creates an inline disposition. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function inline(
+    null|string $filename = null,
+  ): ContentDisposition {
+    return ContentDisposition::named('inline', $filename);
+  }
+
+  /** Creates an attachment disposition. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function attachment(
+    null|string $filename = null,
+  ): ContentDisposition {
+    return ContentDisposition::named('attachment', $filename);
+  }
+
+  /** Returns a path-safe filename parameter. */
+  #[MustUse]
+  #[TrackCaller]
+  public function filename(): null|string {
+    $filename = $this->parameters->get('filename') ?? return null;
+
+    $filename = Str\replace($filename, '\\', '/');
+    $slash = Str\search_last($filename, '/');
+    if ($slash != null) {
+      $filename = Str\slice($filename, $slash + 1);
+    }
+
+    if (
+      $filename == ''
+      || $filename == '.'
+      || $filename == '..'
+      || Str\contains($filename, "\x00")
+    ) {
+      return null;
+    }
+
+    return $filename;
+  }
+
+  /** Returns the unsanitized filename parameter. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function unsafeFilename(): null|string {
+    return $this->parameters->get('filename');
+  }
+
+  /** Serializes the content disposition. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    return $this->type . $this->parameters->toString();
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private static function named(
+    string $type,
+    null|string $filename,
+  ): ContentDisposition {
+    if ($filename == null) {
+      return ContentDisposition::fromParts($type);
+    }
+
+    return ContentDisposition::fromParts(
+      $type,
+      Parameters::fromPairs(vec[('filename', $filename)]),
+    );
+  }
+}

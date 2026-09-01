@@ -1,0 +1,67 @@
+use Whim\Unwind\DiscardedResultError;
+
+$bytes = Whim\SecureRandom\bytes(32);
+$assertion_value_1 = $bytes;
+assert!($assertion_value_1 is string);
+assert!(length!($assertion_value_1) == 32);
+
+$text = Whim\SecureRandom\string(24, 'ab');
+assert!(length!($text) == 24);
+for ($index = 0; $index < length!($text); $index++) {
+  assert!(contains!(vec['a', 'b'], $text[$index]));
+}
+
+$assertion_value_4 = Whim\SecureRandom\int(10, 20);
+assert!($assertion_value_4 >= 10);
+assert!($assertion_value_4 <= 20);
+$assertion_value_5 = Whim\SecureRandom\float();
+assert!($assertion_value_5 >= 0.0);
+assert!($assertion_value_5 < 1.0);
+
+$assertion_value_6 = Whim\PseudoRandom\int(-5, 5);
+assert!($assertion_value_6 >= -5);
+assert!($assertion_value_6 <= 5);
+assert!(
+  Whim\PseudoRandom\int(Whim\Math\INT_MIN, Whim\Math\INT_MIN)
+  == Whim\Math\INT_MIN,
+);
+
+assert!(
+  Whim\PseudoRandom\int(Whim\Math\INT_MAX, Whim\Math\INT_MAX)
+  == Whim\Math\INT_MAX,
+);
+
+$assertion_value_9 = Whim\PseudoRandom\int();
+assert!($assertion_value_9 >= Whim\Math\INT_MIN);
+assert!($assertion_value_9 <= Whim\Math\INT_MAX);
+
+$assertion_value_10 = Whim\PseudoRandom\float();
+assert!($assertion_value_10 >= 0.0);
+assert!($assertion_value_10 < 1.0);
+
+$left = new Whim\RandomSequence\MersenneTwisterSequence(1234);
+$right = new Whim\RandomSequence\MersenneTwisterSequence(1234);
+for ($index = 0; $index < 20; $index++) {
+  assert!($left->next() == $right->next());
+}
+
+$reference = new Whim\RandomSequence\MersenneTwisterSequence(5489);
+assert!($reference->nextWord() == 3_499_211_612);
+assert!($reference->nextWord() == 581_869_302);
+
+$secure = Whim\RandomSequence\SecureSequence::default();
+assert!($secure is Whim\RandomSequence\Sequence);
+assert!($secure->next() is int);
+
+$assertion_value_16 = function(): void {
+  Whim\RandomSequence\SecureSequence::default();
+};
+
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (DiscardedResultError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is DiscardedResultError);

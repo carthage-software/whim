@@ -1,0 +1,136 @@
+namespace Whim\Range;
+
+use Whim\Iterate\ToIterator;
+use Whim\Iterate\Iterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Represents a range bounded on both sides. */
+final readonly class BetweenRange implements
+  LowerBoundRange,
+  UpperBoundRange,
+  ToIterator<int, int> {
+  /**
+   * Creates a range bounded on both sides.
+   *
+   * @throws InvalidRangeException when the lower bound exceeds the upper bound.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    private int $lowerBound,
+    private int $upperBound,
+    private bool $upperInclusive = false,
+  ) {
+    if ($lowerBound > $upperBound) {
+      throw new InvalidRangeException(
+        'the lower bound must not exceed the upper bound',
+      );
+    }
+  }
+
+  /** Reports whether the range contains a value. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(int $value): bool {
+    if ($value < $this->lowerBound) {
+      return false;
+    }
+
+    if ($this->upperInclusive) {
+      return $value <= $this->upperBound;
+    }
+
+    return $value < $this->upperBound;
+  }
+
+  /** Replaces the lower bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withLowerBound(int $lowerBound): BetweenRange {
+    return new BetweenRange(
+      $lowerBound,
+      $this->upperBound,
+      $this->upperInclusive,
+    );
+  }
+
+  /** Replaces the upper bound and its inclusivity. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBound(
+    int $upperBound,
+    bool $upperInclusive,
+  ): BetweenRange {
+    return new BetweenRange($this->lowerBound, $upperBound, $upperInclusive);
+  }
+
+  /** Replaces the upper bound with an inclusive bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundInclusive(int $upperBound): BetweenRange {
+    return new BetweenRange($this->lowerBound, $upperBound, true);
+  }
+
+  /** Replaces the upper bound with an exclusive bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundExclusive(int $upperBound): BetweenRange {
+    return new BetweenRange($this->lowerBound, $upperBound, false);
+  }
+
+  /** Removes the lower bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withoutLowerBound(): ToRange {
+    return new ToRange($this->upperBound, $this->upperInclusive);
+  }
+
+  /** Removes the upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withoutUpperBound(): FromRange {
+    return new FromRange($this->lowerBound);
+  }
+
+  /** Returns the lower bound. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLowerBound(): int {
+    return $this->lowerBound;
+  }
+
+  /** Returns the upper bound. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getUpperBound(): int {
+    return $this->upperBound;
+  }
+
+  /** Reports whether the upper bound is inclusive. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isUpperInclusive(): bool {
+    return $this->upperInclusive;
+  }
+
+  /** Changes whether the upper bound is inclusive. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperInclusive(bool $upperInclusive): static {
+    return new static($this->lowerBound, $this->upperBound, $upperInclusive);
+  }
+
+  /** Creates an iterator over the range. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toIterator(): Iterator<int, int> {
+    return new _Private\RangeIterator(
+      $this->lowerBound,
+      $this->upperBound,
+      $this->upperInclusive,
+    );
+  }
+}

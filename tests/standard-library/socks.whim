@@ -1,0 +1,173 @@
+use Whim\Async;
+use Whim\Binary;
+use Whim\HTTP\Client;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Request;
+use Whim\IP\Address;
+use Whim\IO\Reader;
+use Whim\Network\InternetEndpoint;
+use Whim\SOCKS;
+use Whim\Str;
+use Whim\TCP;
+use Whim\URL\URL;
+
+$loopback = Address::v4('127.0.0.1');
+$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$endpoint = $listener->getLocalEndpoint();
+$server = Async\spawn::<string>(function() use ($listener): string {
+  $stream = $listener->accept();
+  assert!($stream->readFixedSize(3) == "\x05\x01\x00");
+  $stream->writeAll("\x05\x00");
+
+  assert!($stream->readFixedSize(4) == "\x05\x01\x00\x03");
+  $length = Str\ord($stream->readFixedSize(1));
+  assert!($stream->readFixedSize($length) == 'target.local');
+  assert!(Binary\decode_u16($stream->readFixedSize(2)) == 8080);
+  $stream->writeAll("\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00");
+
+  $reader = new Reader($stream);
+  $head = $reader->readUntilBounded("\r\n\r\n", 8192);
+  assert!($head != null);
+  $stream->writeAll(
+    "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello",
+  );
+
+  $stream->close();
+  return $head;
+});
+
+$socks = new SOCKS\Connector(
+  new SOCKS\Configuration($endpoint->address, $endpoint->port),
+);
+
+$request = Request::fromURL(
+  Message\METHOD_GET,
+  URL::from('http://target.local:8080/path'),
+);
+
+$configuration = new Client\Configuration(
+  protocolVersions: vec[Message\ProtocolVersion::V11],
+);
+
+$connection = new Client\DirectConnector($socks)->connect(
+  Client\Origin::fromURL($request->url as URL),
+  $request,
+  $configuration,
+);
+
+$metadata = $connection->getMetadata();
+assert!($metadata->proxied);
+assert!($metadata->destinationEndpoint == null);
+assert!($metadata->peerEndpoint->port == $endpoint->port);
+$transaction = $connection->exchange($request, $configuration);
+$body = $transaction->response->body;
+assert!($body != null);
+assert!($body->readAll() == 'hello');
+$head = $server->await();
+$listener->close();
+assert!(Str\starts_with($head, "GET /path HTTP/1.1\r\n"));
+
+$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$endpoint = $listener->getLocalEndpoint();
+$server = Async\spawn::<null>(function() use ($listener): null {
+  $stream = $listener->accept();
+  assert!($stream->readFixedSize(4) == "\x05\x02\x00\x02");
+  $stream->writeAll("\x05\x02");
+
+  assert!(Str\ord($stream->readFixedSize(1)) == 1);
+  $usernameLength = Str\ord($stream->readFixedSize(1));
+  assert!($stream->readFixedSize($usernameLength) == 'user');
+  $passwordLength = Str\ord($stream->readFixedSize(1));
+  assert!($stream->readFixedSize($passwordLength) == 'secret');
+  $stream->writeAll("\x01\x00");
+
+  assert!($stream->readFixedSize(4) == "\x05\x01\x00\x01");
+  assert!($stream->readFixedSize(4) == Address::v4('192.0.2.10')->toBytes());
+
+  assert!(Binary\decode_u16($stream->readFixedSize(2)) == 9000);
+  $stream->writeAll("\x05\x00\x00\x04" . Str\join('', vec["\x00"; 18]));
+  assert!($stream->readFixedSize(4) == 'ping');
+  $stream->writeAll('pong');
+  $stream->close();
+  return null;
+});
+
+$socks = new SOCKS\Connector(
+  new SOCKS\Configuration(
+    $endpoint->address,
+    $endpoint->port,
+    'user',
+    'secret',
+  ),
+);
+
+$stream = $socks->connect(Address::v4('192.0.2.10'), 9000);
+$stream->writeAll('ping');
+assert!($stream->readFixedSize(4) == 'pong');
+$stream->close();
+$server->await();
+$listener->close();
+
+assert!(
+  SOCKS\_Private\encode_host(Address::v4('192.0.2.1'))
+  == "\x01" . Address::v4('192.0.2.1')->toBytes(),
+);
+
+assert!(
+  SOCKS\_Private\encode_host(Address::v6('2001:db8::1'))
+  == "\x04" . Address::v6('2001:db8::1')->toBytes(),
+);
+
+assert!(SOCKS\_Private\encode_host('example.com') == "\x03\x0bexample.com");
+
+$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$endpoint = $listener->getLocalEndpoint();
+$server = Async\spawn::<null>(function() use ($listener): null {
+  $stream = $listener->accept();
+  discard!($stream->readFixedSize(3));
+  $stream->writeAll("\x05\x00");
+  $header = $stream->readFixedSize(4);
+  $type = Str\ord($header[3]);
+  if ($type == 3) {
+    $length = Str\ord($stream->readFixedSize(1));
+    discard!($stream->readFixedSize($length));
+  }
+
+  discard!($stream->readFixedSize(2));
+  $stream->writeAll("\x05\x05\x00\x01\x00\x00\x00\x00\x00\x00");
+  $stream->close();
+  return null;
+});
+
+$socks = new SOCKS\Connector(
+  new SOCKS\Configuration($endpoint->address, $endpoint->port),
+);
+
+$assertion_value_21 = fn(): TCP\Stream => (
+  $socks->connect('unreachable.local', 80)
+);
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (SOCKS\ConnectionException $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is SOCKS\ConnectionException);
+
+$server->await();
+$listener->close();
+
+$assertion_value_22 = fn(): SOCKS\Configuration => (
+  new SOCKS\Configuration('proxy.example.com', username: 'user')
+);
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is Whim\Unwind\InvalidArgumentException);

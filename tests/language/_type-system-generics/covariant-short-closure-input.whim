@@ -1,0 +1,1 @@
+$make = fn<out T>(T $value): T => $value;

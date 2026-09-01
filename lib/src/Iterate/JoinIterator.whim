@@ -1,0 +1,32 @@
+namespace Whim\Iterate;
+
+use Whim\Refine\Iterable;
+
+/** Lazily joins a sequence of iterables. */
+final class JoinIterator<O, K, V> implements Iterator<K, V> {
+  private null|Iterator<K, V> $current = null;
+
+  /** Creates an iterator over the nested values. */
+  public function __construct(private Iterator<O, Iterable<K, V>> $iterator) {}
+
+  /** Returns the next entry from the current nested iterable. */
+  public function next(): null|(K, V) {
+    while (true) {
+      if ($this->current != null) {
+        $entry = $this->current->next();
+        if ($entry != null) {
+          return $entry;
+        }
+
+        $this->current = null;
+      }
+
+      $entry = $this->iterator->next();
+      if ($entry == null) {
+        return null;
+      }
+
+      $this->current = to_iterator::<K, V>($entry[1]);
+    }
+  }
+}

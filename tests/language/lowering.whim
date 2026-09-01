@@ -1,0 +1,422 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Time\Duration;
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\Error;
+use Whim\Unwind\UndefinedVariableError;
+use Whim\Unwind\VisibilityError;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+rejects(
+  $work,
+  'capture-parameter-collision',
+  '$x = 1;' . "\n" . '$f = function (int $x) use ($x) { return $x; };' . "\n",
+  'both captured and declared as a parameter',
+);
+
+rejects(
+  $work,
+  'duplicate-capture',
+  '$x = 1;' . "\n" . '$f = function () use ($x, $x) { return $x; };' . "\n",
+  'is captured twice',
+);
+
+rejects(
+  $work,
+  'filled-vec-is-not-constant',
+  'const VALUES = vec[1; 3];' . "\n",
+  'a constant initializer is a constant expression, and a filled vec is not one',
+);
+
+rejects(
+  $work,
+  'interpolated-string-is-not-constant',
+  '$name = \'Ada\';'
+  . "\n\n"
+  . 'function greeting(string $value = "Hello, $name"): string {'
+  . "\n"
+  . '    return $value;'
+  . "\n"
+  . '}'
+  . "\n",
+  'a parameter default is a constant expression',
+);
+
+rejects(
+  $work,
+  'parameter-default-is-constant',
+  '$base = 4;'
+  . "\n"
+  . '$scale = fn (int $value = $base): int => $value;'
+  . "\n",
+  'a parameter default is a constant expression',
+);
+
+accepts(
+  $work,
+  'property-error-line',
+  'class PropertyHolder {'
+  . "\n"
+  . '    public int $present = 1;'
+  . "\n"
+  . '}'
+  . "\n"
+  . '$holder = new PropertyHolder();'
+  . "\n"
+  . 'try {'
+  . "\n"
+  . '    $holder->missing = 2;'
+  . "\n"
+  . '} catch (Whim\Unwind\TypeError $e) {'
+  . "\n"
+  . '    assert!($e->getTrace()[0]->line == 8);'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'try {'
+  . "\n"
+  . '    $read = $holder->absent;'
+  . "\n"
+  . '} catch (Whim\Unwind\TypeError $e) {'
+  . "\n"
+  . '    assert!($e->getTrace()[0]->line == 13);'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$validShortClosure = fn(): never => exit!(1);
+
+File\write(
+  $work . '/never-named.whim',
+  'function fail(): never {' . "\n" . '    return 5;' . "\n" . '}' . "\n",
+);
+
+$neverNamed = $work . '/never-named.whim';
+$assertion_value_1 = function() use ($neverNamed): void {
+  require!($neverNamed);
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (CompilerError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is CompilerError);
+
+File\write(
+  $work . '/never-closure.whim',
+  '$fail = function (): never {' . "\n" . '    return 5;' . "\n" . '};' . "\n",
+);
+
+$neverClosure = $work . '/never-closure.whim';
+$assertion_value_2 = function() use ($neverClosure): void {
+  require!($neverClosure);
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (CompilerError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is CompilerError);
+
+File\write(
+  $work . '/never-negated.whim',
+  'function fail(): !mixed {' . "\n" . '    return 5;' . "\n" . '}' . "\n",
+);
+
+$neverNegated = $work . '/never-negated.whim';
+$assertion_value_3 = function() use ($neverNegated): void {
+  require!($neverNegated);
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (CompilerError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is CompilerError);
+
+File\write(
+  $work . '/void-expression-short-closure.whim',
+  '$consume = fn (int $value): void => $value;' . "\n",
+);
+
+$voidExpressionShortClosure = $work . '/void-expression-short-closure.whim';
+$assertion_value_4 = function() use ($voidExpressionShortClosure): void {
+  require!($voidExpressionShortClosure);
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (CompilerError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is CompilerError);
+
+Filesystem\delete_directory($work, true);
+
+$assertion_value_5 = function(): bool {
+  do {
+    break;
+    $value = 1;
+  } while (false);
+
+  return $value == 1;
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (UndefinedVariableError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is UndefinedVariableError);
+
+do {
+  $kept = 'kept';
+} while (false);
+
+assert!($kept == 'kept');
+
+class Counter {
+  private int $value = 5;
+
+  public function nested(): fn(): fn(): int {
+    return function(): fn(): int {
+      return function(): int {
+        return $this->value;
+      };
+    };
+  }
+}
+
+$make = fn(): fn(int): int => fn(int $x): int => $x;
+assert!(($make())(7) == 7);
+assert!(((new Counter()->nested())())() == 5);
+
+$offset = 10;
+$add = fn(int $n): int => $n + $offset;
+assert!($add(1) == 11);
+
+class ParentScope {
+  private int $own = 11;
+
+  public function make(): fn(): int {
+    return fn(): int => $this->own;
+  }
+}
+
+class ChildScope extends ParentScope {
+  private int $mine = 22;
+}
+
+$child = new ChildScope();
+assert!(($child->make())() == 11);
+
+class Opaque {
+  public function reach(): fn(): int {
+    return fn(): int => $this->hidden;
+  }
+}
+
+class HiddenHolder extends Opaque {
+  private int $hidden = 33;
+}
+
+$assertion_value_11 = fn(): int => (new HiddenHolder()->reach())();
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (VisibilityError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is VisibilityError);
+
+$nested = vec[vec[1]];
+$nested[0][0] = 2;
+assert!($nested[0][0] == 2);
+
+$again = vec[vec[1]];
+$alias = $again[0];
+$again[0][0] = 99;
+assert!($again[0][0] == 99);
+assert!($alias[0] == 1);
+
+class Box {
+  public mixed $items = vec[vec[vec[1]]];
+}
+
+$box = new Box();
+$box->items[0][0][0] = 3;
+assert!($box->items[0][0][0] == 3);
+
+$map = dict['a' => dict['b' => 1]];
+$map['a']['b'] = 4;
+assert!($map['a']['b'] == 4);
+
+$compound = vec[vec[1]];
+$compound[0][0] += 5;
+$compound[0][0]++;
+$compound[0][] = 8;
+assert!($compound[0][0] == 7);
+assert!($compound[0][1] == 8);
+
+class StaticBox {
+  public static mixed $data = vec[vec[1]];
+}
+
+StaticBox::$data[0][0] = 6;
+assert!(StaticBox::$data[0][0] == 6);
+
+function fresh(): mixed {
+  return vec[vec[1]];
+}
+
+fresh()[0][0] = 2;
+assert!(fresh()[0][0] == 1);
+
+class ProbeLog {
+  public static int $count = 0;
+}
+
+function probe(string $label): int {
+  ProbeLog::$count++;
+  return 0;
+}
+
+$nothing = null;
+
+$indexed = $nothing?->items[probe('index')];
+assert!($indexed == null);
+
+$called = $nothing?->thing->method(probe('argument'));
+assert!($called == null);
+
+$deep = $nothing?->a[probe('deep')]->b[probe('deeper')];
+assert!($deep == null);
+
+assert!(ProbeLog::$count == 0);
+
+class ItemHolder {
+  public mixed $items = vec[10, 20];
+}
+
+$holder = new ItemHolder();
+assert!($holder?->items[1] == 20);
+
+function collect(int $first, vec<mixed> $rest): void {
+  $local = 'a local that must not be traced';
+  $temporary = vec[1, 2, 3];
+  throw new Error('boom');
+}
+
+$collected = null;
+$assertion_callable_26 = function(): void {
+  collect(1, vec['a', 'b']);
+};
+
+try {
+  $assertion_callable_26();
+} catch (Error $assertion_caught_26) {
+  $collected = $assertion_caught_26;
+  assert!(Whim\Str\contains($assertion_caught_26->getMessage(), 'boom'));
+}
+
+assert!($collected is Error);
+
+$collectArguments = $collected->getTrace()[0]->arguments;
+assert!(length!($collectArguments) == 2);
+$assertion_value_28 = $collectArguments[0];
+assert!($assertion_value_28 is int);
+assert!($assertion_value_28 == 1);
+$assertion_value_29 = $collectArguments[1];
+assert!($assertion_value_29 is vec<string>);
+assert!($assertion_value_29 == vec['a', 'b']);
+
+function login(
+  string $user,
+  #[Whim\Marker\SensitiveParameter] string $secret,
+): void {
+  throw new Error('boom');
+}
+
+$loggedIn = null;
+$assertion_callable_30 = function(): void {
+  login('ada', 'hunter2');
+};
+
+try {
+  $assertion_callable_30();
+} catch (Error $assertion_caught_30) {
+  $loggedIn = $assertion_caught_30;
+  assert!(Whim\Str\contains($assertion_caught_30->getMessage(), 'boom'));
+}
+
+assert!($loggedIn is Error);
+
+$loginArguments = $loggedIn->getTrace()[0]->arguments;
+assert!(length!($loginArguments) == 2);
+$assertion_value_32 = $loginArguments[0];
+assert!($assertion_value_32 is string);
+assert!($assertion_value_32 == 'ada');
+assert!($loginArguments[1] is Whim\Marker\SensitiveParameterValue);
+
+function countdown(int $ticks): void {
+  while ($ticks > 0) {
+    $ticks--;
+  }
+
+  throw new Error('done');
+}
+
+$counted = null;
+$assertion_callable_34 = function(): void {
+  countdown(3);
+};
+
+try {
+  $assertion_callable_34();
+} catch (Error $assertion_caught_34) {
+  $counted = $assertion_caught_34;
+  assert!(Whim\Str\contains($assertion_caught_34->getMessage(), 'done'));
+}
+
+assert!($counted is Error);
+
+assert!($counted->getTrace()[0]->arguments[0] == 3);
+
+function inspect_duration(Duration $duration): void {
+  discard!($duration->getTotalSeconds());
+  throw new Error('inspected');
+}
+
+$inspected = null;
+$assertion_callable_36 = function(): void {
+  inspect_duration(new Duration(2, 0));
+};
+
+try {
+  $assertion_callable_36();
+} catch (Error $assertion_caught_36) {
+  $inspected = $assertion_caught_36;
+  assert!(Whim\Str\contains($assertion_caught_36->getMessage(), 'inspected'));
+}
+
+assert!($inspected is Error);
+
+assert!($inspected->getTrace()[0]->arguments[0] is Duration);

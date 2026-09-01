@@ -1,0 +1,140 @@
+use Whim\Encoding\EncodingException;
+use Whim\Str;
+use Whim\Unicode;
+use Whim\Unwind\TypeError;
+
+assert!(Unicode\case_fold('Whim') == 'whim');
+assert!(Unicode\case_fold("Stra\u{df}e") == 'strasse');
+assert!(Unicode\case_fold("\u{3a3}\u{3c3}\u{3c2}") == "\u{3c3}\u{3c3}\u{3c3}");
+
+assert!(Unicode\case_fold("\u{fb03}") == 'ffi');
+assert!(Unicode\case_fold("\u{130}") == "i\u{307}");
+$assertion_value_6 = fn(): string => Unicode\case_fold("\xff");
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (EncodingException $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is EncodingException);
+
+assert!(Unicode\code_point_at('', 0) == null);
+assert!(Unicode\code_point_at('A', 0) == 0x41);
+assert!(Unicode\code_point_at("\xc2\xa2", 0) == 0xa2);
+assert!(Unicode\code_point_at("\xe2\x82\xac", 0) == 0x20ac);
+assert!(Unicode\code_point_at("\xf0\x9f\x98\x80", 0) == 0x1f600);
+assert!(Unicode\code_point_at("\xf0\x9f\x98\x80", 1) == 0xfffd);
+assert!(Unicode\code_point_at("\xf0\x9f\x98\x80", 4) == null);
+assert!(Unicode\code_point_at('A', 2) == null);
+assert!(Unicode\code_point_at("A\xe2\x82\xacB", 1) == 0x20ac);
+
+assert!(Unicode\code_point_before('', 0) == null);
+assert!(Unicode\code_point_before('A', 0) == null);
+assert!(Unicode\code_point_before('A', 1) == 0x41);
+assert!(Unicode\code_point_before("\xc2\xa2", 2) == 0xa2);
+assert!(Unicode\code_point_before("\xe2\x82\xac", 3) == 0x20ac);
+assert!(Unicode\code_point_before("\xf0\x9f\x98\x80", 4) == 0x1f600);
+assert!(Unicode\code_point_before("\xf0\x9f\x98\x80", 2) == 0xfffd);
+assert!(Unicode\code_point_before('A', 2) == null);
+assert!(Unicode\code_point_before("A\xe2\x82\xacB", 4) == 0x20ac);
+assert!(Unicode\code_point_before("\xc2\x80\x80", 2) == 0x80);
+assert!(Unicode\code_point_before("\xc2\x80\x80", 3) == 0xfffd);
+
+foreach (vec[
+  "\x80",
+  "\xc0\x80",
+  "\xe0\x80\x80",
+  "\xed\xa0\x80",
+  "\xf0\x80\x80\x80",
+  "\xf4\x90\x80\x80",
+  "\xf5\x80\x80\x80",
+  "\xe2\x82",
+] as $malformed) {
+  assert!(Unicode\code_point_at($malformed, 0) == 0xfffd);
+  assert!(Unicode\code_point_before($malformed, length!($malformed)) == 0xfffd);
+}
+
+assert!(Str\from_code_point(0) == "\x00");
+assert!(Str\from_code_point(0x41) == 'A');
+assert!(Str\from_code_point(0xa2) == "\xc2\xa2");
+assert!(Str\from_code_point(0x20ac) == "\xe2\x82\xac");
+assert!(Str\from_code_point(0x1f600) == "\xf0\x9f\x98\x80");
+assert!(Str\from_code_point(0xfffd) == "\xef\xbf\xbd");
+foreach (vec[
+  0,
+  0x7f,
+  0x80,
+  0x7ff,
+  0x800,
+  0xd7ff,
+  0xe000,
+  0xffff,
+  0x10000,
+  0x10ffff,
+] as $scalar) {
+  $encoded = Str\from_code_point($scalar);
+  assert!(Unicode\code_point_at($encoded, 0) == $scalar);
+  assert!(Unicode\code_point_before($encoded, length!($encoded)) == $scalar);
+}
+
+$assertion_value_37 = fn(): string => Str\from_code_point(0xd800);
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (TypeError $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is TypeError);
+
+$assertion_value_38 = fn(): string => Str\from_code_point(0x110000);
+$assertion_error_38 = null;
+try {
+  $assertion_value_38();
+} catch (TypeError $assertion_caught_38) {
+  $assertion_error_38 = $assertion_caught_38;
+}
+
+assert!($assertion_error_38 is TypeError);
+
+assert!(Unicode\is_valid(0));
+assert!(Unicode\is_valid(0x10ffff));
+assert!(!(Unicode\is_valid(-1)));
+assert!(!(Unicode\is_valid(0xd800)));
+assert!(!(Unicode\is_valid(0x110000)));
+
+assert!(Unicode\is_whitespace(0x20));
+assert!(Unicode\is_whitespace(0xa0));
+assert!(Unicode\is_whitespace(0x3000));
+assert!(!(Unicode\is_whitespace(0x200b)));
+
+assert!(Unicode\is_letter(0x41));
+assert!(Unicode\is_letter(0x627));
+assert!(Unicode\is_letter(0x4e2d));
+assert!(!(Unicode\is_letter(0x2167)));
+assert!(Unicode\is_mark(0x301));
+assert!(!(Unicode\is_mark(0x41)));
+
+assert!(Unicode\is_number(0x2167));
+assert!(Unicode\is_digit(0x660));
+assert!(!(Unicode\is_digit(0x2167)));
+assert!(Unicode\is_alphanumeric(0x4e2d));
+assert!(Unicode\is_alphanumeric(0x2167));
+assert!(!(Unicode\is_alphanumeric(0x2e)));
+
+assert!(Unicode\is_punctuation(0x2e));
+assert!(Unicode\is_punctuation(0x60c));
+assert!(Unicode\is_punctuation(0x3001));
+assert!(!(Unicode\is_punctuation(0x20ac)));
+assert!(Unicode\is_symbol(0x20ac));
+assert!(Unicode\is_symbol(0x1f600));
+assert!(Unicode\is_separator(0x2028));
+assert!(Unicode\is_control(0xa));
+
+assert!(Unicode\is_uppercase(0xd6));
+assert!(!(Unicode\is_uppercase(0xf6)));
+assert!(Unicode\is_lowercase(0xf6));
+assert!(!(Unicode\is_lowercase(0xd6)));
+
+assert!(!(Unicode\is_punctuation(0xd800)));

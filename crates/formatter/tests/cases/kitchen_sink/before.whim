@@ -1,0 +1,39 @@
+namespace   App\Service ;
+
+use   App\{ Repo , Model } ;
+
+interface  Comparable<T> {
+    function compareTo( T $other ) : int ;
+    function isEqual( T $other ) : bool { return $this->compareTo( $other ) == 0 ; }
+}
+
+final class Point implements Comparable<Point> {
+    public const int ORIGIN = 0 ;
+    private int $x ;
+    private int $y ;
+
+    public function __construct( private int $px , private int $py ) {}
+
+    public function compareTo( Point $other ) : int { return $this->x <=> $other->x ; }
+
+    public function label() : string {
+        return match ($this->x) {
+            0 => 'origin' ,
+            1 | 2 | 3 => 'small' ,
+            _ => 'other' ,
+        } ;
+    }
+}
+
+enum Suit : string {
+    case Hearts = 'H' ;
+    case Spades = 'S' ;
+}
+
+function main() : int {
+    $p = new Point::<int>( 1 , 2 ) ;
+    if ( $p->x > 0 ) { write_line!( 'positive' ) ; }
+    foreach  (vec[ 1 , 2 , 3 ]  as $i => $v)  { $sum += $v ; }
+    $double = fn ( int $n ) : int => $n * 2 ;
+    return 0 ;
+}

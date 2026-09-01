@@ -1,0 +1,23 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Decodes one fixed-width integer, or null on short input or overflow. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function binary_decode(
+  string $bytes,
+  int $offset,
+  int $width,
+  bool $signed,
+  bool $little,
+): null|int {}
+
+/** Encodes the low bytes of an integer at a fixed width. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function binary_encode(int $value, int $width, bool $little): string {}

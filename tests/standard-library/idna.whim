@@ -1,0 +1,40 @@
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\EncodingException;
+use Whim\IDNA;
+
+$ascii = IDNA\to_ascii('例え.jp');
+assert!($ascii == 'xn--r8jz45g.jp');
+assert!(IDNA\to_unicode($ascii) == '例え.jp');
+assert!(IDNA\to_ascii('EXAMPLE.COM') == 'example.com');
+
+$encodingError = null;
+try {
+  discard!(IDNA\to_ascii('-invalid.example'));
+} catch (EncodingException $error) {
+  $encodingError = $error;
+}
+
+assert!($encodingError is EncodingException);
+assert!(
+  $encodingError->getMessage()
+  == 'the domain name cannot be encoded using IDNA',
+);
+
+$invalidBytesError = null;
+try {
+  discard!(IDNA\to_ascii("\xff"));
+} catch (EncodingException $error) {
+  $invalidBytesError = $error;
+}
+
+assert!($invalidBytesError is EncodingException);
+
+$decodingError = null;
+try {
+  discard!(IDNA\to_unicode('-invalid.example'));
+} catch (DecodingException $error) {
+  $decodingError = $error;
+}
+
+assert!($decodingError is DecodingException);
+assert!($decodingError->getMessage() == 'the domain name is not valid IDNA');

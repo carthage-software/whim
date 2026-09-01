@@ -1,0 +1,12 @@
+namespace Whim\Database;
+
+/** Selects the isolation level of a transaction. */
+enum TransactionIsolation {
+  case ReadUncommitted;
+
+  case ReadCommitted;
+
+  case RepeatableRead;
+
+  case Serializable;
+}

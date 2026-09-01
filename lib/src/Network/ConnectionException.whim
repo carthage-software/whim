@@ -1,0 +1,4 @@
+namespace Whim\Network;
+
+/** Reports a failed connection attempt. */
+final class ConnectionException extends NetworkException {}

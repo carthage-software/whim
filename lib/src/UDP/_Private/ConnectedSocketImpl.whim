@@ -1,0 +1,87 @@
+namespace Whim\UDP\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\InternetEndpoint;
+use Whim\OS\FileDescriptor;
+use Whim\UDP\SendMetadata;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Implements a connected UDP socket. */
+final class ConnectedSocketImpl extends DatagramSocketImpl implements
+  Whim\UDP\ConnectedSocket {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    FileDescriptor $descriptor,
+    InternetEndpoint $localEndpoint,
+    private InternetEndpoint $peerEndpoint,
+  ) {
+    parent::__construct($descriptor, $localEndpoint);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getPeerEndpoint(): InternetEndpoint {
+    return $this->peerEndpoint;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function send(
+    string $bytes,
+    null|SendMetadata $metadata = null,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    if (length!($bytes) > 65507) {
+      throw new InvalidArgumentException(
+        'a UDP datagram cannot exceed 65507 bytes',
+      );
+    }
+
+    if (
+      $metadata != null
+      && $metadata->sourceAddress->family
+      != $this->peerEndpoint->address->family
+    ) {
+      throw new InvalidArgumentException(
+        'the UDP endpoint and source metadata must use one address family',
+      );
+    }
+
+    while (true) {
+      try {
+        if ($metadata == null) {
+          return Whim\_Private\write_descriptor(
+            $this->getFileDescriptor(),
+            $bytes,
+          );
+        }
+
+        return Whim\_Private\send_message(
+          $this->getFileDescriptor(),
+          $bytes,
+          null,
+          0,
+          $metadata->sourceAddress->toString(),
+          $metadata->interfaceIndex,
+          $metadata->explicitCongestion->value,
+        );
+      } catch (Whim\_Private\SystemError $error) {
+        if ($error->errno() != Whim\_Private\ERRNO_WOULD_BLOCK) {
+          Whim\Network\_Private\failure($error);
+        }
+      }
+
+      Whim\Network\_Private\wait_writable(
+        $this->getFileDescriptor(),
+        $cancellation,
+      );
+    }
+  }
+}

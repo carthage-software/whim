@@ -1,0 +1,4 @@
+type AnyVec = vec;
+
+$value = vec[1];
+$ok = $value is AnyVec;

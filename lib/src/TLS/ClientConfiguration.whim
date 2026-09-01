@@ -1,0 +1,103 @@
+namespace Whim\TLS;
+
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** Configures TLS client connections. */
+final readonly class ClientConfiguration implements Default {
+  #[AlwaysInline]
+  public function __construct(
+    public bool $useSystemRoots = true,
+    public vec<Certificate> $trustedRoots = vec[],
+    public null|Identity $identity = null,
+    public vec<NonEmptyString> $alpnProtocols = vec[],
+    public Version $minimumVersion = Version::Tls12,
+    public Version $maximumVersion = Version::Tls13,
+    public PeerVerification $peerVerification = PeerVerification::Full,
+    public bool $verifyPeerName = true,
+    public bool $sendServerName = true,
+    public bool $enableSessionResumption = true,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSystemRoots(bool $enabled): ClientConfiguration {
+    return clone!($this, useSystemRoots: $enabled);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTrustedRoots(
+    vec<Certificate> $trustedRoots,
+  ): ClientConfiguration {
+    return clone!($this, trustedRoots: $trustedRoots);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withIdentity(null|Identity $identity): ClientConfiguration {
+    return clone!($this, identity: $identity);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withAlpnProtocols(
+    vec<NonEmptyString> $alpnProtocols,
+  ): ClientConfiguration {
+    return clone!($this, alpnProtocols: $alpnProtocols);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMinimumVersion(
+    Version $minimumVersion,
+  ): ClientConfiguration {
+    return clone!($this, minimumVersion: $minimumVersion);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumVersion(
+    Version $maximumVersion,
+  ): ClientConfiguration {
+    return clone!($this, maximumVersion: $maximumVersion);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withPeerVerification(
+    PeerVerification $peerVerification,
+  ): ClientConfiguration {
+    return clone!($this, peerVerification: $peerVerification);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withPeerNameVerification(
+    bool $verifyPeerName,
+  ): ClientConfiguration {
+    return clone!($this, verifyPeerName: $verifyPeerName);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withServerName(bool $sendServerName): ClientConfiguration {
+    return clone!($this, sendServerName: $sendServerName);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSessionResumption(
+    bool $enableSessionResumption,
+  ): ClientConfiguration {
+    return clone!($this, enableSessionResumption: $enableSessionResumption);
+  }
+}

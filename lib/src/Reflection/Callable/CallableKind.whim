@@ -1,0 +1,15 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Enum\UnitEnum;
+use Whim\Marker\Stub;
+
+/** Identifies the origin of a callable value. */
+#[Stub]
+enum CallableKind implements UnitEnum {
+  case Function;
+  case StaticMethod;
+  case InstanceMethod;
+  case Closure;
+  case ShortClosure;
+  case Partial;
+}

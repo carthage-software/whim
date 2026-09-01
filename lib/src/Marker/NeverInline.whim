@@ -1,0 +1,8 @@
+namespace Whim\Marker;
+
+use Whim\Attribute\Attribute;
+
+/** Prevents the optimizer from splicing a callable into its caller. */
+#[Stub]
+#[Attribute(Attribute::TARGET_FUNCTION | Attribute::TARGET_METHOD)]
+final class NeverInline {}

@@ -1,0 +1,7 @@
+namespace Whim\Type;
+
+use Whim\Marker\Stub;
+
+/** An engine-local type identity. */
+#[Stub]
+newtype TypeId = 0..;

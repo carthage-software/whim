@@ -1,0 +1,224 @@
+namespace Whim\Message\Address\_Private;
+
+use Whim\Encoding\EncodedWord;
+use Whim\Encoding\EncodingException;
+use Whim\IDNA;
+use Whim\Str;
+
+/** Reports whether a local part has strict dot-atom form. */
+function is_valid_dot_atom(string $localPart): bool {
+  if ($localPart == '' || length!($localPart) > 64) {
+    return false;
+  }
+
+  $afterDot = true;
+  $index = 0;
+  while ($index < length!($localPart)) {
+    $character = $localPart[$index];
+    if ($character == '.') {
+      if ($afterDot) {
+        return false;
+      }
+
+      $afterDot = true;
+      $index++;
+      continue;
+    }
+
+    $byte = Str\ord($character);
+    if (
+      !($byte is 48..=57|65..=90|97..=122)
+      && $byte < 128
+      && !($byte is 33|35..=39|42|43|45|47|61|63|94..=96|123..=126)
+    ) {
+      return false;
+    }
+
+    $afterDot = false;
+    $index++;
+  }
+
+  return !$afterDot;
+}
+
+/** Reports whether local and domain parts form a strict mailbox. */
+function is_valid_mailbox(string $localPart, string $domain): bool {
+  if (!is_valid_dot_atom($localPart)) {
+    return false;
+  }
+
+  try {
+    $asciiDomain = IDNA\to_ascii($domain);
+  } catch (EncodingException $_) {
+    return false;
+  }
+
+  if (
+    $asciiDomain == ''
+    || $asciiDomain[0] == '.'
+    || $asciiDomain[length!($asciiDomain) - 1] == '.'
+    || Str\contains($asciiDomain, '..')
+  ) {
+    return false;
+  }
+
+  return length!($localPart) + length!($asciiDomain) + 1 <= 254;
+}
+
+/** Splits an address list outside quotes, angles, and groups. */
+function split_addresses(string $input): vec<string> {
+  $segments = vec[];
+  $current = '';
+  $angleDepth = 0;
+  $group = false;
+  $quote = false;
+  $index = 0;
+  while ($index < length!($input)) {
+    $byte = $input[$index];
+    if ($byte == '\\' && $quote && $index + 1 < length!($input)) {
+      $current .= $byte . $input[$index + 1];
+      $index += 2;
+      continue;
+    }
+
+    if ($byte == '"') {
+      $quote = !$quote;
+      $current .= $byte;
+      $index++;
+      continue;
+    }
+
+    if (!$quote) {
+      if ($byte == '<') {
+        $angleDepth++;
+      } else if ($byte == '>' && $angleDepth > 0) {
+        $angleDepth--;
+      } else if ($byte == ':' && $angleDepth == 0) {
+        $group = true;
+      } else if ($byte == ';' && $group) {
+        $group = false;
+      } else if ($byte == ',' && $angleDepth == 0 && !$group) {
+        $segments[] = Str\trim($current);
+        $current = '';
+        $index++;
+        continue;
+      }
+    }
+
+    $current .= $byte;
+    $index++;
+  }
+
+  if (Str\trim($current) != '') {
+    $segments[] = Str\trim($current);
+  }
+
+  return $segments;
+}
+
+/** Removes comments and returns the first comment text. */
+function strip_comments(string $input): (string, null|string) {
+  $result = '';
+  $comment = null;
+  $current = '';
+  $depth = 0;
+  $quote = false;
+  $index = 0;
+  while ($index < length!($input)) {
+    $byte = $input[$index];
+    if ($byte == '\\' && $index + 1 < length!($input)) {
+      if ($depth > 0) {
+        $current .= $input[$index + 1];
+      } else {
+        $result .= $byte . $input[$index + 1];
+      }
+
+      $index += 2;
+      continue;
+    }
+
+    if ($byte == '"' && $depth == 0) {
+      $quote = !$quote;
+      $result .= $byte;
+      $index++;
+      continue;
+    }
+
+    if (!$quote && $byte == '(') {
+      if ($depth > 0) {
+        $current .= $byte;
+      }
+
+      $depth++;
+      $index++;
+      continue;
+    }
+
+    if (!$quote && $byte == ')' && $depth > 0) {
+      $depth--;
+      if ($depth == 0) {
+        if ($comment == null) {
+          $comment = $current;
+        }
+
+        $current = '';
+      } else {
+        $current .= $byte;
+      }
+
+      $index++;
+      continue;
+    }
+
+    if ($depth > 0) {
+      $current .= $byte;
+    } else {
+      $result .= $byte;
+    }
+
+    $index++;
+  }
+
+  return ($result, $comment);
+}
+
+/** Decodes and unquotes an address display name. */
+function parse_display(string $display): null|string {
+  $display = match (Str\trim($display)) {
+    '' => return null,
+    $display => $display,
+  };
+
+  if (
+    length!($display) >= 2
+    && Str\starts_with($display, '"')
+    && Str\ends_with($display, '"')
+  ) {
+    return Str\replace(
+      Str\slice($display, 1, length!($display) - 2),
+      '\\"',
+      '"',
+    );
+  }
+
+  return EncodedWord\decode($display);
+}
+
+/** Encodes and quotes an address display name when needed. */
+function serialize_display(string $display): string {
+  $encoded = EncodedWord\encode($display);
+  if ($encoded != $display) {
+    return $encoded;
+  }
+
+  $index = 0;
+  while ($index < length!($display)) {
+    if (Str\contains('()<>@,;:\\".[]', $display[$index])) {
+      return '"' . Str\replace($display, '"', '\\"') . '"';
+    }
+
+    $index++;
+  }
+
+  return $display;
+}

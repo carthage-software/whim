@@ -1,0 +1,16 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\StatusCode;
+use Whim\Marker\AlwaysInline;
+
+/** Holds a parsed HTTP/1 response head. */
+final readonly class H1ResponseHead {
+  #[AlwaysInline]
+  public function __construct(
+    public ProtocolVersion $protocolVersion,
+    public StatusCode $status,
+    public FieldMap $headers,
+  ) {}
+}

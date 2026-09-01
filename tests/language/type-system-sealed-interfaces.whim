@@ -1,0 +1,17 @@
+interface SealedResult for SuccessfulResult, AnyResult {}
+
+interface SuccessfulResult extends SealedResult for Success {}
+
+interface AnyResult extends SealedResult {}
+
+class Success implements SuccessfulResult {}
+
+class Failure implements AnyResult {}
+
+$assertion_value_1 = new Success();
+assert!($assertion_value_1 is SealedResult);
+assert!($assertion_value_1 is SuccessfulResult);
+
+$assertion_value_2 = new Failure();
+assert!($assertion_value_2 is SealedResult);
+assert!($assertion_value_2 is AnyResult);

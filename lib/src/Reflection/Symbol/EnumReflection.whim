@@ -1,0 +1,142 @@
+namespace Whim\Reflection\Symbol;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\Generic\TypeParameterReflection;
+use Whim\Reflection\Member\ClassConstantReflection;
+use Whim\Reflection\Member\EnumCaseReflection;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Reflection\Member\PropertyReflection;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+use Whim\Symbol\SymbolKind;
+
+/** Describes one enum declaration. */
+#[Stub]
+final class EnumReflection implements ClassLikeReflection {
+  private function __construct() {}
+
+  /** Returns where this enum was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this enum's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this enum's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns the fully qualified enum name. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the enum name without its namespace. */
+  #[MustUse]
+  public function getShortName(): string {}
+
+  /** Returns the namespace name, or an empty string in the global namespace. */
+  #[MustUse]
+  public function getNamespaceName(): string {}
+
+  /** Returns the enum symbol kind. */
+  #[MustUse]
+  public function getKind(): SymbolKind {}
+
+  /** Returns type parameters in declaration order. */
+  #[MustUse]
+  public function getTypeParameters(): vec<TypeParameterReflection> {}
+
+  /** Returns a type parameter by zero-based position or name. */
+  #[MustUse]
+  public function getTypeParameter(
+    int|string $parameter,
+  ): null|TypeParameterReflection {}
+
+  /** Returns this enum applied to references to its own parameters. */
+  #[MustUse]
+  public function getType(): ClassTypeReflection {}
+
+  /** Returns directly declared interface types. */
+  #[MustUse]
+  public function getDirectBaseTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns every transitive interface specialization. */
+  #[MustUse]
+  public function getBaseTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns permitted direct subtype names, or null when not sealed. */
+  #[MustUse]
+  public function getPermittedSubtypeNames(): null|vec<string> {}
+
+  /** Returns methods declared directly by this enum. */
+  #[MustUse]
+  public function getDeclaredMethods(): vec<MethodReflection> {}
+
+  /** Returns effective methods after inheritance. */
+  #[MustUse]
+  public function getMethods(): vec<MethodReflection> {}
+
+  /** Returns the effective method with the given name, when present. */
+  #[MustUse]
+  public function getMethod(string $name): null|MethodReflection {}
+
+  /** Returns properties declared directly by this enum. */
+  #[MustUse]
+  public function getDeclaredProperties(): vec<PropertyReflection> {}
+
+  /** Returns the complete linked property layout. */
+  #[MustUse]
+  public function getProperties(): vec<PropertyReflection> {}
+
+  /** Returns the effective property with the given name, when present. */
+  #[MustUse]
+  public function getProperty(string $name): null|PropertyReflection {}
+
+  /** Returns constants declared directly by this enum. */
+  #[MustUse]
+  public function getDeclaredConstants(): vec<ClassConstantReflection> {}
+
+  /** Returns effective constants after inheritance. */
+  #[MustUse]
+  public function getConstants(): vec<ClassConstantReflection> {}
+
+  /** Returns the effective constant with the given name, when present. */
+  #[MustUse]
+  public function getConstant(string $name): null|ClassConstantReflection {}
+
+  /** Returns the int or string backing type, when present. */
+  #[MustUse]
+  public function getBackingType(): null|TypeReflection {}
+
+  /** Returns declared cases in source order. */
+  #[MustUse]
+  public function getCases(): vec<EnumCaseReflection> {}
+
+  /** Returns the case with the given name, when present. */
+  #[MustUse]
+  public function getCase(string $name): null|EnumCaseReflection {}
+
+  /** Returns interfaces implemented directly by this enum. */
+  #[MustUse]
+  public function getDirectInterfaceTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns every interface specialization satisfied by this enum. */
+  #[MustUse]
+  public function getInterfaceTypes(): vec<ClassTypeReflection> {}
+}

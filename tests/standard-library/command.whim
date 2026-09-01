@@ -1,0 +1,151 @@
+use Whim\Async;
+use Whim\Command;
+use Whim\IO;
+use Whim\Process\Signal;
+use Whim\Time\Duration;
+
+$output = Command\Command::create('/bin/sh')->withArguments(vec[
+  '-c',
+  'printf standard-output; printf standard-error >&2; exit 7',
+])->run();
+
+assert!($output->status is Command\Exited);
+assert!(($output->status as Command\Exited)->code == 7);
+assert!(!($output->isSuccess()));
+assert!($output->standardOutput == 'standard-output');
+assert!($output->standardError == 'standard-error');
+
+$successful = Command\output('/bin/sh', vec['-c', 'printf success']);
+assert!($successful == 'success');
+assert!(Command\succeeds('/bin/sh', vec['-c', 'exit 0']));
+assert!(!(Command\succeeds('/bin/sh', vec['-c', 'exit 1'])));
+
+$failure = null;
+$assertion_callable_9 = fn(): string => (
+  Command\output('/bin/sh', vec['-c', 'printf out; printf err >&2; exit 2'])
+);
+
+try {
+  $assertion_callable_9();
+} catch (Command\FailedException $assertion_caught_9) {
+  $failure = $assertion_caught_9;
+}
+
+assert!($failure is Command\FailedException);
+
+assert!($failure->getStatus() is Command\Exited);
+assert!($failure->getStandardOutput() == 'out');
+assert!($failure->getStandardError() == 'err');
+
+$child = Command\Command::create('/bin/cat')->withStandardInput(
+  Command\piped(),
+)->start();
+
+assert!($child->getId() > 0);
+assert!($child->isRunning());
+assert!($child->getStandardInput() is IO\FileDescriptorHandle);
+
+assert!($child->getStandardOutput() is IO\FileDescriptorHandle);
+
+assert!($child->getStandardError() is IO\FileDescriptorHandle);
+
+$child->getStandardInput()->writeAll('through-stdin');
+$child->getStandardInput()->close();
+$cat = $child->join();
+assert!($cat->isSuccess());
+assert!($cat->standardOutput == 'through-stdin');
+assert!($cat->standardError == '');
+assert!(!($child->isRunning()));
+assert!($child->wait() == $cat->status);
+
+$unavailable = Command\Command::create('/bin/sh')
+  ->withArguments(vec['-c', 'exit 0'])
+  ->withStandardOutput(Command\discarded())
+  ->start();
+
+$assertion_value_23 = fn(): IO\ReadHandle => $unavailable->getStandardOutput();
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (Command\StreamUnavailableException $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is Command\StreamUnavailableException);
+
+assert!($unavailable->wait()->isSuccess());
+
+$startFailure = null;
+$assertion_callable_25 = fn(): Command\Child => (
+  Command\start('/definitely/not/an/whim-command-test-program')
+);
+
+try {
+  $assertion_callable_25();
+} catch (Command\StartFailedException $assertion_caught_25) {
+  $startFailure = $assertion_caught_25;
+}
+
+assert!($startFailure is Command\StartFailedException);
+
+assert!($startFailure->getPrevious() is Whim\_Private\SystemError);
+
+($read, $write) = IO\pipe();
+$input = Command\attached_input($read);
+$outputStream = Command\attached_output($write);
+assert!($input is Command\InputStream);
+assert!($outputStream is Command\OutputStream);
+$read->close();
+$write->close();
+
+($attachedInput, $inputWriter) = IO\pipe();
+$inputWriter->writeAll('attached-input');
+$inputWriter->close();
+$fromAttachedInput = Command\Command::create('/bin/cat')->withStandardInput(
+  Command\attached_input($attachedInput),
+)->run();
+
+assert!($fromAttachedInput->isSuccess());
+assert!($fromAttachedInput->standardOutput == 'attached-input');
+$attachedInput->close();
+
+($outputReader, $attachedOutput) = IO\pipe();
+$toAttachedOutput = Command\Command::create('/bin/sh')
+  ->withArguments(vec['-c', 'printf attached-output'])
+  ->withStandardOutput(Command\attached_output($attachedOutput))
+  ->run();
+
+assert!($toAttachedOutput->isSuccess());
+assert!($toAttachedOutput->standardOutput == '');
+$attachedOutput->close();
+assert!($outputReader->readAll() == 'attached-output');
+$outputReader->close();
+
+$observed = Command\Command::create('/bin/sh')->withArguments(vec[
+  '-c',
+  'exit 0',
+])->start();
+
+Async\sleep(Duration::fromMilliseconds(200));
+assert!(!($observed->isRunning()));
+assert!($observed->wait()->isSuccess());
+
+$killed = Command\Command::create('/bin/sleep')
+  ->withArgument('10')
+  ->withOwnProcessGroup()
+  ->start()
+  ->kill();
+
+assert!($killed is Command\Signalled);
+assert!(($killed as Command\Signalled)->signal == Signal::Kill);
+
+$stubborn = Command\Command::create('/bin/sh')
+  ->withArguments(vec['-c', 'trap "" TERM; sleep 10'])
+  ->withOwnProcessGroup()
+  ->start();
+
+Async\sleep(Duration::fromMilliseconds(20));
+$escalated = $stubborn->terminate(Duration::fromMilliseconds(20));
+
+assert!($escalated is Command\Signalled);
+assert!(($escalated as Command\Signalled)->signal == Signal::Kill);

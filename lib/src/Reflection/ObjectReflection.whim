@@ -1,0 +1,63 @@
+namespace Whim\Reflection;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Generic\TypeParameterReflection;
+use Whim\Reflection\Member\EnumCaseReflection;
+use Whim\Reflection\Member\PropertyReflection;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Symbol\ClassReflection;
+use Whim\Reflection\Symbol\EnumReflection;
+use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one object and its complete reified class specialization. */
+#[Stub]
+final class ObjectReflection {
+  private function __construct() {}
+
+  /** Returns the object's concrete class or enum declaration. */
+  #[MustUse]
+  public function getClass(): ClassReflection|EnumReflection {}
+
+  /**
+   * Returns the exact enum case represented by this object, when applicable.
+   */
+  #[MustUse]
+  public function getEnumCase(): null|EnumCaseReflection {}
+
+  /** Returns the object's concrete class-like type and own arguments. */
+  #[MustUse]
+  public function getType(): ClassTypeReflection {}
+
+  /** Returns bindings for the concrete type and every reachable base. */
+  #[MustUse]
+  public function getTypeEnvironment(): TypeEnvironmentReflection {}
+
+  /** Returns the argument bound to an exact parameter, when present. */
+  #[MustUse]
+  public function getTypeArgument(
+    TypeParameterReflection $parameter,
+  ): null|TypeReflection {}
+
+  /** Reports whether the object satisfies a reflected class-like type. */
+  #[MustUse]
+  public function isInstanceOf(ClassTypeReflection $type): bool {}
+
+  /** Returns this object's specialization of a reachable base, when present. */
+  #[MustUse]
+  public function getSpecialization(
+    ClassLikeReflection $declaration,
+  ): null|ClassTypeReflection {}
+
+  /** Returns every instance-property slot, including private ancestor slots. */
+  #[MustUse]
+  public function getProperties(): vec<PropertyValueReflection> {}
+
+  /** Returns the exact reflected property slot, when present on this object. */
+  #[MustUse]
+  public function getProperty(
+    PropertyReflection $property,
+  ): null|PropertyValueReflection {}
+}

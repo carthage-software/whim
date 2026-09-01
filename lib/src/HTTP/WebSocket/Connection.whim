@@ -1,0 +1,70 @@
+namespace Whim\HTTP\WebSocket;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** A connected WebSocket endpoint. */
+interface Connection {
+  /** Returns the negotiated subprotocol, or null when none was selected. */
+  #[MustUse]
+  public function getSubprotocol(): null|string;
+
+  /** Waits for the next peer message, or null after the connection closes. */
+  #[MustUse]
+  #[TrackCaller]
+  public function receive(
+    null|CancellationToken $cancellation = null,
+  ): null|Message;
+
+  /** Waits until a message can be received or the connection closes. */
+  #[TrackCaller]
+  public function waitUntilReceivable(
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Attempts to receive a peer message without waiting. */
+  #[MustUse]
+  #[TrackCaller]
+  public function tryReceive(): null|Message;
+
+  /** Sends one UTF-8 text message. */
+  #[TrackCaller]
+  public function sendText(string $text): void;
+
+  /** Sends one binary message. */
+  #[TrackCaller]
+  public function sendBinary(string $bytes): void;
+
+  /** Sends one ping control message. */
+  #[TrackCaller]
+  public function ping(string $payload = ''): void;
+
+  /** Starts a clean close handshake. */
+  #[TrackCaller]
+  public function close(null|int $code = null, string $reason = ''): void;
+
+  /** Reports whether closing has started. */
+  #[MustUse]
+  public function isClosed(): bool;
+
+  /** Returns the close code observed or sent by this connection. */
+  #[MustUse]
+  public function getCloseCode(): null|int;
+
+  /** Returns the close reason observed or sent by this connection. */
+  #[MustUse]
+  public function getCloseReason(): null|string;
+
+  /** Starts a normal close when the connection leaves scope. */
+  #[TrackCaller]
+  public function __destruct(): void {
+    if (!$this->isClosed()) {
+      try {
+        $this->close(1000);
+      } catch (Throwable $_) {
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+namespace Whim\Range\_Private;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Iterate\Iterator;
+use Whim\Math;
+use Whim\Unwind\OverflowException;
+
+/** Represents a range iterator. */
+final class RangeIterator implements Iterator<int, int> {
+  private int $current;
+  private int $key = 0;
+  private bool $overflowPending = false;
+
+  /** Creates a range iterator. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    int $start,
+    private null|int $upper,
+    private bool $inclusive,
+  ) {
+    $this->current = $start;
+  }
+
+  /**
+   * Advances the iterator and returns its next entry.
+   *
+   * @throws OverflowException when the next value does not fit in an integer.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function next(): null|(int, int) {
+    if ($this->overflowPending) {
+      throw new OverflowException('integer range overflow');
+    }
+
+    if ($this->upper != null) {
+      if ($this->inclusive && $this->current > $this->upper) {
+        return null;
+      }
+
+      if (!$this->inclusive && $this->current >= $this->upper) {
+        return null;
+      }
+    }
+
+    $key = $this->key;
+    $value = $this->current;
+    $this->key++;
+
+    if ($value != Math\INT_MAX) {
+      $this->current++;
+    } else if ($this->upper == null) {
+      $this->overflowPending = true;
+    } else {
+      $this->inclusive = false;
+    }
+
+    return ($key, $value);
+  }
+}

@@ -1,0 +1,90 @@
+namespace Whim\DataStructure;
+
+use Whim\DataStructure\_Private;
+use Whim\Iterate\ToIterator;
+use Whim\Iterate\ArrayIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+use Whim\Option\Option;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonNegativeInt;
+use Whim\_Private\RingBuffer;
+
+/** Stores values that can be added or removed at either end. */
+final class Deque<T> implements ToIterator<int, T> {
+  private RingBuffer<T> $buffer;
+
+  /** Creates a deque containing the yielded values. */
+  #[TrackCaller]
+  public function __construct(Iterable<_, T> $values = vec[]) {
+    $this->buffer = new RingBuffer::<T>();
+    foreach ($values as $value) {
+      $this->buffer->pushBack($value);
+    }
+  }
+
+  /** Adds a value to the front. */
+  #[AlwaysInline]
+  public function pushFront(T $value): void {
+    $this->buffer->pushFront($value);
+  }
+
+  /** Adds a value to the back. */
+  #[AlwaysInline]
+  public function pushBack(T $value): void {
+    $this->buffer->pushBack($value);
+  }
+
+  /** Removes and returns the front value. */
+  #[AlwaysInline]
+  public function popFront(): Option<T> {
+    return _Private\option::<T>($this->buffer->popFront());
+  }
+
+  /** Removes and returns the back value. */
+  #[AlwaysInline]
+  public function popBack(): Option<T> {
+    return _Private\option::<T>($this->buffer->popBack());
+  }
+
+  /** Returns the front value without removing it. */
+  #[AlwaysInline]
+  public function peekFront(): Option<T> {
+    return _Private\option::<T>($this->buffer->peekFront());
+  }
+
+  /** Returns the back value without removing it. */
+  #[AlwaysInline]
+  public function peekBack(): Option<T> {
+    return _Private\option::<T>($this->buffer->peekBack());
+  }
+
+  /** Returns the number of stored values. */
+  #[AlwaysInline]
+  public function count(): NonNegativeInt {
+    return $this->buffer->count();
+  }
+
+  /** Reports whether the deque contains no values. */
+  #[AlwaysInline]
+  public function isEmpty(): bool {
+    return $this->buffer->isEmpty();
+  }
+
+  /** Removes every stored value. */
+  #[AlwaysInline]
+  public function clear(): void {
+    $this->buffer->clear();
+  }
+
+  /** Returns the values from front to back. */
+  #[AlwaysInline]
+  public function toVec(): vec<T> {
+    return $this->buffer->toVec();
+  }
+
+  /** Creates a snapshot iterator from front to back. */
+  public function toIterator(): ArrayIterator<int, T> {
+    return new ArrayIterator::<int, T>($this->toVec());
+  }
+}

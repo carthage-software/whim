@@ -1,0 +1,80 @@
+use Whim\Async;
+use Whim\Async\TaskLocal;
+use Whim\Reference\Weak;
+use Whim\Unwind\TypeError;
+
+final class TaskLocalPayload {}
+
+$local = new TaskLocal::<string>();
+$other = new TaskLocal::<string>();
+
+assert!($local->get() == null);
+assert!($other->get() == null);
+
+$local->set('main');
+$other->set('other');
+assert!($local->get() == 'main');
+assert!($other->get() == 'other');
+
+$local->set('updated');
+assert!($local->get() == 'updated');
+$local->clear();
+assert!($local->get() == null);
+$local->clear();
+
+$local->set('main');
+$first = Async\spawn::<vec<null|string>>(
+  function() use ($local): vec<null|string> {
+    $before = $local->get();
+    $local->set('first');
+    Async\later();
+    $after = $local->get();
+    return vec[$before, $after];
+  },
+);
+
+$second = Async\spawn::<vec<null|string>>(
+  function() use ($local): vec<null|string> {
+    $before = $local->get();
+    $local->set('second');
+    Async\later();
+    $after = $local->get();
+    $local->clear();
+    return vec[$before, $after, $local->get()];
+  },
+);
+
+assert!($first->await() == vec[null, 'first']);
+assert!($second->await() == vec[null, 'second', null]);
+assert!($local->get() == 'main');
+
+$nested = Async\spawn::<vec<null|string>>(
+  function() use ($local): vec<null|string> {
+    $local->set('parent');
+    $child = Async\spawn::<null|string>(fn(): null|string => $local->get());
+    return vec[$local->get(), $child->await(), $local->get()];
+  },
+);
+
+assert!($nested->await() == vec['parent', null, 'parent']);
+
+$rejectedNull = false;
+try {
+  $local->set(null);
+} catch (TypeError $_) {
+  $rejectedNull = true;
+}
+
+assert!($rejectedNull);
+assert!($local->get() == 'main');
+
+$payloadStorage = new TaskLocal::<TaskLocalPayload>();
+$weak = Async\spawn::<Weak<TaskLocalPayload>>(
+  function() use ($payloadStorage): Weak<TaskLocalPayload> {
+    $payload = new TaskLocalPayload();
+    $payloadStorage->set($payload);
+    return new Weak::<TaskLocalPayload>($payload);
+  },
+)->await();
+
+assert!($weak->get() == null);

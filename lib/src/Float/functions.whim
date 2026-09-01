@@ -1,0 +1,70 @@
+namespace Whim\Float;
+
+use Whim\Binary\Endianness;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Math;
+use Whim;
+use Whim\_Private\float_try_parse;
+
+/** Parses a complete float string, or returns null. */
+#[AlwaysInline]
+#[MustUse]
+function try_parse(string $value): null|float {
+  return float_try_parse($value);
+}
+
+/** Returns whether a float is not a number. */
+#[AlwaysInline]
+#[MustUse]
+function is_nan(float $value): bool {
+  return $value != $value;
+}
+
+/** Returns whether a float is finite. */
+#[AlwaysInline]
+#[MustUse]
+function is_finite(float $value): bool {
+  return $value >= Math\FLOAT_MIN && $value <= Math\FLOAT_MAX;
+}
+
+/** Returns whether a float is infinite. */
+#[AlwaysInline]
+#[MustUse]
+function is_infinite(float $value): bool {
+  return $value < Math\FLOAT_MIN || $value > Math\FLOAT_MAX;
+}
+
+/** Reinterprets an IEEE 754 bit pattern as a float. */
+#[AlwaysInline]
+#[MustUse]
+function from_bits(int $bits): float {
+  return Whim\_Private\bits_to_float($bits);
+}
+
+/** Returns the exact IEEE 754 representation as a signed integer. */
+#[AlwaysInline]
+#[MustUse]
+function to_bits(float $value): int {
+  return Whim\_Private\float_to_bits($value);
+}
+
+/** Reinterprets eight bytes in the selected byte order as a float. */
+#[AlwaysInline]
+#[MustUse]
+function from_bytes(string $bytes, Endianness $endianness): float {
+  return match ($endianness) {
+    Endianness::Big => Whim\_Private\float_from_be_bytes($bytes),
+    Endianness::Little => Whim\_Private\float_from_le_bytes($bytes),
+  };
+}
+
+/** Returns the eight IEEE 754 bytes in the selected byte order. */
+#[AlwaysInline]
+#[MustUse]
+function to_bytes(float $value, Endianness $endianness): string {
+  return match ($endianness) {
+    Endianness::Big => Whim\_Private\float_to_be_bytes($value),
+    Endianness::Little => Whim\_Private\float_to_le_bytes($value),
+  };
+}

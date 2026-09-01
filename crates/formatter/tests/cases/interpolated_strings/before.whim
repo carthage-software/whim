@@ -1,0 +1,6 @@
+function receipt ( Order $order , string $name ) : string {
+    return "Order #{$order -> id + 1} for $name: \${ $order -> total }" ;
+}
+
+$nested = "outer {"inner $name"}" ;
+$escaped = "\{literal\} and \$name" ;

@@ -1,0 +1,4 @@
+namespace Whim\HTTP\Client;
+
+/** Reports an invalid HTTP peer message. */
+final class ProtocolException extends Exception {}

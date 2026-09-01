@@ -1,0 +1,4 @@
+enum E {
+  case A;
+  public int $x = 1;
+}

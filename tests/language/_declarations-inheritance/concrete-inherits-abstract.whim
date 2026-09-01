@@ -1,0 +1,6 @@
+abstract class A {
+  abstract public function m(): int;
+}
+
+class B extends A {}
+$b = new B();

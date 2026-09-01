@@ -1,0 +1,329 @@
+namespace Whim\File\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\File\LockType;
+use Whim\IO\SeekWhence;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+use Whim\_Private\FileOperation;
+
+/** Shared descriptor state for the concrete file handles. */
+final class State {
+  private bool $reachedEnd = false;
+  private null|FileOperation $readOperation = null;
+  private null|FileOperation $writeOperation = null;
+
+  /** Creates state for one owned descriptor and its source path. */
+  #[AlwaysInline]
+  public function __construct(
+    private FileDescriptor $descriptor,
+    private string $path,
+  ) {}
+
+  /** Returns the path used to open the descriptor. */
+  #[AlwaysInline]
+  public function getPath(): string {
+    return $this->path;
+  }
+
+  /** Returns the backing descriptor, or raises when this state is closed. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    $this->ensureOpen();
+    return $this->descriptor;
+  }
+
+  /** Returns the descriptor's current file size. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getSize(): int {
+    $this->ensureOpen();
+    try {
+      $operation = FileOperation::metadata($this->descriptor);
+      await_operation($operation, null);
+      $metadata = $operation->takeMetadata() as vec<int>;
+      return $metadata[4];
+    } catch (Whim\_Private\SystemError $error) {
+      $this->operationFailure($error, 'size');
+    }
+  }
+
+  /**
+   * Moves the descriptor cursor.
+   *
+   * @throws Whim\Unwind\RuntimeException when the handle is closed, the target lies before the start, or the seek fails.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function seek(int $offset, SeekWhence $whence): int {
+    $this->ensureOpen();
+    if ($whence == SeekWhence::Set && $offset < 0) {
+      throw new RuntimeException('cannot seek before the start of the file');
+    }
+
+    try {
+      $operation = FileOperation::seek(
+        $this->descriptor,
+        $offset,
+        $whence->value,
+      );
+
+      await_operation($operation, null);
+      $position = $operation->takeInt() as int;
+    } catch (Whim\_Private\SystemError $error) {
+      $this->operationFailure($error, 'seek');
+    }
+
+    $this->reachedEnd = false;
+    return $position;
+  }
+
+  /** Waits for a pending read. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation,
+  ): void {
+    $this->ensureOpen();
+    if ($this->readOperation != null) {
+      await_operation($this->readOperation, $cancellation);
+    } else {
+      $cancellation?->throwIfCancellationRequested();
+    }
+  }
+
+  /** Waits for a pending write. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation,
+  ): void {
+    $this->ensureOpen();
+    if ($this->writeOperation != null) {
+      await_operation($this->writeOperation, $cancellation);
+    } else {
+      $cancellation?->throwIfCancellationRequested();
+    }
+  }
+
+  /** Reports whether a previous read reached the end. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function reachedEnd(): bool {
+    $this->ensureOpen();
+    return $this->reachedEnd;
+  }
+
+  /** Starts or collects one worker-backed read. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryRead(null|int $maxBytes): string {
+    $this->ensureOpen();
+    $maximum = $maxBytes ?? 65536;
+    if ($maximum < 0) {
+      throw new InvalidArgumentException(
+        'the maximum byte count must be non-negative',
+      );
+    }
+
+    if ($maximum == 0) {
+      return '';
+    }
+
+    if ($this->readOperation == null) {
+      $this->readOperation = FileOperation::read($this->descriptor, $maximum);
+    }
+
+    try {
+      $bytes = $this->readOperation->takeBytes();
+    } catch (Whim\_Private\SystemError $error) {
+      $this->operationFailure($error, 'read from');
+    }
+
+    if ($bytes == null) {
+      return '';
+    }
+
+    $this->readOperation = null;
+
+    if ($bytes == '') {
+      $this->reachedEnd = true;
+    }
+
+    return $bytes;
+  }
+
+  /** Starts or collects one worker-backed write. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryWrite(string $bytes): int {
+    $this->ensureOpen();
+    if ($bytes == '') {
+      return 0;
+    }
+
+    if ($this->writeOperation == null) {
+      $this->writeOperation = FileOperation::write($this->descriptor, $bytes);
+    }
+
+    try {
+      $written = $this->writeOperation->takeInt();
+    } catch (Whim\_Private\SystemError $error) {
+      $this->operationFailure($error, 'write to');
+    }
+
+    if ($written == null) {
+      return 0;
+    }
+
+    $this->writeOperation = null;
+    return $written;
+  }
+
+  /** Performs one cancellable blocking write. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    if ($bytes == '') {
+      return 0;
+    }
+
+    while (true) {
+      $written = $this->tryWrite($bytes);
+      if ($written != 0) {
+        return $written;
+      }
+
+      $this->waitUntilWritable($cancellation);
+    }
+  }
+
+  /** Synchronizes pending file data and metadata with storage. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function synchronize(null|CancellationToken $cancellation): void {
+    $this->waitUntilWritable($cancellation);
+    try {
+      $operation = FileOperation::synchronize($this->descriptor);
+      await_operation($operation, $cancellation);
+      discard!($operation->takeBool());
+    } catch (Whim\_Private\SystemError $error) {
+      $this->operationFailure($error, 'synchronize');
+    }
+  }
+
+  /** Sets the file length, extending it with zero bytes when it grows. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function truncate(
+    NonNegativeInt $length,
+    null|CancellationToken $cancellation,
+  ): void {
+    $this->waitUntilWritable($cancellation);
+    try {
+      $operation = FileOperation::truncate($this->descriptor, $length);
+      await_operation($operation, $cancellation);
+      discard!($operation->takeBool());
+    } catch (Whim\_Private\SystemError $error) {
+      $this->operationFailure($error, 'truncate');
+    }
+
+    $this->reachedEnd = false;
+  }
+
+  /** Attempts to acquire an advisory lock. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function acquire(LockType $type, bool $wait): bool {
+    $this->ensureOpen();
+    try {
+      $operation = FileOperation::lock(
+        $this->descriptor,
+        lock_kind($type),
+        $wait,
+      );
+
+      await_operation($operation, null);
+      return $operation->takeBool() as bool;
+    } catch (Whim\_Private\SystemError $error) {
+      $this->operationFailure($error, 'lock');
+    }
+  }
+
+  /** Releases the descriptor's advisory lock. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function release(): void {
+    if ($this->descriptor->isClosed()) {
+      return;
+    }
+
+    try {
+      $operation = FileOperation::lock(
+        $this->descriptor,
+        Whim\_Private\LOCK_KIND_RELEASE,
+        true,
+      );
+
+      await_operation($operation, null);
+      discard!($operation->takeBool());
+    } catch (Whim\_Private\SystemError $_) {
+    }
+  }
+
+  /**
+   * Throws when the descriptor has already been closed.
+   *
+   * @throws Whim\Unwind\RuntimeException when the file handle is closed.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function ensureOpen(): void {
+    if ($this->descriptor->isClosed()) {
+      throw new RuntimeException('the file handle is closed');
+    }
+  }
+
+  /**
+   * Converts an operation failure into a public runtime exception.
+   *
+   * @throws Whim\Unwind\RuntimeException always, carrying the errno as the code.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function operationFailure(
+    Whim\_Private\SystemError $error,
+    string $action,
+  ): never {
+    throw new RuntimeException(
+      'failed to '
+      . $action
+      . ' the file handle: the '
+      . $error->call()
+      . ' system call failed with errno '
+      . $error->errno(),
+      $error->errno(),
+    );
+  }
+}

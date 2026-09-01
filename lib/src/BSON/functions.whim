@@ -1,0 +1,35 @@
+namespace Whim\BSON;
+
+use Whim\_Private;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** Encodes a document as BSON bytes. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function encode(Document|ToBson $value): NonEmptyString {
+  if ($value is ToBson) {
+    $value = $value->toBson();
+  }
+
+  return _Private\bson_encode($value) as NonEmptyString;
+}
+
+/** Decodes exactly one BSON document. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(string $bytes): Document {
+  return _Private\bson_decode($bytes);
+}
+
+/** Decodes a BSON document into a type that knows its shape. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode_as<out T: FromBson>(string $bytes): T {
+  return T::fromBson(decode($bytes));
+}

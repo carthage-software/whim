@@ -1,0 +1,53 @@
+namespace Whim\Compression\_Private;
+
+use Whim\Compression\Compressor as CompressorInterface;
+use Whim\Compression\Exception;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\_Private\CompressionEncoder;
+
+/** Adapts a built-in compression stream to the public interface. */
+final class Compressor implements CompressorInterface {
+  public function __construct(private CompressionEncoder $encoder) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(string $bytes): string {
+    $result = $this->encoder->push($bytes);
+    if ($result == null) {
+      throw new Exception('the compression stream failed');
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function flush(): string {
+    $result = $this->encoder->flush();
+    if ($result == null) {
+      throw new Exception('the compression stream failed');
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function finish(): string {
+    $result = $this->encoder->finish();
+    if ($result == null) {
+      throw new Exception('the compression stream failed');
+    }
+
+    return $result;
+  }
+}

@@ -1,0 +1,214 @@
+namespace Whim\CIDR;
+
+use Whim;
+use Whim\Comparison\Equal;
+use Whim\Convert\ToString;
+use Whim\IP\Address;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Represents a strict, family-specific CIDR network block. */
+final readonly class Block implements Equal<Block>, ToString {
+  /** Creates a block from validated bounds. */
+  #[TrackCaller]
+  private function __construct(
+    public Address $network,
+    public 0..=128 $prefixLength,
+    private Address $last,
+  ) {}
+
+  /** Parses a CIDR block, or returns null when the notation is invalid. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $cidr): null|Block {
+    $parts = Str\split($cidr, '/', 3);
+    if (length!($parts) != 2) {
+      return null;
+    }
+
+    $network = Address::parse($parts[0]) ?? return null;
+
+    $prefixLength = Block::parsePrefix($parts[1]) ?? return null;
+
+    return Block::create($network, $prefixLength);
+  }
+
+  /**
+   * Parses a CIDR block.
+   *
+   * @throws InvalidArgumentException when the notation is invalid or contains host bits.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $cidr): Block {
+    $block = Block::parse($cidr);
+    if ($block == null) {
+      throw new InvalidArgumentException('invalid CIDR block: `' . $cidr . '`');
+    }
+
+    return $block;
+  }
+
+  /**
+   * Creates a block from its network address and prefix length.
+   *
+   * @throws InvalidArgumentException when the prefix is invalid for the family or the address contains host bits.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromAddress(
+    Address $network,
+    0..=128 $prefixLength,
+  ): Block {
+    $block = Block::create($network, $prefixLength);
+    if ($block == null) {
+      throw new InvalidArgumentException(
+        'the prefix is invalid for the address family, or the address contains host bits',
+      );
+    }
+
+    return $block;
+  }
+
+  /** Reports whether an address belongs to this block. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(Address $address): bool {
+    if ($address->family != $this->network->family) {
+      return false;
+    }
+
+    $bytes = $address->toBytes();
+    return (
+      $bytes >= $this->network->toBytes()
+      && $bytes <= $this->last->toBytes()
+    );
+  }
+
+  /** Reports whether this block shares any address with another block. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function overlaps(Block $other): bool {
+    if ($other->network->family != $this->network->family) {
+      return false;
+    }
+
+    return (
+      $this->network->toBytes() <= $other->last->toBytes()
+      && $other->network->toBytes() <= $this->last->toBytes()
+    );
+  }
+
+  /** Returns the first address in the block. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function firstAddress(): Address {
+    return $this->network;
+  }
+
+  /** Returns the last address in the block. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function lastAddress(): Address {
+    return $this->last;
+  }
+
+  /** Returns canonical CIDR notation. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): NonEmptyString {
+    return (
+      ($this->network->toString() . '/' . $this->prefixLength) as NonEmptyString
+    );
+  }
+
+  /** Reports whether two blocks have the same network and prefix. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Block $other): bool {
+    return (
+      $this->prefixLength == $other->prefixLength
+      && $this->network->equals($other->network)
+    );
+  }
+
+  /** Parses a decimal prefix length. */
+  #[TrackCaller]
+  private static function parsePrefix(string $prefix): null|int {
+    if ($prefix == '') {
+      return null;
+    }
+
+    $value = 0;
+    $index = 0;
+    while ($index < length!($prefix)) {
+      $digit = Str\ord($prefix[$index]);
+      if ($digit < 48 || $digit > 57) {
+        return null;
+      }
+
+      $value = $value * 10 + $digit - 48;
+      if ($value > 128) {
+        return null;
+      }
+
+      $index++;
+    }
+
+    return $value;
+  }
+
+  /** Creates a block when the address is an exact network boundary. */
+  #[TrackCaller]
+  private static function create(
+    Address $network,
+    int $prefixLength,
+  ): null|Block {
+    if ($prefixLength < 0 || $prefixLength > $network->family->bitLength()) {
+      return null;
+    }
+
+    $input = $network->toBytes();
+    $networkOctets = vec[];
+    $lastOctets = vec[];
+    $index = 0;
+    while ($index < length!($input)) {
+      $inputOctet = Str\ord($input[$index]);
+      $remainingBits = $prefixLength - $index * 8;
+      if ($remainingBits >= 8) {
+        $networkOctet = $inputOctet;
+        $lastOctet = $inputOctet;
+      } else if ($remainingBits <= 0) {
+        $networkOctet = 0;
+        $lastOctet = 255;
+      } else {
+        $mask = (255 << (8 - $remainingBits)) & 255;
+        $networkOctet = $inputOctet & $mask;
+        $lastOctet = $networkOctet | (255 ^ $mask);
+      }
+
+      $networkOctets[] = $networkOctet;
+      $lastOctets[] = $lastOctet;
+      $index++;
+    }
+
+    $networkBytes = Whim\_Private\string_from_bytes($networkOctets);
+    if ($networkBytes != $input) {
+      return null;
+    }
+
+    $lastBytes = Whim\_Private\string_from_bytes($lastOctets);
+    return new Block(
+      Address::fromBytes($networkBytes),
+      $prefixLength as 0..=128,
+      Address::fromBytes($lastBytes),
+    );
+  }
+}

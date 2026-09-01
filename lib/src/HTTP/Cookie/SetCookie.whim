@@ -1,0 +1,382 @@
+namespace Whim\HTTP\Cookie;
+
+use Whim\Convert\ToString;
+use Whim\DateTime\ZonedDateTime;
+use Whim\HTTP\Cookie\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+use Whim;
+
+/** A Set-Cookie field value and its attributes. */
+final readonly class SetCookie implements ToString {
+  private function __construct(
+    public NonEmptyString $name,
+    public string $value,
+    public null|SystemTime $expires,
+    public null|int $maxAge,
+    public null|NonEmptyString $domain,
+    public null|NonEmptyString $path,
+    public bool $secure,
+    public bool $httpOnly,
+    public null|SameSite $sameSite,
+  ) {}
+
+  /** Creates and validates a Set-Cookie field value. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    NonEmptyString $name,
+    string $value,
+    null|SystemTime $expires = null,
+    null|int $maxAge = null,
+    null|NonEmptyString $domain = null,
+    null|NonEmptyString $path = null,
+    bool $secure = false,
+    bool $httpOnly = false,
+    null|SameSite $sameSite = null,
+  ): SetCookie {
+    if (
+      !Whim\_Private\http_valid_token($name)
+      || !_Private\valid_value($value)
+    ) {
+      throw new InvalidArgumentException('invalid HTTP cookie name or value');
+    }
+
+    if (
+      ($domain != null && !_Private\valid_attribute($domain))
+      || (
+        $path != null
+        && (!Str\starts_with($path, '/') || !_Private\valid_attribute($path))
+      )
+    ) {
+      throw new InvalidArgumentException('invalid HTTP cookie attribute');
+    }
+
+    if ($sameSite == SameSite::None && !$secure) {
+      throw new InvalidArgumentException(
+        'cookies with SameSite=None must also be Secure',
+      );
+    }
+
+    if (Str\starts_with_ci($name, '__Secure-') && !$secure) {
+      throw new InvalidArgumentException(
+        '__Secure- cookies must also be Secure',
+      );
+    }
+
+    if (
+      Str\starts_with_ci($name, '__Host-')
+      && (!$secure || $domain != null || $path != '/')
+    ) {
+      throw new InvalidArgumentException(
+        '__Host- cookies must be Secure, host-only, and scoped to /',
+      );
+    }
+
+    return new SetCookie(
+      $name,
+      $value,
+      $expires,
+      $maxAge,
+      $domain,
+      $path,
+      $secure,
+      $httpOnly,
+      $sameSite,
+    );
+  }
+
+  /** Creates a Set-Cookie field value from trusted parts. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    NonEmptyString $name,
+    string $value,
+    null|SystemTime $expires,
+    null|int $maxAge,
+    null|NonEmptyString $domain,
+    null|NonEmptyString $path,
+    bool $secure,
+    bool $httpOnly,
+    null|SameSite $sameSite,
+  ): SetCookie {
+    return new SetCookie(
+      $name,
+      $value,
+      $expires,
+      $maxAge,
+      $domain,
+      $path,
+      $secure,
+      $httpOnly,
+      $sameSite,
+    );
+  }
+
+  /** Parses one Set-Cookie field value, or returns null when malformed. */
+  #[MustUse]
+  public static function parse(string $field): null|SetCookie {
+    $parts = Str\split($field, ';');
+    if ($parts == vec[]) {
+      return null;
+    }
+
+    $pair = Str\trim($parts[0]);
+    $separator = Str\search($pair, '=') ?? return null;
+
+    $name = Str\trim(Str\slice($pair, 0, $separator));
+    $value = Str\trim(Str\slice($pair, $separator + 1));
+    if (
+      $name == ''
+      || !Whim\_Private\http_valid_token($name)
+      || !_Private\valid_value($value)
+    ) {
+      return null;
+    }
+
+    $expires = null;
+    $maxAge = null;
+    $domain = null;
+    $path = null;
+    $secure = false;
+    $httpOnly = false;
+    $sameSite = null;
+    $index = 1;
+    while ($index < length!($parts)) {
+      $attribute = Str\trim($parts[$index]);
+      $equals = Str\search($attribute, '=');
+      if ($equals == null) {
+        $attributeName = Str\lowercase($attribute);
+        $attributeValue = null;
+      } else {
+        $attributeName = Str\lowercase(
+          Str\trim(Str\slice($attribute, 0, $equals)),
+        );
+
+        $attributeValue = Str\trim(Str\slice($attribute, $equals + 1));
+      }
+
+      if ($attributeName == 'expires' && $attributeValue != null) {
+        $date = ZonedDateTime::parseRfc2822($attributeValue);
+        if ($date != null) {
+          $expires = $date->systemTime;
+        }
+      } else if ($attributeName == 'max-age' && $attributeValue != null) {
+        $parsed = _Private\parse_integer($attributeValue);
+        if ($parsed != null) {
+          $maxAge = $parsed;
+        }
+      } else if ($attributeName == 'domain' && $attributeValue != null) {
+        $candidate = Str\lowercase($attributeValue);
+        if (Str\starts_with($candidate, '.')) {
+          $candidate = Str\slice($candidate, 1);
+        }
+
+        if (
+          $candidate == ''
+          || Str\ends_with($candidate, '.')
+          || !_Private\valid_attribute($candidate)
+        ) {
+          return null;
+        }
+
+        $domain = $candidate as NonEmptyString;
+      } else if (
+        $attributeName == 'path'
+        && $attributeValue != null
+        && Str\starts_with($attributeValue, '/')
+        && _Private\valid_attribute($attributeValue)
+      ) {
+        $path = $attributeValue as NonEmptyString;
+      } else if ($attributeName == 'secure') {
+        $secure = true;
+      } else if ($attributeName == 'httponly') {
+        $httpOnly = true;
+      } else if ($attributeName == 'samesite' && $attributeValue != null) {
+        $sameSite = match (Str\lowercase($attributeValue)) {
+          'strict' => SameSite::Strict,
+          'lax' => SameSite::Lax,
+          'none' => SameSite::None,
+          $_ => $sameSite,
+        };
+      }
+
+      $index++;
+    }
+
+    if ($sameSite == SameSite::None && !$secure) {
+      return null;
+    }
+
+    if (Str\starts_with_ci($name, '__Secure-') && !$secure) {
+      return null;
+    }
+
+    if (
+      Str\starts_with_ci($name, '__Host-')
+      && (!$secure || $domain != null || $path != '/')
+    ) {
+      return null;
+    }
+
+    return SetCookie::fromPartsUnsafe(
+      $name as NonEmptyString,
+      $value,
+      $expires,
+      $maxAge,
+      $domain,
+      $path,
+      $secure,
+      $httpOnly,
+      $sameSite,
+    );
+  }
+
+  /** Returns a copy with a new value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withValue(string $value): SetCookie {
+    return SetCookie::fromParts(
+      $this->name,
+      $value,
+      $this->expires,
+      $this->maxAge,
+      $this->domain,
+      $this->path,
+      $this->secure,
+      $this->httpOnly,
+      $this->sameSite,
+    );
+  }
+
+  /** Returns a copy with a new expiry time. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withExpires(null|SystemTime $expires): SetCookie {
+    return clone!($this, expires: $expires);
+  }
+
+  /** Returns a copy with a new maximum age in seconds. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaxAge(null|int $maxAge): SetCookie {
+    return clone!($this, maxAge: $maxAge);
+  }
+
+  /** Returns a copy with a new domain. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withDomain(null|NonEmptyString $domain): SetCookie {
+    return SetCookie::fromParts(
+      $this->name,
+      $this->value,
+      $this->expires,
+      $this->maxAge,
+      $domain,
+      $this->path,
+      $this->secure,
+      $this->httpOnly,
+      $this->sameSite,
+    );
+  }
+
+  /** Returns a copy with a new path. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withPath(null|NonEmptyString $path): SetCookie {
+    return SetCookie::fromParts(
+      $this->name,
+      $this->value,
+      $this->expires,
+      $this->maxAge,
+      $this->domain,
+      $path,
+      $this->secure,
+      $this->httpOnly,
+      $this->sameSite,
+    );
+  }
+
+  /** Returns a copy with a new Secure flag. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withSecure(bool $secure): SetCookie {
+    return SetCookie::fromParts(
+      $this->name,
+      $this->value,
+      $this->expires,
+      $this->maxAge,
+      $this->domain,
+      $this->path,
+      $secure,
+      $this->httpOnly,
+      $this->sameSite,
+    );
+  }
+
+  /** Returns a copy with a new HttpOnly flag. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withHttpOnly(bool $httpOnly): SetCookie {
+    return clone!($this, httpOnly: $httpOnly);
+  }
+
+  /** Returns a copy with a new SameSite policy. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withSameSite(null|SameSite $sameSite): SetCookie {
+    return SetCookie::fromParts(
+      $this->name,
+      $this->value,
+      $this->expires,
+      $this->maxAge,
+      $this->domain,
+      $this->path,
+      $this->secure,
+      $this->httpOnly,
+      $sameSite,
+    );
+  }
+
+  /** Serializes this value for a Set-Cookie field. */
+  #[MustUse]
+  public function toString(): string {
+    $result = $this->name . '=' . $this->value;
+    if ($this->expires != null) {
+      $result .= '; Expires=' . _Private\format_expires($this->expires);
+    }
+
+    if ($this->maxAge != null) {
+      $result .= '; Max-Age=' . $this->maxAge;
+    }
+
+    if ($this->domain != null) {
+      $result .= '; Domain=' . $this->domain;
+    }
+
+    if ($this->path != null) {
+      $result .= '; Path=' . $this->path;
+    }
+
+    if ($this->secure) {
+      $result .= '; Secure';
+    }
+
+    if ($this->httpOnly) {
+      $result .= '; HttpOnly';
+    }
+
+    if ($this->sameSite != null) {
+      $result .= '; SameSite=' . $this->sameSite->value;
+    }
+
+    return $result;
+  }
+}

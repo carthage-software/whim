@@ -1,0 +1,10 @@
+$v = vec[
+    1, // one
+    2, // two
+    3, // three
+];
+
+$d = dict[
+    'host' => 'localhost', // where
+    'port' => 8080, // how
+];

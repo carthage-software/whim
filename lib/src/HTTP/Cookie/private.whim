@@ -1,0 +1,106 @@
+namespace Whim\HTTP\Cookie\_Private;
+
+use Whim\DateTime\Formatter;
+use Whim\DateTime\TimeZone;
+use Whim\HTTP\Cookie\Pair;
+use Whim\Marker\AlwaysInline;
+use Whim\Math;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Time\SystemTime;
+use Whim;
+
+/** Reports whether a value uses valid cookie octets. */
+#[AlwaysInline]
+function valid_value(string $value): bool {
+  $index = 0;
+  while ($index < length!($value)) {
+    $byte = Str\ord($value[$index]);
+    if (!($byte is 33|35..=43|45..=58|60..=91|93..=126)) {
+      return false;
+    }
+
+    $index++;
+  }
+
+  return true;
+}
+
+/** Reports whether an attribute value cannot alter its field syntax. */
+#[AlwaysInline]
+function valid_attribute(string $value): bool {
+  return (
+    Whim\_Private\http_valid_field_value($value)
+    && !Str\contains($value, ';')
+  );
+}
+
+/** Parses valid cookie pairs from a Cookie field value. */
+function parse_pairs(string $value): vec<Pair> {
+  $pairs = vec[];
+  foreach (Str\split($value, ';') as $part) {
+    $offset = Str\search($part, '=') ?? continue;
+
+    $name = Str\trim(Str\slice($part, 0, $offset));
+    $cookieValue = Str\trim(Str\slice($part, $offset + 1));
+    if (
+      $name == ''
+      || !Whim\_Private\http_valid_token($name)
+      || !valid_value($cookieValue)
+    ) {
+      continue;
+    }
+
+    $pairs[] = ($name as NonEmptyString, $cookieValue);
+  }
+
+  return $pairs;
+}
+
+/** Parses a signed decimal integer, or returns null. */
+function parse_integer(string $value): null|int {
+  if ($value == '') {
+    return null;
+  }
+
+  $negative = $value[0] == '-';
+  $offset = match ($negative || $value[0] == '+') {
+    true => 1,
+    false => 0,
+  };
+
+  if ($offset == length!($value)) {
+    return null;
+  }
+
+  $result = 0;
+  while ($offset < length!($value)) {
+    $byte = Str\ord($value[$offset]);
+    if (!($byte is 48..=57)) {
+      return null;
+    }
+
+    $digit = $byte - 48;
+    if ($result > Math\INT_MAX / 10) {
+      return null;
+    }
+
+    $result *= 10;
+    if ($result > Math\INT_MAX - $digit) {
+      return null;
+    }
+
+    $result += $digit;
+    $offset++;
+  }
+
+  return match ($negative) {
+    true => -$result,
+    false => $result,
+  };
+}
+
+/** Formats a wall-clock time as an IMF-fixdate. */
+function format_expires(SystemTime $time): string {
+  return Formatter::httpDate()->formatZonedDateTime(TimeZone::utc()->at($time));
+}

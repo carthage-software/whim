@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports a value outside an operation's domain. */
+class DomainException extends LogicException {}

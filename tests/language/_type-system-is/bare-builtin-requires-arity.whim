@@ -1,0 +1,2 @@
+$value = vec[1, 2];
+$matches = $value is vec;

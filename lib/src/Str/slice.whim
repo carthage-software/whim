@@ -1,0 +1,264 @@
+namespace Whim\Str;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Range\LowerBoundRange;
+use Whim\Range\Range;
+use Whim\Range\UpperBoundRange;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Str\_Private;
+use Whim;
+
+/**
+ * Extracts a byte range from a string.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function slice(
+  string $string,
+  int $offset,
+  null|NonNegativeInt $length = null,
+): string {
+  $stringLength = length!($string);
+  $offset = _Private\offset($offset, $stringLength);
+  $remaining = $stringLength - $offset;
+  $length = $length ?? $remaining;
+  if ($length > $remaining) {
+    $length = $remaining;
+  }
+
+  return Whim\_Private\string_slice($string, $offset, $length);
+}
+
+/**
+ * Replaces a byte range within a string.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function splice(
+  string $string,
+  string $replacement,
+  int $offset,
+  null|NonNegativeInt $length = null,
+): string {
+  $stringLength = length!($string);
+  $offset = _Private\offset($offset, $stringLength);
+  $length = $length ?? $stringLength - $offset;
+  $end = $offset + $length;
+  if ($end > $stringLength) {
+    $end = $stringLength;
+  }
+
+  return (
+    Whim\_Private\string_slice($string, 0, $offset)
+    . $replacement
+    . Whim\_Private\string_slice($string, $end, $stringLength - $end)
+  );
+}
+
+/** Splits a string into fixed-size byte chunks. */
+#[MustUse]
+#[TrackCaller]
+function chunk(string $string, PositiveInt $chunkLength = 1): vec<string> {
+  $result = vec[];
+  $offset = 0;
+  $stringLength = length!($string);
+  while ($offset < $stringLength) {
+    $length = $chunkLength;
+    if ($offset + $length > $stringLength) {
+      $length = $stringLength - $offset;
+    }
+
+    $result[] = Whim\_Private\string_slice($string, $offset, $length);
+    $offset += $chunkLength;
+  }
+
+  return $result;
+}
+
+/** Splits a string around a delimiter. */
+#[MustUse]
+#[TrackCaller]
+function split(
+  string $string,
+  string $delimiter,
+  null|PositiveInt $limit = null,
+): vec<string> {
+  if ($delimiter == '') {
+    if ($limit == null || $limit >= length!($string)) {
+      return chunk($string);
+    }
+
+    if ($limit == 1) {
+      return vec[$string];
+    }
+
+    $prefixLength = $limit - 1;
+    $result = chunk(slice($string, 0, $prefixLength));
+    $result[] = slice($string, $prefixLength);
+    return $result;
+  }
+
+  return Whim\_Private\string_split($string, $delimiter, $limit ?? 0);
+}
+
+/** Extracts the bytes selected by a range. */
+#[MustUse]
+#[TrackCaller]
+function range(string $string, Range $range): string {
+  $offset = 0;
+  $length = null;
+  if ($range is LowerBoundRange) {
+    $offset = $range->getLowerBound();
+  }
+
+  if ($range is UpperBoundRange) {
+    $length = $range->getUpperBound() - $offset;
+    if ($range->isUpperInclusive()) {
+      $length++;
+    }
+
+    if ($length < 0) {
+      $length = 0;
+    }
+  }
+
+  return slice($string, $offset, $length);
+}
+
+/**
+ * Returns the bytes before the first matching substring.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function before(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|string {
+  $position = search($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, 0, $position);
+}
+
+/**
+ * Returns bytes before a match without ASCII case sensitivity.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function before_ci(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|string {
+  $position = search_ci($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, 0, $position);
+}
+
+/**
+ * Returns the bytes before the last matching substring.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function before_last(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|string {
+  $position = search_last($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, 0, $position);
+}
+
+/**
+ * Returns bytes before the last case-insensitive ASCII match.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function before_last_ci(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|string {
+  $position = search_last_ci($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, 0, $position);
+}
+
+/**
+ * Returns the bytes after the first matching substring.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function after(string $haystack, string $needle, int $offset = 0): null|string {
+  $position = search($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, $position + length!($needle));
+}
+
+/**
+ * Returns bytes after a match without ASCII case sensitivity.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function after_ci(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|string {
+  $position = search_ci($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, $position + length!($needle));
+}
+
+/**
+ * Returns the bytes after the last matching substring.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function after_last(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|string {
+  $position = search_last($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, $position + length!($needle));
+}
+
+/**
+ * Returns bytes after the last case-insensitive ASCII match.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function after_last_ci(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|string {
+  $position = search_last_ci($haystack, $needle, $offset) ?? return null;
+
+  return slice($haystack, $position + length!($needle));
+}

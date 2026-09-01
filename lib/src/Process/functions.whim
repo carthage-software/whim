@@ -1,0 +1,359 @@
+namespace Whim\Process;
+
+use Whim;
+use Whim\Env;
+use Whim\Filesystem;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+
+/** Returns the current process identifier. */
+#[AlwaysInline]
+#[MustUse]
+function get_id(): PositiveInt {
+  return Whim\_Private\getmypid();
+}
+
+/** Returns the parent process identifier. */
+#[AlwaysInline]
+#[MustUse]
+function get_parent_id(): NonNegativeInt {
+  return Whim\_Private\parent_process_id();
+}
+
+/** Returns CPU time consumed by this process and its waited-for children. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function cpu_times(): CpuTimes {
+  try {
+    (
+      $user,
+      $system,
+      $childrenUser,
+      $childrenSystem,
+    ) = Whim\_Private\process_times();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the process CPU times');
+  }
+
+  return new CpuTimes(
+    Duration::fromMicroseconds($user),
+    Duration::fromMicroseconds($system),
+    Duration::fromMicroseconds($childrenUser),
+    Duration::fromMicroseconds($childrenSystem),
+  );
+}
+
+/**
+ * Replaces the current process image and never returns on success.
+ *
+ * `$arguments` follows the program name. A `null` environment inherits the
+ * current process environment; a dict replaces it. The program must be a
+ * path-use `find_executable()` first when it needs a `PATH` search.
+ *
+ * Whim does not run destructors or `finally` clauses before replacement.
+ * Descriptors without close-on-exec also remain open in the new program.
+ *
+ * @throws Whim\Unwind\RuntimeException when the process cannot be replaced.
+ */
+#[NeverInline]
+#[TrackCaller]
+function replace(
+  NonEmptyString $program,
+  vec<string> $arguments = vec[],
+  null|dict<NonEmptyString, string> $environment = null,
+): never {
+  try {
+    Whim\_Private\replace_process($program, $arguments, $environment);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'replace the current process');
+  }
+}
+
+/** Returns the real and effective user identifiers. */
+#[AlwaysInline]
+#[MustUse]
+function get_user_identity(): UserIdentity {
+  ($real, $effective) = Whim\_Private\process_user();
+  return new UserIdentity($real, $effective);
+}
+
+/** Changes the real or effective user identifier. */
+#[NeverInline]
+#[TrackCaller]
+function set_user_identity(
+  null|NonNegativeInt $real = null,
+  null|NonNegativeInt $effective = null,
+): void {
+  try {
+    Whim\_Private\set_process_user($real ?? -1, $effective ?? -1);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'set the process user identity');
+  }
+}
+
+/** Returns the real and effective group identifiers. */
+#[AlwaysInline]
+#[MustUse]
+function get_group_identity(): GroupIdentity {
+  ($real, $effective) = Whim\_Private\process_group();
+  return new GroupIdentity($real, $effective);
+}
+
+/** Changes the real or effective group identifier. */
+#[NeverInline]
+#[TrackCaller]
+function set_group_identity(
+  null|NonNegativeInt $real = null,
+  null|NonNegativeInt $effective = null,
+): void {
+  try {
+    Whim\_Private\set_process_group($real ?? -1, $effective ?? -1);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'set the process group identity');
+  }
+}
+
+/** Returns the supplementary group identifiers. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function get_supplementary_group_ids(): vec<NonNegativeInt> {
+  try {
+    return Whim\_Private\process_supplementary_groups();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the supplementary group identifiers');
+  }
+}
+
+/** Replaces the supplementary group identifiers. */
+#[NeverInline]
+#[TrackCaller]
+function set_supplementary_group_ids(vec<NonNegativeInt> $groups): void {
+  try {
+    Whim\_Private\set_process_supplementary_groups($groups);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'set the supplementary group identifiers');
+  }
+}
+
+/** Loads the supplementary groups configured for a user. */
+#[NeverInline]
+#[TrackCaller]
+function initialize_supplementary_group_ids(
+  NonEmptyString $user,
+  NonNegativeInt $primaryGroup,
+): void {
+  try {
+    Whim\_Private\initialize_groups($user, $primaryGroup);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'initialize the supplementary group identifiers');
+  }
+}
+
+/** Returns a process's session identifier, or the current session by default. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function get_session_id(null|PositiveInt $process = null): NonNegativeInt {
+  try {
+    return Whim\_Private\session_id($process ?? 0);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the process session identifier');
+  }
+}
+
+/** Starts a new session and returns its identifier. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function start_session(): NonNegativeInt {
+  try {
+    return Whim\_Private\start_session();
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'start a process session');
+  }
+}
+
+/** Returns a process's group identifier, or the current group by default. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function get_process_group_id(
+  null|PositiveInt $process = null,
+): NonNegativeInt {
+  try {
+    return Whim\_Private\process_group_id($process ?? 0);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the process group identifier');
+  }
+}
+
+/** Changes a process's group, defaulting each identifier to the caller. */
+#[NeverInline]
+#[TrackCaller]
+function set_process_group_id(
+  null|PositiveInt $process = null,
+  null|PositiveInt $group = null,
+): void {
+  try {
+    Whim\_Private\set_process_group_id($process ?? 0, $group ?? 0);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'set the process group identifier');
+  }
+}
+
+/** Returns a process's scheduling priority, or the current priority by default. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function get_priority(null|PositiveInt $process = null): int {
+  try {
+    return Whim\_Private\process_priority($process ?? 0);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the process priority');
+  }
+}
+
+/** Changes a process's scheduling priority. */
+#[NeverInline]
+#[TrackCaller]
+function set_priority(int $priority, null|PositiveInt $process = null): void {
+  try {
+    Whim\_Private\set_process_priority($process ?? 0, $priority);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'set the process priority');
+  }
+}
+
+/** Returns the current process limit for a resource. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function get_resource_limit(Resource $resource): ResourceLimit {
+  try {
+    ($soft, $hard) = Whim\_Private\resource_limit($resource->value);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'read the process resource limit');
+  }
+
+  return new ResourceLimit(
+    match ($soft) {
+      -1 => null,
+      $_ => $soft as NonNegativeInt,
+    },
+    match ($hard) {
+      -1 => null,
+      $_ => $hard as NonNegativeInt,
+    },
+  );
+}
+
+/** Changes the current process limit for a resource. */
+#[NeverInline]
+#[TrackCaller]
+function set_resource_limit(Resource $resource, ResourceLimit $limit): void {
+  try {
+    Whim\_Private\set_resource_limit(
+      $resource->value,
+      $limit->soft ?? -1,
+      $limit->hard ?? -1,
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, 'set the process resource limit');
+  }
+}
+
+/** Reports whether a process identifier names a live process. */
+#[MustUse]
+#[TrackCaller]
+function exists(PositiveInt $process): bool {
+  return Whim\_Private\process_exists($process);
+}
+
+/** Sends a signal to one process. */
+#[NeverInline]
+#[TrackCaller]
+function signal(PositiveInt $process, Signal $signal): void {
+  if (!$signal->isSupported()) {
+    throw new InvalidArgumentException(
+      'the signal is not supported by the running system',
+    );
+  }
+
+  try {
+    Whim\_Private\send_signal($process, $signal->value);
+  } catch (Whim\_Private\SystemError $error) {
+    throw new RuntimeException(
+      'failed to signal process ' . $process . ': ' . $error->getMessage(),
+      previous: $error,
+    );
+  }
+}
+
+/** Sends a signal to every process in a process group. */
+#[NeverInline]
+#[TrackCaller]
+function signal_group(PositiveInt $group, Signal $signal): void {
+  if (!$signal->isSupported()) {
+    throw new InvalidArgumentException(
+      'the signal is not supported by the running system',
+    );
+  }
+
+  try {
+    Whim\_Private\send_signal(-$group, $signal->value);
+  } catch (Whim\_Private\SystemError $error) {
+    throw new RuntimeException(
+      'failed to signal process group ' . $group . ': ' . $error->getMessage(),
+      previous: $error,
+    );
+  }
+}
+
+/** Calls a callback whenever this process receives a signal. */
+#[MustUse('keep the watcher alive until the signal no longer needs watching')]
+#[TrackCaller]
+function watch_signal(Signal $signal, fn(): void $callback): SignalWatcher {
+  return new SignalWatcher($signal, $callback);
+}
+
+/** Finds an executable by path or by searching PATH. */
+#[MustUse]
+#[TrackCaller]
+function find_executable(NonEmptyString $name): null|NonEmptyString {
+  if (Str\contains($name, '/')) {
+    if (Filesystem\is_file($name) && Filesystem\is_executable($name)) {
+      return $name;
+    }
+
+    return null;
+  }
+
+  $path = Env\get_variable('PATH') ?? return null;
+
+  foreach (Str\split($path, ':') as $directory) {
+    if ($directory == '') {
+      $directory = Env\current_directory() ?? '.';
+    }
+
+    $candidate = $directory . '/' . $name;
+    if (
+      Filesystem\is_file($candidate)
+      && Filesystem\is_executable($candidate)
+    ) {
+      return $candidate as NonEmptyString;
+    }
+  }
+
+  return null;
+}

@@ -1,0 +1,366 @@
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Symbol\SymbolKind;
+use Whim\Unwind\Error;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedSymbolError;
+
+final class AutoloadFallbackRecorder {
+  public vec<string> $seen = vec[];
+}
+
+function accept_registry_probe(
+  (fn(): vec<Whim\Autoload\Autoloader>) $probe,
+): void {}
+
+function accept_symbol_file_builder(
+  (fn(string, string): Whim\Autoload\Autoloader) $builder,
+): void {}
+
+function accept_symbol_files_builder(
+  (fn(dict<string, string>): Whim\Autoload\Autoloader) $builder,
+): void {}
+
+function accept_fallback_builder(
+  (fn(
+    (fn(Whim\Symbol\SymbolKind, string): bool),
+  ): Whim\Autoload\Autoloader) $builder,
+): void {}
+
+function accept_load_probe(
+  (fn(Whim\Symbol\SymbolKind, string): bool) $probe,
+): void {}
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+File\write(
+  $work . '/greet.whim',
+  'namespace App {'
+  . "\n"
+  . '    function greet(): string { return \'hello from disk\'; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+accept_registry_probe(Autoload\get_autoloaders(...));
+
+$base = new Autoload\Autoloader();
+accept_symbol_file_builder($base->withSymbolFile(...));
+accept_symbol_files_builder($base->withSymbolFiles(...));
+accept_fallback_builder($base->withFallback(...));
+accept_load_probe($base->loadSymbol(...));
+
+$mapped = $base->withSymbolFile('App\\greet', $work . '/greet.whim');
+assert!($mapped != $base);
+Autoload\register($base);
+assert!(length!(Autoload\get_autoloaders()) == 1);
+$assertion_value_3 = fn(): string => App\greet();
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (UndefinedSymbolError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is UndefinedSymbolError);
+Autoload\register($mapped);
+assert!(length!(Autoload\get_autoloaders()) == 2);
+assert!(Autoload\load_symbol(SymbolKind::Function, 'App\\greet'));
+
+assert!(App\greet() == 'hello from disk');
+Autoload\unregister($base);
+Autoload\unregister($mapped);
+assert!(length!(Autoload\get_autoloaders()) == 0);
+
+File\write(
+  $work . '/user.whim',
+  'namespace App {'
+  . "\n"
+  . '    class User {'
+  . "\n"
+  . '        public function hello(): string { return \'loaded user\'; }'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/configure.whim',
+  'namespace App {'
+  . "\n"
+  . '    function configure(): string { return \'configured\'; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/constants.whim',
+  'namespace App {'
+  . "\n"
+  . '    const DEFAULT_LOCALE = \'en_US\';'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$symbolFilesLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'App\\User' => $work . '/user.whim',
+  'App\\configure' => $work . '/configure.whim',
+  'App\\DEFAULT_LOCALE' => $work . '/constants.whim',
+]);
+
+Autoload\register($symbolFilesLoader);
+$user = new App\User();
+assert!($user->hello() == 'loaded user');
+assert!(App\configure() == 'configured');
+assert!(App\DEFAULT_LOCALE == 'en_US');
+Autoload\unregister($symbolFilesLoader);
+
+File\write(
+  $work . '/named.whim',
+  'namespace App;'
+  . "\n\n"
+  . 'interface Named {'
+  . "\n"
+  . '    public function name(): string;'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/speaker.whim',
+  'namespace App;'
+  . "\n\n"
+  . 'interface Speaker extends Named {'
+  . "\n"
+  . '    public function speak(): string;'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/base.whim',
+  'namespace App;'
+  . "\n\n"
+  . 'abstract class Base {'
+  . "\n"
+  . '    public function greet(): string {'
+  . "\n"
+  . '        return \'hello from \' . $this->name();'
+  . "\n"
+  . '    }'
+  . "\n\n"
+  . '    abstract public function name(): string;'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/talker.whim',
+  'namespace App;'
+  . "\n\n"
+  . 'final class Talker extends Base implements Speaker {'
+  . "\n"
+  . '    public function name(): string {'
+  . "\n"
+  . '        return \'talker\';'
+  . "\n"
+  . '    }'
+  . "\n\n"
+  . '    public function speak(): string {'
+  . "\n"
+  . '        return \'speaking\';'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$inheritedBasesLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'App\\Talker' => $work . '/talker.whim',
+  'App\\Base' => $work . '/base.whim',
+  'App\\Speaker' => $work . '/speaker.whim',
+  'App\\Named' => $work . '/named.whim',
+]);
+
+Autoload\register($inheritedBasesLoader);
+$talker = new App\Talker();
+assert!($talker->name() == 'talker');
+assert!($talker->speak() == 'speaking');
+assert!($talker->greet() == 'hello from talker');
+Autoload\unregister($inheritedBasesLoader);
+
+File\write(
+  $work . '/newtype-id.whim',
+  'namespace App;' . "\n\n" . 'newtype Id = int;' . "\n",
+);
+
+File\write(
+  $work . '/newtype-code.whim',
+  'namespace App;' . "\n\n" . 'newtype Code = string;' . "\n",
+);
+
+$newtypeLoader = new Autoload\Autoloader()->withFallback(
+  function(
+    SymbolKind $kind,
+    string $name,
+  ) use ($work): bool {
+    if ($kind != SymbolKind::Newtype) {
+      return false;
+    }
+
+    $file = match ($name) {
+      'App\\Id' => $work . '/newtype-id.whim',
+      'App\\Code' => $work . '/newtype-code.whim',
+      $_ => null,
+    };
+
+    if ($file == null) {
+      return false;
+    }
+
+    require_once!($file);
+    return true;
+  },
+);
+
+Autoload\register($newtypeLoader);
+assert!(Whim\Symbol\exists('App\\Id'));
+assert!(App\Id(42) == App\Id(42));
+assert!(Autoload\load_symbol(SymbolKind::Newtype, 'App\\Code'));
+
+assert!(App\Code('ok') == App\Code('ok'));
+Autoload\unregister($newtypeLoader);
+
+File\write(
+  $work . '/live-refinement.whim',
+  'namespace App;'
+  . "\n\n"
+  . 'function autoload_live_increment(int $value): int {'
+  . "\n"
+  . '  return $value + 1;'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+require_once!($work . '/live-refinement.whim');
+$liveRefinementTotal = 0;
+$liveRefinementIndex = 0;
+while ($liveRefinementIndex < 4) {
+  $liveRefinementTotal += App\autoload_live_increment($liveRefinementIndex);
+  $liveRefinementIndex++;
+}
+
+assert!($liveRefinementTotal == 10);
+
+$assertion_value_18 = function(): void {
+  new Autoload\Autoloader()->withFallback(function(SymbolKind $kind): bool {
+    return false;
+  });
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is TypeError);
+
+File\write(
+  $work . '/unrelated.whim',
+  'namespace App {'
+  . "\n"
+  . '    function unrelated(): string { return \'loaded anyway\'; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$fallbackRecorder = new AutoloadFallbackRecorder();
+$missLoader = new Autoload\Autoloader()->withSymbolFile(
+  'App\\lies',
+  $work . '/unrelated.whim',
+)->withFallback(
+  function(SymbolKind $kind, string $name) use ($fallbackRecorder): bool {
+    $fallbackRecorder->seen[] = $name;
+    return false;
+  },
+);
+
+Autoload\register($missLoader);
+$assertion_value_19 = fn(): string => App\lies();
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (UndefinedSymbolError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is UndefinedSymbolError);
+assert!(App\unrelated() == 'loaded anyway');
+assert!(length!($fallbackRecorder->seen) == 0);
+$assertion_value_22 = fn(): string => ghost();
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (UndefinedSymbolError $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is UndefinedSymbolError);
+assert!($fallbackRecorder->seen == vec['ghost', 'ghost']);
+Autoload\unregister($missLoader);
+
+$firstChainLoader = new Autoload\Autoloader()->withFallback(
+  fn(SymbolKind $kind, string $name): bool => false,
+);
+
+$secondChainLoader = new Autoload\Autoloader()->withFallback(
+  fn(SymbolKind $kind, string $name): bool => false,
+);
+
+Autoload\register($firstChainLoader);
+Autoload\register($secondChainLoader);
+assert!(length!(Autoload\get_autoloaders()) == 2);
+Autoload\unregister($firstChainLoader);
+assert!(length!(Autoload\get_autoloaders()) == 1);
+Autoload\unregister($firstChainLoader);
+assert!(length!(Autoload\get_autoloaders()) == 1);
+$assertion_value_27 = function(): void {
+  Whim\_Private\register_symbol_autoloader(
+    function(int $kind, string $name): void {},
+  );
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (Error $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_27->getMessage(),
+      'an autoloader callback is already registered, and the engine keeps only one',
+    ),
+  );
+}
+
+assert!($assertion_error_27 is Error);
+
+assert!(SymbolKind::from(SymbolKind::Class->value)->name == 'Class');
+assert!(SymbolKind::from(SymbolKind::Constant->value)->name == 'Constant');
+
+Autoload\unregister($secondChainLoader);
+
+Filesystem\delete_directory($work, true);

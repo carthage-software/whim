@@ -1,0 +1,19 @@
+namespace Whim\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Returns the runtime type identity of a value. */
+#[MustUse]
+#[Stub]
+function of(mixed $value): TypeId {}
+
+/** Returns the runtime identity of a reified type. */
+#[MustUse]
+#[Stub]
+function id<T>(): TypeId {}
+
+/** Returns a diagnostic spelling of a runtime type identity. */
+#[MustUse]
+#[Stub]
+function to_debug_string(TypeId $id): string {}

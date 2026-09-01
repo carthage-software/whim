@@ -1,0 +1,206 @@
+use Whim\Unwind\Error;
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_type-system-checks/duplicate-intersection-member.whim',
+  '`A` appears twice in an intersection',
+);
+
+raises(
+  '_type-system-checks/duplicate-union-member.whim',
+  '`int` appears twice in a union',
+);
+
+raises(
+  '_type-system-checks/grouped-union-is-one-union.whim',
+  '`int` appears twice in a union',
+);
+
+raises(
+  '_type-system-checks/literal-subsumed-by-base.whim',
+  '`true` is already contained in `bool`',
+);
+
+raises(
+  '_type-system-checks/mixed-in-intersection.whim',
+  '`mixed` constrains nothing',
+);
+
+raises(
+  '_type-system-checks/mixed-in-union.whim',
+  '`mixed` already contains every type',
+);
+
+class LateWidget {}
+
+$lateWidget = new LateWidget();
+assert!(!($lateWidget is Late\Marker));
+require!('_type-system-checks/late_marker.whim');
+assert!(new Late\Marker() is Late\Marker);
+assert!(!($lateWidget is Late\Marker));
+
+class UnresolvedWidget {}
+
+$unresolvedWidget = new UnresolvedWidget();
+assert!(!($unresolvedWidget is Never\Declared));
+assert!(!(null is Never\Declared));
+$assertion_value_6 = fn(): mixed => $unresolvedWidget as Never\Declared;
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (TypeError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is TypeError);
+
+$unresolvedOutcome = 'unhandled';
+try {
+  throw new Error('probe', 0);
+} catch (Never\Declared $error) {
+  $unresolvedOutcome = 'caught by the unresolved clause';
+} catch (Error $error) {
+  $unresolvedOutcome = 'caught by the error clause';
+}
+
+assert!($unresolvedOutcome == 'caught by the error clause');
+
+type Id = int|string;
+type Caught = TypeError;
+
+assert!(5 is Id);
+assert!(!(5.0 is Id));
+assert!('x' as Id == 'x');
+
+$caughtThroughAlias = false;
+try {
+  $q = vec[1]['x'];
+} catch (Caught $error) {
+  $caughtThroughAlias = true;
+}
+
+assert!($caughtThroughAlias);
+
+assert!(Whim\Symbol\exists('Id'));
+assert!(Whim\Symbol\get_kind('Id') == Whim\Symbol\SymbolKind::TypeAlias);
+
+type Json = null|bool|int|float|string|vec<Json>|dict<string, Json>;
+
+$document = dict[
+  'enabled' => true,
+  'items' => vec[1, 2.5, 'three', null, dict['nested' => vec[false]]],
+];
+
+assert!($document is Json);
+assert!(!(dict['invalid' => new InvalidJson()] is Json));
+
+type Tree = int|(Tree, Tree);
+
+assert!((1, (2, 3)) is Tree);
+assert!(!((1, ('no', 3)) is Tree));
+
+type GenericTree<T> = T|(GenericTree<T>, GenericTree<T>);
+
+function accepts_tree(GenericTree<int> $value): bool {
+  return true;
+}
+
+assert!(accepts_tree((1, 2)));
+assert!(accepts_tree((1, (2, 3))));
+assert!(!((1, ('no', 3)) is GenericTree<int>));
+
+type Rose<T> = T|vec<Rose<T>>;
+
+assert!(vec[1, vec[2, vec[3]]] is Rose<int>);
+assert!(!(vec[1, vec['no']] is Rose<int>));
+
+type A = int|vec<B>;
+type B = dict<string, A>;
+
+assert!(vec[dict['leaf' => 1]] is A);
+assert!(!(vec[dict['leaf' => false]] is A));
+
+class InvalidJson {}
+
+$asValue = 5;
+$asSame = $asValue as int;
+assert!($asSame == 5);
+assert!($asSame is int);
+$assertion_value_27 = fn(): mixed => 'text' as int;
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (TypeError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is TypeError);
+$assertion_value_28 = fn(): mixed => 1 as float;
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (TypeError $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is TypeError);
+
+$rawTimeout = 'nope';
+assert!((($rawTimeout ?as int) ?? 30) == 30);
+$givenTimeout = 12;
+assert!((($givenTimeout ?as int) ?? 30) == 12);
+assert!((null ?as string) == null);
+
+type Integer = int;
+type Identity<T> = T;
+
+function accept_written_duplicate(Integer|int $value): Integer|int {
+  assert!($value is Integer|int);
+
+  return $value;
+}
+
+assert!(accept_written_duplicate(1) == 1);
+assert!(accept_written_duplicate(2) is Identity<int>|int);
+
+type Maybe = null|int;
+type Verdict = 'read'|'write';
+type Any = mixed;
+
+function pick(null|Any $value): mixed {
+  return $value;
+}
+
+assert!(1 is Maybe);
+assert!(pick(null) is null);
+
+$number = 1;
+assert!($number + 1 is int);
+assert!($number + 1.0 is float);
+assert!($number is int);
+assert!(1 != 1.0);
+$assertion_value_41 = function(): void {
+  if (0) {}
+};
+
+$assertion_error_41 = null;
+try {
+  $assertion_value_41();
+} catch (TypeError $assertion_caught_41) {
+  $assertion_error_41 = $assertion_caught_41;
+}
+
+assert!($assertion_error_41 is TypeError);
+
+$assertion_value_42 = fn(): mixed => '5' + 5;
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (IncompatibleOperandsError $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+}
+
+assert!($assertion_error_42 is IncompatibleOperandsError);

@@ -1,0 +1,348 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\Compression\Codec;
+use Whim\Compression\Brotli;
+use Whim\Compression\Compressor;
+use Whim\Compression\DecompressionException;
+use Whim\Compression\Decompressor;
+use Whim\Compression\Deflate;
+use Whim\Compression\Gzip;
+use Whim\Compression\Registry;
+use Whim\Compression\TransformReadHandle;
+use Whim\Compression\Zstandard;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\FunctionHandler;
+use Whim\HTTP\Server\Middleware\RequestDecompression;
+use Whim\HTTP\Server\Middleware\ResponseCompression;
+use Whim\HTTP\Session\Session;
+use Whim\IP\Address;
+use Whim\IO\LimitExceededException;
+use Whim\IO\MemoryHandle;
+use Whim\Network\Endpoint;
+use Whim\Network\InternetEndpoint;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+
+final class CompressionTestTransformer implements Compressor, Decompressor {
+  private string $input = '';
+
+  public function __construct(private string $tag) {}
+
+  public function push(string $bytes): string {
+    $this->input .= $bytes;
+    return '';
+  }
+
+  public function flush(): string {
+    return '';
+  }
+
+  public function finish(): string {
+    return $this->tag . '(' . $this->input . ')';
+  }
+}
+
+final readonly class CompressionTestCodec implements Codec {
+  public function __construct(private NonEmptyString $name) {}
+
+  public function coding(): NonEmptyString {
+    return $this->name;
+  }
+
+  public function createCompressor(): Compressor {
+    return new CompressionTestTransformer($this->name);
+  }
+
+  public function createDecompressor(): Decompressor {
+    return new CompressionTestTransformer($this->name);
+  }
+}
+
+final class CompressionTestContext implements Context {
+  public dict<string, string> $parameters = dict[];
+  private null|Session $session = null;
+
+  public function __construct(
+    public readonly ProtocolVersion $protocolVersion,
+    public readonly Endpoint $localEndpoint,
+    public readonly Endpoint $peerEndpoint,
+  ) {}
+
+  public function getSession(): null|Session {
+    return $this->session;
+  }
+
+  public function setSession(Session $session): void {
+    $this->session = $session;
+  }
+
+  public function onResponseComplete(fn(): void $callback): void {}
+}
+
+function compression_test_context(): CompressionTestContext {
+  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+  return new CompressionTestContext(ProtocolVersion::V11, $local, $peer);
+}
+
+function compression_test_body(Response $response): string {
+  return $response->body?->readAll() ?? '';
+}
+
+function compression_test_encode(Codec $codec, vec<string> $chunks): string {
+  $compressor = $codec->createCompressor();
+  $encoded = '';
+  foreach ($chunks as $index => $chunk) {
+    $encoded .= $compressor->push($chunk);
+    if ($index == 0) {
+      $encoded .= $compressor->flush();
+    }
+  }
+
+  return $encoded . $compressor->finish();
+}
+
+function compression_test_decode(Codec $codec, string $encoded): string {
+  $decompressor = $codec->createDecompressor();
+  $decoded = '';
+  $offset = 0;
+  $length = length!($encoded);
+  while ($offset < $length) {
+    $chunkLength = 3;
+    if ($offset + $chunkLength > $length) {
+      $chunkLength = $length - $offset;
+    }
+
+    $decoded .= $decompressor->push(Str\slice($encoded, $offset, $chunkLength));
+
+    $offset += $chunkLength;
+  }
+
+  return $decoded . $decompressor->finish();
+}
+
+function compression_test_truncated(Codec $codec): void {
+  $encoded = compression_test_encode($codec, vec['truncated stream']);
+  $encoded = Str\slice($encoded, 0, length!($encoded) - 1);
+  compression_test_decode($codec, $encoded);
+}
+
+function compression_test_malformed(Codec $codec): void {
+  compression_test_decode($codec, 'not a compressed stream');
+}
+
+$payload = 'the quick brown fox jumps over the lazy dog';
+$codecs = vec[new Gzip(), new Deflate(), new Brotli(), new Zstandard()];
+foreach ($codecs as $codec) {
+  $encoded = compression_test_encode(
+    $codec,
+    vec['the quick ', 'brown fox ', 'jumps over the lazy dog'],
+  );
+
+  assert!(!($encoded == $payload));
+  assert!(compression_test_decode($codec, $encoded) == $payload);
+  $assertion_value_3 = function() use ($codec): void {
+    compression_test_truncated($codec);
+  };
+
+  $assertion_error_3 = null;
+  try {
+    $assertion_value_3();
+  } catch (DecompressionException $assertion_caught_3) {
+    $assertion_error_3 = $assertion_caught_3;
+  }
+
+  assert!($assertion_error_3 is DecompressionException);
+
+  $assertion_value_4 = function() use ($codec): void {
+    compression_test_malformed($codec);
+  };
+
+  $assertion_error_4 = null;
+  try {
+    $assertion_value_4();
+  } catch (DecompressionException $assertion_caught_4) {
+    $assertion_error_4 = $assertion_caught_4;
+  }
+
+  assert!($assertion_error_4 is DecompressionException);
+
+  $empty = compression_test_encode($codec, vec[]);
+  assert!(compression_test_decode($codec, $empty) == '');
+}
+
+$members =
+  compression_test_encode(new Gzip(), vec['first'])
+  . compression_test_encode(new Gzip(), vec['second']);
+
+assert!(compression_test_decode(new Gzip(), $members) == 'firstsecond');
+
+$alpha = new CompressionTestCodec('alpha');
+$beta = new CompressionTestCodec('beta');
+$registry = new Registry(vec[$alpha, $beta]);
+
+assert!($registry->contains('ALPHA'));
+assert!($registry->get('Beta') == $beta);
+assert!($registry->codings() == vec['alpha', 'beta']);
+$assertion_value_10 = fn(): Registry => (
+  new Registry(vec[$alpha, new CompressionTestCodec('ALPHA')])
+);
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (Whim\Unwind\InvalidArgumentException $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is Whim\Unwind\InvalidArgumentException);
+
+$transformed = new TransformReadHandle(
+  new MemoryHandle('payload'),
+  new CompressionTestTransformer('alpha'),
+);
+
+assert!($transformed->read(3) == 'alp');
+assert!($transformed->readAll() == 'ha(payload)');
+assert!($transformed->reachedEndOfDataSource());
+
+$limited = new TransformReadHandle(
+  new MemoryHandle('payload'),
+  new CompressionTestTransformer('alpha'),
+  4,
+);
+
+$assertion_value_14 = fn(): string => $limited->readAll();
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (LimitExceededException $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is LimitExceededException);
+
+$cancellation = new SignalCancellationToken();
+$echo = new FunctionHandler(
+  function(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response {
+    $body = $request->body?->readAll() ?? '';
+    $encoding = $request->headers->get('Content-Encoding') ?? 'none';
+    $length = $request->headers->get('Content-Length') ?? 'none';
+    return new Response(
+      200,
+      body: new MemoryHandle($encoding . '|' . $length . '|' . $body),
+    );
+  },
+);
+
+$decompression = new RequestDecompression($registry);
+$decoded = $decompression->handle(
+  compression_test_context(),
+  Request::fromParts(
+    'POST',
+    headers: FieldMap::from(vec[
+      ('Content-Encoding', 'alpha, beta'),
+      ('Content-Length', '7'),
+    ]),
+    body: new MemoryHandle('payload'),
+  ),
+  $echo,
+  $cancellation,
+);
+
+assert!(compression_test_body($decoded) == 'none|none|alpha(beta(payload))');
+
+$unsupported = $decompression->handle(
+  compression_test_context(),
+  Request::fromParts(
+    'POST',
+    headers: FieldMap::from(vec[('Content-Encoding', 'unknown')]),
+  ),
+  $echo,
+  $cancellation,
+);
+
+assert!($unsupported->status == 415);
+assert!($unsupported->headers->get('Accept-Encoding') == 'alpha, beta');
+
+$tooLarge = new RequestDecompression($registry, 4);
+$limitedResponse = $tooLarge->handle(
+  compression_test_context(),
+  Request::fromParts(
+    'POST',
+    headers: FieldMap::from(vec[('Content-Encoding', 'alpha')]),
+    body: new MemoryHandle('payload'),
+  ),
+  $echo,
+  $cancellation,
+);
+
+assert!($limitedResponse->status == 413);
+
+$compression = new ResponseCompression($registry);
+$responseHandler = new FunctionHandler(
+  fn(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response => (
+    new Response(
+      200,
+      headers: FieldMap::from(vec[
+        ('Content-Length', '7'),
+        ('ETag', '"payload"'),
+      ]),
+      body: new MemoryHandle('payload'),
+    )
+  ),
+);
+
+$compressed = $compression->handle(
+  compression_test_context(),
+  Request::fromParts(
+    'GET',
+    headers: FieldMap::from(vec[('Accept-Encoding', 'alpha;q=0.5, beta;q=1')]),
+  ),
+  $responseHandler,
+  $cancellation,
+);
+
+assert!($compressed->headers->get('Content-Encoding') == 'beta');
+assert!($compressed->headers->get('Content-Length') == null);
+assert!($compressed->headers->get('ETag') == null);
+assert!($compressed->headers->get('Vary') == 'Accept-Encoding');
+assert!(compression_test_body($compressed) == 'beta(payload)');
+
+$identity = $compression->handle(
+  compression_test_context(),
+  Request::fromParts(
+    'GET',
+    headers: FieldMap::from(vec[('Accept-Encoding', 'alpha;q=0.5')]),
+  ),
+  $responseHandler,
+  $cancellation,
+);
+
+assert!($identity->headers->get('Content-Encoding') == null);
+assert!($identity->headers->get('Vary') == 'Accept-Encoding');
+assert!(compression_test_body($identity) == 'payload');
+
+$unacceptable = $compression->handle(
+  compression_test_context(),
+  Request::fromParts(
+    'GET',
+    headers: FieldMap::from(vec[('Accept-Encoding', 'identity;q=0, *;q=0')]),
+  ),
+  $responseHandler,
+  $cancellation,
+);
+
+assert!($unacceptable->status == 406);

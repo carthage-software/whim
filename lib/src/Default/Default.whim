@@ -1,0 +1,12 @@
+namespace Whim\Default;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Defines the behavior of default values. */
+interface Default {
+  /** Creates the canonical default value. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function default(): static;
+}

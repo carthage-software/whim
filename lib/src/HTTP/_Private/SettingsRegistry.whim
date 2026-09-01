@@ -1,0 +1,79 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Setting;
+use Whim\HTTP\_Private\SettingId;
+use Whim\HTTP\_Private\SettingValue;
+
+/** Stores local and peer HTTP/2 settings. */
+final class SettingsRegistry {
+  private dict<SettingId, SettingValue> $local;
+  private dict<SettingId, SettingValue> $remote;
+  private int $pendingAcknowledgments = 0;
+
+  public function __construct(dict<SettingId, SettingValue> $overrides) {
+    $defaults = default_settings();
+    foreach ($overrides as $id => $value) {
+      $defaults[$id] = $value;
+    }
+
+    $this->local = $defaults;
+    $this->remote = default_settings();
+  }
+
+  public function local(Setting $setting): SettingValue {
+    return $this->local[$setting->value];
+  }
+
+  public function remote(Setting $setting): SettingValue {
+    return $this->remote[$setting->value];
+  }
+
+  public function localOverrides(): dict<SettingId, SettingValue> {
+    $defaults = default_settings();
+    $overrides = dict[];
+    foreach ($this->local as $id => $value) {
+      if (!contains_key!($defaults, $id) || $defaults[$id] != $value) {
+        $overrides[$id] = $value;
+      }
+    }
+
+    return $overrides;
+  }
+
+  public function applyRemote(dict<SettingId, SettingValue> $settings): void {
+    foreach ($settings as $id => $value) {
+      $this->remote[$id] = $value;
+    }
+  }
+
+  public function updateLocal(dict<SettingId, SettingValue> $settings): void {
+    foreach ($settings as $id => $value) {
+      $this->local[$id] = $value;
+    }
+
+    $this->pendingAcknowledgments++;
+  }
+
+  public function acknowledgeLocal(): void {
+    if ($this->pendingAcknowledgments == 0) {
+      throw new H2\ProtocolException(
+        'the peer acknowledged settings which were not sent',
+      );
+    }
+
+    $this->pendingAcknowledgments--;
+  }
+}
+
+function default_settings(): dict<SettingId, SettingValue> {
+  return dict[
+    Setting::HeaderTableSize->value => H2\DEFAULT_HEADER_TABLE_SIZE,
+    Setting::EnablePush->value => 1,
+    Setting::MaxConcurrentStreams->value => 2147483647,
+    Setting::InitialWindowSize->value => H2\DEFAULT_INITIAL_WINDOW_SIZE,
+    Setting::MaxFrameSize->value => H2\DEFAULT_MAX_FRAME_SIZE,
+    Setting::MaxHeaderListSize->value => 2147483647,
+    Setting::EnableConnectProtocol->value => 0,
+  ];
+}

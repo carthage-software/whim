@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** The root protocol implemented by every throwable value. */
+#[Stub]
+interface Throwable for Error, Exception {}

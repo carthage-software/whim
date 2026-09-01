@@ -1,0 +1,249 @@
+namespace Whim\IO;
+
+use Whim\_Private\ByteBuffer;
+use Whim\Async\CancellationToken;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+
+/** Stores readable and writable bytes entirely in memory. */
+final class MemoryHandle implements
+  ReadHandle,
+  WriteHandle,
+  SeekHandle,
+  CloseHandle,
+  ToString {
+  private int $cursor = 0;
+  private bool $closed = false;
+  private string $buffer;
+  private null|ByteBuffer $byteBuffer = null;
+  private int $bufferBytes;
+  private vec<string> $pendingWrites = vec[];
+  private int $pendingBytes = 0;
+
+  /** Creates an in-memory handle containing an initial byte string. */
+  #[TrackCaller]
+  public function __construct(string $buffer = '') {
+    $this->buffer = $buffer;
+    $this->bufferBytes = length!($buffer);
+  }
+
+  /** Validates that the handle remains open. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->ensureOpen();
+  }
+
+  /** Validates that the handle remains open. */
+  #[TrackCaller]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->ensureOpen();
+  }
+
+  /** Reports whether the cursor is at or beyond the buffer's end. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    $this->ensureOpen();
+    return $this->cursor >= $this->bufferedLength();
+  }
+
+  /** Reads available bytes at the cursor without waiting. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    $this->ensureOpen();
+    $this->flushWrites();
+    $available = $this->bufferBytes - $this->cursor;
+    if ($available <= 0) {
+      return '';
+    }
+
+    $length = $available;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $available) {
+      $length = $maxBytes;
+    }
+
+    $byteBuffer = $this->byteBuffer;
+    $result = match ($byteBuffer) {
+      null => Str\slice($this->buffer, $this->cursor, $length),
+      $_ => $byteBuffer->read($this->cursor, $length),
+    };
+
+    $this->cursor += $length;
+    return $result;
+  }
+
+  /** Reads bytes from memory without waiting. */
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    return $this->tryRead($maxBytes);
+  }
+
+  /** Reads the remaining in-memory bytes up to a bound. */
+  #[TrackCaller]
+  public function readAll(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    return $this->tryRead($maxBytes);
+  }
+
+  /** Attempts to write bytes at the cursor. */
+  #[TrackCaller]
+  public function tryWrite(string $bytes): int {
+    $this->ensureOpen();
+    return $this->performWrite($bytes);
+  }
+
+  /** Writes bytes at the cursor. */
+  #[TrackCaller]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $this->ensureOpen();
+    return $this->performWrite($bytes);
+  }
+
+  /**
+   * Repositions the cursor and returns its new byte offset.
+   *
+   * @throws Exception when the handle is closed, or the target lies before the start.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+    $this->ensureOpen();
+    $base = match ($whence) {
+      SeekWhence::Set => 0,
+      SeekWhence::Current => $this->cursor,
+      SeekWhence::End => $this->bufferedLength(),
+    };
+
+    $target = $base + $offset;
+    if ($target < 0) {
+      throw new Exception('cannot seek before the start of the data source');
+    }
+
+    $this->cursor = $target;
+    return $target;
+  }
+
+  /** Marks the handle closed. */
+  #[TrackCaller]
+  public function close(): void {
+    $this->closed = true;
+  }
+
+  /** Whether this handle has been closed. */
+  #[AlwaysInline]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  /** Returns the complete in-memory buffer. */
+  #[AlwaysInline]
+  public function toString(): string {
+    $this->flushWrites();
+    $byteBuffer = $this->byteBuffer;
+    return match ($byteBuffer) {
+      null => $this->buffer,
+      $_ => $byteBuffer->toString(),
+    };
+  }
+
+  /** Overwrites bytes at the cursor, extending and zero-filling as needed. */
+  #[TrackCaller]
+  private function performWrite(string $bytes): int {
+    if ($this->cursor == $this->bufferedLength()) {
+      return $this->append($bytes);
+    }
+
+    $this->flushWrites();
+    $length = length!($bytes);
+    if ($length == 0) {
+      return 0;
+    }
+
+    $buffer = $this->mutableBuffer();
+    $buffer->write($this->cursor, $bytes);
+    $this->cursor += $length;
+    if ($this->cursor > $this->bufferBytes) {
+      $this->bufferBytes = $this->cursor;
+    }
+
+    return $length;
+  }
+
+  /** Queues bytes written at the end. */
+  private function append(string $bytes): int {
+    $length = length!($bytes);
+    if ($length != 0) {
+      $this->pendingWrites[] = $bytes;
+      $this->pendingBytes += $length;
+      $this->cursor += $length;
+    }
+
+    return $length;
+  }
+
+  /** Commits queued writes. */
+  private function flushWrites(): void {
+    if ($this->pendingBytes == 0) {
+      return;
+    }
+
+    $byteBuffer = $this->byteBuffer;
+    if ($byteBuffer == null) {
+      $pending = Str\join('', $this->pendingWrites);
+      $this->buffer = match ($this->buffer) {
+        '' => $pending,
+        $_ => $this->buffer . $pending,
+      };
+    } else {
+      $byteBuffer->appendAll($this->pendingWrites);
+    }
+
+    $this->bufferBytes += $this->pendingBytes;
+    $this->pendingWrites = vec[];
+    $this->pendingBytes = 0;
+  }
+
+  /** Returns the stored and queued byte length. */
+  private function bufferedLength(): int {
+    return $this->bufferBytes + $this->pendingBytes;
+  }
+
+  /** Promotes the stored string when an in-place write needs mutable bytes. */
+  private function mutableBuffer(): ByteBuffer {
+    $buffer = $this->byteBuffer;
+    if ($buffer == null) {
+      $buffer = ByteBuffer::fromString($this->buffer);
+      $this->byteBuffer = $buffer;
+      $this->buffer = '';
+    }
+
+    return $buffer;
+  }
+
+  /**
+   * Throws when an operation requires an open handle.
+   *
+   * @throws Exception when the memory handle is closed.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  private function ensureOpen(): void {
+    if ($this->closed) {
+      throw new Exception('the memory handle is closed');
+    }
+  }
+}

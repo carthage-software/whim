@@ -1,0 +1,3 @@
+class Box {
+  public void $slot;
+}

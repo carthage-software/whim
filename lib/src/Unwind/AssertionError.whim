@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a failed assertion. */
+#[Stub]
+class AssertionError extends Error {}

@@ -1,0 +1,10 @@
+namespace Whim\HTTP\Router\_Private;
+
+/** One parsed route-pattern component. */
+interface Node {
+  /** Returns this component as a regular expression. */
+  public function expression(): string;
+
+  /** Returns parameter names captured by this component. */
+  public function parameterNames(): vec<string>;
+}

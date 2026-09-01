@@ -1,0 +1,14 @@
+namespace Whim\HTTP\Session\Storage\_Private;
+
+use Whim\HTTP\Session\Storage\Record;
+use Whim\Marker\AlwaysInline;
+use Whim\Time\SystemTime;
+
+/** Holds one in-memory record and its expiry. */
+final readonly class Entry {
+  #[AlwaysInline]
+  public function __construct(
+    public Record $record,
+    public SystemTime $expiresAt,
+  ) {}
+}

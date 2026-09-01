@@ -1,0 +1,17 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Maps a Unicode domain to strict IDNA ASCII, or null when invalid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function idna_to_ascii(string $domain): null|string {}
+
+/** Maps an IDNA domain to Unicode, or null when invalid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function idna_to_unicode(string $domain): null|string {}

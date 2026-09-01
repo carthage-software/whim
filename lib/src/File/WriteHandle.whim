@@ -1,0 +1,22 @@
+namespace Whim\File;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\WriteHandle as IOWriteHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Defines the capabilities of a writable file handle. */
+interface WriteHandle extends Handle, IOWriteHandle {
+  /** Synchronizes pending file data and metadata with storage. */
+  #[TrackCaller]
+  public function synchronize(
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Sets the file length, extending it with zero bytes when it grows. */
+  #[TrackCaller]
+  public function truncate(
+    NonNegativeInt $length,
+    null|CancellationToken $cancellation = null,
+  ): void;
+}

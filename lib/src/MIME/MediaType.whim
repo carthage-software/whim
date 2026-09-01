@@ -1,0 +1,124 @@
+namespace Whim\MIME;
+
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable MIME media type. */
+final readonly class MediaType implements ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public string $type,
+    public string $subtype,
+    public string $suffix,
+    public string $tree,
+    public Parameters $parameters,
+  ) {}
+
+  /** Creates a checked media type from its parts. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    string $type,
+    string $subtype,
+    Parameters $parameters = Parameters::default(),
+  ): MediaType {
+    $type = Str\lowercase($type);
+    $subtype = Str\lowercase($subtype);
+    if (!_Private\is_media_component($type)) {
+      throw new InvalidArgumentException('invalid MIME type: `' . $type . '`');
+    }
+
+    if (!_Private\is_media_component($subtype)) {
+      throw new InvalidArgumentException(
+        'invalid MIME subtype: `' . $subtype . '`',
+      );
+    }
+
+    $suffix = '';
+    $suffixPosition = Str\search_last($subtype, '+');
+    if ($suffixPosition != null && $suffixPosition + 1 < length!($subtype)) {
+      $suffix = Str\slice($subtype, $suffixPosition + 1);
+    }
+
+    $tree = '';
+    if (Str\starts_with($subtype, 'x-')) {
+      $tree = 'x';
+    } else {
+      $dot = Str\search($subtype, '.');
+      if ($dot != null && $dot > 0) {
+        $candidate = Str\slice($subtype, 0, $dot);
+        if ($candidate is 'vnd'|'prs'|'x') {
+          $tree = $candidate;
+        }
+      }
+    }
+
+    return new MediaType($type, $subtype, $suffix, $tree, $parameters);
+  }
+
+  /** Parses a media type, or returns null when malformed. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $input): null|MediaType {
+    $input = Str\trim($input);
+    $semicolon = Str\search($input, ';');
+    $essence = $input;
+    $parameters = Parameters::default();
+    if ($semicolon != null) {
+      $essence = Str\trim(Str\slice($input, 0, $semicolon));
+      $parameters =
+        Parameters::parse(Str\slice($input, $semicolon + 1)) ?? return null;
+    }
+
+    $slash = Str\search($essence, '/');
+    if ($slash == null || $slash == 0 || $slash + 1 >= length!($essence)) {
+      return null;
+    }
+
+    $type = Str\lowercase(Str\trim(Str\slice($essence, 0, $slash)));
+    $subtype = Str\lowercase(Str\trim(Str\slice($essence, $slash + 1)));
+    if (
+      !_Private\is_media_component($type)
+      || !_Private\is_media_component($subtype)
+    ) {
+      return null;
+    }
+
+    return MediaType::fromParts($type, $subtype, $parameters);
+  }
+
+  /** Parses a media type. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $input): MediaType {
+    $mediaType = MediaType::parse($input);
+    if ($mediaType == null) {
+      throw new InvalidArgumentException(
+        'invalid MIME media type: `' . $input . '`',
+      );
+    }
+
+    return $mediaType;
+  }
+
+  /** Returns type and subtype without parameters. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function essence(): string {
+    return $this->type . '/' . $this->subtype;
+  }
+
+  /** Serializes the media type. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    return $this->essence() . $this->parameters->toString();
+  }
+}

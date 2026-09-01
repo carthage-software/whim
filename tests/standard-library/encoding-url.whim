@@ -1,0 +1,42 @@
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\Url;
+
+assert!(Url\encode('abcXYZ019-._~') == 'abcXYZ019-._~');
+assert!(Url\encode('a b&c/d?e=f') == 'a%20b%26c%2Fd%3Fe%3Df');
+assert!(Url\decode('a%20b%26c%2Fd%3Fe%3Df') == 'a b&c/d?e=f');
+assert!(Url\decode('a%2fb') == 'a/b');
+assert!(Url\decode('a+b') == 'a+b');
+
+assert!(Url\encode_form('a b+c') == 'a+b%2Bc');
+assert!(Url\decode_form('a+b%2Bc') == 'a b+c');
+
+assert!(Url\encode("\xc3\xa9t\xc3\xa9") == '%C3%A9t%C3%A9');
+assert!(Url\decode('%C3%A9t%C3%A9') == "\xc3\xa9t\xc3\xa9");
+
+$truncated = null;
+$assertion_callable_10 = fn(): string => Url\decode('broken%2');
+try {
+  $assertion_callable_10();
+} catch (DecodingException $assertion_caught_10) {
+  $truncated = $assertion_caught_10;
+}
+
+assert!($truncated is DecodingException);
+
+assert!(
+  $truncated->getMessage() == 'a percent escape must be two hexadecimal digits',
+);
+
+$nonHex = null;
+$assertion_callable_12 = fn(): string => Url\decode('broken%zz');
+try {
+  $assertion_callable_12();
+} catch (DecodingException $assertion_caught_12) {
+  $nonHex = $assertion_caught_12;
+}
+
+assert!($nonHex is DecodingException);
+
+assert!(
+  $nonHex->getMessage() == 'a percent escape must be two hexadecimal digits',
+);

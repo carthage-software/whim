@@ -1,0 +1,80 @@
+namespace Whim\Message\Address;
+
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** A named RFC 5322 group of mailboxes. */
+final readonly class Group implements ToString {
+  /** Creates a mailbox group. */
+  #[AlwaysInline]
+  public function __construct(
+    public string $displayName,
+    public vec<Mailbox> $mailboxes = vec[],
+  ) {}
+
+  /** Parses a mailbox group, or returns null when malformed. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $input): null|Group {
+    $input = Str\trim($input);
+    $colon = Str\search($input, ':');
+    if ($colon == null || $colon == 0 || !Str\ends_with($input, ';')) {
+      return null;
+    }
+
+    $displayName =
+      _Private\parse_display(Str\slice($input, 0, $colon)) ?? return null;
+
+    $body = Str\trim(
+      Str\slice($input, $colon + 1, length!($input) - $colon - 2),
+    );
+
+    $mailboxes = vec[];
+    if ($body != '') {
+      foreach (_Private\split_addresses($body) as $value) {
+        $mailbox = Mailbox::parse($value) ?? return null;
+
+        $mailboxes[] = $mailbox;
+      }
+    }
+
+    return new Group($displayName, $mailboxes);
+  }
+
+  /** Parses a mailbox group. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $input): Group {
+    $group = Group::parse($input);
+    if ($group == null) {
+      throw new InvalidArgumentException(
+        'invalid mailbox group: `' . $input . '`',
+      );
+    }
+
+    return $group;
+  }
+
+  /** Serializes the group for a message header. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    $result = _Private\serialize_display($this->displayName) . ':';
+    if ($this->mailboxes != vec[]) {
+      $values = vec[];
+      foreach ($this->mailboxes as $mailbox) {
+        $values[] = $mailbox->toString();
+      }
+
+      $result .= ' ' . Str\join(', ', $values);
+    }
+
+    return $result . ';';
+  }
+}

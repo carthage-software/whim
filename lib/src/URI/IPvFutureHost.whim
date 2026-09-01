@@ -1,0 +1,54 @@
+namespace Whim\URI;
+
+use Whim;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Represents a bracketed IPvFuture host. */
+final readonly class IPvFutureHost implements Host {
+  #[AlwaysInline]
+  private function __construct(public string $literal) {}
+
+  /** Parses the text inside IPvFuture brackets. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function parse(string $literal): null|IPvFutureHost {
+    $parts = Whim\_Private\uri_parse_authority('[' . $literal . ']');
+    if (
+      $parts == null
+      || $parts[0] != null
+      || $parts[1] != 'future'
+      || $parts[2] != $literal
+      || $parts[3] != null
+    ) {
+      return null;
+    }
+
+    return new IPvFutureHost($literal);
+  }
+
+  /** Parses the text inside IPvFuture brackets. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $literal): IPvFutureHost {
+    $host = IPvFutureHost::parse($literal);
+    if ($host == null) {
+      throw new InvalidArgumentException(
+        'invalid IPvFuture host: `' . $literal . '`',
+      );
+    }
+
+    return $host;
+  }
+
+  /** Returns the bracketed host text. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    return '[' . $this->literal . ']';
+  }
+}

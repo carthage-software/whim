@@ -1,0 +1,268 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\Async\Future;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Server\HTTPException;
+use Whim\IO\BufferedReadHandle;
+use Whim\IO\Exception as IOException;
+use Whim\IO\LimitExceededException;
+use Whim\IO\ReadHandle;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\OverflowException;
+
+/** Decodes one chunked HTTP/1 request body and its trailers. */
+final class H1ChunkedBody implements ReadHandle {
+  private int $chunkRemaining = 0;
+  private int $readBytes = 0;
+  private bool $needsTerminator = false;
+  private bool $completed = false;
+  private bool $failed = false;
+  private Deferred<FieldMap> $trailers;
+
+  public function __construct(
+    private BufferedReadHandle $reader,
+    private int $maximumBodyBytes,
+    private int $maximumTrailerBytes,
+    private CancellationToken $cancellation,
+  ) {
+    $this->trailers = new Deferred::<FieldMap>();
+  }
+
+  public function getTrailers(): Future<FieldMap> {
+    return $this->trailers->getFuture();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if (!$this->completed && !$this->failed) {
+      $this->reader->waitUntilReadable($this->cancellation);
+    }
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->completed || $this->failed;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->completed || $this->failed || $this->chunkRemaining == 0) {
+      return '';
+    }
+
+    $data = $this->reader->tryRead($this->limit($maxBytes));
+    $this->consume($data);
+    return $data;
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($this->completed || $this->failed) {
+      return '';
+    }
+
+    if ($this->chunkRemaining == 0) {
+      $this->beginChunk();
+      if ($this->completed) {
+        return '';
+      }
+    }
+
+    $data = match (
+      $this->reader->read($this->limit($maxBytes), $this->cancellation)
+    ) {
+      '' => $this->fail('the request ended inside a chunk'),
+      $data => $data,
+    };
+
+    $this->consume($data);
+    return $data;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function beginChunk(): void {
+    if ($this->needsTerminator) {
+      try {
+        $terminator = $this->reader->readFixedSize(2, $this->cancellation);
+      } catch (IOException $_) {
+        $this->fail('the request ended inside a chunk terminator');
+      }
+
+      if ($terminator != "\r\n") {
+        $this->fail('a request chunk has no CRLF terminator');
+      }
+
+      $this->needsTerminator = false;
+    }
+
+    try {
+      $line = $this->reader->readUntilBounded(
+        "\r\n",
+        8192,
+        $this->cancellation,
+      );
+    } catch (LimitExceededException $_) {
+      $this->fail('the request chunk size line is too large');
+    }
+
+    if ($line == null || !Str\ends_with($line, "\r\n")) {
+      $this->fail('the request ended before a chunk size');
+    }
+
+    $line = Str\slice($line, 0, length!($line) - 2);
+    $extension = Str\search($line, ';');
+    if ($extension != null) {
+      $value = Str\slice($line, $extension + 1);
+      if (length!($value) > 4096 || !$this->validExtension($value)) {
+        $this->fail('the request contains an invalid chunk extension');
+      }
+
+      $line = Str\slice($line, 0, $extension);
+    }
+
+    $line = Str\trim($line, " \t");
+    if ($line == '' || length!($line) > 15) {
+      $this->fail('the request chunk size is invalid');
+    }
+
+    $index = 0;
+    while ($index < length!($line)) {
+      $byte = Str\ord($line[$index]);
+      if (!(($byte is 48..=57) || ($byte is 65..=70) || ($byte is 97..=102))) {
+        $this->fail('the request chunk size is invalid');
+      }
+
+      $index++;
+    }
+
+    try {
+      $this->chunkRemaining = Math\from_base($line, 16);
+    } catch (OverflowException $_) {
+      $this->fail('the request chunk size is too large');
+    }
+
+    if ($this->chunkRemaining == 0) {
+      $this->readTrailers();
+      $this->completed = true;
+    } else {
+      $this->needsTerminator = true;
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function readTrailers(): void {
+    $fields = vec[];
+    $bytes = 0;
+    while (true) {
+      try {
+        $line = $this->reader->readUntilBounded(
+          "\r\n",
+          $this->maximumTrailerBytes - $bytes,
+          $this->cancellation,
+        );
+      } catch (LimitExceededException $_) {
+        $this->fail('the request trailers exceed their configured limit');
+      }
+
+      if ($line == null || !Str\ends_with($line, "\r\n")) {
+        $this->fail('the request ended inside its trailers');
+      }
+
+      $bytes += length!($line);
+      $line = match (Str\slice($line, 0, length!($line) - 2)) {
+        '' => break,
+        $line => $line,
+      };
+
+      if (Str\starts_with($line, ' ') || Str\starts_with($line, "\t")) {
+        $this->fail('the request contains an invalid trailer');
+      }
+
+      $separator = Str\search($line, ':');
+      if ($separator == null || $separator == 0) {
+        $this->fail('the request contains a malformed trailer');
+      }
+
+      $name = Str\lowercase(Str\slice($line, 0, $separator));
+      if (
+        $name is 'transfer-encoding'
+          | 'content-length'
+          | 'host'
+          | 'content-encoding'
+          | 'content-type'
+          | 'content-range'
+          | 'trailer'
+      ) {
+        $this->fail('the request contains a forbidden trailer');
+      }
+
+      $fields[] = ($name, Str\trim(Str\slice($line, $separator + 1), " \t"));
+    }
+
+    try {
+      $this->trailers->complete(FieldMap::from($fields));
+    } catch (InvalidArgumentException $_) {
+      $this->fail('the request contains an invalid trailer');
+    }
+  }
+
+  private function validExtension(string $extension): bool {
+    $index = 0;
+    while ($index < length!($extension)) {
+      $byte = Str\ord($extension[$index]);
+      if ($byte is 0..=8|10..=31|127) {
+        return false;
+      }
+
+      $index++;
+    }
+
+    return true;
+  }
+
+  private function limit(null|int $maximum): int {
+    if ($maximum == null || $maximum < 0 || $maximum > $this->chunkRemaining) {
+      return $this->chunkRemaining;
+    }
+
+    return $maximum;
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function fail(string $message): never {
+    $this->failed = true;
+    $error = new HTTPException(400, $message);
+    $this->trailers->error($error);
+    throw $error;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function consume(string $data): void {
+    $length = length!($data);
+    $this->chunkRemaining -= $length;
+    $this->readBytes += $length;
+    if ($this->readBytes > $this->maximumBodyBytes) {
+      $this->fail('the request body exceeds its configured limit');
+    }
+  }
+}

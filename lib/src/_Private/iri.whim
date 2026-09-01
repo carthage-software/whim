@@ -1,0 +1,57 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Parses a strict RFC 3987 IRI reference into its major components. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function iri_parse_reference(
+  string $iri,
+): null|(null|string, null|string, string, null|string, null|string) {}
+
+/** Parses an IRI authority into user information, host kind, host data, and port. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function iri_parse_authority(
+  string $authority,
+): null|(null|string, 'future'|'name'|'ipv4'|'ipv6', string, null|string) {}
+
+/** Reports whether encoded IRI components form one valid reference. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function iri_valid_components(
+  null|string $scheme,
+  null|string $authority,
+  string $path,
+  null|string $query,
+  null|string $fragment,
+): bool {}
+
+/** Returns RFC syntax normalization, or null when the reference is invalid. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function iri_normalize(string $iri): null|string {}
+
+/** Resolves an IRI reference against an absolute base, or returns null. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function iri_resolve(string $base, string $reference): null|string {}
+
+/** Maps an IRI reference to an ASCII URI reference. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function iri_to_uri(string $iri): null|string {}
+
+/** Maps an ASCII URI reference to an IRI while preserving unsafe escapes. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function iri_from_uri(string $uri): null|string {}

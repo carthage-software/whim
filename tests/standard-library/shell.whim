@@ -1,0 +1,29 @@
+use Whim\Shell;
+use Whim\Unwind\InvalidArgumentException;
+
+assert!(Shell\escape_argument('') == "''");
+assert!(Shell\escape_argument('plain') == "'plain'");
+assert!(Shell\escape_argument('two words') == "'two words'");
+assert!(Shell\escape_argument("O'Reilly") == "'O'\\''Reilly'");
+assert!(Shell\escape_argument('$(touch /tmp/no)') == "'$(touch /tmp/no)'");
+
+assert!(Shell\escape_argument("first\nsecond") == "'first\nsecond'");
+
+assert!(
+  Shell\join(vec['printf', '%s', "O'Reilly"]) == "'printf' '%s' 'O'\\''Reilly'",
+);
+
+assert!(
+  Shell\join(dict['first' => 'one', 'second' => 'two words'])
+  == "'one' 'two words'",
+);
+
+$assertion_value_9 = fn(): string => Shell\escape_argument("null\x00byte");
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (InvalidArgumentException $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is InvalidArgumentException);

@@ -1,0 +1,269 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** A timezone backed by Jiff's timezone database. */
+#[Stub]
+final class DateTimeZone {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Parses an IANA name or fixed offset. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function parse(string $identifier): null|DateTimeZone {}
+
+  /** Detects the system timezone. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function system(): null|DateTimeZone {}
+
+  /** Creates a fixed-offset timezone. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function fixedOffset(int $seconds): null|DateTimeZone {}
+
+  /** Returns the canonical timezone identifier. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function identifier(): string {}
+
+  /** Returns the UTC offset at a system time. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function offsetAt(int $seconds, int $nanoseconds): null|int {}
+
+  /** Returns the timezone abbreviation at a system time. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function abbreviationAt(int $seconds, int $nanoseconds): null|string {}
+
+  /** Returns the prior offset transition. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function previousTransition(
+    int $seconds,
+    int $nanoseconds,
+  ): null|(int, int) {}
+
+  /** Returns the next offset transition. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function nextTransition(
+    int $seconds,
+    int $nanoseconds,
+  ): null|(int, int) {}
+}
+
+/** A parsed Jiff date-time format. */
+#[Stub]
+final class DateTimeFormatter {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Parses a Jiff strftime format. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function fromPattern(string $pattern): null|DateTimeFormatter {}
+
+  /** Creates one of the standard library formats. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function standard(int $kind): DateTimeFormatter {}
+
+  /** Formats a civil date. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function formatDate(int $year, int $month, int $day): null|string {}
+
+  /** Formats a civil time. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function formatTime(
+    int $hour,
+    int $minute,
+    int $second,
+    int $nanosecond,
+  ): null|string {}
+
+  /** Formats a civil date and time. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function formatDateTime(
+    int $year,
+    int $month,
+    int $day,
+    int $hour,
+    int $minute,
+    int $second,
+    int $nanosecond,
+  ): null|string {}
+
+  /** Formats a zoned date and time. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function formatZonedDateTime(
+    int $year,
+    int $month,
+    int $day,
+    int $hour,
+    int $minute,
+    int $second,
+    int $nanosecond,
+    int $offsetSeconds,
+    string $timezone,
+    string $abbreviation,
+  ): null|string {}
+}
+
+/** Reports whether civil date fields form a valid date. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_is_valid_date(int $year, int $month, int $day): bool {}
+
+/** Reports whether civil time fields form a valid time. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_is_valid_time(
+  int $hour,
+  int $minute,
+  int $second,
+  int $nanosecond,
+): bool {}
+
+/** Parses an ISO civil date. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_parse_date(string $value): null|(int, int, int) {}
+
+/** Parses an ISO civil time. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_parse_time(string $value): null|(int, int, int, int) {}
+
+/** Parses an ISO civil date and time. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_parse_date_time(
+  string $value,
+): null|(int, int, int, int, int, int, int) {}
+
+/** Parses a Temporal-style zoned date and time. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_parse_zoned(string $value): null|(int, int, string) {}
+
+/** Parses an RFC 2822 date and time with a fixed UTC offset. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_parse_rfc2822(string $value): null|(int, int, int) {}
+
+/** Returns weekday, ordinal day, and month length. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_date_metadata(
+  int $year,
+  int $month,
+  int $day,
+): (int, int, int) {}
+
+/** Applies calendar units to a civil date. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_shift_date(
+  int $year,
+  int $month,
+  int $day,
+  int $years,
+  int $months,
+  int $weeks,
+  int $days,
+  int $overflow,
+): null|(int, int, int) {}
+
+/** Applies calendar and exact units to a civil date and time. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_shift_date_time(
+  int $year,
+  int $month,
+  int $day,
+  int $hour,
+  int $minute,
+  int $second,
+  int $nanosecond,
+  int $years,
+  int $months,
+  int $weeks,
+  int $days,
+  int $durationSeconds,
+  int $durationNanoseconds,
+  int $overflow,
+): null|(int, int, int, int, int, int, int) {}
+
+/** Resolves a civil date and time in a timezone. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_resolve(
+  DateTimeZone $timezone,
+  int $year,
+  int $month,
+  int $day,
+  int $hour,
+  int $minute,
+  int $second,
+  int $nanosecond,
+  int $disambiguation,
+): null|(int, int) {}
+
+/** Converts a system time to local civil fields and offset metadata. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function date_time_localize(
+  DateTimeZone $timezone,
+  int $seconds,
+  int $nanoseconds,
+): null|(int, int, int, int, int, int, int, int, string) {}

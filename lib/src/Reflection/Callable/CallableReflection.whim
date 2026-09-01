@@ -1,0 +1,46 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Generic\GenericDeclarationReflection;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Reflection\Symbol\FunctionReflection;
+use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\FunctionTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes a function, method, or closure declaration. */
+#[Stub]
+interface CallableReflection extends
+  GenericDeclarationReflection for
+  FunctionReflection,
+  MethodReflection,
+  ClosureReflection {
+  /** Returns the declared or synthesized callable name. */
+  #[MustUse]
+  public function getName(): string;
+
+  /** Returns parameters in declaration order. */
+  #[MustUse]
+  public function getParameters(): vec<ParameterReflection>;
+
+  /** Returns a parameter by zero-based position or name, when present. */
+  #[MustUse]
+  public function getParameter(int|string $parameter): null|ParameterReflection;
+
+  /** Returns the number of parameters a caller must provide. */
+  #[MustUse]
+  public function getRequiredParameterCount(): 0..;
+
+  /** Returns the declared return type, or null when it was omitted. */
+  #[MustUse]
+  public function getReturnType(): null|TypeReflection;
+
+  /** Returns the structural callable type, resolving known bindings. */
+  #[MustUse]
+  public function getCallableType(
+    null|TypeEnvironmentReflection $environment = null,
+    null|ClassTypeReflection $calledType = null,
+  ): FunctionTypeReflection;
+}

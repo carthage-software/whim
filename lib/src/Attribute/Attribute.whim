@@ -1,0 +1,27 @@
+namespace Whim\Attribute;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\Stub;
+
+/** Marks a class as an attribute and selects its valid declaration targets. */
+#[Stub]
+#[Attribute(Attribute::TARGET_CLASS)]
+final class Attribute {
+  public const int TARGET_CLASS = 1;
+  public const int TARGET_FUNCTION = 2;
+  public const int TARGET_METHOD = 4;
+  public const int TARGET_PROPERTY = 8;
+  public const int TARGET_CLASS_CONSTANT = 16;
+  public const int TARGET_PARAMETER = 32;
+  public const int IS_REPEATABLE = 64;
+  public const int TARGET_TYPE_ALIAS = 128;
+  public const int TARGET_NEWTYPE = 256;
+  public const int TARGET_CONSTANT = 512;
+  public const int TARGET_SYMBOL = 899;
+  public const int TARGET_ALL = 959;
+
+  public readonly int $flags;
+
+  #[TrackCaller]
+  public function __construct(null|int $flags = null) {}
+}

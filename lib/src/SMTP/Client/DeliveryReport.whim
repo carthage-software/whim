@@ -1,0 +1,21 @@
+namespace Whim\SMTP\Client;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Message\Address\Mailbox;
+use Whim\SMTP\Reply;
+
+/** Reports recipients rejected during a partial SMTP delivery. */
+final readonly class DeliveryReport {
+  #[AlwaysInline]
+  public function __construct(
+    public vec<(Mailbox, Reply)> $rejectedRecipients = vec[],
+  ) {}
+
+  /** Reports whether the server rejected any recipient. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function hasRejections(): bool {
+    return $this->rejectedRecipients != vec[];
+  }
+}

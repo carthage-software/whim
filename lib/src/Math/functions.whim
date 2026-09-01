@@ -1,0 +1,170 @@
+namespace Whim\Math;
+
+use Whim\Marker\NeverInline;
+use Whim\Refine\Numeric;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+
+/**
+ * Computes a square root.
+ *
+ * @throws InvalidArgumentException when the number is negative.
+ */
+#[NeverInline]
+#[TrackCaller]
+function sqrt(float $number): float {
+  if ($number < 0.0) {
+    throw new InvalidArgumentException('$number must be non-negative');
+  }
+
+  return _Private\math_sqrt($number);
+}
+
+/** Raises Euler’s number to the given power. */
+#[TrackCaller]
+function exp(float $number): float {
+  return _Private\math_exp($number);
+}
+
+/** Computes a natural logarithm. */
+#[TrackCaller]
+function ln(float $number): float {
+  return _Private\math_ln($number);
+}
+
+/**
+ * Computes a logarithm in an explicit base.
+ *
+ * @throws InvalidArgumentException when the number is not positive, or the base is not positive or is 1.
+ */
+#[NeverInline]
+#[TrackCaller]
+function log_base(float $number, float $base): float {
+  if ($number <= 0.0) {
+    throw new InvalidArgumentException('$number must be positive');
+  }
+
+  if ($base <= 0.0 || $base == 1.0) {
+    throw new InvalidArgumentException('$base must be positive and not 1');
+  }
+
+  return _Private\math_log_base($number, $base);
+}
+
+/**
+ * Computes a logarithm in the requested base.
+ *
+ * @throws InvalidArgumentException when the number is not positive, or the base is not positive or is 1.
+ */
+#[NeverInline]
+#[TrackCaller]
+function log(float $number, null|float $base = null): float {
+  if ($number <= 0.0) {
+    throw new InvalidArgumentException('$number must be positive');
+  }
+
+  if ($base == null) {
+    return _Private\math_ln($number);
+  }
+
+  if ($base <= 0.0 || $base == 1.0) {
+    throw new InvalidArgumentException('$base must be positive and not 1');
+  }
+
+  return _Private\math_log_base($number, $base);
+}
+
+/** Rounds a number down to an integral value. */
+#[TrackCaller]
+function floor(float $number): float {
+  return _Private\math_floor($number);
+}
+
+/** Rounds a number up to an integral value. */
+#[TrackCaller]
+function ceil(float $number): float {
+  return _Private\math_ceil($number);
+}
+
+/** Rounds a number to the requested precision. */
+#[TrackCaller]
+function round(float $number, int $precision = 0): float {
+  return _Private\math_round($number, $precision);
+}
+
+/** Computes an absolute value. */
+#[TrackCaller]
+function abs(Numeric $number): Numeric {
+  if ($number < 0) {
+    return -$number;
+  }
+
+  return $number;
+}
+
+/** Computes a sine. */
+#[TrackCaller]
+function sin(float $number): float {
+  return _Private\math_sin($number);
+}
+
+/** Computes a cosine. */
+#[TrackCaller]
+function cos(float $number): float {
+  return _Private\math_cos($number);
+}
+
+/** Computes a tangent. */
+#[TrackCaller]
+function tan(float $number): float {
+  return _Private\math_tan($number);
+}
+
+/** Computes an inverse sine. */
+#[TrackCaller]
+function asin(float $number): float {
+  return _Private\math_asin($number);
+}
+
+/** Computes an inverse cosine. */
+#[TrackCaller]
+function acos(float $number): float {
+  return _Private\math_acos($number);
+}
+
+/** Computes an inverse tangent. */
+#[TrackCaller]
+function atan(float $number): float {
+  return _Private\math_atan($number);
+}
+
+/** Computes the angle of a Cartesian coordinate. */
+#[TrackCaller]
+function atan2(float $y, float $x): float {
+  return _Private\math_atan2($y, $x);
+}
+
+/**
+ * Parses a non-negative integer in the given base.
+ *
+ * @throws Whim\Unwind\InvalidArgumentException when the number contains a digit outside its base.
+ * @throws Whim\Unwind\OverflowException when the converted integer does not fit in an integer.
+ */
+#[Stub]
+#[TrackCaller]
+function from_base((string&!'') $number, 2..=36 $base): (0..) {}
+
+/**
+ * Converts a number between textual bases.
+ *
+ * @throws Whim\Unwind\InvalidArgumentException when the number contains a digit outside its base.
+ */
+#[Stub]
+#[TrackCaller]
+function base_convert(
+  (string&!'') $number,
+  2..=36 $fromBase,
+  2..=36 $toBase,
+): (string&!'') {}

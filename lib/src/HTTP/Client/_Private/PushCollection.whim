@@ -1,0 +1,82 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\Deferred;
+use Whim\Async\Future;
+use Whim\HTTP\Message\Exchange;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\Throwable;
+
+/** Collects the pushed exchanges associated with one request. */
+final class PushCollection {
+  private Deferred<vec<Exchange>> $deferred;
+  private vec<Exchange> $exchanges = vec[];
+  private NonNegativeInt $accepted = 0;
+  private NonNegativeInt $pending = 0;
+  private bool $sealed = false;
+
+  public function __construct(private NonNegativeInt $maximum) {
+    $this->deferred = new Deferred::<vec<Exchange>>();
+  }
+
+  #[MustUse]
+  public function getFuture(): Future<vec<Exchange>> {
+    return $this->deferred->getFuture();
+  }
+
+  /** Reserves one result slot, or refuses a push beyond the limit. */
+  public function accept(): bool {
+    if (
+      $this->sealed
+      || $this->deferred->isComplete()
+      || $this->accepted >= $this->maximum
+    ) {
+      return false;
+    }
+
+    $this->accepted++;
+    $this->pending++;
+    return true;
+  }
+
+  public function complete(Exchange $exchange): void {
+    if ($this->deferred->isComplete()) {
+      return;
+    }
+
+    $this->exchanges[] = $exchange;
+    $this->pending--;
+    $this->finish();
+  }
+
+  /** Releases a reserved result that the server cancelled. */
+  public function cancel(): void {
+    if ($this->deferred->isComplete() || $this->pending == 0) {
+      return;
+    }
+
+    $this->pending--;
+    $this->finish();
+  }
+
+  public function fail(Throwable $error): void {
+    if (!$this->deferred->isComplete()) {
+      $this->deferred->error($error);
+    }
+  }
+
+  public function seal(): void {
+    $this->sealed = true;
+    $this->finish();
+  }
+
+  private function finish(): void {
+    if (
+      $this->sealed
+      && $this->pending == 0
+      && !$this->deferred->isComplete()
+    ) {
+      $this->deferred->complete($this->exchanges);
+    }
+  }
+}

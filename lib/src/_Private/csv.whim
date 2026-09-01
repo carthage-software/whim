@@ -1,0 +1,44 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Incrementally decodes strict CSV records. */
+#[Stub]
+final class CSVReader {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function create(
+    string $delimiter,
+    string $enclosure,
+  ): CSVReader {}
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function read(string $input): (int, null|vec<string>, int) {}
+}
+
+/** Encodes CSV records. */
+#[Stub]
+final class CSVWriter {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function create(
+    string $delimiter,
+    string $enclosure,
+    string $lineEnding,
+  ): CSVWriter {}
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function encode(vec<string> $fields): string {}
+}

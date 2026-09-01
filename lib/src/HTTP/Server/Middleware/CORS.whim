@@ -1,0 +1,215 @@
+namespace Whim\HTTP\Server\Middleware;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\FieldName;
+use Whim\HTTP\Message\METHOD_GET;
+use Whim\HTTP\Message\METHOD_HEAD;
+use Whim\HTTP\Message\METHOD_OPTIONS;
+use Whim\HTTP\Message\METHOD_POST;
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\STATUS_FORBIDDEN;
+use Whim\HTTP\Message\STATUS_NO_CONTENT;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\Str\join;
+use Whim\Str\split;
+use Whim\Str\trim;
+use Whim\_Private\http_valid_token;
+use Whim\_Private\string_lowercase;
+
+/** Applies Cross-Origin Resource Sharing policy to HTTP requests. */
+final readonly class CORS implements Middleware {
+  /** Creates a CORS policy. */
+  public function __construct(
+    public vec<string> $allowedOrigins = vec['*'],
+    public vec<Method> $allowedMethods = vec[
+      METHOD_GET,
+      METHOD_HEAD,
+      METHOD_POST,
+    ],
+    public vec<FieldName> $allowedHeaders = vec[],
+    public vec<FieldName> $exposedHeaders = vec[],
+    public bool $allowCredentials = false,
+    public null|NonNegativeInt $maxAge = null,
+  ) {}
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    Handler $next,
+    CancellationToken $cancellation,
+  ): Response {
+    $origins = $request->headers->getAll('Origin');
+    if (length!($origins) != 1) {
+      return $next->handle($context, $request, $cancellation);
+    }
+
+    $origin = $origins[0];
+    $allowedOrigin = $this->allowedOrigin($origin);
+    $requestedMethod = $request->headers->get('Access-Control-Request-Method');
+
+    if ($request->method == METHOD_OPTIONS && $requestedMethod != null) {
+      return $this->preflight($request, $allowedOrigin, $requestedMethod);
+    }
+
+    $response = $next->handle($context, $request, $cancellation);
+    if ($allowedOrigin == null) {
+      return $response;
+    }
+
+    return $response->withHeaders(
+      $this->actualHeaders($response->headers, $allowedOrigin),
+    );
+  }
+
+  /** Returns the response origin field, or null when denied. */
+  private function allowedOrigin(string $origin): null|string {
+    if (contains!($this->allowedOrigins, '*')) {
+      return match ($this->allowCredentials) {
+        true => $origin,
+        false => '*',
+      };
+    }
+
+    if (contains!($this->allowedOrigins, $origin)) {
+      return $origin;
+    }
+
+    return null;
+  }
+
+  /** Handles a CORS preflight without invoking the request handler. */
+  private function preflight(
+    Request $request,
+    null|string $allowedOrigin,
+    string $requestedMethod,
+  ): Response {
+    $requestedHeaders = $this->requestedHeaders($request);
+    if (
+      $allowedOrigin == null
+      || !http_valid_token($requestedMethod)
+      || !contains!($this->allowedMethods, $requestedMethod)
+      || $requestedHeaders == null
+      || !$this->allowsHeaders($requestedHeaders)
+    ) {
+      return new Response(STATUS_FORBIDDEN, $request->protocolVersion);
+    }
+
+    $headers = FieldMap::from(vec[
+      ('Access-Control-Allow-Origin', $allowedOrigin),
+      ('Access-Control-Allow-Methods', $requestedMethod),
+    ]);
+
+    if ($requestedHeaders != vec[]) {
+      $headers = $headers->with(
+        'Access-Control-Allow-Headers',
+        join(', ', $requestedHeaders),
+      );
+    }
+
+    if ($this->allowCredentials) {
+      $headers = $headers->with('Access-Control-Allow-Credentials', 'true');
+    }
+
+    if ($this->maxAge != null) {
+      $headers = $headers->with('Access-Control-Max-Age', '' . $this->maxAge);
+    }
+
+    $headers = $this->vary($headers, 'Access-Control-Request-Method');
+    $headers = $this->vary($headers, 'Access-Control-Request-Headers');
+    if ($allowedOrigin != '*') {
+      $headers = $this->vary($headers, 'Origin');
+    }
+
+    return new Response(STATUS_NO_CONTENT, $request->protocolVersion, $headers);
+  }
+
+  /** Adds CORS fields to an ordinary response. */
+  private function actualHeaders(
+    FieldMap $headers,
+    string $allowedOrigin,
+  ): FieldMap {
+    $headers = $headers->with('Access-Control-Allow-Origin', $allowedOrigin);
+    if ($this->allowCredentials) {
+      $headers = $headers->with('Access-Control-Allow-Credentials', 'true');
+    }
+
+    if ($this->exposedHeaders != vec[]) {
+      $headers = $headers->with(
+        'Access-Control-Expose-Headers',
+        join(', ', $this->exposedHeaders),
+      );
+    }
+
+    if ($allowedOrigin != '*') {
+      $headers = $this->vary($headers, 'Origin');
+    }
+
+    return $headers;
+  }
+
+  /** Parses requested preflight field names. */
+  private function requestedHeaders(Request $request): null|vec<FieldName> {
+    $field = $request->headers->get('Access-Control-Request-Headers');
+    if ($field == null || trim($field) == '') {
+      return vec[];
+    }
+
+    $headers = vec[];
+    foreach (split($field, ',') as $part) {
+      $header = trim($part);
+      if ($header == '' || !http_valid_token($header)) {
+        return null;
+      }
+
+      $headers[] = $header as FieldName;
+    }
+
+    return $headers;
+  }
+
+  /** Reports whether every requested field name is permitted. */
+  private function allowsHeaders(vec<FieldName> $requested): bool {
+    if (contains!($this->allowedHeaders, '*')) {
+      return true;
+    }
+
+    foreach ($requested as $header) {
+      $normalized = string_lowercase($header);
+      $allowed = false;
+      foreach ($this->allowedHeaders as $candidate) {
+        if (string_lowercase($candidate) == $normalized) {
+          $allowed = true;
+          break;
+        }
+      }
+
+      if (!$allowed) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /** Adds one Vary field unless it is already covered. */
+  private function vary(FieldMap $headers, FieldName $name): FieldMap {
+    $normalized = string_lowercase($name);
+    foreach ($headers->getAll('Vary') as $field) {
+      foreach (split($field, ',') as $candidate) {
+        $candidate = string_lowercase(trim($candidate));
+        if ($candidate == '*' || $candidate == $normalized) {
+          return $headers;
+        }
+      }
+    }
+
+    return $headers->withAdded('Vary', $name);
+  }
+}

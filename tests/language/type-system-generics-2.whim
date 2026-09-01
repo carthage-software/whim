@@ -1,0 +1,551 @@
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\TypeError;
+
+interface Shape {
+  public function sides(): int;
+}
+
+final class Square implements Shape {
+  public function sides(): int {
+    return 4;
+  }
+}
+
+final class Loose {
+  public function pick<U>(U $value): U {
+    return $value;
+  }
+}
+
+final class Bounded {
+  public function shaped<S: Shape>(S $value): S {
+    return $value;
+  }
+}
+
+$loose = new Loose();
+assert!($loose->pick::<int>(1) == 1);
+assert!($loose->pick::<string>('two') == 'two');
+
+$bounded = new Bounded();
+assert!($bounded->shaped::<Square>(new Square())->sides() == 4);
+
+$assertion_value_4 = function() use ($bounded): void {
+  $bounded->shaped::<int>(3);
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (TypeError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is TypeError);
+
+$assertion_value_5 = function() use ($loose): void {
+  $loose->pick::<int, string>(4);
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is TypeError);
+
+final class Forwarder<T> {
+  public function inner<U>(U $value): U {
+    return $value;
+  }
+
+  public function outer<U>(U $value): U {
+    return $this->inner::<U>($value);
+  }
+}
+
+$forwarder = new Forwarder::<string>();
+assert!($forwarder->outer::<int>(5) == 5);
+assert!($forwarder->outer::<string>('six') == 'six');
+
+final class Plain {
+  public function value(int $x): int {
+    return $x;
+  }
+}
+
+$plain = new Plain();
+$stray_index = 0;
+while ($stray_index < 3) {
+  $assertion_value_8 = function() use ($plain): void {
+    $plain->value::<int>(1);
+  };
+
+  $assertion_error_8 = null;
+  try {
+    $assertion_value_8();
+  } catch (TypeError $assertion_caught_8) {
+    $assertion_error_8 = $assertion_caught_8;
+  }
+
+  assert!($assertion_error_8 is TypeError);
+
+  $stray_index = $stray_index + 1;
+}
+
+class SlotBase {
+  public int $a = 1;
+  public int $b = 2;
+}
+
+final class SlotAppends extends SlotBase {
+  public int $c = 3;
+}
+
+class SlotRedeclared {
+  public int $x = 10;
+  public int $y = 20;
+}
+
+final class SlotTakesOver extends SlotRedeclared {
+  public int $x = 11;
+  public int $z = 30;
+}
+
+class SlotPrivateOwner {
+  private int $secret = 100;
+
+  public function ownSecret(): int {
+    return $this->secret;
+  }
+}
+
+final class SlotPrivateShadow extends SlotPrivateOwner {
+  private int $secret = 200;
+
+  public function shadowedSecret(): int {
+    return $this->secret;
+  }
+}
+
+$appends = new SlotAppends();
+assert!($appends->a == 1);
+assert!($appends->b == 2);
+assert!($appends->c == 3);
+
+$takes_over = new SlotTakesOver();
+assert!($takes_over->x == 11);
+assert!($takes_over->y == 20);
+assert!($takes_over->z == 30);
+
+$shadow = new SlotPrivateShadow();
+assert!($shadow->ownSecret() == 100);
+assert!($shadow->shadowedSecret() == 200);
+
+abstract readonly class SlotHolder<T> {
+  abstract public function get(): T;
+}
+
+final readonly class SlotCell<T> extends SlotHolder<T> {
+  public function __construct(private T $item) {}
+
+  public function get(): T {
+    return $this->item;
+  }
+}
+
+$slot_cell = new SlotCell::<int>(7);
+assert!($slot_cell->get() == 7);
+$nested_cell = new SlotCell::<SlotCell<int>>($slot_cell);
+assert!($nested_cell->get()->get() == 7);
+
+abstract readonly class SlotTagged<T> {
+  public function __construct(public int $tag) {}
+
+  abstract public function unwrap(): T;
+}
+
+final readonly class SlotBoxed<T> extends SlotTagged<T> {
+  public function __construct(int $tag, private T $item) {
+    parent::__construct($tag);
+  }
+
+  public function unwrap(): T {
+    return $this->item;
+  }
+}
+
+$slot_boxed = new SlotBoxed::<int>(5, 42);
+assert!($slot_boxed->tag == 5);
+assert!($slot_boxed->unwrap() == 42);
+
+class GenericProperty<T> {
+  public function __construct(public T $value) {}
+}
+
+final class SpecializedProperty<U> extends GenericProperty<U> {
+  public U $value;
+}
+
+$specialized_property = new SpecializedProperty::<string>('specialized');
+assert!($specialized_property->value == 'specialized');
+
+interface SpecializationHolder<out T> {
+  public function get(): T;
+}
+
+final readonly class SpecializationCell<T> implements SpecializationHolder<T> {
+  public function __construct(private T $item) {}
+
+  public function get(): T {
+    return $this->item;
+  }
+}
+
+final readonly class SpecializationSlot<T> implements SpecializationHolder<T> {
+  public function __construct(private T $item) {}
+
+  public function get(): T {
+    return $this->item;
+  }
+}
+
+function describe_specialization(mixed $value): string {
+  if ($value is SpecializationCell<int>) {
+    return 'cell-int';
+  }
+
+  return 'other';
+}
+
+$specialization_values = vec[
+  new SpecializationCell::<int>(1),
+  new SpecializationCell::<string>('a'),
+  new SpecializationSlot::<int>(2),
+  new SpecializationCell::<int>(3),
+  new SpecializationSlot::<string>('b'),
+  new SpecializationCell::<int>(4),
+];
+
+$specialization_verdicts = vec[];
+foreach ($specialization_values as $specialization_value) {
+  $specialization_verdicts[] = describe_specialization($specialization_value);
+}
+
+assert!(
+  $specialization_verdicts == vec[
+    'cell-int',
+    'other',
+    'other',
+    'cell-int',
+    'other',
+    'cell-int',
+  ],
+);
+
+assert!(describe_specialization(7) == 'other');
+assert!(
+  describe_specialization(new SpecializationCell::<int>(5)) == 'cell-int',
+);
+
+final readonly class InliningCell<T> {
+  public function __construct(private T $item) {}
+
+  public function value(): T {
+    return $this->item;
+  }
+}
+
+final readonly class InliningTwin<A, B> {
+  public function __construct(public A $left, public B $right) {}
+}
+
+final class InliningFactory {
+  public static function cell<U>(U $value): InliningCell<U> {
+    return new InliningCell::<U>($value);
+  }
+
+  public static function twin<X, Y>(X $left, Y $right): InliningTwin<X, Y> {
+    return new InliningTwin::<X, Y>($left, $right);
+  }
+}
+
+$inlined_int = InliningFactory::cell::<int>(1);
+$inlined_text = InliningFactory::cell::<string>('two');
+$inlined_nested = InliningFactory::cell::<InliningCell<int>>($inlined_int);
+
+assert!($inlined_int->value() == 1);
+assert!($inlined_text->value() == 'two');
+assert!($inlined_nested->value()->value() == 1);
+
+$inlined_pair = InliningFactory::twin::<int, string>(3, 'four');
+assert!($inlined_pair->left == 3);
+assert!($inlined_pair->right == 'four');
+
+$inlined_flipped = InliningFactory::twin::<string, int>('five', 6);
+assert!($inlined_flipped->left == 'five');
+assert!($inlined_flipped->right == 6);
+
+assert!($inlined_int is InliningCell<int>);
+assert!(!($inlined_int is InliningCell<string>));
+assert!($inlined_pair is InliningTwin<int, string>);
+assert!(!($inlined_pair is InliningTwin<string, int>));
+
+function wrap_in_inlining_cell<T>(T $value): InliningCell<T> {
+  return InliningFactory::cell::<T>($value);
+}
+
+assert!(wrap_in_inlining_cell::<int>(7)->value() == 7);
+assert!(wrap_in_inlining_cell::<string>('eight')->value() == 'eight');
+
+interface Constructable {
+  public function __construct() {}
+}
+
+interface ReifiedType<T> extends Constructable {
+  public function check(mixed $v): bool;
+
+  public function assert(mixed $v): T;
+}
+
+class GenericType<T> implements ReifiedType<T> {
+  public function check(mixed $v): bool {
+    return $v is T;
+  }
+
+  public function assert(mixed $v): T {
+    return $v as T;
+  }
+}
+
+function create_reified<T: Constructable>(): T {
+  return new T();
+}
+
+$reified = create_reified::<GenericType<(string, int)>>();
+assert!($reified->check(('a', 1)));
+assert!(!($reified->check((1, 1))));
+
+function create_reified_from_name<T: Constructable>(classname<T> $s): T {
+  return new $s();
+}
+
+$reified_from_name = create_reified_from_name::<GenericType<(string, int)>>(
+  'GenericType<(string, int)>',
+);
+
+assert!($reified_from_name->check(('a', 1)));
+assert!(!($reified_from_name->check((1, 1))));
+
+interface Buildable {
+  public static function build(int $seed): static;
+}
+
+class Doubler implements Buildable {
+  public int $value;
+
+  public function __construct(int $value) {
+    $this->value = $value;
+  }
+
+  public static function build(int $seed): static {
+    return new static($seed * 2);
+  }
+}
+
+class Negator implements Buildable {
+  public int $value;
+
+  public function __construct(int $value) {
+    $this->value = $value;
+  }
+
+  public static function build(int $seed): static {
+    return new static(-$seed);
+  }
+}
+
+function construct_buildable<T: Buildable>(int $seed): T {
+  return T::build($seed);
+}
+
+$doubled = construct_buildable::<Doubler>(21);
+assert!($doubled is Doubler);
+assert!($doubled->value == 42);
+
+$negated = construct_buildable::<Negator>(21);
+assert!($negated is Negator);
+assert!($negated->value == -21);
+
+$doubled_again = construct_buildable::<Doubler>(3);
+assert!($doubled_again->value == 6);
+
+function forward_buildable<U: Buildable>(int $seed): U {
+  return construct_buildable::<U>($seed);
+}
+
+$forwarded = forward_buildable::<Negator>(9);
+assert!($forwarded is Negator);
+assert!($forwarded->value == -9);
+
+function unconstrained_static_call<T>(): void {
+  T::build(1);
+}
+
+$assertion_value_49 = function(): void {
+  unconstrained_static_call::<int>();
+};
+
+$assertion_error_49 = null;
+try {
+  $assertion_value_49();
+} catch (TypeError $assertion_caught_49) {
+  $assertion_error_49 = $assertion_caught_49;
+}
+
+assert!($assertion_error_49 is TypeError);
+
+$assertion_value_50 = function(): void {
+  unconstrained_static_call::<null|Doubler>();
+};
+
+$assertion_error_50 = null;
+try {
+  $assertion_value_50();
+} catch (TypeError $assertion_caught_50) {
+  $assertion_error_50 = $assertion_caught_50;
+}
+
+assert!($assertion_error_50 is TypeError);
+
+function expect_in_generic<T>(T $value): void {
+  assert!($value != null);
+}
+
+expect_in_generic::<int>(9);
+expect_in_generic::<string>('ten');
+
+function pick_defaulted<T = int>(T $value): T {
+  return $value;
+}
+
+assert!(pick_defaulted(11) == 11);
+$picked = pick_defaulted(12);
+assert!($picked == 12);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$constant_on_parameter = $work . '/constant-on-parameter.whim';
+File\write(
+  $constant_on_parameter,
+  'class Holder {'
+  . "\n"
+  . '  public const int WIDTH = 3;'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'function width_of<T>(): int {'
+  . "\n"
+  . '  return T::WIDTH;'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$assertion_value_54 = function() use ($constant_on_parameter): void {
+  require!($constant_on_parameter);
+};
+
+$assertion_error_54 = null;
+try {
+  $assertion_value_54();
+} catch (CompilerError $assertion_caught_54) {
+  $assertion_error_54 = $assertion_caught_54;
+}
+
+assert!($assertion_error_54 is CompilerError);
+
+$required_holder = $work . '/required-variance-holder.whim';
+$required_box = $work . '/required-variance-box.whim';
+File\write(
+  $required_holder,
+  'interface RequiredVarianceHolder<out T> {'
+  . ' public function getValue(): T;'
+  . ' }',
+);
+
+File\write(
+  $required_box,
+  'final readonly class RequiredVarianceBox<out T>'
+  . ' implements RequiredVarianceHolder<T> {'
+  . ' public function __construct(private T $value) {}'
+  . ' public function getValue(): T { return $this->value; }'
+  . ' }',
+);
+
+require_once!($required_holder);
+require_once!($required_box);
+assert!(new RequiredVarianceBox::<int>(42)->getValue() == 42);
+
+$autoloaded_holder = $work . '/autoloaded-variance-holder.whim';
+$autoloaded_box = $work . '/autoloaded-variance-box.whim';
+File\write(
+  $autoloaded_holder,
+  'interface AutoloadedVarianceHolder<out T> {'
+  . ' public function getValue(): T;'
+  . ' }',
+);
+
+File\write(
+  $autoloaded_box,
+  'final readonly class AutoloadedVarianceBox<out T>'
+  . ' implements AutoloadedVarianceHolder<T> {'
+  . ' public function __construct(private T $value) {}'
+  . ' public function getValue(): T { return $this->value; }'
+  . ' }',
+);
+
+$variance_loader = new Autoload\Autoloader()->withSymbolFile(
+  'AutoloadedVarianceHolder',
+  $autoloaded_holder,
+);
+
+Autoload\register($variance_loader);
+require_once!($autoloaded_box);
+assert!(new AutoloadedVarianceBox::<string>('value')->getValue() == 'value');
+Autoload\unregister($variance_loader);
+
+$invariant_holder = $work . '/invariant-variance-holder.whim';
+$invalid_box = $work . '/invalid-variance-box.whim';
+File\write($invariant_holder, 'interface InvariantVarianceHolder<T> {}');
+File\write(
+  $invalid_box,
+  'final class InvalidVarianceBox<out T>'
+  . ' implements InvariantVarianceHolder<T> {}',
+);
+
+require!($invariant_holder);
+$assertion_value_57 = function() use ($invalid_box): void {
+  require!($invalid_box);
+};
+
+$assertion_error_57 = null;
+try {
+  $assertion_value_57();
+} catch (Whim\Unwind\Throwable $assertion_caught_57) {
+  $assertion_error_57 = $assertion_caught_57;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_57->getMessage(),
+      'the covariant type parameter `T` is used in an incompatible position',
+    ),
+  );
+}
+
+assert!($assertion_error_57 is Whim\Unwind\Throwable);
+
+Filesystem\delete_directory($work, true);

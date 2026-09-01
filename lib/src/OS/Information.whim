@@ -1,0 +1,16 @@
+namespace Whim\OS;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonEmptyString;
+
+/** Identifies the running operating system and machine. */
+final readonly class Information {
+  #[AlwaysInline]
+  public function __construct(
+    public NonEmptyString $systemName,
+    public string $nodeName,
+    public string $release,
+    public string $version,
+    public string $machine,
+  ) {}
+}

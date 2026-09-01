@@ -1,0 +1,25 @@
+namespace Whim\Channel;
+
+use Whim\Marker\TrackCaller;
+use Whim\Channel\_Private;
+use Whim\Refine\PositiveInt;
+
+/** Creates a channel with bounded buffering. */
+#[TrackCaller]
+function bounded<T>(PositiveInt $capacity): (Sender<T>, Receiver<T>) {
+  $state = new _Private\State::<T>($capacity);
+  return (
+    new _Private\SenderImpl::<T>($state),
+    new _Private\ReceiverImpl::<T>($state),
+  );
+}
+
+/** Creates a channel without a buffer limit. */
+#[TrackCaller]
+function unbounded<T>(): (Sender<T>, Receiver<T>) {
+  $state = new _Private\State::<T>(null);
+  return (
+    new _Private\SenderImpl::<T>($state),
+    new _Private\ReceiverImpl::<T>($state),
+  );
+}

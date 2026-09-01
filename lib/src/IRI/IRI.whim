@@ -1,0 +1,221 @@
+namespace Whim\IRI;
+
+use Whim;
+use Whim\Comparison\Equal;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\URI\URI;
+
+/** Represents an immutable RFC 3987 IRI reference. */
+final readonly class IRI implements Equal<IRI>, ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public null|string $scheme,
+    public null|Authority $authority,
+    public string $path,
+    public null|string $query,
+    public null|string $fragment,
+  ) {}
+
+  /** Parses an IRI reference, or returns null when it is invalid. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function parse(string $iri): null|IRI {
+    $components = Whim\_Private\iri_parse_reference($iri) ?? return null;
+
+    $authority = match ($components[1]) {
+      null => null,
+      $value @ string => Authority::parse($value),
+    };
+
+    if ($components[1] != null && $authority == null) {
+      return null;
+    }
+
+    return new IRI(
+      $components[0],
+      $authority,
+      $components[2],
+      $components[3],
+      $components[4],
+    );
+  }
+
+  /** Parses an IRI reference. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $iri): IRI {
+    $parsed = IRI::parse($iri);
+    if ($parsed == null) {
+      throw new InvalidArgumentException(
+        'invalid IRI reference: `' . $iri . '`',
+      );
+    }
+
+    return $parsed;
+  }
+
+  /** Converts an ASCII URI reference to an IRI. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromURI(URI $uri): IRI {
+    $iri = Whim\_Private\iri_from_uri($uri->toString()) as string;
+    return IRI::parse($iri) as IRI;
+  }
+
+  /** Creates an IRI reference from encoded components. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromComponents(
+    null|string $scheme,
+    null|Authority $authority,
+    string $path,
+    null|string $query = null,
+    null|string $fragment = null,
+  ): IRI {
+    $authorityText = match ($authority) {
+      null => null,
+      $value @ Authority => $value->toString(),
+    };
+
+    if (
+      !Whim\_Private\iri_valid_components(
+        $scheme,
+        $authorityText,
+        $path,
+        $query,
+        $fragment,
+      )
+    ) {
+      throw new InvalidArgumentException('invalid IRI components');
+    }
+
+    return new IRI($scheme, $authority, $path, $query, $fragment);
+  }
+
+  /** Returns a copy with a new scheme. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withScheme(null|string $scheme): IRI {
+    return IRI::fromComponents(
+      $scheme,
+      $this->authority,
+      $this->path,
+      $this->query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with a new authority. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withAuthority(null|Authority $authority): IRI {
+    return IRI::fromComponents(
+      $this->scheme,
+      $authority,
+      $this->path,
+      $this->query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with a new path. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withPath(string $path): IRI {
+    return IRI::fromComponents(
+      $this->scheme,
+      $this->authority,
+      $path,
+      $this->query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with a new query. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withQuery(null|string $query): IRI {
+    return IRI::fromComponents(
+      $this->scheme,
+      $this->authority,
+      $this->path,
+      $query,
+      $this->fragment,
+    );
+  }
+
+  /** Returns a copy with a new fragment. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withFragment(null|string $fragment): IRI {
+    return IRI::fromComponents(
+      $this->scheme,
+      $this->authority,
+      $this->path,
+      $this->query,
+      $fragment,
+    );
+  }
+
+  /** Returns the RFC-normalized IRI reference. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function normalize(): IRI {
+    $normalized = Whim\_Private\iri_normalize($this->toString()) as string;
+    return IRI::parse($normalized) as IRI;
+  }
+
+  /** Converts this IRI to an ASCII URI reference. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toURI(): URI {
+    $uri = Whim\_Private\iri_to_uri($this->toString()) as string;
+    return URI::parse($uri) as URI;
+  }
+
+  /** Reports whether this is an absolute IRI. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isAbsolute(): bool {
+    return $this->scheme != null;
+  }
+
+  /** Reports whether two IRI references have the same components. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(IRI $other): bool {
+    return $this->toString() == $other->toString();
+  }
+
+  /** Rebuilds the IRI reference from its components. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    $result = match ($this->scheme) {
+      null => '',
+      $value @ string => $value . ':',
+    };
+
+    if ($this->authority != null) {
+      $result .= '//' . $this->authority->toString();
+    }
+
+    $result .= $this->path;
+    if ($this->query != null) {
+      $result .= '?' . $this->query;
+    }
+
+    if ($this->fragment != null) {
+      $result .= '#' . $this->fragment;
+    }
+
+    return $result;
+  }
+}

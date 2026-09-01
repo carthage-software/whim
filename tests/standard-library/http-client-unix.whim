@@ -1,0 +1,215 @@
+use Whim\Async;
+use Whim\Filesystem;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Client;
+use Whim\HTTP\Message;
+use Whim\Network\UnixEndpoint;
+use Whim\TLS;
+use Whim\Unwind\Throwable;
+use Whim\URL;
+use Whim\Unix;
+
+final class MetadataRecorder {
+  public null|Client\ConnectionMetadata $value = null;
+}
+
+$directory = Filesystem\create_temporary_directory(null, 'whim-http-unix-');
+
+$h1Path = $directory . '/h1.sock';
+$h1Listener = Unix\listen($h1Path);
+$h1Server = Async\spawn::<null>(
+  function() use ($h1Listener): null {
+    $stream = $h1Listener->accept();
+    $round = 0;
+    while ($round < 2) {
+      $request = $stream->read(8192);
+      assert!($request != '');
+      $body = match ($round) {
+        0 => 'one',
+        $_ => 'two',
+      };
+
+      $stream->writeAll("HTTP/1.1 200 OK\r\nContent-Length: 3\r\n\r\n" . $body);
+
+      $round++;
+    }
+
+    $stream->close();
+    return null;
+  },
+);
+
+$h1Metadata = new MetadataRecorder();
+$h1Client = new Client\DefaultClient(
+  new Client\PooledConnector(new Client\UnixConnector($h1Path)),
+  new Client\Configuration(protocolVersions: vec[Message\ProtocolVersion::V11]),
+);
+
+$first = $h1Client->send(
+  Message\Request::fromURL(
+    Message\METHOD_GET,
+    URL\URL::from('http://service.internal/one'),
+  ),
+  new Client\SendConfiguration(
+    onConnection: function(
+      Client\ConnectionMetadata $metadata,
+    ) use ($h1Metadata): void {
+      $h1Metadata->value = $metadata;
+    },
+  ),
+);
+
+$firstBody = $first->response->body;
+assert!($firstBody != null);
+assert!($firstBody->readAll() == 'one');
+
+$second = $h1Client->send(
+  Message\Request::fromURL(
+    Message\METHOD_GET,
+    URL\URL::from('http://service.internal/two'),
+  ),
+);
+
+$secondBody = $second->response->body;
+assert!($secondBody != null);
+assert!($secondBody->readAll() == 'two');
+assert!($h1Metadata->value != null);
+assert!($h1Metadata->value->localEndpoint is UnixEndpoint);
+assert!($h1Metadata->value->peerEndpoint is UnixEndpoint);
+assert!($h1Metadata->value->destinationEndpoint == null);
+assert!($h1Metadata->value->tls == null);
+$h1Server->await();
+$h1Listener->close();
+Filesystem\delete_file($h1Path);
+
+$h2Path = $directory . '/h2.sock';
+$h2Listener = Unix\listen($h2Path);
+$h2Server = Async\spawn::<null>(function() use ($h2Listener): null {
+  $stream = $h2Listener->accept();
+  $protocol = new H2\ServerConnection();
+  $streamId = null;
+  while ($streamId == null) {
+    foreach ($protocol->receive($stream->read(16384)) as $event) {
+      if ($event is H2\Event\RequestHeadersReceived) {
+        $streamId = $event[1];
+      }
+    }
+
+    $outbound = $protocol->takeOutboundBytes();
+    if ($outbound != '') {
+      $stream->writeAll($outbound);
+    }
+  }
+
+  $protocol->sendHeaders($streamId, vec[(':status', '200', false)]);
+
+  $protocol->sendData($streamId, 'h2 over unix', true);
+  $stream->writeAll($protocol->takeOutboundBytes());
+  $stream->close();
+  return null;
+});
+
+$h2Metadata = new MetadataRecorder();
+$h2Client = new Client\DefaultClient(
+  new Client\UnixConnector($h2Path),
+  new Client\Configuration(protocolVersions: vec[Message\ProtocolVersion::V2]),
+);
+
+$h2Transaction = $h2Client->send(
+  Message\Request::fromURL(
+    Message\METHOD_GET,
+    URL\URL::from('http://service.internal/h2'),
+  ),
+  new Client\SendConfiguration(
+    onConnection: function(
+      Client\ConnectionMetadata $metadata,
+    ) use ($h2Metadata): void {
+      $h2Metadata->value = $metadata;
+    },
+  ),
+);
+
+assert!(
+  $h2Transaction->response->protocolVersion == Message\ProtocolVersion::V2,
+);
+
+$h2Body = $h2Transaction->response->body;
+assert!($h2Body != null);
+assert!($h2Body->readAll() == 'h2 over unix');
+assert!($h2Metadata->value != null);
+assert!($h2Metadata->value->peerEndpoint is UnixEndpoint);
+$h2Server->await();
+$h2Listener->close();
+Filesystem\delete_file($h2Path);
+
+$certificatePem = Whim\File\read(
+  directory!() . '/fixtures/tls/certificate.pem',
+);
+
+$privateKeyPem = Whim\File\read(directory!() . '/fixtures/tls/private-key.pem');
+
+$certificate = TLS\Certificate::from($certificatePem);
+$identity = TLS\Identity::from($certificatePem, $privateKeyPem);
+$tlsPath = $directory . '/tls.sock';
+$tlsListener = TLS\listen::<UnixEndpoint>(
+  Unix\listen($tlsPath),
+  new TLS\ServerConfiguration($identity, alpnProtocols: vec['http/1.1']),
+);
+
+$tlsServer = Async\spawn::<null>(function() use ($tlsListener): null {
+  $stream = $tlsListener->accept();
+  $request = $stream->read(8192);
+  assert!($request != '');
+  $stream->writeAll(
+    "HTTP/1.1 200 OK\r\nContent-Length: 11\r\nConnection: close\r\n\r\nsecure unix",
+  );
+
+  while (!$stream->reachedEndOfDataSource()) {
+    discard!($stream->read(8192));
+  }
+
+  try {
+    $stream->close();
+  } catch (Throwable $_) {
+  }
+
+  return null;
+});
+
+$tlsMetadata = new MetadataRecorder();
+$tlsClient = new Client\DefaultClient(
+  new Client\UnixConnector($tlsPath),
+  new Client\Configuration(
+    tls: new TLS\ClientConfiguration(
+      useSystemRoots: false,
+      trustedRoots: vec[$certificate],
+    ),
+    protocolVersions: vec[Message\ProtocolVersion::V11],
+  ),
+);
+
+$tlsTransaction = $tlsClient->send(
+  Message\Request::fromURL(
+    Message\METHOD_GET,
+    URL\URL::from('https://localhost/secure'),
+  ),
+  new Client\SendConfiguration(
+    onConnection: function(
+      Client\ConnectionMetadata $metadata,
+    ) use ($tlsMetadata): void {
+      $tlsMetadata->value = $metadata;
+    },
+  ),
+);
+
+$tlsBody = $tlsTransaction->response->body;
+assert!($tlsBody != null);
+assert!($tlsBody->readAll() == 'secure unix');
+assert!($tlsMetadata->value != null);
+assert!($tlsMetadata->value->tls != null);
+assert!($tlsMetadata->value->peerEndpoint is UnixEndpoint);
+$tlsServer->await();
+$tlsListener->close();
+Filesystem\delete_file($tlsPath);
+
+Filesystem\delete_directory($directory);

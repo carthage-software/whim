@@ -1,0 +1,65 @@
+namespace Whim\Autoload;
+
+use Whim\Dict;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Symbol\SymbolKind;
+
+/** Maps symbols to source files and an optional fallback loader. */
+final class Autoloader {
+  private dict<string, string> $symbolFiles = dict[];
+  private null|(fn(SymbolKind, string): bool) $fallback = null;
+
+  /** Creates an autoloader that maps nothing and has no fallback. */
+  #[AlwaysInline]
+  public function __construct() {}
+
+  /** The same autoloader with one more symbol mapped to a file. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSymbolFile(
+    string $symbol_name,
+    string $file,
+  ): Autoloader {
+    return clone!($this, symbolFiles: Dict\merge::<string, string>(
+      $this->symbolFiles,
+      vec[dict[$symbol_name => $file]],
+    ));
+  }
+
+  /** The same autoloader with several more symbols mapped to files. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSymbolFiles(
+    dict<string, string> $symbol_files,
+  ): Autoloader {
+    return clone!($this, symbolFiles: Dict\merge::<string, string>(
+      $this->symbolFiles,
+      vec[$symbol_files],
+    ));
+  }
+
+  /** The same autoloader with a fallback for symbols it does not map. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withFallback(
+    (fn(SymbolKind, string): bool) $fallback,
+  ): Autoloader {
+    return clone!($this, fallback: $fallback);
+  }
+
+  /** Asks this autoloader alone to load one symbol. */
+  #[TrackCaller]
+  public function loadSymbol(SymbolKind $kind, string $symbol_name): bool {
+    if (contains_key!($this->symbolFiles, $symbol_name)) {
+      require_once!($this->symbolFiles[$symbol_name]);
+
+      return true;
+    }
+
+    $fallback = $this->fallback ?? return false;
+
+    return $fallback($kind, $symbol_name);
+  }
+}

@@ -1,0 +1,51 @@
+use Whim\Option;
+use Whim\Result\Err;
+use Whim\Result\Ok;
+use Whim\Result\Result;
+use Whim\Unwind\RuntimeException;
+
+$ok = new Ok::<int>(42);
+assert!($ok is Ok<int>);
+assert!($ok is Result<int, string>);
+assert!($ok->ok() is Option\Some<int>);
+$assertion_value_4 = $ok->ok();
+assert!($assertion_value_4 is Whim\Option\Some<int>);
+$assertion_inner_4 = $assertion_value_4->value;
+assert!($assertion_inner_4 == 42);
+assert!($ok->err() is Whim\Option\None);
+assert!($ok->unwrapOr::<string>('fallback') == 42);
+assert!($ok->unwrapOr::<string>('fallback') is int|string);
+
+$mapped = $ok->map::<string>(fn(int $value): string => 'value=' . $value);
+assert!($mapped is Ok<string>);
+$assertion_value_9 = $mapped;
+assert!($assertion_value_9 is Whim\Result\Ok<string>);
+$assertion_inner_9 = $assertion_value_9->value;
+assert!($assertion_inner_9 == 'value=42');
+
+$err = new Err::<string>('failed');
+assert!($err is Result<int, string>);
+assert!($err->ok() is Whim\Option\None);
+assert!($err->err() is Option\Some<string>);
+$assertion_value_13 = $err->err();
+assert!($assertion_value_13 is Whim\Option\Some<string>);
+$assertion_inner_13 = $assertion_value_13->value;
+assert!($assertion_inner_13 == 'failed');
+assert!($err->unwrapOr::<int>(7) == 7);
+assert!($err->unwrapOr::<int>(7) is int|string);
+
+$recovered = $err->orElse::<int, never>(
+  fn(string $error): Result<int, never> => new Ok::<int>(length!($error)),
+);
+
+assert!($recovered is Ok<int>);
+$assertion_value_17 = $recovered;
+assert!($assertion_value_17 is Whim\Result\Ok<int>);
+$assertion_inner_17 = $assertion_value_17->value;
+assert!($assertion_inner_17 == 6);
+
+$caught = Whim\Result\attempt::<never, RuntimeException>(
+  fn(): never => throw new RuntimeException('boom'),
+);
+
+assert!($caught is Err<RuntimeException>);

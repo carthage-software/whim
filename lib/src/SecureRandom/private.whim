@@ -1,0 +1,6 @@
+namespace Whim\SecureRandom\_Private;
+
+use Whim\RandomSequence\SecureSequence;
+
+/** The process-wide secure random sequence. */
+const SECURE_SEQUENCE = SecureSequence::default();

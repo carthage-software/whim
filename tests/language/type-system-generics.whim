@@ -1,0 +1,332 @@
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_type-system-generics/alias-argument-violates-bound.whim',
+  'type argument 1 supplied to OnlyObjects does not satisfy the bound of T',
+);
+
+raises(
+  '_type-system-generics/construction-argument-violates-bound.whim',
+  'type argument 1 supplied to `Box` does not satisfy the bound of `T`',
+);
+
+raises(
+  '_type-system-generics/contravariant-alias-output.whim',
+  'contravariant type parameter `T` is used in an incompatible position',
+);
+
+raises(
+  '_type-system-generics/covariant-alias-input.whim',
+  'covariant type parameter `T` is used in an incompatible position',
+);
+
+raises(
+  '_type-system-generics/covariant-short-closure-input.whim',
+  'covariant type parameter `T` is used in an incompatible position',
+);
+
+raises(
+  '_type-system-generics/covariant-function-input.whim',
+  'covariant type parameter `T` is used in an incompatible position',
+);
+
+raises(
+  '_type-system-generics/covariant-method-input.whim',
+  'covariant type parameter `T` is used in an incompatible position',
+);
+
+raises(
+  '_type-system-generics/default-violates-bound.whim',
+  'the default for type parameter T on Boxed does not satisfy its bound',
+);
+
+raises(
+  '_type-system-generics/duplicate-type-parameter.whim',
+  'type parameter `T` is declared more than once',
+);
+
+raises(
+  '_type-system-generics/late-default-violates-bound.whim',
+  'the default for type parameter T on Boxed does not satisfy its bound',
+);
+
+raises(
+  '_type-system-generics/newtype-default-violates-bound.whim',
+  'the default for type parameter T on NewtypeBoxed does not satisfy its bound',
+);
+
+raises(
+  '_type-system-generics/self-referential-default.whim',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  '_type-system-generics/standalone-wildcard.whim',
+  '`_` cannot be used as a standalone type',
+);
+
+raises(
+  '_type-system-generics/too-few-type-arguments.whim',
+  'expects exactly 2 type argument(s), but 1 were supplied',
+);
+
+raises(
+  '_type-system-generics/too-many-type-arguments.whim',
+  'expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  '_type-system-generics/turbofish-arity-in-the-same-unit.whim',
+  'expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  '_type-system-generics/void-alias-argument.whim',
+  'cannot be used in the type argument position',
+);
+
+interface LateComparable {}
+
+type LateBoxed<T: LateComparable = LateValue> = vec<T>;
+
+require!('_type-system-generics/late-default-satisfying-value.whim');
+
+function take_late_boxed(LateBoxed $values): void {}
+
+take_late_boxed(vec[new LateValue()]);
+
+type MyInt = int;
+
+class SpecializationBox<T> {
+  public function __construct(public T $value) {}
+}
+
+$specialization_box = new SpecializationBox::<MyInt>(1);
+assert!($specialization_box is SpecializationBox<MyInt>);
+assert!($specialization_box is SpecializationBox<int>);
+assert!($specialization_box->value is int);
+
+type VarianceBox<out T> = vec<T>;
+type VarianceConsumer<in T> = fn(T): void;
+
+function consume_anything(mixed $value): void {}
+
+$variance_box = vec[1, 2, 3] as VarianceBox<int>;
+$variance_consumer = consume_anything(...) as VarianceConsumer<string>;
+assert!($variance_box is VarianceBox<int>);
+assert!($variance_consumer is VarianceConsumer<string>);
+
+interface DefaultComparable {}
+
+class DefaultComparableValue implements DefaultComparable {}
+
+type DefaultBoxed<T: DefaultComparable = DefaultComparableValue> = vec<T>;
+
+function take_default_boxed(DefaultBoxed $values): void {}
+
+take_default_boxed(vec[new DefaultComparableValue()]);
+
+function use_identity_callback(fn(int): int $callback): int {
+  return $callback(4);
+}
+
+$defaulted_identity = fn<T = int>(T $value): T => $value;
+$undefaulted_identity = fn<T>(T $value): T => $value;
+
+assert!(use_identity_callback($defaulted_identity) == 4);
+assert!($defaulted_identity is fn(int): int);
+assert!(!($undefaulted_identity is fn(int): int));
+
+function specialized_identity<T>(T $value): T {
+  return $value;
+}
+
+assert!(specialized_identity::<int>(5) == 5);
+assert!(specialized_identity::<string>('runtime') == 'runtime');
+
+$unbound_identity = specialized_identity(...);
+$assertion_value_11 = function() use ($unbound_identity): void {
+  $unbound_identity(1);
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (TypeError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is TypeError);
+
+assert!($unbound_identity::<int>(21) == 21);
+
+$bound_identity = specialized_identity::<int>(...);
+assert!($bound_identity(42) == 42);
+$assertion_value_14 = function() use ($bound_identity): void {
+  $bound_identity('wrong');
+};
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (TypeError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is TypeError);
+
+$assertion_value_15 = function() use ($bound_identity): void {
+  $bound_identity::<string>('wrong');
+};
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (TypeError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is TypeError);
+
+class MappingBox<T> {
+  public function __construct(public T $value) {}
+
+  public function map<U>(fn(T): U $function): U {
+    return $function($this->value);
+  }
+}
+
+$mapping_box = new MappingBox::<int>(3);
+assert!($mapping_box->map::<string>(fn(int $n): string => 'n=' . $n) == 'n=3');
+
+function matches_type_parameter<T>(mixed $value): bool {
+  return $value is T;
+}
+
+class CheckingBox<T> {
+  public function matches(mixed $value): bool {
+    return $value is T;
+  }
+}
+
+assert!(matches_type_parameter::<int>(1));
+assert!(!(matches_type_parameter::<int>('1')));
+
+$checking_box = new CheckingBox::<vec<int>>();
+assert!($checking_box->matches(vec[1, 2]));
+assert!(!($checking_box->matches(vec[1, 'x'])));
+
+class RecursionObservation {
+  public int $checked = 0;
+  public bool $all_held = true;
+}
+
+function repeat_identity<T>(
+  T $value,
+  int $remaining,
+  RecursionObservation $observation,
+): T {
+  if ($remaining == 0) {
+    return $value;
+  }
+
+  $result = repeat_identity::<T>($value, $remaining - 1, $observation);
+  $observation->checked = $observation->checked + 1;
+  $observation->all_held = $observation->all_held && ($result is T);
+
+  return $result;
+}
+
+$recursion_observation = new RecursionObservation();
+assert!(repeat_identity::<string>('ok', 3, $recursion_observation) == 'ok');
+
+assert!($recursion_observation->checked == 3);
+assert!($recursion_observation->all_held);
+
+class RuntimeArgumentBox<out T> {}
+
+$runtime_box = new RuntimeArgumentBox::<int>();
+assert!($runtime_box is RuntimeArgumentBox<int>);
+assert!($runtime_box is RuntimeArgumentBox<int|string>);
+assert!(!($runtime_box is RuntimeArgumentBox<string>));
+
+function consume_wildcard_vector(vec<_> $values): void {}
+
+consume_wildcard_vector(vec[]);
+consume_wildcard_vector(vec[1, 'two', false]);
+
+function forwarding_identity<T>(T $value): T {
+  return $value;
+}
+
+function forwarding_singleton<T>(T $value): vec<T> {
+  return vec[$value];
+}
+
+function forward_value<T>(T $value): T {
+  return forwarding_identity::<T>($value);
+}
+
+function forward_singleton<T>(T $value): vec<T> {
+  return forwarding_singleton::<T>($value);
+}
+
+class ForwardingReceiver<T> {
+  public function identity<U>(U $value): U {
+    return forwarding_identity::<U>($value);
+  }
+
+  public function forward<U>(U $value): U {
+    return $this->identity::<U>($value);
+  }
+}
+
+function through_unrelated_receiver<T>(
+  ForwardingReceiver<string> $receiver,
+  T $value,
+): T {
+  return $receiver->identity::<T>($value);
+}
+
+assert!(forward_value::<int>(42) == 42);
+assert!(forward_value::<int>(42) is int);
+assert!(forward_singleton::<string>('value') is vec<string>);
+
+$forwarding_receiver = new ForwardingReceiver::<string>();
+assert!($forwarding_receiver->forward::<int>(7) == 7);
+assert!($forwarding_receiver->forward::<int>(7) is int);
+assert!(
+  through_unrelated_receiver::<float>($forwarding_receiver, 1.5) is float,
+);
+
+interface InheritanceContainer<out T> {
+  public function get(): T;
+}
+
+abstract class InheritanceBase<T> {
+  public function __construct(public T $item) {}
+}
+
+class InheritanceIntBox extends InheritanceBase<int> implements
+  InheritanceContainer<int> {
+  public function get(): int {
+    return $this->item;
+  }
+}
+
+type Id = int;
+type Count = Id;
+
+function describe_count(Count $n): string {
+  return 'n=' . $n;
+}
+
+$inheritance_box = new InheritanceIntBox(7);
+assert!($inheritance_box->get() == 7);
+assert!(describe_count($inheritance_box->get()) == 'n=7');
+assert!($inheritance_box is InheritanceIntBox);
+assert!($inheritance_box is InheritanceBase<int>);
+assert!($inheritance_box is InheritanceContainer<int>);
+assert!(!($inheritance_box is InheritanceBase<string>));

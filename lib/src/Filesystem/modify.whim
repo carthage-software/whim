@@ -1,0 +1,139 @@
+namespace Whim\Filesystem;
+
+use Whim;
+use Whim\File;
+use Whim\Filesystem\_Private;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\Uint32;
+use Whim\Time\SystemTime;
+
+/**
+ * Moves the node at one path to another, replacing an existing destination.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws NotEmptyException when the destination is a directory that still has entries.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function rename(NonEmptyString $from, NonEmptyString $to): void {
+  try {
+    Whim\_Private\rename_path($from, $to);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $from, 'rename');
+  }
+}
+
+/**
+ * Copies a regular file's contents and permissions to a new path.
+ *
+ * @throws NotFileException when the source does not point to a regular file.
+ * @throws NotFoundException when the path does not exist.
+ * @throws Whim\File\AlreadyCreatedException when the destination exists and `$overwrite` is not set.
+ * @throws Whim\File\NotReadableException when the source is not readable.
+ * @throws Whim\File\NotWritableException when the destination is not writable.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function copy_file(
+  NonEmptyString $from,
+  NonEmptyString $to,
+  bool $overwrite = false,
+): void {
+  $source = metadata($from);
+  if (!$source->isFile()) {
+    throw new NotFileException('path `' . $from . '` does not point to a file');
+  }
+
+  $mode = File\WriteMode::MustCreate;
+  if ($overwrite) {
+    $mode = File\WriteMode::Truncate;
+  }
+
+  using (
+    $reader = File\open_read_only($from),
+    $writer = File\open_write_only($to, $mode),
+  ) {
+    while (true) {
+      $chunk = match ($reader->read(65536)) {
+        '' => break,
+        $chunk => $chunk,
+      };
+
+      $writer->writeAll($chunk);
+    }
+  }
+
+  set_permissions($to, $source->permissions);
+}
+
+/**
+ * Sets the permission bits of the node a path points to.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function set_permissions(NonEmptyString $path, Uint32 $permissions): void {
+  try {
+    Whim\_Private\set_path_mode($path, $permissions);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'set permissions');
+  }
+}
+
+/**
+ * Sets the owning user and group of the node a path points to.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function set_owner(NonEmptyString $path, int $user, int $group): void {
+  try {
+    Whim\_Private\set_path_owner($path, $user, $group, true);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'set owner');
+  }
+}
+
+/**
+ * Sets the access and modification times of the node a path points to.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+function set_times(
+  NonEmptyString $path,
+  SystemTime $accessed,
+  SystemTime $modified,
+): void {
+  try {
+    Whim\_Private\set_path_times(
+      $path,
+      $accessed->getSeconds(),
+      $accessed->getNanoseconds(),
+      $modified->getSeconds(),
+      $modified->getNanoseconds(),
+      true,
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'set times');
+  }
+}

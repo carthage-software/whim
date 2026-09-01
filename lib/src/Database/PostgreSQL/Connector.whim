@@ -1,0 +1,40 @@
+namespace Whim\Database\PostgreSQL;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Connection;
+use Whim\Database\Connector as DatabaseConnector;
+use Whim\Database\PostgreSQL\_Private\ConnectionImpl;
+use Whim\Database\PostgreSQL\_Private\await_connection;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+use Whim\_Private\PostgreSQLConnection;
+
+/** Opens non-blocking PostgreSQL connections. */
+final readonly class Connector implements DatabaseConnector {
+  /** Creates a connector from a libpq connection string. */
+  public function __construct(
+    #[SensitiveParameter] private string $connectionString = '',
+    private bool $binaryResults = false,
+  ) {}
+
+  /** Opens one socket-driven connection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    $opened = PostgreSQLConnection::open($this->connectionString);
+    $connection = $opened[0];
+
+    try {
+      await_connection($opened[1], $cancellation);
+    } catch (Throwable $error) {
+      $connection->close();
+      throw $error;
+    }
+
+    return new ConnectionImpl($connection, $this->binaryResults);
+  }
+}

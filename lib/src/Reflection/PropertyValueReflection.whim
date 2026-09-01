@@ -1,0 +1,34 @@
+namespace Whim\Reflection;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Member\PropertyReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Provides read-only access to one property slot of an object. */
+#[Stub]
+final class PropertyValueReflection {
+  private function __construct() {}
+
+  /** Returns the exact property declaration represented by this slot. */
+  #[MustUse]
+  public function getProperty(): PropertyReflection {}
+
+  /** Reports whether the property slot has been initialized. */
+  #[MustUse]
+  public function isInitialized(): bool {}
+
+  /** Returns the property type resolved for this object's specialization. */
+  #[MustUse]
+  public function getDeclaredType(): null|TypeReflection {}
+
+  /** Returns the initialized value's runtime type, or null before a write. */
+  #[MustUse]
+  public function getValueType(): null|TypeReflection {}
+
+  /** Returns the current property value without permitting a write. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getValue(): mixed {}
+}

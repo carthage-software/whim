@@ -1,0 +1,137 @@
+namespace Whim\Unicode;
+
+use Whim\Encoding\EncodingException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim;
+
+/**
+ * Applies full, locale-independent Unicode case folding.
+ *
+ * @throws EncodingException when the value is not valid UTF-8.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function case_fold(string $value): string {
+  $folded = Whim\_Private\unicode_case_fold($value);
+  if ($folded == null) {
+    throw new EncodingException('the value is not valid UTF-8');
+  }
+
+  return $folded;
+}
+
+/** Returns the scalar value at a byte offset, or null at the end. */
+#[AlwaysInline]
+#[MustUse]
+function code_point_at(
+  string $bytes,
+  NonNegativeInt $offset,
+): null|ScalarValue {
+  return Whim\_Private\unicode_code_point_at($bytes, $offset);
+}
+
+/** Returns the scalar value before a byte offset, or null at the start. */
+#[AlwaysInline]
+#[MustUse]
+function code_point_before(
+  string $bytes,
+  NonNegativeInt $offset,
+): null|ScalarValue {
+  return Whim\_Private\unicode_code_point_before($bytes, $offset);
+}
+
+/** Reports whether an integer is a Unicode scalar value. */
+#[AlwaysInline]
+#[MustUse]
+function is_valid(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 0);
+}
+
+/** Reports whether a code point has the Unicode White_Space property. */
+#[AlwaysInline]
+#[MustUse]
+function is_whitespace(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 1);
+}
+
+/** Reports whether a code point is a Unicode letter. */
+#[AlwaysInline]
+#[MustUse]
+function is_letter(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 2);
+}
+
+/** Reports whether a code point is a Unicode mark. */
+#[AlwaysInline]
+#[MustUse]
+function is_mark(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 3);
+}
+
+/** Reports whether a code point is a Unicode number. */
+#[AlwaysInline]
+#[MustUse]
+function is_number(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 4);
+}
+
+/** Reports whether a code point is a Unicode decimal digit. */
+#[AlwaysInline]
+#[MustUse]
+function is_digit(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 5);
+}
+
+/** Reports whether a code point is a Unicode letter or number. */
+#[AlwaysInline]
+#[MustUse]
+function is_alphanumeric(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 6);
+}
+
+/** Reports whether a code point is Unicode punctuation. */
+#[AlwaysInline]
+#[MustUse]
+function is_punctuation(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 7);
+}
+
+/** Reports whether a code point is a Unicode symbol. */
+#[AlwaysInline]
+#[MustUse]
+function is_symbol(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 8);
+}
+
+/** Reports whether a code point is a Unicode separator. */
+#[AlwaysInline]
+#[MustUse]
+function is_separator(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 9);
+}
+
+/** Reports whether a code point is a Unicode control character. */
+#[AlwaysInline]
+#[MustUse]
+function is_control(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 10);
+}
+
+/** Reports whether a code point has the Unicode Uppercase property. */
+#[AlwaysInline]
+#[MustUse]
+function is_uppercase(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 11);
+}
+
+/** Reports whether a code point has the Unicode Lowercase property. */
+#[AlwaysInline]
+#[MustUse]
+function is_lowercase(int $codePoint): bool {
+  return Whim\_Private\unicode_has_property($codePoint, 12);
+}

@@ -1,0 +1,237 @@
+namespace Whim\Filesystem;
+
+use Whim;
+use Whim\Filesystem\_Private;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+
+/**
+ * Reports whether a path points to an existing node, following symbolic links.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function exists(NonEmptyString $path): bool {
+  try {
+    return Whim\_Private\path_exists($path, true);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+}
+
+/** Reports whether a path points to a regular file. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function is_file(NonEmptyString $path): bool {
+  try {
+    $metadata = _Private\metadata_values($path, true);
+  } catch (Whim\_Private\SystemError $error) {
+    return false;
+  }
+
+  return NodeKind::fromBits($metadata[0]) == NodeKind::File;
+}
+
+/** Reports whether a path points to a directory. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function is_directory(NonEmptyString $path): bool {
+  try {
+    $metadata = _Private\metadata_values($path, true);
+  } catch (Whim\_Private\SystemError $error) {
+    return false;
+  }
+
+  return NodeKind::fromBits($metadata[0]) == NodeKind::Directory;
+}
+
+/** Reports whether a path points to a symbolic link. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function is_symbolic_link(NonEmptyString $path): bool {
+  try {
+    $metadata = _Private\metadata_values($path, false);
+  } catch (Whim\_Private\SystemError $error) {
+    return false;
+  }
+
+  return NodeKind::fromBits($metadata[0]) == NodeKind::SymbolicLink;
+}
+
+/**
+ * Reports whether the effective user can read the node at a path.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function is_readable(NonEmptyString $path): bool {
+  try {
+    return Whim\_Private\check_access($path, true, false, false, true);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+}
+
+/**
+ * Reports whether the effective user can write the node at a path.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function is_writable(NonEmptyString $path): bool {
+  try {
+    return Whim\_Private\check_access($path, false, true, false, true);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+}
+
+/**
+ * Reports whether the effective user can execute the node at a path.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function is_executable(NonEmptyString $path): bool {
+  try {
+    return Whim\_Private\check_access($path, false, false, true, true);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+}
+
+/**
+ * Returns the metadata of the node a path points to, following symbolic links.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function metadata(NonEmptyString $path): Metadata {
+  try {
+    $raw = _Private\metadata_values($path, true);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+
+  return _Private\into_metadata($raw);
+}
+
+/**
+ * Returns the metadata of the node a path points to, without following symbolic links.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function symbolic_link_metadata(NonEmptyString $path): Metadata {
+  try {
+    $raw = _Private\metadata_values($path, false);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+
+  return _Private\into_metadata($raw);
+}
+
+/**
+ * Lists the entries of a directory, excluding `.` and `..`.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function read_directory(NonEmptyString $path): vec<DirectoryEntry> {
+  try {
+    $entries = Whim\_Private\read_directory($path);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'read directory');
+  }
+
+  $result = vec[];
+  foreach ($entries as $entry) {
+    $result[] = new DirectoryEntry($entry[0], NodeKind::fromBits($entry[1]));
+  }
+
+  return $result;
+}
+
+/**
+ * Returns the total capacity in bytes of the filesystem holding a path.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function total_space(NonEmptyString $path): NonNegativeInt {
+  try {
+    $space = Whim\_Private\filesystem_space($path);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+
+  return $space[0] * $space[1];
+}
+
+/**
+ * Returns the bytes available to the current user on the filesystem holding a path.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function available_space(NonEmptyString $path): NonNegativeInt {
+  try {
+    $space = Whim\_Private\filesystem_space($path);
+  } catch (Whim\_Private\SystemError $error) {
+    _Private\failure($error, $path, 'inspect');
+  }
+
+  return $space[0] * $space[3];
+}

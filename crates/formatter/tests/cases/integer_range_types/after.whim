@@ -1,0 +1,7 @@
+type Port = 1..=65535;
+function clamp(-10..10 $value): 0.. {
+  return $value as 0..;
+}
+
+type Below = ..0;
+type ThroughZero = ..=0;

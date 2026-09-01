@@ -1,0 +1,11 @@
+namespace Whim\IO;
+
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+
+/** Defines a write handle with an explicit output buffer. */
+interface BufferedWriteHandle extends WriteHandle {
+  /** Flushes buffered bytes to the underlying destination. */
+  #[TrackCaller]
+  public function flush(null|CancellationToken $cancellation = null): void;
+}

@@ -1,0 +1,65 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Requires another source to yield exactly a configured number of bytes. */
+final class FixedLengthReadHandle implements ReadHandle {
+  private int $consumed = 0;
+
+  /**
+   * Creates a fixed-length view over a readable handle.
+   *
+   * @throws InvalidArgumentException when the length is negative.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(private ReadHandle $handle, private int $length) {
+    if ($length < 0) {
+      throw new InvalidArgumentException('$length must be non-negative');
+    }
+  }
+
+  /** Waits for the underlying source while bytes remain. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->consumed < $this->length) {
+      $this->handle->waitUntilReadable($cancellation);
+    }
+  }
+
+  /** Reports whether the required byte count has been consumed. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->consumed >= $this->length;
+  }
+
+  /** Attempts a read and throws if the source ends before the fixed length. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    $remaining = $this->length - $this->consumed;
+    if ($remaining <= 0) {
+      return '';
+    }
+
+    $wanted = $remaining;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $remaining) {
+      $wanted = $maxBytes;
+    }
+
+    $data = $this->handle->tryRead($wanted);
+    if ($data == '' && $this->handle->reachedEndOfDataSource()) {
+      throw new Exception(
+        'the data source ended before the fixed length was read',
+      );
+    }
+
+    $this->consumed += length!($data);
+    return $data;
+  }
+}

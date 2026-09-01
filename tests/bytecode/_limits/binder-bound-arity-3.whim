@@ -1,0 +1,2 @@
+class Box<T> {}
+type X<U: Box<int, string>> = int;

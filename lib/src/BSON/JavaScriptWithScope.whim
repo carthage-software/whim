@@ -1,0 +1,11 @@
+namespace Whim\BSON;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
+
+/** BSON JavaScript source with an attached scope document. */
+#[Stub]
+final readonly class JavaScriptWithScope {
+  #[AlwaysInline]
+  public function __construct(public string $code, public Document $scope) {}
+}

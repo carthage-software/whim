@@ -1,0 +1,2 @@
+type Ordering=-1|0|1;
+function take(vec<-1.5|-1> $values):-1{return -1;}

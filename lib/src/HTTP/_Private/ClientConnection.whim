@@ -1,0 +1,8 @@
+namespace Whim\HTTP\_Private;
+
+/** A client-side sans-I/O HTTP/2 connection. */
+final class ClientConnection extends ConnectionImpl {
+  public function __construct(null|Configuration $configuration = null) {
+    parent::__construct(Role::Client, $configuration ?? new Configuration());
+  }
+}

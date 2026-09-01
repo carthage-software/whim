@@ -1,0 +1,18 @@
+namespace Whim\Database;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** Executes raw parameterized database statements. */
+interface Executor {
+  /** Executes SQL whose positional parameters are `$1`, `$2`, and so on. */
+  #[MustUse]
+  #[TrackCaller]
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result;
+}

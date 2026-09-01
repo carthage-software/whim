@@ -1,0 +1,288 @@
+namespace Whim\Filesystem\_Private;
+
+use Whim;
+use Whim\Filesystem\AlreadyCreatedException;
+use Whim\Filesystem\Metadata;
+use Whim\Filesystem\NodeKind;
+use Whim\Filesystem\NotDirectoryException;
+use Whim\Filesystem\NotEmptyException;
+use Whim\Filesystem\NotFileException;
+use Whim\Filesystem\NotFoundException;
+use Whim\Filesystem\PermissionDeniedException;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\OS\FileDescriptor;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\Uint32;
+use Whim\Str;
+use Whim\Time\SystemTime;
+use Whim\Unwind\RuntimeException;
+use Whim\_Private\FileOperation;
+
+/**
+ * Converts a raw system failure into the public filesystem exception family.
+ *
+ * @throws NotFoundException for a missing path.
+ * @throws NotDirectoryException for a path component that is not a directory.
+ * @throws NotFileException for a directory where a file is needed.
+ * @throws AlreadyCreatedException for a node that already exists.
+ * @throws PermissionDeniedException for a denied operation.
+ * @throws NotEmptyException for a directory that still has entries.
+ * @throws Whim\Unwind\RuntimeException for every unclassified failure.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function failure(
+  Whim\_Private\SystemError $error,
+  string $path,
+  string $action,
+): never {
+  $number = $error->errno();
+  if ($number == Whim\_Private\ERRNO_NOT_FOUND) {
+    throw new NotFoundException('path `' . $path . '` was not found', $number);
+  }
+
+  if ($number == Whim\_Private\ERRNO_NOT_DIRECTORY) {
+    throw new NotDirectoryException(
+      'path `' . $path . '` does not point to a directory',
+      $number,
+    );
+  }
+
+  if ($number == Whim\_Private\ERRNO_IS_DIRECTORY) {
+    throw new NotFileException(
+      'path `' . $path . '` does not point to a file',
+      $number,
+    );
+  }
+
+  if ($number == Whim\_Private\ERRNO_ALREADY_EXISTS) {
+    throw new AlreadyCreatedException(
+      'path `' . $path . '` already exists',
+      $number,
+    );
+  }
+
+  if (
+    $number == Whim\_Private\ERRNO_PERMISSION_DENIED
+    || $number == Whim\_Private\ERRNO_OPERATION_NOT_PERMITTED
+  ) {
+    throw new PermissionDeniedException(
+      'failed to ' . $action . ' `' . $path . '`: permission denied',
+      $number,
+    );
+  }
+
+  if ($number == Whim\_Private\ERRNO_DIRECTORY_NOT_EMPTY) {
+    throw new NotEmptyException(
+      'directory `' . $path . '` is not empty',
+      $number,
+    );
+  }
+
+  throw new RuntimeException(
+    'failed to '
+    . $action
+    . ' `'
+    . $path
+    . '`: the '
+    . $error->call()
+    . ' system call failed with errno '
+    . $number,
+    $number,
+  );
+}
+
+/** Opens a descriptor through the blocking worker pool. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function open_descriptor(
+  NonEmptyString $path,
+  int $flags,
+  Uint32 $mode,
+): FileDescriptor {
+  $operation = FileOperation::open($path, $flags, $mode);
+  $operation->wait();
+  return $operation->takeDescriptor() as FileDescriptor;
+}
+
+/** Reads path metadata through the blocking worker pool. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function metadata_values(NonEmptyString $path, bool $follow): vec<int> {
+  $operation = FileOperation::pathMetadata($path, $follow);
+  $operation->wait();
+  return $operation->takeMetadata() as vec<int>;
+}
+
+/** Builds public metadata from a raw stat tuple. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function into_metadata(vec<int> $raw): Metadata {
+  return new Metadata(
+    NodeKind::fromBits($raw[0]),
+    $raw[0] & 0o7777,
+    $raw[4],
+    $raw[2],
+    $raw[3],
+    SystemTime::fromUnixTimestamp($raw[9], $raw[10]),
+    SystemTime::fromUnixTimestamp($raw[11], $raw[12]),
+    SystemTime::fromUnixTimestamp($raw[13], $raw[14]),
+    $raw[1],
+    $raw[7],
+    $raw[8],
+    $raw[5],
+    $raw[6],
+  );
+}
+
+/** Returns the parent directory of a path, when it has one. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function parent_directory(NonEmptyString $path): null|NonEmptyString {
+  $length = length!($path);
+  while ($length > 0 && $path[$length - 1] == '/') {
+    $length = $length - 1;
+  }
+
+  while ($length > 0 && $path[$length - 1] != '/') {
+    $length = $length - 1;
+  }
+
+  while ($length > 1 && $path[$length - 1] == '/') {
+    $length = $length - 1;
+  }
+
+  if ($length == 0) {
+    return null;
+  }
+
+  if ($length == 1 && $path[0] == '/') {
+    return null;
+  }
+
+  return Str\slice($path, 0, $length);
+}
+
+/** Reports whether a path points to an existing directory. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function is_existing_directory(NonEmptyString $path, bool $follow): bool {
+  try {
+    $metadata = metadata_values($path, $follow);
+  } catch (Whim\_Private\SystemError $error) {
+    return false;
+  }
+
+  return NodeKind::fromBits($metadata[0]) == NodeKind::Directory;
+}
+
+/**
+ * Creates a directory along with every missing parent.
+ *
+ * @throws AlreadyCreatedException when the path is already created.
+ * @throws NotFoundException when a parent does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function create_directory_recursively(
+  NonEmptyString $path,
+  Uint32 $permissions,
+): void {
+  try {
+    Whim\_Private\create_directory($path, $permissions);
+    return;
+  } catch (Whim\_Private\SystemError $error) {
+    $number = $error->errno();
+    if ($number == Whim\_Private\ERRNO_ALREADY_EXISTS) {
+      if (is_existing_directory($path, true)) {
+        return;
+      }
+
+      failure($error, $path, 'create directory');
+    }
+
+    if ($number != Whim\_Private\ERRNO_NOT_FOUND) {
+      failure($error, $path, 'create directory');
+    }
+  }
+
+  $parent = parent_directory($path);
+  if ($parent != null) {
+    create_directory_recursively($parent, $permissions);
+  }
+
+  try {
+    Whim\_Private\create_directory($path, $permissions);
+  } catch (Whim\_Private\SystemError $error) {
+    if (
+      $error->errno() != Whim\_Private\ERRNO_ALREADY_EXISTS
+      || !is_existing_directory($path, true)
+    ) {
+      failure($error, $path, 'create directory');
+    }
+  }
+}
+
+/**
+ * Deletes a directory along with everything inside it.
+ *
+ * @throws NotFoundException when the path does not exist.
+ * @throws NotDirectoryException when a path component is not a directory.
+ * @throws PermissionDeniedException when the filesystem denies the operation.
+ * @throws Whim\Unwind\RuntimeException when an unclassified system call failure occurs.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function delete_directory_recursively(NonEmptyString $path): void {
+  try {
+    $entries = Whim\_Private\read_directory($path);
+  } catch (Whim\_Private\SystemError $error) {
+    failure($error, $path, 'delete directory');
+  }
+
+  $prefix = Str\trim_right($path, '/');
+  foreach ($entries as $entry) {
+    $child = $prefix . '/' . $entry[0];
+    $bits = $entry[1];
+    if ($bits == 0) {
+      try {
+        $metadata = metadata_values($child, false);
+        $bits = $metadata[0];
+      } catch (Whim\_Private\SystemError $error) {
+        failure($error, $child, 'delete directory');
+      }
+    }
+
+    if (NodeKind::fromBits($bits) == NodeKind::Directory) {
+      delete_directory_recursively($child);
+    } else {
+      try {
+        Whim\_Private\remove_file($child);
+      } catch (Whim\_Private\SystemError $error) {
+        failure($error, $child, 'delete file');
+      }
+    }
+  }
+
+  try {
+    Whim\_Private\remove_directory($path);
+  } catch (Whim\_Private\SystemError $error) {
+    failure($error, $path, 'delete directory');
+  }
+}

@@ -1,0 +1,5 @@
+error: a callable returning void or never cannot be must-use
+ --> tests/ui/function_must_use_void.rs:3:17
+  |
+3 | #[whim_function("Ui\\discard(): void", must_use)]
+  |                 ^^^^^^^^^^^^^^^^^^^^^

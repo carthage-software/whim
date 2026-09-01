@@ -1,0 +1,7 @@
+class ParentValue {
+  public int $value = 1;
+}
+
+class ChildValue extends ParentValue {
+  public readonly int $value = 1;
+}

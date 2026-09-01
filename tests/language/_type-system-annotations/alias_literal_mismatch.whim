@@ -1,0 +1,5 @@
+type Text = string;
+
+class ConstantAliasBad {
+  public const Text NAME = 42;
+}

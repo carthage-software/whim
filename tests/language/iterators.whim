@@ -1,0 +1,210 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Iterate\Iterator;
+use Whim\Iterate\ToIterator;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\RuntimeException;
+
+class RangeIterator implements Iterator<int, int> {
+  public function __construct(private int $from, private readonly int $to) {}
+
+  public function next(): null|(int, int) {
+    if ($this->from > $this->to) {
+      return null;
+    }
+
+    $current = $this->from;
+    $this->from = $current + 1;
+    return ($current, $current * 10);
+  }
+}
+
+class Range implements ToIterator<int, int> {
+  public function __construct(
+    private readonly int $from,
+    private readonly int $to,
+  ) {}
+
+  public function toIterator(): Iterator<int, int> {
+    return new RangeIterator($this->from, $this->to);
+  }
+}
+
+$entries = vec[];
+foreach (new Range(1, 3) as $index => $number) {
+  $entries[] = ($index, $number);
+}
+
+assert!($entries == vec[(1, 10), (2, 20), (3, 30)]);
+
+$range = new Range(1, 2);
+$first = vec[];
+foreach ($range as $number) {
+  $first[] = $number;
+}
+
+$second = vec[];
+foreach ($range as $number) {
+  $second[] = $number;
+}
+
+assert!($first == vec[10, 20]);
+assert!($second == vec[10, 20]);
+
+class Words implements Iterator<string, string> {
+  private bool $done = false;
+
+  public function next(): null|(string, string) {
+    if ($this->done) {
+      return null;
+    }
+
+    $this->done = true;
+    return ('key', 'value');
+  }
+}
+
+$words = vec[];
+foreach (new Words() as $key => $value) {
+  $words[] = ($key, $value);
+}
+
+assert!($words == vec[('key', 'value')]);
+
+class Numbers implements Iterator<int, int> {
+  private int $current = 0;
+
+  public function next(): null|(int, int) {
+    if ($this->current >= 4) {
+      return null;
+    }
+
+    $value = $this->current;
+    $this->current = $value + 1;
+    return ($value, $value);
+  }
+}
+
+$numbers = new Numbers();
+$seen = vec[];
+foreach ($numbers as $number) {
+  $seen[] = $number;
+  if ($number == 1) {
+    break;
+  }
+}
+
+foreach ($numbers as $number) {
+  $seen[] = $number;
+}
+
+assert!($seen == vec[0, 1, 2, 3]);
+
+class FinalIterator implements Iterator<int, int> {
+  public static int $destroyed = 0;
+  public static vec<int> $yielded = vec[];
+  private int $current = 0;
+
+  public function next(): null|(int, int) {
+    if ($this->current == 2) {
+      return null;
+    }
+
+    $value = $this->current;
+    $this->current++;
+    return ($value, $value);
+  }
+
+  public function __destruct(): void {
+    self::$destroyed++;
+  }
+}
+
+/** Exhausts a temporary iterator without retaining the receiver. */
+function exhaust(): void {
+  foreach (new FinalIterator() as $value) {
+    FinalIterator::$yielded[] = $value;
+  }
+}
+
+exhaust();
+assert!(FinalIterator::$destroyed == 1);
+assert!(FinalIterator::$yielded == vec[0, 1]);
+
+class ThrowingIterator implements Iterator<int, int> {
+  public function next(): null|(int, int) {
+    throw new RuntimeException('next failed');
+  }
+}
+
+$assertion_value_8 = function(): void {
+  foreach (new ThrowingIterator() as $value) {
+    $value;
+  }
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (RuntimeException $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+  assert!(Whim\Str\contains($assertion_caught_8->getMessage(), 'next failed'));
+}
+
+assert!($assertion_error_8 is RuntimeException);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+File\write(
+  $work . '/chatty.whim',
+  'class Chatty implements Whim\Iterate\Iterator<mixed, mixed> {'
+  . "\n"
+  . '    public function next(): mixed { return 5; }'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'foreach (new Chatty() as $x) { $x; }'
+  . "\n",
+);
+
+$chattyUnit = $work . '/chatty.whim';
+$assertion_value_9 = function() use ($chattyUnit): void {
+  require!($chattyUnit);
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (LinkerError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is LinkerError);
+
+File\write(
+  $work . '/lying.whim',
+  'class Lying implements Whim\Iterate\ToIterator<mixed, mixed> {'
+  . "\n"
+  . '    public function toIterator(): mixed { return 5; }'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'foreach (new Lying() as $x) { $x; }'
+  . "\n",
+);
+
+$lyingUnit = $work . '/lying.whim';
+$assertion_value_10 = function() use ($lyingUnit): void {
+  require!($lyingUnit);
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (LinkerError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is LinkerError);
+
+Filesystem\delete_directory($work, true);

@@ -1,0 +1,399 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\ParserError;
+use Whim\Unwind\RequireError;
+use Whim\Unwind\TypeError;
+
+require!('_reject.whim');
+require!('_process.whim');
+
+final class LoadingTrace {
+  public static vec<string> $events = vec[];
+}
+
+$work = Filesystem\canonicalize(
+  Filesystem\create_temporary_directory(null, 'whim-test-'),
+);
+
+prints('relative-main', 'main' . "\n" . 'middle' . "\n" . 'inner' . "\n");
+
+File\write($work . '/null-answer.whim', '$answer = 40 + 2;' . "\n");
+File\write($work . '/null-plain.whim', '$noise = 1;' . "\n");
+$answerUnit = $work . '/null-answer.whim';
+$answerValue = require!($answerUnit);
+assert!($answerValue == null);
+$plainUnit = $work . '/null-plain.whim';
+$plainValue = require!($plainUnit);
+assert!($plainValue == null);
+
+File\write(
+  $work . '/late-alias.whim',
+  'type OnlyObjects<T: object> = T;' . "\n",
+);
+
+rejects(
+  $work,
+  'late-generic-bound',
+  'function show(OnlyObjects<int> $value): void {}'
+  . "\n"
+  . 'require!(\'late-alias.whim\');'
+  . "\n",
+  'type argument 1 supplied to OnlyObjects does not satisfy the bound of T',
+);
+
+accepts(
+  $work,
+  'pending-bound-use',
+  'namespace BoundJournal;'
+  . "\n"
+  . 'function consume(LateAlias<int> $value): void {}'
+  . "\n",
+);
+
+rejects(
+  $work,
+  'bound-validation-rollback',
+  'namespace BoundJournal;'
+  . "\n"
+  . 'type LateAlias<T: mixed> = T;'
+  . "\n"
+  . 'final class Broken { public static int $value = \'bad\'; }'
+  . "\n",
+  'must be of type int',
+);
+
+rejects(
+  $work,
+  'bound-validation-after-rollback',
+  'namespace BoundJournal;' . "\n" . 'type LateAlias<T: object> = T;' . "\n",
+  'type argument 1 supplied to BoundJournal\LateAlias does not satisfy the bound of T',
+);
+
+accepts(
+  $work,
+  'pending-default-use',
+  'namespace DefaultJournal;'
+  . "\n"
+  . 'type Pending<T: object = Later> = T;'
+  . "\n",
+);
+
+rejects(
+  $work,
+  'default-validation-rollback',
+  'namespace DefaultJournal;'
+  . "\n"
+  . 'final class Later {}'
+  . "\n"
+  . 'final class Broken { public static int $value = \'bad\'; }'
+  . "\n",
+  'must be of type int',
+);
+
+rejects(
+  $work,
+  'default-validation-after-rollback',
+  'namespace DefaultJournal;' . "\n" . 'type Later = int;' . "\n",
+  'the default for type parameter T on DefaultJournal\Pending does not satisfy its bound',
+);
+
+File\write(
+  $work . '/once-effect.whim',
+  'LoadingTrace::$events[] = \'loaded\';' . "\n",
+);
+
+$onceEffectUnit = $work . '/once-effect.whim';
+$firstOnce = require_once!($onceEffectUnit);
+assert!($firstOnce == null);
+$secondOnce = require_once!($onceEffectUnit);
+assert!($secondOnce == null);
+assert!(LoadingTrace::$events == vec['loaded']);
+
+File\write(
+  $work . '/repeat-effect.whim',
+  'LoadingTrace::$events[] = \'repeated\';' . "\n",
+);
+
+LoadingTrace::$events = vec[];
+$repeatEffectUnit = $work . '/repeat-effect.whim';
+require!($repeatEffectUnit);
+require!($repeatEffectUnit);
+assert!(LoadingTrace::$events == vec['repeated', 'repeated']);
+
+File\write(
+  $work . '/circular-b.whim',
+  'LoadingTrace::$events[] = \'b\';'
+  . "\n"
+  . 'require_once!(\'circular-a.whim\');'
+  . "\n",
+);
+
+File\write(
+  $work . '/circular-a.whim',
+  'LoadingTrace::$events[] = \'a\';'
+  . "\n"
+  . 'require_once!(\'circular-b.whim\');'
+  . "\n"
+  . 'LoadingTrace::$events[] = \'a end\';'
+  . "\n",
+);
+
+LoadingTrace::$events = vec[];
+$circularUnit = $work . '/circular-a.whim';
+require_once!($circularUnit);
+assert!(LoadingTrace::$events == vec['a', 'b', 'a end']);
+
+File\write(
+  $work . '/redeclares.whim',
+  'function redeclared_helper(): int { return 1; }' . "\n",
+);
+
+$redeclaresUnit = $work . '/redeclares.whim';
+require!($redeclaresUnit);
+$assertion_value_8 = function() use ($redeclaresUnit): void {
+  require!($redeclaresUnit);
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (LinkerError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+  assert!(
+    Whim\Str\contains($assertion_caught_8->getMessage(), 'redeclared_helper'),
+  );
+}
+
+assert!($assertion_error_8 is LinkerError);
+
+$absentUnit = $work . '/absent.whim';
+$assertion_value_9 = function() use ($absentUnit): void {
+  require!($absentUnit);
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (RequireError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+  assert!(Whim\Str\contains($assertion_caught_9->getMessage(), 'absent.whim'));
+}
+
+assert!($assertion_error_9 is RequireError);
+
+File\write($work . '/broken.whim', 'function {{{' . "\n");
+File\write($work . '/uncompilable.whim', 'break;' . "\n");
+File\write(
+  $work . '/unlinkable.whim',
+  'class Orphan extends Missing {}' . "\n",
+);
+
+$brokenUnit = $work . '/broken.whim';
+$assertion_value_10 = function() use ($brokenUnit): void {
+  require!($brokenUnit);
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (ParserError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is ParserError);
+
+$uncompilableUnit = $work . '/uncompilable.whim';
+$assertion_value_11 = function() use ($uncompilableUnit): void {
+  require!($uncompilableUnit);
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (CompilerError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is CompilerError);
+
+$unlinkableUnit = $work . '/unlinkable.whim';
+$assertion_value_12 = function() use ($unlinkableUnit): void {
+  require!($unlinkableUnit);
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (LinkerError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is LinkerError);
+
+$binary = Env\current_binary();
+assert!($binary is string);
+File\write(
+  $work . '/trace-library.whim',
+  'function boom(): int {' . "\n" . '    return 1 / 0;' . "\n" . '}' . "\n",
+);
+
+File\write(
+  $work . '/trace-main.whim',
+  'require!(\'trace-library.whim\');' . "\n" . 'boom();' . "\n",
+);
+
+$traceRun = Command\run($binary, vec[$work . '/trace-main.whim']);
+assert!($traceRun->status is Command\Exited);
+assert!(($traceRun->status as Command\Exited)->code == 255);
+$canonicalTraceLibrary = Filesystem\canonicalize($work . '/trace-library.whim');
+$assertion_value_16 = $traceRun->standardError;
+assert!(
+  Whim\Str\contains($assertion_value_16, 'Whim\Unwind\DivisionByZeroError'),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_16,
+    "\n" . ' 0  boom' . "\n" . '    ' . $canonicalTraceLibrary . ':2',
+  ),
+);
+
+File\write(
+  $work . '/generics.whim',
+  'function external_id<T: int|string>(T $value): T { return $value; }'
+  . "\n"
+  . 'function external_default<T = int>(T $value): T { return $value; }'
+  . "\n"
+  . 'function external_plain(int $value): int { return $value; }'
+  . "\n"
+  . 'class ExternalBox<T> {'
+  . "\n"
+  . '    public function __construct(public T $value) {}'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'class ExternalCalls {'
+  . "\n"
+  . '    public function method<T>(T $value): T { return $value; }'
+  . "\n"
+  . '    public static function statically<T>(T $value): T { return $value; }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$genericsUnit = $work . '/generics.whim';
+require!($genericsUnit);
+
+assert!(external_id::<int>(1) == 1);
+assert!(external_default(2) == 2);
+
+$assertion_value_19 = function(): void {
+  external_id(1);
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is TypeError);
+
+$assertion_value_20 = function(): void {
+  external_id::<float>(1.0);
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (TypeError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is TypeError);
+
+$assertion_value_21 = function(): void {
+  external_plain::<int>(1);
+};
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (TypeError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is TypeError);
+
+$box = new ExternalBox::<vec<int>>(vec[1, 2]);
+assert!($box is ExternalBox<vec<int>>);
+
+$assertion_value_23 = function(): void {
+  new ExternalBox(1);
+};
+
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (TypeError $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is TypeError);
+
+$calls = new ExternalCalls();
+assert!($calls->method::<string>('method') == 'method');
+assert!(ExternalCalls::statically::<string>('static') == 'static');
+
+$assertion_value_26 = function() use ($calls): void {
+  $calls->method(1);
+};
+
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (TypeError $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is TypeError);
+
+$assertion_value_27 = function(): void {
+  ExternalCalls::statically(1);
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (TypeError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is TypeError);
+
+$survivorDict = dict[];
+for ($i = 0; $i < 12; $i++) {
+  $survivorDict[$i] = $i * 10;
+}
+
+for ($i = 0; $i < 12; $i++) {
+  if ($i % 3 != 0) {
+    remove!($survivorDict, $i);
+  }
+}
+
+$survivorEntries = vec[];
+foreach ($survivorDict as $key => $value) {
+  $survivorEntries[] = $key . ':' . $value;
+}
+
+assert!($survivorEntries == vec['0:0', '3:30', '6:60', '9:90']);
+assert!(length!($survivorDict) == 4);
+
+Filesystem\delete_directory($work, true);

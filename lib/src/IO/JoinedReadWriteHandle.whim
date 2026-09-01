@@ -1,0 +1,104 @@
+namespace Whim\IO;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\Unwind\Throwable;
+
+/** Presents separate readable and writable handles as one duplex handle. */
+final class JoinedReadWriteHandle implements
+  ReadHandle,
+  WriteHandle,
+  CloseHandle {
+  private bool $closed = false;
+
+  /** Creates a duplex view over separate readable and writable handles. */
+  #[TrackCaller]
+  public function __construct(
+    private ReadHandle $reader,
+    private WriteHandle $writer,
+  ) {}
+
+  /** Waits for the readable side. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->reader->waitUntilReadable($cancellation);
+  }
+
+  /** Reports whether the readable side has reached its end. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->reader->reachedEndOfDataSource();
+  }
+
+  /** Attempts a read from the readable side. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    return $this->reader->tryRead($maxBytes);
+  }
+
+  /** Waits for the writable side. */
+  #[TrackCaller]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->writer->waitUntilWritable($cancellation);
+  }
+
+  /** Attempts a write to the writable side. */
+  #[TrackCaller]
+  public function tryWrite(string $bytes): int {
+    return $this->writer->tryWrite($bytes);
+  }
+
+  /** Writes to the writable side. */
+  #[TrackCaller]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return $this->writer->write($bytes, $cancellation);
+  }
+
+  /** Closes each distinct closeable side, preserving the first failure. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    $failure = null;
+    if ($this->reader is CloseHandle) {
+      try {
+        $this->reader->close();
+      } catch (Throwable $throwable) {
+        $failure = $throwable;
+      }
+    }
+
+    if ($this->writer != $this->reader && $this->writer is CloseHandle) {
+      try {
+        $this->writer->close();
+      } catch (Throwable $throwable) {
+        if ($failure == null) {
+          $failure = $throwable;
+        }
+      }
+    }
+
+    if ($failure != null) {
+      throw $failure;
+    }
+  }
+
+  /** Whether this joined handle has been closed. */
+  #[AlwaysInline]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+}

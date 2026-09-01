@@ -1,0 +1,505 @@
+use Whim\Attribute\Attribute;
+use Whim\Filesystem;
+use Whim\Marker\ConsistentConstructor;
+use Whim\Marker\ConsistentGenerics;
+use Whim\Unwind\Error;
+use Whim\Unwind\Exception;
+use Whim\Unwind\InvalidArgumentException;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+rejects(
+  $work,
+  'class-is-not-an-attribute',
+  'final class Plain {}'
+  . "\n\n"
+  . '#[Plain]'
+  . "\n"
+  . 'function target(): void {}'
+  . "\n",
+  'does not carry #[Whim\Attribute\Attribute]',
+);
+
+rejects(
+  $work,
+  'target-flags-are-enforced',
+  'use Whim\Attribute\Attribute;'
+  . "\n\n"
+  . '#[Attribute(Attribute::TARGET_CLASS)]'
+  . "\n"
+  . 'final class ClassOnly {}'
+  . "\n\n"
+  . '#[ClassOnly]'
+  . "\n"
+  . 'function wrongly_accepted(): string { return \'ran\'; }'
+  . "\n\n"
+  . 'write_line!(wrongly_accepted());'
+  . "\n",
+  'does not target functions',
+);
+
+rejects(
+  $work,
+  'arguments-are-constant',
+  'use Whim\Attribute\Attribute;'
+  . "\n\n"
+  . '#[Attribute]'
+  . "\n"
+  . 'final class Capture {'
+  . "\n"
+  . '  public function __construct(public readonly int $value) {}'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . '#[Capture($value)]'
+  . "\n"
+  . 'class Target {}'
+  . "\n",
+  'an attribute argument is a constant expression',
+);
+
+rejects(
+  $work,
+  'constructor-arity',
+  'use Whim\Attribute\Attribute;'
+  . "\n\n"
+  . '#[Attribute]'
+  . "\n"
+  . 'final class Two {'
+  . "\n"
+  . '  public function __construct(public readonly int $a, public readonly int $b) {}'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . '#[Two(1)]'
+  . "\n"
+  . 'class C {}'
+  . "\n",
+  'its constructor takes exactly 2',
+);
+
+rejects(
+  $work,
+  'repeatability',
+  'use Whim\Attribute\Attribute;'
+  . "\n\n"
+  . '#[Attribute(Attribute::TARGET_CLASS)]'
+  . "\n"
+  . 'final class Once {}'
+  . "\n\n"
+  . '#[Once]'
+  . "\n"
+  . '#[Once]'
+  . "\n"
+  . 'class C {}'
+  . "\n",
+  'is not repeatable',
+);
+
+rejects(
+  $work,
+  'type-alias-wrong-target',
+  'use Whim\Attribute\Attribute;'
+  . "\n\n"
+  . '#[Attribute(Attribute::TARGET_CLASS)]'
+  . "\n"
+  . 'final class ClassOnly {}'
+  . "\n\n"
+  . '#[ClassOnly]'
+  . "\n"
+  . 'type Number = int;'
+  . "\n",
+  'does not target type aliases',
+);
+
+rejects(
+  $work,
+  'consistent-constructor-narrowing',
+  'use Whim\Marker\ConsistentConstructor;'
+  . "\n\n"
+  . '#[ConsistentConstructor]'
+  . "\n"
+  . 'class Base {'
+  . "\n"
+  . '  public function __construct(int|string $value) {}'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'final class Child extends Base {'
+  . "\n"
+  . '  public function __construct(int $value) {}'
+  . "\n"
+  . '}'
+  . "\n",
+  'Child::__construct is not compatible with the method it overrides: parameter 1 is not contravariant with the inherited method',
+);
+
+rejects(
+  $work,
+  'consistent-generics-narrowing',
+  'use Whim\Marker\ConsistentGenerics;'
+  . "\n\n"
+  . '#[ConsistentGenerics]'
+  . "\n"
+  . 'class Base<T: int|string> {}'
+  . "\n\n"
+  . 'final class Narrow<T: int> extends Base<T> {}'
+  . "\n",
+  'type parameter 1 on Narrow must preserve the generic contract of Base',
+);
+
+Filesystem\delete_directory($work, true);
+
+#[ConsistentConstructor]
+class WideningBase {
+  public function __construct(int $value) {}
+}
+
+final class WideningChild extends WideningBase {
+  public function __construct(int|float $value, string $label = '') {}
+}
+
+assert!(new WideningChild(1) is WideningBase);
+
+class PermissiveBase {
+  public function __construct() {}
+}
+
+final class PermissiveChild extends PermissiveBase {
+  public function __construct(int $required) {}
+}
+
+assert!(new PermissiveChild(1) is PermissiveBase);
+
+#[ConsistentGenerics]
+class GenericBase<T: int|string> {}
+
+final class GenericSame<T: int|string> extends GenericBase<T> {}
+
+assert!(new GenericSame::<int>() is GenericBase<int>);
+
+#[Attribute(Attribute::TARGET_ALL)]
+final class Tag {
+  public function __construct(public readonly string $name) {}
+}
+
+enum Signal {
+  #[Tag('ready')]
+  case Ready;
+
+  case Waiting;
+}
+
+$ready = Whim\Attribute\get_enum_case_attributes(Signal::Ready);
+assert!(length!($ready) == 1);
+$tag = $ready[0];
+assert!($tag is Tag);
+assert!($tag->name == 'ready');
+assert!(length!(Whim\Attribute\get_enum_case_attributes(Signal::Waiting)) == 0);
+
+#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
+final class Meta {
+  public function __construct(public readonly mixed $value = null) {}
+}
+
+#[Meta(2 + 3 * 4)]
+#[Meta('a' . 'b')]
+#[Meta(Later::LIMIT)]
+#[Meta(vec[1, 2, Later::LIMIT])]
+#[Meta(dict['k' => Suit::Hearts])]
+class Described {}
+
+class Later {
+  public const int LIMIT = 7;
+}
+
+enum Suit: string {
+  case Hearts = 'H';
+}
+
+$found = Whim\Attribute\get_attribute::<Meta>(new Described());
+assert!(length!($found) == 5);
+assert!($found[0]->value == 14);
+assert!($found[1]->value == 'ab');
+assert!($found[2]->value == 7);
+assert!($found[3]->value[2] == 7);
+$suit = $found[4]->value['k'];
+assert!($suit is Suit);
+assert!($suit->value == 'H');
+
+#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
+final class Deprecated {
+  public function __construct(public readonly string $reason = '') {}
+}
+
+#[Attribute(Attribute::TARGET_ALL)]
+final class Note {
+  public function __construct(public readonly string $tag = '') {}
+}
+
+#[Deprecated('use tomorrow() instead')]
+function today(#[Note('parameter')] int $when): void {}
+
+class Holder {
+  #[Note('constant')]
+  public const int LIMIT = 1;
+
+  #[Note('property')]
+  public int $count = 0;
+
+  #[Deprecated('method reason')]
+  public function old(#[Note('method parameter')] int $n): void {}
+}
+
+function accept_function_probe((fn(string): vec<object>) $probe): void {}
+
+function accept_member_probe((fn(object, string): vec<object>) $probe): void {}
+
+function accept_parameter_probe(
+  (fn(object, string, int|string): vec<object>) $probe,
+): void {}
+
+$holder = new Holder();
+
+$deprecation = Whim\Attribute\get_function_attributes('today')[0];
+assert!($deprecation is Deprecated);
+
+assert!($deprecation->reason == 'use tomorrow() instead');
+
+$positional = Whim\Attribute\get_parameter_attributes($holder, 'old', 0)[0];
+assert!($positional is Note);
+
+assert!($positional->tag == 'method parameter');
+
+$named = Whim\Attribute\get_parameter_attributes($holder, 'old', 'n')[0];
+assert!($named is Note);
+
+assert!($named->tag == 'method parameter');
+
+$method = Whim\Attribute\get_method_attributes($holder, 'old')[0];
+assert!($method is Deprecated);
+
+assert!($method->reason == 'method reason');
+
+$property = Whim\Attribute\get_property_attributes($holder, 'count')[0];
+assert!($property is Note);
+
+assert!($property->tag == 'property');
+
+$constant = Whim\Attribute\get_constant_attributes($holder, 'LIMIT')[0];
+assert!($constant is Note);
+
+assert!($constant->tag == 'constant');
+
+assert!(
+  length!(Whim\Attribute\get_parameter_attributes($holder, 'old', 1)) == 0,
+);
+
+assert!(
+  length!(Whim\Attribute\get_parameter_attributes($holder, 'old', 'missing'))
+  == 0,
+);
+
+accept_function_probe(Whim\Attribute\get_function_attributes(...));
+accept_member_probe(Whim\Attribute\get_method_attributes(...));
+accept_member_probe(Whim\Attribute\get_property_attributes(...));
+accept_member_probe(Whim\Attribute\get_constant_attributes(...));
+accept_parameter_probe(Whim\Attribute\get_parameter_attributes(...));
+
+$assertion_value_29 = fn(): vec<object> => (
+  Whim\Attribute\get_parameter_attributes($holder, 'old', -1)
+);
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (InvalidArgumentException $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is InvalidArgumentException);
+
+$assertion_value_30 = fn(): vec<object> => (
+  Whim\Attribute\get_parameter_attributes($holder, 'old', '')
+);
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (InvalidArgumentException $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is InvalidArgumentException);
+
+#[Attribute(Attribute::TARGET_TYPE_ALIAS)]
+final class TypeMetadata {}
+
+#[TypeMetadata]
+type Number = int;
+
+assert!(1 is Number);
+
+#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
+class LazyTag {
+  public function __construct(public readonly string $label = 'default') {}
+}
+
+#[LazyTag('first')]
+#[LazyTag(label: 'second')]
+class LazilyTaggedPost {}
+
+$tagged_post = new LazilyTaggedPost();
+assert!(Whim\Attribute\has_attribute($tagged_post, 'LazyTag'));
+
+assert!(!(Whim\Attribute\has_attribute($tagged_post, 'Missing')));
+
+$lazy_tags = Whim\Attribute\get_attribute::<LazyTag>($tagged_post);
+assert!(length!($lazy_tags) == 2);
+assert!($lazy_tags[0]->label == 'first');
+assert!($lazy_tags[1]->label == 'second');
+$lazy_tags_again = Whim\Attribute\get_attribute::<LazyTag>($tagged_post);
+assert!($lazy_tags[0] != $lazy_tags_again[0]);
+assert!(length!(Whim\Attribute\get_attributes($tagged_post)) == 2);
+
+function sensitive_login(
+  string $user,
+  #[Whim\Marker\SensitiveParameter] string $password,
+): void {
+  throw new Error('denied', 0);
+}
+
+$denied = null;
+$assertion_callable_39 = function(): void {
+  sensitive_login('ada', 'hunter2');
+};
+
+try {
+  $assertion_callable_39();
+} catch (Error $assertion_caught_39) {
+  $denied = $assertion_caught_39;
+  assert!(Whim\Str\contains($assertion_caught_39->getMessage(), 'denied'));
+}
+
+assert!($denied is Error);
+
+$denied_arguments = $denied->getTrace()[0]->arguments;
+assert!($denied_arguments[0] == 'ada');
+$wrapped_password = $denied_arguments[1];
+assert!($wrapped_password is Whim\Marker\SensitiveParameterValue);
+
+assert!($wrapped_password->getValue() == 'hunter2');
+
+function sensitive_never_login(
+  string $user,
+  #[Whim\Marker\SensitiveParameter] string $password,
+): never {
+  throw new Exception('denied');
+}
+
+$sensitive_rendering = null;
+$assertion_callable_43 = function(): void {
+  sensitive_never_login('alice-username-marker', 'super-secret-pw-marker');
+};
+
+try {
+  $assertion_callable_43();
+} catch (Exception $assertion_caught_43) {
+  $sensitive_rendering = $assertion_caught_43;
+}
+
+assert!($sensitive_rendering is Exception);
+$sensitive_rendering = $sensitive_rendering->toString();
+
+assert!(Whim\Str\contains($sensitive_rendering, 'alice-username-marker'));
+assert!(
+  Whim\Str\contains(
+    $sensitive_rendering,
+    'Whim\Marker\SensitiveParameterValue',
+  ),
+);
+
+assert!(!Whim\Str\contains($sensitive_rendering, 'super-secret-pw-marker'));
+
+#[Attribute(Attribute::TARGET_PARAMETER)]
+final class ParameterOnly {}
+
+#[Attribute(Attribute::TARGET_PROPERTY)]
+final class PropertyOnly {}
+
+class LoginRequest {
+  public function __construct(
+    #[Whim\Marker\SensitiveParameter]
+    #[ParameterOnly]
+    #[PropertyOnly]
+    public string $password,
+  ) {}
+}
+
+$login_request = new LoginRequest('secret');
+assert!($login_request->password == 'secret');
+assert!(
+  length!(
+    Whim\Attribute\get_parameter_attributes(
+      $login_request,
+      '__construct',
+      'password',
+    ),
+  )
+  == 3,
+);
+
+assert!(
+  length!(Whim\Attribute\get_property_attributes($login_request, 'password'))
+  == 3,
+);
+
+$collect_markers = Whim\Attribute\get_function_attributes(
+  'Whim\GC\collect_cycles',
+);
+
+assert!(length!($collect_markers) == 1);
+assert!($collect_markers[0] is Whim\Marker\AlwaysInline);
+
+$random_markers = Whim\Attribute\get_function_attributes(
+  'Whim\_Private\random_bytes',
+);
+
+assert!(length!($random_markers) == 2);
+assert!($random_markers[0] is Whim\Marker\TrackCaller);
+assert!($random_markers[1] is Whim\Marker\TraceBoundary);
+
+$process_markers = Whim\Attribute\get_function_attributes(
+  'Whim\_Private\getmypid',
+);
+
+assert!(length!($process_markers) == 1);
+assert!($process_markers[0] is Whim\Marker\MustUse);
+
+$message_markers = Whim\Attribute\get_method_attributes(
+  new Exception('failed'),
+  'getMessage',
+);
+
+assert!(length!($message_markers) == 1);
+assert!($message_markers[0] is Whim\Marker\TrackCaller);
+
+$some_markers = Whim\Attribute\get_method_attributes(
+  new Whim\Option\Some::<int>(1),
+  'unwrap',
+);
+
+assert!(length!($some_markers) == 2);
+assert!($some_markers[0] is Whim\Marker\AlwaysInline);
+assert!($some_markers[1] is Whim\Marker\MustUse);
+
+$none_markers = Whim\Attribute\get_method_attributes(
+  new Whim\Option\None(),
+  'unwrap',
+);
+
+assert!(length!($none_markers) == 2);
+assert!($none_markers[0] is Whim\Marker\NeverInline);
+assert!($none_markers[1] is Whim\Marker\TrackCaller);

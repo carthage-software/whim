@@ -1,0 +1,3 @@
+class Holder {
+  int $count = 0;
+}

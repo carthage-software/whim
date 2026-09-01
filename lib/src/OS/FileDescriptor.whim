@@ -1,0 +1,33 @@
+namespace Whim\OS;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** An owned operating-system file descriptor. */
+#[Stub]
+final class FileDescriptor {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Duplicates an open descriptor number into an independently owned descriptor. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function duplicate(int $number): FileDescriptor {}
+
+  /** Returns the underlying number for diagnostics and duplication. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function toInt(): (0..) {}
+
+  /** Whether the descriptor has been closed. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool {}
+
+  /** Closes the descriptor now rather than at collection. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {}
+}

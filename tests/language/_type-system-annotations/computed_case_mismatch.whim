@@ -1,0 +1,3 @@
+enum BackingComputedBad: int {
+  case A = 'a' . 'b';
+}

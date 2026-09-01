@@ -1,0 +1,6 @@
+namespace Whim\HTTP\Session;
+
+use Whim\Unwind\OutOfBoundsException;
+
+/** Reports a session key that does not exist. */
+final class UnavailableItemException extends OutOfBoundsException {}

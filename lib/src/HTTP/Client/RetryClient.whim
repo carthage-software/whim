@@ -1,0 +1,89 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\IO\SeekHandle;
+use Whim\IO\SeekWhence;
+use Whim\IO\TransportException as IOTransportException;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\NetworkException;
+use Whim\Refine\PositiveInt;
+use Whim\Time\Duration;
+
+/** Retries replayable idempotent requests after transport failures. */
+final readonly class RetryClient implements Client {
+  private Duration $backoff;
+
+  public function __construct(
+    private Client $client,
+    private 1..=10 $maximumAttempts = 3,
+    null|Duration $backoff = null,
+    private PositiveInt $backoffMultiplier = 2,
+  ) {
+    $this->backoff = $backoff ?? Duration::fromMilliseconds(100);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function send(
+    Request $request,
+    SendConfiguration $configuration = new SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $body = $request->body;
+    $bodyOffset = null;
+    if ($body is SeekHandle) {
+      $bodyOffset = $body->seek(0, SeekWhence::Current);
+    }
+
+    $attempt = 1;
+    while (true) {
+      try {
+        return $this->client->send($request, $configuration, $cancellation);
+      } catch (
+        ConnectionException|IOTransportException|NetworkException $error
+      ) {
+        if (
+          $attempt >= $this->maximumAttempts
+          || !$this->idempotent($request)
+        ) {
+          throw $error;
+        }
+
+        if ($body != null) {
+          if (!($body is SeekHandle) || $bodyOffset == null) {
+            throw $error;
+          }
+
+          discard!($body->seek($bodyOffset));
+        }
+
+        $multiplier = 1;
+        $remaining = $attempt - 1;
+        while ($remaining > 0) {
+          $multiplier *= $this->backoffMultiplier;
+          $remaining--;
+        }
+
+        Async\sleep(
+          Duration::fromNanoseconds(
+            $this->backoff->getTotalNanoseconds() * $multiplier,
+          ),
+          $cancellation,
+        );
+
+        $attempt++;
+      }
+    }
+  }
+
+  #[MustUse]
+  private function idempotent(Request $request): bool {
+    return $request->method is 'GET'|'HEAD'|'PUT'|'DELETE'|'OPTIONS'|'TRACE';
+  }
+}

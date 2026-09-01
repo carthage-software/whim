@@ -1,0 +1,98 @@
+use Whim\Unwind\UndefinedVariableError;
+
+$n = 1;
+$closure = function() use ($n): int {
+  return $n;
+};
+
+$shortClosure = fn(): int => $n;
+$n = 2;
+assert!($closure() == 1);
+assert!($shortClosure() == 1);
+
+$counter = 10;
+$bump_copy = function() use ($counter): int {
+  $counter += 1;
+  return $counter;
+};
+
+assert!($bump_copy() == 11);
+assert!($counter == 10);
+
+class Cell {
+  public int $value = 0;
+}
+
+$cell = new Cell();
+$poke = fn(): int => $cell->value;
+$cell->value = 7;
+assert!($poke() == 7);
+
+$top_level = 'set at the top';
+
+/** Reports whether another scope can reach the top-level binding. */
+function isolated(): string {
+  try {
+    return $top_level;
+  } catch (UndefinedVariableError) {
+    return 'other scopes unreachable';
+  }
+}
+
+assert!(isolated() == 'other scopes unreachable');
+assert!($top_level == 'set at the top');
+
+class Greeter {
+  private string $word = 'hello';
+
+  public function shortClosureSpeaker(): fn(): string {
+    return fn(): string {
+      return $this->word;
+    };
+  }
+
+  public function closureSpeaker(): fn(): string {
+    return function(): string {
+      return $this->word;
+    };
+  }
+}
+
+$greeter = new Greeter();
+assert!($greeter->shortClosureSpeaker()() == 'hello');
+assert!($greeter->closureSpeaker()() == 'hello');
+
+const LIMIT = 10;
+
+class Config {
+  public const int RETRIES = 3;
+}
+
+assert!(LIMIT == 10);
+assert!(Config::RETRIES == 3);
+
+class Tally {
+  public static int $count = 0;
+
+  public function bump(): void {
+    Tally::$count += 100;
+  }
+}
+
+/** Bumps the shared tally slot from a free function. */
+function bump_tally(): void {
+  Tally::$count += 1;
+}
+
+bump_tally();
+bump_tally();
+assert!(Tally::$count == 2);
+$bump_through_closure = function(): void {
+  Tally::$count += 10;
+};
+
+$bump_through_closure();
+assert!(Tally::$count == 12);
+$tally = new Tally();
+$tally->bump();
+assert!(Tally::$count == 112);

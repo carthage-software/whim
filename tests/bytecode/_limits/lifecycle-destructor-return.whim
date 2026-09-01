@@ -1,0 +1,5 @@
+class C {
+  public function __destruct(): int {
+    return 1;
+  }
+}

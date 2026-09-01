@@ -1,0 +1,18 @@
+namespace Whim\HTTP\WebSocket\Client;
+
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\StatusCode;
+use Whim\Unwind\Exception;
+use Whim\Unwind\Throwable;
+
+/** Reports a failed WebSocket opening handshake. */
+final class HandshakeException extends Exception {
+  public function __construct(
+    string $message,
+    public null|StatusCode $status = null,
+    public FieldMap $headers = FieldMap::default(),
+    null|Throwable $previous = null,
+  ) {
+    parent::__construct($message, 0, $previous);
+  }
+}

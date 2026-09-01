@@ -1,0 +1,56 @@
+namespace Whim\SMTP;
+
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Math;
+
+/** A parsed SMTP reply. */
+final readonly class Reply implements ToString {
+  #[AlwaysInline]
+  public function __construct(
+    public ReplyCode $code,
+    public null|EnhancedStatusCode $enhancedStatus,
+    public string $message,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isPositiveCompletion(): bool {
+    return Math\div($this->code, 100) == 2;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isPositiveIntermediate(): bool {
+    return Math\div($this->code, 100) == 3;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isTransientNegativeCompletion(): bool {
+    return Math\div($this->code, 100) == 4;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isPermanentNegativeCompletion(): bool {
+    return Math\div($this->code, 100) == 5;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    if ($this->enhancedStatus == null) {
+      return $this->code . ' ' . $this->message;
+    }
+
+    return (
+      $this->code
+      . ' '
+      . $this->enhancedStatus->toString()
+      . ' '
+      . $this->message
+    );
+  }
+}

@@ -1,0 +1,24 @@
+require_once!('_files.whim');
+
+/**
+ * Requires a persisted fixture that must be refused, and expects the
+ * diagnostic it raises.
+ *
+ * Every fixture is a real source file: `require!` parses, compiles, links,
+ * and runs it, so whatever the engine objects to arrives as a throw.
+ */
+function raises(string $fixture, string $message): void {
+  $assertion_value_1 = function() use ($fixture): void {
+    require!(beside($fixture));
+  };
+
+  $assertion_error_1 = null;
+  try {
+    $assertion_value_1();
+  } catch (Whim\Unwind\Throwable $assertion_caught_1) {
+    $assertion_error_1 = $assertion_caught_1;
+    assert!(Whim\Str\contains($assertion_caught_1->getMessage(), $message));
+  }
+
+  assert!($assertion_error_1 is Whim\Unwind\Throwable);
+}

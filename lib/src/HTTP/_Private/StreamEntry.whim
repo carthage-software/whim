@@ -1,0 +1,21 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private\StreamState;
+
+/** Mutable state owned by one HTTP/2 stream. */
+final class StreamEntry {
+  public StreamState $state = StreamState::Idle;
+  public null|string $requestMethod = null;
+  public null|int $expectedContentLength = null;
+  public int $receivedContentLength = 0;
+  public null|int $expectedSentContentLength = null;
+  public int $sentContentLength = 0;
+  public bool $receivedInitialHeaders = false;
+  public bool $sentInitialHeaders = false;
+
+  public function __construct(
+    public int $sendWindow,
+    public int $receiveWindow,
+    public bool $locallyInitiated,
+  ) {}
+}

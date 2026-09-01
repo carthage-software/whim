@@ -1,0 +1,11 @@
+namespace Whim\SMTP;
+
+/** A message transfer priority from RFC 6710. */
+enum Priority: int {
+  case Deferred = -6;
+  case NonUrgent = -4;
+  case Priority = -2;
+  case Normal = 0;
+  case Flash = 2;
+  case Urgent = 4;
+}

@@ -1,0 +1,9 @@
+namespace Whim\SMTP;
+
+/** An event that requests an RFC 3461 delivery status report. */
+enum DeliveryStatusNotification: string {
+  case Never = 'NEVER';
+  case Success = 'SUCCESS';
+  case Failure = 'FAILURE';
+  case Delay = 'DELAY';
+}

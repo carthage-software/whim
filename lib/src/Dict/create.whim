@@ -1,0 +1,144 @@
+namespace Whim\Dict;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\Transform;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Vec;
+use Whim;
+
+/** Creates a dict from keyed values. */
+#[MustUse]
+#[TrackCaller]
+function from_iterable<K: ArrayKey, V>(Iterable<K, V> $values): dict<K, V> {
+  if ($values is dict<_, _>) {
+    return $values;
+  }
+
+  if ($values is array<_, _>) {
+    return Whim\_Private\dict_from_array($values);
+  }
+
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    $result[$key] = $value;
+  }
+
+  return $result;
+}
+
+/** Creates a dict from key-value entries. */
+#[MustUse]
+#[TrackCaller]
+function from_entries<K: ArrayKey, V>(
+  Iterable<_, (K, V)> $entries,
+): dict<K, V> {
+  if ($entries is array<_, _>) {
+    return Whim\_Private\dict_from_entries($entries);
+  }
+
+  $result = dict[];
+  foreach ($entries as ($key, $value)) {
+    $result[$key] = $value;
+  }
+
+  return $result;
+}
+
+/** Creates a dict by deriving a value for each key. */
+#[MustUse]
+#[TrackCaller]
+function from_keys<K: ArrayKey, V>(
+  Iterable<_, K> $keys,
+  Transform<K, V> $value,
+): dict<K, V> {
+  $result = dict[];
+  foreach ($keys as $key) {
+    $result[$key] = $value($key);
+  }
+
+  return $result;
+}
+
+/**
+ * Associates corresponding yielded keys and values in a new dict.
+ *
+ * @throws LogicException when the keys and values differ in length.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function associate<K: ArrayKey, V>(
+  Iterable<_, K> $keys,
+  Iterable<_, V> $values,
+): dict<K, V> {
+  $keys = Vec\values::<K>($keys);
+  $values = Vec\values::<V>($values);
+  if (length!($keys) != length!($values)) {
+    throw new LogicException('$keys and $values must have the same length');
+  }
+
+  $result = dict[];
+  $index = 0;
+  while ($index < length!($keys)) {
+    $result[$keys[$index]] = $values[$index];
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Groups values under derived keys, skipping values without a key. */
+#[MustUse]
+#[TrackCaller]
+function group_by<K: ArrayKey, V>(
+  Iterable<_, V> $values,
+  Transform<V, Option<K>> $keyFunction,
+): dict<K, vec<V>> {
+  $result = dict[];
+  foreach ($values as $value) {
+    $key = match ($keyFunction($value)) {
+      $some @ Some<K> => $some->value,
+      $_ => continue,
+    };
+
+    try {
+      $group = $result[$key];
+    } catch (OutOfBoundsError $_) {
+      $group = vec[];
+    }
+
+    $group[] = $value;
+    $result[$key] = $group;
+  }
+
+  return $result;
+}
+
+/** Counts the occurrences of each value. */
+#[MustUse]
+#[TrackCaller]
+function count_values<V: ArrayKey>(Iterable<_, V> $values): dict<V, int> {
+  if ($values is array<_, _>) {
+    return Whim\_Private\dict_count_values($values);
+  }
+
+  $result = dict[];
+  foreach ($values as $value) {
+    try {
+      $count = $result[$value];
+    } catch (OutOfBoundsError $_) {
+      $count = 0;
+    }
+
+    $result[$value] = $count + 1;
+  }
+
+  return $result;
+}

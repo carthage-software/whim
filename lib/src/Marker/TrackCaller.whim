@@ -1,0 +1,8 @@
+namespace Whim\Marker;
+
+use Whim\Attribute\Attribute;
+
+/** Attributes explicit throws to the outermost unmarked caller. */
+#[Stub]
+#[Attribute(Attribute::TARGET_FUNCTION | Attribute::TARGET_METHOD)]
+final class TrackCaller {}

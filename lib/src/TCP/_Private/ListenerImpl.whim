@@ -1,0 +1,88 @@
+namespace Whim\TCP\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\ClosedException;
+use Whim\Network\InternetEndpoint;
+use Whim\OS\FileDescriptor;
+
+/** Implements a TCP listener. */
+final class ListenerImpl implements Whim\TCP\Listener {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private FileDescriptor $descriptor,
+    private InternetEndpoint $localEndpoint,
+    private bool $noDelay,
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    if ($this->descriptor->isClosed()) {
+      throw new ClosedException('the TCP listener is closed');
+    }
+
+    return $this->descriptor;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function accept(
+    null|CancellationToken $cancellation = null,
+  ): Whim\TCP\Stream {
+    while (true) {
+      try {
+        $accepted = Whim\_Private\accept_socket($this->getFileDescriptor());
+      } catch (Whim\_Private\SystemError $error) {
+        Whim\Network\_Private\failure($error);
+      }
+
+      if ($accepted == null) {
+        Whim\Network\_Private\wait_readable(
+          $this->getFileDescriptor(),
+          $cancellation,
+        );
+
+        continue;
+      }
+
+      ($descriptor, $host, $port) = $accepted;
+      try {
+        if ($this->noDelay) {
+          Whim\_Private\set_socket_option(
+            $descriptor,
+            Whim\_Private\SOCKET_LEVEL_TCP,
+            Whim\_Private\SOCKET_OPTION_NO_DELAY,
+            1,
+          );
+        }
+
+        $local = Whim\Network\_Private\internet_endpoint(
+          Whim\_Private\socket_address($descriptor),
+        );
+
+        $peer = Whim\Network\_Private\internet_endpoint(($host, $port));
+      } catch (Whim\_Private\SystemError $error) {
+        $descriptor->close();
+        Whim\Network\_Private\failure($error);
+      }
+
+      return new StreamImpl($descriptor, $local, $peer);
+    }
+  }
+}

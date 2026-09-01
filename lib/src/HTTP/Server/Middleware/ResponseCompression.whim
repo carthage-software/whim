@@ -1,0 +1,77 @@
+namespace Whim\HTTP\Server\Middleware;
+
+use Whim\Async\CancellationToken;
+use Whim\Compression\Registry;
+use Whim\Compression\TransformReadHandle;
+use Whim\HTTP\Message\METHOD_HEAD;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\STATUS_NOT_ACCEPTABLE;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Marker\TrackCaller;
+use Whim\Str\join;
+
+/** Compresses eligible response bodies selected through Accept-Encoding. */
+final readonly class ResponseCompression implements Middleware {
+  public function __construct(public Registry $codecs) {}
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    Handler $next,
+    CancellationToken $cancellation,
+  ): Response {
+    $response = $next->handle($context, $request, $cancellation);
+    $body = $response->body;
+    if ($body == null || !$this->eligible($request, $response)) {
+      return $response;
+    }
+
+    $acceptEncoding = $request->headers->getAll('Accept-Encoding');
+    $field = match ($acceptEncoding) {
+      vec[] => null,
+      $_ => join(',', $acceptEncoding),
+    };
+
+    ($codec, $acceptable) = _Private\select_response_codec(
+      $this->codecs,
+      $field,
+    );
+
+    if (!$acceptable) {
+      return new Response(STATUS_NOT_ACCEPTABLE, $request->protocolVersion);
+    }
+
+    $headers = _Private\vary_by_accept_encoding($response->headers);
+    if ($codec == null) {
+      return $response->withHeaders($headers);
+    }
+
+    $headers = $headers
+      ->with('Content-Encoding', $codec->coding())
+      ->without('Content-Length')
+      ->without('ETag');
+
+    return $response->withHeaders($headers)->withBody(
+      new TransformReadHandle($body, $codec->createCompressor()),
+    );
+  }
+
+  /** Reports whether a response may carry a transformed representation. */
+  private function eligible(Request $request, Response $response): bool {
+    if (
+      $request->method == METHOD_HEAD
+      || ($response->status >= 100 && $response->status < 200)
+      || $response->status == 204
+      || $response->status == 304
+      || $response->headers->has('Content-Encoding')
+      || $response->headers->has('Content-Range')
+    ) {
+      return false;
+    }
+
+    return !_Private\forbids_transformation($response->headers);
+  }
+}

@@ -1,0 +1,279 @@
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\TypeError;
+
+final class Histogram {
+  private dict<int, string> $values = dict[99 => 'preserved'];
+
+  public function fill(): void {
+    $index = 0;
+    while ($index <= 10) {
+      $this->values[$index] = 'filled';
+      $index++;
+    }
+  }
+
+  public function values(): dict<int, string> {
+    return $this->values;
+  }
+}
+
+$histogram = new Histogram();
+$histogram->fill();
+$filled = $histogram->values();
+assert!(length!($filled) == 12);
+assert!($filled[0] == 'filled');
+assert!($filled[5] == 'filled');
+assert!($filled[10] == 'filled');
+assert!($filled[99] == 'preserved');
+
+final class ZeroKeyDictionary {
+  private dict<0, string> $values = dict[];
+
+  public function fill(): void {
+    $index = 0;
+    while ($index <= 2) {
+      $this->values[$index] = 'filled';
+      $index++;
+    }
+  }
+
+  public function values(): dict<0, string> {
+    return $this->values;
+  }
+}
+
+$zeroKeyed = new ZeroKeyDictionary();
+$assertion_value_6 = function() use ($zeroKeyed): void {
+  $zeroKeyed->fill();
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (TypeError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is TypeError);
+
+assert!($zeroKeyed->values() == dict[0 => 'filled']);
+
+$numbers = vec[2, 3];
+$tuple = (5, 6);
+$dictionary = dict['x' => 1, 'y' => 2];
+
+assert!(length!(vec[1, ...$numbers, 4]) == 4);
+assert!(vec[1, ...$numbers, 4][2] == 3);
+assert!(vec[...$tuple, 7][0] == 5);
+assert!(length!(vec[...vec[]]) == 0);
+
+$widened = dict['a' => 0, ...$numbers];
+assert!(($widened['a'], $widened[0], $widened[1]) == (0, 2, 3));
+$positional = dict[...$tuple];
+assert!(($positional[0], $positional[1]) == (5, 6));
+$merged = dict['w' => 9, ...$dictionary];
+assert!(($merged['w'], $merged['x'], $merged['y']) == (9, 1, 2));
+
+function render(dict<string, int> $entries): string {
+  $out = '';
+  foreach ($entries as $key => $value) {
+    $out = $out . $key . '=' . $value . ' ';
+  }
+
+  return $out;
+}
+
+$duplicateKey = 'x';
+assert!(
+  render(dict[$duplicateKey => 1, 'y' => 2, $duplicateKey => 3]) == 'x=3 y=2 ',
+);
+
+assert!(render(dict['x' => 1, 'y' => 2, ...dict['x' => 3]]) == 'x=3 y=2 ');
+
+$assertion_value_17 = fn(): mixed => vec[...$dictionary];
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (TypeError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_17->getMessage(),
+      'a vec literal spreads a vec or a tuple, dict given',
+    ),
+  );
+}
+
+assert!($assertion_error_17 is TypeError);
+
+$assertion_value_18 = fn(): mixed => vec[...42];
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_18->getMessage(),
+      'a vec literal spreads a vec or a tuple, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_18 is TypeError);
+
+$assertion_value_19 = fn(): mixed => dict[...'text'];
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_19->getMessage(),
+      'a dict literal spreads a vec, a tuple, or a dict, string given',
+    ),
+  );
+}
+
+assert!($assertion_error_19 is TypeError);
+
+final class SpreadLog {
+  public static vec<string> $events = vec[];
+}
+
+function log_spread(string $label, mixed $value): mixed {
+  SpreadLog::$events[] = $label;
+  return $value;
+}
+
+$ordered = vec[
+  log_spread('1', 1),
+  ...log_spread('2', vec[2]),
+  log_spread('3', 3),
+];
+
+assert!(SpreadLog::$events == vec['1', '2', '3']);
+assert!(length!($ordered) == 3);
+
+$source = vec[];
+$index = 0;
+while ($index < 300) {
+  $source[] = $index;
+  $index = $index + 1;
+}
+
+$spread = vec[-1, ...$source, -2];
+assert!(length!($spread) == 302);
+assert!(
+  ($spread[0], $spread[1], $spread[300], $spread[301]) == (-1, 0, 299, -2),
+);
+
+$keyed = dict[];
+$position = 0;
+while ($position < 300) {
+  $keyed[$position] = $position * 2;
+  $position = $position + 1;
+}
+
+$widenedKeys = dict['head' => 'x', ...$keyed];
+assert!(length!($widenedKeys) == 301);
+assert!($widenedKeys['head'] == 'x');
+assert!($widenedKeys[0] == 0);
+assert!($widenedKeys[299] == 598);
+
+$doubled = vec[...$source, ...$source];
+assert!(length!($doubled) == 600);
+
+$name = 'Ada';
+$identifier = 42;
+$total = 129.5;
+
+assert!("Hello, $name!" == 'Hello, Ada!');
+assert!("Order #{$identifier + 1}: \${$total}" == 'Order #43: $129.5');
+
+assert!("outer {"inner $name"}" == 'outer inner Ada');
+assert!("\{literal\} and \$name" == '{literal} and $name');
+assert!("{$identifier}" is string);
+$assertion_value_34 = fn(): string => "value: {true}";
+$assertion_error_34 = null;
+try {
+  $assertion_value_34();
+} catch (IncompatibleOperandsError $assertion_caught_34) {
+  $assertion_error_34 = $assertion_caught_34;
+}
+
+assert!($assertion_error_34 is IncompatibleOperandsError);
+
+class Widget {}
+
+$assertion_value_35 = fn(): mixed => 'a' . true;
+$assertion_error_35 = null;
+try {
+  $assertion_value_35();
+} catch (IncompatibleOperandsError $assertion_caught_35) {
+  $assertion_error_35 = $assertion_caught_35;
+}
+
+assert!($assertion_error_35 is IncompatibleOperandsError);
+
+$assertion_value_36 = fn(): mixed => 'a' . null;
+$assertion_error_36 = null;
+try {
+  $assertion_value_36();
+} catch (IncompatibleOperandsError $assertion_caught_36) {
+  $assertion_error_36 = $assertion_caught_36;
+}
+
+assert!($assertion_error_36 is IncompatibleOperandsError);
+
+$assertion_value_37 = fn(): mixed => 'a' . vec[];
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (IncompatibleOperandsError $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is IncompatibleOperandsError);
+
+$assertion_value_38 = fn(): mixed => 'a' . dict[];
+$assertion_error_38 = null;
+try {
+  $assertion_value_38();
+} catch (IncompatibleOperandsError $assertion_caught_38) {
+  $assertion_error_38 = $assertion_caught_38;
+}
+
+assert!($assertion_error_38 is IncompatibleOperandsError);
+
+$assertion_value_39 = fn(): mixed => 'a' . (1, 2);
+$assertion_error_39 = null;
+try {
+  $assertion_value_39();
+} catch (IncompatibleOperandsError $assertion_caught_39) {
+  $assertion_error_39 = $assertion_caught_39;
+}
+
+assert!($assertion_error_39 is IncompatibleOperandsError);
+
+$assertion_value_40 = fn(): mixed => 'a' . new Widget();
+$assertion_error_40 = null;
+try {
+  $assertion_value_40();
+} catch (IncompatibleOperandsError $assertion_caught_40) {
+  $assertion_error_40 = $assertion_caught_40;
+}
+
+assert!($assertion_error_40 is IncompatibleOperandsError);
+
+assert!('n=' . 42 == 'n=42');
+assert!('n=' . -7 == 'n=-7');
+assert!('f=' . 5.0 == 'f=5.0');
+assert!('f=' . 0.1 == 'f=0.1');
+assert!('f=' . 1e100 == 'f=1e100');
+$infinity = 1e308 * 10.0;
+assert!('f=' . $infinity == 'f=INF');
+assert!('f=' . -$infinity == 'f=-INF');
+assert!('f=' . ($infinity - $infinity) == 'f=NAN');
+assert!('a' . 'b' . 'c' == 'abc');

@@ -1,0 +1,676 @@
+use Whim\GC;
+use Whim\Reference\Weak;
+use Whim\Unwind\LeakedResourceError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\UndefinedVariableError;
+
+final class Trace {
+  public vec<string> $events = vec[];
+}
+
+final class Guard {
+  public function __construct(public string $name, private Trace $trace) {
+    $this->trace->events[] = 'open ' . $name;
+  }
+
+  public function __destruct(): void {
+    $this->trace->events[] = 'close ' . $this->name;
+  }
+}
+
+/** Exercises an ordinary local lifetime that ends with its scope. */
+function ordinary_lifetime(Trace $trace): void {
+  $guard = new Guard('ordinary', $trace);
+  $trace->events[] = 'body';
+}
+
+$trace = new Trace();
+ordinary_lifetime($trace);
+assert!($trace->events == vec['open ordinary', 'body', 'close ordinary']);
+
+/** Checks whether an argument remains shared with its caller's local. */
+function argument_is_shared(Guard $guard): bool {
+  try {
+    drop!($guard);
+    return false;
+  } catch (LeakedResourceError) {
+    return true;
+  }
+}
+
+/** Passes a local whose source-level lifetime ends with this function. */
+function caller_holds_argument(Trace $trace): bool {
+  $guard = new Guard('argument', $trace);
+  return argument_is_shared($guard);
+}
+
+$argument_trace = new Trace();
+assert!(caller_holds_argument($argument_trace));
+assert!($argument_trace->events == vec['open argument', 'close argument']);
+
+$overwrite_trace = new Trace();
+$overwritten = new Guard('overwritten', $overwrite_trace);
+$overwritten = null;
+$overwrite_trace->events[] = 'after overwrite';
+assert!(
+  $overwrite_trace->events == vec[
+    'open overwritten',
+    'close overwritten',
+    'after overwrite',
+  ],
+);
+
+$dropped = new Guard('drop', $trace);
+drop!($dropped);
+assert!($trace->events[3] == 'open drop');
+assert!($trace->events[4] == 'close drop');
+$dropped_state = 'defined';
+try {
+  $dropped;
+} catch (UndefinedVariableError) {
+  $dropped_state = 'undefined';
+}
+
+assert!($dropped_state == 'undefined');
+
+$outer = new Guard('outer', $trace);
+using ($outer = new Guard('using', $trace)) {
+  assert!($outer->name == 'using');
+  $outer = 42;
+  $trace->events[] = 'using body';
+}
+
+assert!($outer is Guard);
+assert!(($outer as Guard)->name == 'outer');
+assert!($trace->events[7] == 'using body');
+assert!($trace->events[8] == 'close using');
+
+$escaped = null;
+$leak_message = '';
+$leak_previous = false;
+try {
+  using ($resource = new Guard('escaped', $trace)) {
+    $escaped = $resource;
+  }
+} catch (LeakedResourceError $error) {
+  $leak_message = $error->getMessage();
+  $leak_previous = $error->getPrevious() == null;
+}
+
+assert!(
+  $leak_message
+  == 'the resource bound to $resource is still held by another strong reference at the end of the `using` block',
+);
+
+assert!($leak_previous);
+
+assert!($trace->events[9] == 'open escaped');
+assert!(length!($trace->events) == 10);
+drop!($escaped);
+assert!($trace->events[10] == 'close escaped');
+
+using (
+  ($first, $second) = (new Guard('first', $trace), new Guard('second', $trace)),
+) {
+  assert!($first->name == 'first');
+  assert!($second->name == 'second');
+}
+
+assert!($trace->events[13] == 'close first');
+assert!($trace->events[14] == 'close second');
+
+try {
+  using ($throwing = new Guard('throwing', $trace)) {
+    throw new RuntimeException('failure');
+  }
+} catch (RuntimeException) {
+  $trace->events[] = 'caught';
+}
+
+assert!($trace->events[16] == 'close throwing');
+assert!($trace->events[17] == 'caught');
+
+/** Returns through a `using` block so the guard closes before the caller resumes. */
+function return_through_using(Trace $trace): int {
+  using ($returning = new Guard('returning', $trace)) {
+    return 42;
+  }
+}
+
+assert!(return_through_using($trace) == 42);
+assert!($trace->events[19] == 'close returning');
+
+/** Breaks out of a loop through a `using` block. */
+function break_through_using(Trace $trace): void {
+  while (true) {
+    using ($breaking = new Guard('breaking', $trace)) {
+      break;
+    }
+  }
+
+  $trace->events[] = 'broke';
+}
+
+break_through_using($trace);
+assert!($trace->events[21] == 'close breaking');
+assert!($trace->events[22] == 'broke');
+
+/** Continues a loop through a `using` block. */
+function continue_through_using(Trace $trace): void {
+  $iteration = 0;
+  while ($iteration < 1) {
+    $iteration++;
+    using ($continuing = new Guard('continuing', $trace)) {
+      continue;
+    }
+  }
+
+  $trace->events[] = 'continued';
+}
+
+continue_through_using($trace);
+assert!($trace->events[24] == 'close continuing');
+assert!($trace->events[25] == 'continued');
+
+final class AbruptLifetimeLog {
+  public static vec<string> $events = vec[];
+}
+
+final class AbruptLifetimeGuard {
+  public function __construct(private string $name) {
+    AbruptLifetimeLog::$events[] = 'open ' . $name;
+  }
+
+  public function __destruct(): void {
+    AbruptLifetimeLog::$events[] = 'close ' . $this->name;
+  }
+}
+
+function observe_abrupt_lifetime(): void {
+  AbruptLifetimeLog::$events[] = 'observe';
+}
+
+function abrupt_lifetime_failure(): never {
+  throw new RuntimeException('abrupt lifetime failure');
+}
+
+function explicit_throw_releases_temporary(): void {
+  $error = new RuntimeException('explicit abrupt lifetime failure');
+  try {
+    discard!((new AbruptLifetimeGuard('explicit'), throw $error));
+  } catch (RuntimeException) {
+    observe_abrupt_lifetime();
+  }
+}
+
+AbruptLifetimeLog::$events = vec[];
+explicit_throw_releases_temporary();
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open explicit',
+    'close explicit',
+    'observe',
+  ],
+);
+
+function throwing_call_releases_temporary(): void {
+  try {
+    discard!((new AbruptLifetimeGuard('call'), abrupt_lifetime_failure()));
+  } catch (RuntimeException) {
+    observe_abrupt_lifetime();
+  }
+}
+
+AbruptLifetimeLog::$events = vec[];
+throwing_call_releases_temporary();
+assert!(
+  AbruptLifetimeLog::$events == vec['open call', 'close call', 'observe'],
+);
+
+function caught_exception_preserves_local(): void {
+  $local = new AbruptLifetimeGuard('local');
+  try {
+    abrupt_lifetime_failure();
+  } catch (RuntimeException) {
+    observe_abrupt_lifetime();
+  }
+
+  AbruptLifetimeLog::$events[] = 'after local';
+}
+
+AbruptLifetimeLog::$events = vec[];
+caught_exception_preserves_local();
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open local',
+    'observe',
+    'after local',
+    'close local',
+  ],
+);
+
+function throwing_call_releases_temporary_before_finally(): void {
+  try {
+    discard!((new AbruptLifetimeGuard('finally'), abrupt_lifetime_failure()));
+  } finally {
+    AbruptLifetimeLog::$events[] = 'finally';
+  }
+}
+
+AbruptLifetimeLog::$events = vec[];
+try {
+  throwing_call_releases_temporary_before_finally();
+} catch (RuntimeException) {
+  AbruptLifetimeLog::$events[] = 'caught finally';
+}
+
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open finally',
+    'close finally',
+    'finally',
+    'caught finally',
+  ],
+);
+
+function throwing_call_releases_temporary_before_using_cleanup(): void {
+  try {
+    using ($resource = new AbruptLifetimeGuard('using resource')) {
+      discard!(
+        (new AbruptLifetimeGuard('using temporary'), abrupt_lifetime_failure()),
+      );
+    }
+  } catch (RuntimeException) {
+    AbruptLifetimeLog::$events[] = 'caught using';
+  }
+}
+
+AbruptLifetimeLog::$events = vec[];
+throwing_call_releases_temporary_before_using_cleanup();
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open using resource',
+    'open using temporary',
+    'close using temporary',
+    'close using resource',
+    'caught using',
+  ],
+);
+
+function break_expression_releases_temporary(): void {
+  while (true) {
+    discard!((new AbruptLifetimeGuard('break expression'), break));
+  }
+
+  AbruptLifetimeLog::$events[] = 'after break';
+}
+
+AbruptLifetimeLog::$events = vec[];
+break_expression_releases_temporary();
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open break expression',
+    'close break expression',
+    'after break',
+  ],
+);
+
+function continue_expression_releases_temporary(): void {
+  $iteration = 0;
+  while ($iteration < 1) {
+    $iteration++;
+    discard!((new AbruptLifetimeGuard('continue expression'), continue));
+  }
+
+  AbruptLifetimeLog::$events[] = 'after continue';
+}
+
+AbruptLifetimeLog::$events = vec[];
+continue_expression_releases_temporary();
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open continue expression',
+    'close continue expression',
+    'after continue',
+  ],
+);
+
+function return_expression_releases_temporary(): int {
+  discard!((new AbruptLifetimeGuard('return expression'), return 43));
+  return 0;
+}
+
+AbruptLifetimeLog::$events = vec[];
+assert!(return_expression_releases_temporary() == 43);
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open return expression',
+    'close return expression',
+  ],
+);
+
+function return_expression_releases_temporary_before_finally(): int {
+  try {
+    discard!((new AbruptLifetimeGuard('return finally'), return 44));
+  } finally {
+    AbruptLifetimeLog::$events[] = 'return finally cleanup';
+  }
+
+  return 0;
+}
+
+AbruptLifetimeLog::$events = vec[];
+assert!(return_expression_releases_temporary_before_finally() == 44);
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open return finally',
+    'close return finally',
+    'return finally cleanup',
+  ],
+);
+
+function return_expression_releases_temporary_before_using_cleanup(): int {
+  using ($resource = new AbruptLifetimeGuard('return using resource')) {
+    discard!((new AbruptLifetimeGuard('return using temporary'), return 45));
+  }
+
+  return 0;
+}
+
+AbruptLifetimeLog::$events = vec[];
+assert!(return_expression_releases_temporary_before_using_cleanup() == 45);
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open return using resource',
+    'open return using temporary',
+    'close return using temporary',
+    'close return using resource',
+  ],
+);
+
+function break_expression_releases_temporary_before_finally(): void {
+  while (true) {
+    try {
+      discard!((new AbruptLifetimeGuard('break finally'), break));
+    } finally {
+      AbruptLifetimeLog::$events[] = 'break finally cleanup';
+    }
+  }
+
+  AbruptLifetimeLog::$events[] = 'after break finally';
+}
+
+AbruptLifetimeLog::$events = vec[];
+break_expression_releases_temporary_before_finally();
+assert!(
+  AbruptLifetimeLog::$events == vec[
+    'open break finally',
+    'close break finally',
+    'break finally cleanup',
+    'after break finally',
+  ],
+);
+
+drop!($outer);
+assert!($trace->events[26] == 'close outer');
+
+final class KeyedGuard {
+  public function __construct(public string $name, public Trace $trace) {}
+
+  public function __destruct(): void {
+    $this->trace->events[] = 'drop:' . $this->name;
+  }
+}
+
+$keyed_trace = new Trace();
+using (
+  dict['first' => $keyed_first, 'second' => $keyed_second] = dict[
+    'first' => new KeyedGuard('first', $keyed_trace),
+    'second' => new KeyedGuard('second', $keyed_trace),
+  ],
+) {
+  assert!($keyed_first->name == 'first');
+  assert!($keyed_second->name == 'second');
+}
+
+assert!($keyed_trace->events == vec['drop:first', 'drop:second']);
+
+final class Resource {}
+
+final class Cycle {
+  public mixed $next = null;
+}
+
+function consume_resource(Resource $resource): void {
+  drop!($resource);
+}
+
+consume_resource(new Resource());
+consume_resource(resource: new Resource());
+
+$primary = new Resource();
+$primary_alias = $primary;
+$drop_message = '';
+try {
+  drop!($primary);
+} catch (LeakedResourceError $error) {
+  $drop_message = $error->getMessage();
+}
+
+assert!(
+  $drop_message == '$primary is not the last strong reference to its value',
+);
+
+assert!($primary is Resource);
+assert!($primary_alias is Resource);
+
+$primary_alias = null;
+drop!($primary);
+
+$weakly_observed = new Resource();
+$weak_resource = new Weak::<Resource>($weakly_observed);
+drop!($weakly_observed);
+assert!($weak_resource->get() == null);
+
+$released_before_failure = new Resource();
+$shared = new Resource();
+$shared_alias = $shared;
+$not_reached = new Resource();
+
+try {
+  drop!($released_before_failure, $shared, $not_reached);
+} catch (LeakedResourceError) {
+}
+
+assert!($released_before_failure is Resource);
+assert!($shared is Resource);
+assert!($shared_alias is Resource);
+assert!($not_reached is Resource);
+
+$shared_alias = null;
+drop!($released_before_failure, $shared, $not_reached);
+
+$cycle = new Cycle();
+$cycle->next = $cycle;
+$cycle_outcome = 'no error';
+try {
+  drop!($cycle);
+} catch (LeakedResourceError) {
+  $cycle_outcome = 'leak reported';
+}
+
+assert!($cycle_outcome == 'leak reported');
+$cycle->next = null;
+drop!($cycle);
+
+final class Holder {
+  public mixed $value = null;
+}
+
+$rebound = 42;
+$escaped_resource = null;
+$fallthrough_message = '';
+try {
+  using ($rebound = new Resource()) {
+    $escaped_resource = $rebound;
+  }
+} catch (LeakedResourceError $error) {
+  $fallthrough_message = $error->getMessage();
+}
+
+assert!(
+  $fallthrough_message
+  == 'the resource bound to $rebound is still held by another strong reference'
+  . ' at the end of the `using` block',
+);
+
+assert!($rebound == 42);
+assert!($escaped_resource is Resource);
+drop!($escaped_resource);
+
+$using_weak = null;
+using ($observed = new Resource()) {
+  $using_weak = new Weak::<Resource>($observed);
+}
+
+assert!($using_weak->get() == null);
+
+$escaped_second = null;
+$tuple_message = '';
+try {
+  using (($first_used, $second_used) = (new Resource(), new Resource())) {
+    $escaped_second = $second_used;
+  }
+} catch (LeakedResourceError $error) {
+  $tuple_message = $error->getMessage();
+}
+
+assert!(
+  $tuple_message
+  == 'the resource bound to $second_used is still held by another strong'
+  . ' reference at the end of the `using` block',
+);
+
+drop!($escaped_second);
+
+/** Tries to return a `using` resource to the caller. */
+function return_resource(): Resource {
+  using ($resource = new Resource()) {
+    return $resource;
+  }
+}
+
+$assertion_value_48 = fn(): Resource => return_resource();
+$assertion_error_48 = null;
+try {
+  $assertion_value_48();
+} catch (LeakedResourceError $assertion_caught_48) {
+  $assertion_error_48 = $assertion_caught_48;
+}
+
+assert!($assertion_error_48 is LeakedResourceError);
+
+$throw_holder = new Holder();
+$throw_outcome = 'no error';
+try {
+  using ($resource = new Resource()) {
+    $throw_holder->value = $resource;
+    throw new RuntimeException('original');
+  }
+} catch (LeakedResourceError) {
+  $throw_outcome = 'leak reported';
+}
+
+assert!($throw_outcome == 'leak reported');
+$throw_holder->value = null;
+
+/** Throws while its trace retains a resource argument. */
+function throw_with_resource(Resource $resource): never {
+  throw new RuntimeException('trace retained the resource');
+}
+
+$trace_leak_previous = null;
+try {
+  using ($resource = new Resource()) {
+    throw_with_resource($resource);
+  }
+} catch (LeakedResourceError $error) {
+  $trace_leak_previous = $error->getPrevious();
+}
+
+assert!($trace_leak_previous is RuntimeException);
+assert!(
+  ($trace_leak_previous as RuntimeException)->getMessage()
+  == 'trace retained the resource',
+);
+
+$break_holder = new Holder();
+$break_outcome = 'no error';
+try {
+  while (true) {
+    using ($resource = new Resource()) {
+      $break_holder->value = $resource;
+      break;
+    }
+  }
+} catch (LeakedResourceError) {
+  $break_outcome = 'leak reported';
+}
+
+assert!($break_outcome == 'leak reported');
+$break_holder->value = null;
+
+$continue_holder = new Holder();
+$continue_outcome = 'no error';
+$iteration = 0;
+try {
+  while ($iteration < 1) {
+    $iteration++;
+    using ($resource = new Resource()) {
+      $continue_holder->value = $resource;
+      continue;
+    }
+  }
+} catch (LeakedResourceError) {
+  $continue_outcome = 'leak reported';
+}
+
+assert!($continue_outcome == 'leak reported');
+assert!($iteration == 1);
+$continue_holder->value = null;
+
+$using_cycle_outcome = 'no error';
+try {
+  using ($cyclic = new Cycle()) {
+    $cyclic->next = $cyclic;
+  }
+} catch (LeakedResourceError) {
+  $using_cycle_outcome = 'leak reported';
+}
+
+assert!($using_cycle_outcome == 'leak reported');
+
+GC\collect_cycles();
+
+class Payload {}
+
+/** Observes a payload through a weak reference inside its owning scope. */
+function scoped(): Weak<Payload> {
+  $payload = new Payload();
+  $weak = new Weak::<Payload>($payload);
+  assert!($weak->get() != null);
+  return $weak;
+}
+
+$scoped_weak = scoped();
+assert!($scoped_weak->get() == null);
+$kept = new Payload();
+$holding = new Weak::<Payload>($kept);
+assert!($holding->get() != null);
+
+class WeakReferent {}
+
+$referent = new WeakReferent();
+$weak_referent = new Weak::<WeakReferent>($referent);
+$referent = null;
+assert!($weak_referent->get() == null);

@@ -1,0 +1,19 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Handles one request on an acquired connection. */
+interface Handler {
+  #[MustUse]
+  #[TrackCaller]
+  public function handle(
+    Connection $connection,
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction;
+}

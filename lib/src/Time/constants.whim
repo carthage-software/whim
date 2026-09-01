@@ -1,0 +1,28 @@
+namespace Whim\Time;
+
+/** The number of nanoseconds per second. */
+const NANOSECONDS_PER_SECOND = 1_000_000_000;
+
+/** The number of nanoseconds per millisecond. */
+const NANOSECONDS_PER_MILLISECOND = 1_000_000;
+
+/** The number of nanoseconds per microsecond. */
+const NANOSECONDS_PER_MICROSECOND = 1_000;
+
+/** The number of milliseconds per second. */
+const MILLISECONDS_PER_SECOND = 1_000;
+
+/** The number of microseconds per second. */
+const MICROSECONDS_PER_SECOND = 1_000_000;
+
+/** The number of seconds per minute. */
+const SECONDS_PER_MINUTE = 60;
+
+/** The number of minutes per hour. */
+const MINUTES_PER_HOUR = 60;
+
+/** The number of hours per day. */
+const HOURS_PER_DAY = 24;
+
+/** The number of days per week. */
+const DAYS_PER_WEEK = 7;

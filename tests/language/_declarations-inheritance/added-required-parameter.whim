@@ -1,0 +1,11 @@
+class A {
+  public function m(int $a): int {
+    return 1;
+  }
+}
+
+class B extends A {
+  public function m(int $a, int $b): int {
+    return 2;
+  }
+}

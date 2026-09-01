@@ -1,0 +1,413 @@
+/** Filters values that satisfy the reified type parameter. */
+function filter<T>(vec<mixed> $values): vec<T> {
+  $result = vec[];
+  foreach ($values as $value) {
+    if ($value is T) {
+      $result[] = $value;
+    }
+  }
+
+  return $result;
+}
+
+class Filters {
+  public function byMethod<T>(vec<mixed> $values): vec<T> {
+    $result = vec[];
+    foreach ($values as $value) {
+      if ($value is T) {
+        $result[] = $value;
+      }
+    }
+
+    return $result;
+  }
+
+  public static function byStatic<T>(vec<mixed> $values): vec<T> {
+    $result = vec[];
+    foreach ($values as $value) {
+      if ($value is T) {
+        $result[] = $value;
+      }
+    }
+
+    return $result;
+  }
+}
+
+type Numeric = int|float;
+
+interface LeftMark {}
+
+interface RightMark {}
+
+class BothMarks implements LeftMark, RightMark {}
+
+class FilterBox<out T> {}
+
+class IntFilterBox extends FilterBox<int> {}
+
+$both = new BothMarks();
+$intBox = new FilterBox::<int>();
+$stringBox = new FilterBox::<string>();
+$fixedIntBox = new IntFilterBox();
+$intFunction = fn(int $value): int => $value;
+$mixedFunction = fn(mixed $value): int => 1;
+$values = vec[
+  null,
+  false,
+  true,
+  1,
+  2,
+  1.0,
+  2.0,
+  'hello',
+  'x',
+  'FilterBox<int>',
+  'IntFilterBox',
+  'int',
+  'vec<int>',
+  vec[],
+  vec[1, 2, 3],
+  vec[1, 2, 3, 4],
+  vec[1, 2, 3, 3.0],
+  vec[1, 1.0],
+  dict[],
+  dict[1 => 'one', 2 => 'two'],
+  dict['one' => 1, 'two' => 2],
+  (1, 'one'),
+  (2, 2.0),
+  $both,
+  $intBox,
+  $stringBox,
+  $fixedIntBox,
+  $intFunction,
+  $mixedFunction,
+];
+
+$filters = new Filters();
+
+foreach (vec[
+  filter::<mixed>($values),
+  $filters->byMethod::<mixed>($values),
+  Filters::byStatic::<mixed>($values),
+] as $filtered) {
+  assert!($filtered is vec<mixed>);
+  assert!($filtered == $values);
+}
+
+foreach (vec[
+  filter::<null>($values),
+  $filters->byMethod::<null>($values),
+  Filters::byStatic::<null>($values),
+] as $filtered) {
+  assert!($filtered is vec<null>);
+  assert!($filtered == vec[null]);
+}
+
+foreach (vec[
+  filter::<bool>($values),
+  $filters->byMethod::<bool>($values),
+  Filters::byStatic::<bool>($values),
+] as $filtered) {
+  assert!($filtered is vec<bool>);
+  assert!($filtered == vec[false, true]);
+}
+
+foreach (vec[
+  filter::<false>($values),
+  $filters->byMethod::<false>($values),
+  Filters::byStatic::<false>($values),
+] as $filtered) {
+  assert!($filtered is vec<false>);
+  assert!($filtered == vec[false]);
+}
+
+foreach (vec[
+  filter::<true>($values),
+  $filters->byMethod::<true>($values),
+  Filters::byStatic::<true>($values),
+] as $filtered) {
+  assert!($filtered is vec<true>);
+  assert!($filtered == vec[true]);
+}
+
+foreach (vec[
+  filter::<int>($values),
+  $filters->byMethod::<int>($values),
+  Filters::byStatic::<int>($values),
+] as $filtered) {
+  assert!($filtered is vec<int>);
+  assert!($filtered == vec[1, 2]);
+}
+
+foreach (vec[
+  filter::<1|2>($values),
+  $filters->byMethod::<1|2>($values),
+  Filters::byStatic::<1|2>($values),
+] as $filtered) {
+  assert!($filtered is vec<1|2>);
+  assert!($filtered == vec[1, 2]);
+}
+
+foreach (vec[
+  filter::<float>($values),
+  $filters->byMethod::<float>($values),
+  Filters::byStatic::<float>($values),
+] as $filtered) {
+  assert!($filtered is vec<float>);
+  assert!($filtered == vec[1.0, 2.0]);
+}
+
+foreach (vec[
+  filter::<float|int>($values),
+  $filters->byMethod::<float|int>($values),
+  Filters::byStatic::<float|int>($values),
+] as $filtered) {
+  assert!($filtered is vec<float|int>);
+  assert!($filtered == vec[1, 2, 1.0, 2.0]);
+}
+
+foreach (vec[
+  filter::<Numeric>($values),
+  $filters->byMethod::<Numeric>($values),
+  Filters::byStatic::<Numeric>($values),
+] as $filtered) {
+  assert!($filtered is vec<Numeric>);
+  assert!($filtered == vec[1, 2, 1.0, 2.0]);
+}
+
+foreach (vec[
+  filter::<string>($values),
+  $filters->byMethod::<string>($values),
+  Filters::byStatic::<string>($values),
+] as $filtered) {
+  assert!($filtered is vec<string>);
+  assert!(
+    $filtered == vec[
+      'hello',
+      'x',
+      'FilterBox<int>',
+      'IntFilterBox',
+      'int',
+      'vec<int>',
+    ],
+  );
+}
+
+foreach (vec[
+  filter::<'hello'|'x'>($values),
+  $filters->byMethod::<'hello'|'x'>($values),
+  Filters::byStatic::<'hello'|'x'>($values),
+] as $filtered) {
+  assert!($filtered is vec<'hello'|'x'>);
+  assert!($filtered == vec['hello', 'x']);
+}
+
+foreach (vec[
+  filter::<object>($values),
+  $filters->byMethod::<object>($values),
+  Filters::byStatic::<object>($values),
+] as $filtered) {
+  assert!($filtered is vec<object>);
+  assert!($filtered == vec[$both, $intBox, $stringBox, $fixedIntBox]);
+}
+
+foreach (vec[
+  filter::<LeftMark&RightMark>($values),
+  $filters->byMethod::<LeftMark&RightMark>($values),
+  Filters::byStatic::<LeftMark&RightMark>($values),
+] as $filtered) {
+  assert!($filtered is vec<LeftMark&RightMark>);
+  assert!($filtered == vec[$both]);
+}
+
+foreach (vec[
+  filter::<FilterBox<int>>($values),
+  $filters->byMethod::<FilterBox<int>>($values),
+  Filters::byStatic::<FilterBox<int>>($values),
+] as $filtered) {
+  assert!($filtered is vec<FilterBox<int>>);
+  assert!($filtered == vec[$intBox, $fixedIntBox]);
+}
+
+foreach (vec[
+  filter::<FilterBox<int|string>>($values),
+  $filters->byMethod::<FilterBox<int|string>>($values),
+  Filters::byStatic::<FilterBox<int|string>>($values),
+] as $filtered) {
+  assert!($filtered is vec<FilterBox<int|string>>);
+  assert!($filtered == vec[$intBox, $stringBox, $fixedIntBox]);
+}
+
+foreach (vec[
+  filter::<vec>($values),
+  $filters->byMethod::<vec>($values),
+  Filters::byStatic::<vec>($values),
+] as $filtered) {
+  assert!($filtered is vec<vec<_>>);
+  assert!(
+    $filtered == vec[
+      vec[],
+      vec[1, 2, 3],
+      vec[1, 2, 3, 4],
+      vec[1, 2, 3, 3.0],
+      vec[1, 1.0],
+    ],
+  );
+}
+
+foreach (vec[
+  filter::<vec<mixed>>($values),
+  $filters->byMethod::<vec<mixed>>($values),
+  Filters::byStatic::<vec<mixed>>($values),
+] as $filtered) {
+  assert!($filtered is vec<vec<mixed>>);
+  assert!(
+    $filtered == vec[
+      vec[],
+      vec[1, 2, 3],
+      vec[1, 2, 3, 4],
+      vec[1, 2, 3, 3.0],
+      vec[1, 1.0],
+    ],
+  );
+}
+
+foreach (vec[
+  filter::<vec<int>>($values),
+  $filters->byMethod::<vec<int>>($values),
+  Filters::byStatic::<vec<int>>($values),
+] as $filtered) {
+  assert!($filtered is vec<vec<int>>);
+  assert!($filtered == vec[vec[], vec[1, 2, 3], vec[1, 2, 3, 4]]);
+}
+
+foreach (vec[
+  filter::<vec<int|float>>($values),
+  $filters->byMethod::<vec<int|float>>($values),
+  Filters::byStatic::<vec<int|float>>($values),
+] as $filtered) {
+  assert!($filtered is vec<vec<int|float>>);
+  assert!(
+    $filtered == vec[
+      vec[],
+      vec[1, 2, 3],
+      vec[1, 2, 3, 4],
+      vec[1, 2, 3, 3.0],
+      vec[1, 1.0],
+    ],
+  );
+}
+
+foreach (vec[
+  filter::<vec<1|1.0>>($values),
+  $filters->byMethod::<vec<1|1.0>>($values),
+  Filters::byStatic::<vec<1|1.0>>($values),
+] as $filtered) {
+  assert!($filtered is vec<vec<1|1.0>>);
+  assert!($filtered == vec[vec[], vec[1, 1.0]]);
+}
+
+foreach (vec[
+  filter::<dict>($values),
+  $filters->byMethod::<dict>($values),
+  Filters::byStatic::<dict>($values),
+] as $filtered) {
+  assert!($filtered is vec<dict<_, _>>);
+  assert!(
+    $filtered == vec[
+      dict[],
+      dict[1 => 'one', 2 => 'two'],
+      dict['one' => 1, 'two' => 2],
+    ],
+  );
+}
+
+foreach (vec[
+  filter::<dict<int, string>>($values),
+  $filters->byMethod::<dict<int, string>>($values),
+  Filters::byStatic::<dict<int, string>>($values),
+] as $filtered) {
+  assert!($filtered is vec<dict<int, string>>);
+  assert!($filtered == vec[dict[], dict[1 => 'one', 2 => 'two']]);
+}
+
+foreach (vec[
+  filter::<dict<string, int>>($values),
+  $filters->byMethod::<dict<string, int>>($values),
+  Filters::byStatic::<dict<string, int>>($values),
+] as $filtered) {
+  assert!($filtered is vec<dict<string, int>>);
+  assert!($filtered == vec[dict[], dict['one' => 1, 'two' => 2]]);
+}
+
+foreach (vec[
+  filter::<(int, string)>($values),
+  $filters->byMethod::<(int, string)>($values),
+  Filters::byStatic::<(int, string)>($values),
+] as $filtered) {
+  assert!($filtered is vec<(int, string)>);
+  assert!($filtered == vec[(1, 'one')]);
+}
+
+foreach (vec[
+  filter::<(int, int|float)>($values),
+  $filters->byMethod::<(int, int|float)>($values),
+  Filters::byStatic::<(int, int|float)>($values),
+] as $filtered) {
+  assert!($filtered is vec<(int, int|float)>);
+  assert!($filtered == vec[(2, 2.0)]);
+}
+
+foreach (vec[
+  filter::<classname<FilterBox<int>>>($values),
+  $filters->byMethod::<classname<FilterBox<int>>>($values),
+  Filters::byStatic::<classname<FilterBox<int>>>($values),
+] as $filtered) {
+  assert!($filtered is vec<classname<FilterBox<int>>>);
+  assert!($filtered == vec['FilterBox<int>', 'IntFilterBox']);
+}
+
+foreach (vec[
+  filter::<fn>($values),
+  $filters->byMethod::<fn>($values),
+  Filters::byStatic::<fn>($values),
+] as $filtered) {
+  assert!($filtered is vec<fn>);
+  assert!($filtered == vec[$intFunction, $mixedFunction]);
+}
+
+foreach (vec[
+  filter::<fn(int): int>($values),
+  $filters->byMethod::<fn(int): int>($values),
+  Filters::byStatic::<fn(int): int>($values),
+] as $filtered) {
+  assert!($filtered is vec<fn(int): int>);
+  assert!($filtered == vec[$intFunction, $mixedFunction]);
+}
+
+foreach (vec[
+  filter::<fn(mixed): int>($values),
+  $filters->byMethod::<fn(mixed): int>($values),
+  Filters::byStatic::<fn(mixed): int>($values),
+] as $filtered) {
+  assert!($filtered is vec<fn(mixed): int>);
+  assert!($filtered == vec[$mixedFunction]);
+}
+
+foreach (vec[
+  filter::<vec<int>|dict<int, string>>($values),
+  $filters->byMethod::<vec<int>|dict<int, string>>($values),
+  Filters::byStatic::<vec<int>|dict<int, string>>($values),
+] as $filtered) {
+  assert!($filtered is vec<vec<int>|dict<int, string>>);
+  assert!(
+    $filtered == vec[
+      vec[],
+      vec[1, 2, 3],
+      vec[1, 2, 3, 4],
+      dict[],
+      dict[1 => 'one', 2 => 'two'],
+    ],
+  );
+}

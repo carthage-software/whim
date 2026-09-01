@@ -1,0 +1,4 @@
+namespace Whim\Path;
+
+/** The path separator used by every supported system. */
+const SEPARATOR = '/';

@@ -1,0 +1,23 @@
+namespace Whim\Binary\_Private;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\PositiveInt;
+use Whim\Unwind\UnderflowException;
+
+/**
+ * Rejects a byte string shorter than the width a decode needs.
+ *
+ * @throws UnderflowException when the input holds fewer bytes than the value needs.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function require_length(string $bytes, PositiveInt $width): void {
+  if (length!($bytes) < $width) {
+    throw new UnderflowException(
+      'expected ' . $width . ' bytes, got ' . length!($bytes),
+    );
+  }
+}

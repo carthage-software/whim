@@ -1,0 +1,9 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Detects the media type represented by a byte prefix. */
+#[Stub]
+#[MustUse]
+function mime_sniff(string $bytes): string {}

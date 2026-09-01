@@ -1,0 +1,108 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\_Private\H2FrameDecoder;
+use Whim\_Private\HpackDecoder;
+use Whim\_Private\HpackEncoder;
+use Whim\HTTP\_Private\Configuration;
+use Whim\HTTP\_Private\ConnectionStreamId;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\StreamId;
+use Whim\Refine\NonNegativeInt;
+
+/** Mutable state shared by the sans-I/O protocol operations. */
+final class State {
+  public H2FrameDecoder $frameDecoder;
+  public HpackDecoder $headerDecoder;
+  public HpackEncoder $headerEncoder;
+  public NonNegativeInt $maximumDecodedHeaderListSize;
+  public NonNegativeInt $maximumEncodedHeaderListSize;
+  public SettingsRegistry $settings;
+  public StreamTable $streams;
+  public FlowController $flow;
+  public HeaderBlockAssembler $headerBlocks;
+  public string $outbound = '';
+  public int $nextLocalStreamId;
+  public ConnectionStreamId $lastLocalStreamId = 0;
+  public ConnectionStreamId $lastPeerStreamId = 0;
+  public null|ConnectionStreamId $sentGoAway = null;
+  public null|ConnectionStreamId $receivedGoAway = null;
+  public bool $connected = true;
+  public bool $closed = false;
+  public bool $receivedInitialSettings = false;
+  public string $pendingClientPreface = '';
+  public bool $receivedClientPreface;
+
+  public function __construct(
+    public Role $role,
+    public Configuration $configuration,
+  ) {
+    validate_local_settings($role, $configuration->settings);
+    $this->settings = new SettingsRegistry($configuration->settings);
+    $this->frameDecoder = H2FrameDecoder::create(
+      $this->settings->local(Whim\HTTP\_Private\Setting::MaxFrameSize),
+    );
+
+    $this->headerDecoder = HpackDecoder::create(
+      $this->settings->local(Whim\HTTP\_Private\Setting::HeaderTableSize),
+    );
+
+    $this->maximumDecodedHeaderListSize = $this->settings->local(
+      Whim\HTTP\_Private\Setting::MaxHeaderListSize,
+    );
+
+    $this->headerEncoder = HpackEncoder::create(
+      $this->settings->remote(Whim\HTTP\_Private\Setting::HeaderTableSize),
+    );
+
+    $this->maximumEncodedHeaderListSize = $this->settings->remote(
+      Whim\HTTP\_Private\Setting::MaxHeaderListSize,
+    );
+
+    $this->streams = new StreamTable(
+      $this->settings->remote(Whim\HTTP\_Private\Setting::MaxConcurrentStreams),
+      $this->settings->remote(Whim\HTTP\_Private\Setting::InitialWindowSize),
+      $this->settings->local(Whim\HTTP\_Private\Setting::InitialWindowSize),
+      $this->settings->local(Whim\HTTP\_Private\Setting::MaxConcurrentStreams),
+      $configuration->maximumReservedPushes,
+    );
+
+    $this->flow = new FlowController();
+    $this->headerBlocks = new HeaderBlockAssembler(
+      $configuration->maximumHeaderBlockSize,
+    );
+
+    $this->nextLocalStreamId = match ($role) {
+      Role::Client => 1,
+      Role::Server => 2,
+    };
+
+    $this->receivedClientPreface = $role == Role::Client;
+
+    if ($role == Role::Client) {
+      $this->outbound = Whim\HTTP\_Private\CLIENT_PREFACE;
+    }
+
+    queue_frame($this, (4, $this->settings->localOverrides(), false));
+
+    $this->settings->updateLocal(dict[]);
+  }
+
+  public function nextStreamId(): StreamId {
+    if (!$this->connected) {
+      throw new Whim\HTTP\_Private\ProtocolException(
+        'the HTTP/2 connection is shutting down',
+      );
+    }
+
+    if ($this->nextLocalStreamId > 2147483647) {
+      throw new Whim\HTTP\_Private\ProtocolException(
+        'the HTTP/2 stream identifier space is exhausted',
+      );
+    }
+
+    $streamId = $this->nextLocalStreamId;
+    $this->nextLocalStreamId += 2;
+    return $streamId as StreamId;
+  }
+}

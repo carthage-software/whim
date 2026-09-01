@@ -1,0 +1,194 @@
+namespace Whim\HTTP\Server\Middleware;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Hex\encode;
+use Whim\HTTP\Cookie\add;
+use Whim\HTTP\Cookie\Collection;
+use Whim\HTTP\Cookie\SetCookie;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Session\Configuration;
+use Whim\HTTP\Session\Session as HttpSession;
+use Whim\HTTP\Session\Storage\Record;
+use Whim\HTTP\Session\Storage\Store;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\SecureRandom\bytes;
+use Whim\Time\SystemTime;
+
+/** Loads and persists one server-side session per request. */
+final readonly class Session implements Middleware {
+  /** Creates session middleware backed by a store. */
+  public function __construct(
+    public Store $store,
+    public Configuration $configuration = new Configuration(),
+  ) {}
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    Handler $next,
+    CancellationToken $cancellation,
+  ): Response {
+    $cookieValue = Collection::fromHeaders($request->headers)->get(
+      $this->configuration->cookie->name,
+    );
+
+    $identifier = null as null|NonEmptyString;
+    $record = null as null|Record;
+    if ($cookieValue != null && $cookieValue != '') {
+      $identifier = $cookieValue as NonEmptyString;
+      $record = $this->store->load($identifier, $cancellation);
+    }
+
+    $session = match ($record) {
+      null => new HttpSession(),
+      $record @ Record => new HttpSession($record->data),
+    };
+
+    $context->setSession($session);
+    $response = $next->handle($context, $request, $cancellation);
+    return $this->persist(
+      $response,
+      $session,
+      $identifier,
+      $record,
+      $cookieValue != null,
+      $cancellation,
+    );
+  }
+
+  #[TrackCaller]
+  private function persist(
+    Response $response,
+    HttpSession $session,
+    null|NonEmptyString $identifier,
+    null|Record $record,
+    bool $hadCookie,
+    CancellationToken $cancellation,
+  ): Response {
+    if ($session->isDestroyed()) {
+      if ($identifier != null) {
+        $this->store->delete($identifier, $cancellation);
+      }
+
+      if ($hadCookie) {
+        return add($response, $this->expiredCookie());
+      }
+
+      return $response;
+    }
+
+    if ($session->isIdentifierRegenerationRequested()) {
+      $freshIdentifier = $this->generateIdentifier();
+      $this->store->create(
+        $freshIdentifier,
+        $session->toDict(),
+        $this->configuration->idleTimeout,
+        $cancellation,
+      );
+
+      if ($identifier != null) {
+        $this->store->delete($identifier, $cancellation);
+      }
+
+      return add($response, $this->activeCookie($freshIdentifier));
+    }
+
+    if ($record == null) {
+      if (!$session->isDirty()) {
+        if ($hadCookie) {
+          return add($response, $this->expiredCookie());
+        }
+
+        return $response;
+      }
+
+      $freshIdentifier = $this->generateIdentifier();
+      $this->store->create(
+        $freshIdentifier,
+        $session->toDict(),
+        $this->configuration->idleTimeout,
+        $cancellation,
+      );
+
+      return add($response, $this->activeCookie($freshIdentifier));
+    }
+
+    $identifier = $identifier as NonEmptyString;
+    if ($session->isDirty() || $this->configuration->rollingExpiration) {
+      $this->store->replace(
+        $identifier,
+        $record->revision,
+        $session->toDict(),
+        $this->configuration->idleTimeout,
+        $cancellation,
+      );
+    }
+
+    if (
+      $this->configuration->rollingExpiration
+      && $this->configuration->cookieLifetime != null
+    ) {
+      return add($response, $this->activeCookie($identifier));
+    }
+
+    return $response;
+  }
+
+  /** Generates an unguessable session identifier. */
+  #[MustUse]
+  #[TrackCaller]
+  private function generateIdentifier(): NonEmptyString {
+    return encode(bytes(32)) as NonEmptyString;
+  }
+
+  /** Creates the active session cookie. */
+  #[MustUse]
+  private function activeCookie(NonEmptyString $identifier): SetCookie {
+    $template = $this->configuration->cookie;
+    $lifetime = $this->configuration->cookieLifetime;
+    $expires = null as null|SystemTime;
+    $maximumAge = null as null|int;
+    if ($lifetime != null) {
+      $expires = SystemTime::now()->plus($lifetime);
+      $maximumAge = $lifetime->seconds;
+      if ($lifetime->nanoseconds > 0) {
+        $maximumAge++;
+      }
+    }
+
+    return SetCookie::fromPartsUnsafe(
+      $template->name,
+      $identifier,
+      $expires,
+      $maximumAge,
+      $template->domain,
+      $template->path,
+      $template->secure,
+      $template->httpOnly,
+      $template->sameSite,
+    );
+  }
+
+  /** Creates a cookie that removes the browser's session identifier. */
+  #[MustUse]
+  private function expiredCookie(): SetCookie {
+    $template = $this->configuration->cookie;
+    return SetCookie::fromPartsUnsafe(
+      $template->name,
+      '',
+      SystemTime::unixEpoch(),
+      0,
+      $template->domain,
+      $template->path,
+      $template->secure,
+      $template->httpOnly,
+      $template->sameSite,
+    );
+  }
+}

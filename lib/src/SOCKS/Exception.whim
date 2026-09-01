@@ -1,0 +1,6 @@
+namespace Whim\SOCKS;
+
+use Whim\Network\NetworkException;
+
+/** The root of SOCKS proxy failures. */
+class Exception extends NetworkException {}

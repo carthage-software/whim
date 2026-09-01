@@ -1,0 +1,315 @@
+namespace Whim\Str;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\Iterable;
+use Whim\Refine\Uint8;
+use Whim\Str\_Private;
+use Whim\Unicode\ScalarValue;
+use Whim;
+use Whim\Comparison\Ordering;
+use Whim\Vec;
+
+/** Returns the number of bytes in a string. */
+#[AlwaysInline]
+#[MustUse]
+function length(string $string): NonNegativeInt {
+  return length!($string);
+}
+
+/** Returns the byte value of a one-byte string. */
+#[MustUse]
+#[TrackCaller]
+function ord(NonEmptyString $character): Uint8 {
+  return Whim\_Private\string_ord($character);
+}
+
+/** Creates a one-byte string from a byte value. */
+#[MustUse]
+#[TrackCaller]
+function chr(Uint8 $ascii): string {
+  return Whim\_Private\string_chr($ascii);
+}
+
+/** Encodes a Unicode scalar value as UTF-8. */
+#[AlwaysInline]
+#[MustUse]
+function from_code_point(ScalarValue $codePoint): NonEmptyString {
+  return Whim\_Private\unicode_from_code_point($codePoint);
+}
+
+/** Returns the byte at an offset. */
+#[MustUse]
+#[TrackCaller]
+function byte_at(string $string, NonNegativeInt $offset): Uint8 {
+  return Whim\_Private\string_byte_at($string, $offset);
+}
+
+/** Returns the byte values in a string. */
+#[AlwaysInline]
+#[MustUse]
+function to_bytes(string $string): vec<Uint8> {
+  return Whim\_Private\string_to_bytes($string);
+}
+
+/** Builds a string from byte values. */
+#[AlwaysInline]
+#[MustUse]
+function from_bytes(vec<Uint8> $bytes): string {
+  return Whim\_Private\string_from_bytes($bytes);
+}
+
+/** Reports whether a one-byte string is ASCII whitespace. */
+#[AlwaysInline]
+#[MustUse]
+function is_whitespace(string $byte): bool {
+  return $byte is ' '|"\t"|"\n"|"\r"|"\f"|"\v";
+}
+
+/** Reports whether a one-byte string is an ASCII digit. */
+#[AlwaysInline]
+#[MustUse]
+function is_digit(string $byte): bool {
+  return length!($byte) == 1 && $byte >= '0' && $byte <= '9';
+}
+
+/** Reports whether a one-byte string is an ASCII letter. */
+#[AlwaysInline]
+#[MustUse]
+function is_letter(string $byte): bool {
+  return (
+    length!($byte) == 1
+    && (($byte >= 'a' && $byte <= 'z') || ($byte >= 'A' && $byte <= 'Z'))
+  );
+}
+
+/** Reports whether a one-byte string is an ASCII letter or digit. */
+#[AlwaysInline]
+#[MustUse]
+function is_alphanumeric(string $byte): bool {
+  return is_letter($byte) || is_digit($byte);
+}
+
+/** Reports whether a one-byte string is an ASCII hexadecimal digit. */
+#[AlwaysInline]
+#[MustUse]
+function is_hex_digit(string $byte): bool {
+  return (
+    is_digit($byte)
+    || (
+      length!($byte) == 1
+      && (($byte >= 'a' && $byte <= 'f') || ($byte >= 'A' && $byte <= 'F'))
+    )
+  );
+}
+
+/** Reports whether a one-byte string is ASCII punctuation. */
+#[AlwaysInline]
+#[MustUse]
+function is_ascii_punctuation(string $byte): bool {
+  return (
+    length!($byte) == 1
+    && (
+      ($byte >= '!' && $byte <= '/')
+      || ($byte >= ':' && $byte <= '@')
+      || ($byte >= '[' && $byte <= '`')
+      || ($byte >= '{' && $byte <= '~')
+    )
+  );
+}
+
+/** Joins string values with a separator. */
+#[MustUse]
+#[TrackCaller]
+function join(string $separator, Iterable<_, string> $values): string {
+  return Whim\_Private\string_join(Vec\values::<string>($values), $separator);
+}
+
+/** Compares two strings byte by byte. */
+#[MustUse]
+#[TrackCaller]
+function compare(
+  string $string,
+  string $other,
+  null|NonNegativeInt $length = null,
+): Ordering {
+  if ($length != null) {
+    $string = slice($string, 0, $length);
+    $other = slice($other, 0, $length);
+  }
+
+  return Ordering::from($string <=> $other);
+}
+
+/** Compares two ASCII strings without case sensitivity. */
+#[MustUse]
+#[TrackCaller]
+function compare_ci(
+  string $string,
+  string $other,
+  null|NonNegativeInt $length = null,
+): Ordering {
+  return compare(lowercase($string), lowercase($other), $length);
+}
+
+/**
+ * Finds the first byte offset of a substring.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function search(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|NonNegativeInt {
+  $offset = _Private\offset($offset, length!($haystack));
+  $needleLength = length!($needle);
+  if ($needleLength == 0) {
+    return $offset;
+  }
+
+  if ($needleLength == 1) {
+    return Whim\_Private\memchr($haystack, ord($needle), $offset);
+  }
+
+  return Whim\_Private\memmem($haystack, $needle, $offset, false);
+}
+
+/**
+ * Finds a substring without ASCII case sensitivity.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function search_ci(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|NonNegativeInt {
+  $offset = _Private\offset($offset, length!($haystack));
+  if (length!($needle) == 0) {
+    return $offset;
+  }
+
+  return Whim\_Private\memmem($haystack, $needle, $offset, true);
+}
+
+/**
+ * Finds the last byte offset of a substring.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function search_last(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|NonNegativeInt {
+  $offset = _Private\offset($offset, length!($haystack));
+  $needleLength = length!($needle);
+  if ($needleLength == 0) {
+    return length!($haystack);
+  }
+
+  if ($needleLength == 1) {
+    return Whim\_Private\memrchr($haystack, ord($needle), $offset);
+  }
+
+  return Whim\_Private\memrmem($haystack, $needle, $offset, false);
+}
+
+/**
+ * Finds the last substring without ASCII case sensitivity.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function search_last_ci(
+  string $haystack,
+  string $needle,
+  int $offset = 0,
+): null|NonNegativeInt {
+  $offset = _Private\offset($offset, length!($haystack));
+  if (length!($needle) == 0) {
+    return length!($haystack);
+  }
+
+  return Whim\_Private\memrmem($haystack, $needle, $offset, true);
+}
+
+/**
+ * Reports whether a string contains a substring.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function contains(string $haystack, string $needle, int $offset = 0): bool {
+  if ($needle == '') {
+    _Private\offset($offset, length!($haystack));
+    return true;
+  }
+
+  return search($haystack, $needle, $offset) != null;
+}
+
+/**
+ * Reports containment without ASCII case sensitivity.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[MustUse]
+#[TrackCaller]
+function contains_ci(string $haystack, string $needle, int $offset = 0): bool {
+  if ($needle == '') {
+    _Private\offset($offset, length!($haystack));
+    return true;
+  }
+
+  return search_ci($haystack, $needle, $offset) != null;
+}
+
+/** Reports whether a string starts with a prefix. */
+#[MustUse]
+#[TrackCaller]
+function starts_with(string $string, string $prefix): bool {
+  return $prefix == '' || _Private\equal_at($string, $prefix, 0, false);
+}
+
+/** Reports prefix matching without ASCII case sensitivity. */
+#[MustUse]
+#[TrackCaller]
+function starts_with_ci(string $string, string $prefix): bool {
+  return $prefix == '' || _Private\equal_at($string, $prefix, 0, true);
+}
+
+/** Reports whether a string ends with a suffix. */
+#[MustUse]
+#[TrackCaller]
+function ends_with(string $string, string $suffix): bool {
+  $offset = length!($string) - length!($suffix);
+  return (
+    $suffix == ''
+    || ($offset >= 0 && _Private\equal_at($string, $suffix, $offset, false))
+  );
+}
+
+/** Reports suffix matching without ASCII case sensitivity. */
+#[MustUse]
+#[TrackCaller]
+function ends_with_ci(string $string, string $suffix): bool {
+  $offset = length!($string) - length!($suffix);
+  return (
+    $suffix == ''
+    || ($offset >= 0 && _Private\equal_at($string, $suffix, $offset, true))
+  );
+}

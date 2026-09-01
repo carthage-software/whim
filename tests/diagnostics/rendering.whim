@@ -1,0 +1,181 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Str;
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$work = Filesystem\canonicalize(
+  Filesystem\create_temporary_directory(null, 'whim-test-'),
+);
+
+$escape = Str\chr(27);
+
+$fault = $work . '/runtime-fault.whim';
+File\write(
+  $fault,
+  '$a = 1;' . "\n" . '$b = vec[];' . "\n" . '$c = $a + $b;' . "\n",
+);
+
+$run = Command\run($binary, vec[$fault]);
+assert!(!($run->isSuccess()));
+$assertion_value_3 = $run->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_3,
+    'uncaught Whim\Unwind\IncompatibleOperandsError: '
+    . 'the + operator is not defined for int and vec (code 0)',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_3, ' --> ' . $fault . ':3:6'));
+assert!(Whim\Str\contains($assertion_value_3, '3 | $c = $a + $b;'));
+assert!(Whim\Str\contains($assertion_value_3, '|      ^^^^^^^'));
+assert!(
+  Whim\Str\contains(
+    $assertion_value_3,
+    "\n\n"
+    . 'Stack backtrace:'
+    . "\n"
+    . ' 0  {main}'
+    . "\n"
+    . '    '
+    . $fault
+    . ':3',
+  ),
+);
+
+assert!(!Whim\Str\contains($assertion_value_3, $escape));
+
+$parser = $work . '/parser-error.whim';
+File\write($parser, '$a = 1');
+$run = Command\run($binary, vec[$parser]);
+assert!(!($run->isSuccess()));
+$assertion_value_5 = $run->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_5,
+    'uncaught Whim\Unwind\ParserError: unexpected end of file; expected `;` (code 0)',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_5, ' --> ' . $parser . ':1:7'));
+
+$compiler = $work . '/compiler-error.whim';
+File\write($compiler, 'function f(): void { return 1; }' . "\n");
+$run = Command\run($binary, vec[$compiler]);
+assert!(!($run->isSuccess()));
+$assertion_value_7 = $run->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_7,
+    'uncaught Whim\Unwind\CompilerError: a `void` function cannot return a value (code 0)',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_7, ' --> ' . $compiler . ':1:22'));
+assert!(
+  Whim\Str\contains($assertion_value_7, '|                      ^^^^^^^^'),
+);
+
+$explicit = $work . '/explicit-throw.whim';
+File\write(
+  $explicit,
+  '$error = new Whim\Unwind\Exception(\'made here\');'
+  . "\n"
+  . '$unused = 1;'
+  . "\n"
+  . 'throw $error;'
+  . "\n",
+);
+
+$run = Command\run($binary, vec[$explicit]);
+assert!(!($run->isSuccess()));
+$assertion_value_9 = $run->standardError;
+assert!(
+  Whim\Str\contains($assertion_value_9, 'error: the exception was thrown here'),
+);
+
+assert!(Whim\Str\contains($assertion_value_9, ' --> ' . $explicit . ':3:1'));
+assert!(Whim\Str\contains($assertion_value_9, '3 | throw $error;'));
+
+$chained = $work . '/chained-origins.whim';
+File\write(
+  $chained,
+  '$inner = null;'
+  . "\n"
+  . 'try {'
+  . "\n"
+  . 'throw new Whim\Unwind\Exception(\'inner\');'
+  . "\n"
+  . '} catch (Whim\Unwind\Exception $error) { $inner = $error; }'
+  . "\n"
+  . 'throw new Whim\Unwind\Exception(\'outer\', 0, $inner);'
+  . "\n",
+);
+
+$run = Command\run($binary, vec[$chained]);
+assert!(!($run->isSuccess()));
+$assertion_value_11 = $run->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_11,
+    'Whim\Unwind\Exception: outer (code 0)',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_11, ' --> ' . $chained . ':5:1'));
+assert!(Whim\Str\contains($assertion_value_11, 'Caused by:'));
+assert!(
+  Whim\Str\contains($assertion_value_11, '0: Whim\Unwind\Exception: inner'),
+);
+
+assert!(Whim\Str\contains($assertion_value_11, ' --> ' . $chained . ':3:1'));
+
+$broken = $work . '/broken-unit.whim';
+File\write($broken, 'class Broken implements Box {}' . "\n");
+$linker = $work . '/linker-error.whim';
+File\write(
+  $linker,
+  'interface Box<T> {}' . "\n" . 'require!(\'' . $broken . '\');' . "\n",
+);
+
+$run = Command\run($binary, vec[$linker]);
+assert!(!($run->isSuccess()));
+$assertion_value_13 = $run->standardError;
+assert!(
+  Whim\Str\contains($assertion_value_13, 'uncaught Whim\Unwind\LinkerError:'),
+);
+
+assert!(Whim\Str\contains($assertion_value_13, ' --> ' . $broken . ':1:25'));
+assert!(
+  Whim\Str\contains($assertion_value_13, '1 | class Broken implements Box {}'),
+);
+
+assert!(
+  Whim\Str\contains($assertion_value_13, '|                         ^^^'),
+);
+
+$plain = $work . '/plain-streams.whim';
+File\write($plain, 'length!(1);' . "\n");
+$run = Command\run($binary, vec[$plain]);
+assert!(!Whim\Str\contains($run->standardError, $escape));
+
+$builtIn = $work . '/built-in-boundary.whim';
+File\write($builtIn, 'Whim\Math\abs(\'wrong\');' . "\n");
+$run = Command\run($binary, vec[$builtIn]);
+assert!(!($run->isSuccess()));
+$assertion_value_16 = $run->standardError;
+assert!(
+  Whim\Str\contains($assertion_value_16, 'uncaught Whim\Unwind\TypeError:'),
+);
+
+assert!(Whim\Str\contains($assertion_value_16, ' --> ' . $builtIn . ':1:1'));
+assert!(
+  Whim\Str\contains($assertion_value_16, '1 | Whim\Math\abs(\'wrong\');'),
+);
+
+assert!(Whim\Str\contains($assertion_value_16, '| ^^^^^^^^^'));
+
+Filesystem\delete_directory($work, true);

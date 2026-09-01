@@ -1,0 +1,629 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\CompilerError;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\TypeError;
+
+$number = 10;
+$number += 5;
+assert!($number == 15);
+$number -= 3;
+assert!($number == 12);
+$number *= 2;
+assert!($number == 24);
+$number /= 6;
+assert!($number == 4.0);
+$remainder = 7;
+$remainder %= 4;
+assert!($remainder == 3);
+$text = 'a';
+$text .= 'b';
+assert!($text == 'ab');
+$bits = 6;
+$bits &= 3;
+assert!($bits == 2);
+$bits |= 8;
+assert!($bits == 10);
+$bits ^= 2;
+assert!($bits == 8);
+$bits <<= 2;
+assert!($bits == 32);
+$bits >>= 1;
+assert!($bits == 16);
+
+final class TickLog {
+  public static int $count = 0;
+}
+
+function tick(): int {
+  TickLog::$count++;
+  return 0;
+}
+
+$container = vec[10];
+$container[tick()] += 1;
+assert!(TickLog::$count == 1);
+assert!($container[0] == 11);
+
+$target = 0;
+$assigned = ($target = 5);
+assert!($assigned == 5);
+assert!($target == 5);
+$slots = vec[0];
+assert!(($slots[0] = 9) == 9);
+assert!($slots[0] == 9);
+
+final class NullSafeAssignmentSource {
+  public function value(): int {
+    return 42;
+  }
+}
+
+function assign_nullsafe(null|NullSafeAssignmentSource $source): null|int {
+  $value = $source?->value();
+  return $value;
+}
+
+assert!(assign_nullsafe(new NullSafeAssignmentSource()) == 42);
+assert!(assign_nullsafe(null) == null);
+
+final class BoomLog {
+  public static int $count = 0;
+}
+
+function boom(): bool {
+  BoomLog::$count++;
+  return true;
+}
+
+$conjunction = false;
+$conjunction &&= boom();
+assert!(!($conjunction));
+$disjunction = true;
+$disjunction ||= boom();
+assert!($disjunction);
+$kept = 'kept';
+$kept ??= 'replacement' . boom();
+assert!($kept == 'kept');
+$empty = null;
+$empty ??= 'filled';
+assert!($empty == 'filled');
+assert!(BoomLog::$count == 0);
+
+($a, $b) = (1, 2);
+assert!(($a, $b) == (1, 2));
+($x, ($y, $z)) = ('p', ('q', 'r'));
+assert!($x . $y . $z == 'pqr');
+($v, $w) = vec[3, 4];
+assert!(($v, $w) == (3, 4));
+$assertion_value_26 = function(): void {
+  ($u, $t) = (1, 2, 3);
+};
+
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (TypeError $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is TypeError);
+
+$assertion_value_27 = function(): void {
+  ($u, $t) = dict['a' => 1, 'b' => 2];
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (TypeError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is TypeError);
+
+final class FallbackCalls {
+  public int $count = 0;
+}
+
+function fallback(FallbackCalls $calls, mixed $value): mixed {
+  $calls->count++;
+  return $value;
+}
+
+$calls = new FallbackCalls();
+($given, $family = fallback($calls, $given . '-family')) = vec['Ada'];
+assert!($given == 'Ada');
+assert!($family == 'Ada-family');
+assert!($calls->count == 1);
+
+($given, $family = fallback($calls, 'unused')) = vec['Grace', 'Hopper'];
+assert!($given == 'Grace');
+assert!($family == 'Hopper');
+assert!($calls->count == 1);
+
+($presentNull, $nullable = fallback($calls, 'not null')) = vec[1, null];
+assert!($presentNull == 1);
+assert!($nullable == null);
+assert!($calls->count == 1);
+
+($only = 5,) = vec[];
+assert!($only == 5);
+
+(
+  $first,
+  $second = fallback($calls, 2),
+  $third = fallback($calls, $second + 1),
+) = vec[1];
+
+assert!(($first, $second, $third) == (1, 2, 3));
+assert!($calls->count == 3);
+
+($outer, ($inner, $nested = 9)) = vec[1, vec[2]];
+assert!(($outer, $inner, $nested) == (1, 2, 9));
+
+($head, $optional = 2, ...$tail) = vec[1, 3, 4, 5];
+assert!($head == 1);
+assert!($optional == 3);
+assert!($tail == vec[4, 5]);
+
+$rows = vec[];
+foreach (vec[vec[1], vec[2, 3]] as ($left, $right = 10)) {
+  $rows[] = ($left, $right);
+}
+
+assert!($rows == vec[(1, 10), (2, 3)]);
+
+$assertion_value_45 = function(): void {
+  ($required, $alsoRequired, $optional = 3) = vec[1];
+};
+
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (TypeError $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is TypeError);
+
+$assertion_value_46 = function(): void {
+  ($required, $optional = 2) = vec[1, 2, 3];
+};
+
+$assertion_error_46 = null;
+try {
+  $assertion_value_46();
+} catch (TypeError $assertion_caught_46) {
+  $assertion_error_46 = $assertion_caught_46;
+}
+
+assert!($assertion_error_46 is TypeError);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+File\write(
+  $work . '/required-after-default.whim',
+  '($first, $optional = 2, $required) = vec[1, 2, 3];' . "\n",
+);
+
+$requiredAfterDefault = $work . '/required-after-default.whim';
+$assertion_value_47 = function() use ($requiredAfterDefault): void {
+  require!($requiredAfterDefault);
+};
+
+$assertion_error_47 = null;
+try {
+  $assertion_value_47();
+} catch (CompilerError $assertion_caught_47) {
+  $assertion_error_47 = $assertion_caught_47;
+}
+
+assert!($assertion_error_47 is CompilerError);
+
+Filesystem\delete_directory($work, true);
+
+$values = vec[];
+($values[], $values[]) = (1, 2);
+assert!($values == vec[1, 2]);
+
+$appended = vec[];
+((($a, $b), ($c, $d)), $appended[]) = (((3, 4), (5, 6)), 7);
+assert!(($a, $b, $c, $d) == (3, 4, 5, 6));
+assert!($appended == vec[7]);
+
+($duplicated, $duplicated) = ('a', 'b');
+assert!($duplicated == 'b');
+
+($front, $_, $_, $back) = (1, 2, 3, 4);
+assert!($front == 1);
+assert!($back == 4);
+assert!($_ == 3);
+
+(($_, $keptSkip), $_) = ((1, 2), 3);
+assert!($keptSkip == 2);
+($_, ...$rest) = vec[1, 2, 3];
+assert!(length!($rest) == 2);
+
+final class KeyTrace {
+  public vec<string> $events = vec[];
+}
+
+function trace_key(KeyTrace $trace, string $name): string {
+  $trace->events[] = 'key:' . $name;
+  return $name;
+}
+
+function trace_source(KeyTrace $trace): dict<string, mixed> {
+  $trace->events[] = 'source';
+  return dict[
+    'id' => 42,
+    'profile' => dict['name' => 'Ada'],
+    'pair' => ('left', 'right'),
+  ];
+}
+
+$trace = new KeyTrace();
+dict[
+  trace_key($trace, 'id') => $identifier,
+  trace_key($trace, 'profile') => dict['name' => $profileName],
+  trace_key($trace, 'pair') => ($pairLeft, $pairRight),
+] = trace_source($trace);
+
+assert!($trace->events == vec['key:id', 'key:profile', 'key:pair', 'source']);
+
+assert!($identifier == 42);
+assert!($profileName == 'Ada');
+assert!($pairLeft == 'left');
+assert!($pairRight == 'right');
+
+$assertion_value_62 = function(): void {
+  dict['unknown' => $_] = dict[];
+};
+
+$assertion_error_62 = null;
+try {
+  $assertion_value_62();
+} catch (OutOfBoundsError $assertion_caught_62) {
+  $assertion_error_62 = $assertion_caught_62;
+}
+
+assert!($assertion_error_62 is OutOfBoundsError);
+
+$assertion_value_63 = function(): void {
+  dict[0 => $_] = vec['not a dict'];
+};
+
+$assertion_error_63 = null;
+try {
+  $assertion_value_63();
+} catch (TypeError $assertion_caught_63) {
+  $assertion_error_63 = $assertion_caught_63;
+}
+
+assert!($assertion_error_63 is TypeError);
+
+$selected = match (dict['id' => 7, 'label' => 'seven']) {
+  dict['id' => $matchedIdentifier, 'label' => $matchedLabel] @ dict<
+    string,
+    mixed,
+  > => ($matchedIdentifier, $matchedLabel),
+  $_ => null,
+};
+
+assert!($selected == (7, 'seven'));
+
+$vector = vec[1, 2, 3, 4];
+($a, $b, ...$rest) = $vector;
+assert!(($a, $b) == (1, 2));
+assert!($rest == vec[3, 4]);
+
+$triple = (9, 8, 7);
+($first, ...$tail) = $triple;
+assert!($first == 9);
+assert!(length!($tail) == 2);
+assert!($tail[0] == 8);
+assert!($tail[1] == 7);
+
+($a, $b, ...$emptyRest) = vec[1, 2];
+assert!(length!($emptyRest) == 0);
+
+($only, ...) = $vector;
+assert!($only == 1);
+
+(($head, ...$innerRest), $label) = (vec[1, 2, 3], 'end');
+assert!($head == 1);
+assert!(length!($innerRest) == 2);
+assert!($label == 'end');
+
+$assertion_value_76 = function(): void {
+  ($p, $q) = vec[1, 2, 3];
+};
+
+$assertion_error_76 = null;
+try {
+  $assertion_value_76();
+} catch (TypeError $assertion_caught_76) {
+  $assertion_error_76 = $assertion_caught_76;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_76->getMessage(),
+      'destructuring requires a vec or tuple of 2 elements, a vec of 3 given',
+    ),
+  );
+}
+
+assert!($assertion_error_76 is TypeError);
+
+$assertion_value_77 = function(): void {
+  ($p, $q) = vec[1];
+};
+
+$assertion_error_77 = null;
+try {
+  $assertion_value_77();
+} catch (TypeError $assertion_caught_77) {
+  $assertion_error_77 = $assertion_caught_77;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_77->getMessage(),
+      'destructuring requires a vec or tuple of 2 elements, a vec of 1 given',
+    ),
+  );
+}
+
+assert!($assertion_error_77 is TypeError);
+
+$assertion_value_78 = function(): void {
+  ($p, $q, ...$r) = vec[1];
+};
+
+$assertion_error_78 = null;
+try {
+  $assertion_value_78();
+} catch (TypeError $assertion_caught_78) {
+  $assertion_error_78 = $assertion_caught_78;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_78->getMessage(),
+      'destructuring requires a vec or tuple of at least 2 elements, a vec of 1 given',
+    ),
+  );
+}
+
+assert!($assertion_error_78 is TypeError);
+
+$assertion_value_79 = function(): void {
+  ($p, $q) = dict['a' => 1, 'b' => 2];
+};
+
+$assertion_error_79 = null;
+try {
+  $assertion_value_79();
+} catch (TypeError $assertion_caught_79) {
+  $assertion_error_79 = $assertion_caught_79;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_79->getMessage(),
+      'destructuring requires a vec or tuple of 2 elements, dict given',
+    ),
+  );
+}
+
+assert!($assertion_error_79 is TypeError);
+
+$assertion_value_80 = function(): void {
+  ($p, ...$r) = dict['a' => 1, 'b' => 2];
+};
+
+$assertion_error_80 = null;
+try {
+  $assertion_value_80();
+} catch (TypeError $assertion_caught_80) {
+  $assertion_error_80 = $assertion_caught_80;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_80->getMessage(),
+      'destructuring requires a vec or tuple of at least 1 element, dict given',
+    ),
+  );
+}
+
+assert!($assertion_error_80 is TypeError);
+
+$assertion_value_81 = function(): void {
+  ($p, $q) = 42;
+};
+
+$assertion_error_81 = null;
+try {
+  $assertion_value_81();
+} catch (TypeError $assertion_caught_81) {
+  $assertion_error_81 = $assertion_caught_81;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_81->getMessage(),
+      'destructuring requires a vec or tuple of 2 elements, int given',
+    ),
+  );
+}
+
+assert!($assertion_error_81 is TypeError);
+
+$long = vec[];
+$index = 0;
+while ($index < 300) {
+  $long[] = $index;
+  $index = $index + 1;
+}
+
+($leader, ...$remainder) = $long;
+assert!($leader == 0);
+assert!(length!($remainder) == 299);
+assert!($remainder[298] == 299);
+
+$tupleSource = (1, 2, 3);
+($tupleSource, $selfSecond, $selfThird) = $tupleSource;
+assert!(($tupleSource, $selfSecond, $selfThird) == (1, 2, 3));
+
+$list = vec[10, 20, 30];
+($list, ...$listTail) = $list;
+assert!($list == 10);
+assert!($listTail == vec[20, 30]);
+
+$again = vec[4, 5, 6];
+($againHead, $again, ...$againRest) = $again;
+assert!($againHead == 4);
+assert!($again == 5);
+assert!(length!($againRest) == 1);
+
+$outerSource = (vec[7, 8], 9);
+(($outerSource, $outerSecond), $outerThird) = $outerSource;
+assert!(($outerSource, $outerSecond, $outerThird) == (7, 8, 9));
+
+($a, $b) = vec[1, 2];
+assert!(($a, $b) == (1, 2));
+($c, $d) = (1, 2);
+assert!(($c, $d) == (1, 2));
+(($e, $f), $g) = (vec[1, 2], 3);
+assert!(($e, $f, $g) == (1, 2, 3));
+(($h, $i), $j) = vec[(4, 5), 6];
+assert!(($h, $i, $j) == (4, 5, 6));
+
+$pairs = vec[];
+foreach (vec[vec[1, 2], vec[3, 4]] as ($pairFirst, $pairSecond)) {
+  $pairs[] = $pairFirst . '-' . $pairSecond;
+}
+
+assert!($pairs == vec['1-2', '3-4']);
+
+final class AssignmentPropertyBuffer {
+  public vec<int> $items = vec[];
+
+  public function push(mixed $value): void {
+    $this->items[] = $value;
+  }
+
+  public function set(int $index, mixed $value): void {
+    $this->items[$index] = $value;
+  }
+}
+
+$propertyBuffer = new AssignmentPropertyBuffer();
+$propertyBuffer->push(1);
+$propertySnapshot = $propertyBuffer->items;
+$propertyBuffer->push(2);
+assert!($propertySnapshot == vec[1]);
+assert!($propertyBuffer->items == vec[1, 2]);
+$assertion_value_99 = function() use ($propertyBuffer): void {
+  $propertyBuffer->push('bad');
+};
+
+$assertion_error_99 = null;
+try {
+  $assertion_value_99();
+} catch (TypeError $assertion_caught_99) {
+  $assertion_error_99 = $assertion_caught_99;
+}
+
+assert!($assertion_error_99 is TypeError);
+
+assert!($propertyBuffer->items == vec[1, 2]);
+
+$propertyIndexSnapshot = $propertyBuffer->items;
+$propertyBuffer->set(0, 3);
+assert!($propertyIndexSnapshot == vec[1, 2]);
+assert!($propertyBuffer->items == vec[3, 2]);
+$assertion_value_103 = function() use ($propertyBuffer): void {
+  $propertyBuffer->set(0, 'bad');
+};
+
+$assertion_error_103 = null;
+try {
+  $assertion_value_103();
+} catch (TypeError $assertion_caught_103) {
+  $assertion_error_103 = $assertion_caught_103;
+}
+
+assert!($assertion_error_103 is TypeError);
+
+assert!($propertyBuffer->items == vec[3, 2]);
+
+final class AssignmentPropertyDictionary {
+  public dict<string, int> $items = dict['first' => 1];
+
+  public function set(mixed $key, mixed $value): void {
+    $this->items[$key] = $value;
+  }
+
+  public function setComputed(int $key, int $value): void {
+    $this->items['key-' . $key] = $value;
+  }
+
+  public function setWith(fn(): string $key, int $value): void {
+    $this->items[$key()] = $value;
+  }
+}
+
+$propertyDictionary = new AssignmentPropertyDictionary();
+$propertyDictionary->set('second', 2);
+assert!($propertyDictionary->items == dict['first' => 1, 'second' => 2]);
+
+$assertion_value_106 = function() use ($propertyDictionary): void {
+  $propertyDictionary->set(3, 3);
+};
+
+$assertion_error_106 = null;
+try {
+  $assertion_value_106();
+} catch (TypeError $assertion_caught_106) {
+  $assertion_error_106 = $assertion_caught_106;
+}
+
+assert!($assertion_error_106 is TypeError);
+
+$assertion_value_107 = function() use ($propertyDictionary): void {
+  $propertyDictionary->set('first', 'bad');
+};
+
+$assertion_error_107 = null;
+try {
+  $assertion_value_107();
+} catch (TypeError $assertion_caught_107) {
+  $assertion_error_107 = $assertion_caught_107;
+}
+
+assert!($assertion_error_107 is TypeError);
+
+assert!($propertyDictionary->items == dict['first' => 1, 'second' => 2]);
+
+$assertion_value_109 = function() use ($propertyDictionary): void {
+  $propertyDictionary->setWith(function(): string {
+    throw new TypeError('computed key failed');
+  }, 3);
+};
+
+$assertion_error_109 = null;
+try {
+  $assertion_value_109();
+} catch (TypeError $assertion_caught_109) {
+  $assertion_error_109 = $assertion_caught_109;
+}
+
+assert!($assertion_error_109 is TypeError);
+
+assert!($propertyDictionary->items == dict['first' => 1, 'second' => 2]);
+
+$propertyDictionarySnapshot = $propertyDictionary->items;
+for ($index = 0; $index < 2000; $index++) {
+  $propertyDictionary->setComputed($index, $index);
+}
+
+assert!($propertyDictionarySnapshot == dict['first' => 1, 'second' => 2]);
+assert!(length!($propertyDictionary->items) == 2002);
+
+$propertyAppendScale = new AssignmentPropertyBuffer();
+for ($index = 0; $index < 50000; $index++) {
+  $propertyAppendScale->push($index);
+}
+
+assert!(length!($propertyAppendScale->items) == 50000);

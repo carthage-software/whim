@@ -1,0 +1,4 @@
+namespace Whim\Network;
+
+/** Reports a host-name resolution failure. */
+final class ResolutionException extends NetworkException {}

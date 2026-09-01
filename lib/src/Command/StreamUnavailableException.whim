@@ -1,0 +1,6 @@
+namespace Whim\Command;
+
+use Whim\Unwind\LogicException;
+
+/** Reports a stream asked for that the command did not pipe. */
+final class StreamUnavailableException extends LogicException {}

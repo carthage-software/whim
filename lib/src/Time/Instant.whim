@@ -1,0 +1,88 @@
+namespace Whim\Time;
+
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim;
+
+/** Represents a monotonically increasing clock reading. */
+final readonly class Instant implements Order<Instant> {
+  #[TrackCaller]
+  private function __construct(
+    private int $seconds,
+    private int $nanoseconds,
+  ) {}
+
+  /** Captures the current high-resolution clock reading. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function now(): Instant {
+    $reading = Whim\_Private\get_high_resolution_time();
+    return new Instant($reading[0], $reading[1]);
+  }
+
+  /** Measures the duration elapsed since this reading. */
+  #[MustUse]
+  #[TrackCaller]
+  public function elapsed(): Duration {
+    $now = Whim\_Private\get_high_resolution_time();
+    return new Duration($now[0] - $this->seconds, $now[1] - $this->nanoseconds);
+  }
+
+  /** Measures the duration since an earlier reading. */
+  #[MustUse]
+  #[TrackCaller]
+  public function durationSince(Instant $earlier): Duration {
+    return new Duration(
+      $this->seconds - $earlier->seconds,
+      $this->nanoseconds - $earlier->nanoseconds,
+    );
+  }
+
+  /** Moves this reading forward by a duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function plus(Duration $duration): Instant {
+    $seconds = $this->seconds + $duration->seconds;
+    $nanoseconds = $this->nanoseconds + $duration->nanoseconds;
+    $seconds += Math\div($nanoseconds, NANOSECONDS_PER_SECOND);
+    $nanoseconds %= NANOSECONDS_PER_SECOND;
+    if ($nanoseconds < 0) {
+      $seconds--;
+      $nanoseconds += NANOSECONDS_PER_SECOND;
+    }
+
+    return new Instant($seconds, $nanoseconds);
+  }
+
+  /** Moves this reading backward by a duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minus(Duration $duration): Instant {
+    return $this->plus($duration->invert());
+  }
+
+  /** Compares this reading with another. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(Instant $other): Ordering {
+    if ($this->seconds != $other->seconds) {
+      return Ordering::from($this->seconds <=> $other->seconds);
+    }
+
+    return Ordering::from($this->nanoseconds <=> $other->nanoseconds);
+  }
+
+  /** Reports whether two readings are equal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Instant $other): bool {
+    return (
+      $this->seconds == $other->seconds
+      && $this->nanoseconds == $other->nanoseconds
+    );
+  }
+}

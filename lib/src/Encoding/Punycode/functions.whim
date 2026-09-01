@@ -1,0 +1,42 @@
+namespace Whim\Encoding\Punycode;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\EncodingException;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/**
+ * Encodes Unicode text using Punycode.
+ *
+ * @throws EncodingException when the input cannot be encoded as Punycode.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function encode(string $input): string {
+  $encoded = Whim\_Private\punycode_encode($input);
+  if ($encoded == null) {
+    throw new EncodingException('the input cannot be encoded as punycode');
+  }
+
+  return $encoded;
+}
+
+/**
+ * Decodes Punycode into Unicode text.
+ *
+ * @throws DecodingException when the input is not valid Punycode.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(string $input): string {
+  $decoded = Whim\_Private\punycode_decode($input);
+  if ($decoded == null) {
+    throw new DecodingException('the input is not valid punycode');
+  }
+
+  return $decoded;
+}

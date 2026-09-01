@@ -1,0 +1,121 @@
+namespace Whim\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\Stub;
+
+/** Returns the values of an array as a vec. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_from_array(array<_, _> $values): vec<mixed> {}
+
+/** Returns the entries of an array as a vec of key-value tuples. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function array_entries(array<_, _> $values): vec<(string|int|bool, mixed)> {}
+
+/** Returns an array as a dict, keying vecs and tuples by index. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function dict_from_array(array<_, _> $values): dict<string|int|bool, mixed> {}
+
+/** Builds a dict from an array of key-value tuples. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function dict_from_entries(
+  array<_, (string|int|bool, _)> $entries,
+): dict<string|int|bool, mixed> {}
+
+/** Merges two dicts, with the second's values replacing the first's. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function dict_merge(
+  dict<_, _> $first,
+  dict<_, _> $second,
+): dict<string|int|bool, mixed> {}
+
+/** Exchanges the keys and values of an array. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function dict_flip(
+  array<_, string|int|bool> $values,
+): dict<string|int|bool, mixed> {}
+
+/** Flattens one level of nested arrays, or null on a non-array value. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function dict_flatten(array<_, _> $values): null|dict<string|int|bool, mixed> {}
+
+/** Counts the occurrences of each value in an array. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function dict_count_values(
+  array<_, string|int|bool> $values,
+): dict<string|int|bool, int> {}
+
+/** Sorts a dict by value with a stable sort, preserving keys. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function dict_sort(
+  dict<_, _> $values,
+  null|fn(_, _): int $comparator,
+): dict<string|int|bool, mixed> {}
+
+/** Sorts a vec with a stable sort. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_sort(vec<_> $values, null|fn(_, _): int $comparator): vec<mixed> {}
+
+/** Sorts values by their parallel keys with a stable sort. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_sort_by(
+  vec<_> $values,
+  vec<_> $keys,
+  null|fn(_, _): int $comparator,
+): vec<mixed> {}
+
+/** Extracts a contiguous vec range. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_slice(
+  vec<_> $values,
+  (0..) $start,
+  null|(0..) $length,
+): vec<mixed> {}
+
+/** Splits a vec into fixed-size vecs. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_chunk(vec<_> $values, (1..) $size): vec<vec<mixed>> {}
+
+/** Reverses a vec. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_reverse(vec<_> $values): vec<mixed> {}
+
+/** Removes duplicate vec values while preserving first occurrences. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_unique(vec<_> $values): vec<mixed> {}
+
+/** Removes values with duplicate parallel keys. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function vec_unique_by(vec<_> $values, vec<_> $keys): vec<mixed> {}

@@ -1,0 +1,213 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private\ErrorCode;
+use Whim\HTTP\_Private\FlowControlException;
+use Whim\HTTP\_Private\StreamException;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\_Private\StreamState;
+use Whim\Refine\NonNegativeInt;
+
+/** Tracks stream state, windows, and concurrency. */
+final class StreamTable {
+  private dict<StreamId, StreamEntry> $streams = dict[];
+  private NonNegativeInt $localActive = 0;
+  private NonNegativeInt $peerActive = 0;
+  private NonNegativeInt $peerReserved = 0;
+
+  public function __construct(
+    private NonNegativeInt $localMaximum,
+    private int $initialSendWindow,
+    private int $initialReceiveWindow,
+    private NonNegativeInt $peerMaximum,
+    private NonNegativeInt $peerReservedMaximum,
+  ) {}
+
+  public function get(StreamId $streamId): null|StreamEntry {
+    if (!contains_key!($this->streams, $streamId)) {
+      return null;
+    }
+
+    return $this->streams[$streamId];
+  }
+
+  private function getOrCreate(
+    StreamId $streamId,
+    bool $locallyInitiated,
+  ): StreamEntry {
+    if (!contains_key!($this->streams, $streamId)) {
+      $this->streams[$streamId] = new StreamEntry(
+        $this->initialSendWindow,
+        $this->initialReceiveWindow,
+        $locallyInitiated,
+      );
+    }
+
+    return $this->streams[$streamId];
+  }
+
+  public function openLocal(StreamId $streamId): StreamEntry {
+    if ($this->localActive >= $this->localMaximum) {
+      throw new FlowControlException(
+        'the peer maximum concurrent stream count was exceeded',
+      );
+    }
+
+    return $this->open($streamId, true);
+  }
+
+  public function openPeer(StreamId $streamId): StreamEntry {
+    if ($this->peerActive >= $this->peerMaximum) {
+      throw new StreamException(
+        'the local maximum concurrent stream count was exceeded',
+        $streamId,
+        ErrorCode::RefusedStream->value,
+      );
+    }
+
+    return $this->open($streamId, false);
+  }
+
+  public function reserveLocal(StreamId $streamId): StreamEntry {
+    $entry = $this->getOrCreate($streamId, true);
+    if ($entry->state == StreamState::Idle) {
+      $entry->state = StreamState::ReservedLocal;
+    }
+
+    return $entry;
+  }
+
+  public function reservePeer(StreamId $streamId): StreamEntry {
+    if ($this->peerReserved >= $this->peerReservedMaximum) {
+      throw new StreamException(
+        'the local reserved push stream limit was exceeded',
+        $streamId,
+        ErrorCode::EnhanceYourCalm->value,
+      );
+    }
+
+    $entry = $this->getOrCreate($streamId, false);
+    if ($entry->state == StreamState::Idle) {
+      $entry->state = StreamState::ReservedRemote;
+      $this->peerReserved++;
+    }
+
+    return $entry;
+  }
+
+  public function activateLocal(StreamEntry $entry): void {
+    if ($this->localActive >= $this->localMaximum) {
+      throw new FlowControlException(
+        'the peer maximum concurrent stream count was exceeded',
+      );
+    }
+
+    $entry->state = StreamState::HalfClosedRemote;
+    $this->localActive++;
+  }
+
+  public function activatePeer(StreamId $streamId, StreamEntry $entry): void {
+    if ($this->peerActive >= $this->peerMaximum) {
+      throw new StreamException(
+        'the local maximum concurrent stream count was exceeded',
+        $streamId,
+        ErrorCode::RefusedStream->value,
+      );
+    }
+
+    if ($this->peerReserved > 0) {
+      $this->peerReserved--;
+    }
+
+    $entry->state = StreamState::HalfClosedLocal;
+    $this->peerActive++;
+  }
+
+  private function open(
+    StreamId $streamId,
+    bool $locallyInitiated,
+  ): StreamEntry {
+    $entry = $this->getOrCreate($streamId, $locallyInitiated);
+    if ($entry->state == StreamState::Idle) {
+      $entry->state = StreamState::Open;
+      if ($locallyInitiated) {
+        $this->localActive++;
+      } else {
+        $this->peerActive++;
+      }
+    }
+
+    return $entry;
+  }
+
+  public function close(StreamId $streamId): void {
+    $entry = $this->get($streamId) ?? return;
+
+    if (
+      $entry->state == StreamState::ReservedRemote
+      && $this->peerReserved > 0
+    ) {
+      $this->peerReserved--;
+    } else if (counts_toward_concurrency($entry->state)) {
+      if ($entry->locallyInitiated && $this->localActive > 0) {
+        $this->localActive--;
+      } else if (!$entry->locallyInitiated && $this->peerActive > 0) {
+        $this->peerActive--;
+      }
+    }
+
+    $entry->state = StreamState::Closed;
+    remove!($this->streams, $streamId);
+  }
+
+  public function activeCount(): NonNegativeInt {
+    return $this->localActive;
+  }
+
+  public function localMaximum(): NonNegativeInt {
+    return $this->localMaximum;
+  }
+
+  public function setLocalMaximum(NonNegativeInt $maximum): void {
+    $this->localMaximum = $maximum;
+  }
+
+  public function setInitialSendWindow(int $window): void {
+    $this->initialSendWindow = $window;
+  }
+
+  public function adjustSendWindows(int $delta): void {
+    foreach ($this->streams as $entry) {
+      if (!has_flow_control_window($entry->state)) {
+        continue;
+      }
+
+      $window = $entry->sendWindow + $delta;
+      if ($window > Whim\HTTP\_Private\MAX_WINDOW_SIZE) {
+        throw new FlowControlException(
+          'an HTTP/2 stream send window overflowed',
+        );
+      }
+
+      $entry->sendWindow = $window;
+    }
+  }
+}
+
+function counts_toward_concurrency(StreamState $state): bool {
+  return (
+    $state is StreamState::Open
+      | StreamState::HalfClosedLocal
+      | StreamState::HalfClosedRemote
+  );
+}
+
+function has_flow_control_window(StreamState $state): bool {
+  return (
+    $state is StreamState::ReservedLocal
+      | StreamState::ReservedRemote
+      | StreamState::Open
+      | StreamState::HalfClosedLocal
+      | StreamState::HalfClosedRemote
+  );
+}

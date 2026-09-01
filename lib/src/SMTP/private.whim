@@ -1,0 +1,50 @@
+namespace Whim\SMTP\_Private;
+
+use Whim\SMTP\EnhancedStatusPart;
+use Whim\Str;
+
+/** Parses an unsigned decimal integer. */
+function parse_decimal(string $value): null|int {
+  if ($value == '') {
+    return null;
+  }
+
+  $result = 0;
+  $index = 0;
+  while ($index < length!($value)) {
+    $byte = Str\ord($value[$index]);
+    if (!($byte is 48..=57)) {
+      return null;
+    }
+
+    $result = $result * 10 + $byte - 48;
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Splits three decimal enhanced-status fields. */
+function split_enhanced_status(
+  string $value,
+): null|(EnhancedStatusPart, EnhancedStatusPart, EnhancedStatusPart) {
+  $first = Str\search($value, '.') ?? return null;
+
+  $second = Str\search($value, '.', $first + 1);
+  if ($second == null || Str\search($value, '.', $second + 1) != null) {
+    return null;
+  }
+
+  $class = parse_decimal(Str\slice($value, 0, $first));
+  $subject = parse_decimal(Str\slice($value, $first + 1, $second - $first - 1));
+  $detail = parse_decimal(Str\slice($value, $second + 1));
+  if (
+    !($class is EnhancedStatusPart)
+    || !($subject is EnhancedStatusPart)
+    || !($detail is EnhancedStatusPart)
+  ) {
+    return null;
+  }
+
+  return ($class, $subject, $detail);
+}

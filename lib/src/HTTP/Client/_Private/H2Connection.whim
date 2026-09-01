@@ -1,0 +1,664 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim;
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\Async\LinkedCancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\Channel;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\ConnectionMetadata;
+use Whim\HTTP\Client\MultiplexedConnection;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Message\Exchange;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Transaction;
+use Whim\IO\CloseHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\Throwable;
+
+/** Multiplexes HTTP/2 exchanges over one byte stream. */
+final class H2Connection implements MultiplexedConnection {
+  private H2\ClientConnection $protocol;
+  private SignalCancellationToken $stop;
+  private SignalCancellationToken $readerCancellation;
+  private bool $readerRunning = false;
+  private dict<H2\StreamId, H2Exchange> $exchanges = dict[];
+  private Channel\Sender<null> $writeSender;
+  private Channel\Receiver<null> $writeReceiver;
+  private Channel\Sender<null> $capacitySender;
+  private Channel\Receiver<null> $capacityReceiver;
+  private bool $pushEnabled;
+  private int $maximumPushes;
+
+  public function __construct(
+    private ReadHandle&WriteHandle&CloseHandle $stream,
+    private ConnectionMetadata $metadata,
+    H2\Configuration $configuration,
+  ) {
+    $this->protocol = new H2\ClientConnection($configuration);
+
+    $settings = $configuration->settings;
+    $enablePush = H2\Setting::EnablePush->value;
+    $this->pushEnabled =
+      !contains_key!($settings, $enablePush)
+      || $settings[$enablePush] != 0;
+
+    $this->maximumPushes = $configuration->maximumReservedPushes;
+
+    $this->stop = new SignalCancellationToken();
+    $this->readerCancellation = new SignalCancellationToken();
+    ($this->writeSender, $this->writeReceiver) = Channel\bounded::<null>(1);
+    ($this->capacitySender, $this->capacityReceiver) = Channel\unbounded::<
+      null,
+    >();
+
+    $this->writeSender->send(null);
+  }
+
+  public function __destruct(): void {
+    try {
+      $this->close();
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[MustUse]
+  public function getMetadata(): ConnectionMetadata {
+    return $this->metadata;
+  }
+
+  #[MustUse]
+  public function isReusable(): bool {
+    return $this->protocol->isConnected() && !$this->stream->isClosed();
+  }
+
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->stream->isClosed();
+  }
+
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->stop->isCancellationRequested()) {
+      return;
+    }
+
+    $error = new ProtocolException('the HTTP/2 connection was closed');
+    try {
+      $this->stop->cancel();
+    } finally {
+      $this->failAll($error);
+      $this->stream->close();
+    }
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function exchange(
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $operationCancellation = match ($cancellation) {
+      null => $this->stop,
+      $token @ CancellationToken => new LinkedCancellationToken(vec[
+        $this->stop,
+        $token,
+      ]),
+    };
+
+    $this->waitForCapacity($operationCancellation);
+    $streamId = $this->protocol->nextStreamId();
+    $pushes = match ($this->pushEnabled) {
+      true => new PushCollection($this->maximumPushes),
+      false => null,
+    };
+
+    $exchange = new H2Exchange(
+      $configuration->maximumResponseBodySize,
+      $configuration->maximumInformationalResponses,
+      $request,
+      $pushes,
+    );
+
+    $this->exchanges[$streamId] = $exchange;
+    $this->startReader();
+    $handedOff = false;
+
+    try {
+      $this->sendRequest(
+        $streamId,
+        $exchange,
+        $request,
+        $operationCancellation,
+      );
+
+      ($transaction, $handedOff) = $this->receiveResponse(
+        $request,
+        $streamId,
+        $exchange,
+        $operationCancellation,
+        $configuration->maximumInformationalResponses,
+      );
+
+      return $transaction;
+    } catch (Throwable $error) {
+      $this->cancelStream($streamId);
+      throw $error;
+    } finally {
+      if (!$handedOff) {
+        $this->unregister($streamId);
+      }
+    }
+  }
+
+  private function sendRequest(
+    H2\StreamId $streamId,
+    H2Exchange $exchange,
+    Request $request,
+    CancellationToken $cancellation,
+  ): void {
+    $body = $request->body;
+    $endStream = $body == null && $request->trailers == null;
+    $this->protocol->sendHeaders(
+      $streamId,
+      h2_request_headers($request),
+      $endStream,
+    );
+
+    $this->flush();
+    if ($body != null) {
+      while (true) {
+        $window = $this->protocol->availableSendWindow($streamId);
+        while ($window <= 0) {
+          if ($this->waitForWindow($streamId, $exchange, $cancellation)) {
+            return;
+          }
+
+          $window = $this->protocol->availableSendWindow($streamId);
+        }
+
+        $maximum = 16384;
+        if ($window < $maximum) {
+          $maximum = $window;
+        }
+
+        $data = $body->read($maximum, $cancellation);
+        if ($exchange->hasFinalResponse()) {
+          return;
+        }
+
+        if ($data == '') {
+          if ($body->reachedEndOfDataSource()) {
+            break;
+          }
+
+          continue;
+        }
+
+        $this->protocol->sendData($streamId, $data);
+        $this->flush();
+      }
+    }
+
+    if ($request->trailers != null) {
+      if ($exchange->hasFinalResponse()) {
+        return;
+      }
+
+      $trailers = vec[];
+      foreach ($request->trailers->await($cancellation) as ($name, $value)) {
+        $trailers[] = (Whim\Str\lowercase($name), $value, false);
+      }
+
+      if ($exchange->hasFinalResponse()) {
+        return;
+      }
+
+      $this->protocol->sendHeaders($streamId, $trailers, true);
+    } else if (!$endStream) {
+      if ($exchange->hasFinalResponse()) {
+        return;
+      }
+
+      $this->protocol->sendData($streamId, '', true);
+    }
+
+    $this->flush();
+  }
+
+  private function receiveResponse(
+    Request $request,
+    H2\StreamId $streamId,
+    H2Exchange $exchange,
+    CancellationToken $cancellation,
+    NonNegativeInt $maximumInformationalResponses,
+  ): (Transaction, bool) {
+    $pushes = $exchange->pushes();
+    $pushed = match ($pushes) {
+      $collection @ PushCollection => $collection->getFuture(),
+      null => null,
+    };
+
+    $informational = vec[];
+    $events = $exchange->takePending();
+    while (true) {
+      if (length!($events) == 0) {
+        $batch = $exchange->receive($cancellation);
+        if ($batch->error != null) {
+          throw $batch->error;
+        }
+
+        $events = $batch->events;
+      }
+
+      foreach ($events as $event) {
+        if ($event[0] == 2) {
+          ($status, $headers) = h2_response_headers($event[2]);
+          if ($event[5]) {
+            if (length!($informational) >= $maximumInformationalResponses) {
+              throw new ProtocolException(
+                'the HTTP/2 response sent too many informational responses',
+              );
+            }
+
+            $informational[] = new Response(
+              $status,
+              ProtocolVersion::V2,
+              $headers,
+            );
+
+            continue;
+          }
+
+          if ($event[4]) {
+            throw new ProtocolException(
+              'the HTTP/2 response sent trailers before final headers',
+            );
+          }
+
+          if ($event[3]) {
+            return (
+              new Transaction(
+                $informational,
+                $pushed,
+                new Response($status, ProtocolVersion::V2, $headers),
+              ),
+              false,
+            );
+          }
+
+          if (!response_has_body($request, $status)) {
+            $this->cancelStream($streamId);
+            return (
+              new Transaction(
+                $informational,
+                $pushed,
+                new Response($status, ProtocolVersion::V2, $headers),
+              ),
+              false,
+            );
+          }
+
+          $trailers = new Deferred::<FieldMap>();
+          return (
+            new Transaction(
+              $informational,
+              $pushed,
+              new Response(
+                $status,
+                ProtocolVersion::V2,
+                $headers,
+                new H2ResponseBody($this, $streamId, $exchange, $trailers),
+                $trailers->getFuture(),
+              ),
+            ),
+            true,
+          );
+        } else if ($event[0] == 7) {
+          throw new ProtocolException('the HTTP/2 response stream was reset');
+        } else if ($event[0] == 8) {
+          throw new ProtocolException(
+            'the HTTP/2 stream ended without a response',
+          );
+        }
+      }
+
+      $events = vec[];
+    }
+  }
+
+  private function waitForCapacity(CancellationToken $cancellation): void {
+    while (
+      $this->protocol->activeStreamCount() >= $this->protocol->maximumConcurrentStreams()
+    ) {
+      if (!$this->isReusable()) {
+        throw new ProtocolException('the HTTP/2 connection is shutting down');
+      }
+
+      $this->startReader();
+      $_ = $this->capacityReceiver->receive($cancellation);
+    }
+  }
+
+  private function waitForWindow(
+    H2\StreamId $streamId,
+    H2Exchange $exchange,
+    CancellationToken $cancellation,
+  ): bool {
+    $batch = $exchange->receive($cancellation);
+    if ($batch->error != null) {
+      throw $batch->error;
+    }
+
+    foreach ($batch->events as $event) {
+      if ($event[0] == 7) {
+        if (
+          $exchange->hasFinalResponse()
+          && $event[2] == H2\ErrorCode::NoError->value
+        ) {
+          $exchange->defer($event);
+          continue;
+        }
+
+        throw new ProtocolException(
+          'the HTTP/2 request stream was reset while waiting for flow-control capacity',
+        );
+      }
+
+      if ($event[0] == 8) {
+        if ($exchange->hasFinalResponse()) {
+          $exchange->defer($event);
+          continue;
+        }
+
+        throw new ProtocolException(
+          'the HTTP/2 request stream closed while waiting for flow-control capacity',
+        );
+      }
+
+      if ($event[0] != 10 || ($event[1] != 0 && $event[1] != $streamId)) {
+        $exchange->defer($event);
+      }
+    }
+
+    return $exchange->hasFinalResponse();
+  }
+
+  private function startReader(): void {
+    if ($this->readerRunning || $this->stop->isCancellationRequested()) {
+      return;
+    }
+
+    $this->readerRunning = true;
+    $this->readerCancellation = new SignalCancellationToken();
+    $cancellation = new LinkedCancellationToken(vec[
+      $this->stop,
+      $this->readerCancellation,
+    ]);
+
+    Async\spawn::<null>(fn(): null => $this->read($cancellation))->ignore();
+  }
+
+  private function read(CancellationToken $cancellation): null {
+    try {
+      while (true) {
+        $cancellation->throwIfCancellationRequested();
+        $bytes = $this->stream->read(16384, $cancellation);
+        if ($bytes == '' && $this->stream->reachedEndOfDataSource()) {
+          throw new ProtocolException(
+            'the HTTP/2 transport closed unexpectedly',
+          );
+        }
+
+        $events = $this->protocol->receive($bytes);
+        foreach ($events as $event) {
+          $this->dispatch($event);
+        }
+
+        $this->flush();
+      }
+    } catch (Async\CancelledException $_) {
+      return null;
+    } catch (Throwable $error) {
+      $this->failAll($error);
+      try {
+        $this->stream->close();
+      } catch (Throwable $_) {
+      }
+    } finally {
+      $this->readerRunning = false;
+      if (
+        length!($this->exchanges) != 0
+        && !$this->stop->isCancellationRequested()
+      ) {
+        $this->startReader();
+      }
+    }
+
+    return null;
+  }
+
+  private function dispatch(Event\WeakendEvent $event): void {
+    if ($event[0] == 6) {
+      $this->goAway($event);
+      return;
+    }
+
+    if ($event[0] == 3 || $event[0] == 4) {
+      $this->capacitySender->send(null);
+      $this->broadcast($event);
+      return;
+    }
+
+    if ($event[0] == 10 && $event[1] == 0) {
+      $this->broadcast($event);
+      return;
+    }
+
+    if ($event[0] == 5) {
+      $this->acceptPush($event);
+      return;
+    }
+
+    $streamId = $this->eventStreamId($event);
+
+    if ($streamId == null || !contains_key!($this->exchanges, $streamId)) {
+      return;
+    }
+
+    if ($event[0] == 9) {
+      $this->exchanges[$streamId]->fail(new ProtocolException($event[3]));
+
+      $this->unregister($streamId);
+      return;
+    }
+
+    if (!$this->exchanges[$streamId]->deliver($event)) {
+      $this->cancelStream($streamId);
+      $this->unregister($streamId);
+      return;
+    }
+
+    if ($event[0] == 7 || $event[0] == 8) {
+      $this->unregister($streamId);
+    }
+  }
+
+  private function eventStreamId(Event\WeakendEvent $event): null|int {
+    return match ($event[0]) {
+      1 | 2 | 5 | 7 | 8 | 9 | 10 => $event[1],
+      $_ => null,
+    };
+  }
+
+  private function acceptPush(Event\WeakendEvent $event): void {
+    if (!contains_key!($this->exchanges, $event[1])) {
+      $this->rejectPush($event[2]);
+      return;
+    }
+
+    $parent = $this->exchanges[$event[1]];
+    $pushes = $parent->pushes();
+    if ($pushes == null) {
+      $this->rejectPush($event[2]);
+      return;
+    }
+
+    $request = h2_push_request($parent->request(), $event[3]);
+    if ($request == null || !$pushes->accept()) {
+      $this->rejectPush($event[2]);
+      return;
+    }
+
+    $exchange = new H2Exchange(
+      $parent->maximumBodyBytes(),
+      $parent->maximumInformationalResponses(),
+      $request,
+    );
+
+    $this->exchanges[$event[2]] = $exchange;
+    Async\spawn::<null>(
+      fn(): null => $this->receivePush($request, $event[2], $exchange, $pushes),
+    )->ignore();
+  }
+
+  private function receivePush(
+    Request $request,
+    H2\StreamId $streamId,
+    H2Exchange $exchange,
+    PushCollection $pushes,
+  ): null {
+    $handedOff = false;
+    try {
+      ($transaction, $handedOff) = $this->receiveResponse(
+        $request,
+        $streamId,
+        $exchange,
+        $this->stop,
+        $exchange->maximumInformationalResponses(),
+      );
+
+      $pushes->complete(new Exchange($request, $transaction->response));
+    } catch (Throwable $error) {
+      $pushes->fail($error);
+      $this->cancelStream($streamId);
+    } finally {
+      if (!$handedOff) {
+        $this->unregister($streamId);
+      }
+    }
+
+    return null;
+  }
+
+  private function rejectPush(H2\StreamId $streamId): void {
+    try {
+      $this->protocol->rejectPush($streamId);
+      $this->flush();
+    } catch (Throwable $_) {
+    }
+  }
+
+  private function goAway(Event\WeakendEvent $event): void {
+    if ($event[2] != H2\ErrorCode::NoError->value) {
+      $this->failAll(
+        new ProtocolException('the HTTP/2 peer closed the connection'),
+      );
+
+      return;
+    }
+
+    foreach ($this->exchanges as $streamId => $exchange) {
+      if ($streamId > $event[1]) {
+        $exchange->fail(
+          new ProtocolException(
+            'the HTTP/2 peer did not process the response stream',
+          ),
+        );
+
+        $this->unregister($streamId);
+      }
+    }
+
+    $this->capacitySender->send(null);
+  }
+
+  private function broadcast(Event\WeakendEvent $event): void {
+    foreach ($this->exchanges as $exchange) {
+      discard!($exchange->deliver($event));
+    }
+  }
+
+  /** Releases or cancels a response stream after its body is done. */
+  public function releaseResponse(H2\StreamId $streamId, bool $cancel): void {
+    if ($cancel) {
+      $this->cancelStream($streamId);
+    }
+
+    $this->unregister($streamId);
+  }
+
+  private function cancelStream(H2\StreamId $streamId): void {
+    if (!contains_key!($this->exchanges, $streamId)) {
+      return;
+    }
+
+    try {
+      $this->protocol->resetStream($streamId, H2\ErrorCode::Cancel->value);
+      $this->flush();
+    } catch (Throwable $_) {
+    }
+  }
+
+  private function unregister(H2\StreamId $streamId): void {
+    if (!contains_key!($this->exchanges, $streamId)) {
+      return;
+    }
+
+    $exchange = remove!($this->exchanges, $streamId);
+    $exchange->close();
+    $this->capacitySender->send(null);
+    if (length!($this->exchanges) == 0 && $this->readerRunning) {
+      $this->readerCancellation->cancel();
+    }
+  }
+
+  private function failAll(Throwable $error): void {
+    $exchanges = $this->exchanges;
+    $this->exchanges = dict[];
+    foreach ($exchanges as $exchange) {
+      $exchange->fail($error);
+      $exchange->close();
+    }
+
+    $this->capacitySender->send(null);
+  }
+
+  private function flush(): void {
+    $bytes = match ($this->protocol->takeOutboundBytes()) {
+      '' => return,
+      $bytes => $bytes,
+    };
+
+    $_ = $this->writeReceiver->receive($this->stop);
+    try {
+      $this->stream->writeAll($bytes, $this->stop);
+    } finally {
+      $this->writeSender->send(null);
+    }
+  }
+}

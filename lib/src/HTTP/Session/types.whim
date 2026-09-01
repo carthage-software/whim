@@ -1,0 +1,7 @@
+namespace Whim\HTTP\Session;
+
+use Whim\Json\Value;
+use Whim\Refine\NonEmptyString;
+
+/** The values stored in one session. */
+type Data = dict<NonEmptyString, Value>;

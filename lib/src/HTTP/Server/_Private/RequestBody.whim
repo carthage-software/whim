@@ -1,0 +1,128 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Channel;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Unwind\Throwable;
+
+/** Streams request data from a protocol loop to a handler. */
+final class RequestBody implements ReadHandle {
+  private string $buffer = '';
+  private bool $complete = false;
+  private null|Throwable $error = null;
+  private Channel\Sender<string> $sender;
+  private Channel\Receiver<string> $receiver;
+
+  public function __construct() {
+    ($this->sender, $this->receiver) = Channel\unbounded::<string>();
+  }
+
+  #[TrackCaller]
+  public function push(string $data): void {
+    if ($data == '' || $this->complete) {
+      return;
+    }
+
+    $this->sender->send($data);
+  }
+
+  #[TrackCaller]
+  public function complete(): void {
+    if ($this->complete) {
+      return;
+    }
+
+    $this->complete = true;
+    $this->sender->close();
+  }
+
+  #[TrackCaller]
+  public function fail(Throwable $error): void {
+    if ($this->complete) {
+      return;
+    }
+
+    $this->error = $error;
+    $this->complete();
+  }
+
+  #[TrackCaller]
+  public function discard(): void {
+    $this->buffer = '';
+    $this->complete();
+  }
+
+  public function isComplete(): bool {
+    return $this->complete;
+  }
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->throwIfFailed();
+    if ($this->buffer != '' || $this->complete) {
+      return;
+    }
+
+    try {
+      $this->buffer .= $this->receiver->receive($cancellation);
+    } catch (Channel\ClosedException $_) {
+      $this->complete = true;
+    }
+
+    $this->throwIfFailed();
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    $this->drain();
+    $this->throwIfFailed();
+    return $this->complete && $this->buffer == '';
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($maxBytes == 0) {
+      return '';
+    }
+
+    $this->drain();
+    $this->throwIfFailed();
+    if ($this->buffer == '') {
+      return '';
+    }
+
+    $length = length!($this->buffer);
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->buffer, 0, $length);
+    $this->buffer = Str\slice($this->buffer, $length);
+    return $data;
+  }
+
+  #[TrackCaller]
+  private function drain(): void {
+    while (true) {
+      try {
+        $this->buffer .= $this->receiver->tryReceive();
+      } catch (Channel\EmptyException $_) {
+        return;
+      } catch (Channel\ClosedException $_) {
+        $this->complete = true;
+        return;
+      }
+    }
+  }
+
+  #[TrackCaller]
+  private function throwIfFailed(): void {
+    if ($this->error != null) {
+      throw $this->error;
+    }
+  }
+}

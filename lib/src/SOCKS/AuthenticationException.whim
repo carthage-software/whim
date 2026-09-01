@@ -1,0 +1,4 @@
+namespace Whim\SOCKS;
+
+/** Reports failed SOCKS authentication. */
+final class AuthenticationException extends Exception {}

@@ -1,0 +1,115 @@
+namespace Whim\Process;
+
+use Whim\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Names a process signal by its number on the running system. */
+enum Signal: int {
+  /** SIGHUP. */
+  case Hangup = _Private\SIGNAL_HANGUP;
+
+  /** SIGINT. */
+  case Interrupt = _Private\SIGNAL_INTERRUPT;
+
+  /** SIGQUIT. */
+  case Quit = _Private\SIGNAL_QUIT;
+
+  /** SIGILL. */
+  case IllegalInstruction = _Private\SIGNAL_ILLEGAL_INSTRUCTION;
+
+  /** SIGTRAP. */
+  case Trap = _Private\SIGNAL_TRAP;
+
+  /** SIGABRT. */
+  case Abort = _Private\SIGNAL_ABORT;
+
+  /** SIGBUS. */
+  case BusError = _Private\SIGNAL_BUS_ERROR;
+
+  /** SIGFPE. */
+  case FloatingPointException = _Private\SIGNAL_FLOATING_POINT_EXCEPTION;
+
+  /** SIGKILL. */
+  case Kill = _Private\SIGNAL_KILL;
+
+  /** SIGUSR1. */
+  case UserDefined1 = _Private\SIGNAL_USER_DEFINED_1;
+
+  /** SIGSEGV. */
+  case SegmentationFault = _Private\SIGNAL_SEGMENTATION_FAULT;
+
+  /** SIGUSR2. */
+  case UserDefined2 = _Private\SIGNAL_USER_DEFINED_2;
+
+  /** SIGPIPE. */
+  case BrokenPipe = _Private\SIGNAL_BROKEN_PIPE;
+
+  /** SIGALRM. */
+  case Alarm = _Private\SIGNAL_ALARM;
+
+  /** SIGTERM. */
+  case Terminate = _Private\SIGNAL_TERMINATE;
+
+  /** SIGSTKFLT, negative on systems without it. */
+  case StackFault = _Private\SIGNAL_STACK_FAULT;
+
+  /** SIGCHLD. */
+  case Child = _Private\SIGNAL_CHILD;
+
+  /** SIGCONT. */
+  case Continue_ = _Private\SIGNAL_CONTINUE;
+
+  /** SIGSTOP. */
+  case Stop = _Private\SIGNAL_STOP;
+
+  /** SIGTSTP. */
+  case TerminalStop = _Private\SIGNAL_TERMINAL_STOP;
+
+  /** SIGTTIN. */
+  case TerminalInput = _Private\SIGNAL_TERMINAL_INPUT;
+
+  /** SIGTTOU. */
+  case TerminalOutput = _Private\SIGNAL_TERMINAL_OUTPUT;
+
+  /** SIGURG. */
+  case Urgent = _Private\SIGNAL_URGENT;
+
+  /** SIGXCPU. */
+  case CpuTimeLimitExceeded = _Private\SIGNAL_CPU_TIME_LIMIT_EXCEEDED;
+
+  /** SIGXFSZ. */
+  case FileSizeLimitExceeded = _Private\SIGNAL_FILE_SIZE_LIMIT_EXCEEDED;
+
+  /** SIGVTALRM. */
+  case VirtualAlarm = _Private\SIGNAL_VIRTUAL_ALARM;
+
+  /** SIGPROF. */
+  case ProfilingTimerExpired = _Private\SIGNAL_PROFILING_TIMER_EXPIRED;
+
+  /** SIGWINCH. */
+  case WindowChange = _Private\SIGNAL_WINDOW_CHANGE;
+
+  /** SIGIO. */
+  case InputOutput = _Private\SIGNAL_INPUT_OUTPUT;
+
+  /** SIGPWR, negative on systems without it. */
+  case PowerFailure = _Private\SIGNAL_POWER_FAILURE;
+
+  /** SIGSYS. */
+  case BadSystemCall = _Private\SIGNAL_BAD_SYSTEM_CALL;
+
+  /** Whether this signal can be caught, blocked, or ignored. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isCatchable(): bool {
+    return $this != self::Kill && $this != self::Stop;
+  }
+
+  /** Whether the running system names this signal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isSupported(): bool {
+    return $this->value > 0;
+  }
+}

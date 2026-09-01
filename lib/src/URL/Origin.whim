@@ -1,0 +1,49 @@
+namespace Whim\URL;
+
+use Whim\Comparison\Equal;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\Uint16;
+use Whim\URI\Host;
+
+/** Identifies the security origin of a URL. */
+final readonly class Origin implements Equal<Origin>, ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public NonEmptyString $scheme,
+    public Host $host,
+    public null|Uint16 $port,
+  ) {}
+
+  /** Extracts an origin without credentials or resource components. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromURL(URL $url): Origin {
+    return new Origin(
+      $url->scheme,
+      $url->authority->host,
+      $url->authority->port,
+    );
+  }
+
+  /** Reports whether two origins are the same. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Origin $other): bool {
+    return $this->toString() == $other->toString();
+  }
+
+  /** Returns the serialized origin. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    $origin = $this->scheme . '://' . $this->host->toString();
+    if ($this->port != null) {
+      $origin .= ':' . $this->port;
+    }
+
+    return $origin;
+  }
+}

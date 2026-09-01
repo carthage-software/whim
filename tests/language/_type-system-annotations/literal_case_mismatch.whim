@@ -1,0 +1,3 @@
+enum BackingLiteralBad: int {
+  case A = 'text';
+}

@@ -1,0 +1,184 @@
+namespace Whim\Dict;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Vec;
+use Whim;
+
+/** Merges keyed iterables, with later values replacing earlier ones. */
+#[MustUse]
+#[TrackCaller]
+function merge<K: ArrayKey, V>(
+  Iterable<K, V> $first,
+  Iterable<_, Iterable<K, V>> $rest = vec[],
+): dict<K, V> {
+  $result = from_iterable::<K, V>($first);
+  foreach ($rest as $other) {
+    if ($other is array<_, _>) {
+      $result = Whim\_Private\dict_merge(
+        $result,
+        Whim\_Private\dict_from_array($other),
+      );
+
+      continue;
+    }
+
+    foreach ($other as $key => $value) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Removes entries whose values appear in another iterable. */
+#[MustUse]
+#[TrackCaller]
+function diff<K: ArrayKey, V>(
+  Iterable<K, V> $first,
+  Iterable<_, V> $second,
+  Iterable<_, Iterable<_, V>> $rest = vec[],
+): dict<K, V> {
+  $others = vec[Vec\values::<V>($second)];
+  foreach ($rest as $other) {
+    $others[] = Vec\values::<V>($other);
+  }
+
+  $result = dict[];
+  foreach ($first as $key => $value) {
+    $found = false;
+    foreach ($others as $other) {
+      if (contains!($other, $value)) {
+        $found = true;
+        break;
+      }
+    }
+
+    if (!$found) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains entries whose values appear in every other iterable. */
+#[MustUse]
+#[TrackCaller]
+function intersect<K: ArrayKey, V>(
+  Iterable<K, V> $first,
+  Iterable<_, mixed> $second,
+  Iterable<_, Iterable<_, mixed>> $rest = vec[],
+): dict<K, V> {
+  $others = vec[Vec\values::<mixed>($second)];
+  foreach ($rest as $other) {
+    $others[] = Vec\values::<mixed>($other);
+  }
+
+  $result = dict[];
+  foreach ($first as $key => $value) {
+    $inAll = true;
+    foreach ($others as $other) {
+      if (!contains!($other, $value)) {
+        $inAll = false;
+        break;
+      }
+    }
+
+    if ($inAll) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Removes entries whose keys appear in another keyed iterable. */
+#[MustUse]
+#[TrackCaller]
+function diff_by_key<K: ArrayKey, V>(
+  Iterable<K, V> $first,
+  Iterable<K, _> $second,
+  Iterable<_, Iterable<K, _>> $rest = vec[],
+): dict<K, V> {
+  $others = vec[from_iterable::<K, mixed>($second)];
+  foreach ($rest as $other) {
+    $others[] = from_iterable::<K, mixed>($other);
+  }
+
+  $result = dict[];
+  foreach ($first as $key => $value) {
+    $found = false;
+    foreach ($others as $other) {
+      if (contains_key!($other, $key)) {
+        $found = true;
+        break;
+      }
+    }
+
+    if (!$found) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Retains entries whose keys appear in every other keyed iterable. */
+#[MustUse]
+#[TrackCaller]
+function intersect_by_key<K: ArrayKey, V>(
+  Iterable<K, V> $first,
+  Iterable<K, _> $second,
+  Iterable<_, Iterable<K, _>> $rest = vec[],
+): dict<K, V> {
+  $others = vec[from_iterable::<K, mixed>($second)];
+  foreach ($rest as $other) {
+    $others[] = from_iterable::<K, mixed>($other);
+  }
+
+  $result = dict[];
+  foreach ($first as $key => $value) {
+    $inAll = true;
+    foreach ($others as $other) {
+      if (!contains_key!($other, $key)) {
+        $inAll = false;
+        break;
+      }
+    }
+
+    if ($inAll) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Reports whether two dicts contain equal entries. */
+#[MustUse]
+#[TrackCaller]
+function equal<K: ArrayKey, V>(
+  Iterable<K, V> $first,
+  Iterable<K, V> $second,
+): bool {
+  $first = from_iterable::<K, V>($first);
+  $second = from_iterable::<K, V>($second);
+  if (length!($first) != length!($second)) {
+    return false;
+  }
+
+  foreach ($first as $key => $value) {
+    if (!contains_key!($second, $key)) {
+      return false;
+    }
+
+    if ($value != $second[$key]) {
+      return false;
+    }
+  }
+
+  return true;
+}

@@ -1,0 +1,42 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\ProtocolException;
+
+function queue_frame(State $state, Frame\WeakendFrame $frame): void {
+  queue_bytes($state, Frame\encode($frame));
+}
+
+function queue_raw_frame(
+  State $state,
+  int $type,
+  int $flags,
+  int $streamId,
+  string $payload,
+): void {
+  queue_bytes(
+    $state,
+    Whim\_Private\h2_encode_frame($type, $flags, $streamId, $payload),
+  );
+}
+
+function queue_bytes(State $state, string $bytes): void {
+  if (
+    length!($state->outbound)
+    + length!($bytes)
+    > $state->configuration->maximumOutboundBufferSize
+  ) {
+    throw new ProtocolException(
+      'the HTTP/2 outbound buffer limit was exceeded',
+    );
+  }
+
+  $state->outbound .= $bytes;
+}
+
+function take_outbound(State $state): string {
+  $bytes = $state->outbound;
+  $state->outbound = '';
+  return $bytes;
+}

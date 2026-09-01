@@ -1,0 +1,70 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\UnixEndpoint;
+use Whim\Refine\NonEmptyString;
+use Whim\Unix;
+
+/** Opens HTTP connections through one Unix-domain socket. */
+final readonly class UnixConnector implements Connector {
+  public function __construct(private NonEmptyString $path) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function connect(
+    Origin $origin,
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    $versions = _Private\resolve_protocol_versions($request, $configuration);
+
+    $stream = Unix\connect($this->path, $cancellation);
+    if ($origin->scheme == 'https') {
+      ($_host, $serverName) = _Private\origin_host($origin);
+      return _Private\connect_secure::<UnixEndpoint>(
+        $stream,
+        $serverName,
+        null,
+        $versions,
+        $configuration,
+        $cancellation,
+      );
+    }
+
+    if (length!($versions) == 1 && $versions[0] == ProtocolVersion::V2) {
+      return new _Private\H2Connection(
+        $stream,
+        new ConnectionMetadata(
+          $stream->getLocalEndpoint(),
+          $stream->getPeerEndpoint(),
+          ProtocolVersion::V2,
+        ),
+        _Private\h2_configuration($configuration),
+      );
+    }
+
+    $h1 = _Private\preferred_h1_protocol($versions);
+    if ($h1 != null) {
+      return new _Private\H1Connection(
+        $stream,
+        new ConnectionMetadata(
+          $stream->getLocalEndpoint(),
+          $stream->getPeerEndpoint(),
+          $h1,
+        ),
+      );
+    }
+
+    $stream->close();
+    throw new ConnectionException(
+      'the HTTP/2 prior-knowledge mode must be selected alone',
+    );
+  }
+}

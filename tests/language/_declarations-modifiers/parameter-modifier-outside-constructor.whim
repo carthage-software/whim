@@ -1,0 +1,1 @@
+function f(public readonly int $x): void {}

@@ -1,0 +1,115 @@
+namespace Whim\URL;
+
+use Whim;
+use Whim\Convert\ToString;
+use Whim\IP\Address;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Uint16;
+use Whim\URI\Host;
+use Whim\URI\IPHost;
+use Whim\URI\IPvFutureHost;
+use Whim\URI\RegisteredNameHost;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Represents a URL authority with a numeric port. */
+final readonly class Authority implements ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public null|string $userInfo,
+    public Host $host,
+    public null|Uint16 $port,
+  ) {}
+
+  /** Parses an authority, or returns null when it is invalid. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function parse(string $authority): null|Authority {
+    $parts = Whim\_Private\url_parse_authority($authority) ?? return null;
+
+    $host = match ($parts[1]) {
+      'future' => IPvFutureHost::from($parts[2]),
+      'name' => RegisteredNameHost::from($parts[2]),
+      'ipv4' | 'ipv6' => IPHost::fromAddress(Address::fromBytes($parts[2])),
+    };
+
+    return new Authority($parts[0], $host, $parts[3]);
+  }
+
+  /** Parses an authority. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $authority): Authority {
+    $parsed = Authority::parse($authority);
+    if ($parsed == null) {
+      throw new InvalidArgumentException(
+        'invalid URL authority: `' . $authority . '`',
+      );
+    }
+
+    return $parsed;
+  }
+
+  /** Creates an authority from its parts. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    Host $host,
+    null|string $userInfo = null,
+    null|Uint16 $port = null,
+  ): Authority {
+    $authority = match ($userInfo) {
+      null => '',
+      $value @ string => $value . '@',
+    };
+
+    $authority .= $host->toString();
+    if ($port != null) {
+      $authority .= ':' . $port;
+    }
+
+    return Authority::from($authority);
+  }
+
+  /** Returns a copy with new user information. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUserInfo(null|string $userInfo): Authority {
+    return Authority::fromParts($this->host, $userInfo, $this->port);
+  }
+
+  /** Returns a copy with a new host. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withHost(Host $host): Authority {
+    return Authority::fromParts($host, $this->userInfo, $this->port);
+  }
+
+  /** Returns a copy with a new port. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withPort(null|Uint16 $port): Authority {
+    return Authority::fromParts($this->host, $this->userInfo, $port);
+  }
+
+  /** Returns the authority text. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    $authority = match ($this->userInfo) {
+      null => '',
+      $value @ string => $value . '@',
+    };
+
+    $authority .= $this->host->toString();
+    if ($this->port != null) {
+      $authority .= ':' . $this->port;
+    }
+
+    return $authority;
+  }
+}

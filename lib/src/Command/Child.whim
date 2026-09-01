@@ -1,0 +1,88 @@
+namespace Whim\Command;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\FileDescriptorHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Process\Signal;
+use Whim\Refine\NonNegativeInt;
+use Whim\Time\Duration;
+
+/** A running child process. */
+interface Child {
+  /** The identifier the operating system gave the child. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getId(): NonNegativeInt;
+
+  /** Whether the child has yet to end. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isRunning(): bool;
+
+  /**
+   * The child's standard input, when the command piped it.
+   *
+   * @throws StreamUnavailableException when the stream was not piped.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function getStandardInput(): WriteHandle&FileDescriptorHandle;
+
+  /**
+   * The child's standard output, when the command piped it.
+   *
+   * @throws StreamUnavailableException when the stream was not piped.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function getStandardOutput(): ReadHandle&FileDescriptorHandle;
+
+  /**
+   * The child's standard error, when the command piped it.
+   *
+   * @throws StreamUnavailableException when the stream was not piped.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function getStandardError(): ReadHandle&FileDescriptorHandle;
+
+  /** Sends a signal to the child. */
+  #[TrackCaller]
+  public function signal(Signal $signal): void;
+
+  /** Waits for the child to end and reports how it did. */
+  #[MustUse]
+  #[TrackCaller]
+  public function wait(null|CancellationToken $cancellation = null): ExitStatus;
+
+  /**
+   * Reads both output streams to their end, then waits for the child.
+   *
+   * Both streams are drained at once, because reading one to its end while
+   * the other fills its pipe would leave the child blocked on a write that
+   * nobody is reading.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function join(null|CancellationToken $cancellation = null): Output;
+
+  /**
+   * Sends `Terminate` and waits for the child to end.
+   *
+   * With a `$grace`, a child still running when it elapses is sent `Kill`.
+   * Without one, this waits as long as the child takes: terminating and
+   * killing are different requests, and only the caller can say which one
+   * they meant.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function terminate(null|Duration $grace = null): ExitStatus;
+
+  /** Ends the child at once, with a signal it cannot refuse. */
+  #[MustUse]
+  #[TrackCaller]
+  public function kill(): ExitStatus;
+}

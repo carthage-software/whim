@@ -1,0 +1,107 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\CIDR\Block;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Transaction;
+use Whim\IP\Address;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\InternetEndpoint;
+use Whim\Refine\Iterable;
+use Whim\Str;
+
+/** Blocks exchanges to denied resolved peer addresses. */
+final readonly class DeniedDestinationsMiddleware implements Middleware {
+  private vec<Address|Block> $denied;
+
+  public function __construct(
+    Iterable<_, Address|Block> $denied = vec[],
+    private bool $denyNonPublic = false,
+  ) {
+    $values = vec[];
+    foreach ($denied as $value) {
+      $values[] = $value;
+    }
+
+    $this->denied = $values;
+  }
+
+  /** Allows only globally routed unicast destinations. */
+  #[MustUse]
+  public static function publicOnly(): DeniedDestinationsMiddleware {
+    return new DeniedDestinationsMiddleware(denyNonPublic: true);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function process(
+    Connection $connection,
+    Request $request,
+    Configuration $configuration,
+    Handler $next,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $metadata = $connection->getMetadata();
+    $endpoint = $metadata->destinationEndpoint;
+    if ($endpoint == null) {
+      if ($metadata->proxied) {
+        throw new DestinationDeniedException(
+          'the proxy-resolved destination cannot be verified',
+        );
+      }
+
+      if (!($metadata->peerEndpoint is InternetEndpoint)) {
+        throw new DestinationDeniedException(
+          'the transport destination cannot be verified',
+        );
+      }
+
+      $endpoint = $metadata->peerEndpoint;
+    }
+
+    $address = $endpoint->address;
+    $normalized = $this->normalize($address);
+    if ($this->denyNonPublic && !$normalized->isGlobalUnicast()) {
+      $this->deny($address);
+    }
+
+    foreach ($this->denied as $denied) {
+      if ($denied is Block) {
+        if ($denied->contains($address) || $denied->contains($normalized)) {
+          $this->deny($address);
+        }
+      } else {
+        $denied = $denied as Address;
+        $normalizedDenied = $this->normalize($denied);
+        if (
+          $denied->equals($address)
+          || $normalizedDenied->equals($normalized)
+        ) {
+          $this->deny($address);
+        }
+      }
+    }
+
+    return $next->handle($connection, $request, $configuration, $cancellation);
+  }
+
+  #[MustUse]
+  private function normalize(Address $address): Address {
+    if (!$address->isIPv4Mapped()) {
+      return $address;
+    }
+
+    return Address::fromBytes(Str\slice($address->toBytes(), 12));
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  private function deny(Address $address): never {
+    throw new DestinationDeniedException(
+      'connection to ' . $address->toString() . ' is denied',
+    );
+  }
+}

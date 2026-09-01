@@ -1,0 +1,61 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Represents one operating-system lookup on the blocking worker pool. */
+#[Stub]
+final class OSOperation {
+  private function __construct() {}
+
+  /** Starts a user lookup by name or identifier. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function user((string&!'')|(0..) $identity): OSOperation {}
+
+  /** Starts a group lookup by name or identifier. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function group((string&!'')|(0..) $identity): OSOperation {}
+
+  /** Starts resolving the primary and supplementary groups of a user. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function groupsForUser(
+    (string&!'') $name,
+    (0..) $primaryGroup,
+  ): OSOperation {}
+
+  /** Suspends until this operation completes. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function wait(): void {}
+
+  /** Takes a completed user record. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeUser(
+  ): null|((string&!''), (0..), (0..), string, string) {}
+
+  /** Takes a completed group record. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeGroup(): null|((string&!''), (0..), vec<(string&!'')>) {}
+
+  /** Takes completed group records. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeGroups(
+  ): null|vec<((string&!''), (0..), vec<(string&!'')>)> {}
+
+  /** Abandons this operation's result. */
+  public function cancel(): void {}
+}

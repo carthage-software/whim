@@ -1,0 +1,92 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Member\ClassConstantReflection;
+use Whim\Reflection\Member\EnumCaseReflection;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Symbol\SymbolReflection;
+use Whim\Type\TypeId;
+
+/**
+ * Describes a class, interface, or enum with concrete or symbolic arguments.
+ */
+#[Stub]
+final class ClassTypeReflection implements NamedTypeReflection {
+  private function __construct() {}
+
+  /** Returns the structural kind of this type. */
+  #[MustUse]
+  public function getKind(): TypeKind {}
+
+  /** Reports whether this type is fully resolved. */
+  #[MustUse]
+  public function isResolved(): bool {}
+
+  /** Returns this closed type's engine-local identity. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getId(): TypeId {}
+
+  /** Returns a diagnostic spelling of this type. */
+  #[MustUse]
+  public function toString(): string {}
+
+  /** Resolves generic parameters and an optional late-bound class. */
+  #[MustUse]
+  public function resolve(
+    null|TypeEnvironmentReflection $environment = null,
+    null|ClassTypeReflection $calledType = null,
+  ): TypeReflection {}
+
+  /** Reports whether a value satisfies this closed type. */
+  #[MustUse]
+  #[TrackCaller]
+  public function accepts(mixed $value): bool {}
+
+  /** Reports whether another reflected type has the same meaning. */
+  #[MustUse]
+  public function equals(TypeReflection $other): bool {}
+
+  /** Reports whether this closed type is a subtype of another. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isSubtypeOf(TypeReflection $other): bool {}
+
+  /** Returns the declaration named by this type. */
+  #[MustUse]
+  public function getDeclaration(
+  ): SymbolReflection
+  | MethodReflection
+  | ClassConstantReflection
+  | EnumCaseReflection {}
+
+  /** Returns arguments for this declaration's own type parameters. */
+  #[MustUse]
+  public function getTypeArguments(): vec<TypeReflection> {}
+
+  /** Returns all bindings implied by this named specialization. */
+  #[MustUse]
+  public function getTypeEnvironment(): TypeEnvironmentReflection {}
+
+  /** Reports whether this reference closes a recursive alias cycle. */
+  #[MustUse]
+  public function isRecursiveReference(): bool {}
+
+  /** Returns the class-like declaration named by this type. */
+  #[MustUse]
+  public function getClassLike(): ClassLikeReflection {}
+
+  /** Returns this type's specialization of a reachable base, when present. */
+  #[MustUse]
+  public function getSpecialization(
+    ClassLikeReflection $declaration,
+  ): null|ClassTypeReflection {}
+
+  /** Returns every transitive base specialization. */
+  #[MustUse]
+  public function getBaseTypes(): vec<ClassTypeReflection> {}
+}

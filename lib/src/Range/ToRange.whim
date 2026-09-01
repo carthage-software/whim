@@ -1,0 +1,89 @@
+namespace Whim\Range;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Represents a range with only an upper bound. */
+final readonly class ToRange implements UpperBoundRange {
+  /** Creates an upper-bounded range. */
+  #[TrackCaller]
+  public function __construct(
+    private int $upperBound,
+    private bool $upperInclusive = false,
+  ) {}
+
+  /** Reports whether the range contains a value. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(int $value): bool {
+    if ($this->upperInclusive) {
+      return $value <= $this->upperBound;
+    }
+
+    return $value < $this->upperBound;
+  }
+
+  /** Adds a lower bound to this range. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withLowerBound(int $lowerBound): BetweenRange {
+    return new BetweenRange(
+      $lowerBound,
+      $this->upperBound,
+      $this->upperInclusive,
+    );
+  }
+
+  /** Removes the upper bound from this range. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withoutUpperBound(): FullRange {
+    return new FullRange();
+  }
+
+  /** Replaces the upper bound and its inclusivity. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBound(
+    int $upperBound,
+    bool $upperInclusive,
+  ): ToRange {
+    return new ToRange($upperBound, $upperInclusive);
+  }
+
+  /** Replaces the upper bound with an inclusive bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundInclusive(int $upperBound): ToRange {
+    return new ToRange($upperBound, true);
+  }
+
+  /** Replaces the upper bound with an exclusive bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundExclusive(int $upperBound): ToRange {
+    return new ToRange($upperBound, false);
+  }
+
+  /** Returns the upper bound. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getUpperBound(): int {
+    return $this->upperBound;
+  }
+
+  /** Reports whether the upper bound is inclusive. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isUpperInclusive(): bool {
+    return $this->upperInclusive;
+  }
+
+  /** Changes whether the upper bound is inclusive. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperInclusive(bool $upperInclusive): static {
+    return new static($this->upperBound, $upperInclusive);
+  }
+}

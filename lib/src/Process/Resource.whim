@@ -1,0 +1,27 @@
+namespace Whim\Process;
+
+use Whim\_Private;
+
+/** Selects a resource limit of the current process. */
+enum Resource: int {
+  /** Processor time in seconds. */
+  case CpuTime = _Private\RESOURCE_LIMIT_CPU_TIME;
+
+  /** Maximum file size in bytes. */
+  case FileSize = _Private\RESOURCE_LIMIT_FILE_SIZE;
+
+  /** Maximum data-segment size in bytes. */
+  case Data = _Private\RESOURCE_LIMIT_DATA;
+
+  /** Maximum stack size in bytes. */
+  case Stack = _Private\RESOURCE_LIMIT_STACK;
+
+  /** Maximum core-file size in bytes. */
+  case Core = _Private\RESOURCE_LIMIT_CORE;
+
+  /** Maximum number of open file descriptors. */
+  case OpenFiles = _Private\RESOURCE_LIMIT_OPEN_FILES;
+
+  /** Maximum address-space size in bytes. */
+  case AddressSpace = _Private\RESOURCE_LIMIT_ADDRESS_SPACE;
+}

@@ -1,0 +1,3 @@
+function f(null|mixed $value): mixed {
+  return $value;
+}

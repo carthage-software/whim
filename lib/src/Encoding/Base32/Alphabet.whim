@@ -1,0 +1,10 @@
+namespace Whim\Encoding\Base32;
+
+/** Names a base32 character table. */
+enum Alphabet {
+  /** The RFC 4648 table: `A..Z`, `2..7`. */
+  case Standard;
+
+  /** The RFC 4648 extended hex table: `0..9`, `A..V`, which preserves sort order. */
+  case Hex;
+}

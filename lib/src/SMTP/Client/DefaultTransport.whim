@@ -1,0 +1,430 @@
+namespace Whim\SMTP\Client;
+
+use Whim\Async\CancelledException;
+use Whim\Async\CancellationToken;
+use Whim\Encoding\EncodingException;
+use Whim\IDNA;
+use Whim\IO;
+use Whim\IO\ReadHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Message;
+use Whim\Message\Envelope;
+use Whim\Message\Message as InternetMessage;
+use Whim\Network\Host;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\NetworkException;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\Capability;
+use Whim\SMTP\Client\Authentication\Authenticator;
+use Whim\SMTP\Command;
+use Whim\SMTP\ConnectionException;
+use Whim\SMTP\ProtocolException;
+use Whim\SMTP\Security;
+use Whim\SMTP\TransmissionException;
+use Whim\SMTP\_Private\DotStuffingReadHandle;
+use Whim\TLS\Connector as TlsConnector;
+use Whim\TLS\Exception as TlsException;
+use Whim\Unwind\Throwable;
+
+/** Sends messages with pooled SMTP connections. */
+final class DefaultTransport implements Transport {
+  private vec<_Private\Session> $idle = vec[];
+  private bool $closed = false;
+
+  #[TrackCaller]
+  public function __construct(
+    public readonly TransportConfiguration $configuration = new TransportConfiguration(),
+    private readonly null|Authenticator $authenticator = null,
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function send(
+    Envelope $envelope,
+    InternetMessage $message,
+    SendConfiguration $configuration = new SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): DeliveryReport {
+    $session = $this->checkout($cancellation);
+    try {
+      $report = $this->deliver(
+        $session->connection,
+        $envelope,
+        $message,
+        $configuration,
+        $cancellation,
+      );
+
+      $reply = $session->connection->sendCommand('RSET', $cancellation);
+      if (!$reply->isPositiveCompletion()) {
+        throw new ProtocolException(
+          'the SMTP server rejected RSET with '
+          . $reply->code
+          . ': '
+          . $reply->message,
+        );
+      }
+    } catch (Throwable $error) {
+      $this->closeSession($session);
+      throw $error;
+    }
+
+    $this->checkin($session);
+    return $report;
+  }
+
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    $idle = $this->idle;
+    $this->idle = vec[];
+    foreach ($idle as $session) {
+      $this->closeSession($session);
+    }
+  }
+
+  public function __destruct(): void {
+    try {
+      $this->close();
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function checkout(
+    null|CancellationToken $cancellation,
+  ): _Private\Session {
+    if ($this->closed) {
+      throw new ConnectionException('the SMTP transport is closed');
+    }
+
+    while ($this->idle != vec[]) {
+      $session = remove_last!($this->idle);
+      if ($session->isExpired($this->configuration->idleConnectionTimeout)) {
+        $this->closeSession($session);
+        continue;
+      }
+
+      try {
+        $reply = $session->connection->sendCommand('NOOP', $cancellation);
+        if ($reply->isPositiveCompletion()) {
+          return $session;
+        }
+      } catch (CancelledException $error) {
+        $this->closeSession($session);
+        throw $error;
+      } catch (Throwable $_) {
+      }
+
+      $this->closeSession($session);
+    }
+
+    return $this->connect($cancellation);
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  private function checkin(_Private\Session $session): void {
+    if (
+      $this->closed
+      || $this->configuration->maximumIdleConnections == 0
+      || length!($this->idle) >= $this->configuration->maximumIdleConnections
+    ) {
+      $this->closeSession($session);
+      return;
+    }
+
+    $session->markIdle();
+    $this->idle[] = $session;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function connect(
+    null|CancellationToken $cancellation,
+  ): _Private\Session {
+    ($host, $serverName) = $this->target($this->configuration->host);
+    $port =
+      $this->configuration->port ?? match ($this->configuration->security) {
+        Security::Plaintext => 25,
+        Security::StartTls => 587,
+        Security::ImplicitTls => 465,
+      };
+
+    try {
+      $stream = $this->configuration->connector->connect(
+        $host,
+        $port,
+        $cancellation,
+      );
+
+      if ($this->configuration->security == Security::ImplicitTls) {
+        $tls = new TlsConnector::<InternetEndpoint>($this->configuration->tls);
+
+        $stream = $tls->connect($stream, $serverName, $cancellation);
+      }
+
+      $connection = new Connection($stream);
+      discard!($connection->readGreeting($cancellation));
+      $this->ehlo($connection, $cancellation);
+      if ($this->configuration->security == Security::StartTls) {
+        if (!$connection->supportsCapability(Capability::StartTls)) {
+          throw new ConnectionException(
+            'the SMTP server does not advertise STARTTLS',
+          );
+        }
+
+        $reply = $connection->sendCommand('STARTTLS', $cancellation);
+        if ($reply->code != 220) {
+          throw new ConnectionException(
+            'the SMTP server rejected STARTTLS with '
+            . $reply->code
+            . ': '
+            . $reply->message,
+          );
+        }
+
+        $tls = new TlsConnector::<InternetEndpoint>($this->configuration->tls);
+
+        $stream = $tls->connect($stream, $serverName, $cancellation);
+        $connection = new Connection($stream);
+        $this->ehlo($connection, $cancellation);
+      }
+
+      if ($this->authenticator != null) {
+        $this->authenticator->authenticate($connection, $cancellation);
+      }
+
+      return new _Private\Session($stream, $connection);
+    } catch (NetworkException|TlsException $error) {
+      throw new ConnectionException(
+        'failed to connect to SMTP server ' . $serverName . ':' . $port,
+        previous: $error,
+      );
+    }
+  }
+
+  #[TrackCaller]
+  private function ehlo(
+    Connection $connection,
+    null|CancellationToken $cancellation,
+  ): void {
+    $reply = $connection->ehlo(
+      $this->configuration->localHostname,
+      $cancellation,
+    );
+
+    if ($reply->isPositiveCompletion()) {
+      return;
+    }
+
+    $reply = $connection->helo(
+      $this->configuration->localHostname,
+      $cancellation,
+    );
+
+    if (!$reply->isPositiveCompletion()) {
+      throw new ProtocolException(
+        'the SMTP server rejected EHLO and HELO with '
+        . $reply->code
+        . ': '
+        . $reply->message,
+      );
+    }
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private function target(Host $host): (Host, NonEmptyString) {
+    return match ($host) {
+      $name @ string => $this->hostnameTarget($name),
+      $_ => ($host, $host->toString() as NonEmptyString),
+    };
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private function hostnameTarget(
+    NonEmptyString $hostname,
+  ): (Host, NonEmptyString) {
+    try {
+      $ascii = IDNA\to_ascii($hostname);
+    } catch (EncodingException $_) {
+      throw new ConnectionException('the SMTP host name is not valid');
+    }
+
+    if ($ascii == '') {
+      throw new ConnectionException('the SMTP host name is not valid');
+    }
+
+    return ($ascii as NonEmptyString, $ascii as NonEmptyString);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function deliver(
+    Connection $connection,
+    Envelope $envelope,
+    InternetMessage $message,
+    SendConfiguration $configuration,
+    null|CancellationToken $cancellation,
+  ): DeliveryReport {
+    $mail = _Private\mail_from_command($connection, $envelope, $configuration);
+
+    $recipients = vec[];
+    foreach ($envelope->recipients as $recipient) {
+      $recipients[] = _Private\recipient_command(
+        $connection,
+        $recipient,
+        $configuration,
+      );
+    }
+
+    $chunking =
+      $this->configuration->chunking
+      && $connection->supportsCapability(Capability::Chunking);
+
+    $pipelining =
+      $this->configuration->pipelining
+      && $connection->supportsCapability(Capability::Pipelining);
+
+    $mailReply = null;
+    $recipientReplies = vec[];
+    $dataReply = null;
+    if ($pipelining) {
+      $connection->writeCommand($mail, $cancellation);
+      foreach ($recipients as $command) {
+        $connection->writeCommand($command, $cancellation);
+      }
+
+      if (!$chunking) {
+        $connection->writeCommand('DATA', $cancellation);
+      }
+
+      $mailReply = $connection->readReply($cancellation);
+      foreach ($recipients as $_) {
+        $recipientReplies[] = $connection->readReply($cancellation);
+      }
+
+      if (!$chunking) {
+        $dataReply = $connection->readReply($cancellation);
+      }
+    } else {
+      $mailReply = $connection->sendCommand($mail, $cancellation);
+      foreach ($recipients as $command) {
+        $recipientReplies[] = $connection->sendCommand($command, $cancellation);
+      }
+    }
+
+    if (!$mailReply->isPositiveCompletion()) {
+      $sender = match ($envelope->sender) {
+        null => '<>',
+        $_ => $envelope->sender->address,
+      };
+
+      _Private\sender_rejected($sender, $mailReply);
+    }
+
+    $accepted = 0;
+    $rejected = vec[];
+    foreach ($envelope->recipients as $index => $recipient) {
+      $reply = $recipientReplies[$index];
+      if ($reply->isPositiveCompletion()) {
+        $accepted++;
+        continue;
+      }
+
+      if (!$this->configuration->allowPartialSuccess) {
+        _Private\recipient_rejected($recipient, $reply);
+      }
+
+      $rejected[] = ($recipient, $reply);
+    }
+
+    if ($accepted == 0) {
+      if ($this->configuration->allowPartialSuccess) {
+        return new DeliveryReport($rejected);
+      }
+
+      throw new TransmissionException(
+        'the SMTP server rejected every recipient',
+      );
+    }
+
+    if (!$chunking && !$pipelining) {
+      $dataReply = $connection->sendCommand('DATA', $cancellation);
+    }
+
+    $source = Message\serialize($message);
+    if ($chunking) {
+      $this->transmitChunked($connection, $source, $cancellation);
+    } else {
+      if ($dataReply == null || $dataReply->code != 354) {
+        if ($dataReply == null) {
+          throw new ProtocolException('the SMTP server omitted the DATA reply');
+        }
+
+        _Private\data_rejected($dataReply);
+      }
+
+      IO\copy(new DotStuffingReadHandle($source), $connection, $cancellation);
+
+      $finalReply = $connection->readReply($cancellation);
+      if (!$finalReply->isPositiveCompletion()) {
+        _Private\data_rejected($finalReply);
+      }
+    }
+
+    return new DeliveryReport($rejected);
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  private function transmitChunked(
+    Connection $connection,
+    ReadHandle $source,
+    null|CancellationToken $cancellation,
+  ): void {
+    while (true) {
+      $chunk = $source->read($this->configuration->chunkSize, $cancellation);
+
+      $last = $chunk == '' || $source->reachedEndOfDataSource();
+      $command = 'BDAT ' . length!($chunk);
+      if ($last) {
+        $command .= ' LAST';
+      }
+
+      $connection->writeCommand(Command::from($command), $cancellation);
+      if ($chunk != '') {
+        $connection->writeAll($chunk, $cancellation);
+      }
+
+      $reply = $connection->readReply($cancellation);
+      if (!$reply->isPositiveCompletion()) {
+        _Private\data_rejected($reply);
+      }
+
+      if ($last) {
+        return;
+      }
+    }
+  }
+
+  private function closeSession(_Private\Session $session): void {
+    try {
+      $session->stream->close();
+    } catch (Throwable $_) {
+    }
+  }
+}

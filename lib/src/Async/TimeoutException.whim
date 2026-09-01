@@ -1,0 +1,6 @@
+namespace Whim\Async;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports a timeout failure. */
+class TimeoutException extends RuntimeException {}

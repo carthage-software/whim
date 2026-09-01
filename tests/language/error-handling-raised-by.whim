@@ -1,0 +1,622 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\ArithmeticError;
+use Whim\Unwind\AssertionError;
+use Whim\Unwind\DivisionByZeroError;
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\InstantiationError;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\ReadonlyError;
+use Whim\Unwind\RequireError;
+use Whim\Unwind\StackOverflowError;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedSymbolError;
+use Whim\Unwind\UndefinedVariableError;
+use Whim\Unwind\UnderflowError;
+use Whim\Unwind\UnhandledMatchError;
+use Whim\Unwind\UninitializedPropertyError;
+use Whim\Unwind\VisibilityError;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+function needs_two(int $a, int $b): int {
+  return $a + $b;
+}
+
+$assertion_value_1 = function(): void {
+  needs_two(1);
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (ArgumentCountError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is ArgumentCountError);
+
+$assertion_value_2 = function(): void {
+  needs_two(1, 2, 3);
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (ArgumentCountError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is ArgumentCountError);
+
+$assertion_value_3 = function(): void {
+  needs_two(
+    a: 1,
+    ghost: 2,
+  );
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (ArgumentCountError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is ArgumentCountError);
+
+$assertion_value_4 = function(): void {
+  $x = 1 << 64;
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (ArithmeticError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is ArithmeticError);
+
+$assertion = null;
+$assertion_callable_5 = function(): void {
+  assert!(false, 'invariant broken');
+};
+
+try {
+  $assertion_callable_5();
+} catch (AssertionError $assertion_caught_5) {
+  $assertion = $assertion_caught_5;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_5->getMessage(),
+      'assertion failed: false',
+    ),
+  );
+}
+
+assert!($assertion is AssertionError);
+
+assert!(Whim\Str\contains($assertion->getMessage(), 'invariant broken'));
+
+$assertion_value_7 = function(): void {
+  $x = 1 / 0;
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (DivisionByZeroError $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is DivisionByZeroError);
+
+$assertion_value_8 = function(): void {
+  $x = 1 % 0;
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (DivisionByZeroError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is DivisionByZeroError);
+
+$assertion_value_9 = function(): void {
+  $x = 1.0 / 0.0;
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (DivisionByZeroError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is DivisionByZeroError);
+
+$assertion_value_10 = function(): void {
+  $x = '5' + 5;
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (IncompatibleOperandsError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is IncompatibleOperandsError);
+
+$assertion_value_11 = function(): void {
+  $x = 'a' . true;
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (IncompatibleOperandsError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is IncompatibleOperandsError);
+
+$assertion_value_12 = function(): void {
+  $x = 1 < 'a';
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (IncompatibleOperandsError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is IncompatibleOperandsError);
+
+$assertion_value_13 = function(): void {
+  $x = vec[1] < vec[2];
+};
+
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (IncompatibleOperandsError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is IncompatibleOperandsError);
+
+abstract class GhostlyShape {}
+interface SpectralContract {}
+
+$assertion_value_14 = function(): void {
+  $x = new GhostlyShape();
+};
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (InstantiationError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is InstantiationError);
+
+$assertion_value_15 = function(): void {
+  $x = new SpectralContract();
+};
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (InstantiationError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is InstantiationError);
+
+$assertion_value_16 = function(): void {
+  $x = vec[1][5];
+};
+
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (OutOfBoundsError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is OutOfBoundsError);
+
+$assertion_value_17 = function(): void {
+  $x = dict['a' => 1]['b'];
+};
+
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (OutOfBoundsError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is OutOfBoundsError);
+
+$assertion_value_18 = function(): void {
+  $x = 'abc'[9];
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (OutOfBoundsError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is OutOfBoundsError);
+
+$assertion_value_19 = function(): void {
+  $empty = vec[];
+  remove_first!($empty);
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (OutOfBoundsError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is OutOfBoundsError);
+
+$assertion_value_20 = function(): void {
+  $x = 9223372036854775807 + 1;
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (OverflowError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is OverflowError);
+
+$assertion_value_21 = function(): void {
+  $x = (-9223372036854775807 - 1) - 1;
+};
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (UnderflowError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is UnderflowError);
+
+class FixedCell {
+  public function __construct(public readonly int $n) {}
+}
+
+$fixed = new FixedCell(1);
+$assertion_value_22 = function() use ($fixed): void {
+  $fixed->n = 2;
+};
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (ReadonlyError $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is ReadonlyError);
+
+class WrittenTwice {
+  public readonly int $n;
+
+  public function __construct() {
+    $this->n = 1;
+    $this->n = 2;
+  }
+}
+
+$assertion_value_23 = function(): void {
+  $x = new WrittenTwice();
+};
+
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (ReadonlyError $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is ReadonlyError);
+
+const TAKEN = 1;
+
+$taken = $work . '/taken.whim';
+File\write($taken, 'function TAKEN(): void {}' . "\n");
+$assertion_value_24 = function() use ($taken): void {
+  require!($taken);
+};
+
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (LinkerError $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is LinkerError);
+
+$nowhere = $work . '/nowhere.whim';
+$assertion_value_25 = function() use ($nowhere): void {
+  require!($nowhere);
+};
+
+$assertion_error_25 = null;
+try {
+  $assertion_value_25();
+} catch (RequireError $assertion_caught_25) {
+  $assertion_error_25 = $assertion_caught_25;
+}
+
+assert!($assertion_error_25 is RequireError);
+
+rejects(
+  $work,
+  'self-referential-constant',
+  'const SELF = SELF + 1;' . "\n" . 'write_line!(\'never reached\');' . "\n",
+  'refers to itself',
+);
+
+function dive(int $n): int {
+  return dive($n + 1);
+}
+
+$assertion_value_26 = function(): void {
+  dive(0);
+};
+
+$assertion_error_26 = null;
+try {
+  $assertion_value_26();
+} catch (StackOverflowError $assertion_caught_26) {
+  $assertion_error_26 = $assertion_caught_26;
+}
+
+assert!($assertion_error_26 is StackOverflowError);
+
+$assertion_value_27 = function(): void {
+  if (1) {}
+};
+
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (TypeError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is TypeError);
+
+$assertion_value_28 = function(): void {
+  $x = 'a' as int;
+};
+
+$assertion_error_28 = null;
+try {
+  $assertion_value_28();
+} catch (TypeError $assertion_caught_28) {
+  $assertion_error_28 = $assertion_caught_28;
+}
+
+assert!($assertion_error_28 is TypeError);
+
+$assertion_value_29 = function(): void {
+  $x = dict[][1.5];
+};
+
+$assertion_error_29 = null;
+try {
+  $assertion_value_29();
+} catch (TypeError $assertion_caught_29) {
+  $assertion_error_29 = $assertion_caught_29;
+}
+
+assert!($assertion_error_29 is TypeError);
+
+$assertion_value_30 = function(): void {
+  $tuple = (1, 2);
+  $tuple[0] = 9;
+};
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (TypeError $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is TypeError);
+
+$assertion_value_31 = function(): void {
+  $letters = 'abc';
+  $letters[0] = 'z';
+};
+
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (TypeError $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is TypeError);
+
+class BareShape {}
+
+$assertion_value_32 = function(): void {
+  $x = new BareShape()->ghost;
+};
+
+$assertion_error_32 = null;
+try {
+  $assertion_value_32();
+} catch (TypeError $assertion_caught_32) {
+  $assertion_error_32 = $assertion_caught_32;
+}
+
+assert!($assertion_error_32 is TypeError);
+
+$assertion_value_33 = function(): void {
+  throw 5;
+};
+
+$assertion_error_33 = null;
+try {
+  $assertion_value_33();
+} catch (TypeError $assertion_caught_33) {
+  $assertion_error_33 = $assertion_caught_33;
+}
+
+assert!($assertion_error_33 is TypeError);
+
+$assertion_value_34 = function(): void {
+  $callable = 5;
+  $callable();
+};
+
+$assertion_error_34 = null;
+try {
+  $assertion_value_34();
+} catch (TypeError $assertion_caught_34) {
+  $assertion_error_34 = $assertion_caught_34;
+}
+
+assert!($assertion_error_34 is TypeError);
+
+$assertion_value_35 = function(): void {
+  Whim\Float\is_nan('x');
+};
+
+$assertion_error_35 = null;
+try {
+  $assertion_value_35();
+} catch (TypeError $assertion_caught_35) {
+  $assertion_error_35 = $assertion_caught_35;
+}
+
+assert!($assertion_error_35 is TypeError);
+
+$assertion_value_36 = function(): void {
+  ghost();
+};
+
+$assertion_error_36 = null;
+try {
+  $assertion_value_36();
+} catch (UndefinedSymbolError $assertion_caught_36) {
+  $assertion_error_36 = $assertion_caught_36;
+}
+
+assert!($assertion_error_36 is UndefinedSymbolError);
+
+$assertion_value_37 = function(): void {
+  write_line!($neverAssigned);
+};
+
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (UndefinedVariableError $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is UndefinedVariableError);
+
+$assertion_value_38 = function(): void {
+  $x = match (3) {
+    1 => 'a',
+  };
+};
+
+$assertion_error_38 = null;
+try {
+  $assertion_value_38();
+} catch (UnhandledMatchError $assertion_caught_38) {
+  $assertion_error_38 = $assertion_caught_38;
+}
+
+assert!($assertion_error_38 is UnhandledMatchError);
+
+class LateSlot {
+  public int $slot;
+}
+
+$late = new LateSlot();
+$assertion_value_39 = function() use ($late): void {
+  $x = $late->slot;
+};
+
+$assertion_error_39 = null;
+try {
+  $assertion_value_39();
+} catch (UninitializedPropertyError $assertion_caught_39) {
+  $assertion_error_39 = $assertion_caught_39;
+}
+
+assert!($assertion_error_39 is UninitializedPropertyError);
+
+$late->slot = 5;
+assert!($late->slot == 5);
+
+class SealedBox {
+  private int $secret = 1;
+  protected int $level = 2;
+
+  public function reveal(): int {
+    return $this->secret + $this->level;
+  }
+}
+
+$sealed = new SealedBox();
+assert!($sealed->reveal() == 3);
+$assertion_value_42 = function() use ($sealed): void {
+  $x = $sealed->secret;
+};
+
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (VisibilityError $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+}
+
+assert!($assertion_error_42 is VisibilityError);
+
+$assertion_value_43 = function() use ($sealed): void {
+  $x = $sealed->level;
+};
+
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (VisibilityError $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is VisibilityError);
+
+Filesystem\delete_directory($work, true);

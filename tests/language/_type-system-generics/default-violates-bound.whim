@@ -1,0 +1,8 @@
+interface Comparable {}
+class Foo {}
+
+type Boxed<T: Comparable = Foo> = vec<T>;
+
+function take(Boxed $values): void {}
+
+take(vec[new Foo()]);

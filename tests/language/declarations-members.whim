@@ -1,0 +1,155 @@
+use Whim\Unwind\CompilerError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_declarations-members/case-outside-enum.whim',
+  'only an enum has cases',
+);
+
+raises(
+  '_declarations-members/comma-separated-properties.whim',
+  'unexpected `,`; expected `;`',
+);
+
+raises(
+  '_declarations-members/constant-without-visibility.whim',
+  'every class-like member declares its visibility',
+);
+
+raises(
+  '_declarations-members/enum-property.whim',
+  'an enum cannot declare a property',
+);
+
+raises(
+  '_declarations-members/method-without-visibility.whim',
+  'every class-like member declares its visibility',
+);
+
+raises(
+  '_declarations-members/property-without-visibility.whim',
+  'every class-like member declares its visibility',
+);
+
+raises(
+  '_declarations-members/duplicate-case.whim',
+  'the case `A` is declared twice',
+);
+
+raises(
+  '_declarations-members/duplicate-constant.whim',
+  'the constant `X` is declared twice',
+);
+
+raises(
+  '_declarations-members/duplicate-method.whim',
+  'the method `m` is declared twice',
+);
+
+raises(
+  '_declarations-members/duplicate-property.whim',
+  'the property `$x` is declared twice',
+);
+
+raises(
+  '_declarations-members/method-constant-collision.whim',
+  'the constant `value` conflicts with the method of the same name',
+);
+
+raises(
+  '_declarations-members/case-constant-collision.whim',
+  'the constant `Value` conflicts with the case of the same name',
+);
+
+raises(
+  '_declarations-members/case-method-collision.whim',
+  'the method `value` conflicts with the case of the same name',
+);
+
+raises(
+  '_declarations-members/promoted-parameter-declares-a-property.whim',
+  'the property `$x` is declared twice',
+);
+
+raises(
+  '_declarations-members/promotion-in-an-interface.whim',
+  'an interface cannot declare a property, and promoting a parameter declares one',
+);
+
+$assertion_value_1 = function(): void {
+  require!('_declarations-members/top-level.whim');
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (CompilerError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is CompilerError);
+
+$assertion_value_2 = function(): void {
+  require!('_declarations-members/class-constant.whim');
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (CompilerError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is CompilerError);
+
+$assertion_value_3 = function(): void {
+  require!('_declarations-members/property.whim');
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (CompilerError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is CompilerError);
+
+interface Shape {
+  public const string KIND = 'shape';
+
+  public function area(): int;
+}
+
+abstract class Base implements Shape {
+  abstract public function area(): int;
+
+  protected function describe(int $scale): string {
+    return 'base';
+  }
+}
+
+final class Square extends Base {
+  public function __construct(private int $side) {}
+
+  public function area(): int {
+    return $this->side * $this->side;
+  }
+
+  public function describe(int $scale, string $suffix = '!'): string {
+    return 'square' . $suffix;
+  }
+}
+
+enum Suit: string {
+  case Hearts = 'H';
+  case Spades = 'S';
+}
+
+$square = new Square(3);
+assert!($square->area() == 9);
+assert!($square->describe(1) == 'square!');
+assert!(Square::KIND == 'shape');
+assert!(Suit::Hearts->value == 'H');
+assert!($square is Shape);

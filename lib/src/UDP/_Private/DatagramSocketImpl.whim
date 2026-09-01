@@ -1,0 +1,168 @@
+namespace Whim\UDP\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IO\FileDescriptorHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\ClosedException;
+use Whim\Network\InternetEndpoint;
+use Whim\OS\FileDescriptor;
+use Whim\Refine\PositiveInt;
+use Whim\UDP\Datagram;
+use Whim\UDP\ExplicitCongestion;
+use Whim\UDP\SendMetadata;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Shares datagram behavior across connected and unconnected UDP sockets. */
+abstract class DatagramSocketImpl implements
+  Whim\UDP\DatagramSocket,
+  FileDescriptorHandle {
+  #[TrackCaller]
+  #[TraceBoundary]
+  protected function __construct(
+    private null|FileDescriptor $descriptor,
+    private InternetEndpoint $localEndpoint,
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    if ($this->descriptor == null || $this->descriptor->isClosed()) {
+      throw new ClosedException('the UDP socket is closed');
+    }
+
+    return $this->descriptor;
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLocalEndpoint(): InternetEndpoint {
+    return $this->localEndpoint;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryReceive(PositiveInt $maxBytes): null|Datagram {
+    try {
+      $message = Whim\_Private\receive_message(
+        $this->getFileDescriptor(),
+        $maxBytes,
+        $this->localEndpoint->port,
+      );
+    } catch (Whim\_Private\SystemError $error) {
+      Whim\Network\_Private\failure($error);
+    }
+
+    if ($message == null) {
+      return null;
+    }
+
+    return new Datagram(
+      $message[0],
+      Whim\Network\_Private\internet_endpoint($message[1]),
+      Whim\Network\_Private\internet_endpoint($message[2]),
+      ExplicitCongestion::from($message[3]),
+      $message[4],
+      $message[5],
+    );
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function receive(
+    PositiveInt $maxBytes,
+    null|CancellationToken $cancellation = null,
+  ): Datagram {
+    while (true) {
+      $datagram = $this->tryReceive($maxBytes);
+      if ($datagram != null) {
+        return $datagram;
+      }
+
+      Whim\Network\_Private\wait_readable(
+        $this->getFileDescriptor(),
+        $cancellation,
+      );
+    }
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  protected function sendTo(
+    string $bytes,
+    InternetEndpoint $peer,
+    null|SendMetadata $metadata,
+    null|CancellationToken $cancellation,
+  ): int {
+    if (length!($bytes) > 65507) {
+      throw new InvalidArgumentException(
+        'a UDP datagram cannot exceed 65507 bytes',
+      );
+    }
+
+    if (
+      $peer->address->family != $this->localEndpoint->address->family
+      || (
+        $metadata != null
+        && $metadata->sourceAddress->family != $peer->address->family
+      )
+    ) {
+      throw new InvalidArgumentException(
+        'the UDP endpoint and source metadata must use one address family',
+      );
+    }
+
+    while (true) {
+      try {
+        if ($metadata == null) {
+          return Whim\_Private\send_to(
+            $this->getFileDescriptor(),
+            $bytes,
+            $peer->address->toString(),
+            $peer->port,
+          );
+        }
+
+        return Whim\_Private\send_message(
+          $this->getFileDescriptor(),
+          $bytes,
+          $peer->address->toString(),
+          $peer->port,
+          $metadata->sourceAddress->toString(),
+          $metadata->interfaceIndex,
+          $metadata->explicitCongestion->value,
+        );
+      } catch (Whim\_Private\SystemError $error) {
+        if ($error->errno() != Whim\_Private\ERRNO_WOULD_BLOCK) {
+          Whim\Network\_Private\failure($error);
+        }
+      }
+
+      Whim\Network\_Private\wait_writable(
+        $this->getFileDescriptor(),
+        $cancellation,
+      );
+    }
+  }
+
+  /** Transfers this socket's descriptor to another handle. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  protected function takeDescriptor(): FileDescriptor {
+    $descriptor = $this->getFileDescriptor();
+    $this->descriptor = null;
+
+    return $descriptor;
+  }
+}

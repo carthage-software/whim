@@ -1,0 +1,67 @@
+namespace Whim\HTTP\Message\Response\_Private;
+
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\StatusCode;
+use Whim\IO\MemoryHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonEmptyString;
+use Whim\URI\URI;
+use Whim\URL\URL;
+
+/** Creates a response containing buffered bytes. */
+#[AlwaysInline]
+function body(
+  string $value,
+  NonEmptyString $contentType,
+  StatusCode $status,
+  FieldMap $headers,
+): Response {
+  $length = '' . length!($value);
+  if ($headers->isEmpty()) {
+    $headers = FieldMap::fromPartsUnsafe(
+      vec[('Content-Type', $contentType), ('Content-Length', $length)],
+      dict[
+        'content-type' => vec[$contentType],
+        'content-length' => vec[$length],
+      ],
+    );
+  } else {
+    $headers = $headers->with('Content-Type', $contentType)->with(
+      'Content-Length',
+      $length,
+    );
+  }
+
+  return new Response(
+    $status,
+    headers: $headers,
+    body: new MemoryHandle($value),
+  );
+}
+
+/** Returns a validated URI reference for a Location field. */
+#[AlwaysInline]
+function location(string|URI|URL $value): string {
+  return match ($value) {
+    $reference @ string => URI::from($reference)->toString(),
+    $uri @ URI => $uri->toString(),
+    $url @ URL => $url->toString(),
+  };
+}
+
+/** Creates a redirect response. */
+#[AlwaysInline]
+function redirect_response(
+  StatusCode $status,
+  string|URI|URL $target,
+): Response {
+  $target = location($target);
+  return new Response(
+    $status,
+    headers: FieldMap::fromPartsUnsafe(
+      vec[('Location', $target)],
+      dict['location' => vec[$target]],
+    ),
+  );
+}

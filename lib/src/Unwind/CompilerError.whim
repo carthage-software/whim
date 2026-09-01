@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a failure while compiling valid syntax. */
+#[Stub]
+class CompilerError extends Error {}

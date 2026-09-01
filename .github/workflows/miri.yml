@@ -1,0 +1,47 @@
+name: miri
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "31 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: miri-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  miri:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+          components: miri, rust-src
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: miri-nightly
+          cache-on-failure: true
+      - run: cargo +nightly miri setup
+      - name: Check spans
+        run: cargo +nightly miri test --locked -p whim-span --lib
+      - name: Check parser input
+        run: cargo +nightly miri test --locked -p whim-syn --lib input::tests
+      - name: Check parser lookahead
+        run: >-
+          cargo +nightly miri test --locked -p whim-syn --lib
+          parser::internal::ring_buffer::tests
+      - name: Check formatter output
+        run: >-
+          cargo +nightly miri test --locked -p whim-formatter --lib
+          tests::kitchen_sink_is_idempotent -- --exact
+      - name: Check runtime values
+        run: >-
+          cargo +nightly miri test --locked -p whim-runtime --lib value::

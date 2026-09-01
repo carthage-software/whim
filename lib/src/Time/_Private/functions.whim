@@ -1,0 +1,71 @@
+namespace Whim\Time\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Math;
+use Whim\Time\Duration;
+use Whim\Time\NANOSECONDS_PER_SECOND;
+
+/** Measures the normalized duration between two clock readings. */
+#[TrackCaller]
+#[TraceBoundary]
+function duration_between(
+  int $laterSeconds,
+  int $laterNanoseconds,
+  int $earlierSeconds,
+  int $earlierNanoseconds,
+): Duration {
+  $nanoseconds = $laterNanoseconds - $earlierNanoseconds;
+
+  if ($laterSeconds >= $earlierSeconds) {
+    if ($laterSeconds >= 0 && $earlierSeconds < 0) {
+      $seconds = $laterSeconds + (-($earlierSeconds + 1));
+      if ($nanoseconds >= 0) {
+        $seconds++;
+      }
+    } else {
+      $seconds = $laterSeconds - $earlierSeconds;
+      if ($nanoseconds < 0) {
+        $seconds--;
+      }
+    }
+
+    if ($nanoseconds < 0) {
+      $nanoseconds += NANOSECONDS_PER_SECOND;
+    }
+
+    return new Duration($seconds, $nanoseconds);
+  }
+
+  if ($laterSeconds < 0 && $earlierSeconds >= 0) {
+    if ($nanoseconds > 0) {
+      if ($earlierSeconds == 0) {
+        $seconds = $laterSeconds + 1;
+      } else {
+        $seconds = $laterSeconds - ($earlierSeconds - 1);
+      }
+
+      $nanoseconds -= NANOSECONDS_PER_SECOND;
+    } else {
+      $seconds = $laterSeconds - $earlierSeconds;
+    }
+  } else {
+    $seconds = $laterSeconds - $earlierSeconds;
+  }
+
+  return new Duration($seconds, $nanoseconds);
+}
+
+/** Normalize system time. */
+#[TrackCaller]
+#[TraceBoundary]
+function normalize_system_time(int $seconds, int $nanoseconds): (int, int) {
+  $seconds += Math\div($nanoseconds, NANOSECONDS_PER_SECOND);
+  $nanoseconds %= NANOSECONDS_PER_SECOND;
+  if ($nanoseconds < 0) {
+    $seconds--;
+    $nanoseconds += NANOSECONDS_PER_SECOND;
+  }
+
+  return ($seconds, $nanoseconds);
+}

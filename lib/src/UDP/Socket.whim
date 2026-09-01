@@ -1,0 +1,27 @@
+namespace Whim\UDP;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\InternetEndpoint;
+
+/** An unconnected UDP socket. */
+interface Socket extends DatagramSocket {
+  /** Sends one datagram to a peer. */
+  #[MustUse]
+  #[TrackCaller]
+  public function sendTo(
+    string $bytes,
+    InternetEndpoint $peer,
+    null|SendMetadata $metadata = null,
+    null|CancellationToken $cancellation = null,
+  ): int;
+
+  /** Connects this socket to one peer and consumes this handle. */
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    InternetEndpoint $peer,
+    null|CancellationToken $cancellation = null,
+  ): ConnectedSocket;
+}

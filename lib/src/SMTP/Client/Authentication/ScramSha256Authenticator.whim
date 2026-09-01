@@ -1,0 +1,118 @@
+namespace Whim\SMTP\Client\Authentication;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\Encoding\DecodingException;
+use Whim\Hash;
+use Whim\Hash\Algorithm;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\AuthenticationException;
+use Whim\SMTP\Client\Connection;
+use Whim\SecureRandom;
+use Whim\Str;
+
+/** Implements RFC 7677 SCRAM-SHA-256 authentication. */
+final readonly class ScramSha256Authenticator implements Authenticator {
+  public function __construct(
+    private string $username,
+    #[SensitiveParameter] private string $password,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function mechanism(): NonEmptyString {
+    return 'SCRAM-SHA-256';
+  }
+
+  #[TrackCaller]
+  public function authenticate(
+    Connection $connection,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    _Private\require_mechanism($connection, $this->mechanism());
+    $nonce = Base64\encode(SecureRandom\bytes(18));
+    $escapedUsername = Str\replace_every(
+      $this->username,
+      dict['=' => '=3D', ',' => '=2C'],
+    );
+
+    $clientFirstBare = 'n=' . $escapedUsername . ',r=' . $nonce;
+    $reply = $connection->sendCommand(
+      'AUTH SCRAM-SHA-256 ' . Base64\encode('n,,' . $clientFirstBare),
+      $cancellation,
+    );
+
+    if ($reply->code != 334) {
+      throw _Private\rejected($this->mechanism(), $reply);
+    }
+
+    try {
+      $serverFirst = Base64\decode($reply->message);
+    } catch (DecodingException $_) {
+      throw _Private\rejected($this->mechanism(), $reply);
+    }
+
+    ($serverNonce, $salt, $iterations) = _Private\parse_server_first(
+      $serverFirst,
+      $nonce,
+    );
+
+    $saltedPassword = Hash\pbkdf2_sha256($this->password, $salt, $iterations);
+
+    $clientKey = Hash\hmac(Algorithm::Sha2_256, $saltedPassword, 'Client Key');
+
+    $storedKey = Hash\digest(Algorithm::Sha2_256, $clientKey);
+    $clientFinalWithoutProof =
+      'c=' . Base64\encode('n,,') . ',r=' . $serverNonce;
+
+    $authMessage =
+      $clientFirstBare . ',' . $serverFirst . ',' . $clientFinalWithoutProof;
+
+    $clientSignature = Hash\hmac(Algorithm::Sha2_256, $storedKey, $authMessage);
+
+    $proof = _Private\xor_bytes($clientKey, $clientSignature);
+    $reply = $connection->sendLine(
+      Base64\encode($clientFinalWithoutProof . ',p=' . Base64\encode($proof)),
+      $cancellation,
+    );
+
+    _Private\require_authentication_success($this->mechanism(), $reply);
+    if ($reply->message == '') {
+      return;
+    }
+
+    try {
+      $serverFinal = Base64\decode($reply->message);
+    } catch (DecodingException $_) {
+      throw _Private\rejected($this->mechanism(), $reply);
+    }
+
+    $verification = _Private\parse_server_verification($serverFinal);
+
+    try {
+      $givenSignature = Base64\decode($verification);
+    } catch (DecodingException $_) {
+      throw new AuthenticationException(
+        'the SCRAM-SHA-256 server verification is malformed',
+      );
+    }
+
+    $serverKey = Hash\hmac(Algorithm::Sha2_256, $saltedPassword, 'Server Key');
+
+    $expectedSignature = Hash\hmac(
+      Algorithm::Sha2_256,
+      $serverKey,
+      $authMessage,
+    );
+
+    if (!Hash\equals($expectedSignature, $givenSignature)) {
+      throw new AuthenticationException(
+        'the SCRAM-SHA-256 server verification failed',
+      );
+    }
+  }
+}

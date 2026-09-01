@@ -1,0 +1,134 @@
+use Whim\Unwind\TypeError;
+
+function vector_sum(vec<int> $values): int {
+  $sum = 0;
+  foreach ($values as $value) {
+    $sum += $value;
+  }
+
+  return $sum;
+}
+
+function alternate_vector_sum(vec<int> $values): int {
+  return vector_sum($values);
+}
+
+function numeric_count(vec<int|float> $values): int {
+  return length!($values);
+}
+
+function guarded_pair(int $id, vec<int> $values): int {
+  return $id + length!($values);
+}
+
+function call_guarded_pair(
+  fn(int, vec<int>): int $callable,
+  mixed $id,
+  mixed $values,
+): int {
+  return $callable($id, $values);
+}
+
+$callable = vector_sum(...);
+if (length!(Whim\Env\get_arguments()) > 0) {
+  $callable = alternate_vector_sum(...);
+}
+
+$values = vec[1, 2, 3];
+assert!($callable($values) == 6);
+assert!($callable($values) == 6);
+
+$values[1] = 'invalid';
+$assertion_value_3 = fn(): mixed => $callable($values);
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (TypeError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is TypeError);
+$values[1] = 4;
+assert!($callable($values) == 8);
+
+$values[] = 'invalid';
+$assertion_value_5 = fn(): mixed => $callable($values);
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is TypeError);
+remove_last!($values);
+assert!($callable($values) == 8);
+
+assert!(numeric_count($values) == 3);
+$values[0] = 'invalid';
+$assertion_value_8 = fn(): mixed => numeric_count($values);
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (TypeError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is TypeError);
+
+$original = vec[7, 8];
+assert!($callable($original) == 15);
+$copy = $original;
+$copy[0] = 'invalid';
+assert!($callable($original) == 15);
+$assertion_value_11 = fn(): mixed => $callable($copy);
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (TypeError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is TypeError);
+
+$pair = guarded_pair(...);
+assert!(call_guarded_pair($pair, 4, vec[1, 2]) == 6);
+$assertion_value_13 = fn(): int => (
+  call_guarded_pair($pair, 'invalid', vec[1, 2])
+);
+
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (TypeError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is TypeError);
+$assertion_value_14 = fn(): int => (
+  call_guarded_pair($pair, 4, vec[1, 'invalid'])
+);
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (TypeError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is TypeError);
+
+function reject_colliding_literal(
+  vec<-4_279_051_080_169_086_976> $_values,
+): void {}
+
+$colliding = vec[4_944_320_956_685_688_832];
+assert!($colliding is vec<4_944_320_956_685_688_832>);
+$collision_error = null;
+try {
+  reject_colliding_literal($colliding);
+} catch (TypeError $error) {
+  $collision_error = $error;
+}
+
+assert!($collision_error is TypeError);

@@ -1,0 +1,24 @@
+namespace Whim\Channel;
+
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+
+/** Defines the behavior of sender values. */
+interface Sender<in T> extends Channel {
+  /** Waits until a value can be sent. */
+  #[TrackCaller]
+  public function waitUntilSendable(
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Sends a value, waiting until the channel can accept it. */
+  #[TrackCaller]
+  public function send(
+    T $value,
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Attempts to send a value without waiting. */
+  #[TrackCaller]
+  public function trySend(T $value): void;
+}

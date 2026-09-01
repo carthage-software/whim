@@ -1,0 +1,138 @@
+namespace Whim\Database\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Connection;
+use Whim\Database\Result;
+use Whim\Database\Statement;
+use Whim\Database\Transaction;
+use Whim\Database\TransactionIsolation;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\Throwable;
+
+/** Returns a checked-out connection after its derived resources close. */
+final class PooledConnection implements Connection {
+  private bool $closed = false;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private Lease $lease) {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isReusable(): bool {
+    if ($this->closed) {
+      return false;
+    }
+
+    $connection = $this->lease->connection();
+    return !$connection->isClosed() && $connection->isReusable();
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function ping(null|CancellationToken $cancellation = null): void {
+    $this->lease->connection()->ping($cancellation);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    $this->lease->retain();
+    try {
+      $result = $this->lease->connection()->execute(
+        $sql,
+        $parameters,
+        $cancellation,
+      );
+    } catch (Throwable $error) {
+      $connection = $this->lease->connection();
+      $this->lease->release(
+        !$connection->isClosed()
+        && $connection->isReusable(),
+      );
+
+      throw $error;
+    }
+
+    return new PooledResult($this->lease, $result);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function prepare(
+    NonEmptyString $sql,
+    null|CancellationToken $cancellation = null,
+  ): Statement {
+    $this->lease->retain();
+    try {
+      $statement = $this->lease->connection()->prepare($sql, $cancellation);
+    } catch (Throwable $error) {
+      $connection = $this->lease->connection();
+      $this->lease->release(
+        !$connection->isClosed()
+        && $connection->isReusable(),
+      );
+
+      throw $error;
+    }
+
+    return new PooledStatement($this->lease, $statement);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function begin(
+    null|TransactionIsolation $isolation = null,
+    bool $readOnly = false,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $this->lease->retain();
+    try {
+      $transaction = $this->lease->connection()->begin(
+        $isolation,
+        $readOnly,
+        $cancellation,
+      );
+    } catch (Throwable $error) {
+      $connection = $this->lease->connection();
+      $this->lease->release(
+        !$connection->isClosed()
+        && $connection->isReusable(),
+      );
+
+      throw $error;
+    }
+
+    return new PooledTransaction($this->lease, $transaction);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    $this->lease->release();
+  }
+}

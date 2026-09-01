@@ -1,0 +1,7 @@
+namespace Whim\MIME;
+
+/** One MIME parameter name and value. */
+type Parameter = (string, string);
+
+/** One MIME header name and value. */
+type Header = (string, string);

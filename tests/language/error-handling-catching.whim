@@ -1,0 +1,298 @@
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Symbol\SymbolKind;
+use Whim\Unwind\Error;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\RequireError;
+use Whim\Unwind\RuntimeException;
+
+final class GuardTrace {
+  public vec<string> $events = vec[];
+}
+
+function must_not_run(): bool {
+  throw new LogicException('wrong guard');
+}
+
+function guard_throws(): bool {
+  throw new LogicException('guard failed');
+}
+
+function route(int $code, GuardTrace $trace): string {
+  try {
+    throw new RuntimeException('request failed', $code);
+  } catch (LogicException $error) if (must_not_run()) {
+    return 'wrong type';
+  } catch (RuntimeException $error) if ($error->getCode() == 404) {
+    $trace->events[] = 'missing';
+
+    return 'missing';
+  } catch (RuntimeException $error) if ($error->getCode() == 429) {
+    $trace->events[] = 'retry';
+
+    return 'retry';
+  } catch (RuntimeException $error) {
+    $trace->events[] = 'fallback';
+
+    return 'fallback';
+  } finally {
+    $trace->events[] = 'finally';
+  }
+}
+
+$guardTrace = new GuardTrace();
+assert!(route(404, $guardTrace) == 'missing');
+assert!(route(429, $guardTrace) == 'retry');
+assert!(route(500, $guardTrace) == 'fallback');
+assert!(
+  $guardTrace->events == vec[
+    'missing',
+    'finally',
+    'retry',
+    'finally',
+    'fallback',
+    'finally',
+  ],
+);
+
+$assertion_value_5 = function() use ($guardTrace): void {
+  try {
+    throw new RuntimeException('original');
+  } catch (RuntimeException $error) if (false) {
+    $guardTrace->events[] = 'false-guard-arm';
+  } finally {
+    $guardTrace->events[] = 'rejected-finally';
+  }
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (RuntimeException $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+  assert!(Whim\Str\contains($assertion_caught_5->getMessage(), 'original'));
+}
+
+assert!($assertion_error_5 is RuntimeException);
+
+$assertion_value_6 = function() use ($guardTrace): void {
+  try {
+    throw new RuntimeException('original');
+  } catch (RuntimeException $error) if (guard_throws()) {
+    $guardTrace->events[] = 'throwing-guard-arm';
+  } finally {
+    $guardTrace->events[] = 'throwing-guard-finally';
+  }
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (LogicException $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+  assert!(Whim\Str\contains($assertion_caught_6->getMessage(), 'guard failed'));
+}
+
+assert!($assertion_error_6 is LogicException);
+
+assert!(
+  $guardTrace->events == vec[
+    'missing',
+    'finally',
+    'retry',
+    'finally',
+    'fallback',
+    'finally',
+    'rejected-finally',
+    'throwing-guard-finally',
+  ],
+);
+
+class RoutedTimeout extends Error {}
+class RoutedNetworkError extends Error {}
+
+$clauses = vec[];
+
+try {
+  throw new RoutedTimeout('slow', 1);
+} catch (RoutedTimeout|RoutedNetworkError $error) {
+  $clauses[] = 'first matching clause: ' . $error->getMessage();
+} catch (Error $error) {
+  $clauses[] = 'general';
+}
+
+try {
+  throw new RoutedNetworkError('down', 2);
+} catch (RoutedTimeout $error) {
+  $clauses[] = 'timeout';
+} catch (Error $error) {
+  $clauses[] = 'tested in source order: ' . $error->getCode();
+}
+
+try {
+  throw new RoutedTimeout('unbound', 0);
+} catch (RoutedTimeout) {
+  $clauses[] = 'clause without a variable';
+}
+
+assert!(
+  $clauses == vec[
+    'first matching clause: slow',
+    'tested in source order: 2',
+    'clause without a variable',
+  ],
+);
+
+class UnwoundTimeout extends Error {}
+class UnwoundNetworkError extends Error {}
+
+function throw_from_deep(): void {
+  throw new UnwoundTimeout('from deep', 0);
+}
+
+$unwinding = vec[];
+
+try {
+  try {
+    throw_from_deep();
+  } catch (UnwoundNetworkError $error) {
+    $unwinding[] = 'inner clause matched';
+  }
+} catch (UnwoundTimeout $error) {
+  $unwinding[] = 'outward to the outer try';
+}
+
+try {
+  try {
+    throw new UnwoundTimeout('t', 0);
+  } catch (UnwoundTimeout $error) {
+    throw new UnwoundNetworkError('n', 0);
+  } catch (UnwoundNetworkError $error) {
+    $unwinding[] = 'same-try clause consulted';
+  }
+} catch (UnwoundNetworkError $error) {
+  $unwinding[] = 'thrown in catch unwinds outward';
+}
+
+assert!(
+  $unwinding == vec[
+    'outward to the outer try',
+    'thrown in catch unwinds outward',
+  ],
+);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+$assertion_value_10 = function(): void {
+  undefined_fn();
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (Error $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is Error);
+
+$assertion_value_11 = function(): void {
+  $x = new Ghost\Widget();
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (Error $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is Error);
+
+$assertion_value_12 = function(): void {
+  $x = GHOST_CONSTANT;
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (Error $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is Error);
+
+$nowhere = $work . '/nowhere.whim';
+$assertion_value_13 = function() use ($nowhere): void {
+  require!($nowhere);
+};
+
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (RequireError $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is RequireError);
+
+function taken(): void {}
+
+$redeclares = $work . '/redeclares.whim';
+File\write($redeclares, 'function taken(): void {}' . "\n");
+$assertion_value_14 = function() use ($redeclares): void {
+  require!($redeclares);
+};
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (LinkerError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is LinkerError);
+
+$badParent = $work . '/bad_parent.whim';
+File\write($badParent, 'class Orphan extends Missing\Parent {}' . "\n");
+$assertion_value_15 = function() use ($badParent): void {
+  require!($badParent);
+};
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (LinkerError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is LinkerError);
+
+Filesystem\delete_directory($work, true);
+
+Autoload\register(
+  new Autoload\Autoloader()->withFallback(
+    fn(SymbolKind $kind, string $name): bool => false,
+  ),
+);
+
+$rounds = vec[];
+$round = 0;
+while ($round < 3) {
+  try {
+    try {
+      throw new Error('inner', 0);
+    } catch (Lazy\Probe $error) {
+      $rounds[] = 'unexpected';
+    }
+  } catch (Error $error) {
+    $rounds[] = 'caught ' . $round;
+  }
+
+  $round = $round + 1;
+}
+
+$rounds[] = 'done';
+assert!($rounds == vec['caught 0', 'caught 1', 'caught 2', 'done']);

@@ -1,0 +1,74 @@
+namespace Whim\Encoding\Base64;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Encodes bytes as base64 text. */
+#[AlwaysInline]
+#[MustUse]
+function encode(
+  string $bytes,
+  Alphabet $alphabet = Alphabet::Standard,
+  bool $padding = true,
+): string {
+  return match ($alphabet) {
+    Alphabet::Standard => Whim\_Private\base64_encode_standard(
+      $bytes,
+      $padding,
+    ),
+    Alphabet::UrlSafe => Whim\_Private\base64_encode_url_safe($bytes, $padding),
+    Alphabet::DotSlash => Whim\_Private\base64_encode_dot_slash(
+      $bytes,
+      $padding,
+    ),
+    Alphabet::DotSlashOrdered => Whim\_Private\base64_encode_dot_slash_ordered(
+      $bytes,
+      $padding,
+    ),
+  };
+}
+
+/**
+ * Decodes base64 text back into bytes, in the exact padding mode asked for.
+ *
+ * @throws DecodingException when the input is not valid base64 text.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(
+  string $encoded,
+  Alphabet $alphabet = Alphabet::Standard,
+  bool $padding = true,
+): string {
+  $decoded = match ($alphabet) {
+    Alphabet::Standard => Whim\_Private\base64_decode_standard(
+      $encoded,
+      $padding,
+    ),
+    Alphabet::UrlSafe => Whim\_Private\base64_decode_url_safe(
+      $encoded,
+      $padding,
+    ),
+    Alphabet::DotSlash => Whim\_Private\base64_decode_dot_slash(
+      $encoded,
+      $padding,
+    ),
+    Alphabet::DotSlashOrdered => Whim\_Private\base64_decode_dot_slash_ordered(
+      $encoded,
+      $padding,
+    ),
+  };
+
+  if ($decoded == null) {
+    throw new DecodingException(
+      'the input is not base64 in the chosen alphabet and padding mode',
+    );
+  }
+
+  return $decoded;
+}

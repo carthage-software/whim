@@ -1,0 +1,13 @@
+namespace Whim\Reference;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Holds a weak reference to an object. */
+#[Stub]
+final class Weak<T: object> {
+  public function __construct(T $referent) {}
+
+  #[MustUse]
+  public function get(): T|null {}
+}

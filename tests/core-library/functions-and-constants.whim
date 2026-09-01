@@ -1,0 +1,67 @@
+use Whim\Float;
+use Whim\OS;
+use Whim\Path;
+use Whim\Symbol;
+use Whim\Symbol\SymbolKind;
+use Whim\Unwind\UndefinedSymbolError;
+
+$infinity = 1e308 * 10.0;
+$notANumber = $infinity - $infinity;
+assert!(Float\is_nan($notANumber));
+assert!(!(Float\is_nan(1.5)));
+assert!(Float\is_finite(1.5));
+assert!(!(Float\is_finite($infinity)));
+assert!(!(Float\is_finite($notANumber)));
+assert!(Float\is_infinite($infinity));
+assert!(Float\is_infinite(-$infinity));
+assert!(!(Float\is_infinite(1.5)));
+
+assert!(length!(Path\SEPARATOR) == 1);
+assert!(Path\SEPARATOR == '/');
+assert!(
+  contains!(vec['Darwin', 'Linux', 'BSD', 'Solaris', 'Unknown'], OS\FAMILY),
+);
+
+assert!(Whim\VERSION is string);
+assert!(length!(Whim\VERSION) > 0);
+
+const AMOUNT = 5;
+
+function helper(): void {}
+
+class Widget {}
+
+enum Suit {
+  case Hearts;
+}
+
+interface Marker {}
+
+type Id = int|string;
+
+function accept_symbol_kind_probe((fn(string): SymbolKind) $probe): void {
+  assert!($probe('AMOUNT') == SymbolKind::Constant);
+}
+
+assert!(Symbol\exists('AMOUNT'));
+assert!(Symbol\exists('helper'));
+assert!(!(Symbol\exists('Ghost')));
+assert!(!(Symbol\exists('ghost', false)));
+assert!(Symbol\exists('\\Widget'));
+assert!(!(Symbol\exists('widget')));
+assert!(Symbol\get_kind('AMOUNT') == SymbolKind::Constant);
+assert!(Symbol\get_kind('helper') == SymbolKind::Function);
+assert!(Symbol\get_kind('Widget') == SymbolKind::Class);
+assert!(Symbol\get_kind('Suit') == SymbolKind::Enum);
+assert!(Symbol\get_kind('Marker') == SymbolKind::Interface);
+assert!(Symbol\get_kind('Id') == SymbolKind::TypeAlias);
+accept_symbol_kind_probe(Symbol\get_kind(...));
+$assertion_value_27 = fn(): SymbolKind => Symbol\get_kind('Ghost');
+$assertion_error_27 = null;
+try {
+  $assertion_value_27();
+} catch (UndefinedSymbolError $assertion_caught_27) {
+  $assertion_error_27 = $assertion_caught_27;
+}
+
+assert!($assertion_error_27 is UndefinedSymbolError);

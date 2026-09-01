@@ -1,0 +1,5 @@
+function f(): int {
+  return 1;
+}
+
+f() = 1;

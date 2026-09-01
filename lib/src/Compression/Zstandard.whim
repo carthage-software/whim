@@ -1,0 +1,51 @@
+namespace Whim\Compression;
+
+use Whim\Compression\_Private\Compressor;
+use Whim\Compression\_Private\Decompressor;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\NonEmptyString;
+use Whim\_Private\CompressionDecoder;
+use Whim\_Private\CompressionEncoder;
+
+/** Implements the zstd content coding. */
+final readonly class Zstandard implements Codec {
+  public function __construct(private -131_072..=22 $level = 3) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function coding(): NonEmptyString {
+    return 'zstd';
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function createCompressor(): Compressor {
+    $encoder = CompressionEncoder::zstandard($this->level);
+    if ($encoder == null) {
+      throw new Exception('failed to create a zstd compression stream');
+    }
+
+    return new Compressor($encoder);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function createDecompressor(): Decompressor {
+    $decoder = CompressionDecoder::zstandard();
+    if ($decoder == null) {
+      throw new DecompressionException(
+        'failed to create a zstd decompression stream',
+      );
+    }
+
+    return new Decompressor($decoder);
+  }
+}

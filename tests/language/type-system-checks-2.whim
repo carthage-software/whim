@@ -1,0 +1,206 @@
+use Whim\Refine\AnyTuple;
+use Whim\Refine\AnyTupleOf;
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_type-system-checks-2/tuple-rest-must-be-final.whim',
+  'a tuple rest type must be the final tuple element',
+);
+
+interface Foo<T> {
+  public function bar(): T;
+}
+
+class SomeError extends Whim\Unwind\Error {}
+
+class Bar implements Foo<never> {
+  public function bar(): never {
+    throw new SomeError('failed', 0);
+  }
+}
+
+interface IntFoo {
+  public function bar(): int;
+}
+
+class FailingIntFoo implements IntFoo {
+  public function bar(): never {
+    throw new SomeError('failed', 0);
+  }
+}
+
+function acceptsIntegers(vec<int> $values): void {}
+
+function acceptsStrings(vec<string> $values): void {}
+
+function impossible(never $value): void {}
+
+$emptyVector = vec[];
+$emptyDictionary = dict[];
+
+assert!($emptyVector is vec<never>);
+assert!($emptyVector is vec<int>);
+assert!($emptyVector is vec<string>);
+assert!($emptyDictionary is dict<never, never>);
+assert!($emptyDictionary is dict<int, string>);
+assert!($emptyDictionary is dict<string, int>);
+acceptsIntegers($emptyVector);
+acceptsStrings($emptyVector);
+$assertion_value_7 = function(): void {
+  impossible(null);
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (TypeError $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is TypeError);
+
+$bar = new Bar();
+assert!($bar is Foo<never>);
+$assertion_value_9 = function() use ($bar): void {
+  $bar->bar();
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (SomeError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is SomeError);
+
+$failing = new FailingIntFoo();
+$assertion_value_10 = function() use ($failing): void {
+  $failing->bar();
+};
+
+$assertion_error_10 = null;
+try {
+  $assertion_value_10();
+} catch (SomeError $assertion_caught_10) {
+  $assertion_error_10 = $assertion_caught_10;
+}
+
+assert!($assertion_error_10 is SomeError);
+
+final class Target {
+  public function take(int $value): int {
+    return $value;
+  }
+}
+
+final class Caller {
+  public function __construct(private Target $target) {}
+
+  public function proven(int $value): int {
+    return $this->target->take($value);
+  }
+
+  public function unproven(mixed $value): int {
+    return $this->target->take($value);
+  }
+}
+
+$caller = new Caller(new Target());
+assert!($caller->proven(42) == 42);
+$assertion_value_35 = fn(): int => $caller->unproven('wrong');
+$assertion_error_35 = null;
+try {
+  $assertion_value_35();
+} catch (TypeError $assertion_caught_35) {
+  $assertion_error_35 = $assertion_caught_35;
+}
+
+assert!($assertion_error_35 is TypeError);
+
+class ReifiedBox<T> {
+  public function __construct(public T $content) {}
+}
+
+$reifiedValues = vec[1, 2];
+assert!($reifiedValues is vec<int>);
+$reifiedValues[] = 'changed';
+assert!(!($reifiedValues is vec<int>));
+assert!($reifiedValues is vec<int|string>);
+
+$intBox = new ReifiedBox::<int>(1);
+$stringBox = new ReifiedBox::<string>('a');
+assert!($intBox is ReifiedBox<int>);
+assert!(!($intBox is ReifiedBox<string>));
+assert!($stringBox is ReifiedBox<string>);
+
+$nestedReified = vec[
+  (1, 1, 1.5, new ReifiedBox::<string>('value'), dict['one' => 1]),
+];
+
+assert!(
+  $nestedReified is vec<(int, 1, float, ReifiedBox<string>, dict<string, int>)>,
+);
+
+type DeliveryStop = (int, int, ...string);
+type Row<H, V> = (H, ...V);
+
+assert!((41, 99) is DeliveryStop);
+assert!((41, 99, 'fragile', 'signed') is DeliveryStop);
+assert!(!((41,) is DeliveryStop));
+assert!(!((41, 99, 'fragile', 7) is DeliveryStop));
+
+assert!((1, 'two', false) is AnyTuple);
+assert!((1, 2, 3) is AnyTupleOf<int>);
+assert!(!((1, 'two') is AnyTupleOf<int>));
+
+assert!(('row',) is Row<string, int>);
+assert!(('row', 1, 2, 3) is Row<string, int>);
+assert!(!((1, 2, 3) is Row<string, int>));
+
+$deliveryRows = vec[('first', 1, 2), ('second', 3)];
+assert!($deliveryRows is vec<(string, ...int)>);
+
+$deliveryStop = (41, 99, 'signed') as DeliveryStop;
+assert!($deliveryStop == (41, 99, 'signed'));
+assert!((41, 99, 7) ?as DeliveryStop == null);
+
+class WildcardBox<T> {
+  public function __construct(public T $value) {}
+}
+
+class WildcardPair<A, B> {
+  public function __construct(public A $first, public B $second) {}
+}
+
+$wildcardBox = new WildcardBox::<string>('x');
+$wildcardPair = new WildcardPair::<string, int>('x', 1);
+
+assert!($wildcardBox is WildcardBox);
+assert!($wildcardBox is WildcardBox<_>);
+assert!(!($wildcardBox is WildcardBox<mixed>));
+assert!($wildcardPair is WildcardPair<_, int>);
+assert!(('x', 1, false) is (string, int, _));
+assert!((fn(string $value): int => length!($value)) is fn(_): int);
+
+$assertion_value_62 = fn(): bool => $wildcardPair is WildcardPair<_>;
+$assertion_error_62 = null;
+try {
+  $assertion_value_62();
+} catch (TypeError $assertion_caught_62) {
+  $assertion_error_62 = $assertion_caught_62;
+}
+
+assert!($assertion_error_62 is TypeError);
+
+$assertion_value_63 = fn(): mixed => $wildcardBox as WildcardBox<string, int>;
+$assertion_error_63 = null;
+try {
+  $assertion_value_63();
+} catch (TypeError $assertion_caught_63) {
+  $assertion_error_63 = $assertion_caught_63;
+}
+
+assert!($assertion_error_63 is TypeError);

@@ -1,0 +1,115 @@
+namespace Whim\Reflection;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Callable\CallableValueReflection;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Symbol\ClassReflection;
+use Whim\Reflection\Symbol\ConstantReflection;
+use Whim\Reflection\Symbol\EnumReflection;
+use Whim\Reflection\Symbol\FunctionReflection;
+use Whim\Reflection\Symbol\InterfaceReflection;
+use Whim\Reflection\Symbol\NewtypeReflection;
+use Whim\Reflection\Symbol\SymbolReflection;
+use Whim\Reflection\Symbol\TypeAliasReflection;
+use Whim\Reflection\Type\TypeReflection;
+use Whim\Symbol\SymbolKind;
+use Whim\Type\TypeId;
+
+/**
+ * Returns loaded symbols, optionally restricted to one kind. Never autoloads.
+ */
+#[Stub]
+#[MustUse]
+function get_loaded_symbols(
+  null|SymbolKind $kind = null,
+): vec<SymbolReflection> {}
+
+/** Reflects a named symbol, autoloading unless asked not to. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_symbol(
+  string $name,
+  bool $autoload = true,
+): null|SymbolReflection {}
+
+/** Reflects a class, interface, or enum declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_class_like(string|object $class): null|ClassLikeReflection {}
+
+/** Reflects a class declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_class(string|object $class): null|ClassReflection {}
+
+/** Reflects an interface declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_interface(string $interface): null|InterfaceReflection {}
+
+/** Reflects an enum declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_enum(string|object $enum): null|EnumReflection {}
+
+/** Reflects a type-alias declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_type_alias(string $alias): null|TypeAliasReflection {}
+
+/** Reflects a newtype declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_newtype(string $newtype): null|NewtypeReflection {}
+
+/** Reflects a named function declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_function(string $function): null|FunctionReflection {}
+
+/** Reflects a namespace constant declaration. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_constant(string $constant): null|ConstantReflection {}
+
+/** Reflects one object's values and complete generic specialization. */
+#[Stub]
+#[MustUse]
+function reflect_object(object $object): ObjectReflection {}
+
+/** Reflects one callable value and its bound state. */
+#[Stub]
+#[MustUse]
+function reflect_callable(fn $callable): CallableValueReflection {}
+
+/** Reflects the outer nominal layer of a newtype value, when present. */
+#[Stub]
+#[MustUse]
+function reflect_newtype_value(mixed $value): null|NewtypeValueReflection {}
+
+/** Reflects a reified type expression. */
+#[Stub]
+#[MustUse]
+function reflect_type<T>(): TypeReflection {}
+
+/** Reflects the runtime type of a value. */
+#[Stub]
+#[MustUse]
+function reflect_type_of(mixed $value): TypeReflection {}
+
+/** Reflects an engine-local type identity. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+function reflect_type_id(TypeId $id): null|TypeReflection {}

@@ -1,0 +1,509 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\AssertionError;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\TypeError;
+
+$copied_left = vec[1, 2];
+$copied_right = $copied_left;
+$copied_right[] = 3;
+$assertion_value_1 = $copied_left;
+assert!(length!($assertion_value_1) == 2);
+assert!($assertion_value_1 == vec[1, 2]);
+$assertion_value_2 = $copied_right;
+assert!(length!($assertion_value_2) == 3);
+assert!($assertion_value_2 == vec[1, 2, 3]);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$binary = Env\current_binary();
+assert!($binary is string);
+
+$debug_copies_file = $work . '/debug-vec-copies.whim';
+File\write(
+  $debug_copies_file,
+  '$a = vec[1, 2];'
+  . "\n"
+  . '$b = $a;'
+  . "\n"
+  . '$b[] = 3;'
+  . "\n"
+  . 'debug!($a, $b);'
+  . "\n",
+);
+
+$debug_copies = Command\run($binary, vec[$debug_copies_file]);
+assert!($debug_copies->isSuccess());
+assert!(length!($debug_copies->standardOutput) == 0);
+assert!(
+  $debug_copies->standardError
+  == '['
+  . Filesystem\canonicalize($debug_copies_file)
+  . ':4:1] vec(2) ['
+  . "\n"
+  . '  1,'
+  . "\n"
+  . '  2,'
+  . "\n"
+  . '],'
+  . "\n"
+  . 'vec(3) ['
+  . "\n"
+  . '  1,'
+  . "\n"
+  . '  2,'
+  . "\n"
+  . '  3,'
+  . "\n"
+  . ']'
+  . "\n",
+);
+
+$debug_tuple_file = $work . '/debug-single-tuple.whim';
+File\write($debug_tuple_file, 'debug!((1,), vec[(2,)]);' . "\n");
+$debug_tuple = Command\run($binary, vec[$debug_tuple_file]);
+assert!($debug_tuple->isSuccess());
+assert!(length!($debug_tuple->standardOutput) == 0);
+$assertion_value_9 = $debug_tuple->standardError;
+assert!(Whim\Str\contains($assertion_value_9, 'tuple(1) ['));
+assert!(Whim\Str\contains($assertion_value_9, 'vec(1) ['));
+
+$tuple_assertion = null;
+$assertion_callable_10 = function(): void {
+  assert!((1,) == (2,));
+};
+
+try {
+  $assertion_callable_10();
+} catch (AssertionError $assertion_caught_10) {
+  $tuple_assertion = $assertion_caught_10;
+}
+
+assert!($tuple_assertion is AssertionError);
+
+$assertion_value_11 = $tuple_assertion->getMessage();
+assert!(Whim\Str\contains($assertion_value_11, 'left:  (1,)'));
+assert!(Whim\Str\contains($assertion_value_11, 'right: (2,)'));
+
+$written_left = vec[1];
+$written_right = $written_left;
+$written_right[0] = 9;
+assert!($written_left[0] == 1);
+assert!($written_right[0] == 9);
+
+$ordered = dict['a' => 1, 'b' => 2, 'c' => 3];
+$ordered['a'] = 10;
+remove!($ordered, 'b');
+$ordered['b'] = 20;
+$ordered_keys = vec[];
+$ordered_values = vec[];
+foreach ($ordered as $key => $value) {
+  $ordered_keys[] = $key;
+  $ordered_values[] = $value;
+}
+
+assert!($ordered_keys == vec['a', 'c', 'b']);
+assert!($ordered_values == vec[10, 3, 20]);
+
+$assertion_value_16 = function(): void {
+  $probe = vec[1];
+  $probe[1];
+};
+
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (OutOfBoundsError $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is OutOfBoundsError);
+
+$assertion_value_17 = function(): void {
+  $probe = vec[1];
+  $probe[-1];
+};
+
+$assertion_error_17 = null;
+try {
+  $assertion_value_17();
+} catch (OutOfBoundsError $assertion_caught_17) {
+  $assertion_error_17 = $assertion_caught_17;
+}
+
+assert!($assertion_error_17 is OutOfBoundsError);
+
+$assertion_value_18 = function(): void {
+  $probe = vec[1];
+  $probe['0'];
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is TypeError);
+
+$assertion_value_19 = function(): void {
+  $probe = vec[1];
+  $probe[1] = 2;
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (OutOfBoundsError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is OutOfBoundsError);
+
+$assertion_value_20 = function(): void {
+  $probe = dict[1 => 'a'];
+  $probe[2];
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (OutOfBoundsError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is OutOfBoundsError);
+
+$assertion_value_21 = function(): void {
+  $probe = dict[1 => 'a'];
+  $probe[1.5];
+};
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (TypeError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is TypeError);
+
+$int_keyed = dict[5 => 'int'];
+assert!($int_keyed[5] == 'int');
+$string_keyed = dict['5' => 'string'];
+assert!($string_keyed['5'] == 'string');
+
+$mixed_keys = dict[5 => 'int'];
+$mixed_keys['5'] = 'string';
+assert!(length!($mixed_keys) == 2);
+assert!($mixed_keys[5] == 'int');
+assert!($mixed_keys['5'] == 'string');
+
+$indexed_tuple = (10, 'x');
+$indexed_text = 'abc';
+assert!($indexed_tuple[0] == 10);
+assert!($indexed_tuple[1] == 'x');
+assert!($indexed_text[1] == 'b');
+$assertion_value_30 = function(): void {
+  $tuple = (1, 2);
+  $tuple[0] = 3;
+};
+
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (TypeError $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is TypeError);
+
+$assertion_value_31 = function(): void {
+  $text = 'abc';
+  $text[0] = 'z';
+};
+
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (TypeError $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is TypeError);
+
+$assertion_value_32 = function(): void {
+  $text = 'abc';
+  $text[3];
+};
+
+$assertion_error_32 = null;
+try {
+  $assertion_value_32();
+} catch (OutOfBoundsError $assertion_caught_32) {
+  $assertion_error_32 = $assertion_caught_32;
+}
+
+assert!($assertion_error_32 is OutOfBoundsError);
+
+function string_pair(string $left, string $right): (string, string) {
+  return ($left, $right);
+}
+
+$paired = string_pair('left', 'right');
+assert!($paired[0] == 'left');
+assert!($paired[1] == 'right');
+
+$removal_probe = vec['a', 'b', 'c'];
+assert!(remove!($removal_probe, 1) == 'b');
+assert!($removal_probe[1] == 'c');
+assert!(length!($removal_probe) == 2);
+assert!(remove_first!($removal_probe) == 'a');
+assert!(remove_last!($removal_probe) == 'c');
+assert!(length!($removal_probe) == 0);
+
+$unordered = vec['a', 'b', 'c', 'd'];
+assert!(swap_remove!($unordered, 1) == 'b');
+assert!($unordered == vec['a', 'd', 'c']);
+assert!(swap_remove!($unordered, 2) == 'c');
+assert!($unordered == vec['a', 'd']);
+
+$shared = vec[1, 2, 3];
+$changed = $shared;
+assert!(swap_remove!($changed, 0) == 1);
+assert!($changed == vec[3, 2]);
+assert!($shared == vec[1, 2, 3]);
+
+final class RemovalHolder {
+  public dict<string, string> $entries = dict['key' => 'value'];
+  public vec<string> $items = vec['first', 'middle', 'last'];
+  public dict<string, dict<string, string>> $nested = dict[
+    'outer' => dict['inner' => 'nested'],
+  ];
+
+  public function removeEntry(string $key): void {
+    remove!($this->entries, $key);
+  }
+
+  public function removeEntryGuarded(string $key): void {
+    if (contains_key!($this->entries, $key)) {
+      remove!($this->entries, $key);
+    }
+  }
+
+  public function removeFirstItem(): void {
+    remove_first!($this->items);
+  }
+
+  public function removeLastItem(): void {
+    remove_last!($this->items);
+  }
+
+  public function swapRemoveItem(int $index): string {
+    return swap_remove!($this->items, $index);
+  }
+}
+
+final class RemovalOrderProbe {
+  public vec<string> $events = vec[];
+}
+
+function removal_target(
+  RemovalOrderProbe $probe,
+  RemovalHolder $holder,
+): RemovalHolder {
+  $probe->events[] = 'target';
+  return $holder;
+}
+
+function removal_index(RemovalOrderProbe $probe): int {
+  $probe->events[] = 'index';
+  return 1;
+}
+
+$removal_holder = new RemovalHolder();
+assert!(remove!($removal_holder->entries, 'key') == 'value');
+assert!($removal_holder->entries == dict[]);
+assert!(remove_first!($removal_holder->items) == 'first');
+assert!(remove_last!($removal_holder->items) == 'last');
+assert!($removal_holder->items == vec['middle']);
+assert!(remove!($removal_holder->nested['outer'], 'inner') == 'nested');
+assert!($removal_holder->nested == dict['outer' => dict[]]);
+
+$swap_removal_holder = new RemovalHolder();
+assert!($swap_removal_holder->swapRemoveItem(0) == 'first');
+assert!($swap_removal_holder->items == vec['last', 'middle']);
+
+$removal_order_probe = new RemovalOrderProbe();
+$removal_order_holder = new RemovalHolder();
+assert!(
+  swap_remove!(
+    removal_target($removal_order_probe, $removal_order_holder)->items,
+    removal_index($removal_order_probe),
+  )
+  == 'middle',
+);
+
+assert!($removal_order_probe->events == vec['target', 'index']);
+assert!($removal_order_holder->items == vec['first', 'last']);
+
+$discarded_removal_holder = new RemovalHolder();
+$discarded_removal_holder->removeEntry('key');
+$discarded_removal_holder->removeEntryGuarded('missing');
+$discarded_removal_holder->removeFirstItem();
+$discarded_removal_holder->removeLastItem();
+assert!($discarded_removal_holder->entries == dict[]);
+assert!($discarded_removal_holder->items == vec['middle']);
+
+$assertion_value_41 = function(): void {
+  $empty = vec[];
+  remove_first!($empty);
+};
+
+$assertion_error_41 = null;
+try {
+  $assertion_value_41();
+} catch (OutOfBoundsError $assertion_caught_41) {
+  $assertion_error_41 = $assertion_caught_41;
+}
+
+assert!($assertion_error_41 is OutOfBoundsError);
+
+$assertion_value_42 = function(): void {
+  $keyed = dict[1 => 2];
+  remove!($keyed, '9');
+};
+
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (OutOfBoundsError $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_42->getMessage(),
+      "the dict key '9' is not present",
+    ),
+  );
+}
+
+assert!($assertion_error_42 is OutOfBoundsError);
+
+$assertion_value_43 = function(): void {
+  remove!('text', 0);
+};
+
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (TypeError $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is TypeError);
+
+$assertion_value_swap_remove_bounds = function(): void {
+  $items = vec[1];
+  swap_remove!($items, 1);
+};
+
+$assertion_error_swap_remove_bounds = null;
+try {
+  $assertion_value_swap_remove_bounds();
+} catch (OutOfBoundsError $caught) {
+  $assertion_error_swap_remove_bounds = $caught;
+}
+
+assert!($assertion_error_swap_remove_bounds is OutOfBoundsError);
+
+$assertion_value_swap_remove_type = function(): void {
+  $items = dict[0 => 1];
+  swap_remove!($items, 0);
+};
+
+$assertion_error_swap_remove_type = null;
+try {
+  $assertion_value_swap_remove_type();
+} catch (TypeError $caught) {
+  $assertion_error_swap_remove_type = $caught;
+}
+
+assert!($assertion_error_swap_remove_type is TypeError);
+
+$assertion_value_44 = function(): void {
+  $keyed = dict[];
+  $keyed[] = 1;
+};
+
+$assertion_error_44 = null;
+try {
+  $assertion_value_44();
+} catch (TypeError $assertion_caught_44) {
+  $assertion_error_44 = $assertion_caught_44;
+}
+
+assert!($assertion_error_44 is TypeError);
+
+assert!(length!('abcd') == 4);
+assert!(length!(vec[1]) == 1);
+assert!(length!(dict['k' => 1]) == 1);
+assert!(length!((1, 2)) == 2);
+$assertion_value_49 = function(): void {
+  length!(5);
+};
+
+$assertion_error_49 = null;
+try {
+  $assertion_value_49();
+} catch (TypeError $assertion_caught_49) {
+  $assertion_error_49 = $assertion_caught_49;
+}
+
+assert!($assertion_error_49 is TypeError);
+
+(($nested_first, $nested_second), $nested_third) = ((1, 2), 3);
+assert!(($nested_first, $nested_second, $nested_third) == (1, 2, 3));
+
+(($mixed_first, $mixed_second), ...$mixed_rest) = vec[(1, 2), 3, 4];
+assert!(($mixed_first, $mixed_second) == (1, 2));
+assert!(length!($mixed_rest) == 2);
+
+$assertion_value_53 = function(): void {
+  ($left, $right) = (1, 2, 3);
+};
+
+$assertion_error_53 = null;
+try {
+  $assertion_value_53();
+} catch (TypeError $assertion_caught_53) {
+  $assertion_error_53 = $assertion_caught_53;
+}
+
+assert!($assertion_error_53 is TypeError);
+
+$assertion_value_54 = function(): void {
+  ($left, $right) = dict['a' => 1, 'b' => 2];
+};
+
+$assertion_error_54 = null;
+try {
+  $assertion_value_54();
+} catch (TypeError $assertion_caught_54) {
+  $assertion_error_54 = $assertion_caught_54;
+}
+
+assert!($assertion_error_54 is TypeError);
+
+class AppendBag {
+  public vec<int> $items = vec[];
+}
+
+$append_bag = new AppendBag();
+($append_bag->items[], $append_bag->items[]) = (10, 20);
+assert!(length!($append_bag->items) == 2);
+assert!($append_bag->items[0] == 10);
+assert!($append_bag->items[1] == 20);
+
+Filesystem\delete_directory($work, true);

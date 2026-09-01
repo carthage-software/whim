@@ -1,0 +1,95 @@
+namespace Whim\Async;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\_Private;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\Throwable;
+use Whim;
+
+/** Represents a wait group. */
+final class WaitGroup {
+  private int $count = 0;
+  private vec<_Private\Waiter<null>> $waiters = vec[];
+
+  /** Adds one unfinished operation to the group. */
+  #[TrackCaller]
+  public function add(): void {
+    $this->count++;
+  }
+
+  /**
+   * Marks one operation as finished.
+   *
+   * @throws LogicException when the wait group counter is already zero.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function done(): void {
+    if ($this->count == 0) {
+      throw new LogicException('the wait group counter is already zero');
+    }
+
+    $this->count--;
+    if ($this->count != 0) {
+      return;
+    }
+
+    $waiters = $this->waiters;
+    $this->waiters = vec[];
+    foreach ($waiters as $waiter) {
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->resume(null);
+      }
+    }
+  }
+
+  /** Waits until every tracked operation finishes. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function wait(null|CancellationToken $cancellation = null): void {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    if ($this->count == 0) {
+      return;
+    }
+
+    $suspension = Whim\_Private\create_suspension::<null>();
+    $waiter = new _Private\Waiter::<null>($suspension);
+    $this->waiters[] = $waiter;
+    $id = null;
+    if ($cancellation != null) {
+      $id = $cancellation->register(fn(): void {
+        if (!$waiter->active) {
+          return;
+        }
+
+        $waiter->active = false;
+        try {
+          $cancellation->throwIfCancellationRequested();
+        } catch (Throwable $error) {
+          $waiter->suspension->throw($error);
+        }
+      });
+    }
+
+    try {
+      $suspension->suspend();
+    } finally {
+      $waiter->active = false;
+      if ($cancellation != null && $id != null) {
+        $cancellation->unregister($id);
+      }
+    }
+  }
+
+  /** Returns the number of unfinished operations. */
+  #[TrackCaller]
+  public function getCount(): NonNegativeInt {
+    return $this->count as NonNegativeInt;
+  }
+}

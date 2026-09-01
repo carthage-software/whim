@@ -1,0 +1,4 @@
+namespace Whim\Database;
+
+/** Reports that no pooled connection became available before the deadline. */
+final class AcquisitionTimeoutException extends ConnectionException {}

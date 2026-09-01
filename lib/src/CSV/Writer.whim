@@ -1,0 +1,68 @@
+namespace Whim\CSV;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\WriteHandle;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\CSVWriter;
+
+/** Writes CSV records to any writable handle. */
+final readonly class Writer {
+  private CSVWriter $writer;
+
+  /** Creates a CSV writer for a one-byte delimiter and enclosure. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(
+    private WriteHandle $handle,
+    NonEmptyString $delimiter = ',',
+    NonEmptyString $enclosure = '"',
+    NonEmptyString $lineEnding = "\r\n",
+  ) {
+    if (
+      length!($delimiter) != 1
+      || length!($enclosure) != 1
+      || $delimiter == $enclosure
+      || ($delimiter is "\r"|"\n")
+      || ($enclosure is "\r"|"\n")
+      || ($lineEnding != "\n" && $lineEnding != "\r\n")
+    ) {
+      throw new InvalidArgumentException('invalid CSV writer dialect');
+    }
+
+    $this->writer = CSVWriter::create($delimiter, $enclosure, $lineEnding);
+  }
+
+  /** Writes one CSV record. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function write(
+    Iterable<_, string> $fields,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $materialized = vec[];
+    foreach ($fields as $field) {
+      $materialized[] = $field;
+    }
+
+    $this->handle->writeAll(
+      $this->writer->encode($materialized),
+      $cancellation,
+    );
+  }
+
+  /** Writes several CSV records. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function writeAll(
+    Iterable<_, Iterable<_, string>> $records,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    foreach ($records as $record) {
+      $this->write($record, $cancellation);
+    }
+  }
+}

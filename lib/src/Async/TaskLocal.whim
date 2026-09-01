@@ -1,0 +1,20 @@
+namespace Whim\Async;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+
+/** Stores one value for each task. */
+#[Stub]
+final class TaskLocal<T: !null> {
+  public function __construct() {}
+
+  /** Returns the value set in the current task, or null. */
+  #[MustUse]
+  public function get(): null|T {}
+
+  /** Sets the value for the current task. */
+  public function set(T $value): void {}
+
+  /** Removes the value for the current task. */
+  public function clear(): void {}
+}

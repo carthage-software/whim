@@ -1,0 +1,101 @@
+namespace Whim\UUID;
+
+use Whim;
+use Whim\Comparison\Equal;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Represents an immutable RFC 9562 UUID. */
+final readonly class UUID implements Equal<UUID>, ToString {
+  #[AlwaysInline]
+  private function __construct(
+    private NonEmptyString $bytes,
+    public null|1..=8 $version,
+  ) {}
+
+  /** Generates a random UUID version 4. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function v4(): UUID {
+    return new UUID(Whim\_Private\uuid_v4() as NonEmptyString, 4);
+  }
+
+  /** Generates a time-ordered UUID version 7. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function v7(): UUID {
+    return new UUID(Whim\_Private\uuid_v7() as NonEmptyString, 7);
+  }
+
+  /** Parses canonical lowercase UUID text, or returns null. */
+  #[MustUse]
+  public static function parse(string $value): null|UUID {
+    $bytes = Whim\_Private\uuid_parse($value) ?? return null;
+
+    return new UUID(
+      $bytes as NonEmptyString,
+      Whim\_Private\uuid_version($bytes),
+    );
+  }
+
+  /** Parses canonical lowercase UUID text. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $value): UUID {
+    $uuid = UUID::parse($value);
+    if ($uuid == null) {
+      throw new InvalidArgumentException(
+        'invalid canonical UUID: `' . $value . '`',
+      );
+    }
+
+    return $uuid;
+  }
+
+  /** Reports whether text is a canonical lowercase UUID. */
+  #[MustUse]
+  public static function isValid(string $value): bool {
+    return Whim\_Private\uuid_parse($value) != null;
+  }
+
+  /** Creates a UUID from exactly 16 bytes. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromBytes(string $bytes): UUID {
+    $version = Whim\_Private\uuid_version($bytes);
+    if (Whim\_Private\uuid_format($bytes) == null) {
+      throw new InvalidArgumentException(
+        'a UUID must contain exactly 16 bytes',
+      );
+    }
+
+    return new UUID($bytes as NonEmptyString, $version);
+  }
+
+  /** Returns the 16 raw UUID bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toBytes(): NonEmptyString {
+    return $this->bytes;
+  }
+
+  /** Returns the canonical lowercase UUID text. */
+  #[MustUse]
+  public function toString(): NonEmptyString {
+    return Whim\_Private\uuid_format($this->bytes) as NonEmptyString;
+  }
+
+  /** Reports whether two UUIDs contain the same bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(UUID $other): bool {
+    return $this->bytes == $other->bytes;
+  }
+}

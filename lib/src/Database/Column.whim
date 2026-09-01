@@ -1,0 +1,12 @@
+namespace Whim\Database;
+
+use Whim\Refine\NonEmptyString;
+
+/** Describes one column in a database result. */
+final readonly class Column {
+  /** Creates column metadata. */
+  public function __construct(
+    public NonEmptyString $name,
+    public null|NonEmptyString $typeName = null,
+  ) {}
+}

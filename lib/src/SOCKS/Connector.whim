@@ -1,0 +1,46 @@
+namespace Whim\SOCKS;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Host;
+use Whim\Network\Port;
+use Whim\TCP;
+use Whim\Unwind\Throwable;
+
+/** Opens TCP tunnels through a SOCKS5 proxy. */
+final readonly class Connector implements TCP\ProxyConnector {
+  public function __construct(
+    private Configuration $configuration,
+    private TCP\Connector $connector = new TCP\DefaultConnector(),
+  ) {}
+
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    Host $host,
+    Port $port,
+    null|CancellationToken $cancellation = null,
+  ): TCP\Stream {
+    $stream = $this->connector->connect(
+      $this->configuration->host,
+      $this->configuration->port,
+      $cancellation,
+    );
+
+    try {
+      _Private\handshake(
+        $stream,
+        $host,
+        $port,
+        $this->configuration,
+        $cancellation,
+      );
+
+      return $stream;
+    } catch (Throwable $error) {
+      $stream->close();
+      throw $error;
+    }
+  }
+}

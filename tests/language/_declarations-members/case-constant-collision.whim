@@ -1,0 +1,4 @@
+enum E {
+  case Value;
+  public const int Value = 1;
+}

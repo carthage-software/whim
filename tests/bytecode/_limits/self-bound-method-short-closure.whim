@@ -1,0 +1,7 @@
+namespace Limits\self_bound_method_arrow;
+
+class C {
+  public function m(): void {
+    $f = fn<T: self>(): int => 1;
+  }
+}

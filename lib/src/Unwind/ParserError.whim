@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports invalid source syntax. */
+#[Stub]
+class ParserError extends Error {}

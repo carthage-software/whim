@@ -1,0 +1,19 @@
+namespace Whim\HTTP\_Private;
+
+/** The client connection preface. */
+const CLIENT_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+
+/** The initial per-stream and connection flow-control window. */
+const DEFAULT_INITIAL_WINDOW_SIZE = 65535;
+
+/** The default HPACK dynamic table size. */
+const DEFAULT_HEADER_TABLE_SIZE = 4096;
+
+/** The smallest permitted maximum frame size. */
+const DEFAULT_MAX_FRAME_SIZE = 16384;
+
+/** The largest flow-control window. */
+const MAX_WINDOW_SIZE = 2147483647;
+
+/** The largest frame payload. */
+const MAX_FRAME_SIZE = 16777215;

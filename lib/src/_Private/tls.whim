@@ -1,0 +1,297 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\PositiveInt;
+use Whim\Unwind\Error;
+
+/** The engine's number for TLS 1.2. */
+#[Stub]
+const TLS_VERSION_1_2 = TLS_VERSION_1_2;
+
+/** The engine's number for TLS 1.3. */
+#[Stub]
+const TLS_VERSION_1_3 = TLS_VERSION_1_3;
+
+/** Verifies the peer certificate chain. */
+#[Stub]
+const TLS_PEER_VERIFICATION_FULL = TLS_PEER_VERIFICATION_FULL;
+
+/** Accepts a valid self-signed peer certificate. */
+#[Stub]
+const TLS_PEER_VERIFICATION_ALLOW_SELF_SIGNED = TLS_PEER_VERIFICATION_ALLOW_SELF_SIGNED;
+
+/** Skips peer certificate verification. */
+#[Stub]
+const TLS_PEER_VERIFICATION_DISABLED = TLS_PEER_VERIFICATION_DISABLED;
+
+/** Does not request a client certificate. */
+#[Stub]
+const TLS_CLIENT_AUTHENTICATION_NONE = TLS_CLIENT_AUTHENTICATION_NONE;
+
+/** Verifies a client certificate when the client supplies one. */
+#[Stub]
+const TLS_CLIENT_AUTHENTICATION_OPTIONAL = TLS_CLIENT_AUTHENTICATION_OPTIONAL;
+
+/** Requires and verifies a client certificate. */
+#[Stub]
+const TLS_CLIENT_AUTHENTICATION_REQUIRED = TLS_CLIENT_AUTHENTICATION_REQUIRED;
+
+/** A full handshake without a HelloRetryRequest. */
+#[Stub]
+const TLS_HANDSHAKE_KIND_FULL = TLS_HANDSHAKE_KIND_FULL;
+
+/** A full handshake that used a HelloRetryRequest. */
+#[Stub]
+const TLS_HANDSHAKE_KIND_FULL_WITH_HELLO_RETRY_REQUEST = TLS_HANDSHAKE_KIND_FULL_WITH_HELLO_RETRY_REQUEST;
+
+/** A handshake that resumed an earlier session. */
+#[Stub]
+const TLS_HANDSHAKE_KIND_RESUMED = TLS_HANDSHAKE_KIND_RESUMED;
+
+/** A TLS configuration is invalid. */
+#[Stub]
+const TLS_ERROR_CONFIGURATION = TLS_ERROR_CONFIGURATION;
+
+/** A certificate or private key is invalid. */
+#[Stub]
+const TLS_ERROR_CERTIFICATE = TLS_ERROR_CERTIFICATE;
+
+/** A TLS handshake failed. */
+#[Stub]
+const TLS_ERROR_HANDSHAKE = TLS_ERROR_HANDSHAKE;
+
+/** Decodes a PEM bundle or DER certificate into DER certificates. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_decode_certificates(string $bytes): vec<string> {}
+
+/** Returns the start of the certificate's validity period. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_not_before(string $der): int {}
+
+/** Returns the end of the certificate's validity period. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_not_after(string $der): int {}
+
+/** Returns the certificate subject name. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_subject(string $der): string {}
+
+/** Returns the certificate issuer name. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_issuer(string $der): string {}
+
+/** Returns the certificate's DNS subject alternative names. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_dns_names(string $der): vec<string> {}
+
+/** Returns the certificate's raw IP subject alternative names. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_ip_addresses(string $der): vec<string> {}
+
+/** Returns the certificate's email subject alternative names. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_email_addresses(string $der): vec<string> {}
+
+/** Returns the certificate's URI subject alternative names. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_certificate_uris(string $der): vec<string> {}
+
+/** Decodes a PEM or DER private key into its DER form. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function tls_decode_private_key(#[SensitiveParameter] string $bytes): string {}
+
+/** A failure reported by rustls. */
+#[Stub]
+final class TlsError extends Error {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Returns one of the `TLS_ERROR_*` constants. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function kind(): int {}
+}
+
+/** An immutable rustls client configuration. */
+#[Stub]
+final class TlsClientConfiguration {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Builds a reusable client configuration. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function create(
+    bool $useSystemRoots,
+    vec<string> $trustedRoots,
+    null|vec<string> $certificateChain,
+    #[SensitiveParameter] null|string $privateKey,
+    vec<string> $alpnProtocols,
+    null|int $minimumVersion,
+    null|int $maximumVersion,
+    int $peerVerification,
+    bool $verifyPeerName,
+    bool $sendServerName,
+    bool $enableSessionResumption,
+  ): TlsClientConfiguration {}
+
+  /** Starts a connection for a DNS name or IP address. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function createConnection(string $serverName): TlsConnection {}
+}
+
+/** An immutable rustls server configuration. */
+#[Stub]
+final class TlsServerConfiguration {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Builds a reusable server configuration. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function create(
+    vec<string> $certificateChain,
+    #[SensitiveParameter] string $privateKey,
+    #[SensitiveParameter]
+    dict<string, (vec<string>, string)> $serverNameIdentities,
+    bool $useSystemClientRoots,
+    vec<string> $trustedClientRoots,
+    int $clientAuthentication,
+    vec<string> $alpnProtocols,
+    null|int $minimumVersion,
+    null|int $maximumVersion,
+    bool $enableSessionResumption,
+  ): TlsServerConfiguration {}
+
+  /** Starts a server connection. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function createConnection(): TlsConnection {}
+}
+
+/** One live rustls client or server connection. */
+#[Stub]
+final class TlsConnection {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Reports whether the TLS handshake is still in progress. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isHandshaking(): bool {}
+
+  /** Feeds received ciphertext into the connection. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function receiveCiphertext(
+    #[SensitiveParameter] string $bytes,
+  ): void {}
+
+  /** Reports that the underlying transport reached its end. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function receiveEnd(): void {}
+
+  /** Reads available plaintext, or null after a clean TLS close. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function readPlaintext(PositiveInt $maximumBytes): null|string {}
+
+  /** Accepts plaintext and returns the number of bytes buffered. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function writePlaintext(#[SensitiveParameter] string $bytes): int {}
+
+  /** Takes ciphertext waiting to be sent to the underlying transport. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function transmitCiphertext(PositiveInt $maximumBytes): string {}
+
+  /** Queues a TLS close notification. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendCloseNotify(): void {}
+
+  /** Returns the negotiated TLS version, or null before the handshake. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function protocolVersion(): null|int {}
+
+  /** Returns the negotiated cipher suite, or null before the handshake. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function cipherSuite(): null|string {}
+
+  /** Returns the negotiated ALPN protocol. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function alpnProtocol(): null|string {}
+
+  /** Returns the completed handshake kind. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function handshakeKind(): null|int {}
+
+  /** Returns the peer certificate chain as DER certificates. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function peerCertificates(): vec<string> {}
+
+  /** Returns the server name observed by this connection. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function serverName(): null|string {}
+}

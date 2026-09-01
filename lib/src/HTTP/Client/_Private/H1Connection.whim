@@ -1,0 +1,437 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\ConnectionMetadata;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Client\RequestException;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Transaction;
+use Whim\IO\CloseHandle;
+use Whim\IO\MemoryHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\Reader;
+use Whim\IO\WriteHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Unwind\Throwable;
+use Whim\_Private\http1_serialize_request_head;
+
+/** Performs one HTTP/1 exchange over a byte stream. */
+final class H1Connection implements Connection {
+  private Reader $reader;
+  private bool $reusable = true;
+  private bool $responseActive = false;
+
+  public function __construct(
+    private ReadHandle&WriteHandle&CloseHandle $stream,
+    private ConnectionMetadata $metadata,
+    private bool $forwardProxy = false,
+    private null|string $proxyAuthorization = null,
+  ) {
+    $this->reader = new Reader($stream);
+  }
+
+  public function __destruct(): void {}
+
+  #[MustUse]
+  public function getMetadata(): ConnectionMetadata {
+    return $this->metadata;
+  }
+
+  #[MustUse]
+  public function isReusable(): bool {
+    return (
+      !$this->responseActive
+      && $this->reusable
+      && !$this->stream->isClosed()
+    );
+  }
+
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->stream->isClosed();
+  }
+
+  #[TrackCaller]
+  public function close(): void {
+    $this->responseActive = false;
+    $this->reusable = false;
+    $this->stream->close();
+  }
+
+  /** Releases this connection after its response body ends or is abandoned. */
+  public function releaseResponse(bool $complete): void {
+    if (!$this->responseActive) {
+      return;
+    }
+
+    $this->responseActive = false;
+    if ($complete) {
+      return;
+    }
+
+    $this->reusable = false;
+    try {
+      $this->stream->close();
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function exchange(
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    if (!$this->isReusable()) {
+      throw new ProtocolException('the HTTP/1 connection cannot be reused');
+    }
+
+    $headers = $request->headers;
+    if (!$headers->has('host')) {
+      $headers = $headers->with('Host', request_host($request));
+    } else if (length!($headers->getAll('host')) != 1) {
+      throw new RequestException('an HTTP/1 request must have one Host field');
+    }
+
+    if (
+      $this->forwardProxy
+      && $this->proxyAuthorization != null
+      && !$headers->has('proxy-authorization')
+    ) {
+      $headers = $headers->with(
+        'Proxy-Authorization',
+        $this->proxyAuthorization,
+      );
+    }
+
+    $contentLength = request_content_length($headers);
+    $transferEncoding = $headers->has('transfer-encoding');
+    if ($contentLength != null && $transferEncoding) {
+      throw new RequestException(
+        'an HTTP/1 request cannot contain both Content-Length and Transfer-Encoding',
+      );
+    }
+
+    $chunked = false;
+    if ($transferEncoding) {
+      try {
+        $chunked = is_chunked($headers);
+      } catch (ProtocolException $error) {
+        throw new RequestException($error->getMessage(), previous: $error);
+      }
+    }
+
+    if ($request->body != null && $contentLength == null && !$chunked) {
+      if ($this->metadata->protocolVersion == ProtocolVersion::V10) {
+        throw new RequestException(
+          'an HTTP/1.0 request body needs a Content-Length field',
+        );
+      }
+
+      $chunked = true;
+      $headers = $headers->with('Transfer-Encoding', 'chunked');
+    }
+
+    if (
+      $request->body == null
+      && $contentLength != null
+      && $contentLength != 0
+    ) {
+      throw new RequestException(
+        'the request has a non-zero Content-Length but no body',
+      );
+    }
+
+    if (
+      $request->body == null
+      && $contentLength == null
+      && !$transferEncoding
+    ) {
+      $headers = $headers->with('Content-Length', '0');
+      $contentLength = 0;
+    }
+
+    $target = match ($this->forwardProxy) {
+      true => absolute_request_target($request),
+      false => $request->requestTarget,
+    };
+
+    try {
+      return $this->performExchange(
+        $request,
+        $configuration,
+        $cancellation,
+        $headers,
+        $contentLength,
+        $chunked,
+        $target,
+      );
+    } catch (Throwable $error) {
+      $this->responseActive = false;
+      $this->reusable = false;
+      try {
+        $this->stream->close();
+      } catch (Throwable $_) {
+      }
+
+      throw $error;
+    }
+  }
+
+  private function performExchange(
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation,
+    FieldMap $headers,
+    null|int $contentLength,
+    bool $chunked,
+    string $target,
+  ): Transaction {
+    $this->stream->writeAll(
+      http1_serialize_request_head(
+        $request->method,
+        $target,
+        $this->metadata->protocolVersion->value,
+        $headers->toVec(),
+      ),
+      $cancellation,
+    );
+
+    $informational = vec[];
+    $responseHead = null;
+    if ($request->body == null && $chunked) {
+      $this->stream->writeAll("0\r\n\r\n", $cancellation);
+    } else if ($request->body != null) {
+      if (expects_continue($headers)) {
+        while (true) {
+          $candidate = read_h1_response_head(
+            $this->reader,
+            $configuration->maximumResponseHeaderSize,
+            $cancellation,
+          );
+
+          if (
+            $candidate->status >= 200
+            || $candidate->status == Message\STATUS_SWITCHING_PROTOCOLS
+          ) {
+            $responseHead = $candidate;
+            break;
+          }
+
+          if (
+            length!($informational)
+            >= $configuration->maximumInformationalResponses
+          ) {
+            throw new ProtocolException(
+              'the response sent too many informational responses',
+            );
+          }
+
+          $informational[] = new Response(
+            $candidate->status,
+            $candidate->protocolVersion,
+            $candidate->headers,
+          );
+
+          if ($candidate->status == Message\STATUS_CONTINUE) {
+            $this->writeBody($request, $contentLength, $chunked, $cancellation);
+
+            break;
+          }
+        }
+      } else {
+        $this->writeBody($request, $contentLength, $chunked, $cancellation);
+      }
+    }
+
+    while ($responseHead == null) {
+      $candidate = read_h1_response_head(
+        $this->reader,
+        $configuration->maximumResponseHeaderSize,
+        $cancellation,
+      );
+
+      if (
+        $candidate->status < 200
+        && $candidate->status != Message\STATUS_SWITCHING_PROTOCOLS
+      ) {
+        if (
+          length!($informational)
+          >= $configuration->maximumInformationalResponses
+        ) {
+          throw new ProtocolException(
+            'the response sent too many informational responses',
+          );
+        }
+
+        $informational[] = new Response(
+          $candidate->status,
+          $candidate->protocolVersion,
+          $candidate->headers,
+        );
+
+        continue;
+      }
+
+      $responseHead = $candidate;
+    }
+
+    $head = $responseHead;
+    $body = null;
+    $trailers = null;
+    $hasBody = response_has_body($request, $head->status);
+    $requestCloses = connection_token($headers, 'close');
+    $responseCloses = connection_token($head->headers, 'close');
+    $responseKeepsAlive = connection_token($head->headers, 'keep-alive');
+    $this->reusable =
+      !$requestCloses
+      && !$responseCloses
+      && $head->status != Message\STATUS_SWITCHING_PROTOCOLS
+      && match ($head->protocolVersion) {
+        ProtocolVersion::V11 => true,
+        ProtocolVersion::V10 => $responseKeepsAlive,
+        $_ => false,
+      };
+
+    if ($hasBody) {
+      $contentLength = content_length($head->headers);
+      $chunked = is_chunked($head->headers);
+      if ($contentLength != null && $chunked) {
+        $this->stream->close();
+        throw new ProtocolException(
+          'the response contains both Content-Length and Transfer-Encoding',
+        );
+      }
+
+      if ($contentLength != null) {
+        if ($contentLength > $configuration->maximumResponseBodySize) {
+          $this->stream->close();
+          throw new ProtocolException(
+            'the response body exceeds its configured limit',
+          );
+        }
+
+        if ($contentLength == 0) {
+          if (!$this->reusable) {
+            $this->stream->close();
+          }
+        } else {
+          $body = new FixedLengthBody(
+            $this->reader,
+            $this->stream,
+            $contentLength,
+            !$this->reusable,
+          );
+        }
+      } else if ($chunked) {
+        $deferred = new Deferred::<FieldMap>();
+        $body = new ChunkedBody(
+          $this->reader,
+          $this->stream,
+          $deferred,
+          $configuration->maximumResponseBodySize,
+          $configuration->maximumResponseHeaderSize,
+          !$this->reusable,
+        );
+
+        $trailers = $deferred->getFuture();
+      } else {
+        $this->reusable = false;
+        $body = new UntilCloseBody(
+          $this->reader,
+          $configuration->maximumResponseBodySize,
+        );
+      }
+    } else {
+      if (!$this->reusable) {
+        $this->stream->close();
+      }
+    }
+
+    if ($body != null && !$body->reachedEndOfDataSource()) {
+      $this->responseActive = true;
+      $body = new H1ResponseBody($body, $this);
+    }
+
+    return new Transaction(
+      $informational,
+      null,
+      new Response(
+        $head->status,
+        $head->protocolVersion,
+        $head->headers,
+        $body,
+        $trailers,
+      ),
+    );
+  }
+
+  private function writeBody(
+    Request $request,
+    null|int $contentLength,
+    bool $chunked,
+    null|CancellationToken $cancellation,
+  ): void {
+    $body = $request->body;
+    assert!($body != null);
+    if ($chunked) {
+      while (true) {
+        $data = match ($body->read(8192, $cancellation)) {
+          '' => match ($body->reachedEndOfDataSource()) {
+            true => break,
+            false => continue,
+          },
+          $data => $data,
+        };
+
+        $this->stream->writeAll(
+          Math\to_base(length!($data), 16) . "\r\n" . $data . "\r\n",
+          $cancellation,
+        );
+      }
+
+      $this->stream->writeAll("0\r\n", $cancellation);
+      if ($request->trailers != null) {
+        foreach ($request->trailers->await($cancellation) as ($name, $value)) {
+          $this->stream->writeAll(
+            $name . ': ' . $value . "\r\n",
+            $cancellation,
+          );
+        }
+      }
+
+      $this->stream->writeAll("\r\n", $cancellation);
+      return;
+    }
+
+    if ($contentLength == null) {
+      throw new RequestException('the request body has no framing');
+    }
+
+    $remaining = $contentLength;
+    while ($remaining > 0) {
+      $data = $body->read($remaining, $cancellation);
+      if ($data == '' && $body->reachedEndOfDataSource()) {
+        throw new RequestException(
+          'the request body ended before its declared content length',
+        );
+      }
+
+      $this->stream->writeAll($data, $cancellation);
+      $remaining -= length!($data);
+    }
+  }
+}

@@ -1,0 +1,46 @@
+namespace Whim\HTTP\Session\Storage;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Session\Data;
+use Whim\HTTP\Session\ConflictException;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Time\Duration;
+
+/** Stores versioned server-side sessions. */
+interface Store {
+  /** Loads an unexpired record, or null when none exists. */
+  #[MustUse]
+  public function load(
+    NonEmptyString $identifier,
+    null|CancellationToken $cancellation = null,
+  ): null|Record;
+
+  /** Creates a record that does not already exist. */
+  public function create(
+    NonEmptyString $identifier,
+    Data $data,
+    Duration $ttl,
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /**
+   * Replaces a record only when its revision still matches.
+   *
+   * @throws ConflictException when the record is missing or has changed.
+   */
+  public function replace(
+    NonEmptyString $identifier,
+    NonNegativeInt $revision,
+    Data $data,
+    Duration $ttl,
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Deletes a record when it exists. */
+  public function delete(
+    NonEmptyString $identifier,
+    null|CancellationToken $cancellation = null,
+  ): void;
+}

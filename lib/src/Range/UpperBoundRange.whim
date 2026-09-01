@@ -1,0 +1,27 @@
+namespace Whim\Range;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Defines the behavior of upper bound range values. */
+interface UpperBoundRange extends Range {
+  /** Removes the upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withoutUpperBound(): Range;
+
+  /** Returns the upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getUpperBound(): int;
+
+  /** Reports whether the upper bound is inclusive. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isUpperInclusive(): bool;
+
+  /** Changes whether the upper bound is inclusive. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperInclusive(bool $upperInclusive): static;
+}

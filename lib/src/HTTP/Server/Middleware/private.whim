@@ -1,0 +1,180 @@
+namespace Whim\HTTP\Server\Middleware\_Private;
+
+use Whim\Compression\Codec;
+use Whim\Compression\Registry;
+use Whim\HTTP\Message\FieldMap;
+use Whim\Refine\NonEmptyString;
+use Whim\Str\join;
+use Whim\Str\ord;
+use Whim\Str\split;
+use Whim\Str\trim;
+use Whim\_Private\http_valid_token;
+use Whim\_Private\string_lowercase;
+
+/** Parses a Content-Encoding field in application order. */
+function content_codings(vec<string> $values): null|vec<NonEmptyString> {
+  $codings = vec[];
+  foreach (split(join(',', $values), ',') as $part) {
+    $coding = string_lowercase(trim($part));
+    if ($coding == '' || !http_valid_token($coding)) {
+      return null;
+    }
+
+    $codings[] = $coding as NonEmptyString;
+  }
+
+  return $codings;
+}
+
+/** Selects a response codec and reports whether any representation is allowed. */
+function select_response_codec(
+  Registry $registry,
+  null|string $field,
+): (null|Codec, bool) {
+  if ($field == null) {
+    return (null, true);
+  }
+
+  $qualities = dict[];
+  foreach (split($field, ',') as $part) {
+    $weighted = weighted_coding($part) ?? continue;
+
+    ($coding, $quality) = $weighted;
+    $qualities[$coding] = $quality;
+  }
+
+  $wildcard = null as null|int;
+  if (contains_key!($qualities, '*')) {
+    $wildcard = $qualities['*'];
+  }
+
+  $identityQuality = 1000;
+  if (contains_key!($qualities, 'identity')) {
+    $identityQuality = $qualities['identity'];
+  } else if ($wildcard == 0) {
+    $identityQuality = 0;
+  }
+
+  $selected = null as null|Codec;
+  $selectedQuality = 0;
+  foreach ($registry->codings() as $coding) {
+    $quality = $wildcard ?? 0;
+    if (contains_key!($qualities, $coding)) {
+      $quality = $qualities[$coding];
+    }
+
+    if ($quality > $selectedQuality) {
+      $selected = $registry->get($coding);
+      $selectedQuality = $quality;
+    }
+  }
+
+  if ($selectedQuality > 0 && $selectedQuality >= $identityQuality) {
+    return ($selected, true);
+  }
+
+  return (null, $identityQuality > 0);
+}
+
+/** Adds Accept-Encoding to Vary unless it is already covered. */
+function vary_by_accept_encoding(FieldMap $headers): FieldMap {
+  foreach ($headers->getAll('Vary') as $field) {
+    foreach (split($field, ',') as $name) {
+      $name = string_lowercase(trim($name));
+      if ($name == '*' || $name == 'accept-encoding') {
+        return $headers;
+      }
+    }
+  }
+
+  return $headers->withAdded('Vary', 'Accept-Encoding');
+}
+
+/** Reports whether Cache-Control forbids transformation. */
+function forbids_transformation(FieldMap $headers): bool {
+  foreach ($headers->getAll('Cache-Control') as $field) {
+    foreach (split($field, ',') as $directive) {
+      if (string_lowercase(trim($directive)) == 'no-transform') {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/** Parses one weighted Accept-Encoding item. */
+function weighted_coding(string $part): null|(string, int) {
+  $segments = split($part, ';');
+  $coding = string_lowercase(trim($segments[0]));
+  if ($coding == '' || ($coding != '*' && !http_valid_token($coding))) {
+    return null;
+  }
+
+  $quality = 1000;
+  $index = 1;
+  while ($index < length!($segments)) {
+    $parameter = split(trim($segments[$index]), '=', 2);
+    if (
+      length!($parameter) == 2
+      && string_lowercase(trim($parameter[0])) == 'q'
+    ) {
+      $parsed = quality(trim($parameter[1]));
+      $quality = $parsed ?? 0;
+      break;
+    }
+
+    $index++;
+  }
+
+  return ($coding, $quality);
+}
+
+/** Parses an HTTP quality value into thousandths. */
+function quality(string $value): null|int {
+  if ($value == '0') {
+    return 0;
+  }
+
+  if ($value == '1') {
+    return 1000;
+  }
+
+  $length = length!($value);
+  if (
+    $length < 2
+    || $length > 5
+    || $value[1] != '.'
+    || !($value[0] is '0'|'1')
+  ) {
+    return null;
+  }
+
+  $result = match ($value[0]) {
+    '0' => 0,
+    '1' => 1000,
+  };
+
+  $factor = 100;
+  $index = 2;
+  while ($index < $length) {
+    $byte = ord($value[$index] as NonEmptyString);
+    if (!($byte is 48..=57)) {
+      return null;
+    }
+
+    $digit = $byte - 48;
+    if ($result == 1000 && $digit != 0) {
+      return null;
+    }
+
+    if ($result != 1000) {
+      $result += $digit * $factor;
+    }
+
+    $factor /= 10;
+    $index++;
+  }
+
+  return $result;
+}

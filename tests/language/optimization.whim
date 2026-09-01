@@ -1,0 +1,177 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Marker\Cold;
+use Whim\Math;
+
+#[Cold]
+function adjust(int $value): int {
+  return $value + 100;
+}
+
+/** Routes zero through the cold adjustment branch. */
+function adjusted(int $value): int {
+  if ($value == 0) {
+    $value = adjust($value);
+  }
+
+  return $value + 1;
+}
+
+assert!(adjusted(1) == 2);
+assert!(adjusted(0) == 101);
+
+assert!(!((Math\NAN < 1.0) || false));
+
+final class ColdProbe {
+  public static bool $ran = false;
+}
+
+#[Cold]
+function run_cold_probe(): void {
+  ColdProbe::$ran = true;
+}
+
+if (Math\NAN < 1.0) {
+  run_cold_probe();
+}
+
+assert!(!(ColdProbe::$ran));
+
+interface NumberValue {
+  public function get(): int;
+}
+
+final class OneValue implements NumberValue {
+  public function get(): int {
+    return 1;
+  }
+}
+
+final class TwoValue implements NumberValue {
+  public function get(): int {
+    return 2;
+  }
+}
+
+/** Reads through a guarded call cache. */
+function read_value(NumberValue $value): int {
+  return $value->get();
+}
+
+/** Drives both receivers through one guarded call site. */
+function invoke_read(NumberValue $value): int {
+  return read_value($value);
+}
+
+assert!(invoke_read(new OneValue()) == 1);
+assert!(invoke_read(new TwoValue()) == 2);
+
+final readonly class PairSource {
+  public function __construct(public string $value) {}
+}
+
+/** Returns one pure read in both tuple positions. */
+function duplicate_pair(PairSource $source): (string, string) {
+  return ($source->value, $source->value);
+}
+
+($firstPairValue, $secondPairValue) = duplicate_pair(new PairSource('kept'));
+assert!($firstPairValue == 'kept');
+assert!($secondPairValue == 'kept');
+
+/** Scans with a loop-invariant byte read hoisted before the loop. */
+function scan(string $source, int $limit): int {
+  $index = 0;
+  $character = $source[$index];
+  $count = 0;
+  while ($index < $limit) {
+    if ($character == 'a') {
+      $count = $count + 1;
+    }
+
+    $index = $index + 1;
+  }
+
+  return $count;
+}
+
+assert!(scan('abbb', 4) == 4);
+
+$falseGuardIndex = 0;
+$falseGuardLimit = 0;
+$falseGuardSubject = 5;
+$falseGuardTotal = 0;
+while ($falseGuardIndex < $falseGuardLimit) {
+  $falseGuardTotal += length!($falseGuardSubject);
+  $falseGuardIndex++;
+}
+
+assert!($falseGuardTotal == 0);
+
+function fourth_power(float $value): float {
+  $value = $value * $value;
+  $result = $value * $value;
+  return $result;
+}
+
+assert!(fourth_power(2.0) == 16.0);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+File\write(
+  $work . '/late-function.whim',
+  'function late_text(): LateText { return \'loaded\'; }' . "\n",
+);
+
+File\write($work . '/late-alias.whim', 'type LateText = string;' . "\n");
+$lateFunction = $work . '/late-function.whim';
+$lateAlias = $work . '/late-alias.whim';
+require!($lateFunction);
+require!($lateAlias);
+assert!(late_text() == 'loaded');
+
+/** Completes inside one locally optimized application unit. */
+function local_value(): int {
+  return 42;
+}
+
+assert!(local_value() == 42);
+
+$binary = Env\current_binary();
+assert!($binary is string);
+File\write(
+  $work . '/configured-function.whim',
+  'function configured_text(): ConfiguredText { return \'loaded\'; }' . "\n",
+);
+
+File\write(
+  $work . '/configured-alias.whim',
+  'type ConfiguredText = string;' . "\n",
+);
+
+File\write(
+  $work . '/configured-main.whim',
+  'require!(\''
+  . $work
+  . '/configured-function.whim\');'
+  . "\n"
+  . 'require!(\''
+  . $work
+  . '/configured-alias.whim\');'
+  . "\n"
+  . 'assert!(configured_text() == \'loaded\');'
+  . "\n",
+);
+
+$configured = Command\Command::create($binary)
+  ->withArgument($work . '/configured-main.whim')
+  ->withVariable('WHIM_OPTIMIZATIONS', 'off')
+  ->run();
+
+assert!(length!($configured->standardError) == 0);
+assert!($configured->isSuccess());
+assert!(length!($configured->standardOutput) == 0);
+
+Filesystem\delete_directory($work, true);

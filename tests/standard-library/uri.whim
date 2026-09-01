@@ -1,0 +1,124 @@
+use Whim;
+use Whim\IP\Address;
+use Whim\URI\Authority;
+use Whim\URI\IPHost;
+use Whim\URI\IPvFutureHost;
+use Whim\URI\RegisteredNameHost;
+use Whim\URI\URI;
+use Whim\Unwind\InvalidArgumentException;
+
+$uri = URI::from('https://user@example.com:8443/a/b?query#fragment');
+assert!($uri->scheme == 'https');
+assert!($uri->path == '/a/b');
+assert!($uri->query == 'query');
+assert!($uri->fragment == 'fragment');
+assert!($uri->isAbsolute());
+assert!($uri->toString() == 'https://user@example.com:8443/a/b?query#fragment');
+
+$authority = $uri->authority as Authority;
+assert!($authority->userInfo == 'user');
+assert!($authority->port == '8443');
+assert!($authority->host is RegisteredNameHost);
+assert!($authority->host->toString() == 'example.com');
+
+$relative = URI::from('../images/logo.svg?size=2#icon');
+assert!($relative->scheme == null);
+assert!($relative->authority == null);
+assert!(!($relative->isAbsolute()));
+assert!($relative->toString() == '../images/logo.svg?size=2#icon');
+
+$empty = URI::from('scheme://host:?#');
+assert!(($empty->authority as Authority)->port == '');
+assert!($empty->query == '');
+assert!($empty->fragment == '');
+assert!($empty->toString() == 'scheme://host:?#');
+
+$ipv4 = Authority::from('192.0.2.1')->host;
+assert!($ipv4 is IPHost);
+assert!(($ipv4 as IPHost)->address->equals(Address::v4('192.0.2.1')));
+assert!($ipv4->toString() == '192.0.2.1');
+
+$ipv6 = Authority::from('[2001:db8::1]:443');
+assert!($ipv6->host is IPHost);
+assert!($ipv6->host->toString() == '[2001:db8::1]');
+assert!($ipv6->port == '443');
+
+$future = Authority::from('[v1.fe80]')->host;
+assert!($future is IPvFutureHost);
+assert!($future->toString() == '[v1.fe80]');
+
+assert!(RegisteredNameHost::parse('bad host') == null);
+assert!(IPvFutureHost::parse('v.not-hex') == null);
+assert!(URI::parse('http://[not-an-ip]/') == null);
+assert!(URI::parse('http://example.com/%zz') == null);
+assert!(URI::parse("http://example.com/line\nbreak") == null);
+
+$assertion_value_32 = fn(): URI => URI::from('http://[not-an-ip]/');
+$assertion_error_32 = null;
+try {
+  $assertion_value_32();
+} catch (InvalidArgumentException $assertion_caught_32) {
+  $assertion_error_32 = $assertion_caught_32;
+}
+
+assert!($assertion_error_32 is InvalidArgumentException);
+
+$built = URI::fromComponents(
+  'https',
+  Authority::fromParts(RegisteredNameHost::from('example.com'), 'user', '443'),
+  '/path',
+  'query',
+  'fragment',
+);
+
+assert!(
+  $built->toString() == 'https://user@example.com:443/path?query#fragment',
+);
+
+$assertion_value_34 = fn(): URI => (
+  URI::fromComponents(null, Authority::from('example.com'), 'relative')
+);
+
+$assertion_error_34 = null;
+try {
+  $assertion_value_34();
+} catch (InvalidArgumentException $assertion_caught_34) {
+  $assertion_error_34 = $assertion_caught_34;
+}
+
+assert!($assertion_error_34 is InvalidArgumentException);
+
+assert!(
+  URI::from('HTTP://Example.COM/%7euser/../a/./b')->normalize()->toString()
+  == 'http://example.com/a/b',
+);
+
+$base = URI::from('http://a/b/c/d;p?q');
+assert!(
+  Whim\URI\resolve($base, URI::from('g'))->toString() == 'http://a/b/c/g',
+);
+
+assert!(
+  Whim\URI\resolve($base, URI::from('../g'))->toString() == 'http://a/b/g',
+);
+
+assert!(
+  Whim\URI\resolve($base, URI::from('?y'))->toString() == 'http://a/b/c/d;p?y',
+);
+
+assert!(
+  Whim\URI\resolve($base, URI::from('#s'))->toString()
+  == 'http://a/b/c/d;p?q#s',
+);
+
+assert!(Whim\URI\resolve($base, URI::from('//g'))->toString() == 'http://g');
+
+$changed = $uri
+  ->withScheme('http')
+  ->withAuthority(Authority::from('example.net'))
+  ->withPath('/new')
+  ->withQuery(null)
+  ->withFragment(null);
+
+assert!($changed->toString() == 'http://example.net/new');
+assert!($changed->equals(URI::from('http://example.net/new')));

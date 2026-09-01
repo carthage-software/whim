@@ -1,0 +1,197 @@
+namespace Limits\attributes_one_list_at_limit;
+
+use Whim\Attribute\Attribute;
+#[Attribute]
+final class A0 {}
+
+#[Attribute]
+final class A1 {}
+
+#[Attribute]
+final class A2 {}
+
+#[Attribute]
+final class A3 {}
+
+#[Attribute]
+final class A4 {}
+
+#[Attribute]
+final class A5 {}
+
+#[Attribute]
+final class A6 {}
+
+#[Attribute]
+final class A7 {}
+
+#[Attribute]
+final class A8 {}
+
+#[Attribute]
+final class A9 {}
+
+#[Attribute]
+final class A10 {}
+
+#[Attribute]
+final class A11 {}
+
+#[Attribute]
+final class A12 {}
+
+#[Attribute]
+final class A13 {}
+
+#[Attribute]
+final class A14 {}
+
+#[Attribute]
+final class A15 {}
+
+#[Attribute]
+final class A16 {}
+
+#[Attribute]
+final class A17 {}
+
+#[Attribute]
+final class A18 {}
+
+#[Attribute]
+final class A19 {}
+
+#[Attribute]
+final class A20 {}
+
+#[Attribute]
+final class A21 {}
+
+#[Attribute]
+final class A22 {}
+
+#[Attribute]
+final class A23 {}
+
+#[Attribute]
+final class A24 {}
+
+#[Attribute]
+final class A25 {}
+
+#[Attribute]
+final class A26 {}
+
+#[Attribute]
+final class A27 {}
+
+#[Attribute]
+final class A28 {}
+
+#[Attribute]
+final class A29 {}
+
+#[Attribute]
+final class A30 {}
+
+#[Attribute]
+final class A31 {}
+
+#[Attribute]
+final class A32 {}
+
+#[Attribute]
+final class A33 {}
+
+#[Attribute]
+final class A34 {}
+
+#[Attribute]
+final class A35 {}
+
+#[Attribute]
+final class A36 {}
+
+#[Attribute]
+final class A37 {}
+
+#[Attribute]
+final class A38 {}
+
+#[Attribute]
+final class A39 {}
+
+#[Attribute]
+final class A40 {}
+
+#[Attribute]
+final class A41 {}
+
+#[Attribute]
+final class A42 {}
+
+#[Attribute]
+final class A43 {}
+
+#[Attribute]
+final class A44 {}
+
+#[Attribute]
+final class A45 {}
+
+#[Attribute]
+final class A46 {}
+
+#[Attribute]
+final class A47 {}
+
+#[Attribute]
+final class A48 {}
+
+#[Attribute]
+final class A49 {}
+
+#[Attribute]
+final class A50 {}
+
+#[Attribute]
+final class A51 {}
+
+#[Attribute]
+final class A52 {}
+
+#[Attribute]
+final class A53 {}
+
+#[Attribute]
+final class A54 {}
+
+#[Attribute]
+final class A55 {}
+
+#[Attribute]
+final class A56 {}
+
+#[Attribute]
+final class A57 {}
+
+#[Attribute]
+final class A58 {}
+
+#[Attribute]
+final class A59 {}
+
+#[Attribute]
+final class A60 {}
+
+#[Attribute]
+final class A61 {}
+
+#[Attribute]
+final class A62 {}
+
+#[Attribute]
+final class A63 {}
+
+#[A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16, A17, A18, A19, A20, A21, A22, A23, A24, A25, A26, A27, A28, A29, A30, A31, A32, A33, A34, A35, A36, A37, A38, A39, A40, A41, A42, A43, A44, A45, A46, A47, A48, A49, A50, A51, A52, A53, A54, A55, A56, A57, A58, A59, A60, A61, A62, A63]
+function f(): void {}

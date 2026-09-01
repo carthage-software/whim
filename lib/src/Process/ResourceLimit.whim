@@ -1,0 +1,13 @@
+namespace Whim\Process;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonNegativeInt;
+
+/** The soft and hard bounds for one process resource; `null` means unlimited. */
+final readonly class ResourceLimit {
+  #[AlwaysInline]
+  public function __construct(
+    public null|NonNegativeInt $soft,
+    public null|NonNegativeInt $hard,
+  ) {}
+}

@@ -1,0 +1,26 @@
+namespace Whim\Async;
+
+use Whim\Marker\TrackCaller;
+
+/** Defines the behavior of cancellation token values. */
+interface CancellationToken {
+  /** Reports whether cancellation was requested. */
+  #[TrackCaller]
+  public function isCancellationRequested(): bool;
+
+  /**
+   * Throws when cancellation was requested.
+   *
+   * @throws CancelledException when cancellation was requested.
+   */
+  #[TrackCaller]
+  public function throwIfCancellationRequested(): void;
+
+  /** Registers a callback for cancellation. */
+  #[TrackCaller]
+  public function register(fn(): void $callback): int;
+
+  /** Removes a registered cancellation callback. */
+  #[TrackCaller]
+  public function unregister(int $id): void;
+}

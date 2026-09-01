@@ -1,0 +1,40 @@
+namespace Whim\Reflection\Generic;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Callable\CallableReflection;
+use Whim\Reflection\Callable\ClosureReflection;
+use Whim\Reflection\DeclarationReflection;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Symbol\ClassReflection;
+use Whim\Reflection\Symbol\EnumReflection;
+use Whim\Reflection\Symbol\FunctionReflection;
+use Whim\Reflection\Symbol\InterfaceReflection;
+use Whim\Reflection\Symbol\NewtypeReflection;
+use Whim\Reflection\Symbol\TypeAliasReflection;
+
+/** Describes a declaration that may introduce reified type parameters. */
+#[Stub]
+interface GenericDeclarationReflection extends
+  DeclarationReflection for
+  ClassLikeReflection,
+  CallableReflection,
+  ClassReflection,
+  InterfaceReflection,
+  EnumReflection,
+  TypeAliasReflection,
+  NewtypeReflection,
+  FunctionReflection,
+  MethodReflection,
+  ClosureReflection {
+  /** Returns the type parameters in declaration order. */
+  #[MustUse]
+  public function getTypeParameters(): vec<TypeParameterReflection>;
+
+  /** Returns a type parameter by zero-based position or name, when present. */
+  #[MustUse]
+  public function getTypeParameter(
+    int|string $parameter,
+  ): null|TypeParameterReflection;
+}

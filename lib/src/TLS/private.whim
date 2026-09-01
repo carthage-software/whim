@@ -1,0 +1,252 @@
+namespace Whim\TLS\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\Endpoint;
+use Whim\Network\Stream as NetworkStream;
+use Whim\Refine\NonEmptyString;
+use Whim\TLS\Certificate;
+use Whim\TLS\CertificateException;
+use Whim\TLS\ClientConfiguration;
+use Whim\TLS\ConfigurationException;
+use Whim\TLS\ConnectionState;
+use Whim\TLS\HandshakeException;
+use Whim\TLS\HandshakeKind;
+use Whim\TLS\ProtocolException;
+use Whim\TLS\ServerConfiguration;
+use Whim\TLS\Version;
+
+/** Converts an engine TLS error into the public exception family. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function failure(Whim\_Private\TlsError $error): never {
+  $message = $error->getMessage();
+  $code = $error->kind();
+  if ($code == Whim\_Private\TLS_ERROR_CONFIGURATION) {
+    throw new ConfigurationException($message, $code, $error);
+  }
+
+  if ($code == Whim\_Private\TLS_ERROR_CERTIFICATE) {
+    throw new CertificateException($message, $code, $error);
+  }
+
+  if ($code == Whim\_Private\TLS_ERROR_HANDSHAKE) {
+    throw new HandshakeException($message, $code, $error);
+  }
+
+  throw new ProtocolException($message, $code, $error);
+}
+
+/** Extracts DER bytes from certificate values. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function certificate_bytes(vec<Certificate> $certificates): vec<string> {
+  $bytes = vec[];
+  foreach ($certificates as $certificate) {
+    $bytes[] = $certificate->toDer();
+  }
+
+  return $bytes;
+}
+
+/** Builds the engine client configuration represented by a public value. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function client_configuration(
+  ClientConfiguration $configuration,
+): Whim\_Private\TlsClientConfiguration {
+  $chain = null;
+  $key = null;
+  if ($configuration->identity != null) {
+    $chain = certificate_bytes($configuration->identity->certificateChain);
+    $key = $configuration->identity->privateKey;
+  }
+
+  try {
+    return Whim\_Private\TlsClientConfiguration::create(
+      $configuration->useSystemRoots,
+      certificate_bytes($configuration->trustedRoots),
+      $chain,
+      $key,
+      $configuration->alpnProtocols,
+      $configuration->minimumVersion->value,
+      $configuration->maximumVersion->value,
+      $configuration->peerVerification->value,
+      $configuration->verifyPeerName,
+      $configuration->sendServerName,
+      $configuration->enableSessionResumption,
+    );
+  } catch (Whim\_Private\TlsError $error) {
+    failure($error);
+  }
+}
+
+/** Builds the engine server configuration represented by a public value. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function server_configuration(
+  ServerConfiguration $configuration,
+): Whim\_Private\TlsServerConfiguration {
+  $identities = dict[];
+  foreach ($configuration->serverNameIdentities as $name => $identity) {
+    $identities[$name] = (
+      certificate_bytes($identity->certificateChain),
+      $identity->privateKey,
+    );
+  }
+
+  try {
+    return Whim\_Private\TlsServerConfiguration::create(
+      certificate_bytes($configuration->identity->certificateChain),
+      $configuration->identity->privateKey,
+      $identities,
+      $configuration->useSystemClientRoots,
+      certificate_bytes($configuration->trustedClientRoots),
+      $configuration->clientAuthentication->value,
+      $configuration->alpnProtocols,
+      $configuration->minimumVersion->value,
+      $configuration->maximumVersion->value,
+      $configuration->enableSessionResumption,
+    );
+  } catch (Whim\_Private\TlsError $error) {
+    failure($error);
+  }
+}
+
+/** Sends every TLS record currently waiting on a connection. */
+#[TrackCaller]
+#[TraceBoundary]
+function transmit<TEndpoint: Endpoint>(
+  NetworkStream<TEndpoint> $stream,
+  Whim\_Private\TlsConnection $connection,
+  null|CancellationToken $cancellation,
+): void {
+  while (true) {
+    try {
+      $bytes = $connection->transmitCiphertext(65536);
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+
+    if ($bytes == '') {
+      return;
+    }
+
+    $stream->writeAll($bytes, $cancellation);
+  }
+}
+
+/** Completes a TLS handshake over an existing stream. */
+#[TrackCaller]
+#[TraceBoundary]
+function handshake<TEndpoint: Endpoint>(
+  NetworkStream<TEndpoint> $stream,
+  Whim\_Private\TlsConnection $connection,
+  null|CancellationToken $cancellation,
+): void {
+  while ($connection->isHandshaking()) {
+    transmit::<TEndpoint>($stream, $connection, $cancellation);
+    if (!$connection->isHandshaking()) {
+      break;
+    }
+
+    $bytes = $stream->read(65536, $cancellation);
+    if ($bytes == '' && $stream->reachedEndOfDataSource()) {
+      throw new HandshakeException(
+        'the transport ended during the TLS handshake',
+      );
+    }
+
+    try {
+      $connection->receiveCiphertext($bytes);
+    } catch (Whim\_Private\TlsError $error) {
+      failure($error);
+    }
+  }
+
+  transmit::<TEndpoint>($stream, $connection, $cancellation);
+}
+
+/** Starts and completes a client handshake. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function establish_client<TEndpoint: Endpoint>(
+  NetworkStream<TEndpoint> $stream,
+  NonEmptyString $serverName,
+  Whim\_Private\TlsClientConfiguration $configuration,
+  null|CancellationToken $cancellation,
+): Whim\_Private\TlsConnection {
+  try {
+    $connection = $configuration->createConnection($serverName);
+  } catch (Whim\_Private\TlsError $error) {
+    failure($error);
+  }
+
+  handshake::<TEndpoint>($stream, $connection, $cancellation);
+  return $connection;
+}
+
+/** Starts and completes a server handshake. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function establish_server<TEndpoint: Endpoint>(
+  NetworkStream<TEndpoint> $stream,
+  Whim\_Private\TlsServerConfiguration $configuration,
+  null|CancellationToken $cancellation,
+): Whim\_Private\TlsConnection {
+  try {
+    $connection = $configuration->createConnection();
+  } catch (Whim\_Private\TlsError $error) {
+    failure($error);
+  }
+
+  handshake::<TEndpoint>($stream, $connection, $cancellation);
+  return $connection;
+}
+
+/** Captures negotiated connection metadata. */
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function connection_state(
+  Whim\_Private\TlsConnection $connection,
+): ConnectionState {
+  try {
+    $version = $connection->protocolVersion();
+    $cipherSuite = $connection->cipherSuite();
+    $handshakeKind = $connection->handshakeKind();
+    $alpnProtocol = $connection->alpnProtocol();
+    $serverName = $connection->serverName();
+    $peerDer = $connection->peerCertificates();
+  } catch (Whim\_Private\TlsError $error) {
+    failure($error);
+  }
+
+  if ($version == null || $cipherSuite == null || $handshakeKind == null) {
+    throw new ProtocolException('the TLS handshake has not completed');
+  }
+
+  $peerCertificates = vec[];
+  foreach ($peerDer as $certificate) {
+    $peerCertificates[] = Certificate::from($certificate);
+  }
+
+  return new ConnectionState(
+    Version::from($version),
+    $cipherSuite as NonEmptyString,
+    $alpnProtocol as null|NonEmptyString,
+    HandshakeKind::from($handshakeKind),
+    $peerCertificates,
+    $serverName as null|NonEmptyString,
+  );
+}

@@ -1,0 +1,71 @@
+namespace Whim\Reflection\Member;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Type\MemberTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one constant declared in a class-like. */
+#[Stub]
+final class ClassConstantReflection implements MemberReflection {
+  private function __construct() {}
+
+  /** Returns where this constant was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this constant's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this constant's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns the constant name. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the class-like that declares this constant. */
+  #[MustUse]
+  public function getDeclaringType(): ClassLikeReflection {}
+
+  /** Returns the constant visibility. */
+  #[MustUse]
+  public function getVisibility(): Visibility {}
+
+  /** Returns the explicitly declared type, when present. */
+  #[MustUse]
+  public function getDeclaredType(): null|TypeReflection {}
+
+  /** Returns the runtime type of the evaluated constant value. */
+  #[MustUse]
+  public function getValueType(): TypeReflection {}
+
+  /** Evaluates and returns the constant value. */
+  #[MustUse]
+  public function getValue(): mixed {}
+
+  /** Returns inherited declarations whose contracts this constant fulfills. */
+  #[MustUse]
+  public function getPrototypes(): vec<ClassConstantReflection> {}
+
+  /** Returns the constant's member type. */
+  #[MustUse]
+  public function getType(): MemberTypeReflection {}
+}

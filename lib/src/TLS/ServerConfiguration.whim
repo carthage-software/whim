@@ -1,0 +1,106 @@
+namespace Whim\TLS;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** Configures TLS server connections. */
+final readonly class ServerConfiguration {
+  #[AlwaysInline]
+  public function __construct(
+    public Identity $identity,
+    public dict<NonEmptyString, Identity> $serverNameIdentities = dict[],
+    public bool $useSystemClientRoots = false,
+    public vec<Certificate> $trustedClientRoots = vec[],
+    public ClientAuthentication $clientAuthentication = ClientAuthentication::None,
+    public vec<NonEmptyString> $alpnProtocols = vec[],
+    public Version $minimumVersion = Version::Tls12,
+    public Version $maximumVersion = Version::Tls13,
+    public bool $enableSessionResumption = true,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function create(Identity $identity): ServerConfiguration {
+    return new ServerConfiguration($identity);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withIdentity(Identity $identity): ServerConfiguration {
+    return clone!($this, identity: $identity);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withServerNameIdentity(
+    NonEmptyString $serverName,
+    Identity $identity,
+  ): ServerConfiguration {
+    $identities = $this->serverNameIdentities;
+    $identities[$serverName] = $identity;
+    return clone!($this, serverNameIdentities: $identities);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withServerNameIdentities(
+    dict<NonEmptyString, Identity> $serverNameIdentities,
+  ): ServerConfiguration {
+    return clone!($this, serverNameIdentities: $serverNameIdentities);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSystemClientRoots(bool $enabled): ServerConfiguration {
+    return clone!($this, useSystemClientRoots: $enabled);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTrustedClientRoots(
+    vec<Certificate> $trustedClientRoots,
+  ): ServerConfiguration {
+    return clone!($this, trustedClientRoots: $trustedClientRoots);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withClientAuthentication(
+    ClientAuthentication $clientAuthentication,
+  ): ServerConfiguration {
+    return clone!($this, clientAuthentication: $clientAuthentication);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withAlpnProtocols(
+    vec<NonEmptyString> $alpnProtocols,
+  ): ServerConfiguration {
+    return clone!($this, alpnProtocols: $alpnProtocols);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMinimumVersion(
+    Version $minimumVersion,
+  ): ServerConfiguration {
+    return clone!($this, minimumVersion: $minimumVersion);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withMaximumVersion(
+    Version $maximumVersion,
+  ): ServerConfiguration {
+    return clone!($this, maximumVersion: $maximumVersion);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withSessionResumption(
+    bool $enableSessionResumption,
+  ): ServerConfiguration {
+    return clone!($this, enableSessionResumption: $enableSessionResumption);
+  }
+}

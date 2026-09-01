@@ -1,0 +1,4 @@
+namespace Whim\IO;
+
+/** An operating-system IO operation failed. */
+final class TransportException extends Exception {}

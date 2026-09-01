@@ -1,0 +1,35 @@
+namespace Whim\HTTP\Server\Middleware;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\_Private\RequestCancellationToken;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+
+/** Limits how long a request handler may run. */
+final readonly class HandlerTimeout implements Middleware {
+  public function __construct(public Duration $timeout) {}
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    Handler $next,
+    CancellationToken $cancellation,
+  ): Response {
+    if ($cancellation is RequestCancellationToken) {
+      $cancellation->addTimeout($this->timeout);
+      return $next->handle($context, $request, $cancellation);
+    }
+
+    return $next->handle(
+      $context,
+      $request,
+      new TimeoutCancellationToken($this->timeout, $cancellation),
+    );
+  }
+}

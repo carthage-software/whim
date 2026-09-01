@@ -1,0 +1,131 @@
+class C {
+  public function m0(): void {}
+
+  public function m1(): void {}
+
+  public function m2(): void {}
+
+  public function m3(): void {}
+
+  public function m4(): void {}
+
+  public function m5(): void {}
+
+  public function m6(): void {}
+
+  public function m7(): void {}
+
+  public function m8(): void {}
+
+  public function m9(): void {}
+
+  public function m10(): void {}
+
+  public function m11(): void {}
+
+  public function m12(): void {}
+
+  public function m13(): void {}
+
+  public function m14(): void {}
+
+  public function m15(): void {}
+
+  public function m16(): void {}
+
+  public function m17(): void {}
+
+  public function m18(): void {}
+
+  public function m19(): void {}
+
+  public function m20(): void {}
+
+  public function m21(): void {}
+
+  public function m22(): void {}
+
+  public function m23(): void {}
+
+  public function m24(): void {}
+
+  public function m25(): void {}
+
+  public function m26(): void {}
+
+  public function m27(): void {}
+
+  public function m28(): void {}
+
+  public function m29(): void {}
+
+  public function m30(): void {}
+
+  public function m31(): void {}
+
+  public function m32(): void {}
+
+  public function m33(): void {}
+
+  public function m34(): void {}
+
+  public function m35(): void {}
+
+  public function m36(): void {}
+
+  public function m37(): void {}
+
+  public function m38(): void {}
+
+  public function m39(): void {}
+
+  public function m40(): void {}
+
+  public function m41(): void {}
+
+  public function m42(): void {}
+
+  public function m43(): void {}
+
+  public function m44(): void {}
+
+  public function m45(): void {}
+
+  public function m46(): void {}
+
+  public function m47(): void {}
+
+  public function m48(): void {}
+
+  public function m49(): void {}
+
+  public function m50(): void {}
+
+  public function m51(): void {}
+
+  public function m52(): void {}
+
+  public function m53(): void {}
+
+  public function m54(): void {}
+
+  public function m55(): void {}
+
+  public function m56(): void {}
+
+  public function m57(): void {}
+
+  public function m58(): void {}
+
+  public function m59(): void {}
+
+  public function m60(): void {}
+
+  public function m61(): void {}
+
+  public function m62(): void {}
+
+  public function m63(): void {}
+
+  public function m64(): void {}
+}

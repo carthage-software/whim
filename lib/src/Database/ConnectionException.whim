@@ -1,0 +1,4 @@
+namespace Whim\Database;
+
+/** Reports a database connection failure. */
+class ConnectionException extends Exception {}

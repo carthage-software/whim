@@ -1,0 +1,62 @@
+namespace Whim\Database\_Private;
+
+use Whim\Database\Connection;
+use Whim\Database\ConnectionException;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Retains one checked-out pool entry while derived resources exist. */
+final class Lease {
+  private int $references = 1;
+  private bool $reusable = true;
+  private bool $released = false;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private PoolState $pool, private Entry $entry) {}
+
+  /** Returns the checked-out connection. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function connection(): Connection {
+    if ($this->released) {
+      throw new ConnectionException('the pooled connection is closed');
+    }
+
+    return $this->entry->connection;
+  }
+
+  /** Retains this entry for a derived resource. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function retain(): void {
+    if ($this->released) {
+      throw new ConnectionException('the pooled connection is closed');
+    }
+
+    $this->references++;
+  }
+
+  /** Releases one reference and eventually returns the entry. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function release(bool $reusable = true): void {
+    if ($this->released) {
+      return;
+    }
+
+    $this->reusable = $this->reusable && $reusable;
+    $this->references--;
+    if ($this->references != 0) {
+      return;
+    }
+
+    $this->released = true;
+    $this->pool->release($this->entry, $this->reusable);
+  }
+}

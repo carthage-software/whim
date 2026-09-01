@@ -1,0 +1,16 @@
+namespace Whim\DataStructure\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+
+/** Converts an optional slot into an option. */
+#[AlwaysInline]
+function option<T>(null|(T,) $slot): Option<T> {
+  if ($slot == null) {
+    return new None();
+  }
+
+  return new Some::<T>($slot[0]);
+}

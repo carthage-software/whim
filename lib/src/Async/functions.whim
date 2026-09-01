@@ -1,0 +1,185 @@
+namespace Whim\Async;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\_Private;
+use Whim\Marker\MustUse;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Supplier;
+use Whim\Refine\Iterable;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\Throwable;
+use Whim\Vec;
+use Whim;
+
+/** Starts a task and returns its future. */
+#[MustUse('call ->ignore() when the task is intentionally unobserved')]
+#[TrackCaller]
+function spawn<T>(Supplier<T> $task): Future<T> {
+  $deferred = new Deferred::<T>();
+  Whim\_Private\defer_task(fn(): void {
+    try {
+      $deferred->complete($task());
+    } catch (Throwable $error) {
+      $deferred->error($error);
+    }
+  });
+
+  return $deferred->getFuture();
+}
+
+/** Starts a detached task and ignores its failure. */
+#[TrackCaller]
+function launch(fn(): void $task): void {
+  spawn::<null>(fn(): null {
+    $task();
+    return null;
+  })->ignore();
+}
+
+/** Yields execution until the next event-loop turn. */
+#[TrackCaller]
+function later(): void {
+  $suspension = Whim\_Private\create_suspension::<null>();
+  Whim\_Private\defer_task(fn(): void {
+    $suspension->resume(null);
+  });
+
+  $suspension->suspend();
+}
+
+/** Suspends the current task for a duration. */
+#[NeverInline]
+#[TrackCaller]
+function sleep(
+  Duration $duration,
+  null|CancellationToken $cancellation = null,
+): void {
+  if ($cancellation != null) {
+    $cancellation->throwIfCancellationRequested();
+  }
+
+  $suspension = Whim\_Private\create_suspension::<null>();
+  $task = Whim\_Private\delay_task($duration, fn(): void {
+    $suspension->resume(null);
+  });
+
+  $id = null;
+  if ($cancellation != null) {
+    $id = $cancellation->register(fn(): void {
+      Whim\_Private\cancel_task($task);
+      try {
+        $cancellation->throwIfCancellationRequested();
+      } catch (Throwable $error) {
+        $suspension->throw($error);
+      }
+    });
+  }
+
+  try {
+    $suspension->suspend();
+  } finally {
+    Whim\_Private\cancel_task($task);
+    if ($cancellation != null && $id != null) {
+      $cancellation->unregister($id);
+    }
+  }
+}
+
+/** Runs scheduled tasks until no work remains. */
+#[TrackCaller]
+function drain(): void {
+  Whim\_Private\drain();
+}
+
+/**
+ * Awaits every future and preserves its key.
+ *
+ * @throws CompositeException when more than one future fails; a single failure is rethrown as itself.
+ */
+#[NeverInline]
+#[TrackCaller]
+function all<K: ArrayKey, V>(Iterable<K, Future<V>> $futures): dict<K, V> {
+  $results = dict[];
+  $errors = vec[];
+  foreach ($futures as $key => $future) {
+    try {
+      $results[$key] = $future->await(null);
+    } catch (Throwable $error) {
+      $errors[] = $error;
+    }
+  }
+
+  if (length!($errors) == 1) {
+    throw $errors[0];
+  }
+
+  if (length!($errors) > 1) {
+    throw new CompositeException($errors);
+  }
+
+  return $results;
+}
+
+/** Runs a collection of tasks concurrently. */
+#[TrackCaller]
+function concurrently<K: ArrayKey, V>(
+  Iterable<K, Supplier<V>> $tasks,
+): dict<K, V> {
+  $futures = dict[];
+  foreach ($tasks as $key => $task) {
+    $futures[$key] = spawn::<V>($task);
+  }
+
+  return all::<K, V>($futures);
+}
+
+/** Runs a collection of tasks in sequence. */
+#[TrackCaller]
+function series<K: ArrayKey, V>(Iterable<K, Supplier<V>> $tasks): dict<K, V> {
+  $results = dict[];
+  foreach ($tasks as $key => $task) {
+    $results[$key] = $task();
+  }
+
+  return $results;
+}
+
+/**
+ * Returns the first successfully completed future.
+ *
+ * Futures that do not win remain observable by their callers.
+ *
+ * @throws InvalidArgumentException when no future is given.
+ * @throws CompositeException when every future fails.
+ */
+#[NeverInline]
+#[TrackCaller]
+function any<T>(array<_, Future<T>> $futures): T {
+  $futures = Vec\values::<Future<T>>($futures);
+  if (length!($futures) == 0) {
+    throw new InvalidArgumentException('any() requires at least one future');
+  }
+
+  return _Private\select_successful_future::<T>($futures);
+}
+
+/**
+ * Returns the outcome of the first completed future.
+ *
+ * Futures that do not win remain observable by their callers.
+ *
+ * @throws InvalidArgumentException when no future is given.
+ */
+#[NeverInline]
+#[TrackCaller]
+function first<T>(array<_, Future<T>> $futures): T {
+  $futures = Vec\values::<Future<T>>($futures);
+  if (length!($futures) == 0) {
+    throw new InvalidArgumentException('first() requires at least one future');
+  }
+
+  $index = _Private\select_future::<T>($futures);
+  return $futures[$index]->await(null);
+}

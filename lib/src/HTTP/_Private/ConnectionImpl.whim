@@ -1,0 +1,122 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private\Configuration;
+use Whim\HTTP\_Private\ConnectionStreamId;
+use Whim\HTTP\_Private\ErrorCode;
+use Whim\HTTP\_Private\ErrorCodeValue;
+use Whim\HTTP\_Private\Event\WeakendEvent;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\Setting;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\_Private\StreamState;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Shares the public sans-I/O connection operations. */
+abstract class ConnectionImpl {
+  protected State $state;
+
+  protected function __construct(Role $role, Configuration $configuration) {
+    $this->state = new State($role, $configuration);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function nextStreamId(): StreamId {
+    return $this->state->nextStreamId();
+  }
+
+  #[MustUse]
+  public function isConnected(): bool {
+    return $this->state->connected;
+  }
+
+  #[MustUse]
+  public function activeStreamCount(): NonNegativeInt {
+    return $this->state->streams->activeCount();
+  }
+
+  #[MustUse]
+  public function maximumConcurrentStreams(): NonNegativeInt {
+    return $this->state->streams->localMaximum();
+  }
+
+  #[MustUse]
+  public function availableSendWindow(ConnectionStreamId $streamId): int {
+    if ($streamId == 0) {
+      return $this->state->flow->connectionSendWindow();
+    }
+
+    if (stream_state($this->state, $streamId) == StreamState::Closed) {
+      return 0;
+    }
+
+    $entry =
+      $this->state->streams->get($streamId)
+      ?? return min_int(
+        $this->state->flow->connectionSendWindow(),
+        $this->state->settings->remote(Setting::InitialWindowSize),
+      );
+
+    return $this->state->flow->available($entry);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function receive(string $bytes): vec<WeakendEvent> {
+    return receive($this->state, $bytes);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function finish(): vec<WeakendEvent> {
+    return finish($this->state);
+  }
+
+  #[MustUse]
+  public function takeOutboundBytes(): string {
+    return take_outbound($this->state);
+  }
+
+  #[TrackCaller]
+  public function sendHeaders(
+    StreamId $streamId,
+    vec<Header> $headers,
+    bool $endStream = false,
+  ): void {
+    send_headers($this->state, $streamId, $headers, $endStream);
+  }
+
+  #[TrackCaller]
+  public function sendData(
+    StreamId $streamId,
+    string $data,
+    bool $endStream = false,
+  ): void {
+    send_data($this->state, $streamId, $data, $endStream);
+  }
+
+  #[TrackCaller]
+  public function resetStream(
+    StreamId $streamId,
+    ErrorCodeValue $errorCode,
+  ): void {
+    send_reset($this->state, $streamId, $errorCode);
+  }
+
+  #[TrackCaller]
+  public function rejectPush(StreamId $promisedStreamId): void {
+    send_reset($this->state, $promisedStreamId, ErrorCode::Cancel->value);
+  }
+
+  #[TrackCaller]
+  public function goAway(
+    ErrorCodeValue $errorCode = 0,
+    string $debugData = '',
+    null|ConnectionStreamId $lastStreamId = null,
+  ): void {
+    send_go_away($this->state, $errorCode, $debugData, $lastStreamId);
+  }
+}

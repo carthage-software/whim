@@ -1,0 +1,17 @@
+namespace Whim\Json;
+
+use Whim\Marker\MustUse;
+
+/** Defines construction from a decoded JSON value. */
+interface FromJson {
+  /**
+   * Builds an instance from a decoded JSON value.
+   *
+   * An implementation MUST throw `DecodingException`, and nothing else,
+   * when the value does not have the shape it expects.
+   *
+   * @throws DecodingException when the value does not have the expected shape.
+   */
+  #[MustUse]
+  public static function fromJson(Value $value): static;
+}

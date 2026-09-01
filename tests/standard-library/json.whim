@@ -1,0 +1,164 @@
+use Whim\Json;
+use Whim\Json\DecodingException;
+use Whim\Json\EncodingException;
+use Whim\Json\FromJson;
+use Whim\Json\ToJson;
+use Whim\Json\Value;
+
+assert!(Json\encode(null) == 'null');
+assert!(Json\encode(true) == 'true');
+assert!(Json\encode(false) == 'false');
+assert!(Json\encode(42) == '42');
+assert!(Json\encode(-7) == '-7');
+assert!(Json\encode(1.5) == '1.5');
+assert!(Json\encode('hello') == '"hello"');
+assert!(Json\encode('') == '""');
+assert!(Json\encode(vec[]) == '[]');
+assert!(Json\encode(dict[]) == '{}');
+assert!(Json\encode(vec[1, 2, 3]) == '[1,2,3]');
+assert!(
+  Json\encode(dict['a' => 1, 'b' => vec[true, null]])
+  == '{"a":1,"b":[true,null]}',
+);
+
+$accent = Whim\Str\chr(0xC3) . Whim\Str\chr(0xA9);
+assert!(Json\encode('caf' . $accent) == '"caf' . $accent . '"');
+
+$pretty = Json\encode(dict['a' => 1], true);
+assert!(Whim\Str\contains($pretty, "\n"));
+assert!(Json\decode($pretty) == dict['a' => 1]);
+
+assert!(Json\decode('null') == null);
+assert!(Json\decode('true'));
+assert!(!(Json\decode('false')));
+assert!(Json\decode('42') == 42);
+assert!(Json\decode('-7') == -7);
+assert!(Json\decode('1.5') == 1.5);
+assert!(Json\decode('1e2') == 100.0);
+assert!(Json\decode('"hello"') == 'hello');
+assert!(Json\decode('"é"') == $accent);
+assert!(Json\decode('[]') == vec[]);
+assert!(Json\decode('{}') == dict[]);
+assert!(
+  Json\decode('[1, "two", [3.5], {"four": null}]') == vec[
+    1,
+    'two',
+    vec[3.5],
+    dict['four' => null],
+  ],
+);
+
+assert!(
+  Json\decode('{"nested": {"deep": [1, 2]}}') == dict[
+    'nested' => dict['deep' => vec[1, 2]],
+  ],
+);
+
+assert!(Json\decode('18446744073709551615') == 18446744073709551615.0);
+$assertion_value_30 = fn(): Value => Json\decode('1e9999');
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (Json\DecodingException $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is Json\DecodingException);
+
+$roundtrip = dict['name' => 'Alice', 'tags' => vec['a', 'b'], 'score' => 9.5];
+assert!(Json\decode(Json\encode($roundtrip)) == $roundtrip);
+
+$deep = dict['leaf' => vec[1, 2, 3]];
+$level = 100;
+while ($level > 0) {
+  $deep = dict['level' => $level, 'next' => $deep];
+  $level--;
+}
+
+assert!(Json\decode(Json\encode($deep)) == $deep);
+
+$invalid = null;
+$assertion_callable_33 = fn(): Value => Json\decode('{"a": }');
+try {
+  $assertion_callable_33();
+} catch (DecodingException $assertion_caught_33) {
+  $invalid = $assertion_caught_33;
+}
+
+assert!($invalid is DecodingException);
+
+assert!($invalid->getCode() > 0);
+
+$assertion_value_35 = fn(): Value => Json\decode('1 garbage');
+$assertion_error_35 = null;
+try {
+  $assertion_value_35();
+} catch (DecodingException $assertion_caught_35) {
+  $assertion_error_35 = $assertion_caught_35;
+}
+
+assert!($assertion_error_35 is DecodingException);
+
+$assertion_value_36 = fn(): string => Json\encode(Whim\Math\NAN);
+$assertion_error_36 = null;
+try {
+  $assertion_value_36();
+} catch (EncodingException $assertion_caught_36) {
+  $assertion_error_36 = $assertion_caught_36;
+}
+
+assert!($assertion_error_36 is EncodingException);
+
+$assertion_value_37 = fn(): string => Json\encode(Whim\Str\chr(0xFF));
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (EncodingException $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is EncodingException);
+
+final readonly class Point implements ToJson, FromJson {
+  public function __construct(public int $x, public int $y) {}
+
+  public function toJson(): Value {
+    return dict['x' => $this->x, 'y' => $this->y];
+  }
+
+  public static function fromJson(Value $value): static {
+    return match ($value) {
+      dict['x' => $x @ int, 'y' => $y @ int] => new static($x, $y),
+      $_ => throw new DecodingException(
+        'a point needs a dict with x and y fields',
+      ),
+    };
+  }
+}
+
+assert!(Json\encode(new Point(3, 4)) == '{"x":3,"y":4}');
+
+$point = Json\decode_as::<Point>('{"x": 3, "y": 4}');
+assert!($point is Point);
+assert!($point->x == 3);
+assert!($point->y == 4);
+
+$assertion_value_42 = fn(): Point => Json\decode_as::<Point>('{"x": "three"}');
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (DecodingException $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+}
+
+assert!($assertion_error_42 is DecodingException);
+
+$assertion_value_43 = fn(): Point => Json\decode_as::<Point>('not json');
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (DecodingException $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is DecodingException);

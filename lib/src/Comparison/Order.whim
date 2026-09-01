@@ -1,0 +1,87 @@
+namespace Whim\Comparison;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Defines a total order against values of type T. */
+interface Order<T> extends Equal<T> {
+  /** Compares this value with another. */
+  #[MustUse]
+  public function compare(T $other): Ordering;
+
+  /** Whether this value sorts before another. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isLessThan(T $other): bool {
+    return $this->compare($other)->isLess();
+  }
+
+  /** Whether this value does not sort after another. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isLessThanOrEqual(T $other): bool {
+    return $this->compare($other)->isLessOrEqual();
+  }
+
+  /** Whether this value sorts after another. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isGreaterThan(T $other): bool {
+    return $this->compare($other)->isGreater();
+  }
+
+  /** Whether this value does not sort before another. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isGreaterThanOrEqual(T $other): bool {
+    return $this->compare($other)->isGreaterOrEqual();
+  }
+
+  /** Returns whichever of this value and another sorts first. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minimum(T $other): T|static {
+    return match ($this->compare($other)->isLessOrEqual()) {
+      true => $this,
+      false => $other,
+    };
+  }
+
+  /** Returns whichever of this value and another sorts last. */
+  #[MustUse]
+  #[TrackCaller]
+  public function maximum(T $other): T|static {
+    return match ($this->compare($other)->isGreaterOrEqual()) {
+      true => $this,
+      false => $other,
+    };
+  }
+
+  /**
+   * Restricts this value to a range whose minimum must not sort after its maximum.
+   *
+   * @throws InvalidArgumentException when the minimum sorts after the maximum.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function clamp(T $min, T $max): T|static {
+    $belowMinimum = $this->compare($min)->isLess();
+    $aboveMaximum = $this->compare($max)->isGreater();
+    if ($belowMinimum && $aboveMaximum) {
+      throw new InvalidArgumentException('the minimum sorts after the maximum');
+    }
+
+    if ($belowMinimum) {
+      return $min;
+    }
+
+    if ($aboveMaximum) {
+      return $max;
+    }
+
+    return $this;
+  }
+}

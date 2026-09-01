@@ -1,0 +1,15 @@
+namespace Whim\Database\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Row;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Fetches remaining rows in one operation. */
+interface BatchResult {
+  #[MustUse]
+  #[TrackCaller]
+  public function fetchAll(
+    null|CancellationToken $cancellation = null,
+  ): vec<Row>;
+}

@@ -1,0 +1,167 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\PseudoRandom;
+use Whim\Str;
+use Whim\Unwind\Throwable;
+
+/** One of a handful of local variables. */
+function fuzz_variable(): string {
+  return match (PseudoRandom\int(0, 4)) {
+    0 => '$a',
+    1 => '$b',
+    2 => '$c',
+    3 => '$d',
+    $_ => '$e',
+  };
+}
+
+/** A binary operator that parses in an ordinary expression position. */
+function fuzz_operator(): string {
+  return match (PseudoRandom\int(0, 11)) {
+    0 => '+',
+    1 => '-',
+    2 => '*',
+    3 => '/',
+    4 => '%',
+    5 => '<',
+    6 => '>',
+    7 => '==',
+    8 => '!=',
+    9 => '&&',
+    10 => '||',
+    $_ => '.',
+  };
+}
+
+/** A small expression over literals and variables. */
+function fuzz_expression(int $depth): string {
+  if ($depth <= 0 || PseudoRandom\int(0, 2) == 0) {
+    return match (PseudoRandom\int(0, 4)) {
+      0 => '' . PseudoRandom\int(-9, 99),
+      1 => '1.5',
+      2 => "'text'",
+      3 => 'true',
+      $_ => fuzz_variable(),
+    };
+  }
+
+  return (
+    '('
+    . fuzz_expression($depth - 1)
+    . ' '
+    . fuzz_operator()
+    . ' '
+    . fuzz_expression($depth - 1)
+    . ')'
+  );
+}
+
+/** A statement drawn from assignments, conditionals, and loops. */
+function fuzz_statement(int $depth): string {
+  $choice = PseudoRandom\int(0, 2);
+  if ($depth <= 0 || $choice == 0) {
+    return fuzz_variable() . ' = ' . fuzz_expression(2) . ";\n";
+  }
+
+  if ($choice == 1) {
+    return (
+      'if ('
+      . fuzz_variable()
+      . ' == '
+      . fuzz_expression(1)
+      . ') {'
+      . "\n"
+      . fuzz_statement($depth - 1)
+      . '}'
+      . "\n"
+    );
+  }
+
+  $counter = '$n' . $depth;
+  return (
+    $counter
+    . ' = 0;'
+    . "\n"
+    . 'while ('
+    . $counter
+    . ' < '
+    . PseudoRandom\int(1, 5)
+    . ') {'
+    . "\n"
+    . fuzz_statement($depth - 1)
+    . '  '
+    . $counter
+    . ' = '
+    . $counter
+    . ' + 1;'
+    . "\n"
+    . '}'
+    . "\n"
+  );
+}
+
+/**
+ * A whole program: a helper declaration and a body of fuzzed statements.
+ *
+ * The body is a function nobody calls. The compiler still sees every
+ * statement it generated; the engine never runs one, so a program that
+ * happens to loop forever costs nothing.
+ */
+function fuzz_program(): string {
+  $source =
+    'function helper'
+    . PseudoRandom\int(0, 999)
+    . '(int $x): int {'
+    . "\n"
+    . '  return $x + '
+    . PseudoRandom\int(0, 9)
+    . ';'
+    . "\n"
+    . '}'
+    . "\n\n"
+    . 'function fuzzed(): void {'
+    . "\n"
+    . '$a = 1;'
+    . "\n"
+    . '$b = 2;'
+    . "\n"
+    . '$c = 3;'
+    . "\n"
+    . '$d = 4;'
+    . "\n"
+    . '$e = 5;'
+    . "\n";
+
+  $statements = PseudoRandom\int(1, 8);
+  $index = 0;
+  while ($index < $statements) {
+    $source = $source . fuzz_statement(2);
+    $index++;
+  }
+
+  return $source . '}' . "\n";
+}
+
+$work = Filesystem\create_temporary_directory(null, 'whim-fuzz-');
+
+$case = 0;
+while ($case < 32) {
+  $source = fuzz_program();
+  $file = $work . '/case-' . $case . '.whim';
+  File\write(
+    $file,
+    'namespace Fuzz\\Case' . $case . ';' . "\n" . 'use Whim;' . "\n" . $source,
+  );
+
+  try {
+    require!($file);
+  } catch (Throwable $thrown) {
+    assert!($thrown->getMessage() != '');
+  }
+
+  $case++;
+}
+
+Filesystem\delete_directory($work, true);

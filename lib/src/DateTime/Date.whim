@@ -1,0 +1,205 @@
+namespace Whim\DateTime;
+
+use Whim;
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable date without a time or timezone. */
+final readonly class Date implements Order<Date>, ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public Year $year,
+    public Month $month,
+    public Day $day,
+  ) {}
+
+  /** Creates a valid civil date. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(Year $year, Month $month, Day $day): Date {
+    if (!Whim\_Private\date_time_is_valid_date($year, $month->value, $day)) {
+      throw new InvalidArgumentException('invalid civil date');
+    }
+
+    return new Date($year, $month, $day);
+  }
+
+  /** Creates a date from fields already checked by the date-time engine. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    int $year,
+    int $month,
+    int $day,
+  ): Date {
+    return new Date($year as Year, Month::from($month), $day as Day);
+  }
+
+  /** Parses an ISO date, or returns null. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $value): null|Date {
+    $parts = Whim\_Private\date_time_parse_date($value) ?? return null;
+
+    return Date::fromPartsUnsafe($parts[0], $parts[1], $parts[2]);
+  }
+
+  /** Parses an ISO date. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $value): Date {
+    $date = Date::parse($value);
+    if ($date == null) {
+      throw new InvalidArgumentException(
+        'invalid civil date: `' . $value . '`',
+      );
+    }
+
+    return $date;
+  }
+
+  /** Returns the ISO weekday. */
+  #[MustUse]
+  #[TrackCaller]
+  public function weekday(): Weekday {
+    $metadata = Whim\_Private\date_time_date_metadata(
+      $this->year,
+      $this->month->value,
+      $this->day,
+    );
+
+    return Weekday::from($metadata[0]);
+  }
+
+  /** Returns this date's one-based day of year. */
+  #[MustUse]
+  #[TrackCaller]
+  public function dayOfYear(): DayOfYear {
+    $metadata = Whim\_Private\date_time_date_metadata(
+      $this->year,
+      $this->month->value,
+      $this->day,
+    );
+
+    return $metadata[1] as DayOfYear;
+  }
+
+  /** Returns the number of days in this date's month. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function daysInMonth(): DaysInMonth {
+    return $this->month->daysIn($this->year);
+  }
+
+  /** Returns this date's era. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function era(): Era {
+    return Era::fromYear($this->year);
+  }
+
+  /** Returns the positive year within this date's era. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function yearOfEra(): YearOfEra {
+    return match ($this->year > 0) {
+      true => $this->year as YearOfEra,
+      false => (1 - $this->year) as YearOfEra,
+    };
+  }
+
+  /** Reports whether this date belongs to a leap year. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isLeapYear(): bool {
+    return is_leap_year($this->year);
+  }
+
+  /** Adds a calendar period. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function plus(
+    Period $period,
+    Overflow $overflow = Overflow::Constrain,
+  ): Date {
+    $parts = Whim\_Private\date_time_shift_date(
+      $this->year,
+      $this->month->value,
+      $this->day,
+      $period->years,
+      $period->months,
+      $period->weeks,
+      $period->days,
+      $overflow->value,
+    );
+
+    if ($parts == null) {
+      throw new InvalidArgumentException(
+        'calendar arithmetic produced an invalid date',
+      );
+    }
+
+    return Date::fromPartsUnsafe($parts[0], $parts[1], $parts[2]);
+  }
+
+  /** Subtracts a calendar period. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minus(
+    Period $period,
+    Overflow $overflow = Overflow::Constrain,
+  ): Date {
+    return $this->plus($period->invert(), $overflow);
+  }
+
+  /** Formats this date. */
+  #[MustUse]
+  #[TrackCaller]
+  public function format(Formatter $formatter): string {
+    return $formatter->formatDate($this);
+  }
+
+  /** Returns this date in ISO form. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    return Formatter::isoDate()->formatDate($this);
+  }
+
+  /** Compares this date with another. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(Date $other): Ordering {
+    $ordering = Ordering::from($this->year <=> $other->year);
+    if (!$ordering->isEqual()) {
+      return $ordering;
+    }
+
+    $ordering = Ordering::from($this->month->value <=> $other->month->value);
+    if (!$ordering->isEqual()) {
+      return $ordering;
+    }
+
+    return Ordering::from($this->day <=> $other->day);
+  }
+
+  /** Reports whether two dates are equal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Date $other): bool {
+    return (
+      $this->year == $other->year
+      && $this->month == $other->month
+      && $this->day == $other->day
+    );
+  }
+}

@@ -1,0 +1,7 @@
+class IntegerConstant {
+  public const int VALUE = 1;
+}
+
+class StringConstant extends IntegerConstant {
+  public const string VALUE = 'wrong';
+}

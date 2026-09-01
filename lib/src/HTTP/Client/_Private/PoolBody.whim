@@ -1,0 +1,89 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Releases a pooled connection only after its response body ends. */
+final class PoolBody implements ReadHandle {
+  private bool $closed = false;
+
+  public function __construct(
+    private ReadHandle $body,
+    private PoolLease $lease,
+  ) {}
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if (!$this->closed) {
+      $this->body->waitUntilReadable($cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    if ($this->closed) {
+      return true;
+    }
+
+    $ended = $this->body->reachedEndOfDataSource();
+    if ($ended) {
+      $this->finish(true);
+    }
+
+    return $ended;
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->closed) {
+      return '';
+    }
+
+    try {
+      $data = $this->body->tryRead($maxBytes);
+      $this->releaseIfEnded();
+      return $data;
+    } catch (Throwable $error) {
+      $this->finish(false);
+      throw $error;
+    }
+  }
+
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($this->closed) {
+      return '';
+    }
+
+    try {
+      $data = $this->body->read($maxBytes, $cancellation);
+      $this->releaseIfEnded();
+      return $data;
+    } catch (Throwable $error) {
+      $this->finish(false);
+      throw $error;
+    }
+  }
+
+  private function releaseIfEnded(): void {
+    if ($this->body->reachedEndOfDataSource()) {
+      $this->finish(true);
+    }
+  }
+
+  private function finish(bool $reusable): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    $this->lease->release($reusable);
+  }
+}

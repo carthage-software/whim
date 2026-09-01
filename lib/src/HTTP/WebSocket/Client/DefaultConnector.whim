@@ -1,0 +1,323 @@
+namespace Whim\HTTP\WebSocket\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\WebSocket\Client\_Private\ConnectionImpl;
+use Whim\IO\LimitExceededException;
+use Whim\IO\Reader;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Stream;
+use Whim\Refine\NonEmptyString;
+use Whim\SecureRandom;
+use Whim\Str;
+use Whim\TCP;
+use Whim\TLS;
+use Whim\TLS\ConnectionState;
+use Whim\URI\IPHost;
+use Whim\URI\RegisteredNameHost;
+use Whim\Unwind\Throwable;
+use Whim\URL\URL;
+use Whim\_Private\http1_parse_response_head;
+use Whim\_Private\http1_serialize_request_head;
+use Whim\_Private\http_valid_token;
+use Whim\_Private\websocket_accept_key;
+
+/** Opens direct WebSocket connections over TCP or TLS. */
+final readonly class DefaultConnector implements Connector {
+  public function __construct(
+    private TCP\Connector $tcp = new TCP\DefaultConnector(),
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function connect(
+    URL $url,
+    Configuration $configuration = new Configuration(),
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    if ($url->fragment != null) {
+      throw new HandshakeException('a WebSocket URL cannot contain a fragment');
+    }
+
+    if ($url->authority->userInfo != null) {
+      throw new HandshakeException(
+        'a WebSocket URL cannot contain user information',
+      );
+    }
+
+    ($host, $serverName) = $this->networkHost($url);
+    $port = $url->authority->port;
+    if ($port == null) {
+      $port = match ($url->scheme) {
+        'ws' => 80,
+        'wss' => 443,
+        $_ => throw new HandshakeException(
+          'unsupported WebSocket URL scheme: `' . $url->scheme . '`',
+        ),
+      };
+    } else if (!($url->scheme is 'ws'|'wss')) {
+      throw new HandshakeException(
+        'unsupported WebSocket URL scheme: `' . $url->scheme . '`',
+      );
+    }
+
+    $stream = $this->tcp->connect($host, $port, $cancellation);
+    if ($url->scheme == 'ws') {
+      return $this->upgrade($stream, null, $url, $configuration, $cancellation);
+    }
+
+    try {
+      $secure = new TLS\Connector::<InternetEndpoint>(
+        $configuration->tls->withAlpnProtocols(vec['http/1.1']),
+      )->connect($stream, $serverName, $cancellation);
+    } catch (Throwable $error) {
+      $stream->close();
+      throw $error;
+    }
+
+    return $this->upgrade(
+      $secure,
+      $secure->getConnectionState(),
+      $url,
+      $configuration,
+      $cancellation,
+    );
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private function upgrade(
+    Stream<InternetEndpoint> $stream,
+    null|ConnectionState $tlsState,
+    URL $url,
+    Configuration $configuration,
+    null|CancellationToken $cancellation,
+  ): Connection {
+    try {
+      $key = Base64\encode(SecureRandom\bytes(16));
+      $expectedAccept = websocket_accept_key($key) as string;
+      $fields = $this->requestFields($url, $configuration, $key);
+      $stream->writeAll(
+        http1_serialize_request_head(
+          'GET',
+          $this->requestTarget($url),
+          'HTTP/1.1',
+          $fields,
+        ),
+        $cancellation,
+      );
+
+      $reader = new Reader($stream);
+      try {
+        $block = $reader->readUntilBounded(
+          "\r\n\r\n",
+          $configuration->maximumResponseHeaderSize,
+          $cancellation,
+        );
+      } catch (LimitExceededException $error) {
+        throw new HandshakeException(
+          'the WebSocket response head exceeds its configured limit',
+          previous: $error,
+        );
+      }
+
+      if ($block == null) {
+        throw new HandshakeException(
+          'the peer closed before completing the WebSocket handshake',
+        );
+      }
+
+      $parsed = http1_parse_response_head($block);
+      if ($parsed == null) {
+        throw new HandshakeException(
+          'the WebSocket response head is malformed',
+        );
+      }
+
+      ($version, $status, $fieldEntries, $fieldIndex) = $parsed;
+      $headers = FieldMap::fromPartsUnsafe($fieldEntries, $fieldIndex);
+      $subprotocol = $this->validateResponse(
+        $version,
+        $status,
+        $headers,
+        $expectedAccept,
+        $configuration->subprotocols,
+      );
+
+      return new ConnectionImpl(
+        $url,
+        $headers,
+        $stream,
+        $reader,
+        $cancellation,
+        $configuration,
+        $subprotocol,
+        $tlsState,
+      );
+    } catch (Throwable $error) {
+      $stream->close();
+      throw $error;
+    }
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private function validateResponse(
+    int $version,
+    int $status,
+    FieldMap $headers,
+    string $expectedAccept,
+    vec<string> $offeredSubprotocols,
+  ): null|string {
+    if ($version != 11 || $status != 101) {
+      throw new HandshakeException(
+        'the server did not switch to the WebSocket protocol',
+        $status as null|(100..=599),
+        $headers,
+      );
+    }
+
+    if (
+      !$this->hasToken($headers, 'connection', 'upgrade')
+      || !$this->hasToken($headers, 'upgrade', 'websocket')
+    ) {
+      throw new HandshakeException(
+        'the WebSocket response is missing its upgrade fields',
+        101,
+        $headers,
+      );
+    }
+
+    $accept = $headers->getAll('sec-websocket-accept');
+    if (
+      length!($accept) != 1
+      || Str\trim($accept[0], " \t") != $expectedAccept
+    ) {
+      throw new HandshakeException(
+        'the WebSocket response accept value is invalid',
+        101,
+        $headers,
+      );
+    }
+
+    if ($headers->has('sec-websocket-extensions')) {
+      throw new HandshakeException(
+        'the server selected an extension that was not offered',
+        101,
+        $headers,
+      );
+    }
+
+    $protocols = $headers->getAll('sec-websocket-protocol');
+    if (length!($protocols) == 0) {
+      return null;
+    }
+
+    $protocol = Str\trim($protocols[0], " \t");
+    if (
+      length!($protocols) != 1
+      || !http_valid_token($protocol)
+      || !contains!($offeredSubprotocols, $protocol)
+    ) {
+      throw new HandshakeException(
+        'the server selected an invalid WebSocket subprotocol',
+        101,
+        $headers,
+      );
+    }
+
+    return $protocol;
+  }
+
+  #[MustUse]
+  private function hasToken(
+    FieldMap $headers,
+    string $name,
+    string $token,
+  ): bool {
+    foreach ($headers->getAll($name) as $field) {
+      foreach (Str\split($field, ',') as $candidate) {
+        if (Str\lowercase(Str\trim($candidate, " \t")) == $token) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  #[MustUse]
+  private function requestFields(
+    URL $url,
+    Configuration $configuration,
+    string $key,
+  ): vec<(string, string)> {
+    $fields = $configuration->headers->toVec();
+    $fields[] = ('Host', $this->hostField($url));
+    $fields[] = ('Upgrade', 'websocket');
+    $fields[] = ('Connection', 'Upgrade');
+    $fields[] = ('Sec-WebSocket-Key', $key);
+    $fields[] = ('Sec-WebSocket-Version', '13');
+
+    if ($configuration->subprotocols != vec[]) {
+      $fields[] = (
+        'Sec-WebSocket-Protocol',
+        Str\join(', ', $configuration->subprotocols),
+      );
+    }
+
+    if ($configuration->origin != null) {
+      $fields[] = ('Origin', $configuration->origin);
+    }
+
+    return $fields;
+  }
+
+  #[MustUse]
+  private function hostField(URL $url): string {
+    $host = $url->authority->host->toString();
+    if ($url->authority->port != null) {
+      return $host . ':' . $url->authority->port;
+    }
+
+    return $host;
+  }
+
+  #[MustUse]
+  private function requestTarget(URL $url): string {
+    $target = match ($url->path) {
+      '' => '/',
+      $_ => $url->path,
+    };
+
+    if ($url->query != null) {
+      $target .= '?' . $url->query;
+    }
+
+    return $target;
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private function networkHost(URL $url): (Network\Host, NonEmptyString) {
+    return match ($url->authority->host) {
+      $host @ IPHost => (
+        $host->address,
+        $host->address->toString() as NonEmptyString,
+      ),
+      $host @ RegisteredNameHost => (
+        $host->name,
+        $host->name as NonEmptyString,
+      ),
+      $_ => throw new HandshakeException(
+        'an IPvFuture host cannot serve as a network endpoint',
+      ),
+    };
+  }
+}

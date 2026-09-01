@@ -1,0 +1,27 @@
+namespace Whim\Iterate;
+
+use Whim\Iterate\Iterator;
+use Whim\Marker\AlwaysInline;
+use Whim\_Private;
+
+/** Iterates over a snapshot of a data structure. */
+final class ArrayIterator<K, V> implements Iterator<K, V> {
+  private int $index = 0;
+  private vec<(K, V)> $entries;
+
+  /** Creates an iterator over the given values. */
+  #[AlwaysInline]
+  public function __construct(array<K, V> $values) {
+    $this->entries = _Private\array_entries($values);
+  }
+
+  /** Returns the next indexed value. */
+  #[AlwaysInline]
+  public function next(): null|(K, V) {
+    if ($this->index >= length!($this->entries)) {
+      return null;
+    }
+
+    return $this->entries[$this->index++];
+  }
+}

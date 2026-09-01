@@ -1,0 +1,87 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Encodes and decodes one WebSocket connection without performing I/O. */
+#[Stub]
+final class WebSocketCodec {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Creates a strict server-side codec with bounded input. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function server(
+    1.. $maximumMessageSize,
+    1.. $maximumFrameSize,
+  ): WebSocketCodec {}
+
+  /** Creates a strict client-side codec with bounded input. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function client(
+    1.. $maximumMessageSize,
+    1.. $maximumFrameSize,
+  ): WebSocketCodec {}
+
+  /** Supplies received bytes. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(string $bytes): void {}
+
+  /** Reports that the input transport ended. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function finishInput(): void {}
+
+  /** Returns the next text, binary, or close event. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function nextEvent(): null|(int, string, int) {}
+
+  /** Takes encoded bytes waiting for the transport. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeOutput(): string {}
+
+  /** Queues one text message. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendText(string $text): void {}
+
+  /** Queues one binary message. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function sendBinary(string $bytes): void {}
+
+  /** Queues a ping control message. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function ping(string $payload = ''): void {}
+
+  /** Starts a clean close handshake. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(null|int $code = null, string $reason = ''): void {}
+
+  /** Reports whether the connection reached its terminal state. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool {}
+}
+
+/** Validates a client handshake key and derives the server response. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function websocket_accept_key(string $key): null|string {}

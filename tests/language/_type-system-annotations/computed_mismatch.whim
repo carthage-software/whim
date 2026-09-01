@@ -1,0 +1,3 @@
+class ConstantComputedBad {
+  public const int X = 'a' . 'b';
+}

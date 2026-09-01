@@ -1,0 +1,18 @@
+namespace Whim\Math\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Math;
+
+/** Computes an overflow-safe midpoint. */
+#[TrackCaller]
+#[TraceBoundary]
+function midpoint(int|float $left, int|float $right): float {
+  if ($left is int && $right is int) {
+    $whole = Math\div($left, 2) + Math\div($right, 2);
+    $remainder = ($left % 2) + ($right % 2);
+    return $whole + $remainder / 2.0;
+  }
+
+  return $left / 2.0 + $right / 2.0;
+}

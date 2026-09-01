@@ -1,0 +1,92 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+$rendering = $work . '/rendering.whim';
+File\write(
+  $rendering,
+  'write_line!(\'before the throw\');'
+  . "\n"
+  . 'function detonate(): void {'
+  . "\n"
+  . '    throw new Whim\Unwind\Error(\'boom\', 9);'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'detonate();'
+  . "\n"
+  . 'write_line!(\'never reached\');'
+  . "\n",
+);
+
+$rendered = Command\run($binary, vec[$rendering]);
+assert!($rendered->status is Command\Exited);
+assert!(($rendered->status as Command\Exited)->code == 255);
+assert!($rendered->standardOutput == 'before the throw' . "\n");
+$assertion_value_5 = $rendered->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_5,
+    'uncaught Whim\Unwind\Error: boom (code 9)',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_5, 'Stack backtrace:'));
+assert!(Whim\Str\contains($assertion_value_5, 'detonate'));
+assert!(Whim\Str\contains($assertion_value_5, '{main}'));
+
+$tracked = $work . '/tracked-built-in-error.whim';
+File\write(
+  $tracked,
+  'function overflow(): void {'
+  . "\n"
+  . '    Whim\Math\div(Whim\Math\INT64_MIN, -1);'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'overflow();'
+  . "\n",
+);
+
+$traced = Command\run($binary, vec[$tracked]);
+assert!($traced->status is Command\Exited);
+assert!(($traced->status as Command\Exited)->code == 255);
+assert!(length!($traced->standardOutput) == 0);
+$assertion_value_9 = $traced->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_9,
+    'uncaught Whim\Unwind\OverflowException: integer division overflow (code 0)',
+  ),
+);
+
+assert!(
+  Whim\Str\contains($assertion_value_9, 'error: the exception was thrown here'),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_9,
+    'Whim\Math\div(Whim\Math\INT64_MIN, -1);',
+  ),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_9,
+    'note: raised inside Whim\Math\div (<std>/Math/arithmetic.whim:21)',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_9, 'Stack backtrace:'));
+assert!(Whim\Str\contains($assertion_value_9, 'Whim\Math\div'));
+assert!(Whim\Str\contains($assertion_value_9, '<std>/Math/arithmetic.whim:21'));
+assert!(Whim\Str\contains($assertion_value_9, 'overflow'));
+assert!(Whim\Str\contains($assertion_value_9, '{main}'));
+
+Filesystem\delete_directory($work, true);

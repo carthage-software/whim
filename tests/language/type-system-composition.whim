@@ -1,0 +1,333 @@
+use Whim\Autoload;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_type-system-composition/alias-names-void.whim',
+  'cannot alias bare `void`',
+);
+
+raises(
+  '_type-system-composition/negated-arity-is-not-inverted.whim',
+  'expects exactly 2 type argument(s), 1 provided',
+);
+
+raises(
+  '_type-system-composition/negated-diagnostic.whim',
+  'must be of type !null, null given',
+);
+
+raises(
+  '_type-system-composition/negated-variance.whim',
+  'the covariant type parameter `T` is used in an incompatible position',
+);
+
+raises(
+  '_type-system-composition/negated-void.whim',
+  '`void` is return-only and cannot be used in the negated type position',
+);
+
+raises(
+  '_type-system-composition/negated-wildcard.whim',
+  '`_` is an existential type pattern and cannot be negated',
+);
+
+raises(
+  '_type-system-composition/never-in-a-union.whim',
+  'a union with `never` is redundant',
+);
+
+raises(
+  '_type-system-composition/void-in-a-union.whim',
+  'cannot be a member of a union type',
+);
+
+raises(
+  '_type-system-composition/void-parameter-rejected.whim',
+  'cannot be used in the parameter position',
+);
+
+raises(
+  '_type-system-composition/void-property-rejected.whim',
+  'cannot be used in the property position',
+);
+
+interface LateIntersectionMarker {}
+
+type LateIntersectionEmpty = LateExternalUnion&LateIntersectionMarker;
+
+require!('_type-system-composition/late-external-union.whim');
+
+assert!(!(1 is LateIntersectionEmpty));
+
+assert!(1 is !Later\Thing);
+
+Autoload\register(
+  new Autoload\Autoloader()->withSymbolFiles(dict[
+    'Later\Thing' => beside(
+      '_type-system-composition/negated-autoload-thing.whim',
+    ),
+  ]),
+);
+
+$autoloaded_thing = new Later\Thing();
+assert!(!($autoloaded_thing is !Later\Thing));
+
+interface AliasIntersectionMarker {}
+
+type AliasedUnion = int|string;
+type AliasIntersectionEmpty = AliasedUnion&AliasIntersectionMarker;
+
+assert!(!(1 is AliasIntersectionEmpty));
+
+type Bottom = never;
+
+$empty_vector = vec[];
+assert!($empty_vector is vec<Bottom>);
+
+interface CollectionCountable {}
+
+type CollectionIntersectionEmpty = vec<never>&CollectionCountable;
+
+assert!(!(vec[] is CollectionIntersectionEmpty));
+
+interface ForwardIntersectionMarker {}
+
+type ForwardIntersectionEmpty = ForwardUnion&ForwardIntersectionMarker;
+type ForwardUnion = int|string;
+
+assert!(!('x' is ForwardIntersectionEmpty));
+
+interface GenericIntersectionMarker {}
+
+type Identity<T> = T;
+type GenericIntersectionEmpty = Identity<int|string>&GenericIntersectionMarker;
+
+assert!(!(1 is GenericIntersectionEmpty));
+
+interface GroupingA {}
+interface GroupingB {}
+interface GroupingC {}
+
+type Grouped = (GroupingA&GroupingB)|GroupingC;
+type GroupedNullable = (GroupingA&GroupingB)|null;
+type GroupedSingle = (GroupingA);
+
+function receive_never(never $value): void {}
+
+interface NominalA {}
+interface NominalB {}
+
+type NominalAlias = NominalA;
+type NominalGood = NominalAlias&NominalB;
+
+class NominalBoth implements NominalA, NominalB {}
+
+function accepts_nominal(NominalGood $value): void {}
+
+accepts_nominal(new NominalBoth());
+assert!(new NominalBoth() is NominalGood);
+
+interface ScalarIntersectionMarker {}
+
+type ScalarIntersectionEmpty = int&ScalarIntersectionMarker;
+
+assert!(!(1 is ScalarIntersectionEmpty));
+
+interface MixA {}
+interface MixB {}
+interface MixC {}
+
+type MixedComposed = MixA&MixB|MixC;
+
+class MixedBoth implements MixA, MixB {}
+class OnlyMixC implements MixC {}
+
+assert!(new MixedBoth() is MixedComposed);
+assert!(new OnlyMixC() is MixedComposed);
+
+interface UnionA {}
+interface UnionB {}
+interface UnionC {}
+
+type UnionComposed = (UnionA|UnionB)&UnionC;
+
+class UnionAC implements UnionA, UnionC {}
+class UnionBC implements UnionB, UnionC {}
+
+assert!(new UnionAC() is UnionComposed);
+assert!(new UnionBC() is UnionComposed);
+
+function returns_nothing(): void {}
+
+returns_nothing();
+
+type Excluding<A, B> = A&!B;
+type NonEmptyString = Excluding<string, ''>;
+type ScalarButNotString = Excluding<int|float|string|bool, string>;
+
+assert!(null is !never);
+assert!(!(null is !mixed));
+assert!(1 is !!int);
+assert!(!(1 is !!string));
+
+function returns_anything(): !never {
+  return 5;
+}
+
+assert!(returns_anything() == 5);
+
+assert!('whim' is NonEmptyString);
+assert!(!('' is NonEmptyString));
+assert!(1 is ScalarButNotString);
+assert!(1.5 is ScalarButNotString);
+assert!(true is ScalarButNotString);
+assert!(!('value' is ScalarButNotString));
+
+assert!(1 is int&!string);
+assert!(!(1 is string&int));
+assert!(1 is !(string|bool));
+assert!(!(1 is !(int|string)));
+assert!((1, 'x') is (!string, !int));
+assert!(1 as !string == 1);
+assert!(1 ?as !string == 1);
+assert!('x' ?as !string == null);
+
+$negated_callback = fn(mixed $value): int => 1;
+assert!($negated_callback is fn(!string): !bool);
+
+$negated_values = vec[1, 'x'];
+assert!($negated_values is vec<!bool>);
+$negated_values[] = false;
+assert!(!($negated_values is vec<!bool>));
+
+class NegatedA {}
+class NegatedB {}
+
+assert!(new NegatedA() is !NegatedB);
+assert!(!(new NegatedA() is !NegatedA));
+
+class NonNullBox<T: !null = int> {
+  public function __construct(public T $value) {}
+}
+
+$non_null_box = new NonNullBox::<int>(1);
+assert!($non_null_box->value == 1);
+$defaulted_non_null_box = new NonNullBox(2);
+assert!($defaulted_non_null_box->value == 2);
+
+class NegatedHolder {
+  public function __construct(public !null $value) {}
+}
+
+class NegatedStaticHolder {
+  public static !null $value = 1;
+  public const !null VALUE = 1;
+}
+
+$negated_holder = new NegatedHolder(1);
+$assertion_value_41 = function() use ($negated_holder): void {
+  $negated_holder->value = null;
+};
+
+$assertion_error_41 = null;
+try {
+  $assertion_value_41();
+} catch (TypeError $assertion_caught_41) {
+  $assertion_error_41 = $assertion_caught_41;
+}
+
+assert!($assertion_error_41 is TypeError);
+
+assert!($negated_holder->value == 1);
+
+$assertion_value_43 = function(): void {
+  NegatedStaticHolder::$value = null;
+};
+
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (TypeError $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is TypeError);
+
+assert!(NegatedStaticHolder::$value == 1);
+assert!(NegatedStaticHolder::VALUE == 1);
+
+class NegatedValid<out T> {
+  public function reject(!T $value): void {}
+}
+
+interface NegatedMarker<out T> {}
+
+class NotString implements NegatedMarker<!string> {}
+
+function accepts_non_empty(NegatedMarker<!''> $value): void {}
+
+accepts_non_empty(new NotString());
+
+interface NegatedSource<out T> {
+  public function get(): T;
+}
+
+class EmptySource implements NegatedSource<string&int> {
+  public function get(): never {
+    exit!(1);
+  }
+}
+
+function takes_bool_source(NegatedSource<bool> $source): void {}
+
+takes_bool_source(new EmptySource());
+
+class Anything<T: int|!int> {
+  public function __construct(public T $value) {}
+}
+
+$anything = new Anything::<string>('anything');
+assert!($anything->value == 'anything');
+
+class NegatedBase<T> {
+  public function __construct(public T $value) {}
+}
+
+class NegatedChild extends NegatedBase<!null> {}
+
+$negated_child = new NegatedChild(1);
+assert!($negated_child->value == 1);
+
+function non_null(!null $value): !null {
+  return $value;
+}
+
+assert!(non_null(1) == 1);
+
+$non_null_message = null;
+$assertion_callable_49 = function(): void {
+  non_null(null);
+};
+
+try {
+  $assertion_callable_49();
+} catch (TypeError $assertion_caught_49) {
+  $non_null_message = $assertion_caught_49;
+}
+
+assert!($non_null_message is TypeError);
+$non_null_message = $non_null_message->getMessage();
+
+assert!($non_null_message != '');
+
+$negated_catch_reached = false;
+try {
+  throw new RuntimeException('expected');
+} catch (!TypeError $error) {
+  $negated_catch_reached = true;
+}
+
+assert!($negated_catch_reached);

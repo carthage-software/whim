@@ -1,0 +1,16 @@
+namespace Whim\HTTP\Message;
+
+/** An HTTP protocol version. */
+enum ProtocolVersion: string {
+  /** HTTP/1.0. */
+  case V10 = 'HTTP/1.0';
+
+  /** HTTP/1.1. */
+  case V11 = 'HTTP/1.1';
+
+  /** HTTP/2. */
+  case V2 = 'HTTP/2';
+
+  /** HTTP/3. */
+  case V3 = 'HTTP/3';
+}

@@ -1,0 +1,9 @@
+function dive(int $n): int {
+  return dive($n + 1);
+}
+
+try {
+  dive(0);
+} catch (Whim\Unwind\StackOverflowError $e) {
+  write_line!('depth exceeded gracefully');
+}

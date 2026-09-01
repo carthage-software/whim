@@ -1,0 +1,99 @@
+namespace Whim\HTTP\WebSocket\Server;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\WebSocket\Connection;
+use Whim\Marker\TrackCaller;
+
+/** Adapts a callable into a WebSocket connection handler. */
+final readonly class FunctionConnectionHandler implements ConnectionHandler {
+  private (fn(Connection, Context, Request, CancellationToken): void) $function;
+
+  #[TrackCaller]
+  public function __construct(
+    (fn(Connection): void)
+    | (fn(Connection, Context): void)
+    | (fn(Connection, Request): void)
+    | (fn(Connection, CancellationToken): void)
+    | (fn(Connection, Context, Request): void)
+    | (fn(Connection, Context, CancellationToken): void)
+    | (fn(Connection, Request, CancellationToken): void)
+    | (fn(Connection, Context, Request, CancellationToken): void) $function,
+  ) {
+    $this->function = match ($function) {
+      $handler @ (fn(
+        Connection,
+        Context,
+        Request,
+        CancellationToken,
+      ): void) => $handler,
+      $handler @ (fn(Connection, Context, Request): void) => fn(
+        Connection $connection,
+        Context $context,
+        Request $request,
+        CancellationToken $_cancellation,
+      ): void {
+        $handler($connection, $context, $request);
+      },
+      $handler @ (fn(Connection, Context, CancellationToken): void) => fn(
+        Connection $connection,
+        Context $context,
+        Request $_request,
+        CancellationToken $cancellation,
+      ): void {
+        $handler($connection, $context, $cancellation);
+      },
+      $handler @ (fn(Connection, Request, CancellationToken): void) => fn(
+        Connection $connection,
+        Context $_context,
+        Request $request,
+        CancellationToken $cancellation,
+      ): void {
+        $handler($connection, $request, $cancellation);
+      },
+      $handler @ (fn(Connection, Context): void) => fn(
+        Connection $connection,
+        Context $context,
+        Request $_request,
+        CancellationToken $_cancellation,
+      ): void {
+        $handler($connection, $context);
+      },
+      $handler @ (fn(Connection, Request): void) => fn(
+        Connection $connection,
+        Context $_context,
+        Request $request,
+        CancellationToken $_cancellation,
+      ): void {
+        $handler($connection, $request);
+      },
+      $handler @ (fn(Connection, CancellationToken): void) => fn(
+        Connection $connection,
+        Context $_context,
+        Request $_request,
+        CancellationToken $cancellation,
+      ): void {
+        $handler($connection, $cancellation);
+      },
+      $handler @ (fn(Connection): void) => fn(
+        Connection $connection,
+        Context $_context,
+        Request $_request,
+        CancellationToken $_cancellation,
+      ): void {
+        $handler($connection);
+      },
+    };
+  }
+
+  #[TrackCaller]
+  public function handle(
+    Connection $connection,
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): void {
+    ($this->function)($connection, $context, $request, $cancellation);
+  }
+}

@@ -1,0 +1,9 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\MustUse;
+
+/** Returns the current process identifier. */
+#[Stub]
+#[MustUse]
+function getmypid(): (1..) {}

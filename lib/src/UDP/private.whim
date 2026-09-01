@@ -1,0 +1,87 @@
+namespace Whim\UDP\_Private;
+
+use Whim;
+use Whim\IP\Family;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\UDP\BindConfiguration;
+
+/** Applies UDP socket options before binding. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function configure(
+  FileDescriptor $descriptor,
+  Family $family,
+  BindConfiguration $configuration,
+): void {
+  $reuseAddress = 0;
+  if ($configuration->reuseAddress) {
+    $reuseAddress = 1;
+  }
+
+  Whim\_Private\set_socket_option(
+    $descriptor,
+    Whim\_Private\SOCKET_LEVEL_SOCKET,
+    Whim\_Private\SOCKET_OPTION_REUSE_ADDRESS,
+    $reuseAddress,
+  );
+
+  $reusePort = 0;
+  if ($configuration->reusePort) {
+    $reusePort = 1;
+  }
+
+  Whim\_Private\set_socket_option(
+    $descriptor,
+    Whim\_Private\SOCKET_LEVEL_SOCKET,
+    Whim\_Private\SOCKET_OPTION_REUSE_PORT,
+    $reusePort,
+  );
+
+  $broadcast = 0;
+  if ($configuration->broadcast) {
+    $broadcast = 1;
+  }
+
+  Whim\_Private\set_socket_option(
+    $descriptor,
+    Whim\_Private\SOCKET_LEVEL_SOCKET,
+    Whim\_Private\SOCKET_OPTION_BROADCAST,
+    $broadcast,
+  );
+
+  if ($family == Family::V6) {
+    $onlyIPv6 = 0;
+    if ($configuration->onlyIPv6) {
+      $onlyIPv6 = 1;
+    }
+
+    Whim\_Private\set_socket_option(
+      $descriptor,
+      Whim\_Private\SOCKET_LEVEL_INET6,
+      Whim\_Private\SOCKET_OPTION_ONLY_INET6,
+      $onlyIPv6,
+    );
+  }
+
+  if ($configuration->receiveBuffer != null) {
+    Whim\_Private\set_socket_option(
+      $descriptor,
+      Whim\_Private\SOCKET_LEVEL_SOCKET,
+      Whim\_Private\SOCKET_OPTION_RECEIVE_BUFFER,
+      $configuration->receiveBuffer,
+    );
+  }
+
+  if ($configuration->sendBuffer != null) {
+    Whim\_Private\set_socket_option(
+      $descriptor,
+      Whim\_Private\SOCKET_LEVEL_SOCKET,
+      Whim\_Private\SOCKET_OPTION_SEND_BUFFER,
+      $configuration->sendBuffer,
+    );
+  }
+}

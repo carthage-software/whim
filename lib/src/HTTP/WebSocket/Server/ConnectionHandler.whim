@@ -1,0 +1,19 @@
+namespace Whim\HTTP\WebSocket\Server;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\WebSocket\Connection;
+use Whim\Marker\TrackCaller;
+
+/** Handles one accepted WebSocket connection. */
+interface ConnectionHandler {
+  /** Runs the connection until the application is finished with it. */
+  #[TrackCaller]
+  public function handle(
+    Connection $connection,
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): void;
+}

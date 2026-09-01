@@ -1,0 +1,4 @@
+class C {
+  public const int X = 1;
+  public const int X = 2;
+}

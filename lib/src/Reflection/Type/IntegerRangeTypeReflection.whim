@@ -1,0 +1,59 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Type\TypeId;
+
+/** Describes an integer range type. */
+#[Stub]
+final class IntegerRangeTypeReflection implements TypeReflection {
+  private function __construct() {}
+
+  /** Returns the structural kind of this type. */
+  #[MustUse]
+  public function getKind(): TypeKind {}
+
+  /** Reports whether this type is fully resolved. */
+  #[MustUse]
+  public function isResolved(): bool {}
+
+  /** Returns this closed type's engine-local identity. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getId(): TypeId {}
+
+  /** Returns a diagnostic spelling of this type. */
+  #[MustUse]
+  public function toString(): string {}
+
+  /** Resolves generic parameters and an optional late-bound class. */
+  #[MustUse]
+  public function resolve(
+    null|TypeEnvironmentReflection $environment = null,
+    null|ClassTypeReflection $calledType = null,
+  ): TypeReflection {}
+
+  /** Reports whether a value satisfies this closed type. */
+  #[MustUse]
+  #[TrackCaller]
+  public function accepts(mixed $value): bool {}
+
+  /** Reports whether another reflected type has the same meaning. */
+  #[MustUse]
+  public function equals(TypeReflection $other): bool {}
+
+  /** Reports whether this closed type is a subtype of another. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isSubtypeOf(TypeReflection $other): bool {}
+
+  /** Returns the inclusive lower bound, or null when unbounded. */
+  #[MustUse]
+  public function getLowerBound(): null|int {}
+
+  /** Returns the inclusive upper bound, or null when unbounded. */
+  #[MustUse]
+  public function getUpperBound(): null|int {}
+}

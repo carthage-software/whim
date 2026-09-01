@@ -1,0 +1,7 @@
+class ParentValue {
+  public int|string $value = 1;
+}
+
+class ChildValue extends ParentValue {
+  public int $value = 1;
+}

@@ -1,0 +1,35 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Network\Port;
+use Whim\Refine\NonEmptyString;
+use Whim\URI\Host;
+use Whim\URL\URL;
+
+/** Identifies a connection pool by scheme, host, and port. */
+final readonly class Origin {
+  #[AlwaysInline]
+  private function __construct(
+    public NonEmptyString $scheme,
+    public Host $host,
+    public Port $port,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromURL(URL $url): Origin {
+    $port = $url->authority->port;
+    if ($port == null) {
+      $port = match ($url->scheme) {
+        'http' => 80,
+        'https' => 443,
+        $_ => throw new RequestException(
+          'unsupported HTTP URL scheme: `' . $url->scheme . '`',
+        ),
+      };
+    }
+
+    return new Origin($url->scheme, $url->authority->host, $port);
+  }
+}

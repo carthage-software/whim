@@ -1,0 +1,53 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\FunctionTypeReflection;
+
+/** Describes one callable value, including reified and bound state. */
+#[Stub]
+final class CallableValueReflection {
+  private function __construct() {}
+
+  /** Returns how this callable value was formed. */
+  #[MustUse]
+  public function getKind(): CallableKind {}
+
+  /** Returns the originating function, method, or closure declaration. */
+  #[MustUse]
+  public function getDeclaration(): CallableReflection {}
+
+  /** Returns the callable's current structural type. */
+  #[MustUse]
+  public function getType(): FunctionTypeReflection {}
+
+  /** Returns all class, function, method, and closure type bindings. */
+  #[MustUse]
+  public function getTypeEnvironment(): TypeEnvironmentReflection {}
+
+  /** Returns the bound method receiver, when present. */
+  #[MustUse]
+  public function getBoundObject(): null|object {}
+
+  /** Returns the lexical class scope carried by this callable. */
+  #[MustUse]
+  public function getScopeClass(): null|ClassLikeReflection {}
+
+  /**
+   * Returns the late-bound called class specialization carried by this
+   * callable.
+   */
+  #[MustUse]
+  public function getCalledType(): null|ClassTypeReflection {}
+
+  /** Returns this callable value's captured values. */
+  #[MustUse]
+  public function getCaptures(): vec<CaptureValueReflection> {}
+
+  /** Returns arguments fixed by a partial application. */
+  #[MustUse]
+  public function getBoundArguments(): vec<BoundArgumentReflection> {}
+}

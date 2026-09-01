@@ -1,0 +1,4 @@
+abstract class CompileEvent for CompileLogin {}
+
+class CompileLogin extends CompileEvent {}
+class CompileLogout extends CompileEvent {}

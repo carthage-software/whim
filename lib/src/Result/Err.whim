@@ -1,0 +1,133 @@
+namespace Whim\Result;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\Frameless;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Option\None;
+use Whim\Option\Some;
+use Whim\Refine\Consumer;
+use Whim\Refine\Transform;
+use Whim\Unwind\LogicException;
+
+/** Represents a failed result containing an error. */
+final readonly class Err<out E> implements Result<never, E> {
+  /** Creates a failed result. */
+  #[AlwaysInline]
+  public function __construct(public E $error) {}
+
+  /** Reports whether the result is successful. */
+  #[Frameless]
+  #[MustUse]
+  public function isOk(): false {
+    return false;
+  }
+
+  /** Reports whether the result is an error. */
+  #[Frameless]
+  #[MustUse]
+  public function isErr(): true {
+    return true;
+  }
+
+  /**
+   * Returns the contained success value or fails.
+   *
+   * @throws LogicException always, because an Err holds no value.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function unwrap(): never {
+    throw new LogicException('called unwrap() on an Err');
+  }
+
+  /** Returns the contained error value or fails. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function unwrapErr(): E {
+    return $this->error;
+  }
+
+  /** Returns the contained value or the supplied default. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function unwrapOr<D>(D $default): D {
+    return $default;
+  }
+
+  /** Returns the contained value or computes a fallback. */
+  #[MustUse]
+  #[TrackCaller]
+  public function unwrapOrElse<D>(Transform<E, D> $fallback): D {
+    return $fallback($this->error);
+  }
+
+  /** Transforms the contained success value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function map<U>(Transform<never, U> $function): Err<E> {
+    return $this;
+  }
+
+  /** Transforms the contained error value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function mapErr<F>(Transform<E, F> $function): Err<F> {
+    return new Err::<F>($function($this->error));
+  }
+
+  /** Transforms the contained value or returns a default. */
+  #[MustUse]
+  #[TrackCaller]
+  public function mapOr<U>(U $default, Transform<never, U> $function): U {
+    return $default;
+  }
+
+  /** Chains another operation after a successful value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function andThen<U, F>(
+    Transform<never, Result<U, F>> $function,
+  ): Err<E> {
+    return $this;
+  }
+
+  /** Recovers from an error or absent value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function orElse<V, F>(
+    Transform<E, Result<V, F>> $function,
+  ): Result<V, F> {
+    return $function($this->error);
+  }
+
+  /** Returns the success value as an option. */
+  #[MustUse]
+  #[TrackCaller]
+  public function ok(): None {
+    return new None();
+  }
+
+  /** Returns the error value as an option. */
+  #[MustUse]
+  #[TrackCaller]
+  public function err(): Some<E> {
+    return new Some::<E>($this->error);
+  }
+
+  /** Observes a contained success value without changing it. */
+  #[MustUse]
+  #[TrackCaller]
+  public function inspect(Consumer<never> $function): Err<E> {
+    return $this;
+  }
+
+  /** Observes a contained error value without changing it. */
+  #[MustUse]
+  #[TrackCaller]
+  public function inspectErr(Consumer<E> $function): Err<E> {
+    $function($this->error);
+    return $this;
+  }
+}

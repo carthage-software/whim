@@ -1,0 +1,16 @@
+[book]
+title = "The Whim Programming Language"
+description = "A guide to the Whim programming language."
+authors = ["Seifeddine Gmati"]
+language = "en"
+src = "src"
+
+[build]
+create-missing = false
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "navy"
+site-url = "/whim/"
+git-repository-url = "https://github.com/carthage-software/whim"
+edit-url-template = "https://github.com/carthage-software/whim/edit/main/docs/{path}"

@@ -1,0 +1,8 @@
+namespace Whim\Unix;
+
+use Whim\IO\FileDescriptorHandle;
+use Whim\Network\Stream as NetworkStream;
+use Whim\Network\UnixEndpoint;
+
+/** A connected Unix-domain byte stream. */
+interface Stream extends NetworkStream<UnixEndpoint>, FileDescriptorHandle {}

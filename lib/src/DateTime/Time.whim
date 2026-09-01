@@ -1,0 +1,153 @@
+namespace Whim\DateTime;
+
+use Whim;
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable clock time without a date or timezone. */
+final readonly class Time implements Order<Time>, ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public Hour $hour,
+    public Minute $minute,
+    public Second $second,
+    public Nanosecond $nanosecond,
+  ) {}
+
+  /** Creates a valid civil time. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    Hour $hour,
+    Minute $minute,
+    Second $second = 0,
+    Nanosecond $nanosecond = 0,
+  ): Time {
+    if (
+      !Whim\_Private\date_time_is_valid_time(
+        $hour,
+        $minute,
+        $second,
+        $nanosecond,
+      )
+    ) {
+      throw new InvalidArgumentException('invalid civil time');
+    }
+
+    return new Time($hour, $minute, $second, $nanosecond);
+  }
+
+  /** Creates a time from fields already checked by the date-time engine. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    int $hour,
+    int $minute,
+    int $second,
+    int $nanosecond,
+  ): Time {
+    return new Time(
+      $hour as Hour,
+      $minute as Minute,
+      $second as Second,
+      $nanosecond as Nanosecond,
+    );
+  }
+
+  /** Parses an ISO time, or returns null. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $value): null|Time {
+    $parts = Whim\_Private\date_time_parse_time($value) ?? return null;
+
+    return Time::fromPartsUnsafe($parts[0], $parts[1], $parts[2], $parts[3]);
+  }
+
+  /** Parses an ISO time. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $value): Time {
+    $time = Time::parse($value);
+    if ($time == null) {
+      throw new InvalidArgumentException(
+        'invalid civil time: `' . $value . '`',
+      );
+    }
+
+    return $time;
+  }
+
+  /** Returns this time's half of the day. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function meridiem(): Meridiem {
+    return Meridiem::fromHour($this->hour);
+  }
+
+  /** Returns this time's hour on a twelve-hour clock. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function hourOfMeridiem(): HourOfMeridiem {
+    $hour = $this->hour % 12;
+    return match ($hour) {
+      0 => 12,
+      $_ => $hour as HourOfMeridiem,
+    };
+  }
+
+  /** Formats this time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function format(Formatter $formatter): string {
+    return $formatter->formatTime($this);
+  }
+
+  /** Returns this time in ISO form. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    return Formatter::isoTime()->formatTime($this);
+  }
+
+  /** Compares this time with another. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(Time $other): Ordering {
+    $ordering = Ordering::from($this->hour <=> $other->hour);
+    if (!$ordering->isEqual()) {
+      return $ordering;
+    }
+
+    $ordering = Ordering::from($this->minute <=> $other->minute);
+    if (!$ordering->isEqual()) {
+      return $ordering;
+    }
+
+    $ordering = Ordering::from($this->second <=> $other->second);
+    if (!$ordering->isEqual()) {
+      return $ordering;
+    }
+
+    return Ordering::from($this->nanosecond <=> $other->nanosecond);
+  }
+
+  /** Reports whether two times are equal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Time $other): bool {
+    return (
+      $this->hour == $other->hour
+      && $this->minute == $other->minute
+      && $this->second == $other->second
+      && $this->nanosecond == $other->nanosecond
+    );
+  }
+}

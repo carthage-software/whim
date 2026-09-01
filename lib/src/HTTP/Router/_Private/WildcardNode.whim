@@ -1,0 +1,19 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** A trailing route wildcard. */
+final readonly class WildcardNode implements Node {
+  #[AlwaysInline]
+  #[MustUse]
+  public function expression(): string {
+    return '(?P<' . WILDCARD_CAPTURE . '>.*)';
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function parameterNames(): vec<string> {
+    return vec['*'];
+  }
+}

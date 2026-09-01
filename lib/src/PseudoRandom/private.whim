@@ -1,0 +1,6 @@
+namespace Whim\PseudoRandom\_Private;
+
+use Whim\RandomSequence\MersenneTwisterSequence;
+
+/** The process-wide pseudo-random sequence. */
+const RANDOM_SEQUENCE = MersenneTwisterSequence::fromSecureSeed();

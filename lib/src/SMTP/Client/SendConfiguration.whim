@@ -1,0 +1,72 @@
+namespace Whim\SMTP\Client;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\SMTP\DeliverBy;
+use Whim\SMTP\DeliveryStatusNotification;
+use Whim\SMTP\DeliveryStatusReturn;
+use Whim\SMTP\Priority;
+
+/** Configures one SMTP delivery attempt. */
+final readonly class SendConfiguration {
+  #[AlwaysInline]
+  public function __construct(
+    public null|DeliveryStatusReturn $deliveryStatusReturn = null,
+    public null|string $envelopeIdentifier = null,
+    public vec<DeliveryStatusNotification> $deliveryStatusNotifications = vec[],
+    public bool $requireTls = false,
+    public null|Priority $priority = null,
+    public null|DeliverBy $deliverBy = null,
+    public null|FutureRelease $futureRelease = null,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withDeliveryStatusReturn(
+    null|DeliveryStatusReturn $return,
+  ): SendConfiguration {
+    return clone!($this, deliveryStatusReturn: $return);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withEnvelopeIdentifier(
+    null|string $identifier,
+  ): SendConfiguration {
+    return clone!($this, envelopeIdentifier: $identifier);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withDeliveryStatusNotifications(
+    vec<DeliveryStatusNotification> $notifications,
+  ): SendConfiguration {
+    return clone!($this, deliveryStatusNotifications: $notifications);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withRequiredTls(bool $required): SendConfiguration {
+    return clone!($this, requireTls: $required);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withPriority(null|Priority $priority): SendConfiguration {
+    return clone!($this, priority: $priority);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withDeliverBy(null|DeliverBy $deliverBy): SendConfiguration {
+    return clone!($this, deliverBy: $deliverBy);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withFutureRelease(
+    null|FutureRelease $futureRelease,
+  ): SendConfiguration {
+    return clone!($this, futureRelease: $futureRelease);
+  }
+}

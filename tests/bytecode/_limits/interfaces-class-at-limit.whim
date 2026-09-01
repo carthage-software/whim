@@ -1,0 +1,131 @@
+namespace Limits\interfaces_class_at_limit;
+
+interface I0 {}
+interface I1 {}
+interface I2 {}
+interface I3 {}
+interface I4 {}
+interface I5 {}
+interface I6 {}
+interface I7 {}
+interface I8 {}
+interface I9 {}
+interface I10 {}
+interface I11 {}
+interface I12 {}
+interface I13 {}
+interface I14 {}
+interface I15 {}
+interface I16 {}
+interface I17 {}
+interface I18 {}
+interface I19 {}
+interface I20 {}
+interface I21 {}
+interface I22 {}
+interface I23 {}
+interface I24 {}
+interface I25 {}
+interface I26 {}
+interface I27 {}
+interface I28 {}
+interface I29 {}
+interface I30 {}
+interface I31 {}
+interface I32 {}
+interface I33 {}
+interface I34 {}
+interface I35 {}
+interface I36 {}
+interface I37 {}
+interface I38 {}
+interface I39 {}
+interface I40 {}
+interface I41 {}
+interface I42 {}
+interface I43 {}
+interface I44 {}
+interface I45 {}
+interface I46 {}
+interface I47 {}
+interface I48 {}
+interface I49 {}
+interface I50 {}
+interface I51 {}
+interface I52 {}
+interface I53 {}
+interface I54 {}
+interface I55 {}
+interface I56 {}
+interface I57 {}
+interface I58 {}
+interface I59 {}
+interface I60 {}
+interface I61 {}
+interface I62 {}
+interface I63 {}
+class C implements
+  I0,
+  I1,
+  I2,
+  I3,
+  I4,
+  I5,
+  I6,
+  I7,
+  I8,
+  I9,
+  I10,
+  I11,
+  I12,
+  I13,
+  I14,
+  I15,
+  I16,
+  I17,
+  I18,
+  I19,
+  I20,
+  I21,
+  I22,
+  I23,
+  I24,
+  I25,
+  I26,
+  I27,
+  I28,
+  I29,
+  I30,
+  I31,
+  I32,
+  I33,
+  I34,
+  I35,
+  I36,
+  I37,
+  I38,
+  I39,
+  I40,
+  I41,
+  I42,
+  I43,
+  I44,
+  I45,
+  I46,
+  I47,
+  I48,
+  I49,
+  I50,
+  I51,
+  I52,
+  I53,
+  I54,
+  I55,
+  I56,
+  I57,
+  I58,
+  I59,
+  I60,
+  I61,
+  I62,
+  I63 {}

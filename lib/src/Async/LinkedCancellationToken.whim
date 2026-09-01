@@ -1,0 +1,128 @@
+namespace Whim\Async;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Reference\Weak;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\Throwable;
+use Whim\_Private\CallbackRegistry;
+
+/** Represents a linked cancellation token. */
+final class LinkedCancellationToken implements CancellationToken {
+  private bool $cancelled = false;
+  private null|CancelledException $exception = null;
+  private CallbackRegistry $callbacks;
+  private vec<(CancellationToken, int)> $subscriptions = vec[];
+
+  /**
+   * Creates a linked cancellation token.
+   *
+   * @throws InvalidArgumentException when no token is given.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(array<_, CancellationToken> $tokens) {
+    $this->callbacks = new CallbackRegistry();
+    if (length!($tokens) == 0) {
+      throw new InvalidArgumentException(
+        'a linked cancellation token requires at least one token to link',
+      );
+    }
+
+    $weak = new Weak::<LinkedCancellationToken>($this);
+    foreach ($tokens as $token) {
+      $id = $token->register(fn(): void {
+        $linked = $weak->get();
+        if ($linked != null) {
+          $linked->cancelFromSource();
+        }
+      });
+
+      if ($this->cancelled) {
+        $token->unregister($id);
+        break;
+      }
+
+      $this->subscriptions[] = ($token, $id);
+    }
+  }
+
+  public function __destruct(): void {
+    $subscriptions = $this->subscriptions;
+    $this->subscriptions = vec[];
+    foreach ($subscriptions as ($token, $id)) {
+      try {
+        $token->unregister($id);
+      } catch (Throwable $_) {
+      }
+    }
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  private function cancelFromSource(): void {
+    if ($this->cancelled) {
+      return;
+    }
+
+    $this->cancelled = true;
+    $this->exception = new CancelledException('the operation was cancelled');
+
+    $subscriptions = $this->subscriptions;
+    $this->subscriptions = vec[];
+    foreach ($subscriptions as ($token, $id)) {
+      $token->unregister($id);
+    }
+
+    $callbacks = $this->callbacks->drain();
+    $errors = vec[];
+    foreach ($callbacks as $callback) {
+      try {
+        $callback();
+      } catch (Throwable $error) {
+        $errors[] = $error;
+      }
+    }
+
+    if (length!($errors) == 1) {
+      throw $errors[0];
+    }
+
+    if (length!($errors) > 1) {
+      throw new CompositeException($errors);
+    }
+  }
+
+  /** Registers a callback for cancellation. */
+  #[TrackCaller]
+  public function register(fn(): void $callback): int {
+    if ($this->cancelled) {
+      $callback();
+      return -1;
+    }
+
+    return $this->callbacks->insert($callback);
+  }
+
+  /** Removes a registered cancellation callback. */
+  #[TrackCaller]
+  public function unregister(int $id): void {
+    $this->callbacks->remove($id);
+  }
+
+  /** Reports whether cancellation was requested. */
+  #[AlwaysInline]
+  public function isCancellationRequested(): bool {
+    return $this->cancelled;
+  }
+
+  /** Throws when cancellation was requested. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function throwIfCancellationRequested(): void {
+    if ($this->exception != null) {
+      throw $this->exception;
+    }
+  }
+}

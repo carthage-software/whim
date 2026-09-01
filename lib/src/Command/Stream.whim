@@ -1,0 +1,151 @@
+namespace Whim\Command;
+
+use Whim\IO\FileDescriptorHandle;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Says what a child's standard stream is connected to. */
+interface Stream for InputStream, OutputStream {
+  /** The engine disposition this stream resolves to. */
+  #[MustUse]
+  public function getDisposition(): Disposition;
+}
+
+/** A disposition valid for a child's standard input. */
+interface InputStream extends
+  Stream for
+  Piped,
+  Inherited,
+  Discarded,
+  AttachedInput,
+  Terminal {}
+
+/** A disposition valid for a child's standard output or error. */
+interface OutputStream extends
+  Stream for
+  Piped,
+  Inherited,
+  Discarded,
+  AttachedOutput,
+  Terminal {}
+
+/** Connects the stream to a pipe the parent holds the other end of. */
+final readonly class Piped implements InputStream, OutputStream {
+  #[AlwaysInline]
+  public function __construct() {}
+
+  /** The engine disposition this stream resolves to. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getDisposition(): Disposition {
+    return Disposition::Piped;
+  }
+}
+
+/** Hands the parent's own stream to the child. */
+final readonly class Inherited implements InputStream, OutputStream {
+  /** The engine disposition this stream resolves to. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getDisposition(): Disposition {
+    return Disposition::Inherited;
+  }
+}
+
+/** Connects the stream to nothing, discarding reads and writes. */
+final readonly class Discarded implements InputStream, OutputStream {
+  /** The engine disposition this stream resolves to. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getDisposition(): Disposition {
+    return Disposition::Discarded;
+  }
+}
+
+/** Connects a child's input to a readable handle the caller already holds. */
+final readonly class AttachedInput implements InputStream {
+  #[AlwaysInline]
+  public function __construct(
+    public readonly FileDescriptorHandle&ReadHandle $handle,
+  ) {}
+
+  /** The engine disposition this stream resolves to. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getDisposition(): Disposition {
+    return Disposition::Attached;
+  }
+}
+
+/** Connects a child's output to a writable handle the caller already holds. */
+final readonly class AttachedOutput implements OutputStream {
+  #[AlwaysInline]
+  public function __construct(
+    public readonly FileDescriptorHandle&WriteHandle $handle,
+  ) {}
+
+  /** The engine disposition this stream resolves to. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getDisposition(): Disposition {
+    return Disposition::Attached;
+  }
+}
+
+/** Connects the stream to the controlling terminal. */
+final readonly class Terminal implements InputStream, OutputStream {
+  /** The engine disposition this stream resolves to. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getDisposition(): Disposition {
+    return Disposition::Terminal;
+  }
+}
+
+/** Connects the stream to a pipe. */
+#[AlwaysInline]
+#[MustUse]
+function piped(): Piped {
+  return new Piped();
+}
+
+/** Hands the parent's own stream to the child. */
+#[AlwaysInline]
+#[MustUse]
+function inherited(): Inherited {
+  return new Inherited();
+}
+
+/** Connects the stream to nothing. */
+#[AlwaysInline]
+#[MustUse]
+function discarded(): Discarded {
+  return new Discarded();
+}
+
+/** Connects a child's input to a readable descriptor-backed handle. */
+#[AlwaysInline]
+#[MustUse]
+function attached_input(
+  FileDescriptorHandle&ReadHandle $handle,
+): AttachedInput {
+  return new AttachedInput($handle);
+}
+
+/** Connects a child's output to a writable descriptor-backed handle. */
+#[AlwaysInline]
+#[MustUse]
+function attached_output(
+  FileDescriptorHandle&WriteHandle $handle,
+): AttachedOutput {
+  return new AttachedOutput($handle);
+}
+
+/** Connects the stream to the controlling terminal. */
+#[AlwaysInline]
+#[MustUse]
+function terminal(): Terminal {
+  return new Terminal();
+}

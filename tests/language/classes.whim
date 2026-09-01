@@ -1,0 +1,781 @@
+use Whim\Async;
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\GC;
+use Whim\Unwind\ReadonlyError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedSymbolError;
+use Whim\Unwind\UninitializedPropertyError;
+use Whim\Unwind\VisibilityError;
+
+require!('_reject.whim');
+require!('_process.whim');
+
+class SharedCounter {
+  public int $count = 0;
+
+  public function bump(): void {
+    $this->count = $this->count + 1;
+  }
+}
+
+$first_counter = new SharedCounter();
+$second_counter = $first_counter;
+$second_counter->bump();
+$first_counter->bump();
+assert!($first_counter->count == 2);
+assert!($second_counter->count == 2);
+
+class UninitializedBag {
+  public int $x;
+}
+
+$assertion_value_3 = function(): void {
+  $bag = new UninitializedBag();
+  $bag->x;
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (UninitializedPropertyError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is UninitializedPropertyError);
+
+class InitializedBag {
+  public int $x = 1;
+}
+
+$assertion_value_4 = function(): void {
+  $bag = new InitializedBag();
+  $bag->missing;
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (TypeError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is TypeError);
+
+$assertion_value_5 = function(): void {
+  $number = 5;
+  $number->x;
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (TypeError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is TypeError);
+
+class SealedBox {
+  private int $secret = 1;
+}
+
+$assertion_value_6 = function(): void {
+  $sealed = new SealedBox();
+  $sealed->secret;
+};
+
+$assertion_error_6 = null;
+try {
+  $assertion_value_6();
+} catch (VisibilityError $assertion_caught_6) {
+  $assertion_error_6 = $assertion_caught_6;
+}
+
+assert!($assertion_error_6 is VisibilityError);
+
+class ProtectedBase {
+  protected int $shared = 7;
+}
+
+class ProtectedChild extends ProtectedBase {
+  public function reveal(): int {
+    return $this->shared;
+  }
+}
+
+assert!(new ProtectedChild()->reveal() == 7);
+
+class PrivateBase {
+  private int $secret = 1;
+}
+
+class PrivateChild extends PrivateBase {
+  public function reveal(): int {
+    return $this->secret;
+  }
+}
+
+$assertion_value_8 = function(): void {
+  new PrivateChild()->reveal();
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (VisibilityError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is VisibilityError);
+
+class LockedMethods {
+  private function hidden(): void {}
+}
+
+$assertion_value_9 = function(): void {
+  new LockedMethods()->hidden();
+};
+
+$assertion_error_9 = null;
+try {
+  $assertion_value_9();
+} catch (VisibilityError $assertion_caught_9) {
+  $assertion_error_9 = $assertion_caught_9;
+}
+
+assert!($assertion_error_9 is VisibilityError);
+
+class ReadonlyUser {
+  public readonly int $id;
+
+  public function __construct(int $id) {
+    $this->id = $id;
+  }
+}
+
+assert!(new ReadonlyUser(42)->id == 42);
+
+class DoubleWriteUser {
+  public readonly int $id;
+
+  public function __construct() {
+    $this->id = 1;
+    $this->id = 2;
+  }
+}
+
+$assertion_value_11 = function(): void {
+  new DoubleWriteUser();
+};
+
+$assertion_error_11 = null;
+try {
+  $assertion_value_11();
+} catch (ReadonlyError $assertion_caught_11) {
+  $assertion_error_11 = $assertion_caught_11;
+}
+
+assert!($assertion_error_11 is ReadonlyError);
+
+class OnceWrittenUser {
+  public readonly int $id;
+
+  public function __construct() {
+    $this->id = 1;
+  }
+}
+
+$assertion_value_12 = function(): void {
+  $user = new OnceWrittenUser();
+  $user->id = 9;
+};
+
+$assertion_error_12 = null;
+try {
+  $assertion_value_12();
+} catch (ReadonlyError $assertion_caught_12) {
+  $assertion_error_12 = $assertion_caught_12;
+}
+
+assert!($assertion_error_12 is ReadonlyError);
+
+class ReadonlyParentValue {
+  public readonly int $id;
+}
+
+class ReadonlyChildValue extends ReadonlyParentValue {
+  public function __construct() {
+    $this->id = 1;
+  }
+}
+
+$readonlyChildValue = new ReadonlyChildValue();
+assert!($readonlyChildValue->id == 1);
+
+class ProtectedReadonlyParentValue {
+  protected readonly int $id;
+
+  public function id(): int {
+    return $this->id;
+  }
+}
+
+class ProtectedReadonlyChildValue extends ProtectedReadonlyParentValue {
+  public function __construct() {
+    $this->id = 2;
+  }
+}
+
+$protectedReadonlyChildValue = new ProtectedReadonlyChildValue();
+assert!($protectedReadonlyChildValue->id() == 2);
+
+class PrivateReadonlyParentValue {
+  private readonly int $id;
+}
+
+class PrivateReadonlyChildValue extends PrivateReadonlyParentValue {
+  public function __construct() {
+    $this->id = 3;
+  }
+}
+
+$assertion_value_15 = function(): void {
+  new PrivateReadonlyChildValue();
+};
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (VisibilityError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is VisibilityError);
+
+class ClonePoint {
+  public function __construct(public int $x, public int $y) {}
+}
+
+$clone_source = new ClonePoint(1, 2);
+$clone_copy = clone!($clone_source, y: 9);
+$clone_source->x = 100;
+assert!(($clone_source->x, $clone_source->y) == (100, 2));
+assert!(($clone_copy->x, $clone_copy->y) == (1, 9));
+
+class NarrowPoint {
+  public function __construct(public int $x) {}
+}
+
+$assertion_value_18 = function(): void {
+  $point = new NarrowPoint(1);
+  clone!($point, z: 2);
+};
+
+$assertion_error_18 = null;
+try {
+  $assertion_value_18();
+} catch (TypeError $assertion_caught_18) {
+  $assertion_error_18 = $assertion_caught_18;
+}
+
+assert!($assertion_error_18 is TypeError);
+
+$assertion_value_19 = function(): void {
+  clone!(5);
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is TypeError);
+
+class StaticRegistry {
+  public static int $count = 0;
+
+  public static function bump(): void {
+    StaticRegistry::$count = StaticRegistry::$count + 1;
+  }
+}
+
+StaticRegistry::bump();
+StaticRegistry::bump();
+assert!(StaticRegistry::$count == 2);
+
+class HiddenStatic {
+  private static int $secret = 1;
+}
+
+$assertion_value_21 = function(): void {
+  HiddenStatic::$secret;
+};
+
+$assertion_error_21 = null;
+try {
+  $assertion_value_21();
+} catch (VisibilityError $assertion_caught_21) {
+  $assertion_error_21 = $assertion_caught_21;
+}
+
+assert!($assertion_error_21 is VisibilityError);
+
+class StaticBase {
+  public static int $shared = 5;
+}
+
+class StaticChild extends StaticBase {}
+
+StaticChild::$shared = 8;
+assert!(StaticBase::$shared == 8);
+
+class ConfigConstants {
+  public const int MAX = 100;
+}
+
+class ExtendedConstants extends ConfigConstants {}
+
+assert!(ConfigConstants::MAX + ExtendedConstants::MAX == 200);
+
+class PrivateConstant {
+  private const int SECRET = 1;
+}
+
+$assertion_value_24 = function(): void {
+  PrivateConstant::SECRET;
+};
+
+$assertion_error_24 = null;
+try {
+  $assertion_value_24();
+} catch (VisibilityError $assertion_caught_24) {
+  $assertion_error_24 = $assertion_caught_24;
+}
+
+assert!($assertion_error_24 is VisibilityError);
+
+class ConstantFree {}
+
+$assertion_value_25 = function(): void {
+  ConstantFree::MISSING;
+};
+
+$assertion_error_25 = null;
+try {
+  $assertion_value_25();
+} catch (UndefinedSymbolError $assertion_caught_25) {
+  $assertion_error_25 = $assertion_caught_25;
+}
+
+assert!($assertion_error_25 is UndefinedSymbolError);
+
+class StaticModel {
+  public static function create(): static {
+    return new static();
+  }
+
+  public function name(): string {
+    return 'model';
+  }
+}
+
+class StaticPost extends StaticModel {
+  public function name(): string {
+    return 'post';
+  }
+}
+
+assert!(StaticModel::create()->name() == 'model');
+assert!(StaticPost::create()->name() == 'post');
+
+class ForwardingModel {
+  public static function create(): static {
+    return static::make();
+  }
+
+  public static function make(): static {
+    return new static();
+  }
+
+  public function name(): string {
+    return 'model';
+  }
+}
+
+class ForwardingPost extends ForwardingModel {
+  public function name(): string {
+    return 'post';
+  }
+}
+
+assert!(ForwardingPost::create()->name() == 'post');
+
+class Animal {
+  public function speak(): string {
+    return 'generic';
+  }
+
+  public function describe(): string {
+    return 'a ' . $this->kind();
+  }
+
+  public function kind(): string {
+    return 'animal';
+  }
+}
+
+class Dog extends Animal {
+  public function speak(): string {
+    return 'woof and ' . parent::speak();
+  }
+
+  public function kind(): string {
+    return 'dog';
+  }
+}
+
+$dog = new Dog();
+assert!($dog->speak() == 'woof and generic');
+assert!($dog->describe() == 'a dog');
+
+class ChainedEntity {
+  public readonly int $id;
+
+  public function __construct(int $id) {
+    $this->id = $id;
+  }
+}
+
+class ChainedUser extends ChainedEntity {
+  public string $name = '';
+
+  public function __construct(int $id, string $name) {
+    parent::__construct($id);
+    $this->name = $name;
+  }
+}
+
+$chained_user = new ChainedUser(7, 'ada');
+assert!($chained_user->id == 7);
+assert!($chained_user->name == 'ada');
+
+final class ResurrectingResource {
+  public static vec<string> $events = vec[];
+  public static null|ResurrectingResource $kept = null;
+
+  public function __construct(public string $name) {}
+
+  public function __destruct(): void {
+    self::$events[] = 'destruct ' . $this->name;
+    self::$kept = $this;
+  }
+}
+
+$resurrecting = new ResurrectingResource('socket');
+$resurrecting = null;
+ResurrectingResource::$events[] = 'after';
+assert!(ResurrectingResource::$kept is ResurrectingResource);
+
+ResurrectingResource::$kept = null;
+assert!(ResurrectingResource::$events == vec['destruct socket', 'after']);
+
+final class DestructorLog {
+  public static vec<string> $events = vec[];
+}
+
+class ParentResource {
+  public function __destruct(): void {
+    DestructorLog::$events[] = 'parent';
+  }
+}
+
+class InheritedResource extends ParentResource {}
+
+class ReplacingResource extends ParentResource {
+  public function __destruct(): void {
+    DestructorLog::$events[] = 'child';
+  }
+}
+
+class ChainedResource extends ParentResource {
+  public function __destruct(): void {
+    DestructorLog::$events[] = 'chained';
+    parent::__destruct();
+  }
+}
+
+$inherited = new InheritedResource();
+$inherited = null;
+$replacing = new ReplacingResource();
+$replacing = null;
+$chained_resource = new ChainedResource();
+$chained_resource = null;
+assert!(DestructorLog::$events == vec['parent', 'child', 'chained', 'parent']);
+
+final class ReentrantDestructorLog {
+  public static vec<string> $events = vec[];
+  public static null|ReentrantDestructorLeaf $leaf = null;
+}
+
+final class ReentrantDestructorLeaf {
+  public function __destruct(): void {
+    ReentrantDestructorLog::$events[] = 'leaf';
+  }
+}
+
+function clear_reentrant_destructor_leaf(): void {
+  ReentrantDestructorLog::$leaf = null;
+}
+
+final class ReentrantDestructorRoot {
+  public function __destruct(): void {
+    ReentrantDestructorLog::$events[] = 'root-start';
+    clear_reentrant_destructor_leaf();
+    ReentrantDestructorLog::$events[] = 'root-end';
+  }
+}
+
+ReentrantDestructorLog::$leaf = new ReentrantDestructorLeaf();
+$reentrant_destructor = new ReentrantDestructorRoot();
+$reentrant_destructor = null;
+GC\collect_cycles();
+assert!(
+  ReentrantDestructorLog::$events == vec['root-start', 'root-end', 'leaf'],
+);
+
+class ThrowingResource {
+  public function __destruct(): void {
+    throw new RuntimeException('released');
+  }
+}
+
+function release_resource(): void {
+  $resource = new ThrowingResource();
+}
+
+$assertion_value_37 = function(): void {
+  release_resource();
+};
+
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (RuntimeException $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+  assert!(Whim\Str\contains($assertion_caught_37->getMessage(), 'released'));
+}
+
+assert!($assertion_error_37 is RuntimeException);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$binary = Env\current_binary();
+assert!($binary is string);
+
+prints('shutdown-destructor', 'shutdown' . "\n");
+
+fails('destructor-throw-during-shutdown', 'shutdown failed');
+
+$stop_file = $work . '/exit-in-destructor.whim';
+File\write(
+  $stop_file,
+  'class StopsShutdown {'
+  . "\n"
+  . '    public function __destruct(): void {'
+  . "\n"
+  . '        write_line!(\'stop\');'
+  . "\n"
+  . '        exit!(7);'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'class MustNotRun {'
+  . "\n"
+  . '    public function __destruct(): void { write_line!(\'late\'); }'
+  . "\n"
+  . '}'
+  . "\n"
+  . '$first = new StopsShutdown();'
+  . "\n"
+  . '$second = new MustNotRun();'
+  . "\n"
+  . 'exit!(3);'
+  . "\n",
+);
+
+$stopped = Command\run($binary, vec[$stop_file]);
+assert!($stopped->status is Command\Exited);
+assert!(($stopped->status as Command\Exited)->code == 7);
+assert!($stopped->standardOutput == 'stop' . "\n");
+assert!(length!($stopped->standardError) == 0);
+
+$cycle_file = $work . '/cycle-destructors.whim';
+File\write(
+  $cycle_file,
+  'class Node {'
+  . "\n"
+  . '    public null|Node $next = null;'
+  . "\n"
+  . '    public function __construct(public string $name) {}'
+  . "\n"
+  . '    public function __destruct(): void {'
+  . "\n"
+  . '        write_line!($this->name . \':\' . ($this->next ?as Node)->name);'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'function make_cycle(): void {'
+  . "\n"
+  . '    $left = new Node(\'left\');'
+  . "\n"
+  . '    $right = new Node(\'right\');'
+  . "\n"
+  . '    $left->next = $right;'
+  . "\n"
+  . '    $right->next = $left;'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'make_cycle();'
+  . "\n"
+  . '$collected = Whim\GC\collect_cycles();'
+  . "\n"
+  . 'assert!($collected is int);'
+  . "\n"
+  . 'write_line!(\'collected\');'
+  . "\n",
+);
+
+$cycle_run = Command\Command::create($binary)
+  ->withArgument($cycle_file)
+  ->withVariable('WHIM_CYCLE_THRESHOLD', '8')
+  ->run();
+
+assert!(length!($cycle_run->standardError) == 0);
+assert!($cycle_run->isSuccess());
+assert!(
+  $cycle_run->standardOutput
+  == 'left:right' . "\n" . 'right:left' . "\n" . 'collected' . "\n",
+);
+
+$async_cycle_file = $work . '/async-cycle-destructors.whim';
+File\write(
+  $async_cycle_file,
+  'class AsyncNode {'
+  . "\n"
+  . '    public null|AsyncNode $next = null;'
+  . "\n"
+  . '    public function __construct(public string $name) {}'
+  . "\n"
+  . '    public function __destruct(): void {'
+  . "\n"
+  . '        write_line!(\'start \' . $this->name);'
+  . "\n"
+  . '        Whim\Async\later();'
+  . "\n"
+  . '        write_line!(\'end \' . $this->name);'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'function make_async_cycle(): void {'
+  . "\n"
+  . '    $left = new AsyncNode(\'left\');'
+  . "\n"
+  . '    $right = new AsyncNode(\'right\');'
+  . "\n"
+  . '    $left->next = $right;'
+  . "\n"
+  . '    $right->next = $left;'
+  . "\n"
+  . '}'
+  . "\n"
+  . '$future = Whim\Async\spawn::<null>(function (): null {'
+  . "\n"
+  . '    make_async_cycle();'
+  . "\n"
+  . '    Whim\GC\collect_cycles();'
+  . "\n"
+  . '    return null;'
+  . "\n"
+  . '});'
+  . "\n"
+  . '$future->await();'
+  . "\n"
+  . 'Whim\Async\drain();'
+  . "\n",
+);
+
+$async_cycle_run = Command\Command::create($binary)
+  ->withArgument($async_cycle_file)
+  ->withVariable('WHIM_CYCLE_THRESHOLD', '8')
+  ->run();
+
+assert!(length!($async_cycle_run->standardError) == 0);
+assert!($async_cycle_run->isSuccess());
+assert!(
+  $async_cycle_run->standardOutput
+  == 'start left'
+  . "\n"
+  . 'start right'
+  . "\n"
+  . 'end left'
+  . "\n"
+  . 'end right'
+  . "\n",
+);
+
+class ThrowingCycle {
+  public null|PlainCycle $next = null;
+
+  public function __destruct(): void {
+    throw new RuntimeException('cycle failed');
+  }
+}
+
+class PlainCycle {
+  public null|ThrowingCycle $next = null;
+}
+
+function make_throwing_cycle(): void {
+  $throwing = new ThrowingCycle();
+  $plain = new PlainCycle();
+  $throwing->next = $plain;
+  $plain->next = $throwing;
+}
+
+$assertion_value_49 = function(): void {
+  $future = Async\spawn::<null>(function(): null {
+    make_throwing_cycle();
+    GC\collect_cycles();
+    return null;
+  });
+
+  $future->await();
+};
+
+$assertion_error_49 = null;
+try {
+  $assertion_value_49();
+} catch (RuntimeException $assertion_caught_49) {
+  $assertion_error_49 = $assertion_caught_49;
+  assert!(
+    Whim\Str\contains($assertion_caught_49->getMessage(), 'cycle failed'),
+  );
+}
+
+assert!($assertion_error_49 is RuntimeException);
+
+Async\drain();
+
+Filesystem\delete_directory($work, true);

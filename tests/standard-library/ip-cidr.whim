@@ -1,0 +1,128 @@
+use Whim\CIDR\Block;
+use Whim\Comparison\Ordering;
+use Whim\IP\Address;
+use Whim\IP\Family;
+use Whim\Unwind\InvalidArgumentException;
+
+assert!(Family::V4->byteLength() == 4);
+assert!(Family::V6->byteLength() == 16);
+assert!(Family::V4->bitLength() == 32);
+assert!(Family::V6->bitLength() == 128);
+assert!(Family::V4->ianaFamily() == 1);
+assert!(Family::fromIanaFamily(2) == Family::V6);
+
+$ipv4 = Address::v4('192.0.2.1');
+assert!($ipv4->family == Family::V4);
+assert!($ipv4->toString() == '192.0.2.1');
+assert!($ipv4->toExpandedString() == '192.0.2.1');
+assert!($ipv4->toBytes() == "\xc0\x00\x02\x01");
+assert!($ipv4->toArpaName() == '1.2.0.192.in-addr.arpa');
+assert!(Address::fromBytes($ipv4->toBytes())->equals($ipv4));
+
+$ipv6 = Address::v6('2001:0db8:0:0:0:0:0:1');
+assert!($ipv6->family == Family::V6);
+assert!($ipv6->toString() == '2001:db8::1');
+assert!($ipv6->toExpandedString() == '2001:0db8:0000:0000:0000:0000:0000:0001');
+
+assert!(
+  $ipv6->toArpaName()
+  == '1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa',
+);
+
+assert!(Address::parse('not-an-address') == null);
+assert!(Address::parse('192.168.001.1') == null);
+assert!(Address::parse('2001:db8:::1') == null);
+assert!(
+  Address::v6('ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')->toString()
+  == 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
+);
+
+$assertion_value_19 = fn(): Address => Address::from('not-an-address');
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (InvalidArgumentException $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is InvalidArgumentException);
+
+$assertion_value_20 = fn(): Address => Address::fromBytes('bad');
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (InvalidArgumentException $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is InvalidArgumentException);
+
+$mapped = Address::v4('10.0.0.1')->toIPv4Mapped();
+assert!($mapped->family == Family::V6);
+assert!($mapped->isIPv4Mapped());
+assert!($mapped->toString() == '::ffff:10.0.0.1');
+assert!(!(Address::v4('10.0.0.1')->isIPv4Mapped()));
+assert!(
+  Address::v6('2001:db8::1')->toIPv4Mapped()->equals(
+    Address::v6('2001:db8::1'),
+  ),
+);
+
+assert!(Address::v4('127.0.0.1')->isLoopback());
+assert!(Address::v6('::1')->isLoopback());
+assert!(Address::v4('10.1.2.3')->isPrivate());
+assert!(Address::v6('fd00::1')->isPrivate());
+assert!(Address::v4('169.254.1.1')->isLinkLocal());
+assert!(Address::v6('fe80::1')->isLinkLocal());
+assert!(Address::v4('224.0.0.1')->isMulticast());
+assert!(Address::v6('ff02::1')->isMulticast());
+assert!(Address::v4('0.0.0.0')->isUnspecified());
+assert!(Address::v6('::')->isUnspecified());
+assert!(Address::v4('192.0.2.1')->isDocumentation());
+assert!(Address::v6('2001:db8::1')->isDocumentation());
+assert!(Address::v4('8.8.8.8')->isGlobalUnicast());
+
+assert!(
+  Address::v4('10.0.0.1')->compare(Address::v4('10.0.0.2')) == Ordering::Less,
+);
+
+assert!(Address::v4('10.0.0.1')->compare(Address::v6('::1')) == Ordering::Less);
+
+$ipv4Block = Block::from('192.168.1.0/24');
+assert!($ipv4Block->toString() == '192.168.1.0/24');
+assert!($ipv4Block->firstAddress()->toString() == '192.168.1.0');
+assert!($ipv4Block->lastAddress()->toString() == '192.168.1.255');
+assert!($ipv4Block->contains(Address::v4('192.168.1.0')));
+assert!($ipv4Block->contains(Address::v4('192.168.1.255')));
+assert!(!($ipv4Block->contains(Address::v4('192.168.2.0'))));
+assert!(!($ipv4Block->contains(Address::v6('::ffff:192.168.1.1'))));
+
+assert!($ipv4Block->overlaps(Block::from('192.168.1.128/25')));
+
+assert!(!($ipv4Block->overlaps(Block::from('192.168.2.0/24'))));
+
+assert!($ipv4Block->equals(Block::fromAddress(Address::v4('192.168.1.0'), 24)));
+
+$ipv6Block = Block::from('2001:db8::/32');
+assert!($ipv6Block->contains(Address::v6('2001:db8::1')));
+assert!(
+  $ipv6Block->contains(Address::v6('2001:db8:ffff:ffff:ffff:ffff:ffff:ffff')),
+);
+
+assert!(!($ipv6Block->contains(Address::v6('2001:db9::1'))));
+assert!(Block::parse('192.168.1.1/24') == null);
+assert!(Block::parse('192.168.1.0/33') == null);
+assert!(Block::parse('2001:db8::1/32') == null);
+assert!(Block::parse('192.168.1.0') == null);
+assert!(Block::parse('192.168.1.0/24/extra') == null);
+assert!(Block::parse('192.168.1.0/not-a-prefix') == null);
+
+$assertion_value_60 = fn(): Block => Block::from('192.168.1.1/24');
+$assertion_error_60 = null;
+try {
+  $assertion_value_60();
+} catch (InvalidArgumentException $assertion_caught_60) {
+  $assertion_error_60 = $assertion_caught_60;
+}
+
+assert!($assertion_error_60 is InvalidArgumentException);

@@ -1,0 +1,14 @@
+namespace Whim\BSON;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
+
+/** A deprecated BSON database pointer. */
+#[Stub]
+final readonly class DBPointer {
+  #[AlwaysInline]
+  public function __construct(
+    public string $namespace,
+    public ObjectId $identifier,
+  ) {}
+}

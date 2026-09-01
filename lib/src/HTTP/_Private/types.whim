@@ -1,0 +1,19 @@
+namespace Whim\HTTP\_Private;
+
+/** A non-zero HTTP/2 stream identifier. */
+type StreamId = 1..=2147483647;
+
+/** A stream identifier, including connection stream zero. */
+type ConnectionStreamId = 0..=2147483647;
+
+/** A 32-bit HTTP/2 error code, including unknown extension values. */
+type ErrorCodeValue = 0..=4294967295;
+
+/** A valid flow-control window increment. */
+type WindowIncrement = 1..=2147483647;
+
+/** A SETTINGS identifier. */
+type SettingId = 1..=65535;
+
+/** A SETTINGS value. */
+type SettingValue = 0..=4294967295;

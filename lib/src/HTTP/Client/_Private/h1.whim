@@ -1,0 +1,223 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Client\RequestException;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\StatusCode;
+use Whim\IO\BufferedReadHandle;
+use Whim\IO\LimitExceededException;
+use Whim\Math;
+use Whim\Str;
+use Whim\Unwind\OverflowException;
+use Whim\_Private\http1_parse_response_head;
+
+/** Parses one HTTP/1 response head. */
+function read_h1_response_head(
+  BufferedReadHandle $reader,
+  int $maximumBytes,
+  null|CancellationToken $cancellation,
+): H1ResponseHead {
+  try {
+    $block = $reader->readUntilBounded(
+      "\r\n\r\n",
+      $maximumBytes,
+      $cancellation,
+    );
+  } catch (LimitExceededException $error) {
+    throw new ProtocolException(
+      'the response head exceeds its configured limit',
+      previous: $error,
+    );
+  }
+
+  if ($block == null) {
+    throw new ProtocolException(
+      'the peer closed before completing the response head',
+    );
+  }
+
+  $parsed = http1_parse_response_head($block);
+  if ($parsed == null) {
+    throw new ProtocolException('the response head is malformed');
+  }
+
+  ($version, $status, $fields, $fieldIndex) = $parsed;
+  $headers = FieldMap::fromPartsUnsafe($fields, $fieldIndex);
+
+  $head = new H1ResponseHead(
+    match ($version) {
+      10 => ProtocolVersion::V10,
+      11 => ProtocolVersion::V11,
+      $_ => ProtocolVersion::V11,
+    },
+    $status as StatusCode,
+    $headers,
+  );
+
+  validate_response_framing($head);
+  return $head;
+}
+
+/** Rejects response framing which is forbidden by its status. */
+function validate_response_framing(H1ResponseHead $head): void {
+  if ($head->status is 100..=199|204) {
+    if ($head->headers->has('content-length')) {
+      throw new ProtocolException(
+        'content-length is forbidden on this HTTP/1 response',
+      );
+    }
+
+    if ($head->headers->has('transfer-encoding')) {
+      throw new ProtocolException(
+        'transfer-encoding is forbidden on this HTTP/1 response',
+      );
+    }
+
+    return;
+  }
+
+  if ($head->status != 205) {
+    return;
+  }
+
+  if ($head->headers->has('transfer-encoding')) {
+    throw new ProtocolException(
+      'transfer-encoding is forbidden on an HTTP/1 205 response',
+    );
+  }
+
+  $length = content_length($head->headers);
+  if ($length != null && $length != 0) {
+    throw new ProtocolException('an HTTP/1 205 response must have no content');
+  }
+}
+
+/** Parses one unsigned decimal integer. */
+function decimal(string $value): int {
+  if ($value == '') {
+    throw new ProtocolException('an HTTP decimal value is empty');
+  }
+
+  $index = 0;
+  while ($index < length!($value)) {
+    $byte = Str\ord($value[$index]);
+    if (!($byte is 48..=57)) {
+      throw new ProtocolException('an HTTP decimal value contains a non-digit');
+    }
+
+    $index++;
+  }
+
+  try {
+    return Math\from_base($value, 10);
+  } catch (OverflowException $error) {
+    throw new ProtocolException(
+      'an HTTP decimal value is too large',
+      previous: $error,
+    );
+  }
+}
+
+/** Parses and validates response content length fields. */
+function content_length(FieldMap $headers): null|int {
+  $values = vec[];
+  foreach ($headers->getAll('content-length') as $field) {
+    foreach (Str\split($field, ',') as $value) {
+      $values[] = Str\trim($value, " \t");
+    }
+  }
+
+  if (length!($values) == 0) {
+    return null;
+  }
+
+  $first = decimal($values[0]);
+  foreach ($values as $value) {
+    if (decimal($value) != $first) {
+      throw new ProtocolException(
+        'the response has conflicting content lengths',
+      );
+    }
+  }
+
+  return $first;
+}
+
+/** Reports whether transfer coding is exactly chunked. */
+function is_chunked(FieldMap $headers): bool {
+  $codings = vec[];
+  foreach ($headers->getAll('transfer-encoding') as $field) {
+    foreach (Str\split($field, ',') as $coding) {
+      $coding = Str\lowercase(Str\trim($coding, " \t"));
+      if ($coding != '') {
+        $codings[] = $coding;
+      }
+    }
+  }
+
+  if (length!($codings) == 0) {
+    return false;
+  }
+
+  if (length!($codings) != 1 || $codings[0] != 'chunked') {
+    throw new ProtocolException('the response transfer coding is unsupported');
+  }
+
+  return true;
+}
+
+/** Reports whether a comma-separated Connection field contains a token. */
+function connection_token(FieldMap $headers, string $token): bool {
+  $token = Str\lowercase($token);
+  foreach ($headers->getAll('connection') as $value) {
+    foreach (Str\split($value, ',') as $candidate) {
+      if (Str\lowercase(Str\trim($candidate, " \t")) == $token) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/** Reports whether a request asks the peer to accept its body first. */
+function expects_continue(FieldMap $headers): bool {
+  $values = $headers->getAll('expect');
+  return (
+    length!($values) == 1
+    && Str\lowercase(Str\trim($values[0], " \t")) == '100-continue'
+  );
+}
+
+/** Returns a strict request content length. */
+function request_content_length(FieldMap $headers): null|int {
+  try {
+    return content_length($headers);
+  } catch (ProtocolException $error) {
+    throw new RequestException($error->getMessage(), previous: $error);
+  }
+}
+
+/** Returns a Host field value without credentials. */
+function request_host(Request $request): string {
+  $url = $request->url;
+  if ($url == null) {
+    throw new RequestException('the request URL is missing');
+  }
+
+  $host = $url->authority->host->toString();
+  $port = $url->authority->port ?? return $host;
+
+  $default =
+    ($url->scheme == 'http' && $port == 80)
+    || ($url->scheme == 'https' && $port == 443);
+
+  if ($default) {
+    return $host;
+  }
+
+  return $host . ':' . $port;
+}

@@ -1,0 +1,250 @@
+namespace Whim\Async;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Reference\Weak;
+use Whim\Time\Duration;
+use Whim\Unwind\Throwable;
+use Whim\_Private\CallbackRegistry;
+use Whim;
+
+/** Represents a timeout cancellation token. */
+final class TimeoutCancellationToken implements CancellationToken {
+  private bool $cancelled = false;
+  private null|CancelledException $exception = null;
+  private CallbackRegistry $callbacks;
+  private Duration $timeout;
+  private int $startedAt;
+  private null|Whim\_Private\TaskId $watcher = null;
+  private null|CancellationToken $parent;
+  private null|int $parentSubscription = null;
+
+  /** Creates a timeout cancellation token. */
+  #[TrackCaller]
+  public function __construct(
+    Duration $timeout,
+    null|CancellationToken $parent = null,
+  ) {
+    $this->callbacks = new CallbackRegistry();
+    $this->timeout = $timeout;
+    $this->startedAt = Whim\_Private\get_high_resolution_nanoseconds();
+    $this->parent = $parent;
+  }
+
+  public function __destruct(): void {
+    $this->disarm();
+    $this->parent = null;
+  }
+
+  /** Arms the timer and parent subscription while cancellation is observed. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function arm(): void {
+    if ($this->watcher != null || $this->cancelled) {
+      return;
+    }
+
+    $weak = new Weak::<TimeoutCancellationToken>($this);
+    $this->watcher = Whim\_Private\delay_task($this->remaining(), fn(): void {
+      $token = $weak->get();
+      if ($token != null) {
+        $token->cancelAtTimeout();
+      }
+    });
+
+    $parent = $this->parent ?? return;
+
+    $subscription = $parent->register(fn(): void {
+      $token = $weak->get();
+      if ($token != null) {
+        $token->cancelFromSource();
+      }
+    });
+
+    if ($this->cancelled) {
+      $parent->unregister($subscription);
+      return;
+    }
+
+    $this->parentSubscription = $subscription;
+  }
+
+  /** Cancels the active timer and parent subscription. */
+  #[NeverInline]
+  private function disarm(): void {
+    $watcher = $this->watcher;
+    $this->watcher = null;
+    if ($watcher != null) {
+      Whim\_Private\cancel_task($watcher);
+    }
+
+    $parent = $this->parent;
+    $subscription = $this->parentSubscription;
+    $this->parentSubscription = null;
+    if ($parent != null && $subscription != null) {
+      try {
+        $parent->unregister($subscription);
+      } catch (Throwable $_) {
+      }
+    }
+  }
+
+  /** Returns the unsatisfied part of the timeout. */
+  #[NeverInline]
+  private function remaining(): Duration {
+    $elapsed = $this->elapsed();
+    return new Duration(
+      $this->timeout->seconds - $elapsed[0],
+      $this->timeout->nanoseconds - $elapsed[1],
+    );
+  }
+
+  /** Returns elapsed seconds and nanoseconds. */
+  #[NeverInline]
+  private function elapsed(): (int, int) {
+    $nanoseconds =
+      Whim\_Private\get_high_resolution_nanoseconds() - $this->startedAt;
+
+    return (
+      Math\div($nanoseconds, 1_000_000_000),
+      $nanoseconds % 1_000_000_000,
+    );
+  }
+
+  /** Reports whether the deadline has passed. */
+  #[NeverInline]
+  private function elapsedTimeout(): bool {
+    $elapsed = $this->elapsed();
+    return (
+      $elapsed[0] > $this->timeout->seconds
+      || (
+        $elapsed[0] == $this->timeout->seconds
+        && $elapsed[1] >= $this->timeout->nanoseconds
+      )
+    );
+  }
+
+  /** Observes parent cancellation and the deadline without arming a task. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function refresh(): void {
+    if ($this->cancelled) {
+      return;
+    }
+
+    $parent = $this->parent;
+    if ($parent != null && $parent->isCancellationRequested()) {
+      $this->cancelFromSource();
+      return;
+    }
+
+    if ($this->elapsedTimeout()) {
+      $this->cancelAtTimeout();
+    }
+  }
+
+  /** Cancels once the timeout elapses. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function cancelAtTimeout(): void {
+    if ($this->cancelled) {
+      return;
+    }
+
+    $this->cancelled = true;
+    $this->exception = new CancelledException(
+      'the operation was cancelled',
+      0,
+      new TimeoutException('the operation timed out'),
+    );
+
+    $this->disarm();
+    $this->notify();
+  }
+
+  /** Cancels when the parent token is cancelled. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function cancelFromSource(): void {
+    if ($this->cancelled) {
+      return;
+    }
+
+    $this->cancelled = true;
+    $this->exception = new CancelledException('the operation was cancelled');
+    $this->disarm();
+    $this->notify();
+  }
+
+  /** Notifies every cancellation callback. */
+  #[NeverInline]
+  #[TrackCaller]
+  private function notify(): void {
+    $callbacks = $this->callbacks->drain();
+    $errors = vec[];
+    foreach ($callbacks as $callback) {
+      try {
+        $callback();
+      } catch (Throwable $error) {
+        $errors[] = $error;
+      }
+    }
+
+    if (length!($errors) == 1) {
+      throw $errors[0];
+    }
+
+    if (length!($errors) > 1) {
+      throw new CompositeException($errors);
+    }
+  }
+
+  /** Registers a callback for cancellation. */
+  #[TrackCaller]
+  public function register(fn(): void $callback): int {
+    $this->refresh();
+    if ($this->cancelled) {
+      $callback();
+      return -1;
+    }
+
+    if ($this->callbacks->isEmpty()) {
+      $this->arm();
+      if ($this->cancelled) {
+        $callback();
+        return -1;
+      }
+    }
+
+    return $this->callbacks->insert($callback);
+  }
+
+  /** Removes a registered cancellation callback. */
+  #[TrackCaller]
+  public function unregister(int $id): void {
+    $this->callbacks->remove($id);
+
+    if ($this->callbacks->isEmpty() && !$this->cancelled) {
+      $this->disarm();
+    }
+  }
+
+  /** Reports whether cancellation was requested. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function isCancellationRequested(): bool {
+    $this->refresh();
+    return $this->cancelled;
+  }
+
+  /** Throws when cancellation was requested. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function throwIfCancellationRequested(): void {
+    $this->refresh();
+    if ($this->exception != null) {
+      throw $this->exception;
+    }
+  }
+}

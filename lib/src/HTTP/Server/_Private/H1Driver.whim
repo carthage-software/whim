@@ -1,0 +1,510 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\HTTPException;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\Middleware\wrap;
+use Whim\IO\ReadHandle;
+use Whim\IO\Reader;
+use Whim\IO\MemoryHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Network\Stream;
+use Whim\Str;
+use Whim\TLS\Stream as TLSStream;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\http1_serialize_response_head;
+
+/** An HTTP/1 connection handed to an upgrade callback. */
+type PendingUpgrade = (
+  fn(Stream<_>, ReadHandle, WriteHandle, CancellationToken): void,
+  Reader,
+);
+
+/** Serves HTTP/1 requests over one byte stream. */
+final class H1Driver implements StreamDriver {
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function serve(
+    Stream<_> $stream,
+    bool $enableH2c,
+    Handler $handler,
+    Configuration $configuration,
+    CancellationToken $draining,
+    CancellationToken $forced,
+  ): void {
+    $this->serveFrom(
+      $stream,
+      $stream,
+      $enableH2c,
+      $handler,
+      $configuration,
+      $draining,
+      $forced,
+    );
+  }
+
+  /** Serves a connection through a prepared read handle. */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function serveFrom(
+    Stream<_> $stream,
+    ReadHandle $read,
+    bool $enableH2c,
+    Handler $handler,
+    Configuration $configuration,
+    CancellationToken $draining,
+    CancellationToken $forced,
+  ): void {
+    $handler = wrap($handler, $configuration->middleware);
+    $upgrade = null;
+    try {
+      $upgrade = $this->serveConnection(
+        $stream,
+        $read,
+        $enableH2c,
+        $handler,
+        $configuration,
+        $draining,
+        $forced,
+      );
+    } catch (Throwable $_) {
+    }
+
+    if ($upgrade == null) {
+      return;
+    }
+
+    ($callback, $reader) = $upgrade;
+    $callback($stream, $reader, $stream, $forced);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function serveConnection(
+    Stream<_> $stream,
+    ReadHandle $read,
+    bool $enableH2c,
+    Handler $handler,
+    Configuration $configuration,
+    CancellationToken $draining,
+    CancellationToken $forced,
+  ): null|PendingUpgrade {
+    $reader = new Reader($read);
+    $scheme = 'http';
+    if ($stream is TLSStream<_>) {
+      $scheme = 'https';
+    }
+
+    $localEndpoint = $stream->getLocalEndpoint();
+    $peerEndpoint = $stream->getPeerEndpoint();
+
+    $requestCount = 0;
+    while ($requestCount < $configuration->maximumRequestsPerConnection) {
+      if (
+        $draining->isCancellationRequested()
+        || $forced->isCancellationRequested()
+      ) {
+        return null;
+      }
+
+      try {
+        $reader->waitUntilReadable(
+          h1_cancellation($forced, $configuration->connectionIdleTimeout),
+        );
+      } catch (CancelledException $_) {
+        return null;
+      }
+
+      if ($reader->reachedEndOfDataSource()) {
+        return null;
+      }
+
+      try {
+        $head = h1_read_request_head(
+          $reader,
+          $configuration->maximumHeaderSize,
+          h1_cancellation($forced, $configuration->requestHeaderTimeout),
+        );
+      } catch (CancelledException $_) {
+        if ($forced->isCancellationRequested()) {
+          return null;
+        }
+
+        $this->writeError($stream, $configuration, 408, null, $forced);
+        return null;
+      } catch (HTTPException $error) {
+        $this->writeError(
+          $stream,
+          $configuration,
+          $error->status,
+          $error,
+          $forced,
+        );
+
+        return null;
+      }
+
+      if ($head == null) {
+        return null;
+      }
+
+      if (
+        $head->contentLength != null
+        && $head->contentLength > $configuration->maximumRequestBodySize
+      ) {
+        $this->writeError($stream, $configuration, 413, null, $forced);
+        return null;
+      }
+
+      $body = null;
+      $trailers = null;
+      if ($head->chunked) {
+        $chunkedBody = new H1ChunkedBody(
+          $reader,
+          $configuration->maximumRequestBodySize,
+          $configuration->maximumHeaderSize,
+          h1_cancellation($forced, $configuration->requestBodyTimeout),
+        );
+
+        $body = $chunkedBody;
+        $trailers = $chunkedBody->getTrailers();
+      } else if ($head->contentLength != null && $head->contentLength != 0) {
+        $body = new H1FixedLengthBody(
+          $reader,
+          $head->contentLength,
+          h1_cancellation($forced, $configuration->requestBodyTimeout),
+        );
+      }
+
+      if (
+        $head->expectContinue
+        && $head->protocolVersion == ProtocolVersion::V11
+        && $body != null
+      ) {
+        $stream->writeAll(
+          "HTTP/1.1 100 Continue\r\n\r\n",
+          h1_cancellation($forced, $configuration->responseWriteTimeout),
+        );
+      }
+
+      try {
+        $request = Request::fromPartsUnsafe(
+          $head->method,
+          $head->target,
+          h1_url($scheme, $head->host, $head->target),
+          $head->protocolVersion,
+          $head->headers,
+          $body,
+          $trailers,
+        );
+      } catch (InvalidArgumentException $error) {
+        $this->writeError($stream, $configuration, 400, $error, $forced);
+        return null;
+      }
+
+      $h2cSettings = null;
+      if ($enableH2c && $head->upgrade == 'h2c') {
+        try {
+          $h2cSettings = h1_h2c_settings($head);
+        } catch (HTTPException $error) {
+          $this->writeError(
+            $stream,
+            $configuration,
+            $error->status,
+            $error,
+            $forced,
+          );
+
+          return null;
+        }
+      }
+
+      if ($h2cSettings != null) {
+        if ($body != null) {
+          try {
+            $buffer = $body->readAll();
+          } catch (Throwable $error) {
+            $this->writeError($stream, $configuration, 400, $error, $forced);
+            return null;
+          }
+
+          $request = $request->withBody(new MemoryHandle($buffer));
+        }
+
+        $stream->writeAll(
+          "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: h2c\r\n\r\n",
+          h1_cancellation($forced, $configuration->responseWriteTimeout),
+        );
+
+        new H2Driver()->serveUpgrade(
+          $stream,
+          $reader,
+          $request,
+          $h2cSettings,
+          $handler,
+          $configuration,
+          $draining,
+          $forced,
+        );
+
+        return null;
+      }
+
+      $handlerCancellation = $forced;
+      if (length!($configuration->middleware) != 0) {
+        $handlerCancellation = new RequestCancellationToken($forced);
+      }
+
+      $context = new H1Context(
+        $head->protocolVersion,
+        $localEndpoint,
+        $peerEndpoint,
+        $stream,
+        $handlerCancellation,
+      );
+
+      $requestCount++;
+
+      $shouldClose =
+        $head->connectionClose
+        || !$configuration->keepAlive
+        || $requestCount >= $configuration->maximumRequestsPerConnection
+        || (
+          $head->protocolVersion == ProtocolVersion::V10
+          && !$head->connectionKeepAlive
+        );
+
+      try {
+        $response = $handler->handle($context, $request, $handlerCancellation);
+      } catch (CancelledException $error) {
+        if ($forced->isCancellationRequested()) {
+          return null;
+        }
+
+        $response = $configuration->errorResponder->respond(504, $error);
+        $shouldClose = true;
+      } catch (Throwable $error) {
+        $status = 500;
+        if ($error is HTTPException) {
+          $status = $error->status;
+        }
+
+        $response = $configuration->errorResponder->respond($status, $error);
+        $shouldClose = true;
+      }
+
+      if ($body != null) {
+        try {
+          $body->readAll();
+        } catch (Throwable $error) {
+          $response = $configuration->errorResponder->respond(400, $error);
+          $shouldClose = true;
+        }
+      }
+
+      $upgrade = $context->takeUpgrade();
+      if (
+        $response->status is 100..=199
+        && !($response->status == 101 && $upgrade != null)
+      ) {
+        $response = $configuration->errorResponder->respond(500, null);
+        $shouldClose = true;
+      }
+
+      $writeCancellation = h1_cancellation(
+        $forced,
+        $configuration->responseWriteTimeout,
+      );
+
+      if ($response->status == 101 && $upgrade != null) {
+        $this->writeUpgrade($stream, $response, $writeCancellation);
+        return ($upgrade, $reader);
+      }
+
+      if ($draining->isCancellationRequested()) {
+        $shouldClose = true;
+      }
+
+      $complete = $this->writeResponse(
+        $stream,
+        $head->method,
+        $head->protocolVersion,
+        $response,
+        $shouldClose,
+        $writeCancellation,
+      );
+
+      $context->completeResponse();
+      if ($shouldClose || !$complete) {
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function writeError(
+    Stream<_> $stream,
+    Configuration $configuration,
+    Message\ErrorStatusCode $status,
+    null|Throwable $cause,
+    CancellationToken $forced,
+  ): void {
+    $this->writeResponse(
+      $stream,
+      Message\METHOD_GET,
+      ProtocolVersion::V11,
+      $configuration->errorResponder->respond($status, $cause),
+      true,
+      h1_cancellation($forced, $configuration->responseWriteTimeout),
+    );
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function writeUpgrade(
+    Stream<_> $stream,
+    Response $response,
+    CancellationToken $cancellation,
+  ): void {
+    $head = 'HTTP/1.1 101 ' . (Message\reason_phrase(101) ?? '') . "\r\n";
+    foreach ($response->headers as ($name, $value)) {
+      $head .= Str\lowercase($name) . ': ' . $value . "\r\n";
+    }
+
+    $stream->writeAll($head . "\r\n", $cancellation);
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function writeResponse(
+    Stream<_> $stream,
+    Message\Method $method,
+    ProtocolVersion $requestVersion,
+    Response $response,
+    bool $close,
+    CancellationToken $cancellation,
+  ): bool {
+    $headers = $response->headers;
+    $bodyAllowed =
+      $method != Message\METHOD_HEAD
+      && !($response->status is 100..=199|204|304);
+
+    $contentLength = null;
+    try {
+      $contentLength = h1_content_length($headers);
+    } catch (HTTPException $_) {
+      $response = new Response(500);
+
+      $headers = FieldMap::from(vec[('Server', 'Whim')]);
+
+      $bodyAllowed = true;
+      $close = true;
+    }
+
+    $chunked = false;
+    $addContentLength = false;
+    if ($bodyAllowed && $response->body == null) {
+      if ($contentLength == null) {
+        $contentLength = 0;
+        $addContentLength = true;
+      }
+    } else if ($contentLength == null) {
+      if ($bodyAllowed && $requestVersion == ProtocolVersion::V11) {
+        $chunked = true;
+      } else if ($bodyAllowed) {
+        $close = true;
+      }
+    }
+
+    $head = http1_serialize_response_head(
+      $requestVersion->value,
+      $response->status,
+      Message\reason_phrase($response->status) ?? '',
+      $headers->toVec(),
+      $bodyAllowed,
+      $chunked,
+      $addContentLength,
+      $close,
+      DateHeader::getValue(),
+    );
+
+    if (!$bodyAllowed || $response->body == null) {
+      $stream->writeAll($head, $cancellation);
+      return true;
+    }
+
+    if (!$chunked && $contentLength != null && $contentLength <= 16_384) {
+      $data = $response->body->readAll($contentLength, $cancellation);
+      $stream->writeAll($head . $data, $cancellation);
+      return length!($data) == $contentLength;
+    }
+
+    $stream->writeAll($head, $cancellation);
+
+    if ($chunked) {
+      while (!$response->body->reachedEndOfDataSource()) {
+        $data = match ($response->body->read(16_384, $cancellation)) {
+          '' => break,
+          $data => $data,
+        };
+
+        $stream->writeAll(
+          Math\to_base(length!($data), 16) . "\r\n" . $data . "\r\n",
+          $cancellation,
+        );
+      }
+
+      $tail = "0\r\n";
+      if ($response->trailers != null) {
+        $trailers = $response->trailers->await($cancellation);
+        foreach ($trailers as ($name, $value)) {
+          $tail .= Str\lowercase($name) . ': ' . $value . "\r\n";
+        }
+      }
+
+      $stream->writeAll($tail . "\r\n", $cancellation);
+      return true;
+    }
+
+    $remaining = $contentLength;
+    while (
+      !$response->body->reachedEndOfDataSource()
+      && ($remaining == null || $remaining > 0)
+    ) {
+      $maximum = 16_384;
+      if ($remaining != null && $remaining < $maximum) {
+        $maximum = $remaining;
+      }
+
+      $data = match ($response->body->read($maximum, $cancellation)) {
+        '' => break,
+        $data => $data,
+      };
+
+      $stream->writeAll($data, $cancellation);
+      if ($remaining != null) {
+        $remaining -= length!($data);
+      }
+    }
+
+    return $remaining == null || $remaining == 0;
+  }
+}

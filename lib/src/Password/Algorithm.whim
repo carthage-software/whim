@@ -1,0 +1,42 @@
+namespace Whim\Password;
+
+use Whim\Marker\AlwaysInline;
+
+/** A password hashing algorithm and its costs. */
+interface Algorithm for Bcrypt, Argon2i, Argon2id {}
+
+/** Hashes passwords with bcrypt. */
+final readonly class Bcrypt implements Algorithm {
+  public const 4..=31 DEFAULT_COST = 12;
+
+  #[AlwaysInline]
+  public function __construct(public 4..=31 $cost = self::DEFAULT_COST) {}
+}
+
+/** Hashes passwords with argon2i. */
+final readonly class Argon2i implements Algorithm {
+  public const 8192..=4294967295 DEFAULT_MEMORY_COST = 65536;
+  public const 1..=4294967295 DEFAULT_TIME_COST = 4;
+  public const 1..=255 DEFAULT_PARALLELISM = 1;
+
+  #[AlwaysInline]
+  public function __construct(
+    public 8192..=4294967295 $memoryCost = self::DEFAULT_MEMORY_COST,
+    public 1..=4294967295 $timeCost = self::DEFAULT_TIME_COST,
+    public 1..=255 $parallelism = self::DEFAULT_PARALLELISM,
+  ) {}
+}
+
+/** Hashes passwords with argon2id. */
+final readonly class Argon2id implements Algorithm {
+  public const 8192..=4294967295 DEFAULT_MEMORY_COST = 65536;
+  public const 1..=4294967295 DEFAULT_TIME_COST = 4;
+  public const 1..=255 DEFAULT_PARALLELISM = 1;
+
+  #[AlwaysInline]
+  public function __construct(
+    public 8192..=4294967295 $memoryCost = self::DEFAULT_MEMORY_COST,
+    public 1..=4294967295 $timeCost = self::DEFAULT_TIME_COST,
+    public 1..=255 $parallelism = self::DEFAULT_PARALLELISM,
+  ) {}
+}

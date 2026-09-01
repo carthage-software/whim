@@ -1,0 +1,5 @@
+namespace Limits\binder_tuple_at_limit_6;
+
+$f = fn<
+  T = (int, int, int, int, int, int, int, int, int, int, int, int),
+>(): int => 1;

@@ -1,0 +1,86 @@
+namespace Whim\HTTP\Message;
+
+use Whim\Async\Future;
+use Whim\IO\ReadHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Represents an immutable HTTP response. */
+final readonly class Response extends Message {
+  /** Creates an HTTP response. */
+  #[AlwaysInline]
+  public function __construct(
+    public StatusCode $status,
+    ProtocolVersion $protocolVersion = ProtocolVersion::V11,
+    FieldMap $headers = FieldMap::default(),
+    null|ReadHandle $body = null,
+    null|Future<FieldMap> $trailers = null,
+  ) {
+    $this->protocolVersion = $protocolVersion;
+    $this->headers = $headers;
+    $this->body = $body;
+    $this->trailers = $trailers;
+  }
+
+  /** Returns a copy with a new status code. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withStatus(StatusCode $status): Response {
+    return clone!($this, status: $status);
+  }
+
+  /** Returns a copy with a new protocol version. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withProtocolVersion(
+    ProtocolVersion $protocolVersion,
+  ): Response {
+    return clone!($this, protocolVersion: $protocolVersion);
+  }
+
+  /** Returns a copy with a new field map. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withHeaders(FieldMap $headers): Response {
+    return clone!($this, headers: $headers);
+  }
+
+  /** Returns a copy with one field value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withHeader(FieldName $name, FieldValue $value): Response {
+    return clone!($this, headers: $this->headers->with($name, $value));
+  }
+
+  /** Returns a copy with one field entry appended. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withAddedHeader(
+    FieldName $name,
+    FieldValue $value,
+  ): Response {
+    return clone!($this, headers: $this->headers->withAdded($name, $value));
+  }
+
+  /** Returns a copy without fields of the requested name. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withoutHeader(FieldName $name): Response {
+    return clone!($this, headers: $this->headers->without($name));
+  }
+
+  /** Returns a copy with a new body. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withBody(null|ReadHandle $body): Response {
+    return clone!($this, body: $body);
+  }
+
+  /** Returns a copy with new trailing fields. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withTrailers(null|Future<FieldMap> $trailers): Response {
+    return clone!($this, trailers: $trailers);
+  }
+}

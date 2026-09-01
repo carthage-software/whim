@@ -1,0 +1,27 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\SourceLocation;
+
+/** Describes one capture in a closure declaration. */
+#[Stub]
+final class CaptureReflection {
+  private function __construct() {}
+
+  /** Returns the source variable name without its dollar sign. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the zero-based position in the closure's capture window. */
+  #[MustUse]
+  public function getPosition(): 0.. {}
+
+  /** Reports whether this capture is the closure receiver. */
+  #[MustUse]
+  public function isReceiver(): bool {}
+
+  /** Returns the source span of the capture, when available. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+}

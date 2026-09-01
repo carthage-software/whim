@@ -1,0 +1,79 @@
+namespace Whim\SMTP;
+
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** One SMTP command without its trailing CRLF. */
+final readonly class Command implements ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public NonEmptyString $verb,
+    public string $argument,
+  ) {}
+
+  /** Creates a checked SMTP command. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    NonEmptyString $verb,
+    string $argument = '',
+  ): Command {
+    if (
+      Str\contains($verb, ' ')
+      || Str\contains($verb, "\r")
+      || Str\contains($verb, "\n")
+      || Str\contains($verb, "\x00")
+      || Str\contains($argument, "\r")
+      || Str\contains($argument, "\n")
+      || Str\contains($argument, "\x00")
+    ) {
+      throw new InvalidArgumentException('invalid SMTP command');
+    }
+
+    return new Command(Str\uppercase($verb) as NonEmptyString, $argument);
+  }
+
+  /** Parses a command line without its trailing CRLF. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $command): Command {
+    $space = Str\search($command, ' ');
+    if ($space == null) {
+      if ($command == '') {
+        throw new InvalidArgumentException('an SMTP command cannot be empty');
+      }
+
+      return Command::fromParts($command as NonEmptyString);
+    }
+
+    $verb = match (Str\slice($command, 0, $space)) {
+      '' => throw new InvalidArgumentException(
+        'an SMTP command cannot be empty',
+      ),
+      $verb => $verb,
+    };
+
+    return Command::fromParts(
+      $verb as NonEmptyString,
+      Str\slice($command, $space + 1),
+    );
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    if ($this->argument == '') {
+      return $this->verb;
+    }
+
+    return $this->verb . ' ' . $this->argument;
+  }
+}

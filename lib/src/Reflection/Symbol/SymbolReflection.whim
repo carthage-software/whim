@@ -1,0 +1,37 @@
+namespace Whim\Reflection\Symbol;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\DeclarationReflection;
+use Whim\Symbol\SymbolKind;
+
+/** Describes one named symbol in the engine's symbol table. */
+#[Stub]
+interface SymbolReflection extends
+  DeclarationReflection for
+  ClassLikeReflection,
+  ClassReflection,
+  InterfaceReflection,
+  EnumReflection,
+  TypeAliasReflection,
+  NewtypeReflection,
+  FunctionReflection,
+  ConstantReflection {
+  /** Returns the fully qualified symbol name. */
+  #[MustUse]
+  public function getName(): string;
+
+  /** Returns the symbol name without its namespace. */
+  #[MustUse]
+  public function getShortName(): string;
+
+  /**
+   * Returns the namespace name, or an empty string for the global namespace.
+   */
+  #[MustUse]
+  public function getNamespaceName(): string;
+
+  /** Returns the symbol kind. */
+  #[MustUse]
+  public function getKind(): SymbolKind;
+}

@@ -1,0 +1,4 @@
+namespace Whim\SOCKS;
+
+/** Reports a malformed SOCKS exchange. */
+final class ProtocolException extends Exception {}

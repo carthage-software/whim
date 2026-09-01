@@ -1,0 +1,18 @@
+namespace Whim\TLS;
+
+use Whim\_Private;
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** A TLS protocol version supported by the engine. */
+enum Version: int implements Default {
+  case Tls12 = _Private\TLS_VERSION_1_2;
+  case Tls13 = _Private\TLS_VERSION_1_3;
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return static::Tls13;
+  }
+}

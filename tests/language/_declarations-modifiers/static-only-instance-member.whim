@@ -1,0 +1,3 @@
+final abstract class Utility {
+  public function work(): void {}
+}

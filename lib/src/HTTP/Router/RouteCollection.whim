@@ -1,0 +1,104 @@
+namespace Whim\HTTP\Router;
+
+use Whim\HTTP\Message\METHOD_DELETE;
+use Whim\HTTP\Message\METHOD_GET;
+use Whim\HTTP\Message\METHOD_HEAD;
+use Whim\HTTP\Message\METHOD_OPTIONS;
+use Whim\HTTP\Message\METHOD_PATCH;
+use Whim\HTTP\Message\METHOD_POST;
+use Whim\HTTP\Message\METHOD_PUT;
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Router\_Private\ScopedRouteCollection;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\Middleware\Middleware;
+use Whim\HTTP\Server\Middleware\wrap;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** Collects routes and scoped route groups. */
+interface RouteCollection {
+  /** Registers one method and path pattern. */
+  #[TrackCaller]
+  public function add(
+    Method $method,
+    NonEmptyString $pattern,
+    Handler $handler,
+  ): static;
+
+  /** Registers a GET route. */
+  #[TrackCaller]
+  public function get(NonEmptyString $pattern, Handler $handler): static {
+    return $this->add(METHOD_GET, $pattern, $handler);
+  }
+
+  /** Registers a HEAD route. */
+  #[TrackCaller]
+  public function head(NonEmptyString $pattern, Handler $handler): static {
+    return $this->add(METHOD_HEAD, $pattern, $handler);
+  }
+
+  /** Registers a POST route. */
+  #[TrackCaller]
+  public function post(NonEmptyString $pattern, Handler $handler): static {
+    return $this->add(METHOD_POST, $pattern, $handler);
+  }
+
+  /** Registers a PUT route. */
+  #[TrackCaller]
+  public function put(NonEmptyString $pattern, Handler $handler): static {
+    return $this->add(METHOD_PUT, $pattern, $handler);
+  }
+
+  /** Registers a PATCH route. */
+  #[TrackCaller]
+  public function patch(NonEmptyString $pattern, Handler $handler): static {
+    return $this->add(METHOD_PATCH, $pattern, $handler);
+  }
+
+  /** Registers a DELETE route. */
+  #[TrackCaller]
+  public function delete(NonEmptyString $pattern, Handler $handler): static {
+    return $this->add(METHOD_DELETE, $pattern, $handler);
+  }
+
+  /** Registers an OPTIONS route. */
+  #[TrackCaller]
+  public function options(NonEmptyString $pattern, Handler $handler): static {
+    return $this->add(METHOD_OPTIONS, $pattern, $handler);
+  }
+
+  /** Registers routes beneath a path prefix. */
+  #[TrackCaller]
+  public function prefix(
+    NonEmptyString $prefix,
+    fn(RouteCollection): void $routes,
+  ): static {
+    $scope = new ScopedRouteCollection();
+    $routes($scope);
+    foreach ($scope->getAll() as ($method, $pattern, $handler)) {
+      $this->add($method, ($prefix . $pattern) as NonEmptyString, $handler);
+    }
+
+    return $this;
+  }
+
+  /** Applies middleware to routes registered by a callback. */
+  #[TrackCaller]
+  public function through(
+    Middleware|vec<Middleware> $middleware,
+    fn(RouteCollection): void $routes,
+  ): static {
+    $scope = new ScopedRouteCollection();
+    $routes($scope);
+    $middleware = match ($middleware) {
+      $single @ Middleware => vec[$single],
+      $multiple @ vec<Middleware> => $multiple,
+    };
+
+    foreach ($scope->getAll() as ($method, $pattern, $handler)) {
+      $this->add($method, $pattern, wrap($handler, $middleware));
+    }
+
+    return $this;
+  }
+}

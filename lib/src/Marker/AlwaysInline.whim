@@ -1,0 +1,8 @@
+namespace Whim\Marker;
+
+use Whim\Attribute\Attribute;
+
+/** Requests inlining wherever the optimizer can resolve the call target. */
+#[Stub]
+#[Attribute(Attribute::TARGET_FUNCTION | Attribute::TARGET_METHOD)]
+final class AlwaysInline {}

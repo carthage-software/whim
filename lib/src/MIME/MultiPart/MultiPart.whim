@@ -1,0 +1,73 @@
+namespace Whim\MIME\MultiPart;
+
+use Whim\IO\ReadHandle;
+use Whim\MIME\Headers;
+use Whim\MIME\MediaType;
+use Whim\MIME\Parameters;
+use Whim\MIME\Part\Part;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** A streaming multipart MIME body. */
+final class MultiPart implements Part {
+  public readonly NonEmptyString $boundary;
+  public readonly MediaType $mediaType;
+  public readonly Headers $headers;
+  private vec<Part> $parts;
+
+  /** Creates a multipart body of the requested subtype. */
+  #[TrackCaller]
+  public function __construct(
+    string $subtype = 'mixed',
+    vec<Part> $parts = vec[],
+    null|NonEmptyString $boundary = null,
+  ) {
+    $this->boundary = $boundary ?? _Private\generate_boundary();
+    $this->parts = $parts;
+    $this->mediaType = MediaType::fromParts(
+      'multipart',
+      $subtype,
+      Parameters::fromPairs(vec[('boundary', $this->boundary)]),
+    );
+
+    $this->headers = Headers::fromPairs(vec[
+      ('Content-Type', $this->mediaType->toString()),
+    ]);
+  }
+
+  /** Appends a body part. */
+  #[AlwaysInline]
+  public function add(Part $part): void {
+    $this->parts[] = $part;
+  }
+
+  /** Returns all body parts. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function parts(): vec<Part> {
+    return $this->parts;
+  }
+
+  /** Returns the multipart media type. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function mediaType(): MediaType {
+    return $this->mediaType;
+  }
+
+  /** Returns the multipart headers. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function headers(): Headers {
+    return $this->headers;
+  }
+
+  /** Returns a streaming multipart body. */
+  #[MustUse]
+  #[TrackCaller]
+  public function body(): ReadHandle {
+    return new _Private\MultiPartReadHandle($this->boundary, $this->parts);
+  }
+}

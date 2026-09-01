@@ -1,0 +1,67 @@
+namespace Whim\Autoload\_Private;
+
+use Whim;
+use Whim\Autoload\Autoloader;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Symbol\SymbolKind;
+use Whim\Vec;
+
+/** Walks the chain for one symbol, stopping at the first that handles it. */
+#[TrackCaller]
+#[TraceBoundary]
+function dispatch(int $kind, string $name): void {
+  $symbolKind = SymbolKind::from($kind);
+  foreach (Registry::all() as $autoloader) {
+    if ($autoloader->loadSymbol($symbolKind, $name)) {
+      return;
+    }
+  }
+}
+
+/** The autoloader chain, kept in Whim; the engine holds one callback. */
+final class Registry {
+  private static vec<Autoloader> $autoloaders = vec[];
+  private static bool $installed = false;
+
+  /** Adds an autoloader to the end of the chain. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function register(Autoloader $autoloader): void {
+    Registry::install();
+    Registry::$autoloaders = Vec\concat::<Autoloader>(
+      Registry::$autoloaders,
+      vec[vec[$autoloader]],
+    );
+  }
+
+  /** Removes an autoloader, and does nothing when it was never added. */
+  #[AlwaysInline]
+  public static function unregister(Autoloader $autoloader): void {
+    Registry::$autoloaders = Vec\filter::<Autoloader>(
+      Registry::$autoloaders,
+      fn(Autoloader $registered): bool => $registered != $autoloader,
+    );
+  }
+
+  /** The chain, in the order the engine walks it. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function all(): vec<Autoloader> {
+    return Registry::$autoloaders;
+  }
+
+  /** Hands the engine its one callback, the first time it is needed. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  private static function install(): void {
+    if (Registry::$installed) {
+      return;
+    }
+
+    Registry::$installed = true;
+    Whim\_Private\register_symbol_autoloader(dispatch(...));
+  }
+}

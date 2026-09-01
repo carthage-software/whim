@@ -1,0 +1,6 @@
+class C {
+  public function m<
+    T = (int, int, int, int, int, int, int, int, int, int, int, int, int),
+  >(
+  ): void {}
+}

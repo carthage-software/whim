@@ -1,0 +1,106 @@
+namespace Whim\DateTime;
+
+use Whim\Comparison\Equal;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** A calendar-relative amount of time. */
+final readonly class Period implements Equal<Period> {
+  /** Creates a calendar period. */
+  #[AlwaysInline]
+  public function __construct(
+    public int $years = 0,
+    public int $months = 0,
+    public int $weeks = 0,
+    public int $days = 0,
+  ) {}
+
+  /** Creates a period measured in years. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function years(int $years): Period {
+    return new Period(years: $years);
+  }
+
+  /** Creates a period measured in months. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function months(int $months): Period {
+    return new Period(months: $months);
+  }
+
+  /** Creates a period measured in weeks. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function weeks(int $weeks): Period {
+    return new Period(weeks: $weeks);
+  }
+
+  /** Creates a period measured in days. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function days(int $days): Period {
+    return new Period(days: $days);
+  }
+
+  /** Reports whether every calendar unit is zero. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isZero(): bool {
+    return (
+      $this->years == 0
+      && $this->months == 0
+      && $this->weeks == 0
+      && $this->days == 0
+    );
+  }
+
+  /** Adds another calendar period. */
+  #[MustUse]
+  #[TrackCaller]
+  public function plus(Period $other): Period {
+    return new Period(
+      $this->years + $other->years,
+      $this->months + $other->months,
+      $this->weeks + $other->weeks,
+      $this->days + $other->days,
+    );
+  }
+
+  /** Subtracts another calendar period. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minus(Period $other): Period {
+    return new Period(
+      $this->years - $other->years,
+      $this->months - $other->months,
+      $this->weeks - $other->weeks,
+      $this->days - $other->days,
+    );
+  }
+
+  /** Negates every calendar unit. */
+  #[MustUse]
+  #[TrackCaller]
+  public function invert(): Period {
+    return new Period(
+      -$this->years,
+      -$this->months,
+      -$this->weeks,
+      -$this->days,
+    );
+  }
+
+  /** Reports whether every calendar unit is equal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Period $other): bool {
+    return (
+      $this->years == $other->years
+      && $this->months == $other->months
+      && $this->weeks == $other->weeks
+      && $this->days == $other->days
+    );
+  }
+}

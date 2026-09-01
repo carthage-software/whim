@@ -1,0 +1,21 @@
+use Whim\Async;
+use Whim\Reference\Strong;
+use Whim\Time\Duration;
+
+$completed = new Strong::<bool>(false);
+$finalized = new Strong::<bool>(false);
+$task = Whim\_Private\defer_task(function() use ($completed, $finalized): void {
+  try {
+    Async\sleep(Duration::fromSeconds(3600));
+    $completed->value = true;
+  } finally {
+    $finalized->value = true;
+  }
+});
+
+Async\later();
+Whim\_Private\cancel_task($task);
+Async\drain();
+
+assert!(!($completed->value));
+assert!($finalized->value);

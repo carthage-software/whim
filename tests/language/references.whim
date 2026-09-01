@@ -1,0 +1,59 @@
+use Whim\Reference\Weak;
+use Whim\Reference\WeakMap;
+use Whim\Unwind\OutOfBoundsError;
+
+class Node {
+  public mixed $partner = null;
+}
+
+/** Observes a weak reference while its referent is still alive. */
+function watch_plain(): Weak<Node> {
+  $node = new Node();
+  $weak = new Weak::<Node>($node);
+  assert!($weak->get() != null);
+  return $weak;
+}
+
+$weak = watch_plain();
+assert!($weak->get() == null);
+
+class Key1 {}
+
+/** Fills a weak map through a key that dies with this frame. */
+function fill(WeakMap<Key1, string> $map): void {
+  $key = new Key1();
+  $map->set($key, 'payload');
+  assert!($map->length() == 1);
+  assert!($map->get($key) == 'payload');
+  assert!($map->has($key));
+}
+
+$map = new WeakMap::<Key1, string>();
+fill($map);
+assert!($map->length() == 0);
+$other = new Key1();
+$assertion_value_7 = function() use ($map, $other): void {
+  $map->get($other);
+};
+
+$assertion_error_7 = null;
+try {
+  $assertion_value_7();
+} catch (OutOfBoundsError $assertion_caught_7) {
+  $assertion_error_7 = $assertion_caught_7;
+}
+
+assert!($assertion_error_7 is OutOfBoundsError);
+
+$assertion_value_8 = function() use ($map, $other): void {
+  $map->remove($other);
+};
+
+$assertion_error_8 = null;
+try {
+  $assertion_value_8();
+} catch (OutOfBoundsError $assertion_caught_8) {
+  $assertion_error_8 = $assertion_caught_8;
+}
+
+assert!($assertion_error_8 is OutOfBoundsError);

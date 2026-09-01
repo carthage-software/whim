@@ -1,0 +1,21 @@
+namespace Whim\Async;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+
+/** Reports a composite failure. */
+final class CompositeException extends RuntimeException {
+  /** Creates a composite exception. */
+  #[TrackCaller]
+  public function __construct(private readonly vec<Throwable> $reasons) {
+    parent::__construct('several asynchronous operations failed');
+  }
+
+  /** Returns the failures collected by the operation. */
+  #[AlwaysInline]
+  public function getReasons(): vec<Throwable> {
+    return $this->reasons;
+  }
+}

@@ -1,0 +1,229 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Event;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\Setting;
+use Whim\HTTP\_Private\StreamState;
+
+function receive_headers(
+  State $state,
+  Frame\HeadersFrame $frame,
+): vec<Event\WeakendEvent> {
+  $entry = $state->streams->get($frame[1]);
+  if (
+    $entry == null
+    && stream_state($state, $frame[1]) == StreamState::Closed
+  ) {
+    receive_entry($state, $frame[1]);
+  }
+
+  if ($entry == null) {
+    $entry = open_peer_stream($state, $frame[1]);
+  } else if ($entry->state == StreamState::ReservedRemote) {
+    $state->streams->activatePeer($frame[1], $entry);
+  } else {
+    $entry = receive_entry($state, $frame[1]);
+  }
+
+  if ($frame[5] != null && $frame[5] == $frame[1]) {
+    stream_error($frame[1], 'an HTTP/2 stream cannot depend on itself');
+  }
+
+  $completed =
+    $state->headerBlocks->headers($frame[1], $frame[2], $frame[3], $frame[4])
+    ?? return vec[];
+
+  return complete_header_block($state, $completed);
+}
+
+function receive_continuation(
+  State $state,
+  Frame\ContinuationFrame $frame,
+): vec<Event\WeakendEvent> {
+  $completed =
+    $state->headerBlocks->continuation($frame[1], $frame[2], $frame[3])
+    ?? return vec[];
+
+  return complete_header_block($state, $completed);
+}
+
+function receive_push_promise(
+  State $state,
+  Frame\PushPromiseFrame $frame,
+): vec<Event\WeakendEvent> {
+  if ($state->role != Role::Client) {
+    throw new ProtocolException('an HTTP/2 client cannot send PUSH_PROMISE');
+  }
+
+  if ($state->settings->local(Setting::EnablePush) == 0) {
+    throw new ProtocolException('server push is disabled for HTTP/2');
+  }
+
+  receive_entry($state, $frame[1]);
+  $promised = reserve_peer_stream($state, $frame[2]);
+  $completed =
+    $state->headerBlocks->pushPromise(
+      $frame[1],
+      $frame[2],
+      $frame[3],
+      $frame[4],
+    )
+    ?? return vec[];
+
+  return complete_header_block($state, $completed);
+}
+
+function complete_header_block(
+  State $state,
+  CompletedHeaderBlock $block,
+): vec<Event\WeakendEvent> {
+  $headers = decode_headers($state, $block->bytes);
+
+  if ($block->kind == HeaderBlockKind::PushPromise) {
+    $promisedStreamId = $block->promisedStreamId;
+    if ($promisedStreamId == null) {
+      throw new ProtocolException(
+        'an HTTP/2 push promise lost its promised stream',
+      );
+    }
+
+    HeaderValidator::validate(
+      $promisedStreamId,
+      $headers,
+      Role::Server,
+      false,
+      true,
+      extended_connect_enabled($state, true),
+    );
+
+    $promised = $state->streams->get($promisedStreamId);
+    if ($promised == null) {
+      throw new ProtocolException(
+        'an HTTP/2 push promise lost its promised stream',
+      );
+    }
+
+    $promised->requestMethod = HeaderValidator::requestMethod(
+      $promisedStreamId,
+      $headers,
+    );
+
+    return vec[(5, $block->streamId, $promisedStreamId, $headers)];
+  }
+
+  $entry = receive_entry($state, $block->streamId);
+  $trailers = $entry->receivedInitialHeaders;
+  if ($trailers && !$block->endStream) {
+    stream_error($block->streamId, 'trailers in HTTP/2 must end the stream');
+  }
+
+  if (!$trailers && $state->role == Role::Server) {
+    (
+      $contentLength,
+      $method,
+      $scheme,
+      $authority,
+      $path,
+      $fields,
+    ) = HeaderValidator::validateRequest(
+      $block->streamId,
+      $headers,
+      extended_connect_enabled($state, true),
+    );
+
+    $entry->receivedInitialHeaders = true;
+    $entry->requestMethod = $method;
+    $entry->expectedContentLength = $contentLength;
+    $events = vec[
+      (
+        11,
+        $block->streamId,
+        $method,
+        $scheme,
+        $authority,
+        $path,
+        $fields,
+        $block->endStream,
+      ),
+    ];
+
+    if ($block->endStream) {
+      verify_received_content_length($block->streamId, $entry);
+      if (end_remote($state, $block->streamId, $entry)) {
+        $events[] = (8, $block->streamId);
+      }
+    }
+
+    return $events;
+  }
+
+  $contentLength = HeaderValidator::validate(
+    $block->streamId,
+    $headers,
+    $state->role,
+    $trailers,
+    false,
+    extended_connect_enabled($state, true),
+  );
+
+  $requestMethod = null;
+  $status = null;
+  if (!$trailers) {
+    if ($state->role == Role::Server) {
+      $requestMethod = HeaderValidator::requestMethod(
+        $block->streamId,
+        $headers,
+      );
+    } else {
+      $status = HeaderValidator::responseStatus($block->streamId, $headers);
+
+      $contentLength = HeaderValidator::expectedResponseContentLength(
+        $block->streamId,
+        $entry->requestMethod,
+        $status,
+        $contentLength,
+      );
+    }
+  }
+
+  $informational = $status is 100..=199;
+
+  if ($informational && $block->endStream) {
+    stream_error(
+      $block->streamId,
+      'an informational HTTP/2 response cannot end the stream',
+    );
+  }
+
+  if (!$trailers && !$informational) {
+    $entry->receivedInitialHeaders = true;
+    if ($requestMethod != null) {
+      $entry->requestMethod = $requestMethod;
+    }
+
+    $entry->expectedContentLength = $contentLength;
+  }
+
+  $events = vec[
+    (
+      2,
+      $block->streamId,
+      $headers,
+      $block->endStream,
+      $trailers,
+      $informational,
+    ),
+  ];
+
+  if ($block->endStream) {
+    verify_received_content_length($block->streamId, $entry);
+    if (end_remote($state, $block->streamId, $entry)) {
+      $events[] = (8, $block->streamId);
+    }
+  }
+
+  return $events;
+}

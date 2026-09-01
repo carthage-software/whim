@@ -1,0 +1,24 @@
+namespace Whim\SMTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Message\Envelope;
+use Whim\Message\Message;
+
+/** Sends Internet messages through SMTP. */
+interface Transport {
+  /** Delivers one message. */
+  #[MustUse]
+  #[TrackCaller]
+  public function send(
+    Envelope $envelope,
+    Message $message,
+    SendConfiguration $configuration = new SendConfiguration(),
+    null|CancellationToken $cancellation = null,
+  ): DeliveryReport;
+
+  /** Closes every idle SMTP connection. */
+  #[TrackCaller]
+  public function close(): void;
+}

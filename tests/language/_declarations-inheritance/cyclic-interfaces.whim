@@ -1,0 +1,2 @@
+interface Left extends Right {}
+interface Right extends Left {}

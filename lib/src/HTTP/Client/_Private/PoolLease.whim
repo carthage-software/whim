@@ -1,0 +1,45 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Owns one checked-out pool entry until it is released. */
+final class PoolLease {
+  private null|PoolEntry $entry;
+
+  public function __construct(
+    private Pool $pool,
+    PoolEntry $entry,
+    private bool $shared,
+  ) {
+    $this->entry = $entry;
+  }
+
+  public function __destruct(): void {
+    try {
+      $this->release(false);
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function connection(): Connection {
+    if ($this->entry == null) {
+      throw new ProtocolException('the pooled connection has been released');
+    }
+
+    return $this->entry->connection;
+  }
+
+  #[TrackCaller]
+  public function release(bool $reusable): void {
+    $entry = $this->entry ?? return;
+
+    $this->entry = null;
+    $this->pool->release($entry, $reusable, $this->shared);
+  }
+}

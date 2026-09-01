@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports a runtime value outside an allowed boundary. */
+class OutOfBoundsException extends RuntimeException {}

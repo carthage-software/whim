@@ -1,0 +1,88 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Generic\TypeParameterReflection;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\FunctionTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one closure declaration and its capture layout. */
+#[Stub]
+final class ClosureReflection implements CallableReflection {
+  private function __construct() {}
+
+  /** Returns where this closure was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this closure's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this closure's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns type parameters in declaration order. */
+  #[MustUse]
+  public function getTypeParameters(): vec<TypeParameterReflection> {}
+
+  /** Returns a type parameter by zero-based position or name. */
+  #[MustUse]
+  public function getTypeParameter(
+    int|string $parameter,
+  ): null|TypeParameterReflection {}
+
+  /** Returns the synthesized closure name. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns parameters in declaration order. */
+  #[MustUse]
+  public function getParameters(): vec<ParameterReflection> {}
+
+  /** Returns a parameter by zero-based position or name. */
+  #[MustUse]
+  public function getParameter(
+    int|string $parameter,
+  ): null|ParameterReflection {}
+
+  /** Returns the number of parameters a caller must provide. */
+  #[MustUse]
+  public function getRequiredParameterCount(): 0.. {}
+
+  /** Returns the declared return type, when present. */
+  #[MustUse]
+  public function getReturnType(): null|TypeReflection {}
+
+  /** Returns the structural callable type with known bindings resolved. */
+  #[MustUse]
+  public function getCallableType(
+    null|TypeEnvironmentReflection $environment = null,
+    null|ClassTypeReflection $calledType = null,
+  ): FunctionTypeReflection {}
+
+  /** Reports whether the closure used the auto-capturing `fn` form. */
+  #[MustUse]
+  public function isShort(): bool {}
+
+  /** Returns capture declarations in capture-window order. */
+  #[MustUse]
+  public function getCaptures(): vec<CaptureReflection> {}
+}

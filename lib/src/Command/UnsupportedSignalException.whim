@@ -1,0 +1,6 @@
+namespace Whim\Command;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports a signal the running system does not name. */
+final class UnsupportedSignalException extends InvalidArgumentException {}

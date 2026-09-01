@@ -1,0 +1,17 @@
+namespace Whim\Database;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\CloseHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Represents a prepared database statement. */
+interface Statement extends CloseHandle {
+  /** Executes this statement with positional values. */
+  #[MustUse]
+  #[TrackCaller]
+  public function execute(
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result;
+}

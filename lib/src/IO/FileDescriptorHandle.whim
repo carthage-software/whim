@@ -1,0 +1,40 @@
+namespace Whim\IO;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\OS\FileDescriptor;
+use Whim\Unwind\RuntimeException;
+
+/** A handle backed by an operating-system file descriptor. */
+interface FileDescriptorHandle extends CloseHandle {
+  /** Returns the backing descriptor, or raises when this handle is closed. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function getFileDescriptor(): FileDescriptor;
+
+  /** Whether the backing descriptor has already been closed. */
+  #[AlwaysInline]
+  public function isClosed(): bool {
+    try {
+      discard!($this->getFileDescriptor());
+    } catch (RuntimeException) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /** Closes the backing descriptor now rather than at collection. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->isClosed()) {
+      return;
+    }
+
+    $this->getFileDescriptor()->close();
+  }
+}

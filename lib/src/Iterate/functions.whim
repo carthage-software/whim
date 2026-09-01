@@ -1,0 +1,137 @@
+namespace Whim\Iterate;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Predicate;
+use Whim\Refine\Reducer;
+use Whim\Refine\Transform;
+
+/** Returns an iterator over the given values. */
+#[MustUse]
+#[TrackCaller]
+function to_iterator<K, V>(Iterable<K, V> $values): Iterator<K, V> {
+  if ($values is Iterator<K, V>) {
+    return $values;
+  }
+
+  if ($values is ToIterator<K, V>) {
+    return $values->toIterator();
+  }
+
+  return new ArrayIterator::<K, V>($values);
+}
+
+/** Lazily transforms each value while preserving its key. */
+#[MustUse]
+#[TrackCaller]
+function map<K, T, U>(
+  Iterable<K, T> $values,
+  Transform<T, U> $function,
+): Iterator<K, U> {
+  return new MapIterator::<K, T, U>(to_iterator::<K, T>($values), $function);
+}
+
+/** Lazily keeps values accepted by the predicate. */
+#[MustUse]
+#[TrackCaller]
+function filter<K, V>(
+  Iterable<K, V> $values,
+  Predicate<V> $predicate,
+): Iterator<K, V> {
+  return new FilterIterator::<K, V>(to_iterator::<K, V>($values), $predicate);
+}
+
+/** Lazily yields at most the first requested entries. */
+#[MustUse]
+#[TrackCaller]
+function take<K, V>(
+  Iterable<K, V> $values,
+  NonNegativeInt $count,
+): Iterator<K, V> {
+  return new TakeIterator::<K, V>(to_iterator::<K, V>($values), $count);
+}
+
+/** Lazily skips the first requested entries. */
+#[MustUse]
+#[TrackCaller]
+function drop<K, V>(
+  Iterable<K, V> $values,
+  NonNegativeInt $count,
+): Iterator<K, V> {
+  return new DropIterator::<K, V>(to_iterator::<K, V>($values), $count);
+}
+
+/** Lazily joins nested iterables into one iterator. */
+#[MustUse]
+#[TrackCaller]
+function join<O, K, V>(Iterable<O, Iterable<K, V>> $values): Iterator<K, V> {
+  return new JoinIterator::<O, K, V>(to_iterator::<O, Iterable<K, V>>($values));
+}
+
+/** Consumes an iterable and returns its entry count. */
+#[MustUse]
+#[TrackCaller]
+function count<K, V>(Iterable<K, V> $values): NonNegativeInt {
+  $iterator = to_iterator::<K, V>($values);
+  $count = 0;
+  while ($iterator->next() != null) {
+    $count++;
+  }
+
+  return $count;
+}
+
+/** Consumes an iterable and reduces its values. */
+#[MustUse]
+#[TrackCaller]
+function reduce<K, T, R>(
+  Iterable<K, T> $values,
+  Reducer<T, R> $function,
+  R $initial,
+): R {
+  $iterator = to_iterator::<K, T>($values);
+  $result = $initial;
+  while (true) {
+    $entry = $iterator->next();
+    if ($entry == null) {
+      return $result;
+    }
+
+    $result = $function($result, $entry[1]);
+  }
+}
+
+/** Consumes an iterable and collects its values in a vec. */
+#[MustUse]
+#[TrackCaller]
+function to_vec<K, V>(Iterable<K, V> $values): vec<V> {
+  $iterator = to_iterator::<K, V>($values);
+  $result = vec[];
+  while (true) {
+    $entry = $iterator->next();
+    if ($entry == null) {
+      return $result;
+    }
+
+    $result[] = $entry[1];
+  }
+}
+
+/** Consumes an iterable and collects its entries in a dict. */
+#[MustUse]
+#[TrackCaller]
+function to_dict<K: ArrayKey, V>(Iterable<K, V> $values): dict<K, V> {
+  $iterator = to_iterator::<K, V>($values);
+  $result = dict[];
+  while (true) {
+    $entry = $iterator->next();
+    if ($entry == null) {
+      return $result;
+    }
+
+    $result[$entry[0]] = $entry[1];
+  }
+}

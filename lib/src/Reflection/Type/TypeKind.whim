@@ -1,0 +1,36 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Enum\UnitEnum;
+use Whim\Marker\Stub;
+
+/** Identifies the structural form of a reflected type. */
+#[Stub]
+enum TypeKind implements UnitEnum {
+  case Mixed;
+  case Never;
+  case Void;
+  case Null;
+  case Bool;
+  case Int;
+  case Float;
+  case String;
+  case Object;
+  case Literal;
+  case IntegerRange;
+  case Named;
+  case Member;
+  case TypeParameter;
+  case Static;
+  case Union;
+  case Intersection;
+  case Negated;
+  case Function;
+  case Array;
+  case Vec;
+  case VecShape;
+  case Dict;
+  case DictShape;
+  case Classname;
+  case Tuple;
+  case Wildcard;
+}

@@ -1,0 +1,19 @@
+type Ids = Repository<
+    User, // the entity
+    int, // the identifier
+>;
+
+type Handler = fn(
+    int, // the status code
+    string, // the message
+): void;
+
+type Value =
+    int // a whole number
+    | float // a fractional number
+    | string;
+
+type Bounded =
+    Comparable // orderable
+    & Serializable // storable
+    & Hashable;

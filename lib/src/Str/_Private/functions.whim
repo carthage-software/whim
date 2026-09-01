@@ -1,0 +1,137 @@
+namespace Whim\Str\_Private;
+
+use Whim;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Str;
+use Whim\Unwind\OutOfBoundsException;
+
+/**
+ * Normalizes a possibly negative byte offset.
+ *
+ * @throws OutOfBoundsException when the offset is outside the string.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function offset(int $offset, int $length): int {
+  $original = $offset;
+  if ($offset < 0) {
+    $offset += $length;
+  }
+
+  if ($offset < 0 || $offset > $length) {
+    throw new OutOfBoundsException(
+      'string offset ' . $original . ' is out of bounds',
+    );
+  }
+
+  return $offset;
+}
+
+/** Converts an ASCII uppercase byte to lowercase. */
+#[AlwaysInline]
+function ascii_lower(int $byte): int {
+  return match ($byte) {
+    65..90 => $byte + 32,
+    $_ => $byte,
+  };
+}
+
+/** Converts an ASCII lowercase byte to uppercase. */
+#[AlwaysInline]
+function ascii_upper(int $byte): int {
+  return match ($byte) {
+    97..122 => $byte - 32,
+    $_ => $byte,
+  };
+}
+
+/** Compares a needle with the bytes at a position. */
+#[TrackCaller]
+#[TraceBoundary]
+function equal_at(
+  string $haystack,
+  string $needle,
+  int $position,
+  bool $caseInsensitive,
+): bool {
+  $needleLength = length!($needle);
+  if ($position + $needleLength > length!($haystack)) {
+    return false;
+  }
+
+  $index = 0;
+  while ($index < $needleLength) {
+    $left = Str\ord($haystack[$position + $index]);
+    $right = Str\ord($needle[$index]);
+    if ($caseInsensitive) {
+      $left = ascii_lower($left);
+      $right = ascii_lower($right);
+    }
+
+    if ($left != $right) {
+      return false;
+    }
+
+    $index++;
+  }
+
+  return true;
+}
+
+/** Reports whether a character mask contains a byte. */
+#[TrackCaller]
+#[TraceBoundary]
+function mask_contains(string $mask, int $byte): bool {
+  $length = length!($mask);
+  $index = 0;
+  while ($index < $length) {
+    $start = Str\ord($mask[$index]);
+    if (
+      $index + 3 < $length
+      && $mask[$index + 1] == '.'
+      && $mask[$index + 2] == '.'
+    ) {
+      $end = Str\ord($mask[$index + 3]);
+      if ($start <= $end && $byte >= $start && $byte <= $end) {
+        return true;
+      }
+
+      if ($start > $end && $byte <= $start && $byte >= $end) {
+        return true;
+      }
+
+      $index += 4;
+      continue;
+    }
+
+    if ($start == $byte) {
+      return true;
+    }
+
+    $index++;
+  }
+
+  return false;
+}
+
+/** Returns the default ASCII whitespace mask. */
+#[TrackCaller]
+#[TraceBoundary]
+function default_whitespace(): string {
+  return " \t\n\r" . Str\chr(0) . Str\chr(11);
+}
+
+/** Reports whether a byte belongs to a word. */
+#[TrackCaller]
+#[TraceBoundary]
+function word_byte(int $byte, null|string $additional): bool {
+  if (($byte >= 65 && $byte <= 90) || ($byte >= 97 && $byte <= 122)) {
+    return true;
+  }
+
+  return $additional != null && mask_contains($additional, $byte);
+}

@@ -1,0 +1,7 @@
+namespace Limits\self_bound_method_closure;
+
+class C {
+  public function m(): void {
+    $f = function<T: self>(): void {};
+  }
+}

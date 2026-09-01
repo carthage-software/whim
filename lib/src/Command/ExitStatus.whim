@@ -1,0 +1,43 @@
+namespace Whim\Command;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\Frameless;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Process\Signal;
+use Whim\Refine\Uint8;
+
+/** How a child process ended. */
+interface ExitStatus for Exited, Signalled {
+  /** Whether the child ended the way a successful program does. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isSuccess(): bool;
+}
+
+/** A child that returned a status code of its own accord. */
+final readonly class Exited implements ExitStatus {
+  #[AlwaysInline]
+  public function __construct(public readonly Uint8 $code) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function isSuccess(): bool {
+    return $this->code == 0;
+  }
+}
+
+/** A child that a signal ended. */
+final readonly class Signalled implements ExitStatus {
+  #[AlwaysInline]
+  public function __construct(
+    public readonly Signal $signal,
+    public readonly bool $dumpedCore = false,
+  ) {}
+
+  #[Frameless]
+  #[MustUse]
+  public function isSuccess(): bool {
+    return false;
+  }
+}

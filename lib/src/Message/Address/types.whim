@@ -1,0 +1,4 @@
+namespace Whim\Message\Address;
+
+/** A mailbox or named mailbox group. */
+type Address = Mailbox|Group;

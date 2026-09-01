@@ -1,0 +1,3 @@
+class Holder {
+  function run(): void {}
+}

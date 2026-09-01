@@ -1,0 +1,6 @@
+namespace Whim\OS;
+
+use Whim\OS\_Private;
+
+/** The operating-system family used by the running engine. */
+const FAMILY = _Private\family();

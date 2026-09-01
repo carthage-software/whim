@@ -1,0 +1,27 @@
+namespace Whim\Reflection\Member;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\DeclarationReflection;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+
+/** Describes a method, property, constant, or case declared in a class-like. */
+#[Stub]
+interface MemberReflection extends
+  DeclarationReflection for
+  MethodReflection,
+  PropertyReflection,
+  ClassConstantReflection,
+  EnumCaseReflection {
+  /** Returns the member name without a class prefix or property dollar sign. */
+  #[MustUse]
+  public function getName(): string;
+
+  /** Returns the class-like that declares this member. */
+  #[MustUse]
+  public function getDeclaringType(): ClassLikeReflection;
+
+  /** Returns the member visibility. */
+  #[MustUse]
+  public function getVisibility(): Visibility;
+}

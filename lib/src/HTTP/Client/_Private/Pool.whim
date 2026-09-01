@@ -1,0 +1,237 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\Connector;
+use Whim\HTTP\Client\MultiplexedConnection;
+use Whim\HTTP\Client\Origin;
+use Whim\HTTP\Message\Request;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\Throwable;
+
+/** Owns checked-in HTTP connections. */
+final class Pool {
+  private vec<PoolEntry> $idle = vec[];
+  private vec<PoolEntry> $shared = vec[];
+  private vec<PoolPending> $pending = vec[];
+
+  public function __construct(
+    private Connector $connector,
+    private NonNegativeInt $maximumIdleConnections,
+    private NonNegativeInt $maximumIdleConnectionsPerOrigin,
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function connect(
+    Origin $origin,
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation,
+  ): Connection {
+    $versions = resolve_protocol_versions($request, $configuration);
+    $selected = null;
+    $shared = false;
+    $connections = vec[];
+    foreach ($this->shared as $entry) {
+      if (!$entry->connection->isReusable()) {
+        $this->close($entry->connection);
+      } else {
+        if (
+          $selected == null
+          && $entry->matches($origin, $configuration, $versions)
+        ) {
+          $selected = $entry;
+          $shared = true;
+        }
+
+        $connections[] = $entry;
+      }
+    }
+
+    $this->shared = $connections;
+    $idle = vec[];
+    foreach ($this->idle as $entry) {
+      if (!$entry->connection->isReusable()) {
+        $this->close($entry->connection);
+      } else if (
+        $selected == null
+        && $entry->matches($origin, $configuration, $versions)
+      ) {
+        $selected = $entry;
+      } else {
+        $idle[] = $entry;
+      }
+    }
+
+    $this->idle = $idle;
+    if ($selected == null) {
+      $pending = $this->findPending($origin, $configuration);
+      if ($pending != null) {
+        $selected = $pending->await($cancellation);
+        if (
+          $selected != null
+          && $selected->connection->isReusable()
+          && $selected->matches($origin, $configuration, $versions)
+        ) {
+          return new PooledConnection(new PoolLease($this, $selected, true));
+        }
+
+        $selected = null;
+      }
+
+      $pending = new PoolPending($origin, $configuration);
+
+      $this->pending[] = $pending;
+      try {
+        $selected = new PoolEntry(
+          $origin,
+          $configuration,
+          $this->connector->connect(
+            $origin,
+            $request,
+            $configuration,
+            $cancellation,
+          ),
+        );
+      } catch (Throwable $error) {
+        $this->removePending($pending);
+        $pending->fail($error);
+        throw $error;
+      }
+
+      if ($selected->connection is MultiplexedConnection) {
+        $shared = true;
+        $this->evictShared();
+        $this->shared[] = $selected;
+      }
+
+      $this->removePending($pending);
+      $pending->complete(match ($shared) {
+        true => $selected,
+        false => null,
+      });
+    }
+
+    return new PooledConnection(new PoolLease($this, $selected, $shared));
+  }
+
+  #[TrackCaller]
+  public function release(
+    PoolEntry $entry,
+    bool $reusable,
+    bool $shared,
+  ): void {
+    if ($shared) {
+      if (!$reusable || !$entry->connection->isReusable()) {
+        $connections = vec[];
+        foreach ($this->shared as $candidate) {
+          if ($candidate != $entry) {
+            $connections[] = $candidate;
+          }
+        }
+
+        $this->shared = $connections;
+        $this->close($entry->connection);
+      }
+
+      return;
+    }
+
+    if (!$reusable || !$entry->connection->isReusable()) {
+      $this->close($entry->connection);
+      return;
+    }
+
+    if (
+      $this->maximumIdleConnections == 0
+      || $this->maximumIdleConnectionsPerOrigin == 0
+    ) {
+      $this->close($entry->connection);
+      return;
+    }
+
+    $this->evictOrigin($entry->origin);
+    $this->evictGlobal();
+    $this->idle[] = $entry;
+  }
+
+  private function evictOrigin(Origin $origin): void {
+    $count = 0;
+    foreach ($this->idle as $entry) {
+      if ($entry->hasOrigin($origin)) {
+        $count++;
+      }
+    }
+
+    if ($count < $this->maximumIdleConnectionsPerOrigin) {
+      return;
+    }
+
+    foreach ($this->idle as $index => $entry) {
+      if ($entry->hasOrigin($origin)) {
+        $evicted = remove!($this->idle, $index);
+        $this->close($evicted->connection);
+        return;
+      }
+    }
+  }
+
+  private function evictGlobal(): void {
+    if (length!($this->idle) < $this->maximumIdleConnections) {
+      return;
+    }
+
+    $evicted = remove_first!($this->idle);
+    $this->close($evicted->connection);
+  }
+
+  private function evictShared(): void {
+    if (
+      $this->maximumIdleConnections == 0
+      || length!($this->shared) < $this->maximumIdleConnections
+    ) {
+      return;
+    }
+
+    $evicted = remove_first!($this->shared);
+    $this->close($evicted->connection);
+  }
+
+  private function close(Connection $connection): void {
+    try {
+      $connection->close();
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[MustUse]
+  private function findPending(
+    Origin $origin,
+    Configuration $configuration,
+  ): null|PoolPending {
+    foreach ($this->pending as $pending) {
+      if ($pending->matches($origin, $configuration)) {
+        return $pending;
+      }
+    }
+
+    return null;
+  }
+
+  private function removePending(PoolPending $pending): void {
+    $remaining = vec[];
+    foreach ($this->pending as $candidate) {
+      if ($candidate != $pending) {
+        $remaining[] = $candidate;
+      }
+    }
+
+    $this->pending = $remaining;
+  }
+}

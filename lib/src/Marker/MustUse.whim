@@ -1,0 +1,14 @@
+namespace Whim\Marker;
+
+use Whim\Marker\TrackCaller;
+use Whim\Attribute\Attribute;
+
+/** Requires callers to consume a callable's result or discard it explicitly. */
+#[Stub]
+#[Attribute(Attribute::TARGET_FUNCTION | Attribute::TARGET_METHOD)]
+final class MustUse {
+  public readonly null|string $note;
+
+  #[TrackCaller]
+  public function __construct(null|string $note = null) {}
+}

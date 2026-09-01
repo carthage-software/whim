@@ -1,0 +1,30 @@
+namespace Whim\IRI;
+
+use Whim\IP\Address;
+use Whim\IP\Family;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Represents an IPv4 or bracketed IPv6 IRI host. */
+final readonly class IPHost implements Host {
+  #[AlwaysInline]
+  private function __construct(public Address $address) {}
+
+  /** Creates an IP host. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromAddress(Address $address): IPHost {
+    return new IPHost($address);
+  }
+
+  /** Returns the host text, including IPv6 brackets. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): string {
+    if ($this->address->family == Family::V4) {
+      return $this->address->toString();
+    }
+
+    return '[' . $this->address->toString() . ']';
+  }
+}

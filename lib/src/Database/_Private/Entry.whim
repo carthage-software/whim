@@ -1,0 +1,61 @@
+namespace Whim\Database\_Private;
+
+use Whim\Database\Connection;
+use Whim\Database\PoolConfiguration;
+use Whim\Marker\MustUse;
+use Whim\Time\Instant;
+
+/** Holds one connection and its pool timestamps. */
+final readonly class Entry {
+  public function __construct(
+    public Connection $connection,
+    public Instant $createdAt,
+    public Instant $idleSince,
+  ) {}
+
+  /** Creates a new entry for a fresh connection. */
+  #[MustUse]
+  public static function create(Connection $connection): Entry {
+    $now = Instant::now();
+    return new Entry($connection, $now, $now);
+  }
+
+  /** Marks this entry as idle now. */
+  #[MustUse]
+  public function idle(): Entry {
+    return new Entry($this->connection, $this->createdAt, Instant::now());
+  }
+
+  /** Reports whether this entry exceeded a configured age. */
+  #[MustUse]
+  public function isExpired(PoolConfiguration $configuration): bool {
+    return (
+      $this
+        ->idleSince
+        ->elapsed()
+        ->compare($configuration->maximumIdleTime)
+        ->isGreaterOrEqual()
+      || $this->exceededLifetime($configuration)
+    );
+  }
+
+  /** Reports whether this entry exceeded its configured lifetime. */
+  #[MustUse]
+  public function exceededLifetime(PoolConfiguration $configuration): bool {
+    return $this
+      ->createdAt
+      ->elapsed()
+      ->compare($configuration->maximumLifetime)
+      ->isGreaterOrEqual();
+  }
+
+  /** Reports whether this entry should be checked before reuse. */
+  #[MustUse]
+  public function needsValidation(PoolConfiguration $configuration): bool {
+    $interval = $configuration->validationInterval;
+    return (
+      $interval != null
+      && $this->idleSince->elapsed()->compare($interval)->isGreaterOrEqual()
+    );
+  }
+}

@@ -1,0 +1,25 @@
+namespace Whim\HTTP\Server\Responder;
+
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\ErrorStatusCode;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Response\text;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Exposes complete failure diagnostics for local development. */
+final readonly class Debug implements Responder {
+  #[TrackCaller]
+  public function respond(
+    ErrorStatusCode $status,
+    null|Throwable $cause,
+  ): Response {
+    $phrase = Message\reason_phrase($status) ?? 'Error';
+    $body = $status . ' ' . $phrase;
+    if ($cause != null) {
+      $body .= "\n\n" . $cause->toString();
+    }
+
+    return text($body . "\n", $status);
+  }
+}

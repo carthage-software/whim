@@ -1,0 +1,19 @@
+[package]
+name = "whim-loop"
+description = "The file-descriptor reactor and task scheduler used by Whim"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+corosensei = { workspace = true }
+hashbrown = { workspace = true }
+polling = { workspace = true }
+target-guard = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,6 @@
+namespace Whim\HTTP\_Private;
+
+use Whim\Unwind\RuntimeException;
+
+/** The root of HTTP/2 failures. */
+class Exception extends RuntimeException {}

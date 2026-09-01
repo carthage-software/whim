@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports a match expression with no applicable arm. */
+#[Stub]
+class UnhandledMatchError extends Error {}

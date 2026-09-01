@@ -1,0 +1,2 @@
+class Box<T> {}
+interface I<U: Box<int, string>> {}

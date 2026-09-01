@@ -1,0 +1,42 @@
+namespace Whim\Compression\_Private;
+
+use Whim\Compression\DecompressionException;
+use Whim\Compression\Decompressor as DecompressorInterface;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\_Private\CompressionDecoder;
+
+/** Adapts a built-in decompression stream to the public interface. */
+final class Decompressor implements DecompressorInterface {
+  public function __construct(private CompressionDecoder $decoder) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(string $bytes): string {
+    $result = $this->decoder->push($bytes);
+    if ($result == null) {
+      throw new DecompressionException('the compressed stream is invalid');
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function finish(): string {
+    $result = $this->decoder->finish();
+    if ($result == null) {
+      throw new DecompressionException(
+        'the compressed stream is invalid or truncated',
+      );
+    }
+
+    return $result;
+  }
+}

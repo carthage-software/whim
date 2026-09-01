@@ -1,0 +1,16 @@
+namespace Whim\UDP;
+
+/** Carries the two explicit-congestion bits of an IP packet. */
+enum ExplicitCongestion: int {
+  /** The packet does not use ECN. */
+  case NotCapable = 0;
+
+  /** The packet uses the ECT(1) codepoint. */
+  case CapableTransport1 = 1;
+
+  /** The packet uses the ECT(0) codepoint. */
+  case CapableTransport0 = 2;
+
+  /** A router reported congestion. */
+  case CongestionExperienced = 3;
+}

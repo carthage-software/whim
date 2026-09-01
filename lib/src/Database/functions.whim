@@ -1,0 +1,90 @@
+namespace Whim\Database;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\_Private\BatchResult;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Unwind\Throwable;
+
+/** Fetches one row and closes the result. */
+#[MustUse]
+#[TrackCaller]
+function fetch_one(
+  Result $result,
+  null|CancellationToken $cancellation = null,
+): null|Row {
+  try {
+    return $result->fetch($cancellation);
+  } finally {
+    $result->close();
+  }
+}
+
+/** Fetches every remaining row and closes the result. */
+#[MustUse]
+#[TrackCaller]
+function fetch_all(
+  Result $result,
+  null|CancellationToken $cancellation = null,
+): vec<Row> {
+  try {
+    if ($result is BatchResult) {
+      return $result->fetchAll($cancellation);
+    }
+
+    $rows = vec[];
+    while (true) {
+      $row = $result->fetch($cancellation) ?? return $rows;
+
+      $rows[] = $row;
+    }
+  } finally {
+    $result->close();
+  }
+}
+
+/** Fetches the first column of one row and closes the result. */
+#[MustUse]
+#[TrackCaller]
+function fetch_value(
+  Result $result,
+  null|CancellationToken $cancellation = null,
+): Option<Value> {
+  $row = fetch_one($result, $cancellation) ?? return new None();
+
+  if ($row == vec[]) {
+    throw new QueryException('the database returned a row without columns');
+  }
+
+  return new Some::<Value>(remove_first!($row));
+}
+
+/** Runs an operation in a transaction and rolls back on failure. */
+#[MustUse]
+#[TrackCaller]
+function transactional<T>(
+  Connection $connection,
+  fn(Transaction): T $operation,
+  null|TransactionIsolation $isolation = null,
+  bool $readOnly = false,
+  null|CancellationToken $cancellation = null,
+): T {
+  $transaction = $connection->begin($isolation, $readOnly, $cancellation);
+  try {
+    $result = $operation($transaction);
+    $transaction->commit();
+    return $result;
+  } catch (Throwable $error) {
+    if ($transaction->isActive()) {
+      try {
+        $transaction->rollback();
+      } catch (Throwable $_) {
+      }
+    }
+
+    throw $error;
+  }
+}

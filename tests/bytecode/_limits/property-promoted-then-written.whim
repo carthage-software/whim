@@ -1,0 +1,4 @@
+class C {
+  public function __construct(public int $x) {}
+  public int $x = 1;
+}

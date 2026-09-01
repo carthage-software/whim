@@ -1,0 +1,82 @@
+class Counter {
+  private int $count = 0;
+
+  public function increment(): void {
+    $this->count += 1;
+  }
+
+  public function count(): int {
+    return $this->count;
+  }
+}
+
+$numbers = vec[1, 2];
+$appended = $numbers;
+$appended[] = 3;
+assert!(length!($numbers) == 2);
+assert!(length!($appended) == 3);
+
+$entries = dict['k' => 1];
+$modified = $entries;
+$modified['k'] = 2;
+$modified['new'] = 3;
+assert!($entries['k'] == 1);
+assert!(length!($entries) == 1);
+assert!($modified['k'] == 2);
+assert!(length!($modified) == 2);
+
+/** Appends to its parameter and reports the length it observes. */
+function pad(vec<int> $items): int {
+  $items[] = 0;
+  return length!($items);
+}
+
+$source = vec[1];
+assert!(pad($source) == 2);
+assert!(length!($source) == 1);
+
+$first_holder = vec[new Counter()];
+$second_holder = $first_holder;
+$second_holder[0]->increment();
+assert!($first_holder[0]->count() == 1);
+
+$nested = dict['inner' => vec[new Counter()]];
+$nested_copy = $nested;
+$nested_copy['inner'][0]->increment();
+assert!($nested['inner'][0]->count() == 1);
+
+$shared = new Counter();
+$alias = $shared;
+$alias->increment();
+assert!($shared->count() == 1);
+assert!($alias->count() == 1);
+$increment_through_capture = function() use ($shared): void {
+  $shared->increment();
+};
+
+$increment_through_capture();
+assert!($shared->count() == 2);
+
+$bound = vec[1, 2];
+foreach ($bound as $number) {
+  $number = 99;
+}
+
+assert!($bound == vec[1, 2]);
+
+$keyed = dict['a' => 1];
+foreach ($keyed as $key => $value) {
+  $value = 99;
+}
+
+assert!($keyed['a'] == 1);
+
+$queue = vec[10, 20, 30];
+$visited = vec[];
+foreach ($queue as $item) {
+  remove_last!($queue);
+  $visited[] = $item;
+}
+
+assert!($visited == vec[10, 20, 30]);
+assert!(length!($queue) == 0);

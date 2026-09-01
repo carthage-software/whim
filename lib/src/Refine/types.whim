@@ -1,0 +1,122 @@
+namespace Whim\Refine;
+
+use Whim\Comparison\Ordering;
+use Whim\Iterate\ToIterator;
+use Whim\Iterate\Iterator;
+
+/** A type accepted as a dictionary key. */
+type ArrayKey = string|int|bool;
+
+/** Any integer or floating-point number. */
+type Numeric = int|float;
+
+/** Any scalar value. */
+type Scalar = Numeric|string|bool;
+
+/** A value that may be null. */
+type Nullable<T> = T|null;
+
+/** A callable that decides whether a value satisfies a condition. */
+type Predicate<in T> = fn(T): bool;
+
+/** A callable that transforms a value into another value. */
+type Transform<in T, out U> = fn(T): U;
+
+/** A callable that folds a value into an accumulator. */
+type Reducer<in T, U> = fn(U, T): U;
+
+/** A callable that performs a side effect on a value and returns nothing. */
+type Consumer<in T> = fn(T): void;
+
+/** A callable that produces a value without taking any input. */
+type Supplier<out T> = fn(): T;
+
+/** A callable that orders two values of the same type. */
+type Comparator<in T> = fn(T, T): Ordering;
+
+/** Any Iterator, ToIterator, or array that yields known keys and values. */
+type Iterable<K, V> = Iterator<K, V>|ToIterator<K, V>|array<K, V>;
+
+/** Any tuple, regardless of its length or element types. */
+type AnyTuple = (...);
+
+/** Any tuple whose elements all belong to one type. */
+type AnyTupleOf<T> = (...T);
+
+/** The values in a type except those belonging to another type. */
+type Exclude<T, N> = T&!N;
+
+/** The values in a type that also belong to another type. */
+type Extract<T, U> = T&U;
+
+/** A numeric value other than zero. */
+type NonZero<T: Numeric> = Exclude<T, 0|0.0>;
+
+/** A vec containing at least one element. */
+type NonEmptyVec<T> = Exclude<vec<T>, vec<never>>;
+
+/** A dictionary containing at least one entry. */
+type NonEmptyDict<K: ArrayKey, V> = Exclude<dict<K, V>, dict<never, never>>;
+
+/** A string containing at least one byte. */
+type NonEmptyString = Exclude<string, ''>;
+
+/** An integer greater than zero. */
+type PositiveInt = 1..;
+
+/** An integer greater than or equal to zero. */
+type NonNegativeInt = 0..;
+
+/** An integer less than zero. */
+type NegativeInt = ..0;
+
+/** An integer less than or equal to zero. */
+type NonPositiveInt = ..=0;
+
+/** Any value other than null. */
+type NonNull = Exclude<mixed, null>;
+
+/** An unsigned 8-bit integer. */
+type Uint8 = 0..=255;
+
+/** A signed 8-bit integer. */
+type Int8 = -128..=127;
+
+/** An unsigned 16-bit integer. */
+type Uint16 = 0..=65535;
+
+/** A signed 16-bit integer. */
+type Int16 = -32768..=32767;
+
+/** An unsigned 32-bit integer. */
+type Uint32 = 0..=4294967295;
+
+/** A signed 32-bit integer. */
+type Int32 = -2147483648..=2147483647;
+
+/** An unsigned 64-bit integer. */
+type Uint64 = 0..;
+
+/** A value from zero to one hundred, such as a percentage. */
+type Percent = 0..=100;
+
+/** A single base-10 digit. */
+type Digit = 0..=9;
+
+/** The null, false, zero, and empty-string values PHP considers falsy. */
+type Falsy = null|false|0|0.0|'';
+
+/** Values outside Falsy, using PHP terminology; Whim conditions require bool. */
+type Truthy = Exclude<mixed, Falsy>;
+
+/**
+ * Erases T at runtime: the engine sees only mixed and performs no check.
+ * Static analyzers still enforce T in full.
+ */
+type Erased<T> = mixed;
+
+/**
+ * Weakens T to W at runtime: the engine sees only W and performs checks for W,
+ * but static analyzers still enforce T in full.
+ */
+type Weakend<T: W, W> = W;

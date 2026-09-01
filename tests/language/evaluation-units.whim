@@ -1,0 +1,165 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\ParserError;
+use Whim\Unwind\RequireError;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+rejects(
+  $work,
+  'declaration-inside-a-block',
+  'if (true) {' . "\n" . '    function nested(): void {}' . "\n" . '}' . "\n",
+  'a declaration is only valid at the top level of a file or namespace',
+);
+
+rejects(
+  $work,
+  'declaration-inside-a-function-body',
+  'function outer(): void {' . "\n" . '    class Inner {}' . "\n" . '}' . "\n",
+  'a declaration is only valid at the top level of a file or namespace',
+);
+
+rejects(
+  $work,
+  'top-level-return-is-rejected',
+  'return 5;' . "\n",
+  '`return` may only be used inside a function, method, or closure',
+);
+
+$missingUnit = $work . '/does-not-exist.whim';
+$assertion_value_1 = function() use ($missingUnit): void {
+  require!($missingUnit);
+};
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (RequireError $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is RequireError);
+
+File\write($work . '/broken.whim', 'this is not whim at all ((' . "\n");
+$brokenUnit = $work . '/broken.whim';
+$assertion_value_2 = function() use ($brokenUnit): void {
+  require!($brokenUnit);
+};
+
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (ParserError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is ParserError);
+
+function units_helper(): string {
+  return 'original';
+}
+
+File\write(
+  $work . '/duplicate-function.whim',
+  'function units_helper(): string { return \'dup\'; }' . "\n",
+);
+
+$duplicateFunction = $work . '/duplicate-function.whim';
+$assertion_value_3 = function() use ($duplicateFunction): void {
+  require!($duplicateFunction);
+};
+
+$assertion_error_3 = null;
+try {
+  $assertion_value_3();
+} catch (LinkerError $assertion_caught_3) {
+  $assertion_error_3 = $assertion_caught_3;
+}
+
+assert!($assertion_error_3 is LinkerError);
+
+assert!(units_helper() == 'original');
+
+File\write($work . '/cross-kind.whim', 'class units_helper {}' . "\n");
+$crossKind = $work . '/cross-kind.whim';
+$assertion_value_5 = function() use ($crossKind): void {
+  require!($crossKind);
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (LinkerError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is LinkerError);
+
+final class UnitTrace {
+  public static vec<string> $events = vec[];
+}
+
+File\write(
+  $work . '/library.whim',
+  'const LIBRARY_CONSTANT = 42;'
+  . "\n"
+  . 'function library_helper(): string { return \'helper declared by require\'; }'
+  . "\n"
+  . 'UnitTrace::$events[] = \'library top level\';'
+  . "\n",
+);
+
+UnitTrace::$events[] = 'before require';
+$libraryUnit = $work . '/library.whim';
+$libraryValue = require!($libraryUnit);
+assert!(UnitTrace::$events == vec['before require', 'library top level']);
+
+assert!($libraryValue == null);
+assert!(library_helper() == 'helper declared by require');
+assert!(LIBRARY_CONSTANT == 42);
+
+File\write(
+  $work . '/declaring.whim',
+  'function declared_once(): string { return \'declared once\'; }'
+  . "\n"
+  . 'UnitTrace::$events[] = \'declaring ran\';'
+  . "\n",
+);
+
+UnitTrace::$events = vec[];
+$declaringUnit = $work . '/declaring.whim';
+$firstLoad = require!($declaringUnit);
+assert!($firstLoad == null);
+$onceAfterRequire = require_once!($declaringUnit);
+assert!($onceAfterRequire == null);
+assert!(UnitTrace::$events == vec['declaring ran']);
+assert!(declared_once() == 'declared once');
+
+File\write(
+  $work . '/counter.whim',
+  'UnitTrace::$events[] = \'counter ran\';' . "\n",
+);
+
+UnitTrace::$events = vec[];
+$counterUnit = $work . '/counter.whim';
+$firstOnce = require_once!($counterUnit);
+assert!($firstOnce == null);
+$secondOnce = require_once!($counterUnit);
+assert!($secondOnce == null);
+assert!(UnitTrace::$events == vec['counter ran']);
+
+File\write(
+  $work . '/plain.whim',
+  'UnitTrace::$events[] = \'plain ran\';' . "\n",
+);
+
+UnitTrace::$events = vec[];
+$plainUnit = $work . '/plain.whim';
+$plainValue = require!($plainUnit);
+assert!($plainValue == null);
+assert!(UnitTrace::$events == vec['plain ran']);
+
+Filesystem\delete_directory($work, true);

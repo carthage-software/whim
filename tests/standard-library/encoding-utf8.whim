@@ -1,0 +1,8 @@
+use Whim\Encoding\UTF8;
+use Whim\Json;
+
+assert!(UTF8\lossy('plain ASCII') == 'plain ASCII');
+assert!(UTF8\lossy("caf\xc3\xa9") == "caf\xc3\xa9");
+assert!(UTF8\lossy("a\xffb") == "a\xef\xbf\xbdb");
+assert!(UTF8\lossy("\xf0\x9f") == "\xef\xbf\xbd");
+assert!(Json\encode(UTF8\lossy("\xff")) == "\"\xef\xbf\xbd\"");

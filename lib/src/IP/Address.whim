@@ -1,0 +1,334 @@
+namespace Whim\IP;
+
+use Whim;
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Vec;
+
+/** Represents an immutable IPv4 or IPv6 address. */
+final readonly class Address implements Order<Address>, ToString {
+  /** Creates an address from validated bytes. */
+  #[TrackCaller]
+  private function __construct(
+    public Family $family,
+    private NonEmptyString $bytes,
+  ) {}
+
+  /** Parses an address, or returns null when the text is invalid. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $address): null|Address {
+    $bytes = Whim\_Private\ip_parse($address) ?? return null;
+
+    if (length!($bytes) == 4) {
+      return new Address(Family::V4, $bytes as NonEmptyString);
+    }
+
+    if (length!($bytes) == 16) {
+      return new Address(Family::V6, $bytes as NonEmptyString);
+    }
+
+    return null;
+  }
+
+  /**
+   * Parses an address.
+   *
+   * @throws InvalidArgumentException when the text is not a valid IP address.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $address): Address {
+    $parsed = Address::parse($address);
+    if ($parsed == null) {
+      throw new InvalidArgumentException(
+        'invalid IP address: `' . $address . '`',
+      );
+    }
+
+    return $parsed;
+  }
+
+  /**
+   * Parses an IPv4 address.
+   *
+   * @throws InvalidArgumentException when the text is not a valid IPv4 address.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function v4(string $address): Address {
+    $parsed = Address::parse($address);
+    if ($parsed == null || $parsed->family != Family::V4) {
+      throw new InvalidArgumentException(
+        'invalid IPv4 address: `' . $address . '`',
+      );
+    }
+
+    return $parsed;
+  }
+
+  /**
+   * Parses an IPv6 address.
+   *
+   * @throws InvalidArgumentException when the text is not a valid IPv6 address.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function v6(string $address): Address {
+    $parsed = Address::parse($address);
+    if ($parsed == null || $parsed->family != Family::V6) {
+      throw new InvalidArgumentException(
+        'invalid IPv6 address: `' . $address . '`',
+      );
+    }
+
+    return $parsed;
+  }
+
+  /**
+   * Creates an address from its 4 or 16 raw bytes.
+   *
+   * @throws InvalidArgumentException when the byte length is not 4 or 16.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromBytes(string $bytes): Address {
+    if (length!($bytes) == 4) {
+      return new Address(Family::V4, $bytes as NonEmptyString);
+    }
+
+    if (length!($bytes) == 16) {
+      return new Address(Family::V6, $bytes as NonEmptyString);
+    }
+
+    throw new InvalidArgumentException(
+      'an IP address must contain exactly 4 or 16 bytes',
+    );
+  }
+
+  /** Returns the raw address bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toBytes(): NonEmptyString {
+    return $this->bytes;
+  }
+
+  /** Returns the canonical text form of the address. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): NonEmptyString {
+    return Whim\_Private\ip_format($this->bytes) as NonEmptyString;
+  }
+
+  /** Returns the uncompressed text form of the address. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toExpandedString(): NonEmptyString {
+    if ($this->family == Family::V4) {
+      return $this->toString();
+    }
+
+    $groups = vec[];
+    $index = 0;
+    while ($index < 16) {
+      $value =
+        (Str\ord($this->bytes[$index]) << 8)
+        | Str\ord($this->bytes[$index + 1]);
+
+      $groups[] = Str\pad_left(Math\to_base($value, 16), 4, '0');
+      $index += 2;
+    }
+
+    return Str\join(':', $groups) as NonEmptyString;
+  }
+
+  /** Returns the reverse-DNS name for the address. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toArpaName(): NonEmptyString {
+    if ($this->family == Family::V4) {
+      $parts = Str\split($this->toString(), '.');
+      return (
+        (Str\join('.', Vec\reverse::<string>($parts)) . '.in-addr.arpa')
+          as NonEmptyString
+      );
+    }
+
+    $nibbles = vec[];
+    $index = 0;
+    while ($index < 16) {
+      $hex = Str\pad_left(
+        Math\to_base(Str\ord($this->bytes[$index]), 16),
+        2,
+        '0',
+      );
+
+      $nibbles[] = $hex[0];
+      $nibbles[] = $hex[1];
+      $index++;
+    }
+
+    return (
+      (Str\join('.', Vec\reverse::<string>($nibbles)) . '.ip6.arpa')
+        as NonEmptyString
+    );
+  }
+
+  /** Reports whether this is an IPv4-mapped IPv6 address. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isIPv4Mapped(): bool {
+    return (
+      $this->family == Family::V6
+      && Str\starts_with(
+        $this->bytes,
+        "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff",
+      )
+    );
+  }
+
+  /** Converts IPv4 to IPv4-mapped IPv6 and leaves IPv6 unchanged. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toIPv4Mapped(): Address {
+    if ($this->family == Family::V6) {
+      return $this;
+    }
+
+    return new Address(
+      Family::V6,
+      "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff" . $this->bytes,
+    );
+  }
+
+  /** Reports whether this is a loopback address. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isLoopback(): bool {
+    if ($this->family == Family::V4) {
+      return $this->bytes[0] == "\x7f";
+    }
+
+    return (
+      $this->bytes
+      == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+    );
+  }
+
+  /** Reports whether this is a private or unique-local address. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isPrivate(): bool {
+    if ($this->family == Family::V4) {
+      return (
+        $this->bytes[0] == "\x0a"
+        || (
+          $this->bytes[0] == "\xac"
+          && (Str\ord($this->bytes[1]) & 0xf0) == 0x10
+        )
+        || ($this->bytes[0] == "\xc0" && $this->bytes[1] == "\xa8")
+      );
+    }
+
+    return (Str\ord($this->bytes[0]) & 0xfe) == 0xfc;
+  }
+
+  /** Reports whether this is a link-local address. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isLinkLocal(): bool {
+    if ($this->family == Family::V4) {
+      return $this->bytes[0] == "\xa9" && $this->bytes[1] == "\xfe";
+    }
+
+    return (
+      $this->bytes[0] == "\xfe"
+      && (Str\ord($this->bytes[1]) & 0xc0) == 0x80
+    );
+  }
+
+  /** Reports whether this is a multicast address. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isMulticast(): bool {
+    if ($this->family == Family::V4) {
+      return (Str\ord($this->bytes[0]) & 0xf0) == 0xe0;
+    }
+
+    return $this->bytes[0] == "\xff";
+  }
+
+  /** Reports whether this is the all-zero unspecified address. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isUnspecified(): bool {
+    if ($this->family == Family::V4) {
+      return $this->bytes == "\x00\x00\x00\x00";
+    }
+
+    return (
+      $this->bytes
+      == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+    );
+  }
+
+  /** Reports whether this belongs to an address block reserved for documentation. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isDocumentation(): bool {
+    if ($this->family == Family::V4) {
+      return (
+        Str\starts_with($this->bytes, "\xc0\x00\x02")
+        || Str\starts_with($this->bytes, "\xc6\x33\x64")
+        || Str\starts_with($this->bytes, "\xcb\x00\x71")
+      );
+    }
+
+    return Str\starts_with($this->bytes, "\x20\x01\x0d\xb8");
+  }
+
+  /** Reports whether this is unicast and not locally or specially scoped. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isGlobalUnicast(): bool {
+    return (
+      !$this->isLoopback()
+      && !$this->isPrivate()
+      && !$this->isLinkLocal()
+      && !$this->isMulticast()
+      && !$this->isUnspecified()
+      && !$this->isDocumentation()
+    );
+  }
+
+  /** Compares addresses by family and then by raw bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(Address $other): Ordering {
+    if ($this->family != $other->family) {
+      return Ordering::from($this->family->value <=> $other->family->value);
+    }
+
+    return Ordering::from($this->bytes <=> $other->bytes);
+  }
+
+  /** Reports whether two addresses have the same family and bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Address $other): bool {
+    return $this->family == $other->family && $this->bytes == $other->bytes;
+  }
+}

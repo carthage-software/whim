@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Raised when the result of a `MustUse` callable is discarded implicitly. */
+#[Stub]
+class DiscardedResultError extends Error {}

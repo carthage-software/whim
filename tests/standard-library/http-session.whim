@@ -1,0 +1,362 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\Database\SQLite\Connector as SQLiteConnector;
+use Whim\Filesystem;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context;
+use Whim\HTTP\Server\Handler\FunctionHandler;
+use Whim\HTTP\Server\Middleware\Session as SessionMiddleware;
+use Whim\HTTP\Session\Configuration;
+use Whim\HTTP\Session\ConflictException;
+use Whim\HTTP\Session\Session;
+use Whim\HTTP\Session\Storage\DatabaseStore;
+use Whim\HTTP\Session\Storage\MemoryStore;
+use Whim\HTTP\Session\UnavailableItemException;
+use Whim\IP\Address;
+use Whim\Network\Endpoint;
+use Whim\Network\InternetEndpoint;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+final class HTTPSessionTestContext implements Context\Context {
+  public dict<string, string> $parameters = dict[];
+  private null|Session $session = null;
+
+  public function __construct(
+    public readonly ProtocolVersion $protocolVersion,
+    public readonly Endpoint $localEndpoint,
+    public readonly Endpoint $peerEndpoint,
+  ) {}
+
+  public function getSession(): null|Session {
+    return $this->session;
+  }
+
+  public function setSession(Session $session): void {
+    $this->session = $session;
+  }
+
+  public function onResponseComplete(fn(): void $callback): void {}
+}
+
+function http_session_test_context(): HTTPSessionTestContext {
+  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+  return new HTTPSessionTestContext(ProtocolVersion::V11, $local, $peer);
+}
+
+function http_session_identifier(Response $response): NonEmptyString {
+  $value = $response->headers->get('Set-Cookie') as string;
+  $pair = Str\split($value, ';', 2)[0];
+  return Str\split($pair, '=', 2)[1] as NonEmptyString;
+}
+
+function http_session_request(null|string $identifier = null): Request {
+  $headers = match ($identifier) {
+    null => FieldMap::default(),
+    $identifier @ string => FieldMap::from(vec[
+      ('Cookie', '__session=' . $identifier),
+    ]),
+  };
+
+  return Request::fromParts('GET', headers: $headers);
+}
+
+$session = new Session(dict['nullable' => null]);
+assert!($session->contains('nullable'));
+assert!($session->get('nullable') == null);
+assert!($session->toIterator()->next() == ('nullable', null));
+assert!(!($session->isDirty()));
+$assertion_value_5 = fn(): Whim\Json\Value => $session->get('missing');
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (UnavailableItemException $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is UnavailableItemException);
+
+$session->set('name', 'Whim');
+assert!($session->get('name') == 'Whim');
+assert!($session->isDirty());
+$session->remove('name');
+assert!(!($session->contains('name')));
+
+$session->regenerateIdentifier();
+assert!($session->isIdentifierRegenerationRequested());
+$session->destroy();
+assert!($session->toDict() == dict[]);
+assert!($session->isDestroyed());
+
+$configuration = new Configuration();
+assert!($configuration->cookie->name == '__session');
+assert!($configuration->cookie->secure);
+assert!($configuration->cookie->httpOnly);
+assert!(!($configuration->rollingExpiration));
+$assertion_value_16 = fn(): Configuration => (
+  new Configuration(idleTimeout: Duration::zero())
+);
+
+$assertion_error_16 = null;
+try {
+  $assertion_value_16();
+} catch (InvalidArgumentException $assertion_caught_16) {
+  $assertion_error_16 = $assertion_caught_16;
+}
+
+assert!($assertion_error_16 is InvalidArgumentException);
+
+$store = new MemoryStore();
+$cancellation = new SignalCancellationToken();
+$ttl = Duration::fromMinutes(5);
+$store->create('identifier', dict['count' => 1], $ttl);
+$record = $store->load('identifier');
+assert!(!($record == null));
+assert!($record?->data == dict['count' => 1]);
+assert!($record?->revision == 0);
+
+$store->replace('identifier', 0, dict['count' => 2], $ttl, $cancellation);
+
+assert!($store->load('identifier', $cancellation)?->revision == 1);
+assert!($store->load('identifier', $cancellation)?->data == dict['count' => 2]);
+
+$assertion_value_22 = function() use ($store, $ttl, $cancellation): void {
+  $store->replace('identifier', 0, dict[], $ttl, $cancellation);
+};
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (ConflictException $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+}
+
+assert!($assertion_error_22 is ConflictException);
+
+$conflictingMiddleware = new SessionMiddleware(
+  $store,
+  new Configuration(rollingExpiration: true),
+);
+
+$assertion_value_23 = function() use (
+  $conflictingMiddleware,
+  $store,
+  $ttl,
+  $cancellation,
+): Response {
+  return $conflictingMiddleware->handle(
+    http_session_test_context(),
+    http_session_request('identifier'),
+    new FunctionHandler(
+      function(
+        Context\Context $_context,
+        Request $_request,
+        CancellationToken $_cancellation,
+      ) use ($store, $ttl): Response {
+        $store->replace('identifier', 1, dict['external' => true], $ttl);
+        return new Response(200);
+      },
+    ),
+    $cancellation,
+  );
+};
+
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (ConflictException $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is ConflictException);
+
+$store->delete('identifier', $cancellation);
+assert!($store->load('identifier', $cancellation) == null);
+
+$middlewareStore = new MemoryStore();
+$middleware = new SessionMiddleware($middlewareStore);
+$context = http_session_test_context();
+$response = $middleware->handle(
+  $context,
+  http_session_request(),
+  new FunctionHandler(
+    function(
+      Context\Context $context,
+      Request $_request,
+      CancellationToken $_cancellation,
+    ): Response {
+      $session = $context->getSession() as Session;
+      assert!($session->toDict() == dict[]);
+      $session->set('account', 42);
+      return new Response(204);
+    },
+  ),
+  new SignalCancellationToken(),
+);
+
+$identifier = http_session_identifier($response);
+assert!(length!($identifier) == 64);
+assert!($middlewareStore->load($identifier)?->data == dict['account' => 42]);
+
+$context = http_session_test_context();
+$response = $middleware->handle(
+  $context,
+  http_session_request($identifier),
+  new FunctionHandler(
+    function(
+      Context\Context $context,
+      Request $_request,
+      CancellationToken $_cancellation,
+    ): Response {
+      $session = $context->getSession() as Session;
+      assert!($session->get('account') == 42);
+      $session->set('account', 84);
+      return new Response(200);
+    },
+  ),
+  new SignalCancellationToken(),
+);
+
+assert!(!($response->headers->has('Set-Cookie')));
+assert!($middlewareStore->load($identifier)?->data == dict['account' => 84]);
+
+$context = http_session_test_context();
+$response = $middleware->handle(
+  $context,
+  http_session_request($identifier),
+  new FunctionHandler(
+    function(
+      Context\Context $context,
+      Request $_request,
+      CancellationToken $_cancellation,
+    ): Response {
+      ($context->getSession() as Session)->regenerateIdentifier();
+      return new Response(204);
+    },
+  ),
+  new SignalCancellationToken(),
+);
+
+$freshIdentifier = http_session_identifier($response);
+assert!(!($freshIdentifier == $identifier));
+assert!($middlewareStore->load($identifier) == null);
+assert!(
+  $middlewareStore->load($freshIdentifier)?->data == dict['account' => 84],
+);
+
+$context = http_session_test_context();
+$response = $middleware->handle(
+  $context,
+  http_session_request($freshIdentifier),
+  new FunctionHandler(
+    function(
+      Context\Context $context,
+      Request $_request,
+      CancellationToken $_cancellation,
+    ): Response {
+      ($context->getSession() as Session)->destroy();
+      return new Response(204);
+    },
+  ),
+  new SignalCancellationToken(),
+);
+
+assert!($middlewareStore->load($freshIdentifier) == null);
+assert!(
+  Str\search(
+    $response->headers->get('Set-Cookie') as string,
+    'Max-Age=0',
+  ) is int,
+);
+
+$context = http_session_test_context();
+$response = $middleware->handle(
+  $context,
+  http_session_request(),
+  new FunctionHandler(
+    fn(
+      Context\Context $_context,
+      Request $_request,
+      CancellationToken $_cancellation,
+    ): Response => new Response(204),
+  ),
+  new SignalCancellationToken(),
+);
+
+assert!(!($response->headers->has('Set-Cookie')));
+assert!(http_session_test_context()->getSession() == null);
+
+$directory = Filesystem\create_temporary_directory(null, 'whim-session-store-');
+
+$databaseStore = new DatabaseStore(
+  new SQLiteConnector($directory . '/sessions.sqlite'),
+);
+
+$databaseStore->create('database', dict['count' => 1], $ttl, $cancellation);
+assert!(
+  $databaseStore->load('database', $cancellation)?->data == dict['count' => 1],
+);
+
+assert!($databaseStore->load('database')?->revision == 0);
+
+$databaseStore->replace(
+  'database',
+  0,
+  dict['count' => 2, 'nullable' => null],
+  $ttl,
+);
+
+assert!($databaseStore->load('database')?->revision == 1);
+assert!(
+  $databaseStore->load('database')?->data == dict[
+    'count' => 2,
+    'nullable' => null,
+  ],
+);
+
+$assertion_value_42 = function() use ($databaseStore, $ttl): void {
+  $databaseStore->replace('database', 0, dict[], $ttl);
+};
+
+$assertion_error_42 = null;
+try {
+  $assertion_value_42();
+} catch (ConflictException $assertion_caught_42) {
+  $assertion_error_42 = $assertion_caught_42;
+}
+
+assert!($assertion_error_42 is ConflictException);
+
+$assertion_value_43 = function() use ($databaseStore, $ttl): void {
+  $databaseStore->create('database', dict[], $ttl);
+};
+
+$assertion_error_43 = null;
+try {
+  $assertion_value_43();
+} catch (ConflictException $assertion_caught_43) {
+  $assertion_error_43 = $assertion_caught_43;
+}
+
+assert!($assertion_error_43 is ConflictException);
+
+$databaseStore->delete('database');
+assert!($databaseStore->load('database') == null);
+
+$databaseStore->create(
+  'expired',
+  dict['stale' => true],
+  Duration::nanosecond(),
+);
+
+assert!($databaseStore->load('expired') == null);
+$databaseStore->create('expired', dict['fresh' => true], $ttl);
+assert!($databaseStore->load('expired')?->data == dict['fresh' => true]);
+
+Filesystem\delete_directory($directory, true);

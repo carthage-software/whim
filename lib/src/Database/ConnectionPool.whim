@@ -1,0 +1,65 @@
+namespace Whim\Database;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\_Private\Lease;
+use Whim\Database\_Private\PooledConnection;
+use Whim\Database\_Private\PoolState;
+use Whim\IO\CloseHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Reuses a bounded set of database connections. */
+final class ConnectionPool implements Connector, CloseHandle {
+  private PoolState $state;
+
+  /** Creates a connection pool. */
+  #[TrackCaller]
+  public function __construct(
+    Connector $connector,
+    PoolConfiguration $configuration = new PoolConfiguration(),
+  ) {
+    $this->state = new PoolState($connector, $configuration);
+  }
+
+  /** Checks out one connection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    $entry = $this->state->acquire($cancellation);
+    $lease = new Lease($this->state, $entry);
+    return new PooledConnection($lease);
+  }
+
+  /** Reports whether this pool has closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->state->isClosed();
+  }
+
+  /** Returns the number of open and reserved connections. */
+  #[MustUse]
+  public function getOpenConnections(): NonNegativeInt {
+    return $this->state->getOpenConnections();
+  }
+
+  /** Returns the number of idle connections. */
+  #[MustUse]
+  public function getIdleConnections(): NonNegativeInt {
+    return $this->state->getIdleConnections();
+  }
+
+  /** Returns the number of tasks waiting for a connection. */
+  #[MustUse]
+  public function getPendingConnections(): NonNegativeInt {
+    return $this->state->getPendingConnections();
+  }
+
+  /** Closes idle connections and rejects pending acquisitions. */
+  #[TrackCaller]
+  public function close(): void {
+    $this->state->close();
+  }
+}

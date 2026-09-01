@@ -1,0 +1,14 @@
+namespace Whim\HTTP\Session\Storage;
+
+use Whim\HTTP\Session\Data;
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonNegativeInt;
+
+/** A session snapshot and the revision read with it. */
+final readonly class Record {
+  #[AlwaysInline]
+  public function __construct(
+    public Data $data,
+    public NonNegativeInt $revision,
+  ) {}
+}

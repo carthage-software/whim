@@ -1,0 +1,12 @@
+namespace Whim\Compression;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Compresses a stream of byte chunks. */
+interface Compressor extends Transformer {
+  /** Flushes available output without finishing the stream. */
+  #[MustUse]
+  #[TrackCaller]
+  public function flush(): string;
+}

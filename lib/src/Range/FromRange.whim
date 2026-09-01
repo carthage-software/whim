@@ -1,0 +1,64 @@
+namespace Whim\Range;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Represents a range with only a lower bound. */
+final readonly class FromRange implements LowerBoundRange {
+  /** Creates a lower-bounded range. */
+  #[TrackCaller]
+  public function __construct(private int $lowerBound) {}
+
+  /** Reports whether the range contains a value. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(int $value): bool {
+    return $value >= $this->lowerBound;
+  }
+
+  /** Replaces the lower bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withLowerBound(int $lowerBound): FromRange {
+    return new FromRange($lowerBound);
+  }
+
+  /** Adds an upper bound with explicit inclusivity. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBound(
+    int $upperBound,
+    bool $upperInclusive,
+  ): BetweenRange {
+    return new BetweenRange($this->lowerBound, $upperBound, $upperInclusive);
+  }
+
+  /** Adds an inclusive upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundInclusive(int $upperBound): BetweenRange {
+    return new BetweenRange($this->lowerBound, $upperBound, true);
+  }
+
+  /** Adds an exclusive upper bound. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withUpperBoundExclusive(int $upperBound): BetweenRange {
+    return new BetweenRange($this->lowerBound, $upperBound, false);
+  }
+
+  /** Removes the lower bound from this range. */
+  #[MustUse]
+  #[TrackCaller]
+  public function withoutLowerBound(): FullRange {
+    return new FullRange();
+  }
+
+  /** Returns the lower bound. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getLowerBound(): int {
+    return $this->lowerBound;
+  }
+}

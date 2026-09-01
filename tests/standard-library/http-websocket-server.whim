@@ -1,0 +1,361 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Async;
+use Whim\HTTP\Server\Configuration as HTTPConfiguration;
+use Whim\HTTP\Server\Handler\Handler as HTTPHandler;
+use Whim\HTTP\Server\_Private\H1Driver;
+use Whim\HTTP\WebSocket\BinaryMessage;
+use Whim\HTTP\WebSocket\CloseMessage;
+use Whim\HTTP\WebSocket\Connection;
+use Whim\HTTP\WebSocket\Message;
+use Whim\HTTP\WebSocket\Server\Configuration;
+use Whim\HTTP\WebSocket\Server\FunctionConnectionHandler;
+use Whim\HTTP\WebSocket\Server\Handler;
+use Whim\HTTP\WebSocket\Server\_Private\ConnectionImpl;
+use Whim\HTTP\WebSocket\TextMessage;
+use Whim\IP\Address;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\ShutdownDirection;
+use Whim\Network\Stream;
+use Whim\Str;
+use Whim\Unix;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+use Whim\_Private\WebSocketCodec;
+
+final class WebSocketServerTestStream implements Stream<InternetEndpoint> {
+  private int $offset = 0;
+  private bool $closed = false;
+  public string $written = '';
+
+  public function __construct(private string $incoming) {}
+
+  public function getLocalEndpoint(): InternetEndpoint {
+    return new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+  }
+
+  public function getPeerEndpoint(): InternetEndpoint {
+    return new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+  }
+
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void {}
+
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->offset >= length!($this->incoming);
+  }
+
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->reachedEndOfDataSource()) {
+      return '';
+    }
+
+    $length = length!($this->incoming) - $this->offset;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $data = Str\slice($this->incoming, $this->offset, $length);
+    $this->offset += $length;
+    return $data;
+  }
+
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+  }
+
+  public function tryWrite(string $bytes): int {
+    $this->written .= $bytes;
+    return length!($bytes);
+  }
+
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    $cancellation?->throwIfCancellationRequested();
+    return $this->tryWrite($bytes);
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+final class WebSocketServerTestState {
+  public string $text = '';
+  public string $binary = '';
+  public null|int $closeCode = null;
+  public string $closeReason = '';
+}
+
+function websocket_server_serve(
+  string $request,
+  HTTPHandler $handler,
+): WebSocketServerTestStream {
+  $stream = new WebSocketServerTestStream($request);
+  new H1Driver()->serve(
+    $stream,
+    false,
+    $handler,
+    new HTTPConfiguration(),
+    new SignalCancellationToken(),
+    new SignalCancellationToken(),
+  );
+
+  return $stream;
+}
+
+function websocket_server_request(
+  string $method = 'GET',
+  string $version = '13',
+  string $key = 'dGhlIHNhbXBsZSBub25jZQ==',
+): string {
+  return (
+    $method
+    . " /chat HTTP/1.1\r\n"
+    . "Host: example.com\r\n"
+    . "Connection: keep-alive, Upgrade\r\n"
+    . "Upgrade: websocket\r\n"
+    . 'Sec-WebSocket-Key: '
+    . $key
+    . "\r\n"
+    . 'Sec-WebSocket-Version: '
+    . $version
+    . "\r\n"
+    . "Sec-WebSocket-Protocol: other, chat\r\n\r\n"
+  );
+}
+
+$state = new WebSocketServerTestState();
+$handler = new Handler(
+  new FunctionConnectionHandler(
+    function(Connection $connection) use ($state): void {
+      assert!($connection->getSubprotocol() == 'chat');
+      $text = $connection->receive();
+      assert!($text is TextMessage);
+      $state->text = $text as string;
+      $connection->sendText('world');
+
+      $binary = $connection->receive();
+      assert!($binary is BinaryMessage);
+      $state->binary = $binary as string;
+
+      $close = $connection->receive();
+      assert!($close is CloseMessage);
+      $state->closeCode = $close[0];
+      $state->closeReason = $close[1];
+    },
+  ),
+  new Configuration(subprotocols: vec['chat']),
+);
+
+$stream = websocket_server_serve(
+  websocket_server_request()
+  . "\x81\x85\x01\x02\x03\x04\x69\x67\x6f\x68\x6e"
+  . "\x82\x82\x01\x02\x03\x04\x01\xfd"
+  . "\x89\x81\x01\x02\x03\x04\x79"
+  . "\x88\x85\x01\x02\x03\x04\x02\xea\x61\x7d\x64",
+  $handler,
+);
+
+assert!(
+  Str\starts_with($stream->written, "HTTP/1.1 101 Switching Protocols\r\n"),
+);
+
+assert!(Str\search($stream->written, "connection: Upgrade\r\n") != null);
+assert!(Str\search($stream->written, "upgrade: websocket\r\n") != null);
+assert!(
+  Str\search(
+    $stream->written,
+    "sec-websocket-accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n",
+  )
+  != null,
+);
+
+assert!(
+  Str\search($stream->written, "sec-websocket-protocol: chat\r\n") != null,
+);
+
+$separator = Str\search($stream->written, "\r\n\r\n") as int;
+$frames = Str\slice($stream->written, $separator + 4);
+assert!($frames == "\x81\x05world\x8a\x01x\x88\x05\x03\xe8bye");
+assert!($state->text == 'hello');
+assert!($state->binary == "\x00\xff");
+assert!($state->closeCode == 1000);
+assert!($state->closeReason == 'bye');
+
+$duplicateConfiguration = false;
+try {
+  discard!(new Configuration(subprotocols: vec['chat', 'chat']));
+} catch (InvalidArgumentException $_) {
+  $duplicateConfiguration = true;
+}
+
+assert!($duplicateConfiguration);
+
+$wrongVersion = websocket_server_serve(
+  websocket_server_request(version: '12'),
+  new Handler(
+    new FunctionConnectionHandler(function(Connection $_connection): void {}),
+  ),
+);
+
+assert!(Str\starts_with($wrongVersion->written, 'HTTP/1.1 426 '));
+assert!(
+  Str\search($wrongVersion->written, "sec-websocket-version: 13\r\n") != null,
+);
+
+$wrongMethod = websocket_server_serve(
+  websocket_server_request(method: 'POST'),
+  new Handler(
+    new FunctionConnectionHandler(function(Connection $_connection): void {}),
+  ),
+);
+
+assert!(Str\starts_with($wrongMethod->written, 'HTTP/1.1 400 '));
+
+$invalidKey = websocket_server_serve(
+  websocket_server_request(key: 'invalid'),
+  new Handler(
+    new FunctionConnectionHandler(function(Connection $_connection): void {}),
+  ),
+);
+
+assert!(Str\starts_with($invalidKey->written, 'HTTP/1.1 400 '));
+
+$invalidConfiguration = false;
+try {
+  discard!(new Configuration(subprotocols: vec['not a token']));
+} catch (InvalidArgumentException $_) {
+  $invalidConfiguration = true;
+}
+
+assert!($invalidConfiguration);
+
+$throwingUpgrade = new Handler(
+  new FunctionConnectionHandler(function(Connection $_connection): never {
+    throw new RuntimeException('upgrade callback failed');
+  }),
+);
+
+$assertion_value_1 = fn(): WebSocketServerTestStream => (
+  websocket_server_serve(websocket_server_request(), $throwingUpgrade)
+);
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (RuntimeException $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_1->getMessage(),
+      'upgrade callback failed',
+    ),
+  );
+}
+
+assert!($assertion_error_1 is RuntimeException);
+
+($connectionStream, $peerStream) = Unix\pair();
+$connection = new ConnectionImpl(
+  $connectionStream,
+  $connectionStream,
+  new SignalCancellationToken(),
+  new Configuration(),
+  null,
+);
+
+$receiveCancellation = new SignalCancellationToken();
+$pendingReceive = Async\spawn::<null|Message>(
+  fn(): null|Message => $connection->receive($receiveCancellation),
+);
+
+Async\later();
+$receiveCancellation->cancel();
+$assertion_value_2 = fn(): mixed => $pendingReceive->await();
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (CancelledException $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is CancelledException);
+
+assert!($connection->tryReceive() == null);
+$waitCancellation = new SignalCancellationToken();
+$pendingWait = Async\spawn::<null>(
+  function() use ($connection, $waitCancellation): null {
+    $connection->waitUntilReceivable($waitCancellation);
+    return null;
+  },
+);
+
+Async\later();
+$waitCancellation->cancel();
+$assertion_value_4 = fn(): null => $pendingWait->await();
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (CancelledException $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is CancelledException);
+
+$pendingWait = Async\spawn::<null>(function() use ($connection): null {
+  $connection->waitUntilReceivable();
+  return null;
+});
+
+Async\later();
+$peerCodec = WebSocketCodec::client(1024, 1024);
+$peerCodec->sendText('after cancellation');
+$peerStream->writeAll($peerCodec->takeOutput());
+$pendingWait->await();
+$message = $connection->tryReceive();
+assert!($message is TextMessage);
+assert!($message as string == 'after cancellation');
+
+function throw_while_websocket_is_destroyed(): never {
+  ($connectionStream, $peerStream) = Unix\pair();
+  $connection = new ConnectionImpl(
+    $connectionStream,
+    $connectionStream,
+    new SignalCancellationToken(),
+    new Configuration(),
+    null,
+  );
+
+  $peerStream->close();
+  throw new RuntimeException('original failure');
+}
+
+$assertion_value_5 = fn(): never => throw_while_websocket_is_destroyed();
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (RuntimeException $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+  assert!(
+    Whim\Str\contains($assertion_caught_5->getMessage(), 'original failure'),
+  );
+}
+
+assert!($assertion_error_5 is RuntimeException);

@@ -1,0 +1,22 @@
+namespace Whim\BSON;
+
+use Whim\Comparison\Equal;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Refine\Uint32;
+
+/** A BSON internal timestamp. */
+#[Stub]
+final readonly class Timestamp implements Equal<Timestamp> {
+  #[AlwaysInline]
+  public function __construct(
+    public Uint32 $seconds,
+    public Uint32 $increment,
+  ) {}
+
+  /** Reports whether two timestamps carry the same fields. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(Timestamp $other): bool {}
+}

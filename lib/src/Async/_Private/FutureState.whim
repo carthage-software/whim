@@ -1,0 +1,163 @@
+namespace Whim\Async\_Private;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Async\UnhandledAwaitableException;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\Throwable;
+use Whim;
+
+/** Represents a future state. */
+final class FutureState<T> {
+  private bool $complete = false;
+  private bool $ignored = false;
+  private dict<string, fn(null|Throwable, null|(T,)): void> $callbacks = dict[];
+  private null|(T,) $result = null;
+  private null|Throwable $error = null;
+  private null|int $unhandledRecord = null;
+  private int $nextCallbackId = 0;
+
+  /** Registers a callback for completion. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function subscribe(
+    fn(null|Throwable, null|(T,)): void $callback,
+  ): string {
+    $id = 'future-callback-' . $this->nextCallbackId;
+    $this->nextCallbackId++;
+
+    if ($this->complete) {
+      $this->observe();
+      $error = $this->error;
+      $result = $this->result;
+      Whim\_Private\queue_task(fn(): void {
+        $callback($error, $result);
+      });
+
+      return $id;
+    }
+
+    $this->callbacks[$id] = $callback;
+    return $id;
+  }
+
+  /** Removes a completion callback. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function unsubscribe(string $id): void {
+    try {
+      remove!($this->callbacks, $id);
+    } catch (OutOfBoundsError $_) {
+      return;
+    }
+  }
+
+  /**
+   * Completes the pending operation successfully.
+   *
+   * @throws LogicException when the deferred is already resolved.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function complete(T $result): void {
+    if ($this->complete) {
+      throw new LogicException('the deferred has already been resolved');
+    }
+
+    $this->result = ($result,);
+    $this->invokeCallbacks();
+  }
+
+  /**
+   * Completes the pending operation with an error.
+   *
+   * @throws LogicException when the deferred is already resolved.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function error(Throwable $error): void {
+    if ($this->complete) {
+      throw new LogicException('the deferred has already been resolved');
+    }
+
+    $this->error = $error;
+    $observed = $this->invokeCallbacks();
+    if (!$observed && !$this->ignored) {
+      $this->unhandledRecord = Whim\_Private\record_unhandled(
+        new UnhandledAwaitableException(
+          'an awaitable failed and its error was never observed',
+          0,
+          $error,
+        ),
+      );
+    }
+  }
+
+  /** Marks the future as intentionally unobserved. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function ignore(): void {
+    $this->ignored = true;
+    $this->observe();
+  }
+
+  /** Reports whether the pending operation completed. */
+  #[AlwaysInline]
+  public function isComplete(): bool {
+    return $this->complete;
+  }
+
+  /**
+   * Returns the completed result or propagates its error.
+   *
+   * @throws LogicException when the future is not complete.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getResult(): T {
+    if (!$this->complete) {
+      throw new LogicException('cannot get the result of an incomplete future');
+    }
+
+    $this->observe();
+    if ($this->error != null) {
+      throw $this->error;
+    }
+
+    return ($this->result as (T,))[0];
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function observe(): void {
+    if ($this->unhandledRecord != null) {
+      Whim\_Private\forget_unhandled($this->unhandledRecord);
+      $this->unhandledRecord = null;
+    }
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function invokeCallbacks(): bool {
+    $this->complete = true;
+    $callbacks = $this->callbacks;
+    $this->callbacks = dict[];
+    $observed = length!($callbacks) != 0;
+
+    $error = $this->error;
+    $result = $this->result;
+    foreach ($callbacks as $callback) {
+      Whim\_Private\queue_task(fn(): void {
+        $callback($error, $result);
+      });
+    }
+
+    return $observed;
+  }
+}

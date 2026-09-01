@@ -1,0 +1,60 @@
+namespace Whim\SOCKS;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Host;
+use Whim\Network\Port;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Configures a SOCKS5 proxy. */
+final readonly class Configuration {
+  #[TrackCaller]
+  public function __construct(
+    public Host $host,
+    public Port $port = 1080,
+    public null|NonEmptyString $username = null,
+    #[SensitiveParameter] public null|NonEmptyString $password = null,
+  ) {
+    if (($username == null) != ($password == null)) {
+      throw new InvalidArgumentException(
+        'a SOCKS username and password must be configured together',
+      );
+    }
+
+    if ($username != null && length!($username) > 255) {
+      throw new InvalidArgumentException(
+        'a SOCKS username cannot exceed 255 bytes',
+      );
+    }
+
+    if ($password != null && length!($password) > 255) {
+      throw new InvalidArgumentException(
+        'a SOCKS password cannot exceed 255 bytes',
+      );
+    }
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withHost(Host $host): Configuration {
+    return clone!($this, host: $host);
+  }
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function withPort(Port $port): Configuration {
+    return clone!($this, port: $port);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function withCredentials(
+    null|NonEmptyString $username,
+    #[SensitiveParameter] null|NonEmptyString $password,
+  ): Configuration {
+    return new Configuration($this->host, $this->port, $username, $password);
+  }
+}

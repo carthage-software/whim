@@ -1,0 +1,14 @@
+namespace Whim\HTTP\Server\Context;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Network\Stream;
+
+/** An HTTP/1 context that can transfer ownership of its connection. */
+interface Upgrade extends Context {
+  /** Takes over the connection after a switching-protocols response. */
+  public function upgrade(
+    fn(Stream<_>, ReadHandle, WriteHandle, CancellationToken): void $handler,
+  ): void;
+}

@@ -1,0 +1,25 @@
+namespace Whim\Database;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\CloseHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+
+/** Streams the result of one database statement. */
+interface Result extends CloseHandle {
+  /** Returns column metadata in row order. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getColumns(): vec<Column>;
+
+  /** Returns the affected row count when the database provides one. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getAffectedRows(): null|NonNegativeInt;
+
+  /** Fetches the next row, or null after the result ends. */
+  #[MustUse]
+  #[TrackCaller]
+  public function fetch(null|CancellationToken $cancellation = null): null|Row;
+}

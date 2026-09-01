@@ -1,0 +1,20 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Parses a complete float string, or returns null. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function float_try_parse(string $value): null|float {}
+
+/** Parses a complete decimal integer string, or returns null. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function int_try_parse(string $value): null|int {}

@@ -1,0 +1,41 @@
+namespace Whim\Async;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Promise\Promise;
+use Whim\Refine\Transform;
+use Whim\Unwind\Throwable;
+
+/** Represents a future that can be observed but not completed by its consumer. */
+interface Future<out T> extends Promise<T> {
+  /** Waits for the future to complete. */
+  #[TrackCaller]
+  public function await(null|CancellationToken $cancellation = null): T;
+
+  /** Marks the future as intentionally unobserved. */
+  #[TrackCaller]
+  public function ignore(): static;
+
+  /** Transforms the contained success value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function map<U>(Transform<T, U> $success): Future<U>;
+
+  /** Transforms either outcome of the asynchronous operation. */
+  #[MustUse]
+  #[TrackCaller]
+  public function then<U>(
+    Transform<T, U> $success,
+    Transform<Throwable, U> $failure,
+  ): Future<U>;
+
+  /** Recovers from a failed asynchronous operation. */
+  #[MustUse]
+  #[TrackCaller]
+  public function catch<U>(Transform<Throwable, U> $failure): Future<T|U>;
+
+  /** Runs a callback after either outcome. */
+  #[MustUse]
+  #[TrackCaller]
+  public function always(fn(): void $always): Future<T>;
+}

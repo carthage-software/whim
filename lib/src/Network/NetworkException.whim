@@ -1,0 +1,6 @@
+namespace Whim\Network;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports a recoverable network failure. */
+class NetworkException extends RuntimeException {}

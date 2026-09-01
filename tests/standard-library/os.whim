@@ -1,0 +1,87 @@
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\OS;
+use Whim\OS\Group;
+use Whim\OS\Information;
+use Whim\OS\LoadAverages;
+use Whim\OS\MemoryInformation;
+use Whim\OS\User;
+use Whim\Process;
+use Whim\Time\Duration;
+
+$information = OS\information();
+assert!($information is Information);
+assert!($information->systemName != '');
+
+$uptime = OS\uptime();
+assert!($uptime is Duration);
+assert!(!($uptime->isNegative()));
+
+$load = OS\load_averages();
+assert!($load is LoadAverages);
+assert!($load->oneMinute >= 0.0);
+assert!($load->fiveMinutes >= 0.0);
+assert!($load->fifteenMinutes >= 0.0);
+
+$memory = OS\memory();
+assert!($memory is MemoryInformation);
+assert!($memory->total > 0);
+assert!($memory->available <= $memory->total);
+
+$identity = Process\get_user_identity();
+$user = OS\find_user($identity->effective);
+assert!($user is User);
+assert!($user->id == $identity->effective);
+assert!($user->name != '');
+if ($user->homeDirectory != null) {
+  assert!($user->homeDirectory != '');
+}
+
+if ($user->shell != null) {
+  assert!($user->shell != '');
+}
+
+$sameUser = OS\find_user($user->name);
+assert!($sameUser is User);
+assert!($sameUser->id == $user->id);
+assert!($sameUser->name == $user->name);
+assert!($sameUser->primaryGroupId == $user->primaryGroupId);
+
+$primaryGroup = OS\find_group($user->primaryGroupId);
+assert!($primaryGroup is Group);
+assert!($primaryGroup->id == $user->primaryGroupId);
+assert!($primaryGroup->name != '');
+
+$sameGroup = OS\find_group($primaryGroup->name);
+assert!($sameGroup is Group);
+assert!($sameGroup->id == $primaryGroup->id);
+assert!($sameGroup->name == $primaryGroup->name);
+
+foreach ($sameGroup->memberNames as $memberName) {
+  assert!($memberName != '');
+}
+
+$groups = OS\groups_for_user($user);
+assert!(length!($groups) > 0);
+$foundPrimaryGroup = false;
+foreach ($groups as $group) {
+  assert!($group->name != '');
+  if ($group->id == $user->primaryGroupId) {
+    $foundPrimaryGroup = true;
+  }
+}
+
+assert!($foundPrimaryGroup);
+assert!(OS\find_user('whim-user-that-does-not-exist.invalid') == null);
+assert!(OS\find_group('whim-group-that-does-not-exist.invalid') == null);
+
+$cancellation = new SignalCancellationToken();
+$cancellation->cancel();
+$cancellationError = null;
+try {
+  discard!(OS\find_user($user->id, $cancellation));
+} catch (CancelledException $error) {
+  $cancellationError = $error;
+}
+
+assert!($cancellationError is CancelledException);

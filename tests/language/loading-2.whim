@@ -1,0 +1,645 @@
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Symbol;
+use Whim\Symbol\SymbolKind;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedSymbolError;
+
+final class LoadingRecorder {
+  public vec<string> $seen = vec[];
+}
+
+$work = Filesystem\canonicalize(
+  Filesystem\create_temporary_directory(null, 'whim-test-'),
+);
+
+File\write(
+  $work . '/map-widget.whim',
+  'class MapWidget { public function id(): int { return 7; } }' . "\n",
+);
+
+File\write(
+  $work . '/map-make.whim',
+  'function map_make_widget(): string { return \'made\'; }' . "\n",
+);
+
+File\write($work . '/map-limit.whim', 'const MAP_WIDGET_LIMIT = 9;' . "\n");
+File\write($work . '/map-kind.whim', 'type MapWidgetKind = int|string;' . "\n");
+$mapKindsLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'MapWidget' => $work . '/map-widget.whim',
+  'map_make_widget' => $work . '/map-make.whim',
+  'MAP_WIDGET_LIMIT' => $work . '/map-limit.whim',
+  'MapWidgetKind' => $work . '/map-kind.whim',
+]);
+
+Autoload\register($mapKindsLoader);
+$mapWidget = new MapWidget();
+assert!($mapWidget->id() == 7);
+assert!(map_make_widget() == 'made');
+assert!(MAP_WIDGET_LIMIT == 9);
+$mapAliasSatisfied = 5 is MapWidgetKind;
+assert!($mapAliasSatisfied);
+Autoload\unregister($mapKindsLoader);
+
+File\write(
+  $work . '/type-probed-function.whim',
+  'function TypeProbedFunction(): void {}' . "\n",
+);
+
+File\write(
+  $work . '/type-probed-constant.whim',
+  'const TYPE_PROBED_CONSTANT = 42;' . "\n",
+);
+
+$typeProbeLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'TypeProbedFunction' => $work . '/type-probed-function.whim',
+  'TYPE_PROBED_CONSTANT' => $work . '/type-probed-constant.whim',
+]);
+
+Autoload\register($typeProbeLoader);
+$identityFunction = fn(mixed $value): mixed => $value;
+assert!(!($identityFunction is TypeProbedFunction));
+assert!(Symbol\get_kind('TypeProbedFunction') == SymbolKind::Function);
+
+assert!(42 is TYPE_PROBED_CONSTANT);
+assert!(Symbol\get_kind('TYPE_PROBED_CONSTANT') == SymbolKind::Constant);
+
+Autoload\unregister($typeProbeLoader);
+
+File\write(
+  $work . '/type-probed-members.whim',
+  'final class TypeProbedMembers {'
+  . "\n"
+  . '    public const VALUE = 42;'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+$memberTypeProbeLoader = new Autoload\Autoloader()->withSymbolFile(
+  'TypeProbedMembers',
+  $work . '/type-probed-members.whim',
+);
+
+Autoload\register($memberTypeProbeLoader);
+assert!(!(42 is TypeProbedMembers::VALUE<int>));
+assert!(42 is TypeProbedMembers::VALUE);
+Autoload\unregister($memberTypeProbeLoader);
+
+File\write(
+  $work . '/loaded-cell.whim',
+  'final readonly class LoadedCell<T> {'
+  . "\n"
+  . '    public function __construct(public T $value) {}'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/loaded-identity.whim',
+  'function loaded_identity<T>(T $value): T { return $value; }' . "\n",
+);
+
+$genericCachesLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'LoadedCell' => $work . '/loaded-cell.whim',
+  'loaded_identity' => $work . '/loaded-identity.whim',
+]);
+
+Autoload\register($genericCachesLoader);
+
+function wrap_loaded<T>(T $value): LoadedCell<T> {
+  return new LoadedCell::<T>(loaded_identity::<T>($value));
+}
+
+$wrappedInteger = wrap_loaded::<int>(42);
+$wrappedString = wrap_loaded::<string>('loaded');
+$wrappedIntegerSatisfied = $wrappedInteger is LoadedCell<int>;
+assert!($wrappedIntegerSatisfied);
+assert!($wrappedInteger->value == 42);
+$wrappedStringSatisfied = $wrappedString is LoadedCell<string>;
+assert!($wrappedStringSatisfied);
+assert!($wrappedString->value == 'loaded');
+Autoload\unregister($genericCachesLoader);
+
+File\write(
+  $work . '/reified-class.whim',
+  'final class AutoloadedReifiedClass {}' . "\n",
+);
+
+File\write(
+  $work . '/reified-class-holder.whim',
+  'final readonly class AutoloadedReifiedClassHolder {'
+  . ' public Whim\\Async\\TaskLocal<AutoloadedReifiedClass> $cell;'
+  . ' public function __construct() {'
+  . ' $this->cell = new Whim\\Async\\TaskLocal::<AutoloadedReifiedClass>();'
+  . ' }'
+  . ' }'
+  . "\n",
+);
+
+File\write(
+  $work . '/reified-local-alias-holder.whim',
+  'type AutoloadedLocalBag = dict<string, int>;'
+  . ' final readonly class AutoloadedLocalAliasHolder {'
+  . ' public Whim\\Async\\TaskLocal<AutoloadedLocalBag> $cell;'
+  . ' public function __construct() {'
+  . ' $this->cell = new Whim\\Async\\TaskLocal::<AutoloadedLocalBag>();'
+  . ' }'
+  . ' }'
+  . "\n",
+);
+
+File\write(
+  $work . '/reified-cross-alias.whim',
+  'type AutoloadedCrossBag<T = AutoloadedCrossEntries> = T;' . "\n",
+);
+
+File\write(
+  $work . '/reified-cross-entries.whim',
+  'type AutoloadedCrossEntries = dict<string, int>;' . "\n",
+);
+
+File\write(
+  $work . '/reified-cross-alias-holder.whim',
+  'final readonly class AutoloadedCrossAliasHolder {'
+  . ' public Whim\\Async\\TaskLocal<AutoloadedCrossBag> $cell;'
+  . ' public function __construct() {'
+  . ' $this->cell = new Whim\\Async\\TaskLocal::<AutoloadedCrossBag>();'
+  . ' }'
+  . ' }'
+  . "\n",
+);
+
+File\write(
+  $work . '/reified-deep-types.whim',
+  'namespace Autoloaded\\Deep\\Log;'
+  . ' type Datum = null|int|vec<Datum>|dict<string, Datum>;'
+  . ' type Data = dict<string, Datum>;'
+  . "\n",
+);
+
+File\write(
+  $work . '/reified-deep-holder.whim',
+  'namespace Autoloaded\\Deep\\Log;'
+  . ' use Autoloaded\\Deep\\Log\\_Private;'
+  . ' use Whim\\Async\\TaskLocal;'
+  . ' final readonly class Holder {'
+  . ' public TaskLocal<Data> $cell;'
+  . ' public function __construct() {'
+  . ' $this->cell = new TaskLocal::<Data>();'
+  . ' }'
+  . ' public function remember(int $value): void {'
+  . ' _Private\\remember($this->cell, $value);'
+  . ' }'
+  . ' }'
+  . "\n",
+);
+
+File\write(
+  $work . '/reified-deep-functions.whim',
+  'namespace Autoloaded\\Deep\\Log\\_Private;'
+  . ' use Autoloaded\\Deep\\Log\\Data;'
+  . ' use Whim\\Async\\TaskLocal;'
+  . ' function remember(TaskLocal<Data> $cell, int $value): void {'
+  . ' $data = $cell->get() ?? dict[];'
+  . ' $data[\'value\'] = $value;'
+  . ' $cell->set($data);'
+  . ' }'
+  . "\n",
+);
+
+File\write(
+  $work . '/reified-delayed-types.whim',
+  'namespace Autoloaded\\Delayed\\Nested; type Item = int;' . "\n",
+);
+
+File\write(
+  $work . '/reified-delayed-holder.whim',
+  'namespace Autoloaded\\Delayed\\Nested;'
+  . ' use Whim\\Async\\TaskLocal;'
+  . ' final readonly class Holder {'
+  . ' public TaskLocal<vec<Item>> $cell;'
+  . ' public function __construct() {'
+  . ' $this->cell = new TaskLocal::<vec<Item>>();'
+  . ' }'
+  . ' }'
+  . "\n",
+);
+
+function weigh_autoloaded_deep_data(Autoloaded\Deep\Log\Data $data): int {
+  return length!($data);
+}
+
+function make_autoloaded_deep_cell<T>(): Whim\Async\TaskLocal<T> {
+  return new Whim\Async\TaskLocal::<T>();
+}
+
+$reifiedAliasLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'AutoloadedReifiedClass' => $work . '/reified-class.whim',
+  'AutoloadedReifiedClassHolder' => $work . '/reified-class-holder.whim',
+  'AutoloadedLocalBag' => $work . '/reified-local-alias-holder.whim',
+  'AutoloadedLocalAliasHolder' => $work . '/reified-local-alias-holder.whim',
+  'AutoloadedCrossBag' => $work . '/reified-cross-alias.whim',
+  'AutoloadedCrossEntries' => $work . '/reified-cross-entries.whim',
+  'AutoloadedCrossAliasHolder' => $work . '/reified-cross-alias-holder.whim',
+  'Autoloaded\\Deep\\Log\\Datum' => $work . '/reified-deep-types.whim',
+  'Autoloaded\\Deep\\Log\\Data' => $work . '/reified-deep-types.whim',
+  'Autoloaded\\Deep\\Log\\Holder' => $work . '/reified-deep-holder.whim',
+  'Autoloaded\\Deep\\Log\\_Private\\remember' => $work
+  . '/reified-deep-functions.whim',
+  'Autoloaded\\Delayed\\Nested\\Item' => $work . '/reified-delayed-types.whim',
+  'Autoloaded\\Delayed\\Nested\\Holder' => $work
+  . '/reified-delayed-holder.whim',
+]);
+
+Autoload\register($reifiedAliasLoader);
+discard!(new AutoloadedReifiedClassHolder());
+discard!(new AutoloadedLocalAliasHolder());
+discard!(new AutoloadedCrossAliasHolder());
+discard!(new Autoloaded\Delayed\Nested\Holder());
+assert!(weigh_autoloaded_deep_data(dict[]) == 0);
+$deepGenericCell = make_autoloaded_deep_cell::<Autoloaded\Deep\Log\Data>();
+$deepGenericCell->set(dict[]);
+assert!($deepGenericCell->get() == dict[]);
+$deepHolder = new Autoloaded\Deep\Log\Holder();
+$deepHolder->remember(42);
+assert!($deepHolder->cell->get() == dict['value' => 42]);
+Autoload\unregister($reifiedAliasLoader);
+
+File\write(
+  $work . '/property-outer.whim',
+  'class PropertyOuter {'
+  . "\n"
+  . '    public int $value = PropertyNested::VALUE;'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/property-nested.whim',
+  'class PropertyNested { public const int VALUE = 7; }' . "\n",
+);
+
+$propertyDefaultLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'PropertyOuter' => $work . '/property-outer.whim',
+  'PropertyNested' => $work . '/property-nested.whim',
+]);
+
+Autoload\register($propertyDefaultLoader);
+$propertyOuter = new PropertyOuter();
+$propertyOuterSatisfied = $propertyOuter is PropertyOuter;
+assert!($propertyOuterSatisfied);
+assert!($propertyOuter->value == 7);
+Autoload\unregister($propertyDefaultLoader);
+
+$unsatisfiedLoader = new Autoload\Autoloader()->withFallback(
+  fn(SymbolKind $kind, string $name): bool => false,
+);
+
+Autoload\register($unsatisfiedLoader);
+$phantomCandidate = 5;
+$phantomSatisfied = $phantomCandidate is Phantom;
+assert!(!($phantomSatisfied));
+Autoload\unregister($unsatisfiedLoader);
+
+File\write($work . '/identifier.whim', 'newtype Identifier<T> = T;' . "\n");
+$newtypeLoader = new Autoload\Autoloader()->withSymbolFile(
+  'Identifier',
+  $work . '/identifier.whim',
+);
+
+Autoload\register($newtypeLoader);
+$identifier = Identifier::<int>(42);
+$identifierSatisfied = $identifier is Identifier<int>;
+assert!($identifierSatisfied);
+$identifierIsInteger = $identifier is int;
+assert!($identifierIsInteger);
+Autoload\unregister($newtypeLoader);
+
+$chainRecorder = new LoadingRecorder();
+$firstChainLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($chainRecorder): bool {
+    $chainRecorder->seen[] = 'first:' . $kind->name . ':' . $name;
+    return false;
+  },
+);
+
+$secondChainLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($chainRecorder): bool {
+    $chainRecorder->seen[] = 'second:' . $kind->name . ':' . $name;
+    return true;
+  },
+);
+
+$thirdChainLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($chainRecorder): bool {
+    $chainRecorder->seen[] = 'third: never';
+    return true;
+  },
+);
+
+Autoload\register($firstChainLoader);
+Autoload\register($secondChainLoader);
+Autoload\register($thirdChainLoader);
+$assertion_value_20 = function(): void {
+  missing_function();
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (UndefinedSymbolError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+  assert!(
+    Whim\Str\contains($assertion_caught_20->getMessage(), 'missing_function'),
+  );
+}
+
+assert!($assertion_error_20 is UndefinedSymbolError);
+
+assert!(
+  $chainRecorder->seen == vec[
+    'first:Function:missing_function',
+    'second:Function:missing_function',
+    'first:Newtype:missing_function',
+    'second:Newtype:missing_function',
+  ],
+);
+
+Autoload\unregister($firstChainLoader);
+Autoload\unregister($secondChainLoader);
+Autoload\unregister($thirdChainLoader);
+
+File\write($work . '/hollow.whim', '$unused = 1;' . "\n");
+$hollowLoader = new Autoload\Autoloader()->withSymbolFile(
+  'HollowGhost',
+  $work . '/hollow.whim',
+);
+
+$hollowRecorder = new LoadingRecorder();
+$hollowFallbackLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($hollowRecorder): bool {
+    $hollowRecorder->seen[] = 'fallback: never';
+    return true;
+  },
+);
+
+Autoload\register($hollowLoader);
+Autoload\register($hollowFallbackLoader);
+$assertion_value_22 = function(): void {
+  new HollowGhost();
+};
+
+$assertion_error_22 = null;
+try {
+  $assertion_value_22();
+} catch (UndefinedSymbolError $assertion_caught_22) {
+  $assertion_error_22 = $assertion_caught_22;
+  assert!(Whim\Str\contains($assertion_caught_22->getMessage(), 'HollowGhost'));
+}
+
+assert!($assertion_error_22 is UndefinedSymbolError);
+
+assert!(length!($hollowRecorder->seen) == 0);
+Autoload\unregister($hollowLoader);
+Autoload\unregister($hollowFallbackLoader);
+
+$orderRecorder = new LoadingRecorder();
+$firstOrderLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($orderRecorder): bool {
+    $orderRecorder->seen[] = 'first asked';
+    return false;
+  },
+);
+
+$secondOrderLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($orderRecorder): bool {
+    $orderRecorder->seen[] = 'second asked';
+    return false;
+  },
+);
+
+Autoload\register($firstOrderLoader);
+Autoload\register($secondOrderLoader);
+assert!(length!(Autoload\get_autoloaders()) == 2);
+assert!(!(Autoload\load_symbol(SymbolKind::Class, 'Nowhere')));
+Autoload\unregister($firstOrderLoader);
+assert!(length!(Autoload\get_autoloaders()) == 1);
+assert!(!(Autoload\load_symbol(SymbolKind::Class, 'Nowhere')));
+assert!(
+  $orderRecorder->seen == vec['first asked', 'second asked', 'second asked'],
+);
+
+Autoload\unregister($secondOrderLoader);
+
+File\write($work . '/probed-widget.whim', 'class ProbedWidget {}' . "\n");
+File\write($work . '/probed-empty.whim', '$unused = 1;' . "\n");
+$probedLoader = new Autoload\Autoloader()->withSymbolFile(
+  'ProbedWidget',
+  $work . '/probed-widget.whim',
+)->withSymbolFile('ProbedGhost', $work . '/probed-empty.whim');
+
+Autoload\register($probedLoader);
+assert!(Autoload\load_symbol(SymbolKind::Class, 'ProbedWidget'));
+
+assert!(!(Autoload\load_symbol(SymbolKind::Class, 'ProbedGhost')));
+
+assert!(!(Autoload\load_symbol(SymbolKind::Class, 'ProbedUnmapped')));
+
+Autoload\unregister($probedLoader);
+
+File\write($work . '/wrong-kind.whim', 'interface WrongKind {}' . "\n");
+$wrongKindLoader = new Autoload\Autoloader()->withSymbolFile(
+  'WrongKind',
+  $work . '/wrong-kind.whim',
+);
+
+Autoload\register($wrongKindLoader);
+assert!(!Autoload\load_symbol(SymbolKind::Class, 'WrongKind'));
+assert!(Autoload\load_symbol(SymbolKind::Interface, 'WrongKind'));
+Autoload\unregister($wrongKindLoader);
+
+$existsRecorder = new LoadingRecorder();
+$existsLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($existsRecorder): bool {
+    $existsRecorder->seen[] = 'probe:' . $kind->name;
+    return false;
+  },
+);
+
+Autoload\register($existsLoader);
+
+function probe_declared(): void {}
+
+assert!(Symbol\exists('probe_declared'));
+assert!(length!($existsRecorder->seen) == 0);
+assert!(!(Symbol\exists('missing', false)));
+assert!(length!($existsRecorder->seen) == 0);
+assert!(!(Symbol\exists('missing')));
+assert!(
+  $existsRecorder->seen == vec[
+    'probe:Class',
+    'probe:Interface',
+    'probe:Enum',
+    'probe:TypeAlias',
+    'probe:Newtype',
+    'probe:Function',
+    'probe:Constant',
+  ],
+);
+
+Autoload\unregister($existsLoader);
+
+$kindRecorder = new LoadingRecorder();
+$kindLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($kindRecorder): bool {
+    $kindRecorder->seen[] = 'probe: never';
+    return true;
+  },
+);
+
+Autoload\register($kindLoader);
+
+const KIND_LIMIT = 1;
+
+function kind_helper(): void {}
+
+class KindShape {}
+
+enum KindSuit {
+  case Hearts;
+}
+
+interface KindCountable {}
+
+type KindScalar = int|string;
+
+newtype KindUserId = int;
+
+assert!(Symbol\get_kind('KIND_LIMIT')->name == 'Constant');
+assert!(Symbol\get_kind('kind_helper')->name == 'Function');
+assert!(Symbol\get_kind('KindShape')->name == 'Class');
+assert!(Symbol\get_kind('KindSuit')->name == 'Enum');
+assert!(Symbol\get_kind('KindCountable')->name == 'Interface');
+assert!(Symbol\get_kind('\\KindScalar')->name == 'TypeAlias');
+assert!(Symbol\get_kind('KindUserId')->name == 'Newtype');
+$assertion_value_45 = function(): void {
+  Symbol\get_kind('absent');
+};
+
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (UndefinedSymbolError $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+  assert!(Whim\Str\contains($assertion_caught_45->getMessage(), 'absent'));
+}
+
+assert!($assertion_error_45 is UndefinedSymbolError);
+
+assert!(length!($kindRecorder->seen) == 0);
+Autoload\unregister($kindLoader);
+
+File\write($work . '/builder-widget.whim', 'class BuilderWidget {}' . "\n");
+$bareBuilder = new Autoload\Autoloader();
+$mappedBuilder = $bareBuilder->withSymbolFile(
+  'BuilderWidget',
+  $work . '/builder-widget.whim',
+);
+
+assert!(!($bareBuilder->loadSymbol(SymbolKind::Class, 'BuilderWidget')));
+
+assert!($mappedBuilder->loadSymbol(SymbolKind::Class, 'BuilderWidget'));
+
+assert!(Symbol\exists('BuilderWidget', false));
+
+$selfMissingRecorder = new LoadingRecorder();
+$selfMissingLoader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $kind, string $name) use ($selfMissingRecorder): bool {
+    $selfMissingRecorder->seen[] = 'asked:' . $name;
+    ghost();
+    return true;
+  },
+);
+
+Autoload\register($selfMissingLoader);
+$assertion_value_50 = function(): void {
+  ghost();
+};
+
+$assertion_error_50 = null;
+try {
+  $assertion_value_50();
+} catch (UndefinedSymbolError $assertion_caught_50) {
+  $assertion_error_50 = $assertion_caught_50;
+  assert!(Whim\Str\contains($assertion_caught_50->getMessage(), 'ghost'));
+}
+
+assert!($assertion_error_50 is UndefinedSymbolError);
+
+assert!($selfMissingRecorder->seen == vec['asked:ghost', 'asked:ghost']);
+
+Autoload\unregister($selfMissingLoader);
+
+File\write(
+  $work . '/reentrant-helper.whim',
+  'function reentrant_helper(): string { return \'helped\'; }' . "\n",
+);
+
+File\write(
+  $work . '/reentrant-widget.whim',
+  'require_once!(\''
+  . $work
+  . '/reentrant-helper.whim\');'
+  . "\n"
+  . 'class ReentrantWidget {'
+  . "\n"
+  . '    public function speak(): string {'
+  . "\n"
+  . '        return reentrant_helper() . \' + \' . reentrant_partner();'
+  . "\n"
+  . '    }'
+  . "\n"
+  . '}'
+  . "\n",
+);
+
+File\write(
+  $work . '/reentrant-partner.whim',
+  'function reentrant_partner(): string { return \'partner\'; }' . "\n",
+);
+
+$reentrantLoader = new Autoload\Autoloader()->withSymbolFiles(dict[
+  'ReentrantWidget' => $work . '/reentrant-widget.whim',
+  'reentrant_partner' => $work . '/reentrant-partner.whim',
+]);
+
+Autoload\register($reentrantLoader);
+$reentrantWidget = new ReentrantWidget();
+assert!($reentrantWidget->speak() == 'helped + partner');
+Autoload\unregister($reentrantLoader);
+
+File\write(
+  $work . '/published-loaded.whim',
+  'final class PublishedLoaded { public function value(): int { return 1; } }'
+  . "\n",
+);
+
+$publicationLoader = new Autoload\Autoloader()->withSymbolFile(
+  'PublishedLoaded',
+  $work . '/published-loaded.whim',
+);
+
+Autoload\register($publicationLoader);
+$publishedSum = 0;
+for ($i = 0; $i < 2; $i++) {
+  $publishedSum += new PublishedLoaded()->value();
+}
+
+assert!($publishedSum == 2);
+Autoload\unregister($publicationLoader);
+
+Filesystem\delete_directory($work, true);

@@ -1,0 +1,680 @@
+/**
+ * Requires a fixture that must be refused, and expects the diagnostic it
+ * raises. Every fixture beneath `_limits` is a real source file: `require!`
+ * compiles, links, and runs it, so a limit violation arrives as a throw.
+ */
+function raises(string $fixture, string $message): void {
+  $assertion_value_1 = function() use ($fixture): void {
+    require!('_limits/' . $fixture . '.whim');
+  };
+
+  $assertion_error_1 = null;
+  try {
+    $assertion_value_1();
+  } catch (Whim\Unwind\Throwable $assertion_caught_1) {
+    $assertion_error_1 = $assertion_caught_1;
+    assert!(Whim\Str\contains($assertion_caught_1->getMessage(), $message));
+  }
+
+  assert!($assertion_error_1 is Whim\Unwind\Throwable);
+}
+
+require!('_limits/union-at-limit.whim');
+require!('_limits/intersection-at-limit.whim');
+require!('_limits/grouped-partition-at-limit.whim');
+require!('_limits/grouped-distinct.whim');
+require!('_limits/grouped-nested-distinct.whim');
+require!('_limits/grouped-intersection-member.whim');
+require!('_limits/grouped-intersection-members.whim');
+require!('_limits/grouped-intersection-nested.whim');
+require!('_limits/grouped-union-in-intersection.whim');
+require!('_limits/parameters-function-at-limit.whim');
+require!('_limits/parameters-method-at-limit.whim');
+require!('_limits/parameters-closure-at-limit.whim');
+require!('_limits/parameters-short-closure-at-limit.whim');
+require!('_limits/parameters-promoted-at-limit.whim');
+require!('_limits/function-type-at-limit.whim');
+require!('_limits/binder-intersection-bound-0.whim');
+require!('_limits/binder-intersection-bound-1.whim');
+require!('_limits/binder-intersection-bound-2.whim');
+require!('_limits/binder-intersection-bound-3.whim');
+require!('_limits/binder-intersection-bound-4.whim');
+require!('_limits/binder-intersection-bound-5.whim');
+require!('_limits/binder-intersection-bound-6.whim');
+require!('_limits/binder-bound-list-0.whim');
+require!('_limits/binder-bound-list-1.whim');
+require!('_limits/binder-bound-list-2.whim');
+require!('_limits/binder-bound-list-3.whim');
+require!('_limits/binder-bound-list-4.whim');
+require!('_limits/binder-bound-list-5.whim');
+require!('_limits/binder-bound-list-6.whim');
+require!('_limits/binder-sibling-bound-0.whim');
+require!('_limits/binder-sibling-bound-1.whim');
+require!('_limits/binder-sibling-bound-2.whim');
+require!('_limits/binder-sibling-bound-3.whim');
+require!('_limits/binder-sibling-bound-4.whim');
+require!('_limits/binder-sibling-bound-5.whim');
+require!('_limits/binder-sibling-bound-6.whim');
+require!('_limits/binder-default-backward-reference-0.whim');
+require!('_limits/binder-default-backward-reference-1.whim');
+require!('_limits/binder-default-backward-reference-2.whim');
+require!('_limits/binder-default-backward-reference-3.whim');
+require!('_limits/binder-default-backward-reference-4.whim');
+require!('_limits/binder-default-backward-reference-5.whim');
+require!('_limits/binder-default-backward-reference-6.whim');
+require!('_limits/self-bound-class.whim');
+require!('_limits/self-bound-interface.whim');
+require!('_limits/self-bound-method.whim');
+require!('_limits/self-bound-method-closure.whim');
+require!('_limits/self-bound-method-short-closure.whim');
+require!('_limits/binder-bound-arguments-at-limit-0.whim');
+require!('_limits/binder-bound-arguments-at-limit-1.whim');
+require!('_limits/binder-bound-arguments-at-limit-2.whim');
+require!('_limits/binder-bound-arguments-at-limit-3.whim');
+require!('_limits/binder-bound-arguments-at-limit-4.whim');
+require!('_limits/binder-bound-arguments-at-limit-5.whim');
+require!('_limits/binder-bound-arguments-at-limit-6.whim');
+require!('_limits/binder-default-arguments-at-limit-0.whim');
+require!('_limits/binder-default-arguments-at-limit-1.whim');
+require!('_limits/binder-default-arguments-at-limit-2.whim');
+require!('_limits/binder-default-arguments-at-limit-3.whim');
+require!('_limits/binder-default-arguments-at-limit-4.whim');
+require!('_limits/binder-default-arguments-at-limit-5.whim');
+require!('_limits/binder-default-arguments-at-limit-6.whim');
+require!('_limits/binder-tuple-at-limit-0.whim');
+require!('_limits/binder-tuple-at-limit-1.whim');
+require!('_limits/binder-tuple-at-limit-2.whim');
+require!('_limits/binder-tuple-at-limit-3.whim');
+require!('_limits/binder-tuple-at-limit-4.whim');
+require!('_limits/binder-tuple-at-limit-5.whim');
+require!('_limits/binder-tuple-at-limit-6.whim');
+require!('_limits/type-parameters-function-at-limit.whim');
+require!('_limits/type-parameters-class-at-limit.whim');
+require!('_limits/type-parameters-interface-at-limit.whim');
+require!('_limits/type-parameters-alias-at-limit.whim');
+require!('_limits/type-parameters-closure-at-limit.whim');
+require!('_limits/interfaces-class-at-limit.whim');
+require!('_limits/interfaces-interface-at-limit.whim');
+require!('_limits/interfaces-enum-at-limit.whim');
+require!('_limits/members-properties-at-limit.whim');
+require!('_limits/members-constants-at-limit.whim');
+require!('_limits/members-methods-at-limit.whim');
+require!('_limits/members-interface-constants-at-limit.whim');
+require!('_limits/members-requirements-at-limit.whim');
+require!('_limits/members-enum-methods-at-limit.whim');
+require!('_limits/properties-written-at-limit.whim');
+require!('_limits/properties-promoted-at-limit.whim');
+require!('_limits/properties-split-at-limit.whim');
+require!('_limits/tuple-literal-at-limit.whim');
+require!('_limits/tuple-type-at-limit.whim');
+require!('_limits/tuple-pattern-at-limit.whim');
+require!('_limits/catch-clauses-at-limit.whim');
+require!('_limits/attributes-one-list-at-limit.whim');
+require!('_limits/attributes-many-lists-at-limit.whim');
+require!('_limits/enum-cases-unbounded.whim');
+require!('_limits/bounds-function-at-limit.whim');
+require!('_limits/bounds-class-at-limit.whim');
+require!('_limits/type-arguments-alias-at-limit.whim');
+require!('_limits/type-arguments-parameter-at-limit.whim');
+require!('_limits/type-arguments-turbofish-at-limit.whim');
+require!('_limits/lifecycle-canonical-shapes.whim');
+require!('_limits/lifecycle-untyped-destructor.whim');
+
+raises('union-past-limit', 'a union may have at most 64 members');
+raises(
+  'intersection-past-limit',
+  'an intersection may have at most 64 members',
+);
+
+raises('far-past-alias', 'a union may have at most 64 members');
+raises('far-past-check', 'a union may have at most 64 members');
+raises('far-past-parameter', 'a union may have at most 64 members');
+raises('far-past-grouped-alias', 'a union may have at most 64 members');
+raises('far-past-grouped-parameter', 'a union may have at most 64 members');
+raises('grouped-partition-past-limit', 'a union may have at most 64 members');
+raises('grouped-duplicate', '`int` appears twice in a union');
+raises('grouped-nested-duplicate', '`int` appears twice in a union');
+raises('grouped-tail-duplicate', '`int` appears twice in a union');
+raises('grouped-single-duplicate', '`int` appears twice in a union');
+raises('grouped-literal-duplicate', '`1` is already contained in `int`');
+raises('grouped-parameter-duplicate', '`int` appears twice in a union');
+raises('grouped-return-duplicate', '`int` appears twice in a union');
+raises('grouped-property-duplicate', '`int` appears twice in a union');
+raises('grouped-check-duplicate', '`int` appears twice in a union');
+raises('grouped-intersection-duplicate', '`A&B` appears twice in a union');
+raises(
+  'parameters-function-past-limit',
+  'a callable may declare at most 64 parameters',
+);
+
+raises(
+  'parameters-method-past-limit',
+  'a callable may declare at most 64 parameters',
+);
+
+raises(
+  'parameters-closure-past-limit',
+  'a callable may declare at most 64 parameters',
+);
+
+raises(
+  'parameters-short-closure-past-limit',
+  'a callable may declare at most 64 parameters',
+);
+
+raises(
+  'parameters-promoted-past-limit',
+  'a callable may declare at most 64 parameters',
+);
+
+raises(
+  'function-type-past-limit',
+  'a function type may declare at most 64 parameters',
+);
+
+raises('binder-void-union-0', '`void` cannot be a member of a union type');
+raises('binder-void-union-1', '`void` cannot be a member of a union type');
+raises('binder-void-union-2', '`void` cannot be a member of a union type');
+raises('binder-void-union-3', '`void` cannot be a member of a union type');
+raises('binder-void-union-4', '`void` cannot be a member of a union type');
+raises('binder-void-union-5', '`void` cannot be a member of a union type');
+raises('binder-void-union-6', '`void` cannot be a member of a union type');
+raises(
+  'binder-non-trailing-default-0',
+  'the type parameter `U` has no default, but a preceding one does',
+);
+
+raises(
+  'binder-non-trailing-default-1',
+  'the type parameter `U` has no default, but a preceding one does',
+);
+
+raises(
+  'binder-non-trailing-default-2',
+  'the type parameter `U` has no default, but a preceding one does',
+);
+
+raises(
+  'binder-non-trailing-default-3',
+  'the type parameter `U` has no default, but a preceding one does',
+);
+
+raises(
+  'binder-non-trailing-default-4',
+  'the type parameter `U` has no default, but a preceding one does',
+);
+
+raises(
+  'binder-non-trailing-default-5',
+  'the type parameter `U` has no default, but a preceding one does',
+);
+
+raises(
+  'binder-non-trailing-default-6',
+  'the type parameter `U` has no default, but a preceding one does',
+);
+
+raises(
+  'binder-default-self-reference-0',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-self-reference-1',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-self-reference-2',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-self-reference-3',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-self-reference-4',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-self-reference-5',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-self-reference-6',
+  'references `T` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-forward-reference-0',
+  'references `U` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-forward-reference-1',
+  'references `U` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-forward-reference-2',
+  'references `U` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-forward-reference-3',
+  'references `U` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-forward-reference-4',
+  'references `U` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-forward-reference-5',
+  'references `U` before it has a concrete binding',
+);
+
+raises(
+  'binder-default-forward-reference-6',
+  'references `U` before it has a concrete binding',
+);
+
+raises(
+  'binder-duplicate-0',
+  'the type parameter `T` is declared more than once in the same parameter list',
+);
+
+raises(
+  'binder-duplicate-1',
+  'the type parameter `T` is declared more than once in the same parameter list',
+);
+
+raises(
+  'binder-duplicate-2',
+  'the type parameter `T` is declared more than once in the same parameter list',
+);
+
+raises(
+  'binder-duplicate-3',
+  'the type parameter `T` is declared more than once in the same parameter list',
+);
+
+raises(
+  'binder-duplicate-4',
+  'the type parameter `T` is declared more than once in the same parameter list',
+);
+
+raises(
+  'binder-duplicate-5',
+  'the type parameter `T` is declared more than once in the same parameter list',
+);
+
+raises(
+  'binder-duplicate-6',
+  'the type parameter `T` is declared more than once in the same parameter list',
+);
+
+raises(
+  'self-bound-function',
+  '`self` refers to the enclosing class, and there is none here',
+);
+
+raises(
+  'self-bound-alias',
+  '`self` refers to the enclosing class, and there is none here',
+);
+
+raises(
+  'self-bound-closure',
+  '`self` refers to the enclosing class, and there is none here',
+);
+
+raises(
+  'self-bound-short-closure',
+  '`self` refers to the enclosing class, and there is none here',
+);
+
+raises(
+  'binder-bound-arguments-past-limit-0',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-bound-arguments-past-limit-1',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-bound-arguments-past-limit-2',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-bound-arguments-past-limit-3',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-bound-arguments-past-limit-4',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-bound-arguments-past-limit-5',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-bound-arguments-past-limit-6',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-default-arguments-past-limit-0',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-default-arguments-past-limit-1',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-default-arguments-past-limit-2',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-default-arguments-past-limit-3',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-default-arguments-past-limit-4',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-default-arguments-past-limit-5',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-default-arguments-past-limit-6',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'binder-tuple-past-limit-0',
+  'a tuple type may have at most 12 elements',
+);
+
+raises(
+  'binder-tuple-past-limit-1',
+  'a tuple type may have at most 12 elements',
+);
+
+raises(
+  'binder-tuple-past-limit-2',
+  'a tuple type may have at most 12 elements',
+);
+
+raises(
+  'binder-tuple-past-limit-3',
+  'a tuple type may have at most 12 elements',
+);
+
+raises(
+  'binder-tuple-past-limit-4',
+  'a tuple type may have at most 12 elements',
+);
+
+raises(
+  'binder-tuple-past-limit-5',
+  'a tuple type may have at most 12 elements',
+);
+
+raises(
+  'binder-tuple-past-limit-6',
+  'a tuple type may have at most 12 elements',
+);
+
+raises(
+  'binder-bound-arity-0',
+  '`Box` expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  'binder-bound-arity-1',
+  '`Box` expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  'binder-bound-arity-2',
+  '`Box` expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  'binder-bound-arity-3',
+  '`Box` expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  'binder-bound-arity-4',
+  '`Box` expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  'binder-bound-arity-5',
+  '`Box` expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  'binder-bound-arity-6',
+  '`Box` expects exactly 1 type argument(s), but 2 were supplied',
+);
+
+raises(
+  'type-parameters-function-past-limit',
+  'a declaration may bind at most 64 type parameters',
+);
+
+raises(
+  'type-parameters-class-past-limit',
+  'a declaration may bind at most 64 type parameters',
+);
+
+raises(
+  'type-parameters-interface-past-limit',
+  'a declaration may bind at most 64 type parameters',
+);
+
+raises(
+  'type-parameters-alias-past-limit',
+  'a declaration may bind at most 64 type parameters',
+);
+
+raises(
+  'type-parameters-closure-past-limit',
+  'a declaration may bind at most 64 type parameters',
+);
+
+raises(
+  'type-parameters-short-closure-past-limit',
+  'a declaration may bind at most 64 type parameters',
+);
+
+raises(
+  'interfaces-class-past-limit',
+  'a class may implement at most 64 interfaces',
+);
+
+raises(
+  'interfaces-interface-past-limit',
+  'an interface may extend at most 64 interfaces',
+);
+
+raises(
+  'interfaces-enum-past-limit',
+  'an enum may implement at most 64 interfaces',
+);
+
+raises(
+  'members-properties-past-limit',
+  'a class may declare at most 64 properties of its own',
+);
+
+raises(
+  'members-constants-past-limit',
+  'a class may declare at most 64 constants of its own',
+);
+
+raises(
+  'members-methods-past-limit',
+  'a class may declare at most 64 methods of its own',
+);
+
+raises(
+  'members-interface-constants-past-limit',
+  'an interface may declare at most 64 constants of its own',
+);
+
+raises(
+  'members-requirements-past-limit',
+  'an interface may declare at most 64 methods of its own',
+);
+
+raises(
+  'members-enum-methods-past-limit',
+  'an enum may declare at most 64 methods of its own',
+);
+
+raises(
+  'properties-written-past-limit',
+  'a class may declare at most 64 properties of its own',
+);
+
+raises(
+  'properties-split-past-limit',
+  'a class may declare at most 64 properties of its own',
+);
+
+raises(
+  'properties-promoted-tips-over',
+  'a class may declare at most 64 properties of its own',
+);
+
+raises(
+  'properties-written-tips-over',
+  'a class may declare at most 64 properties of its own',
+);
+
+raises(
+  'properties-promoted-list-past-limit',
+  'a callable may declare at most 64 parameters',
+);
+
+raises('property-written-twice', 'the property `$x` is declared twice');
+raises('property-written-then-promoted', 'the property `$x` is declared twice');
+raises('property-promoted-then-written', 'the property `$x` is declared twice');
+raises('property-promoted-twice', 'the property `$x` is declared twice');
+raises(
+  'promotion-in-interface',
+  'an interface cannot declare a property, and promoting a parameter declares one',
+);
+
+raises('promotion-in-enum', 'an enum cannot declare a constructor');
+raises(
+  'promotion-in-static-method',
+  '`static` and a promoted parameter cannot be combined',
+);
+
+raises('tuple-literal-past-limit', 'a tuple may have at most 12 elements');
+raises('tuple-type-past-limit', 'a tuple type may have at most 12 elements');
+raises(
+  'tuple-pattern-past-limit',
+  'a destructuring pattern may have at most 12 targets',
+);
+
+raises(
+  'catch-clauses-past-limit',
+  'one `try` statement may have at most 64 catch clauses',
+);
+
+raises(
+  'attributes-one-list-past-limit',
+  'one target may carry at most 64 attributes',
+);
+
+raises(
+  'attributes-many-lists-past-limit',
+  'one target may carry at most 64 attributes',
+);
+
+raises(
+  'bounds-function-past-limit',
+  'a type parameter bound may name at most 64 types',
+);
+
+raises(
+  'bounds-class-past-limit',
+  'a type parameter bound may name at most 64 types',
+);
+
+raises(
+  'bounds-closure-past-limit',
+  'a type parameter bound may name at most 64 types',
+);
+
+raises(
+  'type-arguments-alias-past-limit',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'type-arguments-parameter-past-limit',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'type-arguments-return-past-limit',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'type-arguments-property-past-limit',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'type-arguments-turbofish-past-limit',
+  'a reference may supply at most 64 type arguments',
+);
+
+raises(
+  'lifecycle-constructor-return',
+  'a constructor cannot declare a return type',
+);
+
+raises('lifecycle-static-destructor', 'a destructor cannot be static');
+raises('lifecycle-protected-destructor', 'a destructor must be public');
+raises('lifecycle-private-destructor', 'a destructor must be public');
+raises(
+  'lifecycle-destructor-parameter',
+  'a destructor cannot declare parameters',
+);
+
+raises(
+  'lifecycle-generic-destructor',
+  'a destructor cannot declare type parameters',
+);
+
+raises(
+  'lifecycle-destructor-return',
+  'a destructor may only declare the return type void',
+);

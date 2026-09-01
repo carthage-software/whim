@@ -1,0 +1,4 @@
+namespace Whim\HTTP\Client;
+
+/** Reports that a connection reached a denied network destination. */
+final class DestinationDeniedException extends Exception {}

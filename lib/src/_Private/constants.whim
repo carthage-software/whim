@@ -1,0 +1,51 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+
+/** The target operating system name. */
+#[Stub]
+const OS = OS;
+
+/** The greatest supported integer. */
+#[Stub]
+const MATH_INT_MAX = MATH_INT_MAX;
+
+/** The least supported integer. */
+#[Stub]
+const MATH_INT_MIN = MATH_INT_MIN;
+
+/** The greatest finite float. */
+#[Stub]
+const MATH_FLOAT_MAX = MATH_FLOAT_MAX;
+
+/** The least finite float. */
+#[Stub]
+const MATH_FLOAT_MIN = MATH_FLOAT_MIN;
+
+/** The difference between 1.0 and the next representable float. */
+#[Stub]
+const MATH_FLOAT_EPSILON = MATH_FLOAT_EPSILON;
+
+/** The not-a-number float value. */
+#[Stub]
+const MATH_NAN = MATH_NAN;
+
+/** Positive float infinity. */
+#[Stub]
+const MATH_INFINITY = MATH_INFINITY;
+
+/** Euler's number. */
+#[Stub]
+const MATH_E = MATH_E;
+
+/** The ratio of a circle's circumference to its diameter. */
+#[Stub]
+const MATH_PI = MATH_PI;
+
+/** The greatest finite IEEE-754 binary32 value. */
+#[Stub]
+const MATH_FLOAT32_MAX = MATH_FLOAT32_MAX;
+
+/** The least finite IEEE-754 binary32 value. */
+#[Stub]
+const MATH_FLOAT32_MIN = MATH_FLOAT32_MIN;

@@ -1,0 +1,5 @@
+class C {
+  public function m(): void {}
+
+  public function m(): void {}
+}

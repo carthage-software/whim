@@ -1,0 +1,29 @@
+namespace Whim\HTTP\Server\Context;
+
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Session\Session;
+use Whim\Network\Endpoint;
+
+/** Describes one request and its connection. */
+interface Context {
+  /** The negotiated HTTP version. */
+  public readonly ProtocolVersion $protocolVersion;
+
+  /** The local network endpoint. */
+  public readonly Endpoint $localEndpoint;
+
+  /** The peer network endpoint. */
+  public readonly Endpoint $peerEndpoint;
+
+  /** Parameters attached to this request. */
+  public dict<string, string> $parameters;
+
+  /** Returns the session attached to this request. */
+  public function getSession(): null|Session;
+
+  /** Attaches a session to this request. */
+  public function setSession(Session $session): void;
+
+  /** Registers work to run after the response has been sent. */
+  public function onResponseComplete(fn(): void $callback): void;
+}

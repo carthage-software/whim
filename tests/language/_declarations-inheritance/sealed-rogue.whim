@@ -1,0 +1,1 @@
+class SealedLogout extends SealedEvent {}

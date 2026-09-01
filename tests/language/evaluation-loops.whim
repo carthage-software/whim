@@ -1,0 +1,124 @@
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\OverflowError;
+
+function sum_with(mixed $step): int {
+  $index = 0;
+  $sum = 0;
+
+  while ($index < 4) {
+    $sum = $sum + $step;
+    $index++;
+  }
+
+  return $sum;
+}
+
+assert!(sum_with(3) == 12);
+$assertion_value_2 = fn(): int => sum_with('x');
+$assertion_error_2 = null;
+try {
+  $assertion_value_2();
+} catch (IncompatibleOperandsError $assertion_caught_2) {
+  $assertion_error_2 = $assertion_caught_2;
+}
+
+assert!($assertion_error_2 is IncompatibleOperandsError);
+
+$index = 3;
+$neverRan = 7;
+while ($index < 3) {
+  $neverRan = 9;
+  $index++;
+}
+
+assert!($neverRan == 7);
+
+$assertion_value_4 = function(): void {
+  $index = 0;
+  $maximum = 9223372036854775807;
+  while ($index < 1) {
+    $maximum = $maximum + 1;
+    $index++;
+  }
+};
+
+$assertion_error_4 = null;
+try {
+  $assertion_value_4();
+} catch (OverflowError $assertion_caught_4) {
+  $assertion_error_4 = $assertion_caught_4;
+}
+
+assert!($assertion_error_4 is OverflowError);
+
+$assertion_value_5 = function(): void {
+  $index = 0;
+  $limit = 1;
+  $value = 1.0;
+  $seen = 0;
+  while ($index < $limit) {
+    $value *= 2.0;
+    $index = 9223372036854775807;
+    if ($seen == 1) {
+      break;
+    }
+
+    $seen = 1;
+    $index++;
+  }
+};
+
+$assertion_error_5 = null;
+try {
+  $assertion_value_5();
+} catch (OverflowError $assertion_caught_5) {
+  $assertion_error_5 = $assertion_caught_5;
+}
+
+assert!($assertion_error_5 is OverflowError);
+
+$values = vec[];
+$index = 0;
+while ($index < 70000) {
+  $values[] = ($index * 3) % 1000;
+  $index++;
+}
+
+assert!(length!($values) == 70000);
+assert!($values[0] == 0);
+assert!($values[65536] == 608);
+assert!($values[69999] == 997);
+
+$sum = 0;
+$index = 0;
+while ($index < length!($values)) {
+  $sum = ($sum + $values[$index]) % 1000000007;
+  $index++;
+}
+
+assert!($sum == 34965000);
+
+function paired_float_updates(
+  float $addend,
+  float $left,
+  float $right,
+  float $differenceLeft,
+  float $differenceRight,
+  float $differenceAddend,
+): (float, float) {
+  $first = 0.0;
+  $second = 0.0;
+  $index = 0;
+
+  while ($index < 3) {
+    $first = (($left * 2.0) * $right) + $addend;
+    $second = ($differenceLeft - $differenceRight) + $differenceAddend;
+    $index++;
+  }
+
+  return ($first, $second);
+}
+
+($first, $second) = paired_float_updates(1.0, 2.0, 3.0, 9.0, 4.0, 2.0);
+assert!($first == 13.0);
+assert!($second == 7.0);

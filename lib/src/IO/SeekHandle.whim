@@ -1,0 +1,10 @@
+namespace Whim\IO;
+
+use Whim\Marker\TrackCaller;
+
+/** Defines a handle whose cursor can be repositioned. */
+interface SeekHandle extends Handle {
+  /** Moves the cursor and returns its resulting byte offset. */
+  #[TrackCaller]
+  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int;
+}

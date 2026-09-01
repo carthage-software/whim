@@ -1,0 +1,17 @@
+namespace Whim\OS;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+
+/** A user record returned by the operating-system account directory. */
+final readonly class User {
+  #[AlwaysInline]
+  public function __construct(
+    public NonNegativeInt $id,
+    public NonEmptyString $name,
+    public NonNegativeInt $primaryGroupId,
+    public null|NonEmptyString $homeDirectory,
+    public null|NonEmptyString $shell,
+  ) {}
+}

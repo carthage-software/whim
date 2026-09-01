@@ -1,0 +1,50 @@
+namespace Whim\IP;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Names an IP address family by its byte width. */
+enum Family: int {
+  /** Internet Protocol version 4. */
+  case V4 = 4;
+
+  /** Internet Protocol version 6. */
+  case V6 = 16;
+
+  /** Returns the address width in bytes. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function byteLength(): 4|16 {
+    return $this->value as 4|16;
+  }
+
+  /** Returns the address width in bits. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function bitLength(): 32|128 {
+    return match ($this) {
+      Family::V4 => 32,
+      Family::V6 => 128,
+    };
+  }
+
+  /** Returns the IANA address-family number. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function ianaFamily(): 1|2 {
+    return match ($this) {
+      Family::V4 => 1,
+      Family::V6 => 2,
+    };
+  }
+
+  /** Creates a family from its IANA address-family number. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromIanaFamily(1|2 $family): Family {
+    return match ($family) {
+      1 => Family::V4,
+      2 => Family::V6,
+    };
+  }
+}

@@ -1,0 +1,233 @@
+namespace Whim\HTTP\Client\Middleware;
+
+use Whim\Async\CancellationToken;
+use Whim\Comparison\Ordering;
+use Whim\HTTP\Client\Configuration;
+use Whim\HTTP\Client\Connection;
+use Whim\HTTP\Client\Handler;
+use Whim\HTTP\Client\Middleware as ClientMiddleware;
+use Whim\HTTP\Client\Middleware\_Private;
+use Whim\HTTP\Client\Middleware\_Private\StoredCookie;
+use Whim\HTTP\Cookie\Collection;
+use Whim\HTTP\Cookie\SetCookie;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Message\Transaction;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Time\SystemTime;
+use Whim\URI\IPHost;
+use Whim\URL\URL;
+use Whim\Vec;
+
+/** Stores response cookies and sends matching cookies with later requests. */
+final class CookieJar implements ClientMiddleware {
+  private vec<StoredCookie> $cookies = vec[];
+  private int $nextCreation = 0;
+
+  /** Removes every stored cookie. */
+  #[AlwaysInline]
+  public function clear(): void {
+    $this->cookies = vec[];
+  }
+
+  /** Returns the number of unexpired cookies currently stored. */
+  #[MustUse]
+  public function count(): int {
+    $this->purge(SystemTime::now()->seconds);
+    return length!($this->cookies);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function process(
+    Connection $connection,
+    Request $request,
+    Configuration $configuration,
+    Handler $next,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    $url =
+      $request->url
+      ?? return $next->handle(
+        $connection,
+        $request,
+        $configuration,
+        $cancellation,
+      );
+
+    $now = SystemTime::now()->seconds;
+    $request = $this->withCookies($request, $url, $now);
+    $transaction = $next->handle(
+      $connection,
+      $request,
+      $configuration,
+      $cancellation,
+    );
+
+    $this->store($transaction->response, $url, $now);
+    return $transaction;
+  }
+
+  #[MustUse]
+  private function withCookies(Request $request, URL $url, int $now): Request {
+    $this->purge($now);
+    $host = _Private\host($url);
+    $path = match ($url->path) {
+      '' => '/',
+      $_ => $url->path,
+    };
+
+    $secure = $url->scheme == 'https';
+    $provided = Collection::fromHeaders($request->headers);
+    $matches = vec[];
+    foreach ($this->cookies as $cookie) {
+      if (
+        ($cookie->secure && !$secure)
+        || ($cookie->hostOnly && $cookie->domain != $host)
+        || (
+          !$cookie->hostOnly
+          && !_Private\domain_matches($host, $cookie->domain)
+        )
+        || !_Private\path_matches($path, $cookie->path)
+        || $provided->has($cookie->name)
+      ) {
+        continue;
+      }
+
+      $matches[] = $cookie;
+    }
+
+    if ($matches == vec[]) {
+      return $request;
+    }
+
+    $matches = Vec\sort::<StoredCookie>(
+      $matches,
+      fn(StoredCookie $left, StoredCookie $right): Ordering {
+        $pathOrder = length!($right->path) <=> length!($left->path);
+        if ($pathOrder != 0) {
+          return Ordering::from($pathOrder);
+        }
+
+        return Ordering::from($left->createdAt <=> $right->createdAt);
+      },
+    );
+
+    $pairs = vec[];
+    foreach ($matches as $cookie) {
+      $pairs[] = ($cookie->name, $cookie->value);
+    }
+
+    $value = Collection::fromParts($pairs)->toString();
+    $existing = $request->headers->getAll('Cookie');
+    if ($existing != vec[]) {
+      $value = Str\join('; ', $existing) . '; ' . $value;
+    }
+
+    return $request->withHeader('Cookie', $value);
+  }
+
+  private function store(Response $response, URL $url, int $now): void {
+    $host = _Private\host($url);
+    $hostIsAddress = $url->authority->host is IPHost;
+    foreach ($response->headers->getAll('Set-Cookie') as $field) {
+      $cookie = SetCookie::parse($field);
+      if ($cookie == null || ($cookie->secure && $url->scheme != 'https')) {
+        continue;
+      }
+
+      $hostOnly = $cookie->domain == null;
+      $domain = $cookie->domain ?? $host;
+      if (
+        $domain == ''
+        || (!$hostOnly && $hostIsAddress)
+        || (!$hostOnly && !_Private\domain_matches($host, $domain))
+      ) {
+        continue;
+      }
+
+      $path = ($cookie->path ?? _Private\default_path($url)) as NonEmptyString;
+      $expiresAt = match ($cookie->expires) {
+        null => null,
+        $expires @ SystemTime => $expires->seconds,
+      };
+
+      if ($cookie->maxAge != null) {
+        if ($cookie->maxAge <= 0) {
+          $this->replace($cookie, $domain, $path, null, $hostOnly, false);
+          continue;
+        }
+
+        $expiresAt = match ($cookie->maxAge > Math\INT_MAX - $now) {
+          true => Math\INT_MAX,
+          false => $now + $cookie->maxAge,
+        };
+      }
+
+      $keep = $expiresAt == null || $expiresAt > $now;
+      $this->replace($cookie, $domain, $path, $expiresAt, $hostOnly, $keep);
+    }
+  }
+
+  private function replace(
+    SetCookie $cookie,
+    string $domain,
+    NonEmptyString $path,
+    null|int $expiresAt,
+    bool $hostOnly,
+    bool $keep,
+  ): void {
+    $updated = vec[];
+    $createdAt = $this->nextCreation;
+    $replaced = false;
+    foreach ($this->cookies as $stored) {
+      if (
+        $stored->name == $cookie->name
+        && $stored->domain == $domain
+        && $stored->path == $path
+      ) {
+        $createdAt = $stored->createdAt;
+        $replaced = true;
+      } else {
+        $updated[] = $stored;
+      }
+    }
+
+    if ($keep) {
+      $updated[] = new StoredCookie(
+        $cookie->name,
+        $cookie->value,
+        $domain,
+        $path,
+        $expiresAt,
+        $cookie->secure,
+        $hostOnly,
+        $createdAt,
+      );
+
+      if (!$replaced) {
+        $this->nextCreation++;
+      }
+    }
+
+    $this->cookies = $updated;
+  }
+
+  private function purge(int $now): void {
+    $cookies = vec[];
+    foreach ($this->cookies as $cookie) {
+      if ($cookie->expiresAt == null || $cookie->expiresAt > $now) {
+        $cookies[] = $cookie;
+      }
+    }
+
+    $this->cookies = $cookies;
+  }
+}

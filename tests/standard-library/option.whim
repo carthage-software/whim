@@ -1,0 +1,53 @@
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Result\Err;
+use Whim\Result\Ok;
+
+$some = Whim\Option\some::<int>(21);
+assert!($some is Some<int>);
+assert!($some is Option<int>);
+assert!($some->isSome());
+assert!(!($some->isNone()));
+assert!($some->unwrap() == 21);
+assert!($some->unwrapOr::<int>(0) == 21);
+assert!($some->value == 21);
+
+$null = Whim\Option\some::<null>(null);
+assert!($null is Some<null>);
+assert!($null->isSome());
+assert!($null->unwrap() == null);
+
+$mapped = $some->map::<int>(fn(int $value): int => $value * 2);
+assert!($mapped is Some<int>);
+assert!($mapped->unwrap() == 42);
+
+$none = Whim\Option\none();
+assert!($none is None);
+assert!($none->isNone());
+assert!(!($none->isSome()));
+assert!($none->unwrapOr::<int>(7) == 7);
+assert!($none->map::<int>(fn(int $value): int => $value)->isNone());
+
+assert!($some->filter(fn(int $value): bool => $value > 10)->isSome());
+
+assert!($some->filter(fn(int $value): bool => $value > 100)->isNone());
+
+$chained = $some->andThen::<string>(
+  fn(int $value): Option<string> => Whim\Option\some::<string>('n=' . $value),
+);
+
+assert!($chained->unwrap() == 'n=21');
+
+assert!($some->okOr::<string>('missing') is Ok<int>);
+assert!($none->okOr::<string>('missing') is Err<string>);
+
+$assertion_value_23 = fn(): mixed => $none->unwrap();
+$assertion_error_23 = null;
+try {
+  $assertion_value_23();
+} catch (Whim\Unwind\LogicException $assertion_caught_23) {
+  $assertion_error_23 = $assertion_caught_23;
+}
+
+assert!($assertion_error_23 is Whim\Unwind\LogicException);

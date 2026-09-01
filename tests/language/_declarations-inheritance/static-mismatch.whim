@@ -1,0 +1,11 @@
+class A {
+  public function m(): int {
+    return 1;
+  }
+}
+
+class B extends A {
+  public static function m(): int {
+    return 2;
+  }
+}

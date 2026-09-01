@@ -1,0 +1,154 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Str;
+use Whim\Vec;
+
+/** Collects every markdown chapter beneath a directory, recursively. */
+function chapters(string $directory): vec<string> {
+  $found = vec[];
+  foreach (Filesystem\read_directory($directory) as $entry) {
+    $path = $directory . '/' . $entry->name;
+    if (Filesystem\is_directory($path)) {
+      foreach (chapters($path) as $nested) {
+        $found[] = $nested;
+      }
+
+      continue;
+    }
+
+    if (Str\ends_with($entry->name, '.md')) {
+      $found[] = $path;
+    }
+  }
+
+  return $found;
+}
+
+/** Extracts (file, line, check, source) samples from one chapter. */
+function samples(string $file): vec<(string, int, string, string)> {
+  $found = vec[];
+  $lines = Str\split(File\read($file), "\n");
+  $collecting = false;
+  $skipping = false;
+  $check = '';
+  $source = '';
+  $start = 0;
+  $index = 0;
+  while ($index < length!($lines)) {
+    $line = $lines[$index];
+    $trimmed = Str\trim_left($line);
+    if ($skipping) {
+      if (Str\starts_with($trimmed, '```')) {
+        $skipping = false;
+      }
+    } else if ($collecting) {
+      if (Str\starts_with($trimmed, '```')) {
+        $found[] = ($file, $start, $check, $source);
+        $collecting = false;
+        $source = '';
+      } else {
+        $source = $source . $line . "\n";
+      }
+    } else if (Str\starts_with($trimmed, '```')) {
+      $info = Str\trim(Str\strip_prefix($trimmed, '```'));
+      if ($info == 'whim') {
+        $collecting = true;
+        $check = 'run';
+        $start = $index + 1;
+        $source = '';
+      } else if ($info == 'whim,norun') {
+        $collecting = true;
+        $check = 'compile';
+        $start = $index + 1;
+        $source = '';
+      } else if ($info == 'whim,compile_fail') {
+        $collecting = true;
+        $check = 'compile_fail';
+        $start = $index + 1;
+        $source = '';
+      } else if ($info == 'whim,ignore') {
+        $skipping = true;
+      } else {
+        assert!(!(Str\starts_with($info, 'whim')));
+        $skipping = true;
+      }
+    }
+
+    $index++;
+  }
+
+  return $found;
+}
+
+/** Checks one sample, returning null or a failure description. */
+function check_sample(
+  string $binary,
+  string $work,
+  int $number,
+  (string, int, string, string) $sample,
+): null|string {
+  ($file, $line, $check, $source) = $sample;
+  $snippet = $work . '/sample-' . $number . '.whim';
+  File\write($snippet, $source);
+  $arguments = match ($check) {
+    'run' => vec[$snippet],
+    $_ => vec['disassemble', $snippet],
+  };
+
+  $run = Command\run($binary, $arguments);
+  if ($check == 'compile_fail') {
+    if ($run->isSuccess()) {
+      return $file . ':' . $line . ': compiles, but is marked compile_fail';
+    }
+
+    return null;
+  }
+
+  if (!$run->isSuccess()) {
+    return $file . ':' . $line . ' (' . $check . '): ' . $run->standardError;
+  }
+
+  return null;
+}
+
+$binary = Env\current_binary();
+assert!($binary is string);
+$script = Env\current_script();
+assert!($script is string);
+$script = Filesystem\canonicalize($script);
+
+$root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as int);
+
+$files = Vec\sort::<string>(chapters($root . '/docs/src'));
+assert!($files != vec[]);
+
+$collected = vec[];
+foreach ($files as $file) {
+  foreach (samples($file) as $sample) {
+    $collected[] = $sample;
+  }
+}
+
+foreach (samples($root . '/README.md') as $sample) {
+  $collected[] = $sample;
+}
+
+assert!($collected != vec[]);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-docs-');
+$failures = vec[];
+$number = 0;
+foreach ($collected as $sample) {
+  $failure = check_sample($binary, $work, $number, $sample);
+  if ($failure != null) {
+    $failures[] = $failure;
+  }
+
+  $number++;
+}
+
+Filesystem\delete_directory($work, true);
+
+assert!($failures == vec[]);

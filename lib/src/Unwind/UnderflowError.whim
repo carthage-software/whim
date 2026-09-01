@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports an arithmetic result below the supported range. */
+#[Stub]
+class UnderflowError extends ArithmeticError {}

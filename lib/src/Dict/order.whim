@@ -1,0 +1,120 @@
+namespace Whim\Dict;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Comparator;
+use Whim\Refine\Iterable;
+use Whim\Refine\Transform;
+use Whim;
+
+/** Removes duplicate values while preserving the first key. */
+#[MustUse]
+#[TrackCaller]
+function unique<K: ArrayKey, V>(Iterable<K, V> $values): dict<K, V> {
+  $result = dict[];
+  foreach ($values as $key => $value) {
+    if (!contains!($result, $value)) {
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Removes values with duplicate derived identities. */
+#[MustUse]
+#[TrackCaller]
+function unique_by<K: ArrayKey, V, S>(
+  Iterable<K, V> $values,
+  Transform<V, S> $scalar,
+): dict<K, V> {
+  $result = dict[];
+  $seen = vec[];
+  foreach ($values as $key => $value) {
+    $candidate = $scalar($value);
+    if (!contains!($seen, $candidate)) {
+      $seen[] = $candidate;
+      $result[$key] = $value;
+    }
+  }
+
+  return $result;
+}
+
+/** Sorts values while preserving their keys. */
+#[MustUse]
+#[TrackCaller]
+function sort<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  null|Comparator<V> $comparator = null,
+): dict<K, V> {
+  $values = from_iterable::<K, V>($values);
+  if ($comparator == null) {
+    return Whim\_Private\dict_sort($values, null);
+  }
+
+  return Whim\_Private\dict_sort(
+    $values,
+    fn(V $left, V $right): int => $comparator($left, $right)->value,
+  );
+}
+
+/** Sorts values by a derived scalar while preserving their keys. */
+#[MustUse]
+#[TrackCaller]
+function sort_by<K: ArrayKey, V, S>(
+  Iterable<K, V> $values,
+  Transform<V, S> $scalar,
+  null|Comparator<S> $comparator = null,
+): dict<K, V> {
+  $entries = vec[];
+  $keys = vec[];
+  foreach ($values as $key => $value) {
+    $entries[] = ($key, $value);
+    $keys[] = $scalar($value);
+  }
+
+  if ($comparator == null) {
+    return from_entries::<K, V>(
+      Whim\_Private\vec_sort_by($entries, $keys, null),
+    );
+  }
+
+  return from_entries::<K, V>(
+    Whim\_Private\vec_sort_by(
+      $entries,
+      $keys,
+      fn(S $left, S $right): int => $comparator($left, $right)->value,
+    ),
+  );
+}
+
+/** Sorts a dict by its keys. */
+#[MustUse]
+#[TrackCaller]
+function sort_by_key<K: ArrayKey, V>(
+  Iterable<K, V> $values,
+  null|Comparator<K> $comparator = null,
+): dict<K, V> {
+  $entries = vec[];
+  $keys = vec[];
+  foreach ($values as $key => $value) {
+    $entries[] = ($key, $value);
+    $keys[] = $key;
+  }
+
+  if ($comparator == null) {
+    return from_entries::<K, V>(
+      Whim\_Private\vec_sort_by($entries, $keys, null),
+    );
+  }
+
+  return from_entries::<K, V>(
+    Whim\_Private\vec_sort_by(
+      $entries,
+      $keys,
+      fn(K $left, K $right): int => $comparator($left, $right)->value,
+    ),
+  );
+}

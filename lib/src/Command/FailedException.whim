@@ -1,0 +1,47 @@
+namespace Whim\Command;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Unwind\RuntimeException;
+
+/** Reports a child that ended without success where success was required. */
+final class FailedException extends RuntimeException {
+  private ExitStatus $status;
+  private string $standardOutput;
+  private string $standardError;
+
+  #[AlwaysInline]
+  public function __construct(
+    string $message,
+    ExitStatus $status,
+    string $standardOutput = '',
+    string $standardError = '',
+  ) {
+    parent::__construct($message);
+
+    $this->status = $status;
+    $this->standardOutput = $standardOutput;
+    $this->standardError = $standardError;
+  }
+
+  /** How the child ended. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getStatus(): ExitStatus {
+    return $this->status;
+  }
+
+  /** What the child wrote to its standard output. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getStandardOutput(): string {
+    return $this->standardOutput;
+  }
+
+  /** What the child wrote to its standard error. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getStandardError(): string {
+    return $this->standardError;
+  }
+}

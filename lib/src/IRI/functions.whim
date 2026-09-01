@@ -1,0 +1,27 @@
+namespace Whim\IRI;
+
+use Whim;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Resolves an IRI reference against an absolute base IRI. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function resolve(IRI $base, IRI $reference): IRI {
+  if (!$base->isAbsolute()) {
+    throw new InvalidArgumentException(
+      'an IRI resolution base must be absolute',
+    );
+  }
+
+  $resolved = Whim\_Private\iri_resolve(
+    $base->toString(),
+    $reference->toString(),
+  )
+    as string;
+
+  return IRI::parse($resolved) as IRI;
+}

@@ -1,0 +1,78 @@
+namespace Whim\IO\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IO\Exception;
+use Whim\IO\FileDescriptorHandle;
+use Whim\IO\ReadHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+
+/** The descriptor-backed implementation returned by IO factories. */
+final class ReadHandleImpl implements ReadHandle, FileDescriptorHandle {
+  private bool $reachedEnd = false;
+
+  /** Wraps an owned descriptor. This class is private standard-library API. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(private FileDescriptor $descriptor) {}
+
+  /**
+   * Returns the backing descriptor, or raises when the handle is closed.
+   *
+   * @throws Whim\IO\Exception when the IO handle is closed.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function getFileDescriptor(): FileDescriptor {
+    if ($this->descriptor->isClosed()) {
+      throw new Exception('the IO handle is closed');
+    }
+
+    return $this->descriptor;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    wait_readable($this->descriptor, $cancellation);
+  }
+
+  #[AlwaysInline]
+  public function reachedEndOfDataSource(): bool {
+    return $this->reachedEnd;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryRead(null|int $maxBytes = null): string {
+    $maximum = $maxBytes ?? 65536;
+    if ($maximum <= 0) {
+      return '';
+    }
+
+    try {
+      $bytes = Whim\_Private\read_descriptor($this->descriptor, $maximum);
+    } catch (Whim\_Private\SystemError $error) {
+      failure($error);
+    }
+
+    if ($bytes == null) {
+      return '';
+    }
+
+    if ($bytes == '') {
+      $this->reachedEnd = true;
+    }
+
+    return $bytes;
+  }
+}

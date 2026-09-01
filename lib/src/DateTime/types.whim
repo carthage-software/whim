@@ -1,0 +1,34 @@
+namespace Whim\DateTime;
+
+/** A Gregorian year supported by the date-time engine. */
+type Year = -9999..=9999;
+
+/** A one-based day within a month. */
+type Day = 1..=31;
+
+/** An hour within a day. */
+type Hour = 0..=23;
+
+/** An hour within one half of a day. */
+type HourOfMeridiem = 1..=12;
+
+/** A minute within an hour. */
+type Minute = 0..=59;
+
+/** A second within a minute. */
+type Second = 0..=59;
+
+/** A fractional second measured in nanoseconds. */
+type Nanosecond = 0..=999999999;
+
+/** A one-based day within a year. */
+type DayOfYear = 1..=366;
+
+/** A one-based year within an era. */
+type YearOfEra = 1..=10000;
+
+/** The number of days in a Gregorian month. */
+type DaysInMonth = 28..=31;
+
+/** A UTC offset measured in seconds. */
+type OffsetSeconds = -93599..=93599;

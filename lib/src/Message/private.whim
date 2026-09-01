@@ -1,0 +1,69 @@
+namespace Whim\Message\_Private;
+
+use Whim\IO\Reader;
+use Whim\MIME\Header;
+use Whim\MIME\Headers;
+use Whim\MIME\Part\RawPart;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Message\Message;
+use Whim\Message\MessageId;
+use Whim\Str;
+
+/** Builds a message from parsed headers and a body reader. */
+#[TrackCaller]
+#[TraceBoundary]
+function from_parsed_headers(vec<Header> $pairs, Reader $reader): Message {
+  $headers = Headers::fromPairs($pairs);
+  $bodyHeaders = vec[];
+  foreach ($pairs as ($name, $value)) {
+    $normalized = Str\lowercase($name);
+    if (
+      $normalized is 'content-type'
+        | 'content-transfer-encoding'
+        | 'content-id'
+        | 'content-disposition'
+    ) {
+      $bodyHeaders[] = ($name, $value);
+    }
+  }
+
+  return Message::fromHeaders(
+    $headers,
+    new RawPart(Headers::fromPairs($bodyHeaders), $reader),
+  );
+}
+
+/** Parses all bracketed Message-IDs in a header value. */
+function parse_message_ids(null|string $value): vec<MessageId> {
+  if ($value == null) {
+    return vec[];
+  }
+
+  $ids = vec[];
+  $offset = 0;
+  while ($offset < length!($value)) {
+    $open = Str\search($value, '<', $offset) ?? break;
+
+    $close = Str\search($value, '>', $open + 1) ?? break;
+
+    $id = MessageId::parse(Str\slice($value, $open, $close - $open + 1));
+    if ($id != null) {
+      $ids[] = $id;
+    }
+
+    $offset = $close + 1;
+  }
+
+  return $ids;
+}
+
+/** Serializes a list of Message-IDs. */
+function serialize_message_ids(vec<MessageId> $ids): string {
+  $values = vec[];
+  foreach ($ids as $id) {
+    $values[] = $id->toString();
+  }
+
+  return Str\join(' ', $values);
+}

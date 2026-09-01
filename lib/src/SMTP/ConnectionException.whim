@@ -1,0 +1,6 @@
+namespace Whim\SMTP;
+
+use Whim\Unwind\RuntimeException;
+
+/** Thrown when an SMTP connection cannot be established or initialized. */
+final class ConnectionException extends RuntimeException {}

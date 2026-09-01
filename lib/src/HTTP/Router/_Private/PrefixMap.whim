@@ -1,0 +1,253 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\string_slice;
+
+/** Resolves paths through literal and dynamic prefixes. */
+final readonly class PrefixMap {
+  private function __construct(
+    private dict<string, Handler> $literals,
+    private dict<string, PrefixMap> $prefixes,
+    private vec<RegexBranch> $regexes,
+    private NonNegativeInt $prefixLength,
+  ) {}
+
+  /** Compiles parsed routes into a prefix map. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromEntries(vec<Entry> $entries): PrefixMap {
+    $literals = dict[];
+    $prefixEntries = vec[];
+    $regexEntries = vec[];
+    foreach ($entries as $entry) {
+      ($nodes, $handler) = $entry;
+      if (length!($nodes) == 0) {
+        if (contains_key!($literals, '')) {
+          throw new InvalidArgumentException(
+            'two route patterns resolve to the same path',
+          );
+        }
+
+        $literals[''] = $handler;
+        continue;
+      }
+
+      $node = $nodes[0];
+      $remaining = vec[...$nodes];
+      remove!($remaining, 0);
+      if ($node is LiteralNode) {
+        if (length!($remaining) == 0) {
+          if (contains_key!($literals, $node->text)) {
+            throw new InvalidArgumentException(
+              'two route patterns resolve to the same path',
+            );
+          }
+
+          $literals[$node->text] = $handler;
+        } else {
+          $prefixEntries[] = ($node->text, $remaining, $handler);
+        }
+
+        continue;
+      }
+
+      if (
+        $node is ParameterNode
+        && $node->constraint == null
+        && length!($remaining) > 0
+      ) {
+        $next = $remaining[0];
+        if ($next is LiteralNode && $next->text[0] == '/') {
+          $regexEntries[] = (
+            $node->expression(),
+            $remaining,
+            $handler,
+            $node->parameterNames(),
+          );
+
+          continue;
+        }
+      }
+
+      $regexEntries[] = (
+        nodes_expression($nodes),
+        vec[],
+        $handler,
+        node_parameter_names($nodes),
+      );
+    }
+
+    ($prefixes, $prefixLength) = PrefixMap::compilePrefixes($prefixEntries);
+    $regexes = PrefixMap::compileRegexes($regexEntries);
+    return new PrefixMap($literals, $prefixes, $regexes, $prefixLength);
+  }
+
+  /** Resolves one remaining path. */
+  #[MustUse]
+  #[TrackCaller]
+  public function resolve(string $path): null|Resolution {
+    if (contains_key!($this->literals, $path)) {
+      return ($this->literals[$path], dict[]);
+    }
+
+    $length = length!($path);
+    if ($this->prefixLength > 0 && $length >= $this->prefixLength) {
+      $prefix = string_slice($path, 0, $this->prefixLength);
+      if (contains_key!($this->prefixes, $prefix)) {
+        $remaining = string_slice(
+          $path,
+          $this->prefixLength,
+          $length - $this->prefixLength,
+        );
+
+        $result = $this->prefixes[$prefix]->resolve($remaining);
+        if ($result != null) {
+          return $result;
+        }
+      }
+    }
+
+    foreach ($this->regexes as $branch) {
+      $match = $branch->regex->find($path) ?? continue;
+
+      ($start, $end, $captures) = $match;
+      if ($start != 0) {
+        continue;
+      }
+
+      if ($branch->handler != null) {
+        return (
+          $branch->handler,
+          decode_parameters($captures, $branch->parameterNames),
+        );
+      }
+
+      $remaining = string_slice($path, $end, $length - $end);
+      $result = $branch->map?->resolve($remaining) ?? continue;
+
+      ($handler, $parameters) = $result;
+      foreach (decode_parameters(
+        $captures,
+        $branch->parameterNames,
+      ) as $name => $value) {
+        $parameters[$name] = $value;
+      }
+
+      return ($handler, $parameters);
+    }
+
+    return null;
+  }
+
+  /** Compiles the literal prefix branches. */
+  #[MustUse]
+  #[TrackCaller]
+  private static function compilePrefixes(
+    vec<(string, vec<Node>, Handler)> $entries,
+  ): (dict<string, PrefixMap>, NonNegativeInt) {
+    if (length!($entries) == 0) {
+      return (dict[], 0);
+    }
+
+    $prefixLength = length!($entries[0][0]);
+    foreach ($entries as $entry) {
+      $length = length!($entry[0]);
+      if ($length < $prefixLength) {
+        $prefixLength = $length;
+      }
+    }
+
+    $groups = dict[];
+    foreach ($entries as $entry) {
+      ($text, $nodes, $handler) = $entry;
+      $prefix = string_slice($text, 0, $prefixLength);
+      $group = match (contains_key!($groups, $prefix)) {
+        true => $groups[$prefix],
+        false => vec[],
+      };
+
+      if (length!($text) == $prefixLength) {
+        $group[] = ($nodes, $handler);
+      } else {
+        $suffix = string_slice(
+          $text,
+          $prefixLength,
+          length!($text) - $prefixLength,
+        );
+
+        $group[] = (
+          vec[new LiteralNode($suffix as NonEmptyString), ...$nodes],
+          $handler,
+        );
+      }
+
+      $groups[$prefix] = $group;
+    }
+
+    $prefixes = dict[];
+    foreach ($groups as $prefix => $entries) {
+      $prefixes[$prefix] = PrefixMap::fromEntries($entries);
+    }
+
+    return ($prefixes, $prefixLength as NonNegativeInt);
+  }
+
+  /** Compiles dynamic branches. */
+  #[MustUse]
+  #[TrackCaller]
+  private static function compileRegexes(
+    vec<RegexEntry> $entries,
+  ): vec<RegexBranch> {
+    $groups = dict[];
+    foreach ($entries as $entry) {
+      $source = $entry[0];
+      $group = match (contains_key!($groups, $source)) {
+        true => $groups[$source],
+        false => vec[],
+      };
+
+      $group[] = $entry;
+      $groups[$source] = $group;
+    }
+
+    $branches = vec[];
+    foreach ($groups as $source => $group) {
+      $first = $group[0];
+      if (length!($group) == 1) {
+        $remaining = $first[1];
+        $names = vec[...$first[3]];
+        foreach (node_parameter_names($remaining) as $name) {
+          $names[] = $name;
+        }
+
+        $branches[] = new RegexBranch(
+          compile_expression($source . nodes_expression($remaining), true),
+          $names,
+          null,
+          $first[2],
+        );
+
+        continue;
+      }
+
+      $subEntries = vec[];
+      foreach ($group as $entry) {
+        $subEntries[] = ($entry[1], $entry[2]);
+      }
+
+      $branches[] = new RegexBranch(
+        compile_expression($source, false),
+        $first[3],
+        PrefixMap::fromEntries($subEntries),
+        null,
+      );
+    }
+
+    return $branches;
+  }
+}

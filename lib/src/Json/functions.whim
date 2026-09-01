@@ -1,0 +1,55 @@
+namespace Whim\Json;
+
+use Whim;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/**
+ * Encodes a value as JSON text.
+ *
+ * @throws EncodingException when the value holds a float, string, or dictionary key JSON cannot represent, or nests deeper than 512 levels.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function encode(Value|ToJson $value, bool $pretty = false): NonEmptyString {
+  if ($value is ToJson) {
+    $value = $value->toJson();
+  }
+
+  try {
+    return Whim\_Private\json_encode($value, $pretty);
+  } catch (Whim\_Private\JsonError $error) {
+    throw new EncodingException($error->getMessage());
+  }
+}
+
+/**
+ * Decodes JSON text into its value tree.
+ *
+ * @throws DecodingException when the input is not valid JSON; the code carries the byte offset of the failure.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(NonEmptyString $json): Value {
+  try {
+    return Whim\_Private\json_decode($json);
+  } catch (Whim\_Private\JsonError $error) {
+    throw new DecodingException($error->getMessage(), $error->getCode());
+  }
+}
+
+/**
+ * Decodes JSON text directly into a type that knows its JSON shape.
+ *
+ * @throws DecodingException when the input is not valid JSON, or the decoded value does not have the shape `T` expects.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode_as<out T: FromJson>(NonEmptyString $json): T {
+  return T::fromJson(decode($json));
+}

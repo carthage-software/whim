@@ -1,0 +1,4 @@
+namespace Whim\TLS;
+
+/** Reports an invalid certificate or private key. */
+final class CertificateException extends Exception {}

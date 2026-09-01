@@ -1,0 +1,114 @@
+namespace Whim\Binary;
+
+use Whim\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\Int16;
+use Whim\Refine\Int32;
+use Whim\Refine\Int8;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint16;
+use Whim\Refine\Uint32;
+use Whim\Refine\Uint8;
+
+/** Writes an unsigned 8-bit integer as one byte. */
+#[AlwaysInline]
+#[MustUse]
+function encode_u8(Uint8 $value): string {
+  return _Private\binary_encode($value, 1, false);
+}
+
+/** Writes a signed 8-bit integer as one byte. */
+#[AlwaysInline]
+#[MustUse]
+function encode_i8(Int8 $value): string {
+  return _Private\binary_encode($value, 1, false);
+}
+
+/** Writes an unsigned 16-bit integer as two bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_u16(
+  Uint16 $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode($value, 2, $endianness == Endianness::Little);
+}
+
+/** Writes a signed 16-bit integer as two bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_i16(
+  Int16 $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode($value, 2, $endianness == Endianness::Little);
+}
+
+/** Writes an unsigned 32-bit integer as four bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_u32(
+  Uint32 $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode($value, 4, $endianness == Endianness::Little);
+}
+
+/** Writes a signed 32-bit integer as four bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_i32(
+  Int32 $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode($value, 4, $endianness == Endianness::Little);
+}
+
+/** Writes an unsigned 64-bit integer as eight bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_u64(
+  NonNegativeInt $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode($value, 8, $endianness == Endianness::Little);
+}
+
+/** Writes a signed 64-bit integer as eight bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_i64(
+  int $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode($value, 8, $endianness == Endianness::Little);
+}
+
+/** Writes a single-precision floating-point value as four bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_f32(
+  float $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode(
+    _Private\float_to_bits32($value),
+    4,
+    $endianness == Endianness::Little,
+  );
+}
+
+/** Writes a double-precision floating-point value as eight bytes. */
+#[AlwaysInline]
+#[MustUse]
+function encode_f64(
+  float $value,
+  Endianness $endianness = Endianness::Big,
+): string {
+  return _Private\binary_encode(
+    _Private\float_to_bits($value),
+    8,
+    $endianness == Endianness::Little,
+  );
+}

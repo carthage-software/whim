@@ -1,0 +1,76 @@
+use Whim\Filesystem;
+use Whim\Option\Some;
+use Whim\Str\uppercase;
+
+require!('_reject.whim');
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+
+rejects(
+  $work,
+  'body-needs-a-name',
+  'namespace {' . "\n" . '    $a = 1;' . "\n" . '}' . "\n",
+  'unexpected `{`; expected `;`',
+);
+
+rejects(
+  $work,
+  'name-is-not-an-expression',
+  'namespace Foo + 1;' . "\n",
+  'unexpected an identifier; expected `;`',
+);
+
+rejects(
+  $work,
+  'namespace-is-an-ordinary-identifier',
+  'namespace;' . "\n",
+  'the constant namespace is not defined',
+);
+
+rejects(
+  $work,
+  'duplicate-import',
+  'use App\Model\User;' . "\n" . 'use App\Other\User;' . "\n",
+  'is already imported in this namespace',
+);
+
+rejects(
+  $work,
+  'import-collides-with-a-declaration',
+  'use App\Model\User;' . "\n\n" . 'class User {}' . "\n",
+  'collides with an import of the same name',
+);
+
+rejects(
+  $work,
+  'use-const',
+  'use const App\Util\MAX;' . "\n",
+  'unexpected `const`; expected `;`',
+);
+
+rejects(
+  $work,
+  'use-function',
+  'use function App\Util\format;' . "\n",
+  'unexpected `function`; expected `;`',
+);
+
+Filesystem\delete_directory($work, true);
+
+function namespace(): int {
+  return 7;
+}
+
+assert!(namespace() == 7);
+
+assert!(uppercase('before') == 'BEFORE');
+
+namespace Helpers {
+  function double(int $value): int {
+    return $value * 2;
+  }
+}
+
+assert!(Helpers\double(21) == 42);
+assert!(uppercase('after') == 'AFTER');
+assert!(new Some::<int>(1) is Some<int>);

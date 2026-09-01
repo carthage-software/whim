@@ -1,0 +1,8 @@
+namespace Whim\Marker;
+
+use Whim\Attribute\Attribute;
+
+/** Requires inherited generic bounds to remain equivalent. */
+#[Stub]
+#[Attribute(Attribute::TARGET_CLASS)]
+final class ConsistentGenerics {}

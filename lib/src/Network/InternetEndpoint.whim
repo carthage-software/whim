@@ -1,0 +1,25 @@
+namespace Whim\Network;
+
+use Whim\IP\Address;
+use Whim\IP\Family;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** Identifies an IP address and port. */
+final readonly class InternetEndpoint implements Endpoint {
+  #[AlwaysInline]
+  public function __construct(public Address $address, public Port $port) {}
+
+  /** Returns the endpoint in host-and-port form. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toString(): NonEmptyString {
+    $host = $this->address->toString();
+    if ($this->address->family == Family::V6) {
+      return ('[' . $host . ']:' . $this->port) as NonEmptyString;
+    }
+
+    return ($host . ':' . $this->port) as NonEmptyString;
+  }
+}

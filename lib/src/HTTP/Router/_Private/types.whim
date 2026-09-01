@@ -1,0 +1,15 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\HTTP\Server\Handler\Handler;
+
+/** A registered route and its parsed pattern. */
+type Route = (Pattern, Handler);
+
+/** Parsed nodes paired with their handler. */
+type Entry = (vec<Node>, Handler);
+
+/** One dynamic prefix awaiting compilation. */
+type RegexEntry = (string, vec<Node>, Handler, vec<string>);
+
+/** A successful route resolution. */
+type Resolution = (Handler, dict<string, string>);

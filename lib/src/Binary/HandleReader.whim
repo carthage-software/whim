@@ -1,0 +1,203 @@
+namespace Whim\Binary;
+
+use Whim\IO\ReadHandle;
+use Whim\IO\SeekHandle;
+use Whim\IO\SeekWhence;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Int16;
+use Whim\Refine\Int32;
+use Whim\Refine\Int8;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\Uint16;
+use Whim\Refine\Uint32;
+use Whim\Refine\Uint8;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\UnderflowException;
+
+/** Reads values out of a read handle. */
+final class HandleReader implements Reader {
+  #[AlwaysInline]
+  public function __construct(
+    private readonly ReadHandle $handle,
+    private readonly Endianness $endianness = Endianness::Big,
+  ) {}
+
+  /** Takes exactly the next bytes, or raises when the source runs out. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function consume(NonNegativeInt $length): string {
+    if ($length == 0) {
+      return '';
+    }
+
+    try {
+      return $this->handle->readFixedSize($length);
+    } catch (RuntimeException $error) {
+      throw new UnderflowException(
+        'expected ' . $length . ' bytes, but the handle reached its end',
+        previous: $error,
+      );
+    }
+  }
+
+  /**
+   * Reads an unsigned 8-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u8(): Uint8 {
+    return decode_u8($this->consume(1));
+  }
+
+  /**
+   * Reads an unsigned 16-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u16(null|Endianness $endianness = null): Uint16 {
+    return decode_u16($this->consume(2), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads an unsigned 32-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u32(null|Endianness $endianness = null): Uint32 {
+    return decode_u32($this->consume(4), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads an unsigned 64-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   * @throws OverflowException when the value does not fit in a signed 64-bit integer.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function u64(null|Endianness $endianness = null): NonNegativeInt {
+    return decode_u64($this->consume(8), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads a signed 8-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i8(): Int8 {
+    return decode_i8($this->consume(1));
+  }
+
+  /**
+   * Reads a signed 16-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i16(null|Endianness $endianness = null): Int16 {
+    return decode_i16($this->consume(2), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads a signed 32-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i32(null|Endianness $endianness = null): Int32 {
+    return decode_i32($this->consume(4), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads a signed 64-bit integer.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function i64(null|Endianness $endianness = null): int {
+    return decode_i64($this->consume(8), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads a single-precision floating-point value.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function f32(null|Endianness $endianness = null): float {
+    return decode_f32($this->consume(4), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads a double-precision floating-point value.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function f64(null|Endianness $endianness = null): float {
+    return decode_f64($this->consume(8), $endianness ?? $this->endianness);
+  }
+
+  /**
+   * Reads a raw byte string of the given length.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function bytes(NonNegativeInt $length): string {
+    return $this->consume($length);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function isConsumed(): bool {
+    return $this->handle->reachedEndOfDataSource();
+  }
+
+  /**
+   * Advances past the given number of bytes.
+   *
+   * @throws UnderflowException when the source ends before the value is complete.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function skip(NonNegativeInt $length): void {
+    if ($length == 0) {
+      return;
+    }
+
+    $handle = $this->handle;
+    if ($handle is SeekHandle) {
+      try {
+        discard!($handle->seek($length, SeekWhence::Current));
+      } catch (RuntimeException $error) {
+        throw new UnderflowException(
+          'could not skip ' . $length . ' bytes: the handle reached its end',
+          previous: $error,
+        );
+      }
+
+      return;
+    }
+
+    discard!($this->consume($length));
+  }
+}

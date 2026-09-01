@@ -1,0 +1,5 @@
+error: unknown option `sealed`
+ --> tests/ui/interface_unknown_option.rs:3:33
+  |
+3 | #[whim_interface("Ui\\Speaker", sealed)]
+  |                                 ^^^^^^

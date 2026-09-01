@@ -1,0 +1,32 @@
+use Whim\HTML;
+
+assert!(
+  HTML\escape_text('<p>Tom & Jerry "Hi"</p>')
+  == '&lt;p&gt;Tom &amp; Jerry "Hi"&lt;/p&gt;',
+);
+
+assert!(
+  HTML\escape_attribute('<Tom & "Jerry">')
+  == '&lt;Tom &amp; &quot;Jerry&quot;&gt;',
+);
+
+assert!(
+  HTML\decode('&CounterClockwiseContourIntegral; &#215; &#x1f600;') == '∳ × 😀',
+);
+
+assert!(HTML\decode('&timesX') == '×X');
+assert!(HTML\decode_attribute('&timesX') == '&timesX');
+assert!(HTML\decode_attribute('&times;X') == '×X');
+
+assert!(HTML\entity('AElig') == 'Æ');
+assert!(HTML\entity('aelig') == 'æ');
+assert!(HTML\entity('Sigma') == 'Σ');
+assert!(HTML\entity('sigma') == 'σ');
+assert!(HTML\entity('Dagger') == '‡');
+assert!(HTML\entity('dagger') == '†');
+assert!(HTML\entity('ClockwiseContourIntegral') == '∲');
+assert!(HTML\entity('NotEqualTilde') == '≂̸');
+assert!(HTML\entity('NotAThing') == null);
+assert!(HTML\entity('') == null);
+assert!(HTML\entity('&AElig') == null);
+assert!(HTML\entity('AElig;') == null);

@@ -1,0 +1,168 @@
+use Whim\Async\CancellationToken;
+use Whim\Async\SignalCancellationToken;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\Middleware\CORS;
+use Whim\HTTP\Session\Session;
+use Whim\IP\Address;
+use Whim\Network\Endpoint;
+use Whim\Network\InternetEndpoint;
+
+final class CORSTestContext implements Context {
+  public dict<string, string> $parameters = dict[];
+
+  public function __construct(
+    public readonly ProtocolVersion $protocolVersion,
+    public readonly Endpoint $localEndpoint,
+    public readonly Endpoint $peerEndpoint,
+  ) {}
+
+  public function getSession(): null|Session {
+    return null;
+  }
+
+  public function setSession(Session $session): void {}
+
+  public function onResponseComplete(fn(): void $callback): void {}
+}
+
+final class CORSTestHandler implements Handler {
+  public int $calls = 0;
+
+  public function handle(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response {
+    $this->calls++;
+    return new Response(
+      201,
+      headers: FieldMap::from(vec[('X-Result', 'created')]),
+    );
+  }
+}
+
+function cors_test_context(): CORSTestContext {
+  return new CORSTestContext(
+    ProtocolVersion::V11,
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+  );
+}
+
+function cors_test_request(
+  string $method,
+  vec<(string, string)> $headers,
+): Request {
+  return Request::fromParts($method, headers: FieldMap::from($headers));
+}
+
+$context = cors_test_context();
+$cancellation = new SignalCancellationToken();
+$handler = new CORSTestHandler();
+$cors = new CORS(
+  allowedOrigins: vec['https://app.example'],
+  allowedMethods: vec['GET', 'PUT'],
+  allowedHeaders: vec['Content-Type', 'X-Token'],
+  exposedHeaders: vec['X-Result'],
+  allowCredentials: true,
+  maxAge: 600,
+);
+
+$response = $cors->handle(
+  $context,
+  cors_test_request('GET', vec[('Origin', 'https://app.example')]),
+  $handler,
+  $cancellation,
+);
+
+assert!($response->status == 201);
+assert!(
+  $response->headers->get('Access-Control-Allow-Origin')
+  == 'https://app.example',
+);
+
+assert!($response->headers->get('Access-Control-Allow-Credentials') == 'true');
+
+assert!($response->headers->get('Access-Control-Expose-Headers') == 'X-Result');
+
+assert!($response->headers->getAll('Vary') == vec['Origin']);
+assert!($handler->calls == 1);
+
+$response = $cors->handle(
+  $context,
+  cors_test_request('GET', vec[('Origin', 'https://denied.example')]),
+  $handler,
+  $cancellation,
+);
+
+assert!(!($response->headers->has('Access-Control-Allow-Origin')));
+
+assert!($handler->calls == 2);
+
+$response = $cors->handle(
+  $context,
+  cors_test_request(
+    'OPTIONS',
+    vec[
+      ('Origin', 'https://app.example'),
+      ('Access-Control-Request-Method', 'PUT'),
+      ('Access-Control-Request-Headers', 'content-type, X-Token'),
+    ],
+  ),
+  $handler,
+  $cancellation,
+);
+
+assert!($response->status == 204);
+assert!($response->headers->get('Access-Control-Allow-Methods') == 'PUT');
+
+assert!(
+  $response->headers->get('Access-Control-Allow-Headers')
+  == 'content-type, X-Token',
+);
+
+assert!($response->headers->get('Access-Control-Max-Age') == '600');
+assert!(
+  $response->headers->getAll('Vary') == vec[
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers',
+    'Origin',
+  ],
+);
+
+assert!($handler->calls == 2);
+
+$response = $cors->handle(
+  $context,
+  cors_test_request(
+    'OPTIONS',
+    vec[
+      ('Origin', 'https://app.example'),
+      ('Access-Control-Request-Method', 'DELETE'),
+    ],
+  ),
+  $handler,
+  $cancellation,
+);
+
+assert!($response->status == 403);
+
+$wildcard = new CORS(allowCredentials: true);
+$response = $wildcard->handle(
+  $context,
+  cors_test_request('GET', vec[('Origin', 'https://other.example')]),
+  $handler,
+  $cancellation,
+);
+
+assert!(
+  $response->headers->get('Access-Control-Allow-Origin')
+  == 'https://other.example',
+);
+
+assert!($response->headers->getAll('Vary') == vec['Origin']);

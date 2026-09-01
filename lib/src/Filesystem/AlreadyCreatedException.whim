@@ -1,0 +1,6 @@
+namespace Whim\Filesystem;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports an attempt to create a filesystem node that already exists. */
+final class AlreadyCreatedException extends RuntimeException {}

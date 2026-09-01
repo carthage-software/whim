@@ -1,0 +1,2 @@
+write_line!('main');
+require!('lib/middle.whim');

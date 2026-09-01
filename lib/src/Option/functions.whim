@@ -1,0 +1,18 @@
+namespace Whim\Option;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+
+/** Creates an option containing a value. */
+#[MustUse]
+#[TrackCaller]
+function some<T>(T $value): Some<T> {
+  return new Some::<T>($value);
+}
+
+/** Creates an option containing no value. */
+#[MustUse]
+#[TrackCaller]
+function none(): None {
+  return new None();
+}

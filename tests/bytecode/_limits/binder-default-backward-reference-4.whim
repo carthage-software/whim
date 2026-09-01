@@ -1,0 +1,5 @@
+namespace Limits\binder_default_backward_reference_4;
+
+class C {
+  public function m<T, U = T>(): void {}
+}

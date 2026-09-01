@@ -1,0 +1,19 @@
+namespace Whim\Reflection\Generic;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Associates one exact type-parameter declaration with its argument. */
+#[Stub]
+final class TypeBindingReflection {
+  private function __construct() {}
+
+  /** Returns the bound parameter. */
+  #[MustUse]
+  public function getParameter(): TypeParameterReflection {}
+
+  /** Returns the argument supplied for the parameter. */
+  #[MustUse]
+  public function getArgument(): TypeReflection {}
+}

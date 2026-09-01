@@ -1,0 +1,37 @@
+namespace Whim\BSON;
+
+use Whim\Refine\Int32 as SignedInt32;
+use Whim\Time\SystemTime;
+
+/** A BSON document. */
+type Document = dict<string, Value>;
+
+/** A value BSON can encode. */
+type Value = null
+| bool
+| int
+| float
+| string
+| vec<Value>
+| dict<string, Value>
+| Int32
+| Binary
+| ObjectId
+| SystemTime
+| RegularExpression
+| Timestamp
+| Decimal128
+| JavaScript
+| JavaScriptWithScope
+| Symbol
+| DBPointer
+| Marker;
+
+/** An integer that BSON must store in its 32-bit form. */
+newtype Int32 = SignedInt32;
+
+/** BSON JavaScript source. */
+newtype JavaScript = string;
+
+/** A deprecated BSON symbol. */
+newtype Symbol = string;

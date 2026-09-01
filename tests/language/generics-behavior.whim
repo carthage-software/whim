@@ -1,0 +1,362 @@
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\TypeError;
+
+/** Returns its argument through a reified type parameter. */
+function id<T>(T $value): T {
+  return $value;
+}
+
+/** Returns its argument through a defaulted type parameter. */
+function defaulted<T = int>(T $value): T {
+  return $value;
+}
+
+/** Declares an int return and lies about it. */
+function lies(): int {
+  return 'wrong';
+}
+
+/** Funnels a defaulted generic call through a non-generic frame. */
+function defaulted_probe(): int {
+  return defaulted(2);
+}
+
+$one = id::<int>(1);
+$two = defaulted_probe();
+$unbound = id(...);
+$unboundMissing = false;
+try {
+  $unbound(3);
+} catch (TypeError $_) {
+  $unboundMissing = true;
+}
+
+$integers = id::<int>(...);
+$four = $integers(4);
+$boundArgument = false;
+try {
+  $integers('no');
+} catch (TypeError $_) {
+  $boundArgument = true;
+}
+
+$badReturn = false;
+try {
+  lies();
+} catch (TypeError $_) {
+  $badReturn = true;
+}
+
+assert!($one == 1);
+assert!($two == 2);
+assert!(!($unbound is fn(int): int));
+assert!($unboundMissing);
+assert!($integers is fn(int): int);
+assert!(!($integers is fn(string): int));
+assert!($four == 4);
+assert!($boundArgument);
+assert!($badReturn);
+$nested = vec[(1, 1, 1.5, dict['one' => 1])];
+assert!($nested is vec<(int, 1, float, dict<string, int>)>);
+
+$nested[] = (2, 1, 2.5, dict['two' => 'wrong']);
+assert!(!($nested is vec<(int, 1, float, dict<string, int>)>));
+
+class Calls {
+  public function method<T>(T $value): T {
+    return $value;
+  }
+
+  public static function statically<T: int|string>(T $value): T {
+    return $value;
+  }
+}
+
+$calls = new Calls();
+$methodResult = $calls->method::<int>(1);
+$staticResult = Calls::statically::<string>('static');
+$methodMissing = false;
+try {
+  $calls->method(1);
+} catch (TypeError $_) {
+  $methodMissing = true;
+}
+
+$staticBound = false;
+try {
+  Calls::statically::<float>(1.0);
+} catch (TypeError $_) {
+  $staticBound = true;
+}
+
+$closure = function<T>(T $value): T {
+  return $value;
+};
+
+$closureResult = $closure::<string>('closure');
+$closureMissing = false;
+try {
+  $closure(1);
+} catch (TypeError $_) {
+  $closureMissing = true;
+}
+
+$shortClosure = fn<T = int>(T $value): T => $value;
+$shortClosureDefault = $shortClosure(2);
+$shortClosureString = $shortClosure::<string>('short closure');
+$bound = $closure::<int>(...);
+$boundResult = $bound(3);
+$respecialize = false;
+try {
+  $bound::<string>('no');
+} catch (TypeError $_) {
+  $respecialize = true;
+}
+
+assert!($methodResult == 1);
+assert!($staticResult == 'static');
+assert!($methodMissing);
+assert!($staticBound);
+assert!($closureResult == 'closure');
+assert!($closureMissing);
+assert!($shortClosureDefault == 2);
+assert!($shortClosureString == 'short closure');
+assert!($boundResult == 3);
+assert!($respecialize);
+
+final readonly class ReifiedBox<T> {
+  public function __construct(public T $value) {}
+
+  public function replace<U>(U $value): ReifiedBox<U> {
+    return new ReifiedBox::<U>($value);
+  }
+}
+
+final class ReifiedFactory {
+  public static function make<T>(T $value): ReifiedBox<T> {
+    return new ReifiedBox::<T>($value);
+  }
+}
+
+/** Relays construction through the static factory. */
+function make_reified<T>(T $value): ReifiedBox<T> {
+  return ReifiedFactory::make::<T>($value);
+}
+
+$box = new ReifiedBox::<int>(1);
+$iteration = 0;
+while ($iteration < 3) {
+  $replaced = $box->replace::<string>('next');
+  assert!($replaced is ReifiedBox<string>);
+  $iteration++;
+}
+
+$integer = make_reified::<int>(2);
+$text = make_reified::<string>('value');
+assert!($integer is ReifiedBox<int>);
+assert!($text is ReifiedBox<string>);
+assert!($replaced->value == 'next');
+assert!($integer->value == 2);
+assert!($text->value == 'value');
+
+class LateFactory {
+  public static function make<T>(T $value): static {
+    return new static();
+  }
+
+  public static function relay<T>(T $value): static {
+    return static::make::<T>($value);
+  }
+}
+
+class LateChildFactory extends LateFactory {}
+
+$lateBase = LateFactory::relay::<int>(1);
+$lateChild = LateChildFactory::relay::<string>('value');
+assert!($lateBase is LateFactory);
+assert!($lateChild is LateChildFactory);
+
+class RelativeBox<T> {
+  public function __construct(public T $value) {}
+
+  public function asSelf(T $value): self {
+    return new self($value);
+  }
+
+  public function asStatic(T $value): static {
+    return new static($value);
+  }
+}
+
+class RelativeChild<U> extends RelativeBox<U> {
+  public function asParent(U $value): RelativeBox<U> {
+    return new parent($value);
+  }
+}
+
+$relative = new RelativeChild::<int>(1);
+$self = $relative->asSelf(2);
+$static = $relative->asStatic(3);
+$parent = $relative->asParent(4);
+assert!($self is RelativeBox<int>);
+assert!($static is RelativeChild<int>);
+assert!($parent is RelativeBox<int>);
+$assertion_value_33 = function() use ($relative): void {
+  $relative->asStatic('bad');
+};
+
+$assertion_error_33 = null;
+try {
+  $assertion_value_33();
+} catch (TypeError $assertion_caught_33) {
+  $assertion_error_33 = $assertion_caught_33;
+}
+
+assert!($assertion_error_33 is TypeError);
+
+class LyingBox<T> {
+  public function __construct(public T $value) {}
+
+  public function lies(): static {
+    return new LyingBox::<string>('wrong');
+  }
+}
+
+$assertion_value_34 = function(): void {
+  new LyingBox::<int>(1)->lies();
+};
+
+$assertion_error_34 = null;
+try {
+  $assertion_value_34();
+} catch (TypeError $assertion_caught_34) {
+  $assertion_error_34 = $assertion_caught_34;
+  assert!(
+    Whim\Str\contains($assertion_caught_34->getMessage(), 'must return static'),
+  );
+}
+
+assert!($assertion_error_34 is TypeError);
+
+class VariantParent<T> {
+  public function __construct(public T $value) {}
+
+  public function replace(T $value): T {
+    $this->value = $value;
+    return $this->value;
+  }
+}
+
+class VariantChild<U> extends VariantParent<U> {}
+
+class CovariantSource<out T> {}
+
+class ContravariantSink<in T> {}
+
+interface BoundMarker {}
+
+class BoundMarked implements BoundMarker {}
+
+class BoundOther {}
+
+class BoundRestricted<T: BoundMarker> {}
+
+class DefaultedBox<T = int> {}
+
+/** Constructs the reified type parameter. */
+function instantiate<T>(): T {
+  return new T();
+}
+
+$variant = new VariantChild::<int>(1);
+assert!($variant->replace(2) == 2);
+assert!($variant is VariantChild<int>);
+assert!($variant is VariantParent<int>);
+assert!(!($variant is VariantParent<string>));
+$assertion_value_39 = function() use ($variant): void {
+  $variant->value = 'bad';
+};
+
+$assertion_error_39 = null;
+try {
+  $assertion_value_39();
+} catch (TypeError $assertion_caught_39) {
+  $assertion_error_39 = $assertion_caught_39;
+}
+
+assert!($assertion_error_39 is TypeError);
+
+$assertion_value_40 = function() use ($variant): void {
+  $variant->replace('bad');
+};
+
+$assertion_error_40 = null;
+try {
+  $assertion_value_40();
+} catch (TypeError $assertion_caught_40) {
+  $assertion_error_40 = $assertion_caught_40;
+}
+
+assert!($assertion_error_40 is TypeError);
+
+$assertion_value_41 = function(): void {
+  new VariantChild::<int>('bad');
+};
+
+$assertion_error_41 = null;
+try {
+  $assertion_value_41();
+} catch (TypeError $assertion_caught_41) {
+  $assertion_error_41 = $assertion_caught_41;
+}
+
+assert!($assertion_error_41 is TypeError);
+
+$source = new CovariantSource::<int>();
+assert!($source is CovariantSource<int|string>);
+$sink = new ContravariantSink::<mixed>();
+assert!($sink is ContravariantSink<int>);
+$defaulted = new DefaultedBox();
+assert!($defaulted is DefaultedBox<int>);
+$assertion_value_45 = function(): void {
+  instantiate::<BoundRestricted<BoundOther>>();
+};
+
+$assertion_error_45 = null;
+try {
+  $assertion_value_45();
+} catch (TypeError $assertion_caught_45) {
+  $assertion_error_45 = $assertion_caught_45;
+}
+
+assert!($assertion_error_45 is TypeError);
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+File\write(
+  $work . '/broken-static-property.whim',
+  'class BrokenStatic { public static int $value = \'bad\'; }' . "\n",
+);
+
+$brokenStatic = $work . '/broken-static-property.whim';
+$assertion_value_46 = function() use ($brokenStatic): void {
+  require!($brokenStatic);
+};
+
+$assertion_error_46 = null;
+try {
+  $assertion_value_46();
+} catch (LinkerError $assertion_caught_46) {
+  $assertion_error_46 = $assertion_caught_46;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_46->getMessage(),
+      'static property BrokenStatic::$value must be of type int, string given',
+    ),
+  );
+}
+
+assert!($assertion_error_46 is LinkerError);
+
+Filesystem\delete_directory($work, true);

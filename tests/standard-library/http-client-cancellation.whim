@@ -1,0 +1,84 @@
+use Whim\Async;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Client;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Request;
+use Whim\IP\Address;
+use Whim\Network\InternetEndpoint;
+use Whim\TCP;
+use Whim\Time\Duration;
+use Whim\URL\URL;
+
+$h2Server = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$h2ServerTask = Async\spawn::<null>(function() use ($h2Server): null {
+  $stream = $h2Server->accept();
+  $protocol = new H2\ServerConnection();
+  $requests = 0;
+  while ($requests < 2) {
+    foreach ($protocol->receive($stream->read(16384)) as $event) {
+      if (!($event is H2\Event\RequestHeadersReceived)) {
+        continue;
+      }
+
+      $requests++;
+      if ($requests == 2) {
+        $protocol->sendHeaders($event[1], vec[(':status', '200', false)]);
+
+        $protocol->sendData($event[1], 'reused', true);
+      }
+    }
+
+    $outbound = $protocol->takeOutboundBytes();
+    if ($outbound != '') {
+      $stream->writeAll($outbound);
+    }
+  }
+
+  return null;
+});
+
+$h2Configuration = new Client\Configuration(
+  protocolVersions: vec[Message\ProtocolVersion::V2],
+);
+
+$h2URL = URL::from(
+  'http://127.0.0.1:' . $h2Server->getLocalEndpoint()->port . '/reuse',
+);
+
+$h2Request = Request::fromURL(Message\METHOD_GET, $h2URL);
+$h2Connection = new Client\DirectConnector()->connect(
+  Client\Origin::fromURL($h2URL),
+  $h2Request,
+  $h2Configuration,
+);
+
+$assertion_value_1 = fn(): Message\Transaction => (
+  $h2Connection->exchange(
+    $h2Request,
+    $h2Configuration,
+    new Async\TimeoutCancellationToken(Duration::fromMilliseconds(100)),
+  )
+);
+
+$assertion_error_1 = null;
+try {
+  $assertion_value_1();
+} catch (Async\CancelledException $assertion_caught_1) {
+  $assertion_error_1 = $assertion_caught_1;
+}
+
+assert!($assertion_error_1 is Async\CancelledException);
+
+assert!($h2Connection->isReusable());
+$h2Transaction = $h2Connection->exchange(
+  $h2Request,
+  $h2Configuration,
+  new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+);
+
+$h2Body = $h2Transaction->response->body;
+assert!($h2Body != null);
+assert!($h2Body->readAll() == 'reused');
+$h2Connection->close();
+$h2ServerTask->await();
+$h2Server->close();

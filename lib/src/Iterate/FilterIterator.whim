@@ -1,0 +1,22 @@
+namespace Whim\Iterate;
+
+use Whim\Refine\Predicate;
+
+/** Lazily yields values accepted by a predicate. */
+final class FilterIterator<K, V> implements Iterator<K, V> {
+  /** Creates an iterator that filters the given iterator. */
+  public function __construct(
+    private Iterator<K, V> $iterator,
+    private Predicate<V> $predicate,
+  ) {}
+
+  /** Returns the next accepted entry. */
+  public function next(): null|(K, V) {
+    while (true) {
+      $entry = $this->iterator->next();
+      if ($entry == null || ($this->predicate)($entry[1])) {
+        return $entry;
+      }
+    }
+  }
+}

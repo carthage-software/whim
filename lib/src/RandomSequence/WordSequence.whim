@@ -1,0 +1,17 @@
+namespace Whim\RandomSequence;
+
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Uint32;
+
+/** Defines the behavior of word-based sequence values. */
+interface WordSequence extends Sequence {
+  /** Advances the iterator and returns its next word, uniform in [0, 2^32). */
+  #[TrackCaller]
+  public function nextWord(): Uint32;
+
+  /** Advances the iterator and returns its next entry. */
+  #[TrackCaller]
+  public function next(): int {
+    return ($this->nextWord() << 32) | $this->nextWord();
+  }
+}

@@ -1,0 +1,200 @@
+use Whim\Str;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\OutOfBoundsException;
+use Whim\Unwind\TypeError;
+
+assert!(Str\split('a,b,,c', ',') == vec['a', 'b', '', 'c']);
+assert!(Str\split('abc', 'x') == vec['abc']);
+assert!(Str\split('a,b,c,d', ',', 2) == vec['a', 'b,c,d']);
+assert!(Str\split('abc', '') == vec['a', 'b', 'c']);
+
+assert!(Str\join('|', vec['a', 'b', 'c']) == 'a|b|c');
+assert!(Str\join('-', vec[]) == '');
+assert!(Str\join(', ', dict['x' => 'one', 'y' => 'two']) == 'one, two');
+
+assert!(Str\replace('alpha beta alpha', 'alpha', 'A') == 'A beta A');
+assert!(Str\replace('none', 'x', 'y') == 'none');
+assert!(Str\replace('aaa', '', 'x') == 'aaa');
+assert!(Str\replace_ci('Alpha ALPHA alpha', 'alpha', 'x') == 'x x x');
+
+assert!(Str\lowercase('MiXeD 123!') == 'mixed 123!');
+assert!(Str\uppercase('MiXeD 123!') == 'MIXED 123!');
+assert!(Str\capitalize('hello') == 'Hello');
+assert!(Str\capitalize_words('hello world') == 'Hello World');
+assert!(Str\capitalize_words('one-two_three', '-_') == 'One-Two_Three');
+assert!(Str\capitalize_words("a\x00b", "\x00") == "A\x00B");
+
+assert!(Str\trim('  padded  ') == 'padded');
+assert!(Str\trim_left('xxhixx', 'x') == 'hixx');
+assert!(Str\trim_right('xxhixx', 'x') == 'xxhi');
+assert!(Str\trim('aAbchixba', 'a..c') == 'Abchix');
+
+assert!(Str\pad_left('7', 3, '0') == '007');
+assert!(Str\pad_right('7', 3, '.') == '7..');
+assert!(Str\pad_left('long', 2, '0') == 'long');
+
+assert!(Str\ord('A') == 65);
+assert!(Str\chr(66) == 'B');
+assert!(Str\byte_at("A\x00\xff", 0) == 65);
+assert!(Str\byte_at("A\x00\xff", 1) == 0);
+assert!(Str\byte_at("A\x00\xff", 2) == 255);
+assert!(Str\byte_at('☕', 0) == 226);
+assert!(Str\to_bytes("A\x00\xff") == vec[65, 0, 255]);
+assert!(Str\from_bytes(vec[65, 0, 255]) == "A\x00\xff");
+assert!(Str\repeat('ab', 3) == 'ababab');
+assert!(Str\repeat('ab', 0) == '');
+assert!(Str\repeat('', 100) == '');
+
+assert!(Str\is_whitespace(' '));
+assert!(Str\is_whitespace("\t"));
+assert!(Str\is_whitespace("\n"));
+assert!(Str\is_whitespace("\r"));
+assert!(Str\is_whitespace("\f"));
+assert!(Str\is_whitespace("\v"));
+assert!(!(Str\is_whitespace('A')));
+assert!(!(Str\is_whitespace('')));
+assert!(!(Str\is_whitespace('  ')));
+assert!(Str\is_digit('0'));
+assert!(Str\is_digit('9'));
+assert!(!(Str\is_digit('a')));
+assert!(!(Str\is_digit('12')));
+assert!(Str\is_letter('A'));
+assert!(Str\is_letter('z'));
+assert!(!(Str\is_letter('4')));
+assert!(Str\is_alphanumeric('R'));
+assert!(Str\is_alphanumeric('7'));
+assert!(!(Str\is_alphanumeric('-')));
+assert!(Str\is_hex_digit('0'));
+assert!(Str\is_hex_digit('a'));
+assert!(Str\is_hex_digit('F'));
+assert!(!(Str\is_hex_digit('g')));
+assert!(Str\is_ascii_punctuation('!'));
+assert!(Str\is_ascii_punctuation('~'));
+assert!(!(Str\is_ascii_punctuation('A')));
+assert!(!(Str\is_ascii_punctuation('')));
+
+assert!(Str\search('hello world', 'world') == 6);
+assert!(Str\search('hello', 'xyz') == null);
+assert!(Str\search('banana', 'a', -3) == 3);
+assert!(Str\search_ci('Hello World', 'WORLD') == 6);
+assert!(Str\search_last('ab ab ab', 'ab') == 6);
+assert!(Str\search_last_ci('ab AB ab', 'AB') == 6);
+
+assert!(Str\contains('haystack', 'stack'));
+assert!(Str\contains_ci('HAYSTACK', 'stack'));
+assert!(Str\starts_with('haystack', 'hay'));
+assert!(Str\ends_with('haystack', 'stack'));
+
+assert!(Str\slice('haystack', 3) == 'stack');
+assert!(Str\slice('haystack', 0, 3) == 'hay');
+$assertion_value_70 = fn(): string => Str\slice('short', 99);
+$assertion_error_70 = null;
+try {
+  $assertion_value_70();
+} catch (OutOfBoundsException $assertion_caught_70) {
+  $assertion_error_70 = $assertion_caught_70;
+}
+
+assert!($assertion_error_70 is OutOfBoundsException);
+
+assert!(Str\reverse('abc') == 'cba');
+assert!(Str\reverse("a\x00\xff") == "\xff\x00a");
+
+final class ReplacementIterator implements
+  Whim\Iterate\Iterator<string, string> {
+  private int $offset = 0;
+
+  public function next(): null|(string, string) {
+    $entry = match ($this->offset) {
+      0 => ('cat', 'fox'),
+      1 => ('dog', 'wolf'),
+      $_ => null,
+    };
+
+    $this->offset++;
+    return $entry;
+  }
+}
+
+assert!(Str\length('hello') == 5);
+$assertion_value_73 = fn(): int => Str\ord('');
+$assertion_error_73 = null;
+try {
+  $assertion_value_73();
+} catch (TypeError $assertion_caught_73) {
+  $assertion_error_73 = $assertion_caught_73;
+}
+
+assert!($assertion_error_73 is TypeError);
+$assertion_value_74 = fn(): string => Str\chr(-1);
+$assertion_error_74 = null;
+try {
+  $assertion_value_74();
+} catch (TypeError $assertion_caught_74) {
+  $assertion_error_74 = $assertion_caught_74;
+}
+
+assert!($assertion_error_74 is TypeError);
+$assertion_value_75 = fn(): int => Str\byte_at('a', 1);
+$assertion_error_75 = null;
+try {
+  $assertion_value_75();
+} catch (OutOfBoundsError $assertion_caught_75) {
+  $assertion_error_75 = $assertion_caught_75;
+}
+
+assert!($assertion_error_75 is OutOfBoundsError);
+
+assert!(Str\compare('a', 'b')->isLess());
+assert!(Str\compare_ci('A', 'a')->isEqual());
+
+assert!(Str\search('banana', 'a', 2) == 3);
+assert!(Str\search('banana', 'ana', 2) == 3);
+assert!(Str\search('hello', '') == 0);
+assert!(Str\search_last('ababa', 'ba') == 3);
+assert!(Str\search_last('banana', 'a', 2) == 5);
+assert!(Str\search_last('bananana', 'ana', 2) == 5);
+assert!(Str\search_last('banana', 'xyz') == null);
+assert!(Str\starts_with('hello', ''));
+assert!(Str\ends_with('hello', ''));
+
+assert!(Str\slice('hello', 1, 100) == 'ello');
+assert!(Str\splice('hello', 'i', 1, 3) == 'hio');
+assert!(Str\chunk('abcde', 2) == vec['ab', 'cd', 'e']);
+assert!(Str\split('a,b,c', ',', 1) == vec['a,b,c']);
+assert!(Str\split('a--b--c', '--') == vec['a', 'b', 'c']);
+assert!(Str\split('a--b--c', '--', 2) == vec['a', 'b--c']);
+assert!(Str\split('Hello', '', 2) == vec['H', 'ello']);
+assert!(Str\before('a:b', ':') == 'a');
+assert!(Str\after('a:b', ':') == 'b');
+
+assert!(Str\rot13('Hello') == 'Uryyb');
+assert!(Str\rot13("Az-Mn-Nz\x00\xff") == "Nm-Za-Am\x00\xff");
+assert!(
+  Str\replace_every('cat dog cat', new ReplacementIterator()) == 'fox wolf fox',
+);
+
+assert!(
+  Str\replace_every_ci('CAT dog Cat', new ReplacementIterator())
+  == 'fox wolf fox',
+);
+
+assert!(Str\strip_prefix('hello', 'he') == 'llo');
+assert!(Str\strip_suffix('hello', 'lo') == 'hel');
+assert!(Str\trim(" \thello\n", null) == 'hello');
+assert!(Str\words('Hello, World!', '!, ') == dict[0 => 'Hello, World!']);
+
+assert!(Str\wrap('hello world', 5, '|') == 'hello|world');
+assert!(
+  Str\wrap('The quick brown fox', 10, '<BR>') == 'The quick<BR>brown fox',
+);
+
+assert!(Str\wrap('aaa bbb ccc', 4, '<BR>') == 'aaa<BR>bbb<BR>ccc');
+assert!(Str\wrap('word  double  spaces', 6, '|') == 'word|double|spaces');
+
+assert!(Str\wrap('hi toolongword', 5, '|', false) == 'hi|toolongword');
+
+assert!(Str\wrap('☕ ☕ ☕', 1, ' ~ ') == '☕ ~ ☕ ~ ☕');
+assert!(Str\wrap('héllö, wôrld', 8, "-\n", true) == "héllö,-\nwôrld");
+
+assert!(Str\wrap('مرحبا بكم', 3, '<br />', false) == 'مرحبا<br />بكم');

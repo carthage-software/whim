@@ -1,0 +1,23 @@
+namespace Whim\Reflection\Attribute;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Symbol\ClassReflection;
+
+/** Describes a class's attribute contract. */
+#[Stub]
+final class DefinitionReflection {
+  private function __construct() {}
+
+  /** Returns the attribute class. */
+  #[MustUse]
+  public function getClass(): ClassReflection {}
+
+  /** Returns the declaration targets accepted by the attribute. */
+  #[MustUse]
+  public function getTargets(): vec<Target> {}
+
+  /** Reports whether the attribute may occur more than once on one target. */
+  #[MustUse]
+  public function isRepeatable(): bool {}
+}

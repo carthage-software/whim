@@ -1,0 +1,2 @@
+$values = vec[1];
+$value = ($values[]);

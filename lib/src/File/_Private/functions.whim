@@ -1,0 +1,255 @@
+namespace Whim\File\_Private;
+
+use Whim;
+use Whim\File\AlreadyCreatedException;
+use Whim\File\LockType;
+use Whim\File\NotFileException;
+use Whim\File\NotFoundException;
+use Whim\File\NotReadableException;
+use Whim\File\NotWritableException;
+use Whim\File\ReadHandle;
+use Whim\File\WriteHandle;
+use Whim\File\WriteMode;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\RuntimeException;
+use Whim\Async\CancellationToken;
+use Whim\_Private\FileOperation;
+
+/** Waits for one blocking file operation with cancellation. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_operation(
+  FileOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  $cancellation?->throwIfCancellationRequested();
+  $registration = $cancellation?->register(fn(): void {
+    $operation->cancel();
+  });
+
+  try {
+    $operation->wait();
+    $cancellation?->throwIfCancellationRequested();
+  } finally {
+    $cancellation?->unregister($registration);
+  }
+}
+
+/**
+ * Converts a raw system failure into the public file exception family.
+ *
+ * @throws NotFoundException for a missing file or path component.
+ * @throws AlreadyCreatedException for a file that already exists.
+ * @throws NotWritableException for a denied write.
+ * @throws NotReadableException for a denied read.
+ * @throws NotFileException for a path that is not a regular file.
+ * @throws Whim\Unwind\RuntimeException for every unclassified failure.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function failure(
+  Whim\_Private\SystemError $error,
+  string $path,
+  bool $write,
+): never {
+  $number = $error->errno();
+  if (
+    $number == Whim\_Private\ERRNO_NOT_FOUND
+    || $number == Whim\_Private\ERRNO_NOT_DIRECTORY
+  ) {
+    throw new NotFoundException('file `' . $path . '` was not found', $number);
+  }
+
+  if ($number == Whim\_Private\ERRNO_ALREADY_EXISTS) {
+    throw new AlreadyCreatedException(
+      'file `' . $path . '` already exists',
+      $number,
+    );
+  }
+
+  if (
+    $number == Whim\_Private\ERRNO_PERMISSION_DENIED
+    || $number == Whim\_Private\ERRNO_OPERATION_NOT_PERMITTED
+  ) {
+    if ($write) {
+      throw new NotWritableException(
+        'file `' . $path . '` is not writable',
+        $number,
+      );
+    }
+
+    throw new NotReadableException(
+      'file `' . $path . '` is not readable',
+      $number,
+    );
+  }
+
+  if ($number == Whim\_Private\ERRNO_IS_DIRECTORY) {
+    throw new NotFileException(
+      'path `' . $path . '` does not point to a file',
+      $number,
+    );
+  }
+
+  $action = match ($write) {
+    true => 'write to',
+    false => 'read',
+  };
+
+  throw new RuntimeException(
+    'failed to '
+    . $action
+    . ' file `'
+    . $path
+    . '`: the '
+    . $error->call()
+    . ' system call failed with errno '
+    . $number,
+    $number,
+  );
+}
+
+/** Ensures an existing path is a regular file. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function check_file(
+  NonEmptyString $path,
+  bool $write,
+  bool $required,
+  null|CancellationToken $cancellation,
+): void {
+  try {
+    $operation = FileOperation::pathMetadata($path, true);
+    await_operation($operation, $cancellation);
+    $metadata = $operation->takeMetadata() as vec<int>;
+  } catch (Whim\_Private\SystemError $error) {
+    if (!$required && $error->errno() == Whim\_Private\ERRNO_NOT_FOUND) {
+      return;
+    }
+
+    failure($error, $path, $write);
+  }
+
+  if (
+    ($metadata[0] & Whim\_Private\FILE_TYPE_MASK)
+    != Whim\_Private\FILE_TYPE_REGULAR
+  ) {
+    throw new NotFileException('path `' . $path . '` does not point to a file');
+  }
+}
+
+/** Resolves a public write mode into operating-system open flags. */
+#[TrackCaller]
+#[TraceBoundary]
+function write_flags(WriteMode $mode, bool $read): int {
+  $access = match ($read) {
+    true => Whim\_Private\OPEN_FLAG_READ_WRITE,
+    false => Whim\_Private\OPEN_FLAG_WRITE_ONLY,
+  };
+
+  return $access | $mode->value;
+}
+
+/** Opens a descriptor and maps system-call failures into file exceptions. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function open(
+  NonEmptyString $path,
+  int $flags,
+  bool $write,
+  null|CancellationToken $cancellation,
+): FileDescriptor {
+  try {
+    $operation = FileOperation::open($path, $flags, 0o666);
+    await_operation($operation, $cancellation);
+    return $operation->takeDescriptor() as FileDescriptor;
+  } catch (Whim\_Private\SystemError $error) {
+    failure($error, $path, $write);
+  }
+}
+
+/** Converts a file lock case into its platform operation. */
+#[TrackCaller]
+#[TraceBoundary]
+function lock_kind(LockType $type): int {
+  return match ($type) {
+    LockType::Shared => Whim\_Private\LOCK_KIND_SHARED,
+    LockType::Exclusive => Whim\_Private\LOCK_KIND_EXCLUSIVE,
+  };
+}
+
+/** Opens the private readable handle used by the public File API. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function open_read_handle(
+  NonEmptyString $path,
+  null|CancellationToken $cancellation,
+): ReadHandle {
+  check_file($path, false, true, $cancellation);
+  $descriptor = open(
+    $path,
+    Whim\_Private\OPEN_FLAG_READ_ONLY,
+    false,
+    $cancellation,
+  );
+
+  return new ReadHandleImpl(new State($descriptor, $path));
+}
+
+/** Opens the private writable handle used by the public File API. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function open_write_handle(
+  NonEmptyString $path,
+  WriteMode $mode,
+  null|CancellationToken $cancellation,
+): WriteHandle {
+  check_file($path, true, false, $cancellation);
+  $descriptor = open($path, write_flags($mode, false), true, $cancellation);
+
+  return new WriteHandleImpl(new State($descriptor, $path));
+}
+
+/** Opens the private read-write handle used by the public File API. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function open_read_write_handle(
+  NonEmptyString $path,
+  WriteMode $mode,
+  null|CancellationToken $cancellation,
+): ReadWriteHandleImpl {
+  check_file($path, true, false, $cancellation);
+  $descriptor = open($path, write_flags($mode, true), true, $cancellation);
+
+  return new ReadWriteHandleImpl(new State($descriptor, $path));
+}
+
+/** Opens an anonymous temporary read-write handle. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function open_temporary_handle(
+  null|CancellationToken $cancellation,
+): ReadWriteHandleImpl {
+  $directory = Whim\_Private\temporary_directory();
+  try {
+    $operation = FileOperation::temporary($directory);
+    await_operation($operation, $cancellation);
+    $descriptor = $operation->takeDescriptor() as FileDescriptor;
+  } catch (Whim\_Private\SystemError $error) {
+    failure($error, $directory, true);
+  }
+
+  return new ReadWriteHandleImpl(new State($descriptor, ''));
+}

@@ -1,0 +1,255 @@
+namespace Hardening\NestedFinally;
+
+class Order {
+  public static string $trace = '';
+}
+
+function nested(): int {
+  try {
+    try {
+      try {
+        try {
+          try {
+            try {
+              try {
+                try {
+                  try {
+                    try {
+                      try {
+                        try {
+                          try {
+                            try {
+                              try {
+                                try {
+                                  try {
+                                    try {
+                                      try {
+                                        try {
+                                          try {
+                                            try {
+                                              try {
+                                                try {
+                                                  try {
+                                                    try {
+                                                      try {
+                                                        try {
+                                                          try {
+                                                            try {
+                                                              try {
+                                                                try {
+                                                                  try {
+                                                                    try {
+                                                                      try {
+                                                                        try {
+                                                                          try {
+                                                                            try {
+                                                                              try {
+                                                                                try {
+                                                                                  try {
+                                                                                    try {
+                                                                                      try {
+                                                                                        try {
+                                                                                          try {
+                                                                                            try {
+                                                                                              try {
+                                                                                                try {
+                                                                                                  try {
+                                                                                                    try {
+                                                                                                      try {
+                                                                                                        try {
+                                                                                                          try {
+                                                                                                            try {
+                                                                                                              try {
+                                                                                                                try {
+                                                                                                                  try {
+                                                                                                                    try {
+                                                                                                                      try {
+                                                                                                                        try {
+                                                                                                                          return 42;
+                                                                                                                        } finally {
+                                                                                                                          Order::$trace .= 'f0 ';
+                                                                                                                        }
+                                                                                                                      } finally {
+                                                                                                                        Order::$trace .= 'f1 ';
+                                                                                                                      }
+                                                                                                                    } finally {
+                                                                                                                      Order::$trace .= 'f2 ';
+                                                                                                                    }
+                                                                                                                  } finally {
+                                                                                                                    Order::$trace .= 'f3 ';
+                                                                                                                  }
+                                                                                                                } finally {
+                                                                                                                  Order::$trace .= 'f4 ';
+                                                                                                                }
+                                                                                                              } finally {
+                                                                                                                Order::$trace .= 'f5 ';
+                                                                                                              }
+                                                                                                            } finally {
+                                                                                                              Order::$trace .= 'f6 ';
+                                                                                                            }
+                                                                                                          } finally {
+                                                                                                            Order::$trace .= 'f7 ';
+                                                                                                          }
+                                                                                                        } finally {
+                                                                                                          Order::$trace .= 'f8 ';
+                                                                                                        }
+                                                                                                      } finally {
+                                                                                                        Order::$trace .= 'f9 ';
+                                                                                                      }
+                                                                                                    } finally {
+                                                                                                      Order::$trace .= 'f10 ';
+                                                                                                    }
+                                                                                                  } finally {
+                                                                                                    Order::$trace .= 'f11 ';
+                                                                                                  }
+                                                                                                } finally {
+                                                                                                  Order::$trace .= 'f12 ';
+                                                                                                }
+                                                                                              } finally {
+                                                                                                Order::$trace .= 'f13 ';
+                                                                                              }
+                                                                                            } finally {
+                                                                                              Order::$trace .= 'f14 ';
+                                                                                            }
+                                                                                          } finally {
+                                                                                            Order::$trace .= 'f15 ';
+                                                                                          }
+                                                                                        } finally {
+                                                                                          Order::$trace .= 'f16 ';
+                                                                                        }
+                                                                                      } finally {
+                                                                                        Order::$trace .= 'f17 ';
+                                                                                      }
+                                                                                    } finally {
+                                                                                      Order::$trace .= 'f18 ';
+                                                                                    }
+                                                                                  } finally {
+                                                                                    Order::$trace .= 'f19 ';
+                                                                                  }
+                                                                                } finally {
+                                                                                  Order::$trace .= 'f20 ';
+                                                                                }
+                                                                              } finally {
+                                                                                Order::$trace .= 'f21 ';
+                                                                              }
+                                                                            } finally {
+                                                                              Order::$trace .= 'f22 ';
+                                                                            }
+                                                                          } finally {
+                                                                            Order::$trace .= 'f23 ';
+                                                                          }
+                                                                        } finally {
+                                                                          Order::$trace .= 'f24 ';
+                                                                        }
+                                                                      } finally {
+                                                                        Order::$trace .= 'f25 ';
+                                                                      }
+                                                                    } finally {
+                                                                      Order::$trace .= 'f26 ';
+                                                                    }
+                                                                  } finally {
+                                                                    Order::$trace .= 'f27 ';
+                                                                  }
+                                                                } finally {
+                                                                  Order::$trace .= 'f28 ';
+                                                                }
+                                                              } finally {
+                                                                Order::$trace .= 'f29 ';
+                                                              }
+                                                            } finally {
+                                                              Order::$trace .= 'f30 ';
+                                                            }
+                                                          } finally {
+                                                            Order::$trace .= 'f31 ';
+                                                          }
+                                                        } finally {
+                                                          Order::$trace .= 'f32 ';
+                                                        }
+                                                      } finally {
+                                                        Order::$trace .= 'f33 ';
+                                                      }
+                                                    } finally {
+                                                      Order::$trace .= 'f34 ';
+                                                    }
+                                                  } finally {
+                                                    Order::$trace .= 'f35 ';
+                                                  }
+                                                } finally {
+                                                  Order::$trace .= 'f36 ';
+                                                }
+                                              } finally {
+                                                Order::$trace .= 'f37 ';
+                                              }
+                                            } finally {
+                                              Order::$trace .= 'f38 ';
+                                            }
+                                          } finally {
+                                            Order::$trace .= 'f39 ';
+                                          }
+                                        } finally {
+                                          Order::$trace .= 'f40 ';
+                                        }
+                                      } finally {
+                                        Order::$trace .= 'f41 ';
+                                      }
+                                    } finally {
+                                      Order::$trace .= 'f42 ';
+                                    }
+                                  } finally {
+                                    Order::$trace .= 'f43 ';
+                                  }
+                                } finally {
+                                  Order::$trace .= 'f44 ';
+                                }
+                              } finally {
+                                Order::$trace .= 'f45 ';
+                              }
+                            } finally {
+                              Order::$trace .= 'f46 ';
+                            }
+                          } finally {
+                            Order::$trace .= 'f47 ';
+                          }
+                        } finally {
+                          Order::$trace .= 'f48 ';
+                        }
+                      } finally {
+                        Order::$trace .= 'f49 ';
+                      }
+                    } finally {
+                      Order::$trace .= 'f50 ';
+                    }
+                  } finally {
+                    Order::$trace .= 'f51 ';
+                  }
+                } finally {
+                  Order::$trace .= 'f52 ';
+                }
+              } finally {
+                Order::$trace .= 'f53 ';
+              }
+            } finally {
+              Order::$trace .= 'f54 ';
+            }
+          } finally {
+            Order::$trace .= 'f55 ';
+          }
+        } finally {
+          Order::$trace .= 'f56 ';
+        }
+      } finally {
+        Order::$trace .= 'f57 ';
+      }
+    } finally {
+      Order::$trace .= 'f58 ';
+    }
+  } finally {
+    Order::$trace .= 'f59 ';
+  }
+}
+
+assert!(nested() == 42);
+assert!(
+  Order::$trace
+  == 'f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27 f28 f29 f30 f31 f32 f33 f34 f35 f36 f37 f38 f39 f40 f41 f42 f43 f44 f45 f46 f47 f48 f49 f50 f51 f52 f53 f54 f55 f56 f57 f58 f59 ',
+);

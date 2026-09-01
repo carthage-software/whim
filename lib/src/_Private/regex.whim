@@ -1,0 +1,52 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** A compiled byte-oriented regular expression. */
+#[Stub]
+final class Regex {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** Compiles an expression, or returns null when it is invalid. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function compile(string $expression): null|Regex {}
+
+  /** Returns the next match and its numbered and named captures. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function find(
+    string $subject,
+    0.. $offset = 0,
+  ): null|((0..), (0..), dict<int|string, null|string>) {}
+
+  /** Replaces matches with literal bytes. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function replaceLiteral(
+    string $subject,
+    string $replacement,
+    null|(0..) $limit = null,
+  ): string {}
+
+  /** Splits bytes around every match. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function split(string $subject): vec<string> {}
+}
+
+/** Escapes bytes for literal use in a regular expression. */
+#[MustUse]
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function regex_escape(string $literal): string {}

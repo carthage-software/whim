@@ -1,0 +1,45 @@
+namespace Whim\Async;
+
+use Whim\Async\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Unwind\Throwable;
+
+/** Represents a deferred. */
+final readonly class Deferred<T> {
+  private _Private\FutureState<T> $state;
+  private Future<T> $future;
+
+  /** Creates a deferred. */
+  #[TrackCaller]
+  public function __construct() {
+    $this->state = new _Private\FutureState::<T>();
+    $this->future = new _Private\FutureImpl::<T>($this->state);
+  }
+
+  /** Completes the pending operation successfully. */
+  #[TrackCaller]
+  public function complete(T $value): void {
+    $this->state->complete($value);
+  }
+
+  /** Completes the pending operation with an error. */
+  #[TrackCaller]
+  public function error(Throwable $error): void {
+    $this->state->error($error);
+  }
+
+  /** Reports whether the pending operation completed. */
+  #[TrackCaller]
+  public function isComplete(): bool {
+    return $this->state->isComplete();
+  }
+
+  /** Returns the future controlled by this deferred value. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getFuture(): Future<T> {
+    return $this->future;
+  }
+}

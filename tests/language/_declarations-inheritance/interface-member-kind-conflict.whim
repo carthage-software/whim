@@ -1,0 +1,11 @@
+interface HasMethod {
+  public function value(): void;
+}
+
+interface HasConstant {
+  public const int value = 1;
+}
+
+class ChildClass implements HasMethod, HasConstant {
+  public function value(): void {}
+}

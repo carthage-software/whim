@@ -1,0 +1,247 @@
+namespace Whim\SMTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\ReadHandle;
+use Whim\IO\Reader;
+use Whim\IO\WriteHandle;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\SMTP\Capability;
+use Whim\SMTP\Command;
+use Whim\SMTP\ConnectionException;
+use Whim\SMTP\Reply;
+use Whim\SMTP\_Private;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Speaks SMTP over any duplex byte handle. */
+final class Connection implements WriteHandle {
+  private Reader $reader;
+  private dict<string, string> $capabilities = dict[];
+  private null|int $maximumMessageSize = null;
+
+  /** Wraps an established duplex handle. */
+  #[TrackCaller]
+  public function __construct(private ReadHandle&WriteHandle $stream) {
+    $this->reader = new Reader($stream);
+  }
+
+  /** Reads and validates the server greeting. */
+  #[MustUse]
+  #[TrackCaller]
+  public function readGreeting(
+    null|CancellationToken $cancellation = null,
+  ): Reply {
+    $reply = $this->readReply($cancellation);
+    if ($reply->code != 220) {
+      throw new ConnectionException(
+        'the SMTP server greeted with '
+        . $reply->code
+        . ' instead of 220: '
+        . $reply->message,
+      );
+    }
+
+    return $reply;
+  }
+
+  /** Sends EHLO and records advertised extensions. */
+  #[MustUse]
+  #[TrackCaller]
+  public function ehlo(
+    string $hostname,
+    null|CancellationToken $cancellation = null,
+  ): Reply {
+    $reply = $this->sendCommand(
+      Command::fromParts('EHLO', $hostname),
+      $cancellation,
+    );
+
+    if (!$reply->isPositiveCompletion()) {
+      return $reply;
+    }
+
+    $this->capabilities = dict[];
+    $this->maximumMessageSize = null;
+    foreach (Str\split($reply->message, "\n") as $index => $line) {
+      if ($index == 0) {
+        continue;
+      }
+
+      $line = match (Str\trim($line)) {
+        '' => continue,
+        $line => $line,
+      };
+
+      $space = Str\search($line, ' ');
+      $keyword = match ($space) {
+        null => Str\uppercase($line),
+        $_ => Str\uppercase(Str\slice($line, 0, $space)),
+      };
+
+      $value = match ($space) {
+        null => '',
+        $_ => Str\trim(Str\slice($line, $space + 1)),
+      };
+
+      $this->capabilities[$keyword] = $value;
+      if ($keyword == Capability::Size->value && $value != '') {
+        $size = _Private\parse_decimal($value);
+        if ($size != null && $size >= 0) {
+          $this->maximumMessageSize = $size;
+        }
+      }
+    }
+
+    return $reply;
+  }
+
+  /** Sends HELO and clears ESMTP capabilities after success. */
+  #[MustUse]
+  #[TrackCaller]
+  public function helo(
+    string $hostname,
+    null|CancellationToken $cancellation = null,
+  ): Reply {
+    $reply = $this->sendCommand(
+      Command::fromParts('HELO', $hostname),
+      $cancellation,
+    );
+
+    if ($reply->isPositiveCompletion()) {
+      $this->capabilities = dict[];
+      $this->maximumMessageSize = null;
+    }
+
+    return $reply;
+  }
+
+  /** Reports whether the server advertised a capability. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function supportsCapability(string|Capability $capability): bool {
+    $keyword = match ($capability) {
+      $known @ Capability => $known->value,
+      $custom @ string => Str\uppercase($custom),
+    };
+
+    return contains_key!($this->capabilities, $keyword);
+  }
+
+  /** Returns a capability's parameters, or null when absent. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function capability(string|Capability $capability): null|string {
+    $keyword = match ($capability) {
+      $known @ Capability => $known->value,
+      $custom @ string => Str\uppercase($custom),
+    };
+
+    if (!contains_key!($this->capabilities, $keyword)) {
+      return null;
+    }
+
+    return $this->capabilities[$keyword];
+  }
+
+  /** Returns the advertised SIZE limit. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function maximumMessageSize(): null|int {
+    return $this->maximumMessageSize;
+  }
+
+  /** Writes a command and reads its reply. */
+  #[MustUse]
+  #[TrackCaller]
+  public function sendCommand(
+    string|Command $command,
+    null|CancellationToken $cancellation = null,
+  ): Reply {
+    $this->writeCommand($command, $cancellation);
+    return $this->readReply($cancellation);
+  }
+
+  /** Writes an SMTP continuation line and reads its reply. */
+  #[MustUse]
+  #[TrackCaller]
+  public function sendLine(
+    string $line,
+    null|CancellationToken $cancellation = null,
+  ): Reply {
+    $this->writeLine($line, $cancellation);
+    return $this->readReply($cancellation);
+  }
+
+  /** Writes one checked SMTP command. */
+  #[TrackCaller]
+  public function writeCommand(
+    string|Command $command,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $command = match ($command) {
+      $value @ Command => $value,
+      $value @ string => Command::from($value),
+    };
+
+    $this->stream->writeAll($command->toString() . "\r\n", $cancellation);
+  }
+
+  /** Writes an SMTP continuation line without changing its bytes. */
+  #[TrackCaller]
+  public function writeLine(
+    string $line,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if (
+      Str\contains($line, "\r")
+      || Str\contains($line, "\n")
+      || Str\contains($line, "\x00")
+    ) {
+      throw new InvalidArgumentException(
+        'an SMTP line may not contain CR, LF, or NUL bytes',
+      );
+    }
+
+    $this->stream->writeAll($line . "\r\n", $cancellation);
+  }
+
+  /** Reads one single- or multi-line SMTP reply. */
+  #[MustUse]
+  #[TrackCaller]
+  public function readReply(
+    null|CancellationToken $cancellation = null,
+  ): Reply {
+    return _Private\parse_reply($this->reader, $cancellation);
+  }
+
+  /** Writes raw SMTP payload bytes. */
+  #[TrackCaller]
+  public function writeAll(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->stream->writeAll($bytes, $cancellation);
+  }
+
+  #[TrackCaller]
+  public function waitUntilWritable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->stream->waitUntilWritable($cancellation);
+  }
+
+  #[TrackCaller]
+  public function tryWrite(string $bytes): int {
+    return $this->stream->tryWrite($bytes);
+  }
+
+  #[TrackCaller]
+  public function write(
+    string $bytes,
+    null|CancellationToken $cancellation = null,
+  ): int {
+    return $this->stream->write($bytes, $cancellation);
+  }
+}

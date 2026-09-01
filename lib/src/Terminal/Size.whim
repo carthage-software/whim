@@ -1,0 +1,13 @@
+namespace Whim\Terminal;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\PositiveInt;
+
+/** A terminal's dimensions in character cells. */
+final readonly class Size {
+  #[AlwaysInline]
+  public function __construct(
+    public PositiveInt $columns,
+    public PositiveInt $rows,
+  ) {}
+}

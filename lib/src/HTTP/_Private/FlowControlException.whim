@@ -1,0 +1,4 @@
+namespace Whim\HTTP\_Private;
+
+/** An exhausted or overflowing HTTP/2 flow-control window. */
+final class FlowControlException extends Exception {}

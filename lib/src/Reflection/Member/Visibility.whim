@@ -1,0 +1,12 @@
+namespace Whim\Reflection\Member;
+
+use Whim\Enum\UnitEnum;
+use Whim\Marker\Stub;
+
+/** Identifies the access level of a reflected member. */
+#[Stub]
+enum Visibility implements UnitEnum {
+  case Public;
+  case Protected;
+  case Private;
+}

@@ -1,0 +1,5 @@
+/target
+/docs/book
+node_modules/
+internal-docs/
+.DS_Store

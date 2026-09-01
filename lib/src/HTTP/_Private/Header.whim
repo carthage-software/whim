@@ -1,0 +1,4 @@
+namespace Whim\HTTP\_Private;
+
+/** One HTTP/2 field and its indexing policy. */
+type Header = (string, string, bool);

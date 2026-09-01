@@ -1,0 +1,23 @@
+namespace Whim\Network;
+
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Defines a connected bidirectional byte stream. */
+interface Stream<out TEndpoint: Endpoint> extends
+  Socket<TEndpoint>,
+  ReadHandle,
+  WriteHandle {
+  /** Returns the stream's peer endpoint. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getPeerEndpoint(): TEndpoint;
+
+  /** Shuts down one or both directions without closing the descriptor. */
+  #[TrackCaller]
+  public function shutdown(
+    ShutdownDirection $direction = ShutdownDirection::Write,
+  ): void;
+}

@@ -1,0 +1,20 @@
+namespace Whim\HTTP\Client;
+
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\Marker\AlwaysInline;
+use Whim\Network\Endpoint;
+use Whim\Network\InternetEndpoint;
+use Whim\TLS\ConnectionState;
+
+/** Describes the transport selected for an HTTP exchange. */
+final readonly class ConnectionMetadata {
+  #[AlwaysInline]
+  public function __construct(
+    public Endpoint $localEndpoint,
+    public Endpoint $peerEndpoint,
+    public ProtocolVersion $protocolVersion,
+    public null|ConnectionState $tls = null,
+    public null|InternetEndpoint $destinationEndpoint = null,
+    public bool $proxied = false,
+  ) {}
+}

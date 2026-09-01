@@ -1,0 +1,5 @@
+abstract class Shape {
+  abstract public function area(): float;
+}
+
+$s = new Shape();

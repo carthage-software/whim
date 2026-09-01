@@ -1,0 +1,6 @@
+namespace Whim\File;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports a path that does not identify a regular file. */
+final class NotFileException extends InvalidArgumentException {}

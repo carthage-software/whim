@@ -1,0 +1,1 @@
+class LateValue implements LateComparable {}

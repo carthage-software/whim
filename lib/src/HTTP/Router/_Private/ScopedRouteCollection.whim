@@ -1,0 +1,29 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\HTTP\Message\Method;
+use Whim\HTTP\Router\Registration;
+use Whim\HTTP\Router\RouteCollection;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/** Collects registrations made inside one route group. */
+final class ScopedRouteCollection implements RouteCollection {
+  private vec<Registration> $routes = vec[];
+
+  /** Collects one route registration. */
+  public function add(
+    Method $method,
+    NonEmptyString $pattern,
+    Handler $handler,
+  ): static {
+    $this->routes[] = ($method, $pattern, $handler);
+    return $this;
+  }
+
+  /** Returns the collected registrations. */
+  #[MustUse]
+  public function getAll(): vec<Registration> {
+    return $this->routes;
+  }
+}

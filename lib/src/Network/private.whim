@@ -1,0 +1,171 @@
+namespace Whim\Network\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IP\Address;
+use Whim\IP\Family;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\NetworkException;
+use Whim\Network\Host;
+use Whim\Network\Port;
+use Whim\Network\ResolutionException;
+use Whim\Network\UnixEndpoint;
+use Whim\OS\FileDescriptor;
+use Whim\Refine\NonEmptyString;
+use Whim\_Private\HostResolutionOperation;
+
+/** Converts a raw socket failure into the public network exception family. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function failure(Whim\_Private\SystemError $error): never {
+  throw new NetworkException(
+    'the '
+    . $error->call()
+    . ' system call failed with errno '
+    . $error->errno(),
+    $error->errno(),
+  );
+}
+
+/** Creates a non-blocking socket. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function create_socket(int $family, int $kind): FileDescriptor {
+  try {
+    return Whim\_Private\create_socket($family, $kind);
+  } catch (Whim\_Private\SystemError $error) {
+    failure($error);
+  }
+}
+
+/** Waits until a socket is readable. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function wait_readable(
+  FileDescriptor $descriptor,
+  null|CancellationToken $cancellation,
+): void {
+  try {
+    Whim\IO\_Private\wait_readable($descriptor, $cancellation);
+  } catch (Whim\_Private\SystemError $error) {
+    failure($error);
+  }
+}
+
+/** Waits until a socket is writable. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function wait_writable(
+  FileDescriptor $descriptor,
+  null|CancellationToken $cancellation,
+): void {
+  try {
+    Whim\IO\_Private\wait_writable($descriptor, $cancellation);
+  } catch (Whim\_Private\SystemError $error) {
+    failure($error);
+  }
+}
+
+/** Converts an IP family into the host socket constant. */
+#[AlwaysInline]
+function socket_family(Family $family): int {
+  return match ($family) {
+    Family::V4 => Whim\_Private\SOCKET_FAMILY_INET,
+    Family::V6 => Whim\_Private\SOCKET_FAMILY_INET6,
+  };
+}
+
+/** Converts a raw internet address into a typed endpoint. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function internet_endpoint((string, int) $address): InternetEndpoint {
+  return new InternetEndpoint(Address::from($address[0]), $address[1] as Port);
+}
+
+/** Converts a raw Unix address into a typed endpoint. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function unix_endpoint((string, int) $address): UnixEndpoint {
+  $path = null;
+  if ($address[0] != '') {
+    $path = $address[0] as NonEmptyString;
+  }
+
+  return new UnixEndpoint($path);
+}
+
+/** Resolves a host name for one address family. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function resolve(
+  NonEmptyString $host,
+  Family $family,
+  null|CancellationToken $cancellation,
+): vec<Address> {
+  try {
+    $cancellation?->throwIfCancellationRequested();
+    $operation = HostResolutionOperation::start($host, socket_family($family));
+
+    $registration = $cancellation?->register(fn(): void {
+      $operation->cancel();
+    });
+
+    try {
+      $operation->wait();
+      $cancellation?->throwIfCancellationRequested();
+    } finally {
+      $cancellation?->unregister($registration);
+    }
+
+    $resolved = $operation->take() as vec<(int, (string&!''))>;
+  } catch (Whim\_Private\SystemError $error) {
+    throw new ResolutionException(
+      'failed to resolve host `' . $host . '`',
+      $error->errno(),
+      $error,
+    );
+  }
+
+  $addresses = vec[];
+  foreach ($resolved as ($_family, $address)) {
+    $addresses[] = Address::from($address);
+  }
+
+  return $addresses;
+}
+
+/** Resolves an internet host into concrete addresses. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function resolve_host_addresses(
+  Host $host,
+  null|CancellationToken $cancellation,
+): vec<Address> {
+  if ($host is Address) {
+    return vec[$host];
+  }
+
+  $parsed = Address::parse($host);
+  if ($parsed != null) {
+    return vec[$parsed];
+  }
+
+  $addresses = resolve($host, Family::V6, $cancellation);
+  foreach (resolve($host, Family::V4, $cancellation) as $address) {
+    $addresses[] = $address;
+  }
+
+  return $addresses;
+}

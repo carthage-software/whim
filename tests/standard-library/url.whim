@@ -1,0 +1,150 @@
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\IRI\IRI;
+use Whim\URI\IPHost;
+use Whim\URI\RegisteredNameHost;
+use Whim\URI\URI;
+use Whim\URL\Authority;
+use Whim\URL\URL;
+use Whim\Unwind\InvalidArgumentException;
+
+$url = URL::from('HTTPS://user:pass@Example.COM:443/a/../path?q=1#fragment');
+assert!($url->scheme == 'https');
+assert!($url->authority->userInfo == 'user:pass');
+assert!($url->authority->host is RegisteredNameHost);
+assert!($url->authority->host->toString() == 'example.com');
+assert!($url->authority->port == null);
+assert!($url->path == '/path');
+assert!($url->query == 'q=1');
+assert!($url->fragment == 'fragment');
+assert!($url->toString() == 'https://user:pass@example.com/path?q=1#fragment');
+
+$parsedUnsafe = URL::fromPartsUnsafe(
+  'https',
+  Authority::from('example.com'),
+  '/path',
+  'q=1',
+  'fragment',
+);
+
+assert!($parsedUnsafe->toString() == 'https://example.com/path?q=1#fragment');
+
+$unicode = URL::from('https://münich.example/café/資料?q=élissa');
+assert!($unicode->authority->host->toString() == 'xn--mnich-kva.example');
+
+assert!($unicode->path == '/caf%C3%A9/%E8%B3%87%E6%96%99');
+assert!($unicode->query == 'q=%C3%A9lissa');
+assert!(
+  $unicode->toIRI()->toString() == 'https://münich.example/café/資料?q=élissa',
+);
+
+$ipv6 = URL::from('http://[2001:db8::1]:8080/path');
+assert!($ipv6->authority->host is IPHost);
+assert!($ipv6->authority->port == 8080);
+assert!($ipv6->toString() == 'http://[2001:db8::1]:8080/path');
+
+assert!(URL::from('ws://example.com:80/')->authority->port == null);
+assert!(URL::from('ftp://example.com:21/')->authority->port == null);
+assert!(URL::from('ssh://example.com:22/')->authority->port == null);
+assert!(URL::from('redis://example.com:6379/')->authority->port == null);
+
+assert!(URL::from('custom://example.com:80/')->authority->port == 80);
+
+assert!(
+  URL::from('http://example.com:00081/')->toString()
+  == 'http://example.com:81/',
+);
+
+assert!(URL::parse('//example.com/path') == null);
+assert!(URL::parse('mailto:user@example.com') == null);
+assert!(URL::parse('http://example.com:') == null);
+assert!(URL::parse('http://example.com:65536/') == null);
+assert!(URL::parse('http://foo%20bar/') == null);
+assert!(URL::parse('http://foo_bar/') == null);
+assert!(URL::parse('file:///tmp/file') == null);
+$assertion_value_31 = fn(): URL => URL::from('not a URL');
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (InvalidArgumentException $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is InvalidArgumentException);
+
+$authority = Authority::from('admin@münich.example:65535');
+assert!($authority->userInfo == 'admin');
+assert!($authority->host->toString() == 'xn--mnich-kva.example');
+assert!($authority->port == 65535);
+assert!(Authority::parse('example.com:65536') == null);
+assert!(Authority::from('EXAMPLE.COM:00081')->toString() == 'example.com:81');
+
+$fromURI = URL::fromURI(URI::from('https://example.com:443/a'));
+assert!($fromURI->toString() == 'https://example.com/a');
+assert!(URL::parseURI(URI::from('../a')) == null);
+
+$fromIRI = URL::fromIRI(IRI::from('https://例え.テスト/資料'));
+assert!(
+  $fromIRI->toString() == 'https://xn--r8jz45g.xn--zckzah/%E8%B3%87%E6%96%99',
+);
+
+$origin = $url->origin();
+assert!($origin->toString() == 'https://example.com');
+assert!($origin->equals(URL::from('https://example.com/x')->origin()));
+
+assert!(!($origin->equals(URL::from('https://example.com:444/x')->origin())));
+
+$parameters = Whim\URL\parse_query(
+  'name=Whim+Lang&tag=fast&tag=typed&empty=&flag',
+);
+
+assert!(
+  $parameters == dict[
+    'name' => vec['Whim Lang'],
+    'tag' => vec['fast', 'typed'],
+    'empty' => vec[''],
+    'flag' => vec[''],
+  ],
+);
+
+assert!(Whim\URL\parse_query('') == dict[]);
+assert!(
+  Whim\URL\build_query($parameters)
+  == 'name=Whim+Lang&tag=fast&tag=typed&empty=&flag=',
+);
+
+$assertion_value_46 = fn(): dict<string, vec<string>> => (
+  Whim\URL\parse_query('x=%zz')
+);
+
+$assertion_error_46 = null;
+try {
+  $assertion_value_46();
+} catch (DecodingException $assertion_caught_46) {
+  $assertion_error_46 = $assertion_caught_46;
+}
+
+assert!($assertion_error_46 is DecodingException);
+
+$withQuery = $url->withQueryParameters(dict[
+  'q' => vec['hello world'],
+  'tag' => vec['a', 'b'],
+]);
+
+assert!($withQuery->query == 'q=hello+world&tag=a&tag=b');
+assert!(
+  $withQuery->queryParameters() == dict[
+    'q' => vec['hello world'],
+    'tag' => vec['a', 'b'],
+  ],
+);
+
+$changed = $url
+  ->withScheme('http')
+  ->withAuthority(Authority::from('example.net:8080'))
+  ->withPath('/new')
+  ->withQuery(null)
+  ->withFragment(null);
+
+assert!($changed->toString() == 'http://example.net:8080/new');
+assert!($changed->equals(URL::from('http://example.net:8080/new')));

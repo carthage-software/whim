@@ -1,0 +1,48 @@
+namespace Whim\Filesystem;
+
+use Whim\_Private;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Identifies what kind of node a filesystem path points to. */
+enum NodeKind: int {
+  /** A regular file. */
+  case File = _Private\FILE_TYPE_REGULAR;
+
+  /** A directory. */
+  case Directory = _Private\FILE_TYPE_DIRECTORY;
+
+  /** A symbolic link. */
+  case SymbolicLink = _Private\FILE_TYPE_SYMBOLIC_LINK;
+
+  /** A named pipe. */
+  case NamedPipe = _Private\FILE_TYPE_NAMED_PIPE;
+
+  /** A socket. */
+  case Socket = _Private\FILE_TYPE_SOCKET;
+
+  /** A block device. */
+  case BlockDevice = _Private\FILE_TYPE_BLOCK_DEVICE;
+
+  /** A character device. */
+  case CharacterDevice = _Private\FILE_TYPE_CHARACTER_DEVICE;
+
+  /** A kind the operating system did not report. */
+  case Unknown = 0;
+
+  /** Reads the node kind out of platform mode bits. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromBits(int $bits): NodeKind {
+    return (
+      NodeKind::tryFrom($bits & _Private\FILE_TYPE_MASK) ?? NodeKind::Unknown
+    );
+  }
+
+  /** Returns this kind's platform file-type bits. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toBits(): int {
+    return $this->value;
+  }
+}

@@ -1,0 +1,22 @@
+namespace Whim\Unix\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\UnixEndpoint;
+use Whim\Network\_Private\StreamImpl as NetworkStreamImpl;
+use Whim\OS\FileDescriptor;
+use Whim\Unix\Stream as UnixStream;
+
+/** Implements a Unix-domain stream. */
+final class StreamImpl extends NetworkStreamImpl<UnixEndpoint> implements
+  UnixStream {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    FileDescriptor $descriptor,
+    UnixEndpoint $localEndpoint,
+    UnixEndpoint $peerEndpoint,
+  ) {
+    parent::__construct($descriptor, $localEndpoint, $peerEndpoint);
+  }
+}

@@ -1,0 +1,18 @@
+namespace Whim\Reflection\Attribute;
+
+use Whim\Enum\UnitEnum;
+use Whim\Marker\Stub;
+
+/** Identifies declarations on which an attribute class may appear. */
+#[Stub]
+enum Target implements UnitEnum {
+  case Class;
+  case Function;
+  case Method;
+  case Property;
+  case ClassConstant;
+  case Parameter;
+  case TypeAlias;
+  case Newtype;
+  case Constant;
+}

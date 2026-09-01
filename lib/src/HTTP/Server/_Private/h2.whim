@@ -1,0 +1,227 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Async\Future;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\_Private\Header;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\StatusCode;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\Context\Security;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Stream;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\TLS\Stream as TLSStream;
+
+/** Creates a cancellation token with an optional timeout. */
+#[TrackCaller]
+#[TraceBoundary]
+function h2_cancellation(
+  CancellationToken $parent,
+  null|Duration $timeout,
+): CancellationToken {
+  if ($timeout == null) {
+    return $parent;
+  }
+
+  return new TimeoutCancellationToken($timeout, $parent);
+}
+
+/** Applies HTTP server limits to the HTTP/2 protocol configuration. */
+function h2_configuration(Configuration $configuration): H2\Configuration {
+  $settings = $configuration->h2->settings;
+
+  $headerLimit = $configuration->maximumHeaderSize;
+  if ($headerLimit > 4294967295) {
+    $headerLimit = 4294967295;
+  }
+
+  $headerSetting = H2\Setting::MaxHeaderListSize->value;
+  if (
+    !contains_key!($settings, $headerSetting)
+    || $settings[$headerSetting] > $headerLimit
+  ) {
+    $settings[$headerSetting] = $headerLimit as H2\SettingValue;
+  }
+
+  $streamLimit = $configuration->maximumConcurrentRequests;
+  if ($streamLimit > 4294967295) {
+    $streamLimit = 4294967295;
+  }
+
+  $streamSetting = H2\Setting::MaxConcurrentStreams->value;
+  if (
+    !contains_key!($settings, $streamSetting)
+    || $settings[$streamSetting] > $streamLimit
+  ) {
+    $settings[$streamSetting] = $streamLimit as H2\SettingValue;
+  }
+
+  return $configuration->h2->withSettings($settings);
+}
+
+/** Creates an HTTP request from a validated HTTP/2 field section. */
+#[TrackCaller]
+#[TraceBoundary]
+function h2_request(
+  string $method,
+  string $scheme,
+  string $authority,
+  string $path,
+  vec<(string, string)> $fields,
+  null|ReadHandle $body,
+  null|Future<FieldMap> $trailers,
+): null|Request {
+  if ($method == 'CONNECT' && $path == '') {
+    $path = $authority;
+  }
+
+  if ($scheme != '' && !($scheme is 'http'|'https')) {
+    return null;
+  }
+
+  $url = null;
+  if ($authority != '' && $scheme != '' && Str\starts_with($path, '/')) {
+    $url = h1_url($scheme, $authority, $path);
+  }
+
+  return Request::fromPartsUnsafe(
+    $method,
+    $path,
+    $url,
+    ProtocolVersion::V2,
+    FieldMap::from($fields),
+    $body,
+    $trailers,
+  );
+}
+
+/** Creates a validated HTTP field map from HTTP/2 trailing fields. */
+#[TrackCaller]
+#[TraceBoundary]
+function h2_field_map(vec<Header> $headers): FieldMap {
+  $fields = vec[];
+  foreach ($headers as $header) {
+    if ($header[0][0] != ':') {
+      $fields[] = ($header[0], $header[1]);
+    }
+  }
+
+  return FieldMap::from($fields);
+}
+
+/** Encodes response fields for HTTP/2. */
+function h2_response_headers(
+  StatusCode $status,
+  FieldMap $fields,
+): vec<Header> {
+  $headers = vec[(':status', '' . $status, false)];
+  $hasServer = false;
+  $hasDate = false;
+  foreach ($fields as ($name, $value)) {
+    $name = Str\lowercase($name);
+    if (
+      $name is 'connection'
+        | 'keep-alive'
+        | 'proxy-connection'
+        | 'transfer-encoding'
+        | 'upgrade'
+    ) {
+      continue;
+    }
+
+    if ($name == 'server') {
+      $hasServer = true;
+    } else if ($name == 'date') {
+      $hasDate = true;
+    }
+
+    $headers[] = ($name as NonEmptyString, $value, false);
+  }
+
+  if (!$hasServer) {
+    $headers[] = ('server', 'Whim', false);
+  }
+
+  if (!$hasDate) {
+    $headers[] = ('date', DateHeader::getValue(), false);
+  }
+
+  return $headers;
+}
+
+/** Encodes one server-push request field section. */
+function h2_push_headers(Request $request): null|vec<Header> {
+  $url = $request->url;
+  if ($url == null || $url->authority == null) {
+    return null;
+  }
+
+  $authority = match ($url->authority->toString()) {
+    '' => return null,
+    $authority => $authority,
+  };
+
+  $headers = vec[
+    (':method', $request->method, false),
+    (':scheme', $url->scheme, false),
+    (':authority', $authority as NonEmptyString, false),
+    (':path', $request->requestTarget, false),
+  ];
+
+  foreach ($request->headers as ($name, $value)) {
+    $headers[] = (Str\lowercase($name) as NonEmptyString, $value, false);
+  }
+
+  return $headers;
+}
+
+/** Converts an HTTP/1.1 upgrade request into stream-one fields. */
+function h2_upgrade_headers(Request $request): vec<Header> {
+  $url = $request->url;
+  $scheme = $url?->scheme ?? 'http';
+  $authority =
+    $url?->authority?->toString() ?? ($request->headers->get('host') ?? '');
+
+  $headers = vec[
+    (':method', $request->method, false),
+    (':scheme', $scheme, false),
+    (':authority', $authority, false),
+    (':path', $request->requestTarget, false),
+  ];
+
+  foreach ($request->headers as ($name, $value)) {
+    $name = match (Str\lowercase($name)) {
+      'connection' | 'upgrade' | 'http2-settings' | 'transfer-encoding' => continue,
+      $name => $name,
+    };
+
+    $headers[] = ($name as NonEmptyString, $value, false);
+  }
+
+  return $headers;
+}
+
+/** Returns TLS metadata for an encrypted stream. */
+function h2_security(Stream<_> $stream): null|Security {
+  if (!($stream is TLSStream<_>)) {
+    return null;
+  }
+
+  $state = $stream->getConnectionState();
+  return new Security(
+    $state->peerCertificates,
+    $state->serverName,
+    $state->alpnProtocol,
+    $state->version,
+    $state->cipherSuite,
+  );
+}

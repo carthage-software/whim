@@ -1,0 +1,141 @@
+use Whim\Command;
+use Whim\Env;
+use Whim\File;
+use Whim\Filesystem;
+
+$work = Filesystem\create_temporary_directory(null, 'whim-test-');
+$source = $work . '/debugging.whim';
+$binary = Env\current_binary();
+assert!($binary is string);
+
+File\write(
+  $source,
+  'class DebugBase<T> {'
+  . "\n"
+  . '  public function __construct(protected T $inherited, private int $secret) {}'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'final class DebugBox<T> extends DebugBase<T> {'
+  . "\n"
+  . '  public function __construct(public readonly T $value) {'
+  . "\n"
+  . '    parent::__construct($value, 42);'
+  . "\n"
+  . '  }'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'final class DebugNode {'
+  . "\n"
+  . '  public mixed $next = null;'
+  . "\n"
+  . '}'
+  . "\n\n"
+  . 'newtype DebugId = int;'
+  . "\n\n"
+  . '$box = new DebugBox::<string>("hello");'
+  . "\n"
+  . '  debug!($box);'
+  . "\n"
+  . 'debug!(DebugId(42));'
+  . "\n"
+  . 'debug!("a\\xff\\n\\"\\\\\\x00");'
+  . "\n"
+  . 'debug!(new Whim\\Marker\\SensitiveParameterValue("secret"));'
+  . "\n"
+  . '$node = new DebugNode();'
+  . "\n"
+  . '$node->next = $node;'
+  . "\n"
+  . 'debug!($node);'
+  . "\n"
+  . '$captured = "capture";'
+  . "\n"
+  . 'debug!(function () use ($captured): string { return $captured; });'
+  . "\n"
+  . '$items = vec[];'
+  . "\n"
+  . '$index = 0;'
+  . "\n"
+  . 'while ($index < 70) {'
+  . "\n"
+  . '  $items[] = $index;'
+  . "\n"
+  . '  $index++;'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'debug!($items);'
+  . "\n"
+  . '$nested = null;'
+  . "\n"
+  . '$index = 0;'
+  . "\n"
+  . 'while ($index < 34) {'
+  . "\n"
+  . '  $nested = vec[$nested];'
+  . "\n"
+  . '  $index++;'
+  . "\n"
+  . '}'
+  . "\n"
+  . 'debug!($nested);'
+  . "\n",
+);
+
+$run = Command\run($binary, vec[$source]);
+assert!($run->isSuccess());
+assert!(length!($run->standardOutput) == 0);
+$assertion_value_4 = $run->standardError;
+assert!(
+  Whim\Str\contains(
+    $assertion_value_4,
+    '[' . Filesystem\canonicalize($source) . ':18:3] DebugBox<string> {',
+  ),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_4,
+    'protected string $inherited = <hidden>;',
+  ),
+);
+
+assert!(
+  Whim\Str\contains($assertion_value_4, 'private int $secret = <hidden>;'),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_4,
+    'public readonly string $value = string(5) "hello";',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_4, 'DebugId(42)'));
+assert!(
+  Whim\Str\contains($assertion_value_4, 'string(6) "a\\xff\\n\\"\\\\\\x00"'),
+);
+
+assert!(
+  Whim\Str\contains(
+    $assertion_value_4,
+    'Whim\\Marker\\SensitiveParameterValue(<redacted>)',
+  ),
+);
+
+assert!(!Whim\Str\contains($assertion_value_4, 'secret"'));
+assert!(
+  Whim\Str\contains(
+    $assertion_value_4,
+    '...<recursive reference to DebugNode>',
+  ),
+);
+
+assert!(Whim\Str\contains($assertion_value_4, 'captures(1) ['));
+assert!(Whim\Str\contains($assertion_value_4, 'string(7) "capture"'));
+assert!(Whim\Str\contains($assertion_value_4, '...<6 more items redacted>'));
+assert!(Whim\Str\contains($assertion_value_4, '...<maximum depth 32 reached>'));
+
+Filesystem\delete_directory($work, true);

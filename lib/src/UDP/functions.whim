@@ -1,0 +1,96 @@
+namespace Whim\UDP;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\IP\Address;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\ConnectionException;
+use Whim\Network\Host;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Port;
+
+/** Creates a UDP socket bound to a local endpoint. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function bind(
+  InternetEndpoint $endpoint = new InternetEndpoint(Address::v4('0.0.0.0'), 0),
+  BindConfiguration $configuration = new BindConfiguration(),
+): Socket {
+  $descriptor = Whim\Network\_Private\create_socket(
+    Whim\Network\_Private\socket_family($endpoint->address->family),
+    Whim\_Private\SOCKET_KIND_DATAGRAM,
+  );
+
+  try {
+    _Private\configure($descriptor, $endpoint->address->family, $configuration);
+
+    Whim\_Private\bind_socket(
+      $descriptor,
+      $endpoint->address->toString(),
+      $endpoint->port,
+    );
+
+    Whim\_Private\enable_message_metadata($descriptor);
+    $local = Whim\Network\_Private\internet_endpoint(
+      Whim\_Private\socket_address($descriptor),
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    $descriptor->close();
+    Whim\Network\_Private\failure($error);
+  }
+
+  return new _Private\SocketImpl($descriptor, $local);
+}
+
+/** Creates a UDP socket connected to one peer. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function connect(
+  Host $host,
+  Port $port,
+  null|InternetEndpoint $bindTo = null,
+  BindConfiguration $configuration = new BindConfiguration(),
+  null|CancellationToken $cancellation = null,
+): ConnectedSocket {
+  $addresses = Whim\Network\_Private\resolve_host_addresses(
+    $host,
+    $cancellation,
+  );
+
+  $last = null;
+  foreach ($addresses as $address) {
+    if ($bindTo != null && $bindTo->address->family != $address->family) {
+      continue;
+    }
+
+    $local = $bindTo;
+    if ($local == null) {
+      $localAddress = match ($address->family) {
+        Whim\IP\Family::V4 => Address::v4('0.0.0.0'),
+        Whim\IP\Family::V6 => Address::v6('::'),
+      };
+
+      $local = new InternetEndpoint($localAddress, 0);
+    }
+
+    $socket = bind($local, $configuration);
+    try {
+      return $socket->connect(
+        new InternetEndpoint($address, $port),
+        $cancellation,
+      );
+    } catch (ConnectionException $error) {
+      $socket->close();
+      $last = $error;
+    }
+  }
+
+  throw new ConnectionException(
+    'failed to connect to the UDP host',
+    previous: $last,
+  );
+}

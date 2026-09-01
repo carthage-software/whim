@@ -1,0 +1,214 @@
+namespace Whim\MIME\_Private;
+
+use Whim;
+use Whim\MIME\Header;
+use Whim\MIME\Parameter;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+use Whim\SecureRandom;
+use Whim\Str;
+
+/** Reports whether bytes form an RFC 2045 token. */
+#[AlwaysInline]
+function is_token(string $value): bool {
+  if ($value == '') {
+    return false;
+  }
+
+  $index = 0;
+  while ($index < length!($value)) {
+    $byte = Str\ord($value[$index]);
+    if (
+      $byte <= 32
+      || $byte >= 127
+      || Str\contains('()<>@,;:\\"/?=[]', $value[$index])
+    ) {
+      return false;
+    }
+
+    $index++;
+  }
+
+  return true;
+}
+
+/** Reports whether a media type component follows RFC 6838. */
+#[AlwaysInline]
+function is_media_component(string $value): bool {
+  if ($value == '' || length!($value) > 127) {
+    return false;
+  }
+
+  $index = 0;
+  while ($index < length!($value)) {
+    $byte = Str\ord($value[$index]);
+    if (
+      !($byte is 48..=57|97..=122 || Str\contains('!#$&-^_.+', $value[$index]))
+    ) {
+      return false;
+    }
+
+    $index++;
+  }
+
+  return true;
+}
+
+/** Parses semicolon-prefixed MIME parameters. */
+function parse_parameters(string $input): null|vec<Parameter> {
+  $parameters = vec[];
+  $index = 0;
+  $length = length!($input);
+  while ($index < $length) {
+    while ($index < $length && ($input[$index] is ' '|"\t"|';')) {
+      $index++;
+    }
+
+    if ($index >= $length) {
+      break;
+    }
+
+    $nameStart = $index;
+    while ($index < $length && $input[$index] != '=') {
+      if ($input[$index] == ';') {
+        return null;
+      }
+
+      $index++;
+    }
+
+    if ($index >= $length) {
+      return null;
+    }
+
+    $name = Str\lowercase(
+      Str\trim(Str\slice($input, $nameStart, $index - $nameStart)),
+    );
+
+    if (!is_token($name)) {
+      return null;
+    }
+
+    $index++;
+    while ($index < $length && ($input[$index] is ' '|"\t")) {
+      $index++;
+    }
+
+    $value = '';
+    if ($index < $length && $input[$index] == '"') {
+      $index++;
+      $closed = false;
+      while ($index < $length) {
+        $byte = $input[$index++];
+        if ($byte == '"') {
+          $closed = true;
+          break;
+        }
+
+        if ($byte == '\\' && $index < $length) {
+          $value .= $input[$index++];
+        } else {
+          $value .= $byte;
+        }
+      }
+
+      if (!$closed) {
+        return null;
+      }
+    } else {
+      $valueStart = $index;
+      while ($index < $length && $input[$index] != ';') {
+        $index++;
+      }
+
+      $value = Str\trim(Str\slice($input, $valueStart, $index - $valueStart));
+    }
+
+    $parameters[] = ($name, $value);
+    while ($index < $length && ($input[$index] is ' '|"\t")) {
+      $index++;
+    }
+
+    if ($index < $length && $input[$index] != ';') {
+      return null;
+    }
+  }
+
+  return $parameters;
+}
+
+/** Serializes one MIME parameter value. */
+function serialize_parameter_value(string $value): string {
+  if (is_token($value)) {
+    return $value;
+  }
+
+  return (
+    '"' . Str\replace_every($value, dict['\\' => '\\\\', '"' => '\\"']) . '"'
+  );
+}
+
+/** Reports whether a MIME header pair is safe to serialize. */
+#[AlwaysInline]
+function valid_header(string $name, string $value): bool {
+  if ($name == '' || Str\contains($value, "\r") || Str\contains($value, "\n")) {
+    return false;
+  }
+
+  $index = 0;
+  while ($index < length!($name)) {
+    $byte = Str\ord($name[$index]);
+    if ($byte < 33 || $byte > 126 || $name[$index] == ':') {
+      return false;
+    }
+
+    $index++;
+  }
+
+  return true;
+}
+
+/** Folds one MIME header at whitespace boundaries. */
+function fold_header(
+  string $name,
+  string $value,
+  int $softLimit,
+  int $hardLimit,
+): string {
+  $line = $name . ': ' . $value;
+  if (length!($line) <= $softLimit) {
+    return $line . "\r\n";
+  }
+
+  $result = $name . ':';
+  $lineLength = length!($name) + 1;
+  foreach (Str\words($value) as $word) {
+    $length = length!($word) + 1;
+    if ($lineLength + $length > $softLimit) {
+      $result .= "\r\n ";
+      $lineLength = 1;
+    } else {
+      $result .= ' ';
+      $lineLength++;
+    }
+
+    while (length!($word) + $lineLength > $hardLimit) {
+      $available = $hardLimit - $lineLength;
+      $result .= Str\slice($word, 0, $available) . "\r\n ";
+      $word = Str\slice($word, $available);
+      $lineLength = 1;
+    }
+
+    $result .= $word;
+    $lineLength += length!($word);
+  }
+
+  return $result . "\r\n";
+}
+
+/** Generates a MIME multipart boundary. */
+#[MustUse]
+function generate_boundary(): NonEmptyString {
+  return ('=_whim_' . SecureRandom\string(48)) as NonEmptyString;
+}

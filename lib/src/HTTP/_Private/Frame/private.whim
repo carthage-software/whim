@@ -1,0 +1,406 @@
+namespace Whim\HTTP\_Private\Frame\_Private;
+
+use Whim\Binary;
+use Whim\HTTP\_Private\ErrorCode;
+use Whim\HTTP\_Private\Frame;
+use Whim\HTTP\_Private\FrameDecodingException;
+use Whim\HTTP\_Private\StreamException;
+use Whim\Str;
+
+/** Maps a raw frame envelope to its typed representation. */
+function parse(
+  int $type,
+  int $flags,
+  int $stream,
+  string $payload,
+): Frame\WeakendFrame {
+  return match ($type) {
+    0x0 => parse_data($flags, $stream, $payload),
+    0x1 => parse_headers($flags, $stream, $payload),
+    0x2 => parse_priority($stream, $payload),
+    0x3 => parse_reset($stream, $payload),
+    0x4 => parse_settings($flags, $stream, $payload),
+    0x5 => parse_push_promise($flags, $stream, $payload),
+    0x6 => parse_ping($flags, $stream, $payload),
+    0x7 => parse_go_away($stream, $payload),
+    0x8 => parse_window_update($stream, $payload),
+    0x9 => parse_continuation($flags, $stream, $payload),
+    $_ => (10, $type, $flags, $stream, $payload),
+  };
+}
+
+function parse_data(int $flags, int $stream, string $payload): Frame\DataFrame {
+  require_stream($stream, 'DATA');
+  ($data, $padding) = unpad($flags, $payload, 0);
+
+  return (0, $stream, $data, ($flags & 0x1) != 0, $padding);
+}
+
+function parse_headers(
+  int $flags,
+  int $stream,
+  string $payload,
+): Frame\HeadersFrame {
+  require_stream($stream, 'HEADERS');
+  ($payload, $padding) = unpad($flags, $payload, 0);
+  $dependency = null;
+  $weight = null;
+  $exclusive = false;
+  if (($flags & 0x20) != 0) {
+    if (length!($payload) < 5) {
+      frame_size_error('the `HEADERS` payload is missing priority data');
+    }
+
+    $encodedDependency = Binary\decode_u32(Str\slice($payload, 0, 4));
+    $exclusive = ($encodedDependency & 0x80000000) != 0;
+    $dependency = $encodedDependency & 0x7fffffff;
+    $weight = Str\ord($payload[4]) + 1;
+    $payload = Str\slice($payload, 5);
+  }
+
+  return (
+    1,
+    $stream,
+    $payload,
+    ($flags & 0x1) != 0,
+    ($flags & 0x4) != 0,
+    $dependency,
+    $weight,
+    $exclusive,
+    $padding,
+  );
+}
+
+function parse_priority(int $stream, string $payload): Frame\PriorityFrame {
+  require_stream($stream, 'PRIORITY');
+  if (length!($payload) != 5) {
+    throw new StreamException(
+      '`PRIORITY` requires exactly 5 payload bytes',
+      $stream,
+      ErrorCode::FrameSizeError->value,
+    );
+  }
+
+  $dependency = Binary\decode_u32(Str\slice($payload, 0, 4));
+
+  return (
+    2,
+    $stream,
+    $dependency & 0x7fffffff,
+    Str\ord($payload[4]) + 1,
+    ($dependency & 0x80000000) != 0,
+  );
+}
+
+function parse_reset(int $stream, string $payload): Frame\RstStreamFrame {
+  require_stream($stream, 'RST_STREAM');
+  require_length($payload, 4, 'RST_STREAM');
+
+  return (3, $stream, Binary\decode_u32($payload));
+}
+
+function parse_settings(
+  int $flags,
+  int $stream,
+  string $payload,
+): Frame\SettingsFrame {
+  require_connection($stream, 'SETTINGS');
+  $ack = ($flags & 0x1) != 0;
+  if ($ack && $payload != '') {
+    frame_size_error('a SETTINGS acknowledgment must have an empty payload');
+  }
+
+  if ((length!($payload) % 6) != 0) {
+    frame_size_error(
+      'a SETTINGS payload must contain complete six-byte entries',
+    );
+  }
+
+  $settings = dict[];
+  $offset = 0;
+  while ($offset < length!($payload)) {
+    $id = Binary\decode_u16(Str\slice($payload, $offset, 2));
+    $value = Binary\decode_u32(Str\slice($payload, $offset + 2, 4));
+    if ($id != 0) {
+      $settings[$id] = $value;
+    }
+
+    $offset += 6;
+  }
+
+  return (4, $settings, $ack);
+}
+
+function parse_push_promise(
+  int $flags,
+  int $stream,
+  string $payload,
+): Frame\PushPromiseFrame {
+  require_stream($stream, 'PUSH_PROMISE');
+  if (length!($payload) < 4) {
+    frame_size_error('a PUSH_PROMISE payload must contain a stream identifier');
+  }
+
+  ($payload, $padding) = unpad($flags, $payload, 4);
+  $promised = Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7fffffff;
+  require_stream($promised, 'PUSH_PROMISE');
+
+  return (
+    5,
+    $stream,
+    $promised,
+    Str\slice($payload, 4),
+    ($flags & 0x4) != 0,
+    $padding,
+  );
+}
+
+function parse_ping(int $flags, int $stream, string $payload): Frame\PingFrame {
+  require_connection($stream, 'PING');
+  require_length($payload, 8, 'PING');
+
+  return (6, $payload, ($flags & 0x1) != 0);
+}
+
+function parse_go_away(int $stream, string $payload): Frame\GoAwayFrame {
+  require_connection($stream, 'GOAWAY');
+  if (length!($payload) < 8) {
+    frame_size_error('a GOAWAY payload must contain at least eight bytes');
+  }
+
+  return (
+    7,
+    Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7fffffff,
+    Binary\decode_u32(Str\slice($payload, 4, 4)),
+    Str\slice($payload, 8),
+  );
+}
+
+function parse_window_update(
+  int $stream,
+  string $payload,
+): Frame\WindowUpdateFrame {
+  require_length($payload, 4, 'WINDOW_UPDATE');
+  $increment = Binary\decode_u32($payload) & 0x7fffffff;
+  if ($increment == 0) {
+    if ($stream != 0) {
+      throw new StreamException(
+        'a WINDOW_UPDATE increment must not be zero',
+        $stream,
+        ErrorCode::ProtocolError->value,
+      );
+    }
+
+    malformed('a WINDOW_UPDATE increment must not be zero');
+  }
+
+  return (8, $stream, $increment);
+}
+
+function parse_continuation(
+  int $flags,
+  int $stream,
+  string $payload,
+): Frame\ContinuationFrame {
+  require_stream($stream, 'CONTINUATION');
+
+  return (9, $stream, $payload, ($flags & 0x4) != 0);
+}
+
+function encode_data(Frame\DataFrame $frame): (int, int, int, string) {
+  $flags = match ($frame[3]) {
+    true => 0x1,
+    false => 0,
+  };
+
+  $payload = $frame[2];
+  if ($frame[4] > 0) {
+    $flags |= 0x8;
+    $payload = Binary\encode_u8($frame[4]) . $payload . padding($frame[4]);
+  }
+
+  return (0x0, $flags, $frame[1], $payload);
+}
+
+function encode_headers(Frame\HeadersFrame $frame): (int, int, int, string) {
+  $flags = match ($frame[3]) {
+    true => 0x1,
+    false => 0,
+  };
+
+  if ($frame[4]) {
+    $flags |= 0x4;
+  }
+
+  $payload = $frame[2];
+  if ($frame[5] != null) {
+    $flags |= 0x20;
+    $dependency = $frame[5];
+    if ($frame[7]) {
+      $dependency |= 0x80000000;
+    }
+
+    $payload =
+      Binary\encode_u32($dependency)
+      . Binary\encode_u8(($frame[6] ?? 16) - 1)
+      . $payload;
+  }
+
+  if ($frame[8] > 0) {
+    $flags |= 0x8;
+    $payload = Binary\encode_u8($frame[8]) . $payload . padding($frame[8]);
+  }
+
+  return (0x1, $flags, $frame[1], $payload);
+}
+
+function encode_priority(Frame\PriorityFrame $frame): (int, int, int, string) {
+  $dependency = $frame[2];
+  if ($frame[4]) {
+    $dependency |= 0x80000000;
+  }
+
+  return (
+    0x2,
+    0,
+    $frame[1],
+    Binary\encode_u32($dependency) . Binary\encode_u8($frame[3] - 1),
+  );
+}
+
+function encode_reset(Frame\RstStreamFrame $frame): (int, int, int, string) {
+  return (0x3, 0, $frame[1], Binary\encode_u32($frame[2]));
+}
+
+function encode_settings(Frame\SettingsFrame $frame): (int, int, int, string) {
+  if ($frame[2] && $frame[1] != dict[]) {
+    malformed('a SETTINGS acknowledgment cannot carry settings');
+  }
+
+  $payload = '';
+  foreach ($frame[1] as $id => $value) {
+    $payload .= Binary\encode_u16($id) . Binary\encode_u32($value);
+  }
+
+  $flags = match ($frame[2]) {
+    true => 0x1,
+    false => 0,
+  };
+
+  return (0x4, $flags, 0, $payload);
+}
+
+function encode_push_promise(
+  Frame\PushPromiseFrame $frame,
+): (int, int, int, string) {
+  $flags = match ($frame[4]) {
+    true => 0x4,
+    false => 0,
+  };
+
+  $payload = Binary\encode_u32($frame[2]) . $frame[3];
+
+  if ($frame[5] > 0) {
+    $flags |= 0x8;
+    $payload = Binary\encode_u8($frame[5]) . $payload . padding($frame[5]);
+  }
+
+  return (0x5, $flags, $frame[1], $payload);
+}
+
+function encode_ping(Frame\PingFrame $frame): (int, int, int, string) {
+  require_length($frame[1], 8, 'PING');
+
+  $flags = match ($frame[2]) {
+    true => 0x1,
+    false => 0,
+  };
+
+  return (0x6, $flags, 0, $frame[1]);
+}
+
+function encode_go_away(Frame\GoAwayFrame $frame): (int, int, int, string) {
+  return (
+    0x7,
+    0,
+    0,
+    Binary\encode_u32($frame[1]) . Binary\encode_u32($frame[2]) . $frame[3],
+  );
+}
+
+function encode_window_update(
+  Frame\WindowUpdateFrame $frame,
+): (int, int, int, string) {
+  return (0x8, 0, $frame[1], Binary\encode_u32($frame[2]));
+}
+
+function encode_continuation(
+  Frame\ContinuationFrame $frame,
+): (int, int, int, string) {
+  return (
+    0x9,
+    match ($frame[3]) {
+      true => 0x4,
+      false => 0,
+    },
+    $frame[1],
+    $frame[2],
+  );
+}
+
+function unpad(int $flags, string $payload, int $minimum): (string, int) {
+  if (($flags & 0x8) == 0) {
+    if (length!($payload) < $minimum) {
+      malformed('the HTTP/2 frame payload is truncated');
+    }
+
+    return ($payload, 0);
+  }
+
+  if ($payload == '') {
+    malformed('the padded HTTP/2 frame omits its padding length');
+  }
+
+  $padding = Str\ord($payload[0]);
+  if (length!($payload) - 1 - $padding < $minimum) {
+    malformed('the HTTP/2 frame padding exceeds its payload');
+  }
+
+  return (Str\slice($payload, 1, length!($payload) - 1 - $padding), $padding);
+}
+
+function padding(int $length): string {
+  if ($length == 0) {
+    return '';
+  }
+
+  return Str\pad_right('', $length, "\x00");
+}
+
+function require_stream(int $stream, string $type): void {
+  if ($stream == 0) {
+    malformed('`' . $type . '` requires a non-zero stream identifier');
+  }
+}
+
+function require_connection(int $stream, string $type): void {
+  if ($stream != 0) {
+    malformed('`' . $type . '` must use stream zero');
+  }
+}
+
+function require_length(string $payload, int $length, string $type): void {
+  if (length!($payload) != $length) {
+    frame_size_error(
+      '`' . $type . '` requires exactly ' . $length . ' payload bytes',
+    );
+  }
+}
+
+function malformed(string $message): never {
+  throw new FrameDecodingException($message);
+}
+
+function frame_size_error(string $message): never {
+  throw new FrameDecodingException($message, ErrorCode::FrameSizeError->value);
+}

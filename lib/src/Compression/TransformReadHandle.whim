@@ -1,0 +1,94 @@
+namespace Whim\Compression;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\LimitExceededException;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\_Private\string_slice;
+
+/** Applies a streaming byte transformer while reading another handle. */
+final class TransformReadHandle implements ReadHandle {
+  private string $buffer = '';
+  private bool $finished = false;
+  private int $produced = 0;
+
+  public function __construct(
+    private ReadHandle $source,
+    private Transformer $transformer,
+    private null|NonNegativeInt $maximumOutputBytes = null,
+  ) {}
+
+  /** Waits until input may produce transformed bytes. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->buffer != '' || $this->finished) {
+      return;
+    }
+
+    if (!$this->source->reachedEndOfDataSource()) {
+      $this->source->waitUntilReadable($cancellation);
+    }
+  }
+
+  /** Reports whether the transformer and its buffered output are exhausted. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->finished && $this->buffer == '';
+  }
+
+  /** Attempts to read transformed output without waiting. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($maxBytes == 0) {
+      return '';
+    }
+
+    while ($this->buffer == '' && !$this->finished) {
+      if ($this->source->reachedEndOfDataSource()) {
+        $this->append($this->transformer->finish());
+        $this->finished = true;
+        break;
+      }
+
+      $input = match ($this->source->tryRead()) {
+        '' => return '',
+        $input => $input,
+      };
+
+      $this->append($this->transformer->push($input));
+    }
+
+    $length = length!($this->buffer);
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $result = string_slice($this->buffer, 0, $length);
+    $this->buffer = string_slice(
+      $this->buffer,
+      $length,
+      length!($this->buffer) - $length,
+    );
+
+    return $result;
+  }
+
+  /** Buffers output while enforcing its optional total byte limit. */
+  #[TrackCaller]
+  private function append(string $bytes): void {
+    $this->produced += length!($bytes);
+    if (
+      $this->maximumOutputBytes != null
+      && $this->produced > $this->maximumOutputBytes
+    ) {
+      throw new LimitExceededException(
+        "transformed output exceeded the handle's byte limit",
+      );
+    }
+
+    $this->buffer .= $bytes;
+  }
+}

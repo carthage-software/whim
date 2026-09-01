@@ -1,0 +1,2 @@
+class Box<T> {}
+class C<U: Box<int, string>> {}

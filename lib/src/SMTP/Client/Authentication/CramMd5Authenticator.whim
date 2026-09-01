@@ -1,0 +1,58 @@
+namespace Whim\SMTP\Client\Authentication;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\Hex;
+use Whim\Hash;
+use Whim\Hash\Algorithm;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\Client\Connection;
+
+/** Implements RFC 2195 CRAM-MD5 authentication. */
+final readonly class CramMd5Authenticator implements Authenticator {
+  public function __construct(
+    private string $username,
+    #[SensitiveParameter] private string $password,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function mechanism(): NonEmptyString {
+    return 'CRAM-MD5';
+  }
+
+  #[TrackCaller]
+  public function authenticate(
+    Connection $connection,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    _Private\require_mechanism($connection, $this->mechanism());
+    $reply = $connection->sendCommand('AUTH CRAM-MD5', $cancellation);
+    if ($reply->code != 334) {
+      throw _Private\rejected($this->mechanism(), $reply);
+    }
+
+    try {
+      $challenge = Base64\decode($reply->message);
+    } catch (DecodingException $_) {
+      throw _Private\rejected($this->mechanism(), $reply);
+    }
+
+    $digest = Hex\encode(
+      Hash\hmac(Algorithm::Md5, $this->password, $challenge),
+    );
+
+    _Private\require_authentication_success(
+      $this->mechanism(),
+      $connection->sendLine(
+        Base64\encode($this->username . ' ' . $digest),
+        $cancellation,
+      ),
+    );
+  }
+}

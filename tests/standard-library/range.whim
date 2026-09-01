@@ -1,0 +1,69 @@
+use Whim\Math;
+use Whim\Range;
+use Whim\Unwind\DiscardedResultError;
+
+$full = Range\full();
+assert!($full->contains(Math\INT_MIN));
+assert!($full->contains(Math\INT_MAX));
+
+$to = Range\to(3);
+assert!($to->contains(2));
+assert!(!($to->contains(3)));
+
+$between = Range\between(2, 5, true);
+assert!($between->contains(2));
+assert!($between->contains(5));
+assert!(!($between->contains(6)));
+assert!($between is Range\LowerBoundRange);
+assert!($between is Range\UpperBoundRange);
+
+$values = vec[];
+foreach ($between as $key => $value) {
+  assert!($key == length!($values));
+  $values[] = $value;
+}
+
+assert!($values == vec[2, 3, 4, 5]);
+
+$maximum = vec[];
+foreach (Range\between(Math\INT_MAX, Math\INT_MAX, true) as $value) {
+  $maximum[] = $value;
+}
+
+assert!($maximum == vec[Math\INT_MAX]);
+
+$assertion_value_13 = fn(): Range\BetweenRange => Range\between(5, 2);
+$assertion_error_13 = null;
+try {
+  $assertion_value_13();
+} catch (Range\InvalidRangeException $assertion_caught_13) {
+  $assertion_error_13 = $assertion_caught_13;
+}
+
+assert!($assertion_error_13 is Range\InvalidRangeException);
+
+$assertion_value_14 = function(): void {
+  Range\full();
+};
+
+$assertion_error_14 = null;
+try {
+  $assertion_value_14();
+} catch (DiscardedResultError $assertion_caught_14) {
+  $assertion_error_14 = $assertion_caught_14;
+}
+
+assert!($assertion_error_14 is DiscardedResultError);
+
+$assertion_value_15 = function() use ($between): void {
+  $between->withUpperBoundInclusive(10);
+};
+
+$assertion_error_15 = null;
+try {
+  $assertion_value_15();
+} catch (DiscardedResultError $assertion_caught_15) {
+  $assertion_error_15 = $assertion_caught_15;
+}
+
+assert!($assertion_error_15 is DiscardedResultError);

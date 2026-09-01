@@ -1,0 +1,381 @@
+namespace Whim\Str;
+
+use Whim\Dict;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\MustUse;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Str\_Private;
+use Whim\Vec;
+use Whim;
+
+/** Converts ASCII letters to lowercase. */
+#[MustUse]
+#[TrackCaller]
+function lowercase(string $string): string {
+  return Whim\_Private\string_lowercase($string);
+}
+
+/** Converts ASCII letters to uppercase. */
+#[MustUse]
+#[TrackCaller]
+function uppercase(string $string): string {
+  return Whim\_Private\string_uppercase($string);
+}
+
+/** Capitalizes the first ASCII letter. */
+#[MustUse]
+#[TrackCaller]
+function capitalize(string $string): string {
+  if ($string == '') {
+    return '';
+  }
+
+  return chr(_Private\ascii_upper(ord($string[0]))) . slice($string, 1);
+}
+
+/** Capitalizes words separated by the requested delimiters. */
+#[MustUse]
+#[TrackCaller]
+function capitalize_words(
+  string $string,
+  string $delimiters = " \t\r\n\f\v",
+): string {
+  return Whim\_Private\string_capitalize_words($string, $delimiters);
+}
+
+/** Reverses the bytes in a string. */
+#[MustUse]
+#[TrackCaller]
+function reverse(string $string): string {
+  return Whim\_Private\string_reverse($string);
+}
+
+/** Repeats a string the requested number of times. */
+#[MustUse]
+#[TrackCaller]
+function repeat(string $string, NonNegativeInt $times): string {
+  if ($times == 0 || $string == '') {
+    return '';
+  }
+
+  if ($times == 1) {
+    return $string;
+  }
+
+  return Whim\_Private\string_pad(
+    '',
+    length!($string) * $times,
+    $string as NonEmptyString,
+    2,
+  );
+}
+
+/** Applies the ROT13 substitution to ASCII letters. */
+#[MustUse]
+#[TrackCaller]
+function rot13(string $string): string {
+  return Whim\_Private\string_rot13($string);
+}
+
+/** Replaces occurrences of a substring. */
+#[MustUse]
+#[TrackCaller]
+function replace(
+  string $haystack,
+  string $needle,
+  string $replacement,
+): string {
+  return Whim\_Private\string_replace($haystack, $needle, $replacement, false);
+}
+
+/** Replaces occurrences without ASCII case sensitivity. */
+#[MustUse]
+#[TrackCaller]
+function replace_ci(
+  string $haystack,
+  string $needle,
+  string $replacement,
+): string {
+  return Whim\_Private\string_replace($haystack, $needle, $replacement, true);
+}
+
+/** Applies several substring replacements in one pass over the subject. */
+#[MustUse]
+#[TrackCaller]
+function replace_every(
+  string $haystack,
+  Iterable<string, string> $replacements,
+): string {
+  $replacements = Dict\from_iterable::<string, string>($replacements);
+  $result = '';
+  $offset = 0;
+  $length = length!($haystack);
+  while ($offset < $length) {
+    $best = null;
+    foreach ($replacements as $needle => $replacement) {
+      if ($needle == '') {
+        continue;
+      }
+
+      $position = Whim\_Private\memmem($haystack, $needle, $offset, false);
+      if ($position != null) {
+        $candidate = $position;
+        if ($best == null || $candidate < $best[0]) {
+          $best = ($candidate, $needle, $replacement);
+        }
+      }
+    }
+
+    if ($best == null) {
+      return $result . slice($haystack, $offset);
+    }
+
+    $result .= slice($haystack, $offset, $best[0] - $offset);
+    $result .= $best[2];
+    $offset = $best[0] + length!($best[1]);
+  }
+
+  return $result;
+}
+
+/** Applies several replacements in one pass without ASCII case sensitivity. */
+#[MustUse]
+#[TrackCaller]
+function replace_every_ci(
+  string $haystack,
+  Iterable<string, string> $replacements,
+): string {
+  $replacements = Dict\from_iterable::<string, string>($replacements);
+  $result = '';
+  $offset = 0;
+  $length = length!($haystack);
+  while ($offset < $length) {
+    $best = null;
+    foreach ($replacements as $needle => $replacement) {
+      if ($needle == '') {
+        continue;
+      }
+
+      $position = search_ci($haystack, $needle, $offset);
+      if ($position != null) {
+        $candidate = $position;
+        if ($best == null || $candidate < $best[0]) {
+          $best = ($candidate, $needle, $replacement);
+        }
+      }
+    }
+
+    if ($best == null) {
+      return $result . slice($haystack, $offset);
+    }
+
+    $result .= slice($haystack, $offset, $best[0] - $offset);
+    $result .= $best[2];
+    $offset = $best[0] + length!($best[1]);
+  }
+
+  return $result;
+}
+
+/** Removes a prefix when it is present. */
+#[MustUse]
+#[TrackCaller]
+function strip_prefix(string $string, string $prefix): string {
+  return match (starts_with($string, $prefix)) {
+    true => slice($string, length!($prefix)),
+    false => $string,
+  };
+}
+
+/** Removes a suffix when it is present. */
+#[MustUse]
+#[TrackCaller]
+function strip_suffix(string $string, string $suffix): string {
+  return match (ends_with($string, $suffix)) {
+    true => slice($string, 0, length!($string) - length!($suffix)),
+    false => $string,
+  };
+}
+
+/** Pads the start of a string to a target byte length. */
+#[MustUse]
+#[TrackCaller]
+function pad_left(
+  string $string,
+  NonNegativeInt $totalLength,
+  NonEmptyString $padString = ' ',
+): string {
+  return Whim\_Private\string_pad($string, $totalLength, $padString, 0);
+}
+
+/** Pads the end of a string to a target byte length. */
+#[MustUse]
+#[TrackCaller]
+function pad_right(
+  string $string,
+  NonNegativeInt $totalLength,
+  NonEmptyString $padString = ' ',
+): string {
+  return Whim\_Private\string_pad($string, $totalLength, $padString, 2);
+}
+
+/** Removes selected bytes from the start of a string. */
+#[MustUse]
+#[TrackCaller]
+function trim_left(string $string, null|string $characterMask = null): string {
+  return Whim\_Private\string_trim(
+    $string,
+    $characterMask ?? _Private\default_whitespace(),
+    0,
+  );
+}
+
+/** Removes selected bytes from the end of a string. */
+#[MustUse]
+#[TrackCaller]
+function trim_right(string $string, null|string $characterMask = null): string {
+  return Whim\_Private\string_trim(
+    $string,
+    $characterMask ?? _Private\default_whitespace(),
+    2,
+  );
+}
+
+/** Removes selected bytes from both ends of a string. */
+#[MustUse]
+#[TrackCaller]
+function trim(string $string, null|string $characterMask = null): string {
+  return Whim\_Private\string_trim(
+    $string,
+    $characterMask ?? _Private\default_whitespace(),
+    1,
+  );
+}
+
+/** Returns the bytes of a string in random order. */
+#[MustUse]
+#[TrackCaller]
+function shuffle(string $string): string {
+  $bytes = Vec\shuffle::<int>(Whim\_Private\string_to_bytes($string));
+  return Whim\_Private\string_from_bytes($bytes);
+}
+
+/** Splits a string into words. */
+#[MustUse]
+#[TrackCaller]
+function words(
+  string $string,
+  null|string $additionalCharacters = null,
+): dict<int, string> {
+  $result = dict[];
+  $index = 0;
+  while ($index < length!($string)) {
+    while (
+      $index < length!($string)
+      && !_Private\word_byte(ord($string[$index]), $additionalCharacters)
+    ) {
+      $index++;
+    }
+
+    if ($index == length!($string)) {
+      break;
+    }
+
+    $start = $index;
+    $index++;
+    while ($index < length!($string)) {
+      $byte = ord($string[$index]);
+      if (_Private\word_byte($byte, $additionalCharacters)) {
+        $index++;
+        continue;
+      }
+
+      if (
+        ($byte == 39 || $byte == 45)
+        && $index + 1 < length!($string)
+        && _Private\word_byte(ord($string[$index + 1]), $additionalCharacters)
+      ) {
+        $index++;
+        continue;
+      }
+
+      break;
+    }
+
+    $result[$start] = slice($string, $start, $index - $start);
+  }
+
+  return $result;
+}
+
+/** Wraps text to the requested line width. */
+#[MustUse]
+#[TrackCaller]
+function wrap(
+  string $string,
+  PositiveInt $width = 75,
+  NonEmptyString $break = "\n",
+  bool $cut = false,
+): string {
+  $result = '';
+  $lineLength = 0;
+  $index = 0;
+  while ($index < length!($string)) {
+    if ($string[$index] == "\n") {
+      $result .= "\n";
+      $lineLength = 0;
+      $index++;
+      continue;
+    }
+
+    if ($lineLength == 0 && $string[$index] == ' ') {
+      $index++;
+      continue;
+    }
+
+    $wordEnd = $index;
+    while (
+      $wordEnd < length!($string)
+      && $string[$wordEnd] != ' '
+      && $string[$wordEnd] != "\n"
+    ) {
+      $wordEnd++;
+    }
+
+    $word = slice($string, $index, $wordEnd - $index);
+    if ($lineLength > 0 && $lineLength + length!($word) > $width) {
+      while (ends_with($result, ' ')) {
+        $result = slice($result, 0, length!($result) - 1);
+        $lineLength--;
+      }
+
+      $result .= $break;
+      $lineLength = 0;
+    }
+
+    while ($cut && length!($word) > $width) {
+      $result .= slice($word, 0, $width) . $break;
+      $word = slice($word, $width);
+    }
+
+    $result .= $word;
+    $lineLength += length!($word);
+    $index = $wordEnd;
+    if ($index < length!($string) && $string[$index] == ' ') {
+      if ($lineLength + 1 > $width) {
+        $result .= $break;
+        $lineLength = 0;
+      } else {
+        $result .= ' ';
+        $lineLength++;
+      }
+
+      $index++;
+    }
+  }
+
+  return $result;
+}

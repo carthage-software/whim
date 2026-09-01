@@ -1,0 +1,158 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+
+/** Reads bytes from a path through one blocking worker operation. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function read_file(
+  string $path,
+  (0..) $offset,
+  null|(1..) $maximumBytes,
+): string {}
+
+/** Represents one file operation running on the blocking worker pool. */
+#[Stub]
+final class FileOperation {
+  private function __construct() {}
+
+  /** Starts reading bytes from a descriptor. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function read(
+    FileDescriptor $descriptor,
+    1.. $maximumBytes,
+  ): FileOperation {}
+
+  /** Starts reading bytes directly from a path. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function readPath(
+    string $path,
+    (0..) $offset,
+    null|(1..) $maximumBytes,
+  ): FileOperation {}
+
+  /** Starts writing bytes to a descriptor. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function write(
+    FileDescriptor $descriptor,
+    string $bytes,
+  ): FileOperation {}
+
+  /** Starts synchronizing file data and metadata with storage. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function synchronize(
+    FileDescriptor $descriptor,
+  ): FileOperation {}
+
+  /** Starts changing a file's length. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function truncate(
+    FileDescriptor $descriptor,
+    (0..) $length,
+  ): FileOperation {}
+
+  /** Starts reading descriptor metadata. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function metadata(FileDescriptor $descriptor): FileOperation {}
+
+  /** Starts reading path metadata. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function pathMetadata(
+    string $path,
+    bool $follow,
+  ): FileOperation {}
+
+  /** Starts opening a path. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function open(
+    string $path,
+    int $flags,
+    int $mode,
+  ): FileOperation {}
+
+  /** Starts creating an anonymous temporary file. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function temporary(string $directory): FileOperation {}
+
+  /** Starts moving a descriptor cursor. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function seek(
+    FileDescriptor $descriptor,
+    int $offset,
+    int $origin,
+  ): FileOperation {}
+
+  /** Starts acquiring or releasing an advisory lock. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function lock(
+    FileDescriptor $descriptor,
+    int $kind,
+    bool $wait,
+  ): FileOperation {}
+
+  /** Suspends until this operation completes. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function wait(): void {}
+
+  /** Takes a completed byte result. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeBytes(): null|string {}
+
+  /** Takes a completed integer result. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeInt(): null|int {}
+
+  /** Takes a completed boolean result. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeBool(): null|bool {}
+
+  /** Takes completed metadata. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeMetadata(): null|vec<int> {}
+
+  /** Takes a completed descriptor. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function takeDescriptor(): null|FileDescriptor {}
+
+  /** Abandons this operation's result. */
+  public function cancel(): void {}
+}

@@ -1,0 +1,21 @@
+namespace Whim\SMTP\Client\Authentication;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\Client\Connection;
+
+/** Authenticates an initialized SMTP connection. */
+interface Authenticator {
+  /** Returns the SASL mechanism name. */
+  #[MustUse]
+  public function mechanism(): NonEmptyString;
+
+  /** Performs the mechanism exchange. */
+  #[TrackCaller]
+  public function authenticate(
+    Connection $connection,
+    null|CancellationToken $cancellation = null,
+  ): void;
+}

@@ -1,0 +1,111 @@
+namespace Whim\Time;
+
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Time\_Private as TimePrivate;
+use Whim;
+
+/** Represents a system time. */
+final readonly class SystemTime implements Order<SystemTime> {
+  #[TrackCaller]
+  private function __construct(public int $seconds, public int $nanoseconds) {}
+
+  /** Captures the current wall-clock time. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function now(): SystemTime {
+    $reading = Whim\_Private\get_system_time();
+    return new SystemTime($reading[0], $reading[1]);
+  }
+
+  /** Returns the Unix epoch. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function unixEpoch(): SystemTime {
+    return new SystemTime(0, 0);
+  }
+
+  /** Builds a wall-clock time from a Unix timestamp. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromUnixTimestamp(
+    int $seconds,
+    int $nanoseconds = 0,
+  ): SystemTime {
+    return new SystemTime($seconds, $nanoseconds);
+  }
+
+  /** Returns seconds. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getSeconds(): int {
+    return $this->seconds;
+  }
+
+  /** Returns nanoseconds. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function getNanoseconds(): int {
+    return $this->nanoseconds;
+  }
+
+  /** Measures the duration since an earlier wall-clock time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function durationSince(SystemTime $earlier): Duration {
+    return TimePrivate\duration_between(
+      $this->seconds,
+      $this->nanoseconds,
+      $earlier->seconds,
+      $earlier->nanoseconds,
+    );
+  }
+
+  /** Moves this time forward by a duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function plus(Duration $duration): SystemTime {
+    $shifted = TimePrivate\normalize_system_time(
+      $this->seconds + $duration->seconds,
+      $this->nanoseconds + $duration->nanoseconds,
+    );
+
+    return new SystemTime($shifted[0], $shifted[1]);
+  }
+
+  /** Moves this time backward by a duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minus(Duration $duration): SystemTime {
+    $shifted = TimePrivate\normalize_system_time(
+      $this->seconds - $duration->seconds,
+      $this->nanoseconds - $duration->nanoseconds,
+    );
+
+    return new SystemTime($shifted[0], $shifted[1]);
+  }
+
+  /** Compares this wall-clock time with another. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(SystemTime $other): Ordering {
+    if ($this->seconds != $other->seconds) {
+      return Ordering::from($this->seconds <=> $other->seconds);
+    }
+
+    return Ordering::from($this->nanoseconds <=> $other->nanoseconds);
+  }
+
+  /** Reports whether two wall-clock times are equal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(SystemTime $other): bool {
+    return (
+      $this->seconds == $other->seconds
+      && $this->nanoseconds == $other->nanoseconds
+    );
+  }
+}

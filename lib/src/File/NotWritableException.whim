@@ -1,0 +1,6 @@
+namespace Whim\File;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports a file that cannot be written. */
+final class NotWritableException extends InvalidArgumentException {}

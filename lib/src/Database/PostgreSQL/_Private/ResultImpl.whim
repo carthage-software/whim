@@ -1,0 +1,85 @@
+namespace Whim\Database\PostgreSQL\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Column;
+use Whim\Database\QueryException;
+use Whim\Database\Result;
+use Whim\Database\Row;
+use Whim\Database\_Private\BatchResult;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+use Whim\_Private\PostgreSQLResult;
+
+/** Implements a streaming PostgreSQL result. */
+final class ResultImpl implements Result, BatchResult {
+  private null|vec<Column> $columns = null;
+
+  /** Creates a result whose metadata is ready. */
+  public function __construct(private PostgreSQLResult $result) {}
+
+  /** Returns column metadata in row order. */
+  #[MustUse]
+  public function getColumns(): vec<Column> {
+    if ($this->columns != null) {
+      return $this->columns;
+    }
+
+    $columns = vec[];
+    foreach ($this->result->columns() as $column) {
+      if ($column[0] == '') {
+        throw new QueryException(
+          'the PostgreSQL server returned an empty column name',
+        );
+      }
+
+      $typeName = $column[1];
+      if ($typeName == '') {
+        $typeName = null;
+      }
+
+      $columns[] = new Column(
+        $column[0] as NonEmptyString,
+        $typeName as null|NonEmptyString,
+      );
+    }
+
+    $this->columns = $columns;
+    return $columns;
+  }
+
+  /** Returns the affected row count. */
+  #[MustUse]
+  public function getAffectedRows(): null|NonNegativeInt {
+    return $this->result->affectedRows();
+  }
+
+  /** Fetches the next row. */
+  #[MustUse]
+  #[TrackCaller]
+  public function fetch(null|CancellationToken $cancellation = null): null|Row {
+    return fetch($this->result, $cancellation) as null|Row;
+  }
+
+  /** Fetches every remaining row. */
+  #[MustUse]
+  #[TrackCaller]
+  public function fetchAll(
+    null|CancellationToken $cancellation = null,
+  ): vec<Row> {
+    return fetch_all($this->result, $cancellation) as vec<Row>;
+  }
+
+  /** Reports whether this result is closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->result->isClosed();
+  }
+
+  /** Discards unread rows. */
+  #[TrackCaller]
+  public function close(): void {
+    $this->result->close();
+  }
+}

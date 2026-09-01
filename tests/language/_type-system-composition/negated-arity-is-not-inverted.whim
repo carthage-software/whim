@@ -1,0 +1,4 @@
+class Pair<A, B> {}
+
+$value = new Pair::<int, string>();
+$value is !Pair<int>;

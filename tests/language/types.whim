@@ -1,0 +1,67 @@
+use Whim\Unwind\TypeError;
+
+assert!(5 is int);
+assert!(!(5 is float));
+assert!(5.0 is float);
+assert!('x' is string);
+assert!(null is null);
+assert!(true is bool);
+assert!(vec[1] is vec<_>);
+assert!(dict[] is dict<_, _>);
+assert!((1, 'a') is (int, string));
+assert!(!((1, 'a') is (int, int)));
+assert!(5 is int|string);
+assert!('y' is int|string);
+assert!(!(null is int|string));
+
+interface Shape {}
+
+class Circle implements Shape {}
+
+class Square {}
+
+$circle = new Circle();
+$square = new Square();
+assert!($circle is Shape);
+assert!($circle is Circle);
+assert!(!($square is Shape));
+assert!(!($square is Missing));
+
+assert!(5 as int == 5);
+$assertion_value_19 = function(): void {
+  $_ = 'text' as int;
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_19->getMessage(),
+      'expected int, string given',
+    ),
+  );
+}
+
+assert!($assertion_error_19 is TypeError);
+
+assert!('text' ?as int == null);
+
+$status = 'active';
+assert!($status is 'active');
+assert!(5 is 5);
+assert!(!(6 is 5));
+assert!(true is true);
+
+interface Named {}
+
+interface Aged {}
+
+class Person implements Named, Aged {}
+
+class Robot implements Named {}
+
+assert!(new Person() is Named&Aged);
+assert!(!(new Robot() is Named&Aged));

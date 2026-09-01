@@ -1,0 +1,93 @@
+namespace Whim\Async;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\_Private;
+use Whim\Unwind\Throwable;
+use Whim;
+
+/** Represents a task group. */
+final class TaskGroup {
+  private int $pending = 0;
+  private vec<Throwable> $errors = vec[];
+  private vec<_Private\Waiter<null>> $waiters = vec[];
+
+  /** Schedules a task and tracks its completion. */
+  #[TrackCaller]
+  public function defer(fn(): void $task): void {
+    $this->pending++;
+    Whim\_Private\defer_task(fn(): void {
+      try {
+        $task();
+      } catch (Throwable $error) {
+        $this->errors[] = $error;
+      } finally {
+        $this->pending--;
+        if ($this->pending == 0) {
+          $waiters = $this->waiters;
+          $this->waiters = vec[];
+          foreach ($waiters as $waiter) {
+            if ($waiter->active) {
+              $waiter->active = false;
+              $waiter->suspension->resume(null);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Waits for every scheduled task and reports their failures.
+   *
+   * @throws CompositeException when more than one task fails; a single failure is rethrown as itself.
+   * @throws CancelledException when the cancellation token is cancelled.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function awaitAll(null|CancellationToken $cancellation = null): void {
+    if ($cancellation != null) {
+      $cancellation->throwIfCancellationRequested();
+    }
+
+    if ($this->pending != 0) {
+      $suspension = Whim\_Private\create_suspension::<null>();
+      $waiter = new _Private\Waiter::<null>($suspension);
+      $this->waiters[] = $waiter;
+      $id = null;
+      if ($cancellation != null) {
+        $id = $cancellation->register(fn(): void {
+          if (!$waiter->active) {
+            return;
+          }
+
+          $waiter->active = false;
+          try {
+            $cancellation->throwIfCancellationRequested();
+          } catch (Throwable $error) {
+            $waiter->suspension->throw($error);
+          }
+        });
+      }
+
+      try {
+        $suspension->suspend();
+      } finally {
+        $waiter->active = false;
+        if ($cancellation != null && $id != null) {
+          $cancellation->unregister($id);
+        }
+      }
+    }
+
+    $errors = $this->errors;
+    $this->errors = vec[];
+    if (length!($errors) == 1) {
+      throw $errors[0];
+    }
+
+    if (length!($errors) > 1) {
+      throw new CompositeException($errors);
+    }
+  }
+}

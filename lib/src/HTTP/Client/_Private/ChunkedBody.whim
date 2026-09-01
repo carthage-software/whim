@@ -1,0 +1,230 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Message\FieldMap;
+use Whim\IO\BufferedReadHandle;
+use Whim\IO\CloseHandle;
+use Whim\IO\Exception as IOException;
+use Whim\IO\LimitExceededException;
+use Whim\IO\ReadHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\OverflowException;
+
+/** Decodes one chunked HTTP/1 response body. */
+final class ChunkedBody implements ReadHandle {
+  private int $chunkRemaining = 0;
+  private int $readBytes = 0;
+  private bool $needsTerminator = false;
+  private bool $completed = false;
+
+  public function __construct(
+    private BufferedReadHandle $reader,
+    private CloseHandle $transport,
+    private Deferred<FieldMap> $trailers,
+    private int $maximumBodyBytes,
+    private int $maximumTrailerBytes,
+    private bool $closeAtEnd,
+  ) {}
+
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if (!$this->completed) {
+      $this->reader->waitUntilReadable($cancellation);
+    }
+  }
+
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->completed;
+  }
+
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->completed || $this->chunkRemaining == 0) {
+      return '';
+    }
+
+    $data = $this->reader->tryRead($this->limit($maxBytes));
+    $this->consume($data);
+    return $data;
+  }
+
+  #[TrackCaller]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($this->completed) {
+      return '';
+    }
+
+    if ($this->chunkRemaining == 0) {
+      $this->beginChunk($cancellation);
+      if ($this->completed) {
+        return '';
+      }
+    }
+
+    $data = $this->reader->read($this->limit($maxBytes), $cancellation);
+    if ($data == '' && $this->reader->reachedEndOfDataSource()) {
+      $this->transport->close();
+      throw new ProtocolException('the response ended inside a chunk');
+    }
+
+    $this->consume($data);
+    return $data;
+  }
+
+  private function beginChunk(null|CancellationToken $cancellation): void {
+    if ($this->needsTerminator) {
+      try {
+        $terminator = $this->reader->readFixedSize(2, $cancellation);
+      } catch (IOException $error) {
+        throw new ProtocolException(
+          'the response ended inside a chunk terminator',
+          previous: $error,
+        );
+      }
+
+      if ($terminator != "\r\n") {
+        throw new ProtocolException('a response chunk has no CRLF terminator');
+      }
+
+      $this->needsTerminator = false;
+    }
+
+    try {
+      $line = $this->reader->readUntilBounded("\r\n", 8192, $cancellation);
+    } catch (LimitExceededException $error) {
+      throw new ProtocolException(
+        'the response chunk size line is too large',
+        previous: $error,
+      );
+    }
+
+    if ($line == null || !Str\ends_with($line, "\r\n")) {
+      throw new ProtocolException('the response ended before a chunk size');
+    }
+
+    $line = Str\slice($line, 0, length!($line) - 2);
+    $extension = Str\search($line, ';');
+    if ($extension != null) {
+      $line = Str\slice($line, 0, $extension);
+    }
+
+    $line = match (Str\trim($line, " \t")) {
+      '' => throw new ProtocolException('a response chunk size is empty'),
+      $line => $line,
+    };
+
+    $index = 0;
+    while ($index < length!($line)) {
+      $byte = Str\ord($line[$index]);
+      if (!(($byte is 48..=57) || ($byte is 65..=70) || ($byte is 97..=102))) {
+        throw new ProtocolException('a response chunk size is invalid');
+      }
+
+      $index++;
+    }
+
+    try {
+      $this->chunkRemaining = Math\from_base($line, 16);
+    } catch (OverflowException $error) {
+      throw new ProtocolException(
+        'a response chunk size is too large',
+        previous: $error,
+      );
+    }
+
+    if ($this->chunkRemaining == 0) {
+      $this->readTrailers($cancellation);
+      $this->completed = true;
+      if ($this->closeAtEnd) {
+        $this->transport->close();
+      }
+    } else {
+      $this->needsTerminator = true;
+    }
+  }
+
+  private function readTrailers(null|CancellationToken $cancellation): void {
+    $fields = vec[];
+    $bytes = 0;
+    while (true) {
+      try {
+        $line = $this->reader->readUntilBounded(
+          "\r\n",
+          $this->maximumTrailerBytes - $bytes,
+          $cancellation,
+        );
+      } catch (LimitExceededException $error) {
+        throw new ProtocolException(
+          'the response trailers exceed their configured limit',
+          previous: $error,
+        );
+      }
+
+      if ($line == null || !Str\ends_with($line, "\r\n")) {
+        throw new ProtocolException('the response ended inside its trailers');
+      }
+
+      $bytes += length!($line);
+      $line = match (Str\slice($line, 0, length!($line) - 2)) {
+        '' => break,
+        $line => $line,
+      };
+
+      if (Str\starts_with($line, ' ') || Str\starts_with($line, "\t")) {
+        throw new ProtocolException('the response contains an invalid trailer');
+      }
+
+      $separator = Str\search($line, ':');
+      if ($separator == null || $separator == 0) {
+        throw new ProtocolException(
+          'the response contains a malformed trailer',
+        );
+      }
+
+      $fields[] = (
+        Str\slice($line, 0, $separator),
+        Str\trim(Str\slice($line, $separator + 1), " \t"),
+      );
+    }
+
+    try {
+      $this->trailers->complete(FieldMap::from($fields));
+    } catch (InvalidArgumentException $error) {
+      throw new ProtocolException(
+        'the response contains an invalid trailer',
+        previous: $error,
+      );
+    }
+  }
+
+  private function limit(null|int $maximum): int {
+    if ($maximum == null || $maximum < 0 || $maximum > $this->chunkRemaining) {
+      return $this->chunkRemaining;
+    }
+
+    return $maximum;
+  }
+
+  private function consume(string $data): void {
+    $length = length!($data);
+    $this->chunkRemaining -= $length;
+    $this->readBytes += $length;
+    if ($this->readBytes > $this->maximumBodyBytes) {
+      $this->transport->close();
+      throw new ProtocolException(
+        'the response body exceeds its configured limit',
+      );
+    }
+  }
+}

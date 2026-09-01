@@ -1,0 +1,31 @@
+namespace Whim\HTTP\WebSocket\Client;
+
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\WebSocket\Connection as WebSocketConnection;
+use Whim\Marker\MustUse;
+use Whim\Network\InternetEndpoint;
+use Whim\TLS\ConnectionState;
+use Whim\URL\URL;
+
+/** A client WebSocket connection and its handshake metadata. */
+interface Connection extends WebSocketConnection {
+  /** Returns the URL used for the handshake. */
+  #[MustUse]
+  public function getURL(): URL;
+
+  /** Returns the server's handshake fields. */
+  #[MustUse]
+  public function getResponseHeaders(): FieldMap;
+
+  /** Returns the local network endpoint. */
+  #[MustUse]
+  public function getLocalEndpoint(): InternetEndpoint;
+
+  /** Returns the peer network endpoint. */
+  #[MustUse]
+  public function getPeerEndpoint(): InternetEndpoint;
+
+  /** Returns the TLS state for a secure connection. */
+  #[MustUse]
+  public function getTLSState(): null|ConnectionState;
+}

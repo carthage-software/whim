@@ -1,0 +1,4 @@
+enum E {
+  case value;
+  public function value(): void {}
+}

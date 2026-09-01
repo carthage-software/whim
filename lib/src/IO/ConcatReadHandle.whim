@@ -1,0 +1,47 @@
+namespace Whim\IO;
+
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+
+/** Reads two handles in sequence as one continuous source. */
+final class ConcatReadHandle implements ReadHandle {
+  /** Creates a concatenated view over two readable handles. */
+  #[TrackCaller]
+  public function __construct(
+    private ReadHandle $first,
+    private ReadHandle $second,
+  ) {}
+
+  /** Waits for whichever source is currently active. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->activeHandle()->waitUntilReadable($cancellation);
+  }
+
+  /** Reports whether both sources have reached their ends. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return (
+      $this->first->reachedEndOfDataSource()
+      && $this->second->reachedEndOfDataSource()
+    );
+  }
+
+  /** Attempts a read from the currently active source. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    return $this->activeHandle()->tryRead($maxBytes);
+  }
+
+  /** Returns the first non-exhausted source, or the second source. */
+  #[TrackCaller]
+  private function activeHandle(): ReadHandle {
+    if ($this->first->reachedEndOfDataSource()) {
+      return $this->second;
+    }
+
+    return $this->first;
+  }
+}

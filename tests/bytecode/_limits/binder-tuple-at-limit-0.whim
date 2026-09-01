@@ -1,0 +1,4 @@
+namespace Limits\binder_tuple_at_limit_0;
+
+function f<T = (int, int, int, int, int, int, int, int, int, int, int, int)>(
+): void {}

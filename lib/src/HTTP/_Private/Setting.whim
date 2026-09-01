@@ -1,0 +1,12 @@
+namespace Whim\HTTP\_Private;
+
+/** Standard HTTP/2 setting identifiers. Unknown settings remain available as integers. */
+enum Setting: int {
+  case HeaderTableSize = 0x1;
+  case EnablePush = 0x2;
+  case MaxConcurrentStreams = 0x3;
+  case InitialWindowSize = 0x4;
+  case MaxFrameSize = 0x5;
+  case MaxHeaderListSize = 0x6;
+  case EnableConnectProtocol = 0x8;
+}

@@ -1,0 +1,216 @@
+namespace Whim\Command;
+
+use Whim\Async\CancellationToken;
+use Whim\Dict;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Time\Duration;
+use Whim\Vec;
+
+/**
+ * A program to run, and how to run it.
+ *
+ * Every method returns a new command rather than changing this one, so a
+ * command can be built once and started many times.
+ *
+ * There is no shell. The program is executed directly and the arguments
+ * reach it exactly as written, so nothing a caller passes can become
+ * another command. A caller who wants a shell asks for one by name.
+ */
+final readonly class Command {
+  #[AlwaysInline]
+  private function __construct(
+    public readonly NonEmptyString $program,
+    public readonly vec<string> $arguments,
+    public readonly dict<NonEmptyString, string> $environment,
+    public readonly bool $inheritsEnvironment,
+    public readonly null|NonEmptyString $directory,
+    public readonly InputStream $standardInput,
+    public readonly OutputStream $standardOutput,
+    public readonly OutputStream $standardError,
+    public readonly bool $ownsProcessGroup,
+  ) {}
+
+  /**
+   * A command that runs `$program` with no arguments.
+   *
+   * Its output and error are piped, its input is connected to nothing, and
+   * it inherits the caller's environment and working directory.
+   */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function create(NonEmptyString $program): Command {
+    return new Command(
+      program: $program,
+      arguments: vec[],
+      environment: dict[],
+      inheritsEnvironment: true,
+      directory: null,
+      standardInput: discarded(),
+      standardOutput: piped(),
+      standardError: piped(),
+      ownsProcessGroup: false,
+    );
+  }
+
+  /** The same command with one more argument. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withArgument(string $argument): Command {
+    return clone!($this, arguments: Vec\concat::<string>(
+      $this->arguments,
+      vec[vec[$argument]],
+    ));
+  }
+
+  /** The same command with several more arguments. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withArguments(vec<string> $arguments): Command {
+    return clone!($this, arguments: Vec\concat::<string>(
+      $this->arguments,
+      vec[$arguments],
+    ));
+  }
+
+  /** The same command with its arguments replaced. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withoutArguments(): Command {
+    return clone!($this, arguments: vec[]);
+  }
+
+  /** The same command with one environment variable set. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withVariable(NonEmptyString $name, string $value): Command {
+    return clone!($this, environment: Dict\merge::<NonEmptyString, string>(
+      $this->environment,
+      vec[dict[$name => $value]],
+    ));
+  }
+
+  /** The same command with several environment variables set. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withVariables(
+    dict<NonEmptyString, string> $variables,
+  ): Command {
+    return clone!($this, environment: Dict\merge::<NonEmptyString, string>(
+      $this->environment,
+      vec[$variables],
+    ));
+  }
+
+  /**
+   * The same command with the caller's environment kept out.
+   *
+   * The child then sees only the variables this command sets, which is what
+   * a program should be given when its inputs are meant to be known.
+   */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withoutInheritedEnvironment(): Command {
+    return clone!($this, inheritsEnvironment: false);
+  }
+
+  /** The same command run from a different working directory. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withDirectory(null|NonEmptyString $directory): Command {
+    return clone!($this, directory: $directory);
+  }
+
+  /** The same command with its standard input connected differently. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withStandardInput(InputStream $stream): Command {
+    return clone!($this, standardInput: $stream);
+  }
+
+  /** The same command with its standard output connected differently. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withStandardOutput(OutputStream $stream): Command {
+    return clone!($this, standardOutput: $stream);
+  }
+
+  /** The same command with its standard error connected differently. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withStandardError(OutputStream $stream): Command {
+    return clone!($this, standardError: $stream);
+  }
+
+  /**
+   * The same command in a process group of its own.
+   *
+   * A child in its own group can be signalled together with everything it
+   * starts, which is how a whole tree is stopped rather than only its root.
+   */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withOwnProcessGroup(): Command {
+    return clone!($this, ownsProcessGroup: true);
+  }
+
+  /**
+   * Starts the program and returns without waiting for it.
+   *
+   * @throws StartFailedException when the program cannot be started.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function start(): Child {
+    return _Private\start($this);
+  }
+
+  /**
+   * Runs the program to its end and collects everything it produced.
+   *
+   * Both output streams are read as the child writes them, so a program
+   * that fills a pipe keeps running instead of stopping to wait.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function run(null|CancellationToken $cancellation = null): Output {
+    return $this->start()->join($cancellation);
+  }
+
+  /**
+   * Runs the program and returns its standard output, or raises.
+   *
+   * A child that ends any way but successfully raises `FailedException`,
+   * which carries the status and both streams.
+   *
+   * @throws FailedException when the child does not end successfully.
+   * @throws StartFailedException when the program cannot be started.
+   * @throws Whim\Async\CancelledException when the cancellation token is cancelled.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function output(null|CancellationToken $cancellation = null): string {
+    $output = $this->run($cancellation);
+    if (!$output->isSuccess()) {
+      throw new FailedException(
+        'the command ' . $this->program . ' did not succeed',
+        $output->status,
+        $output->standardOutput,
+        $output->standardError,
+      );
+    }
+
+    return $output->standardOutput;
+  }
+
+  /** Runs the program and reports whether it succeeded. */
+  #[MustUse]
+  #[TrackCaller]
+  public function succeeds(null|CancellationToken $cancellation = null): bool {
+    return $this->run($cancellation)->isSuccess();
+  }
+}

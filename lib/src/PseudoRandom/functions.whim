@@ -1,0 +1,23 @@
+namespace Whim\PseudoRandom;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\PseudoRandom\_Private;
+
+/** Generates a pseudo-random floating-point value in the unit interval. */
+#[NeverInline]
+#[TrackCaller]
+function float(): float {
+  return _Private\RANDOM_SEQUENCE->nextFloat();
+}
+
+/** Generates a pseudo-random integer within the requested bounds. */
+#[NeverInline]
+#[TrackCaller]
+function int(null|int $min = null, null|int $max = null): int {
+  return _Private\RANDOM_SEQUENCE->nextIn(
+    $min ?? Math\INT_MIN,
+    $max ?? Math\INT_MAX,
+  );
+}

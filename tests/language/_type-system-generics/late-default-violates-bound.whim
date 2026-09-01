@@ -1,0 +1,5 @@
+interface Comparable {}
+
+type Boxed<T: Comparable = Value> = vec<T>;
+
+require!('late-default-breaking-value.whim');

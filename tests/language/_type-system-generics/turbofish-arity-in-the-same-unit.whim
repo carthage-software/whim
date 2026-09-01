@@ -1,0 +1,5 @@
+function identity<T>(T $value): T {
+  return $value;
+}
+
+$a = identity::<int, string>(1);

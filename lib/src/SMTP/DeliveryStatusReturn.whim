@@ -1,0 +1,7 @@
+namespace Whim\SMTP;
+
+/** The message content returned in an RFC 3461 delivery status report. */
+enum DeliveryStatusReturn: string {
+  case Full = 'FULL';
+  case Headers = 'HDRS';
+}

@@ -1,0 +1,132 @@
+namespace Whim\Database\SQLite\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\ConnectionException;
+use Whim\Database\ConcurrentOperationException;
+use Whim\Database\QueryException;
+use Whim\Database\TransactionException;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\_Private\SQLiteError;
+use Whim\_Private\SQLiteConcurrentOperationError;
+use Whim\_Private\SQLiteOperation;
+use Whim\_Private\SQLiteResult;
+
+/** Maps a concurrent driver operation to the public database contract. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function throw_concurrent_operation(
+  SQLiteConcurrentOperationError $error,
+): never {
+  throw new ConcurrentOperationException(
+    $error->getMessage(),
+    $error->getCode(),
+    $error,
+  );
+}
+
+/** Waits for one worker operation with cancellation. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_operation(
+  SQLiteOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  $cancellation?->throwIfCancellationRequested();
+  $registration = $cancellation?->register(fn(): void {
+    $operation->cancel();
+  });
+
+  try {
+    $operation->wait();
+    $cancellation?->throwIfCancellationRequested();
+  } finally {
+    $cancellation?->unregister($registration);
+  }
+}
+
+/** Waits for connection work and maps its failure. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_connection(
+  SQLiteOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  try {
+    await_operation($operation, $cancellation);
+  } catch (SQLiteError $error) {
+    $cancellation?->throwIfCancellationRequested();
+    throw new ConnectionException(
+      $error->getMessage(),
+      $error->getCode(),
+      $error,
+    );
+  }
+}
+
+/** Waits for query work and maps its failure. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_query(
+  SQLiteOperation $operation,
+  null|CancellationToken $cancellation,
+): void {
+  try {
+    await_operation($operation, $cancellation);
+  } catch (SQLiteError $error) {
+    $cancellation?->throwIfCancellationRequested();
+    throw new QueryException($error->getMessage(), $error->getCode(), $error);
+  }
+}
+
+/** Waits for transaction work and maps its failure. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function await_transaction(
+  SQLiteOperation $operation,
+  null|CancellationToken $cancellation = null,
+): void {
+  try {
+    await_operation($operation, $cancellation);
+  } catch (SQLiteError $error) {
+    $cancellation?->throwIfCancellationRequested();
+    throw new TransactionException(
+      $error->getMessage(),
+      $error->getCode(),
+      $error,
+    );
+  }
+}
+
+/** Fetches one row with cancellation and maps query failures. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function fetch(
+  SQLiteResult $result,
+  null|CancellationToken $cancellation,
+): null|vec<mixed> {
+  $cancellation?->throwIfCancellationRequested();
+  $registration = $cancellation?->register(fn(): void {
+    $result->interrupt();
+  });
+
+  try {
+    try {
+      $row = $result->fetch();
+      $cancellation?->throwIfCancellationRequested();
+      return $row;
+    } catch (SQLiteError $error) {
+      $cancellation?->throwIfCancellationRequested();
+      throw new QueryException($error->getMessage(), $error->getCode(), $error);
+    }
+  } finally {
+    $cancellation?->unregister($registration);
+  }
+}

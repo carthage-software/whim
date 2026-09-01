@@ -1,0 +1,114 @@
+namespace Whim\HTTP\Client\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Channel;
+use Whim\HTTP\_Private\Event\WeakendEvent;
+use Whim\HTTP\Client\ProtocolException;
+use Whim\HTTP\Message\Request;
+use Whim\Refine\NonNegativeInt;
+use Whim\Refine\PositiveInt;
+use Whim\Unwind\Throwable;
+
+/** Queues events for one HTTP/2 exchange. */
+final class H2Exchange {
+  private Channel\Sender<H2EventBatch> $sender;
+  private Channel\Receiver<H2EventBatch> $receiver;
+  private vec<WeakendEvent> $pending = vec[];
+  private int $bodyBytes = 0;
+  private bool $finalResponse = false;
+
+  public function __construct(
+    private PositiveInt $maximumBodyBytes,
+    private NonNegativeInt $maximumInformationalResponses,
+    private Request $request,
+    private null|PushCollection $pushes = null,
+  ) {
+    ($this->sender, $this->receiver) = Channel\unbounded::<H2EventBatch>();
+  }
+
+  public function maximumBodyBytes(): PositiveInt {
+    return $this->maximumBodyBytes;
+  }
+
+  public function maximumInformationalResponses(): NonNegativeInt {
+    return $this->maximumInformationalResponses;
+  }
+
+  public function request(): Request {
+    return $this->request;
+  }
+
+  public function pushes(): null|PushCollection {
+    return $this->pushes;
+  }
+
+  public function deliver(WeakendEvent $event): bool {
+    if ($event[0] == 2 && !$event[5] && !$event[4]) {
+      $this->finalResponse = true;
+    }
+
+    if ($event[0] == 1) {
+      $this->bodyBytes += length!($event[2]);
+      if ($this->bodyBytes > $this->maximumBodyBytes) {
+        $this->fail(
+          new ProtocolException(
+            'the response body exceeds its configured limit',
+          ),
+        );
+
+        return false;
+      }
+    }
+
+    $this->sender->send(new H2EventBatch(vec[$event]));
+    return true;
+  }
+
+  public function hasFinalResponse(): bool {
+    return $this->finalResponse;
+  }
+
+  public function fail(Throwable $error): void {
+    if ($this->pushes != null) {
+      $this->pushes->fail($error);
+    }
+
+    $this->sender->send(new H2EventBatch(vec[], $error));
+  }
+
+  public function receive(null|CancellationToken $cancellation): H2EventBatch {
+    try {
+      return $this->receiver->receive($cancellation);
+    } catch (Channel\Exception $_) {
+      throw new ProtocolException(
+        'the HTTP/2 exchange closed before completion',
+      );
+    }
+  }
+
+  public function tryReceive(): null|H2EventBatch {
+    try {
+      return $this->receiver->tryReceive();
+    } catch (Channel\Exception $_) {
+      return null;
+    }
+  }
+
+  public function defer(WeakendEvent $event): void {
+    $this->pending[] = $event;
+  }
+
+  public function takePending(): vec<WeakendEvent> {
+    $events = $this->pending;
+    $this->pending = vec[];
+    return $events;
+  }
+
+  public function close(): void {
+    if ($this->pushes != null) {
+      $this->pushes->seal();
+    }
+
+    $this->sender->close();
+  }
+}

@@ -1,0 +1,7 @@
+$x = compute(
+    $alpha, // the first operand
+    $beta, // the second operand
+    $gamma, // the third operand
+);
+
+$y = send(/* inline */ $payload, $target);

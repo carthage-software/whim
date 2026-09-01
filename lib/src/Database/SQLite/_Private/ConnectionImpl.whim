@@ -1,0 +1,184 @@
+namespace Whim\Database\SQLite\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Connection;
+use Whim\Database\ConnectionException;
+use Whim\Database\Result;
+use Whim\Database\Statement;
+use Whim\Database\Transaction;
+use Whim\Database\TransactionException;
+use Whim\Database\TransactionIsolation;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\Throwable;
+use Whim\_Private\SQLiteConnection;
+use Whim\_Private\SQLiteConcurrentOperationError;
+
+/** Implements a public SQLite connection. */
+final class ConnectionImpl implements Connection {
+  private bool $transactionActive = false;
+
+  /** Creates a connection wrapper around an opened worker. */
+  public function __construct(private SQLiteConnection $connection) {}
+
+  /** Executes work outside a transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    if ($this->transactionActive) {
+      throw new ConnectionException(
+        'the SQLite connection has an active transaction',
+      );
+    }
+
+    return $this->executeDirect($sql, $parameters, $cancellation);
+  }
+
+  /** Executes work for the active transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  public function executeTransaction(
+    NonEmptyString $sql,
+    vec<Value> $parameters,
+    null|CancellationToken $cancellation,
+  ): Result {
+    if (!$this->transactionActive) {
+      throw new TransactionException('the SQLite transaction is not active');
+    }
+
+    return $this->executeDirect($sql, $parameters, $cancellation);
+  }
+
+  /** Reports whether this connection can execute more work. */
+  #[MustUse]
+  public function isReusable(): bool {
+    return !$this->transactionActive && $this->connection->isReusable();
+  }
+
+  /** Checks this connection. */
+  #[TrackCaller]
+  public function ping(null|CancellationToken $cancellation = null): void {
+    if ($this->transactionActive) {
+      throw new ConnectionException(
+        'the SQLite connection has an active transaction',
+      );
+    }
+
+    try {
+      $operation = $this->connection->ping();
+    } catch (SQLiteConcurrentOperationError $error) {
+      throw_concurrent_operation($error);
+    }
+
+    await_connection($operation, $cancellation);
+  }
+
+  /** Prepares a reusable SQL statement. */
+  #[MustUse]
+  #[TrackCaller]
+  public function prepare(
+    NonEmptyString $sql,
+    null|CancellationToken $cancellation = null,
+  ): Statement {
+    if ($this->transactionActive) {
+      throw new ConnectionException(
+        'the SQLite connection has an active transaction',
+      );
+    }
+
+    try {
+      $operation = $this->connection->prepare($sql);
+    } catch (SQLiteConcurrentOperationError $error) {
+      throw_concurrent_operation($error);
+    }
+
+    await_query($operation, $cancellation);
+    return new StatementImpl($this, $sql);
+  }
+
+  /** Begins a SQLite transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  public function begin(
+    null|TransactionIsolation $isolation = null,
+    bool $readOnly = false,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    if ($this->transactionActive) {
+      throw new TransactionException(
+        'the SQLite connection is already in a transaction',
+      );
+    }
+
+    $readUncommitted = $isolation == TransactionIsolation::ReadUncommitted;
+    if (
+      $isolation != null
+      && $isolation != TransactionIsolation::Serializable
+      && !$readUncommitted
+    ) {
+      throw new TransactionException(
+        'the SQLite driver does not support the requested isolation level',
+      );
+    }
+
+    try {
+      $operation = $this->connection->begin($readUncommitted, $readOnly);
+    } catch (SQLiteConcurrentOperationError $error) {
+      throw_concurrent_operation($error);
+    }
+
+    await_transaction($operation, $cancellation);
+
+    $this->transactionActive = true;
+    return new TransactionImpl($this, $this->connection);
+  }
+
+  /** Marks the transaction as ended. */
+  public function finishTransaction(): void {
+    $this->transactionActive = false;
+  }
+
+  /** Reports whether this connection is closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->connection->isClosed();
+  }
+
+  /** Closes this connection without blocking. */
+  public function close(): void {
+    $this->transactionActive = false;
+    $this->connection->close();
+  }
+
+  /** Executes a statement through the worker. */
+  #[MustUse]
+  #[TrackCaller]
+  private function executeDirect(
+    NonEmptyString $sql,
+    vec<Value> $parameters,
+    null|CancellationToken $cancellation,
+  ): Result {
+    try {
+      $execution = $this->connection->execute($sql, $parameters);
+    } catch (SQLiteConcurrentOperationError $error) {
+      throw_concurrent_operation($error);
+    }
+
+    $result = $execution[0];
+
+    try {
+      await_query($execution[1], $cancellation);
+    } catch (Throwable $error) {
+      $result->close();
+      throw $error;
+    }
+
+    return new ResultImpl($result);
+  }
+}

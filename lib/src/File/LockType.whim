@@ -1,0 +1,10 @@
+namespace Whim\File;
+
+/** Selects the advisory lock taken over a file handle. */
+enum LockType {
+  /** Allows other shared lock holders. */
+  case Shared;
+
+  /** Excludes every other lock holder. */
+  case Exclusive;
+}

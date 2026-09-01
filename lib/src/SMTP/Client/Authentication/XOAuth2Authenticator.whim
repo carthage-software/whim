@@ -1,0 +1,44 @@
+namespace Whim\SMTP\Client\Authentication;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\Client\Connection;
+
+/** Implements Google's XOAUTH2 SMTP mechanism. */
+final readonly class XOAuth2Authenticator implements Authenticator {
+  public function __construct(
+    private string $username,
+    #[SensitiveParameter] private string $accessToken,
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function mechanism(): NonEmptyString {
+    return 'XOAUTH2';
+  }
+
+  #[TrackCaller]
+  public function authenticate(
+    Connection $connection,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    _Private\require_mechanism($connection, $this->mechanism());
+    $payload = Base64\encode(
+      'user='
+      . $this->username
+      . "\x01auth=Bearer "
+      . $this->accessToken
+      . "\x01\x01",
+    );
+
+    _Private\require_authentication_success(
+      $this->mechanism(),
+      $connection->sendCommand('AUTH XOAUTH2 ' . $payload, $cancellation),
+    );
+  }
+}

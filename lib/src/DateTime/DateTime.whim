@@ -1,0 +1,215 @@
+namespace Whim\DateTime;
+
+use Whim;
+use Whim\Comparison\Order;
+use Whim\Comparison\Ordering;
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable date and time without a timezone. */
+final readonly class DateTime implements Order<DateTime>, ToString {
+  #[AlwaysInline]
+  private function __construct(public Date $date, public Time $time) {}
+
+  /** Combines a date and time. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromDateAndTime(Date $date, Time $time): DateTime {
+    return new DateTime($date, $time);
+  }
+
+  /** Creates a valid civil date and time. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function fromParts(
+    Year $year,
+    Month $month,
+    Day $day,
+    Hour $hour = 0,
+    Minute $minute = 0,
+    Second $second = 0,
+    Nanosecond $nanosecond = 0,
+  ): DateTime {
+    return new DateTime(
+      Date::fromParts($year, $month, $day),
+      Time::fromParts($hour, $minute, $second, $nanosecond),
+    );
+  }
+
+  /** Creates a value from fields checked by the date-time engine. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function fromPartsUnsafe(
+    int $year,
+    int $month,
+    int $day,
+    int $hour,
+    int $minute,
+    int $second,
+    int $nanosecond,
+  ): DateTime {
+    return new DateTime(
+      Date::fromPartsUnsafe($year, $month, $day),
+      Time::fromPartsUnsafe($hour, $minute, $second, $nanosecond),
+    );
+  }
+
+  /** Parses an ISO civil date and time, or returns null. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $value): null|DateTime {
+    $parts = Whim\_Private\date_time_parse_date_time($value) ?? return null;
+
+    return DateTime::fromPartsUnsafe(
+      $parts[0],
+      $parts[1],
+      $parts[2],
+      $parts[3],
+      $parts[4],
+      $parts[5],
+      $parts[6],
+    );
+  }
+
+  /** Parses an ISO civil date and time. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $value): DateTime {
+    $dateTime = DateTime::parse($value);
+    if ($dateTime == null) {
+      throw new InvalidArgumentException(
+        'invalid civil date and time: `' . $value . '`',
+      );
+    }
+
+    return $dateTime;
+  }
+
+  /** Adds a calendar period. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function plusPeriod(
+    Period $period,
+    Overflow $overflow = Overflow::Constrain,
+  ): DateTime {
+    return $this->shift($period, Duration::zero(), $overflow);
+  }
+
+  /** Subtracts a calendar period. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minusPeriod(
+    Period $period,
+    Overflow $overflow = Overflow::Constrain,
+  ): DateTime {
+    return $this->plusPeriod($period->invert(), $overflow);
+  }
+
+  /** Adds an exact duration. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function plusDuration(Duration $duration): DateTime {
+    return $this->shift(new Period(), $duration, Overflow::Reject);
+  }
+
+  /** Subtracts an exact duration. */
+  #[MustUse]
+  #[TrackCaller]
+  public function minusDuration(Duration $duration): DateTime {
+    return $this->plusDuration($duration->invert());
+  }
+
+  /** Resolves this local time in a timezone. */
+  #[MustUse]
+  #[TrackCaller]
+  public function inTimeZone(
+    TimeZone $timezone,
+    Disambiguation $disambiguation = Disambiguation::Compatible,
+  ): ZonedDateTime {
+    return $timezone->resolve($this, $disambiguation);
+  }
+
+  /** Formats this civil date and time. */
+  #[MustUse]
+  #[TrackCaller]
+  public function format(Formatter $formatter): string {
+    return $formatter->formatDateTime($this);
+  }
+
+  /** Returns this civil date and time in ISO form. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    return Formatter::isoDateTime()->formatDateTime($this);
+  }
+
+  /** Compares this civil date and time with another. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function compare(DateTime $other): Ordering {
+    return $this->date->compare($other->date)->then(
+      $this->time->compare($other->time),
+    );
+  }
+
+  /** Reports whether two civil date-times are equal. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function equals(DateTime $other): bool {
+    return (
+      $this->date->equals($other->date)
+      && $this->time->equals($other->time)
+    );
+  }
+
+  /** Applies calendar and exact units. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  private function shift(
+    Period $period,
+    Duration $duration,
+    Overflow $overflow,
+  ): DateTime {
+    $parts = Whim\_Private\date_time_shift_date_time(
+      $this->date->year,
+      $this->date->month->value,
+      $this->date->day,
+      $this->time->hour,
+      $this->time->minute,
+      $this->time->second,
+      $this->time->nanosecond,
+      $period->years,
+      $period->months,
+      $period->weeks,
+      $period->days,
+      $duration->seconds,
+      $duration->nanoseconds,
+      $overflow->value,
+    );
+
+    if ($parts == null) {
+      throw new InvalidArgumentException(
+        'date-time arithmetic produced an invalid value',
+      );
+    }
+
+    return DateTime::fromPartsUnsafe(
+      $parts[0],
+      $parts[1],
+      $parts[2],
+      $parts[3],
+      $parts[4],
+      $parts[5],
+      $parts[6],
+    );
+  }
+}

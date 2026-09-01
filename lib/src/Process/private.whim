@@ -1,0 +1,18 @@
+namespace Whim\Process\_Private;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Unwind\RuntimeException;
+use Whim\_Private\SystemError;
+
+/** Converts a process syscall error into public API context. */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function failure(SystemError $error, string $action): never {
+  throw new RuntimeException(
+    'failed to ' . $action . ': ' . $error->getMessage(),
+    previous: $error,
+  );
+}

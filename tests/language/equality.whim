@@ -1,0 +1,311 @@
+use Whim\Float;
+use Whim\Unwind\IncompatibleOperandsError;
+
+class Point {}
+
+enum Suit {
+  case Hearts;
+  case Spades;
+}
+
+assert!(null == null);
+assert!(true == true);
+assert!(true != false);
+$assertion_value_4 = 7;
+assert!($assertion_value_4 == 7);
+assert!($assertion_value_4 != 8);
+$assertion_value_5 = 1.5;
+assert!($assertion_value_5 == 1.5);
+assert!($assertion_value_5 != 2.5);
+$assertion_value_6 = 'abc';
+assert!($assertion_value_6 == 'abc');
+assert!($assertion_value_6 != 'abd');
+$assertion_value_7 = vec[1, 2];
+assert!($assertion_value_7 == vec[1, 2]);
+assert!($assertion_value_7 != vec[1, 3]);
+$assertion_value_8 = dict['a' => 1];
+assert!($assertion_value_8 == dict['a' => 1]);
+assert!($assertion_value_8 != dict['a' => 2]);
+$assertion_value_9 = (1, 'x');
+assert!($assertion_value_9 == (1, 'x'));
+assert!($assertion_value_9 != (1, 'y'));
+
+$f = fn(): int => 1;
+$g = $f;
+$assertion_value_10 = $f;
+assert!($assertion_value_10 == $g);
+assert!($assertion_value_10 != fn(): int => 1);
+
+$p = new Point();
+$q = $p;
+$assertion_value_11 = $p;
+assert!($assertion_value_11 == $q);
+assert!($assertion_value_11 != new Point());
+
+assert!(1 != 1.0);
+assert!(1.0 != 1);
+assert!('1' != 1);
+assert!(0 != false);
+assert!('' != null);
+assert!(vec[] != dict[]);
+assert!((1, 2) != vec[1, 2]);
+
+$infinity = 1e308 * 10.0;
+$nan = $infinity - $infinity;
+assert!($nan != $nan);
+assert!(0.0 == -0.0);
+assert!($infinity == $infinity);
+
+assert!(vec[vec[1], dict['k' => (1, 2)]] == vec[vec[1], dict['k' => (1, 2)]]);
+
+assert!(vec[1, 2] != vec[2, 1]);
+assert!((1, 2) != (2, 1));
+assert!(dict['a' => 1, 'b' => 2] == dict['b' => 2, 'a' => 1]);
+assert!(dict['a' => 1] != dict['a' => 1, 'b' => 2]);
+$shared = new Point();
+assert!(vec[$shared] == vec[$shared]);
+assert!(vec[new Point()] != vec[new Point()]);
+
+assert!(dict[5 => 'a'] != dict['5' => 'a']);
+$strict = dict[5 => 'int keyed'];
+$strict['5'] = 'string keyed';
+assert!(length!($strict) == 2);
+assert!($strict[5] == 'int keyed');
+assert!($strict['5'] == 'string keyed');
+$strict[true] = 'bool keyed';
+$strict[1] = 'int keyed';
+assert!(length!($strict) == 4);
+assert!($strict[true] == 'bool keyed');
+assert!($strict[1] == 'int keyed');
+
+$suit = Suit::Hearts;
+$assertion_value_36 = $suit;
+assert!($assertion_value_36 == Suit::Hearts);
+assert!($assertion_value_36 != Suit::Spades);
+assert!(Suit::Spades == Suit::Spades);
+
+assert!(1 < 2);
+assert!(2 <= 2);
+assert!(3 > 2);
+assert!(2 < 3);
+assert!(1.5 < 2.5);
+assert!(1 < 2.0);
+assert!(2.0 < 3);
+assert!('abc' < 'abd');
+assert!('10' < '9');
+assert!('a' < 'ab');
+
+$assertion_value_48 = 1;
+assert!($assertion_value_48 != 1.0);
+assert!($assertion_value_48 <= 1.0);
+assert!($assertion_value_48 >= 1.0);
+
+$assertion_value_49 = fn(): bool => true < false;
+$assertion_error_49 = null;
+try {
+  $assertion_value_49();
+} catch (IncompatibleOperandsError $assertion_caught_49) {
+  $assertion_error_49 = $assertion_caught_49;
+}
+
+assert!($assertion_error_49 is IncompatibleOperandsError);
+
+$assertion_value_50 = fn(): bool => null < null;
+$assertion_error_50 = null;
+try {
+  $assertion_value_50();
+} catch (IncompatibleOperandsError $assertion_caught_50) {
+  $assertion_error_50 = $assertion_caught_50;
+}
+
+assert!($assertion_error_50 is IncompatibleOperandsError);
+
+$assertion_value_51 = fn(): bool => vec[1] < vec[2];
+$assertion_error_51 = null;
+try {
+  $assertion_value_51();
+} catch (IncompatibleOperandsError $assertion_caught_51) {
+  $assertion_error_51 = $assertion_caught_51;
+}
+
+assert!($assertion_error_51 is IncompatibleOperandsError);
+
+$assertion_value_52 = fn(): bool => dict[] < dict[];
+$assertion_error_52 = null;
+try {
+  $assertion_value_52();
+} catch (IncompatibleOperandsError $assertion_caught_52) {
+  $assertion_error_52 = $assertion_caught_52;
+}
+
+assert!($assertion_error_52 is IncompatibleOperandsError);
+
+$assertion_value_53 = fn(): bool => (1, 2) < (1, 3);
+$assertion_error_53 = null;
+try {
+  $assertion_value_53();
+} catch (IncompatibleOperandsError $assertion_caught_53) {
+  $assertion_error_53 = $assertion_caught_53;
+}
+
+assert!($assertion_error_53 is IncompatibleOperandsError);
+
+$assertion_value_54 = function(): bool {
+  return (fn(): int => 1) < (fn(): int => 2);
+};
+
+$assertion_error_54 = null;
+try {
+  $assertion_value_54();
+} catch (IncompatibleOperandsError $assertion_caught_54) {
+  $assertion_error_54 = $assertion_caught_54;
+}
+
+assert!($assertion_error_54 is IncompatibleOperandsError);
+
+$assertion_value_55 = fn(): bool => new Point() < new Point();
+$assertion_error_55 = null;
+try {
+  $assertion_value_55();
+} catch (IncompatibleOperandsError $assertion_caught_55) {
+  $assertion_error_55 = $assertion_caught_55;
+}
+
+assert!($assertion_error_55 is IncompatibleOperandsError);
+
+$assertion_value_56 = fn(): bool => 1 < 'a';
+$assertion_error_56 = null;
+try {
+  $assertion_value_56();
+} catch (IncompatibleOperandsError $assertion_caught_56) {
+  $assertion_error_56 = $assertion_caught_56;
+}
+
+assert!($assertion_error_56 is IncompatibleOperandsError);
+$assertion_value_57 = fn(): bool => 'a' < 1;
+$assertion_error_57 = null;
+try {
+  $assertion_value_57();
+} catch (IncompatibleOperandsError $assertion_caught_57) {
+  $assertion_error_57 = $assertion_caught_57;
+}
+
+assert!($assertion_error_57 is IncompatibleOperandsError);
+$assertion_value_58 = fn(): bool => 1 < true;
+$assertion_error_58 = null;
+try {
+  $assertion_value_58();
+} catch (IncompatibleOperandsError $assertion_caught_58) {
+  $assertion_error_58 = $assertion_caught_58;
+}
+
+assert!($assertion_error_58 is IncompatibleOperandsError);
+$assertion_value_59 = fn(): bool => 1.0 < null;
+$assertion_error_59 = null;
+try {
+  $assertion_value_59();
+} catch (IncompatibleOperandsError $assertion_caught_59) {
+  $assertion_error_59 = $assertion_caught_59;
+}
+
+assert!($assertion_error_59 is IncompatibleOperandsError);
+
+$assertion_value_60 = fn(): bool => 'a' < 1.0;
+$assertion_error_60 = null;
+try {
+  $assertion_value_60();
+} catch (IncompatibleOperandsError $assertion_caught_60) {
+  $assertion_error_60 = $assertion_caught_60;
+}
+
+assert!($assertion_error_60 is IncompatibleOperandsError);
+$assertion_value_61 = fn(): bool => vec[] < 1;
+$assertion_error_61 = null;
+try {
+  $assertion_value_61();
+} catch (IncompatibleOperandsError $assertion_caught_61) {
+  $assertion_error_61 = $assertion_caught_61;
+}
+
+assert!($assertion_error_61 is IncompatibleOperandsError);
+
+assert!(!($nan < 1.0));
+assert!(!($nan <= 1.0));
+assert!(!($nan > 1.0));
+assert!(!($nan >= 1.0));
+assert!(!(1.0 < $nan));
+assert!($nan != 1.0);
+assert!(Float\is_nan($nan));
+
+assert!((1 <=> 2) == -1);
+assert!((2 <=> 2) == 0);
+assert!((3 <=> 2) == 1);
+assert!((1.5 <=> 2.5) == -1);
+assert!((1 <=> 1.0) == 0);
+assert!(9_007_199_254_740_993 > 9_007_199_254_740_992.0);
+assert!((9_007_199_254_740_993 <=> 9_007_199_254_740_992.0) == 1);
+assert!(9_223_372_036_854_775_807 < 9_223_372_036_854_775_808.0);
+
+function mixed_numeric_order(int $integer, float $float): int {
+  return $integer <=> $float;
+}
+
+assert!(
+  mixed_numeric_order(9_007_199_254_740_993, 9_007_199_254_740_992.0) == 1,
+);
+
+assert!(('a' <=> 'b') == -1);
+assert!(('b' <=> 'a') == 1);
+assert!(('a' <=> 'a') == 0);
+
+$assertion_value_77 = fn(): int => true <=> false;
+$assertion_error_77 = null;
+try {
+  $assertion_value_77();
+} catch (IncompatibleOperandsError $assertion_caught_77) {
+  $assertion_error_77 = $assertion_caught_77;
+}
+
+assert!($assertion_error_77 is IncompatibleOperandsError);
+
+$assertion_value_78 = fn(): int => vec[] <=> vec[];
+$assertion_error_78 = null;
+try {
+  $assertion_value_78();
+} catch (IncompatibleOperandsError $assertion_caught_78) {
+  $assertion_error_78 = $assertion_caught_78;
+}
+
+assert!($assertion_error_78 is IncompatibleOperandsError);
+
+$assertion_value_79 = fn(): int => $nan <=> 1.0;
+$assertion_error_79 = null;
+try {
+  $assertion_value_79();
+} catch (IncompatibleOperandsError $assertion_caught_79) {
+  $assertion_error_79 = $assertion_caught_79;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_79->getMessage(),
+      'the <=> operator cannot order NAN',
+    ),
+  );
+}
+
+assert!($assertion_error_79 is IncompatibleOperandsError);
+
+$assertion_value_80 = fn(): int => 1.0 <=> $nan;
+$assertion_error_80 = null;
+try {
+  $assertion_value_80();
+} catch (IncompatibleOperandsError $assertion_caught_80) {
+  $assertion_error_80 = $assertion_caught_80;
+  assert!(
+    Whim\Str\contains(
+      $assertion_caught_80->getMessage(),
+      'the <=> operator cannot order NAN',
+    ),
+  );
+}
+
+assert!($assertion_error_80 is IncompatibleOperandsError);

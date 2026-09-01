@@ -1,0 +1,149 @@
+namespace Whim\_Private;
+
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\Stub;
+
+/** Splits a byte string into its byte values. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_to_bytes(string $value): vec<0..=255> {}
+
+/** Builds a byte string from byte values. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_from_bytes(vec<0..=255> $bytes): string {}
+
+/** Extracts a bounded byte range from a string. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_slice(string $string, 0.. $offset, 0.. $length): string {}
+
+/** Returns the byte at an offset. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_byte_at(string $string, 0.. $offset): 0..=255 {}
+
+/** Finds the first byte at or after an offset. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function memchr(string $haystack, 0..=255 $needle, 0.. $offset): null|(0..) {}
+
+/** Finds the last byte at or after an offset. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function memrchr(string $haystack, 0..=255 $needle, 0.. $offset): null|(0..) {}
+
+/** Finds the first byte sequence at or after an offset. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function memmem(
+  string $haystack,
+  string $needle,
+  0.. $offset,
+  bool $ci,
+): null|(0..) {}
+
+/** Finds the last byte sequence at or after an offset. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function memrmem(
+  string $haystack,
+  string $needle,
+  0.. $offset,
+  bool $ci,
+): null|(0..) {}
+
+/** Splits a string around a non-empty delimiter into zero-copy slices. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_split(
+  string $string,
+  string $delimiter,
+  0.. $limit,
+): vec<string> {}
+
+/** Joins string values with a separator in one allocation. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_join(vec<string> $values, string $separator): string {}
+
+/** Replaces non-overlapping occurrences, optionally without case. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_replace(
+  string $haystack,
+  string $needle,
+  string $replacement,
+  bool $ci,
+): string {}
+
+/** Returns the first byte value of a non-empty string. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_ord(string&!'' $character): 0..=255 {}
+
+/** Builds a one-byte string from a byte value. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_chr(0..=255 $byte): string {}
+
+/** Trims mask bytes from the start (0), both ends (1), or the end (2). */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_trim(string $string, string $mask, 0..=2 $mode): string {}
+
+/** Pads to a byte length at the start (0), both ends (1), or the end (2). */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_pad(
+  string $string,
+  0.. $length,
+  string&!'' $pad,
+  0..=2 $mode,
+): string {}
+
+/** Converts ASCII letters to lowercase. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_lowercase(string $string): string {}
+
+/** Converts ASCII letters to uppercase. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_uppercase(string $string): string {}
+
+/** Capitalizes words separated by any byte in the delimiter string. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_capitalize_words(string $string, string $delimiters): string {}
+
+/** Reverses a string byte by byte. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_reverse(string $string): string {}
+
+/** Applies ROT13 to ASCII letters. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function string_rot13(string $string): string {}

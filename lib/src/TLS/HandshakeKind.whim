@@ -1,0 +1,10 @@
+namespace Whim\TLS;
+
+use Whim\_Private;
+
+/** Describes how a TLS handshake completed. */
+enum HandshakeKind: int {
+  case Full = _Private\TLS_HANDSHAKE_KIND_FULL;
+  case FullWithHelloRetryRequest = _Private\TLS_HANDSHAKE_KIND_FULL_WITH_HELLO_RETRY_REQUEST;
+  case Resumed = _Private\TLS_HANDSHAKE_KIND_RESUMED;
+}

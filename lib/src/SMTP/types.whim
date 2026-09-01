@@ -1,0 +1,10 @@
+namespace Whim\SMTP;
+
+/** A valid SMTP reply code. */
+type ReplyCode = 200..=599;
+
+/** One component of an enhanced SMTP status code. */
+type EnhancedStatusPart = 0..=999;
+
+/** A message transfer priority accepted by RFC 6710. */
+type PriorityValue = -9..=9;

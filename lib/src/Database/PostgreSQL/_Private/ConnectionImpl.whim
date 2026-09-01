@@ -1,0 +1,171 @@
+namespace Whim\Database\PostgreSQL\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Connection;
+use Whim\Database\ConnectionException;
+use Whim\Database\Result;
+use Whim\Database\Statement;
+use Whim\Database\Transaction;
+use Whim\Database\TransactionException;
+use Whim\Database\TransactionIsolation;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\Throwable;
+use Whim\_Private\PostgreSQLConnection;
+
+/** Implements a public connection over libpq. */
+final class ConnectionImpl implements Connection {
+  private bool $transactionActive = false;
+
+  /** Creates a connection wrapper around an opened connection. */
+  public function __construct(
+    private PostgreSQLConnection $connection,
+    private bool $binaryResults,
+  ) {}
+
+  /** Executes work outside a transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  public function execute(
+    NonEmptyString $sql,
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    if ($this->transactionActive) {
+      throw new ConnectionException(
+        'the PostgreSQL connection has an active transaction',
+      );
+    }
+
+    return $this->executeDirect($sql, $parameters, $cancellation);
+  }
+
+  /** Executes work for the active transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  public function executeTransaction(
+    NonEmptyString $sql,
+    vec<Value> $parameters,
+    null|CancellationToken $cancellation,
+  ): Result {
+    if (!$this->transactionActive) {
+      throw new TransactionException(
+        'the PostgreSQL transaction is not active',
+      );
+    }
+
+    return $this->executeDirect($sql, $parameters, $cancellation);
+  }
+
+  /** Reports whether this connection can execute more work. */
+  #[MustUse]
+  public function isReusable(): bool {
+    return !$this->transactionActive && $this->connection->isReusable();
+  }
+
+  /** Checks this connection. */
+  #[TrackCaller]
+  public function ping(null|CancellationToken $cancellation = null): void {
+    if ($this->transactionActive) {
+      throw new ConnectionException(
+        'the PostgreSQL connection has an active transaction',
+      );
+    }
+
+    await_connection($this->connection->ping(), $cancellation);
+  }
+
+  /** Prepares a reusable SQL statement. */
+  #[MustUse]
+  #[TrackCaller]
+  public function prepare(
+    NonEmptyString $sql,
+    null|CancellationToken $cancellation = null,
+  ): Statement {
+    if ($this->transactionActive) {
+      throw new ConnectionException(
+        'the PostgreSQL connection has an active transaction',
+      );
+    }
+
+    $prepared = $this->connection->prepare($sql, $this->binaryResults);
+    await_query($prepared[1], $cancellation);
+    return new StatementImpl($prepared[0]);
+  }
+
+  /** Begins a PostgreSQL transaction. */
+  #[MustUse]
+  #[TrackCaller]
+  public function begin(
+    null|TransactionIsolation $isolation = null,
+    bool $readOnly = false,
+    null|CancellationToken $cancellation = null,
+  ): Transaction {
+    if ($this->transactionActive) {
+      throw new TransactionException(
+        'the PostgreSQL connection is already in a transaction',
+      );
+    }
+
+    $level = match ($isolation) {
+      null => null,
+      TransactionIsolation::ReadUncommitted => 0,
+      TransactionIsolation::ReadCommitted => 1,
+      TransactionIsolation::RepeatableRead => 2,
+      TransactionIsolation::Serializable => 3,
+    };
+
+    await_transaction(
+      $this->connection->begin($level, $readOnly),
+      $cancellation,
+    );
+
+    $this->transactionActive = true;
+    return new TransactionImpl($this, $this->connection);
+  }
+
+  /** Marks the transaction as ended. */
+  public function finishTransaction(): void {
+    $this->transactionActive = false;
+  }
+
+  /** Reports whether this connection is closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->connection->isClosed();
+  }
+
+  /** Closes this connection. */
+  public function close(): void {
+    $this->transactionActive = false;
+    $this->connection->close();
+  }
+
+  /** Executes a statement through libpq. */
+  #[MustUse]
+  #[TrackCaller]
+  private function executeDirect(
+    NonEmptyString $sql,
+    vec<Value> $parameters,
+    null|CancellationToken $cancellation,
+  ): Result {
+    $execution = $this->connection->execute(
+      $sql,
+      $parameters,
+      $this->binaryResults,
+    );
+
+    $result = $execution[0];
+
+    try {
+      await_query($execution[1], $cancellation);
+    } catch (Throwable $error) {
+      $result->close();
+      throw $error;
+    }
+
+    return new ResultImpl($result);
+  }
+}

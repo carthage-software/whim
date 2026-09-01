@@ -1,0 +1,73 @@
+namespace Whim\Database\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Result;
+use Whim\Database\Statement;
+use Whim\Database\Value;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Unwind\Throwable;
+
+/** Keeps a pooled connection checked out for a prepared statement. */
+final class PooledStatement implements Statement {
+  private bool $closed = false;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    private Lease $lease,
+    private Statement $statement,
+  ) {}
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function execute(
+    vec<Value> $parameters = vec[],
+    null|CancellationToken $cancellation = null,
+  ): Result {
+    $this->lease->retain();
+    try {
+      $result = $this->statement->execute($parameters, $cancellation);
+    } catch (Throwable $error) {
+      $connection = $this->lease->connection();
+      $this->lease->release(
+        !$connection->isClosed()
+        && $connection->isReusable(),
+      );
+
+      throw $error;
+    }
+
+    return new PooledResult($this->lease, $result);
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    try {
+      if (!$this->statement->isClosed()) {
+        $this->statement->close();
+      }
+    } finally {
+      $connection = $this->lease->connection();
+      $this->lease->release(
+        !$connection->isClosed()
+        && $connection->isReusable(),
+      );
+    }
+  }
+}

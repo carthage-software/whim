@@ -1,0 +1,64 @@
+namespace Whim\Database\SQLite;
+
+use Whim\Async\CancellationToken;
+use Whim\Database\Connection;
+use Whim\Database\Connector as DatabaseConnector;
+use Whim\Database\SQLite\_Private\ConnectionImpl;
+use Whim\Database\SQLite\_Private\await_connection;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\Throwable;
+use Whim\_Private\SQLiteConnection;
+
+/** Opens non-blocking SQLite connections. */
+final readonly class Connector implements DatabaseConnector {
+  /** Creates a connector for a database path or SQLite URI. */
+  public function __construct(
+    public NonEmptyString $path,
+    public Configuration $configuration = new Configuration(),
+  ) {}
+
+  /** Creates a connector for a private in-memory database. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function inMemory(
+    Configuration $configuration = new Configuration(),
+  ): Connector {
+    return new Connector(':memory:', $configuration);
+  }
+
+  /** Opens one connection through the blocking pool. */
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    $configuration = $this->configuration;
+    $create = $configuration->create;
+    if ($configuration->readOnly) {
+      $create = false;
+    }
+
+    $opened = SQLiteConnection::open(
+      $this->path,
+      $configuration->readOnly,
+      $create,
+      $configuration->uri,
+      $configuration->busyTimeoutMilliseconds,
+      $configuration->statementCacheCapacity,
+      $configuration->foreignKeys,
+    );
+
+    $connection = $opened[0];
+
+    try {
+      await_connection($opened[1], $cancellation);
+    } catch (Throwable $error) {
+      $connection->close();
+      throw $error;
+    }
+
+    return new ConnectionImpl($connection);
+  }
+}

@@ -1,0 +1,10 @@
+namespace Whim\HTTP\Router;
+
+use Whim\HTTP\Server\HTTPException;
+
+/** Reports that no route accepts a request path. */
+final class NotFoundException extends HTTPException {
+  public function __construct() {
+    parent::__construct(404, 'no route accepts the request path');
+  }
+}

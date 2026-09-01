@@ -1,0 +1,83 @@
+use Whim\Regex\InvalidPatternException;
+use Whim\Regex\MatchResult;
+use Whim\Regex\Pattern;
+use Whim\Regex\escape;
+use Whim\Unwind\InvalidArgumentException;
+
+$pattern = Pattern::compile('(?P<word>[a-z]+)(?:-(?P<number>\\d+))?');
+assert!($pattern->source == '(?P<word>[a-z]+)(?:-(?P<number>\\d+))?');
+
+assert!($pattern->matches('123 abc-42'));
+assert!(!($pattern->matches('123', 3)));
+
+$match = $pattern->find('123 abc-42 xyz', 4);
+assert!($match?->start == 4);
+assert!($match?->end == 10);
+assert!($match?->length() == 6);
+assert!($match?->value() == 'abc-42');
+assert!($match?->capture('word') == 'abc');
+assert!($match?->capture('number') == '42');
+assert!($match?->capture('missing') == null);
+assert!($match?->capture(0) == 'abc-42');
+assert!($match?->capture(1) == 'abc');
+assert!($match?->capture(2) == '42');
+assert!($match?->capture(3) == null);
+
+$optional = $pattern->find('abc');
+assert!($optional?->capture('number') == null);
+assert!($optional?->capture(2) == null);
+
+$phone = Pattern::compile('(\\d+)-(\\d+)');
+$phoneMatch = $phone->find('call 415-555-0100 now');
+assert!($phoneMatch?->capture(1) == '415');
+assert!($phoneMatch?->capture(2) == '555');
+
+$digits = Pattern::compile('\\d+');
+assert!($digits->replaceAll('a1 b22 c333', '#') == 'a# b# c#');
+assert!($digits->replaceAll('a1 b22 c333', '#', 2) == 'a# b# c333');
+assert!($digits->replaceAll('a1 b22', '$1', 1) == 'a$1 b22');
+assert!($digits->replaceAll('a1 b22', '#', 0) == 'a1 b22');
+
+$commas = Pattern::compile(',+');
+assert!($commas->split(',a,,b,') == vec['', 'a', 'b', '']);
+assert!(Pattern::compile('')->split('ab') == vec['', 'a', 'b', '']);
+
+$literal = 'a+b.c[0]';
+$escaped = Pattern::compile('\\A' . escape($literal) . '\\z');
+assert!($escaped->matches($literal));
+assert!(!($escaped->matches('aabxc0')));
+
+$binary = Pattern::compile('(?-u:.)')->find("\xff");
+assert!($binary?->start == 0);
+assert!($binary?->end == 1);
+assert!($binary?->value() == "\xff");
+
+$assertion_value_30 = fn(): Pattern => Pattern::compile('[');
+$assertion_error_30 = null;
+try {
+  $assertion_value_30();
+} catch (InvalidPatternException $assertion_caught_30) {
+  $assertion_error_30 = $assertion_caught_30;
+}
+
+assert!($assertion_error_30 is InvalidPatternException);
+
+$assertion_value_31 = fn(): MatchResult => new MatchResult('abc', 2, 1, dict[]);
+$assertion_error_31 = null;
+try {
+  $assertion_value_31();
+} catch (InvalidArgumentException $assertion_caught_31) {
+  $assertion_error_31 = $assertion_caught_31;
+}
+
+assert!($assertion_error_31 is InvalidArgumentException);
+
+$assertion_value_32 = fn(): MatchResult => new MatchResult('abc', 0, 4, dict[]);
+$assertion_error_32 = null;
+try {
+  $assertion_value_32();
+} catch (InvalidArgumentException $assertion_caught_32) {
+  $assertion_error_32 = $assertion_caught_32;
+}
+
+assert!($assertion_error_32 is InvalidArgumentException);

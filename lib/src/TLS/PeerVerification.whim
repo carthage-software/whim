@@ -1,0 +1,24 @@
+namespace Whim\TLS;
+
+use Whim\_Private;
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** Selects how a TLS client verifies its peer. */
+enum PeerVerification: int implements Default {
+  /** Requires a chain rooted in a trusted certificate. */
+  case Full = _Private\TLS_PEER_VERIFICATION_FULL;
+
+  /** Also accepts a valid self-signed leaf certificate. */
+  case AllowSelfSigned = _Private\TLS_PEER_VERIFICATION_ALLOW_SELF_SIGNED;
+
+  /** Skips certificate and name verification. */
+  case Disabled = _Private\TLS_PEER_VERIFICATION_DISABLED;
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return static::Full;
+  }
+}

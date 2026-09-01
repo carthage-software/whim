@@ -1,0 +1,108 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\Encoding\DecodingException;
+use Whim\Encoding\Url;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Server\HTTPException;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\LogicException;
+use Whim\_Private\Regex;
+use Whim\_Private\memchr;
+use Whim\_Private\string_slice;
+
+/** Joins parsed nodes as one regular expression. */
+#[MustUse]
+function nodes_expression(vec<Node> $nodes): string {
+  $expression = '';
+  foreach ($nodes as $node) {
+    $expression .= $node->expression();
+  }
+
+  return $expression;
+}
+
+/** Returns parameter names captured by parsed nodes. */
+#[MustUse]
+function node_parameter_names(vec<Node> $nodes): vec<string> {
+  $names = vec[];
+  foreach ($nodes as $node) {
+    foreach ($node->parameterNames() as $name) {
+      $names[] = $name;
+    }
+  }
+
+  return $names;
+}
+
+/** Compiles an internal route expression. */
+#[MustUse]
+#[TrackCaller]
+function compile_expression(string $source, bool $complete): Regex {
+  $expression = '\A(?:' . $source . ')';
+  if ($complete) {
+    $expression .= '\z';
+  }
+
+  $regex = Regex::compile($expression);
+  if ($regex == null) {
+    throw new LogicException('a validated route expression failed to compile');
+  }
+
+  return $regex;
+}
+
+/** Decodes matched route parameters. */
+#[MustUse]
+#[TrackCaller]
+function decode_parameters(
+  dict<int|string, null|string> $captures,
+  vec<string> $names,
+): dict<string, string> {
+  $parameters = dict[];
+  foreach ($names as $name) {
+    $captureName = match ($name) {
+      '*' => WILDCARD_CAPTURE,
+      $_ => $name,
+    };
+
+    if (!contains_key!($captures, $captureName)) {
+      continue;
+    }
+
+    $capture = $captures[$captureName] ?? continue;
+
+    try {
+      $parameters[$name] = Url\decode($capture);
+    } catch (DecodingException $error) {
+      throw new HTTPException(
+        400,
+        'invalid percent escape in route parameter',
+        previous: $error,
+      );
+    }
+  }
+
+  return $parameters;
+}
+
+/** Returns the path component used for routing. */
+#[MustUse]
+function request_path(Request $request): string {
+  if ($request->url != null) {
+    return match ($request->url->path) {
+      '' => '/',
+      $path @ string => $path,
+    };
+  }
+
+  $target = $request->requestTarget;
+  if ($target == '' || $target[0] != '/') {
+    return $target;
+  }
+
+  $query = memchr($target, 63, 0) ?? return $target;
+
+  return string_slice($target, 0, $query as NonNegativeInt);
+}

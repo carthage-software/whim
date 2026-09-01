@@ -1,0 +1,96 @@
+namespace Whim\Unix;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\ConnectionException;
+use Whim\Network\UnixEndpoint;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\Throwable;
+
+/** Connects to a Unix-domain socket path. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function connect(
+  NonEmptyString $path,
+  null|CancellationToken $cancellation = null,
+): Stream {
+  $descriptor = Whim\Network\_Private\create_socket(
+    Whim\_Private\SOCKET_FAMILY_UNIX,
+    Whim\_Private\SOCKET_KIND_STREAM,
+  );
+
+  try {
+    $connected = Whim\_Private\connect_socket($descriptor, $path, 0);
+    if (!$connected) {
+      Whim\Network\_Private\wait_writable($descriptor, $cancellation);
+      Whim\_Private\complete_socket_connection($descriptor);
+    }
+  } catch (Whim\_Private\SystemError $error) {
+    $descriptor->close();
+    throw new ConnectionException(
+      'failed to connect to Unix-domain socket `' . $path . '`',
+      $error->errno(),
+      $error,
+    );
+  } catch (Throwable $error) {
+    $descriptor->close();
+    throw $error;
+  }
+
+  try {
+    $local = Whim\Network\_Private\unix_endpoint(
+      Whim\_Private\socket_address($descriptor),
+    );
+  } catch (Whim\_Private\SystemError $error) {
+    $descriptor->close();
+    Whim\Network\_Private\failure($error);
+  }
+
+  return new _Private\StreamImpl($descriptor, $local, new UnixEndpoint($path));
+}
+
+/** Starts a Unix-domain listener. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function listen(
+  NonEmptyString $path,
+  ListenConfiguration $configuration = new ListenConfiguration(),
+): Listener {
+  $descriptor = Whim\Network\_Private\create_socket(
+    Whim\_Private\SOCKET_FAMILY_UNIX,
+    Whim\_Private\SOCKET_KIND_STREAM,
+  );
+
+  try {
+    Whim\_Private\bind_socket($descriptor, $path, 0);
+    Whim\_Private\listen_socket($descriptor, $configuration->backlog);
+  } catch (Whim\_Private\SystemError $error) {
+    $descriptor->close();
+    Whim\Network\_Private\failure($error);
+  }
+
+  return new _Private\ListenerImpl($descriptor, new UnixEndpoint($path));
+}
+
+/** Creates a connected anonymous Unix-domain stream pair. */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function pair(): (Stream, Stream) {
+  try {
+    ($left, $right) = Whim\_Private\create_socket_pair();
+  } catch (Whim\_Private\SystemError $error) {
+    Whim\Network\_Private\failure($error);
+  }
+
+  $endpoint = new UnixEndpoint(null);
+  return (
+    new _Private\StreamImpl($left, $endpoint, $endpoint),
+    new _Private\StreamImpl($right, $endpoint, $endpoint),
+  );
+}

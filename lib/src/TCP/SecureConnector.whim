@@ -1,0 +1,52 @@
+namespace Whim\TCP;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Network\Host;
+use Whim\Network\InternetEndpoint;
+use Whim\Network\Port;
+use Whim\TLS\ClientConfiguration;
+
+/** Establishes TCP connections and completes client TLS handshakes. */
+final class SecureConnector implements Connector {
+  private readonly Connector $connector;
+  private readonly Whim\_Private\TlsClientConfiguration $configuration;
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function __construct(
+    Connector $connector = new DefaultConnector(),
+    ClientConfiguration $configuration = new ClientConfiguration(),
+  ) {
+    $this->connector = $connector;
+    $this->configuration = Whim\TLS\_Private\client_configuration(
+      $configuration,
+    );
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    Host $host,
+    Port $port,
+    null|CancellationToken $cancellation = null,
+  ): SecureStream {
+    $stream = $this->connector->connect($host, $port, $cancellation);
+    $serverName = match ($host) {
+      $name @ string => $name,
+      $_ => $host->toString(),
+    };
+
+    $connection = Whim\TLS\_Private\establish_client::<InternetEndpoint>(
+      $stream,
+      $serverName,
+      $this->configuration,
+      $cancellation,
+    );
+
+    return new _Private\SecureStreamImpl($stream, $connection);
+  }
+}

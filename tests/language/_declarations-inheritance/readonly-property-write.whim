@@ -1,0 +1,6 @@
+readonly class P {
+  public function __construct(public int $x) {}
+}
+
+$p = new P(1);
+$p->x = 2;

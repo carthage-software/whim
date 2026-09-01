@@ -1,0 +1,15 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Server\Context\Push;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+
+/** Adds server-push capability to an HTTP/2 request context. */
+class H2PushContext extends H2Context implements Push {
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function push(Request $request): void {
+    $this->session->push($this->streamId, $request);
+  }
+}

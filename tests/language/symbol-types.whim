@@ -1,0 +1,253 @@
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+raises(
+  '_symbol-types/constant-type-arguments.whim',
+  '`EXACT_VALUE` is not generic and takes no type arguments',
+);
+
+raises(
+  '_symbol-types/member-type-arguments.whim',
+  '`VALUE` is not generic and takes no type arguments',
+);
+
+raises(
+  '_symbol-types/non-class-member.whim',
+  'the function type `exact_function` has no members',
+);
+
+raises(
+  '_symbol-types/function-bound.whim',
+  'type argument 1 supplied to link_bounded does not satisfy the bound of T',
+);
+
+raises(
+  '_symbol-types/method-bound.whim',
+  'type argument 1 supplied to LinkMethod::call does not satisfy the bound of T',
+);
+
+const OK = 200;
+const ALSO_OK = 200;
+const NOT_FOUND = 404;
+
+final class Codes {
+  public const SUCCESS = 200;
+  public const FAILURE = 500;
+}
+
+final class TypedCodes {
+  public const Codes::SUCCESS SUCCESS = 200;
+}
+
+function identity<T>(T $value): T {
+  return $value;
+}
+
+function add(int $left, int $right): int {
+  return $left + $right;
+}
+
+interface ExactBound {}
+
+function link_bounded<T: ExactBound>(T $value): T {
+  return $value;
+}
+
+final class LinkMethod {
+  public function call<T: ExactBound>(T $value): T {
+    return $value;
+  }
+}
+
+function bounded_status<T: int>(T $status): T {
+  return $status;
+}
+
+function bounded_ok<T: OK>(T $status): T {
+  return $status;
+}
+
+function bounded_callable<T: fn(int): int>(T $function): int {
+  return $function(42);
+}
+
+function bounded_map<T: fn(int, string): string>(T $function): string {
+  return $function(42, 'mapped');
+}
+
+function bounded_identity_family<T: identity>(T $function): int {
+  return $function(42);
+}
+
+function bounded_mapper_family<T: Mapper<int>::map>(T $function): string {
+  return $function(42, 'family');
+}
+
+function increment_ok(OK $status): int {
+  return $status + 1;
+}
+
+function accept_object(object $value): void {}
+
+function call_exact_map(Mapper<int>::map<string> $function): string {
+  return $function(42, 'exact');
+}
+
+function call_identity(identity<int> $function): int {
+  return $function(42);
+}
+
+function call_add(add $function): int {
+  return $function(20, 22);
+}
+
+function status_name(int $status): string {
+  return match ($status) {
+    OK => 'ok',
+    NOT_FOUND => 'not found',
+    $_ => 'other',
+  };
+}
+
+interface Mapper<T> {
+  public function map<U>(T $value, U $fallback): U;
+}
+
+final class IntegerMapper implements Mapper<int> {
+  public function map<U>(int $value, U $fallback): U {
+    return $fallback;
+  }
+}
+
+final class StringMapper implements Mapper<string> {
+  public function map<U>(string $value, U $fallback): U {
+    return $fallback;
+  }
+}
+
+final class UnrelatedMapper {
+  public function map<U>(int $value, U $fallback): U {
+    return $fallback;
+  }
+}
+
+class StaticBase {
+  public static function label(): string {
+    return 'base';
+  }
+}
+
+class StaticChild extends StaticBase {
+  public static function label(): string {
+    return 'child';
+  }
+}
+
+assert!(200 is OK);
+assert!(OK is ALSO_OK);
+assert!(!(404 is OK));
+assert!(200 is Codes::SUCCESS);
+assert!(500 is Codes::FAILURE);
+assert!(TypedCodes::SUCCESS is Codes::SUCCESS);
+assert!(Whim\VERSION is Whim\VERSION);
+assert!(status_name(OK) == 'ok');
+assert!(status_name(NOT_FOUND) == 'not found');
+assert!(status_name(500) == 'other');
+assert!(bounded_status::<OK>(OK) == OK);
+assert!(bounded_status::<Codes::SUCCESS>(Codes::SUCCESS) == OK);
+assert!(bounded_ok::<ALSO_OK>(ALSO_OK) == OK);
+assert!(OK is OK&int);
+assert!(NOT_FOUND is int&!OK);
+assert!(increment_ok(OK) == 201);
+$assertion_value_19 = function(): void {
+  accept_object(OK);
+};
+
+$assertion_error_19 = null;
+try {
+  $assertion_value_19();
+} catch (TypeError $assertion_caught_19) {
+  $assertion_error_19 = $assertion_caught_19;
+}
+
+assert!($assertion_error_19 is TypeError);
+
+$assertion_value_20 = function(): void {
+  accept_object(identity(...));
+};
+
+$assertion_error_20 = null;
+try {
+  $assertion_value_20();
+} catch (TypeError $assertion_caught_20) {
+  $assertion_error_20 = $assertion_caught_20;
+}
+
+assert!($assertion_error_20 is TypeError);
+
+$identity = identity(...);
+$integerIdentity = identity::<int>(...);
+$stringIdentity = identity::<string>(...);
+$add = add(...);
+$partialAdd = add(20, ?);
+$builtinParse = Whim\_Private\int_try_parse(...);
+$builtinDuplicate = Whim\OS\FileDescriptor::duplicate(...);
+
+assert!($identity is identity);
+assert!($integerIdentity is identity);
+assert!($integerIdentity is identity<int>);
+assert!(!($stringIdentity is identity<int>));
+assert!($add is add);
+assert!(!($partialAdd is add));
+assert!($builtinParse is Whim\_Private\int_try_parse);
+assert!($builtinDuplicate is Whim\OS\FileDescriptor::duplicate);
+
+assert!(call_identity($integerIdentity) == 42);
+assert!(call_add($add) == 42);
+assert!(bounded_callable::<identity<int>>($integerIdentity) == 42);
+assert!(bounded_identity_family::<identity<int>>($integerIdentity) == 42);
+
+$assertion_value_36 = fn(): int => call_identity($identity);
+$assertion_error_36 = null;
+try {
+  $assertion_value_36();
+} catch (TypeError $assertion_caught_36) {
+  $assertion_error_36 = $assertion_caught_36;
+}
+
+assert!($assertion_error_36 is TypeError);
+$assertion_value_37 = fn(): int => call_add($partialAdd);
+$assertion_error_37 = null;
+try {
+  $assertion_value_37();
+} catch (TypeError $assertion_caught_37) {
+  $assertion_error_37 = $assertion_caught_37;
+}
+
+assert!($assertion_error_37 is TypeError);
+
+$integerMap = new IntegerMapper()->map::<string>(...);
+$stringMap = new StringMapper()->map::<string>(...);
+$unrelatedMap = new UnrelatedMapper()->map::<string>(...);
+$partialMap = new IntegerMapper()->map::<string>(1, ?);
+$staticBase = StaticBase::label(...);
+$staticChild = StaticChild::label(...);
+
+assert!(bounded_map::<Mapper<int>::map<string>>($integerMap) == 'mapped');
+
+assert!(
+  bounded_mapper_family::<IntegerMapper::map<string>>($integerMap) == 'family',
+);
+
+assert!(call_exact_map($integerMap) == 'exact');
+
+assert!($integerMap is Mapper<int>::map<string>);
+assert!($integerMap is Mapper<int>::map);
+assert!(!($integerMap is Mapper<string>::map<string>));
+assert!($stringMap is Mapper<string>::map<string>);
+assert!(!($unrelatedMap is Mapper<int>::map<string>));
+assert!(!($partialMap is Mapper<int>::map<string>));
+assert!($staticBase is StaticBase::label);
+assert!($staticChild is StaticBase::label);
+assert!($staticChild is StaticChild::label);

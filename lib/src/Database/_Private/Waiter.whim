@@ -1,0 +1,14 @@
+namespace Whim\Database\_Private;
+
+use Whim;
+use Whim\Marker\TrackCaller;
+
+/** Holds one task waiting for a pooled connection. */
+final class Waiter {
+  public bool $active = true;
+
+  #[TrackCaller]
+  public function __construct(
+    public readonly Whim\_Private\Suspension<null|Entry> $suspension,
+  ) {}
+}

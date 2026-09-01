@@ -1,0 +1,20 @@
+namespace Whim\OS;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonNegativeInt;
+
+/** A group record returned by the operating-system account directory. */
+final readonly class Group {
+  #[AlwaysInline]
+  public function __construct(
+    public NonNegativeInt $id,
+    public NonEmptyString $name,
+    /**
+     * Names explicitly listed as members.
+     *
+     * Users whose primary group is this group may not appear here.
+     */
+    public vec<NonEmptyString> $memberNames,
+  ) {}
+}

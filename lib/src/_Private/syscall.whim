@@ -1,0 +1,1014 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\OS\FileDescriptor;
+use Whim\Unwind\Error;
+
+/**
+ * A failed system call.
+ *
+ * `errno` is the raw platform code; compare it against the `ERRNO_*`
+ * constants rather than against a literal.
+ */
+#[Stub]
+final class SystemError extends Error {
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function __construct() {}
+
+  /** The raw platform error number. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function errno(): int {}
+
+  /** The system call that failed, such as `'openat'`. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function call(): (string&!'') {}
+}
+
+/** The platform's `ENOENT` error number. */
+#[Stub]
+const ERRNO_NOT_FOUND = ERRNO_NOT_FOUND;
+
+/** The platform's `ENOTDIR` error number. */
+#[Stub]
+const ERRNO_NOT_DIRECTORY = ERRNO_NOT_DIRECTORY;
+
+/** The platform's `EISDIR` error number. */
+#[Stub]
+const ERRNO_IS_DIRECTORY = ERRNO_IS_DIRECTORY;
+
+/** The platform's `EEXIST` error number. */
+#[Stub]
+const ERRNO_ALREADY_EXISTS = ERRNO_ALREADY_EXISTS;
+
+/** The platform's `EACCES` error number. */
+#[Stub]
+const ERRNO_PERMISSION_DENIED = ERRNO_PERMISSION_DENIED;
+
+/** The platform's `EPERM` error number. */
+#[Stub]
+const ERRNO_OPERATION_NOT_PERMITTED = ERRNO_OPERATION_NOT_PERMITTED;
+
+/** The platform's `ENOTEMPTY` error number. */
+#[Stub]
+const ERRNO_DIRECTORY_NOT_EMPTY = ERRNO_DIRECTORY_NOT_EMPTY;
+
+/** The platform's `EINVAL` error number. */
+#[Stub]
+const ERRNO_INVALID_ARGUMENT = ERRNO_INVALID_ARGUMENT;
+
+/** The platform's `EAGAIN` error number. */
+#[Stub]
+const ERRNO_WOULD_BLOCK = ERRNO_WOULD_BLOCK;
+
+/** The platform's `S_IFMT` file-type mask. */
+#[Stub]
+const FILE_TYPE_MASK = FILE_TYPE_MASK;
+
+/** The platform's `S_IFREG` file-type bits. */
+#[Stub]
+const FILE_TYPE_REGULAR = FILE_TYPE_REGULAR;
+
+/** The platform's `S_IFDIR` file-type bits. */
+#[Stub]
+const FILE_TYPE_DIRECTORY = FILE_TYPE_DIRECTORY;
+
+/** The platform's `S_IFLNK` file-type bits. */
+#[Stub]
+const FILE_TYPE_SYMBOLIC_LINK = FILE_TYPE_SYMBOLIC_LINK;
+
+/** The platform's `S_IFCHR` file-type bits. */
+#[Stub]
+const FILE_TYPE_CHARACTER_DEVICE = FILE_TYPE_CHARACTER_DEVICE;
+
+/** The platform's `S_IFBLK` file-type bits. */
+#[Stub]
+const FILE_TYPE_BLOCK_DEVICE = FILE_TYPE_BLOCK_DEVICE;
+
+/** The platform's `S_IFIFO` file-type bits. */
+#[Stub]
+const FILE_TYPE_NAMED_PIPE = FILE_TYPE_NAMED_PIPE;
+
+/** The platform's `S_IFSOCK` file-type bits. */
+#[Stub]
+const FILE_TYPE_SOCKET = FILE_TYPE_SOCKET;
+
+/** The platform's `O_WRONLY` open flag. */
+#[Stub]
+const OPEN_FLAG_WRITE_ONLY = OPEN_FLAG_WRITE_ONLY;
+
+/** The platform's `O_CREAT` open flag. */
+#[Stub]
+const OPEN_FLAG_CREATE = OPEN_FLAG_CREATE;
+
+/** The platform's `O_EXCL` open flag. */
+#[Stub]
+const OPEN_FLAG_EXCLUSIVE = OPEN_FLAG_EXCLUSIVE;
+
+/** The platform's `O_CLOEXEC` open flag. */
+#[Stub]
+const OPEN_FLAG_CLOSE_ON_EXEC = OPEN_FLAG_CLOSE_ON_EXEC;
+
+/** The platform's `O_RDONLY` open flag. */
+#[Stub]
+const OPEN_FLAG_READ_ONLY = OPEN_FLAG_READ_ONLY;
+
+/** The platform's `O_RDWR` open flag. */
+#[Stub]
+const OPEN_FLAG_READ_WRITE = OPEN_FLAG_READ_WRITE;
+
+/** The platform's `O_APPEND` open flag. */
+#[Stub]
+const OPEN_FLAG_APPEND = OPEN_FLAG_APPEND;
+
+/** The platform's `O_TRUNC` open flag. */
+#[Stub]
+const OPEN_FLAG_TRUNCATE = OPEN_FLAG_TRUNCATE;
+
+/** The platform's `SEEK_SET` seek origin. */
+#[Stub]
+const SEEK_ORIGIN_START = SEEK_ORIGIN_START;
+
+/** The platform's `SEEK_CUR` seek origin. */
+#[Stub]
+const SEEK_ORIGIN_CURRENT = SEEK_ORIGIN_CURRENT;
+
+/** The platform's `SEEK_END` seek origin. */
+#[Stub]
+const SEEK_ORIGIN_END = SEEK_ORIGIN_END;
+
+/** The platform's `LOCK_SH` advisory-lock operation. */
+#[Stub]
+const LOCK_KIND_SHARED = LOCK_KIND_SHARED;
+
+/** The platform's `LOCK_EX` advisory-lock operation. */
+#[Stub]
+const LOCK_KIND_EXCLUSIVE = LOCK_KIND_EXCLUSIVE;
+
+/** The platform's `LOCK_UN` advisory-lock operation. */
+#[Stub]
+const LOCK_KIND_RELEASE = LOCK_KIND_RELEASE;
+
+/** The platform's `SIGHUP` signal number. */
+#[Stub]
+const SIGNAL_HANGUP = SIGNAL_HANGUP;
+
+/** The platform's `SIGINT` signal number. */
+#[Stub]
+const SIGNAL_INTERRUPT = SIGNAL_INTERRUPT;
+
+/** The platform's `SIGQUIT` signal number. */
+#[Stub]
+const SIGNAL_QUIT = SIGNAL_QUIT;
+
+/** The platform's `SIGILL` signal number. */
+#[Stub]
+const SIGNAL_ILLEGAL_INSTRUCTION = SIGNAL_ILLEGAL_INSTRUCTION;
+
+/** The platform's `SIGTRAP` signal number. */
+#[Stub]
+const SIGNAL_TRAP = SIGNAL_TRAP;
+
+/** The platform's `SIGABRT` signal number. */
+#[Stub]
+const SIGNAL_ABORT = SIGNAL_ABORT;
+
+/** The platform's `SIGBUS` signal number. */
+#[Stub]
+const SIGNAL_BUS_ERROR = SIGNAL_BUS_ERROR;
+
+/** The platform's `SIGFPE` signal number. */
+#[Stub]
+const SIGNAL_FLOATING_POINT_EXCEPTION = SIGNAL_FLOATING_POINT_EXCEPTION;
+
+/** The platform's `SIGKILL` signal number. */
+#[Stub]
+const SIGNAL_KILL = SIGNAL_KILL;
+
+/** The platform's `SIGUSR1` signal number. */
+#[Stub]
+const SIGNAL_USER_DEFINED_1 = SIGNAL_USER_DEFINED_1;
+
+/** The platform's `SIGSEGV` signal number. */
+#[Stub]
+const SIGNAL_SEGMENTATION_FAULT = SIGNAL_SEGMENTATION_FAULT;
+
+/** The platform's `SIGUSR2` signal number. */
+#[Stub]
+const SIGNAL_USER_DEFINED_2 = SIGNAL_USER_DEFINED_2;
+
+/** The platform's `SIGPIPE` signal number. */
+#[Stub]
+const SIGNAL_BROKEN_PIPE = SIGNAL_BROKEN_PIPE;
+
+/** The platform's `SIGALRM` signal number. */
+#[Stub]
+const SIGNAL_ALARM = SIGNAL_ALARM;
+
+/** The platform's `SIGTERM` signal number. */
+#[Stub]
+const SIGNAL_TERMINATE = SIGNAL_TERMINATE;
+
+/** The platform's `SIGCHLD` signal number. */
+#[Stub]
+const SIGNAL_CHILD = SIGNAL_CHILD;
+
+/** The platform's `SIGCONT` signal number. */
+#[Stub]
+const SIGNAL_CONTINUE = SIGNAL_CONTINUE;
+
+/** The platform's `SIGSTOP` signal number. */
+#[Stub]
+const SIGNAL_STOP = SIGNAL_STOP;
+
+/** The platform's `SIGTSTP` signal number. */
+#[Stub]
+const SIGNAL_TERMINAL_STOP = SIGNAL_TERMINAL_STOP;
+
+/** The platform's `SIGTTIN` signal number. */
+#[Stub]
+const SIGNAL_TERMINAL_INPUT = SIGNAL_TERMINAL_INPUT;
+
+/** The platform's `SIGTTOU` signal number. */
+#[Stub]
+const SIGNAL_TERMINAL_OUTPUT = SIGNAL_TERMINAL_OUTPUT;
+
+/** The platform's `SIGURG` signal number. */
+#[Stub]
+const SIGNAL_URGENT = SIGNAL_URGENT;
+
+/** The platform's `SIGXCPU` signal number. */
+#[Stub]
+const SIGNAL_CPU_TIME_LIMIT_EXCEEDED = SIGNAL_CPU_TIME_LIMIT_EXCEEDED;
+
+/** The platform's `SIGXFSZ` signal number. */
+#[Stub]
+const SIGNAL_FILE_SIZE_LIMIT_EXCEEDED = SIGNAL_FILE_SIZE_LIMIT_EXCEEDED;
+
+/** The platform's `SIGVTALRM` signal number. */
+#[Stub]
+const SIGNAL_VIRTUAL_ALARM = SIGNAL_VIRTUAL_ALARM;
+
+/** The platform's `SIGPROF` signal number. */
+#[Stub]
+const SIGNAL_PROFILING_TIMER_EXPIRED = SIGNAL_PROFILING_TIMER_EXPIRED;
+
+/** The platform's `SIGWINCH` signal number. */
+#[Stub]
+const SIGNAL_WINDOW_CHANGE = SIGNAL_WINDOW_CHANGE;
+
+/** The platform's `SIGIO` signal number. */
+#[Stub]
+const SIGNAL_INPUT_OUTPUT = SIGNAL_INPUT_OUTPUT;
+
+/** The platform's `SIGSYS` signal number. */
+#[Stub]
+const SIGNAL_BAD_SYSTEM_CALL = SIGNAL_BAD_SYSTEM_CALL;
+
+/** The platform's `SIGSTKFLT` signal number, negative where the signal is missing. */
+#[Stub]
+const SIGNAL_STACK_FAULT = SIGNAL_STACK_FAULT;
+
+/** The platform's `SIGPWR` signal number, negative where the signal is missing. */
+#[Stub]
+const SIGNAL_POWER_FAILURE = SIGNAL_POWER_FAILURE;
+
+/** The platform's `RLIMIT_CPU` resource-limit selector. */
+#[Stub]
+const RESOURCE_LIMIT_CPU_TIME = RESOURCE_LIMIT_CPU_TIME;
+
+/** The platform's `RLIMIT_FSIZE` resource-limit selector. */
+#[Stub]
+const RESOURCE_LIMIT_FILE_SIZE = RESOURCE_LIMIT_FILE_SIZE;
+
+/** The platform's `RLIMIT_DATA` resource-limit selector. */
+#[Stub]
+const RESOURCE_LIMIT_DATA = RESOURCE_LIMIT_DATA;
+
+/** The platform's `RLIMIT_STACK` resource-limit selector. */
+#[Stub]
+const RESOURCE_LIMIT_STACK = RESOURCE_LIMIT_STACK;
+
+/** The platform's `RLIMIT_CORE` resource-limit selector. */
+#[Stub]
+const RESOURCE_LIMIT_CORE = RESOURCE_LIMIT_CORE;
+
+/** The platform's `RLIMIT_NOFILE` resource-limit selector. */
+#[Stub]
+const RESOURCE_LIMIT_OPEN_FILES = RESOURCE_LIMIT_OPEN_FILES;
+
+/** The platform's `RLIMIT_AS` resource-limit selector. */
+#[Stub]
+const RESOURCE_LIMIT_ADDRESS_SPACE = RESOURCE_LIMIT_ADDRESS_SPACE;
+
+/** The `spawn_process` disposition that shares the parent's stream. */
+#[Stub]
+const STREAM_DISPOSITION_INHERIT = STREAM_DISPOSITION_INHERIT;
+
+/** The `spawn_process` disposition that discards the stream. */
+#[Stub]
+const STREAM_DISPOSITION_NULL = STREAM_DISPOSITION_NULL;
+
+/** The `spawn_process` disposition that pipes the stream to the parent. */
+#[Stub]
+const STREAM_DISPOSITION_PIPE = STREAM_DISPOSITION_PIPE;
+
+/** The `spawn_process` disposition that attaches a given descriptor. */
+#[Stub]
+const STREAM_DISPOSITION_DESCRIPTOR = STREAM_DISPOSITION_DESCRIPTOR;
+
+/** The `spawn_process` disposition that attaches the controlling terminal. */
+#[Stub]
+const STREAM_DISPOSITION_TERMINAL = STREAM_DISPOSITION_TERMINAL;
+
+/** The platform's `AF_INET` socket family. */
+#[Stub]
+const SOCKET_FAMILY_INET = SOCKET_FAMILY_INET;
+
+/** The platform's `AF_INET6` socket family. */
+#[Stub]
+const SOCKET_FAMILY_INET6 = SOCKET_FAMILY_INET6;
+
+/** The platform's `AF_UNIX` socket family. */
+#[Stub]
+const SOCKET_FAMILY_UNIX = SOCKET_FAMILY_UNIX;
+
+/** The platform's `SOCK_STREAM` socket kind. */
+#[Stub]
+const SOCKET_KIND_STREAM = SOCKET_KIND_STREAM;
+
+/** The platform's `SOCK_DGRAM` socket kind. */
+#[Stub]
+const SOCKET_KIND_DATAGRAM = SOCKET_KIND_DATAGRAM;
+
+/** The platform's `SOL_SOCKET` socket-option level. */
+#[Stub]
+const SOCKET_LEVEL_SOCKET = SOCKET_LEVEL_SOCKET;
+
+/** The platform's `IPPROTO_TCP` socket-option level. */
+#[Stub]
+const SOCKET_LEVEL_TCP = SOCKET_LEVEL_TCP;
+
+/** The platform's `IPPROTO_IPV6` socket-option level. */
+#[Stub]
+const SOCKET_LEVEL_INET6 = SOCKET_LEVEL_INET6;
+
+/** The platform's `SO_REUSEADDR` option, set at `SOCKET_LEVEL_SOCKET`. */
+#[Stub]
+const SOCKET_OPTION_REUSE_ADDRESS = SOCKET_OPTION_REUSE_ADDRESS;
+
+/** The platform's `SO_REUSEPORT` option, set at `SOCKET_LEVEL_SOCKET`. */
+#[Stub]
+const SOCKET_OPTION_REUSE_PORT = SOCKET_OPTION_REUSE_PORT;
+
+/** The platform's `SO_BROADCAST` option, set at `SOCKET_LEVEL_SOCKET`. */
+#[Stub]
+const SOCKET_OPTION_BROADCAST = SOCKET_OPTION_BROADCAST;
+
+/** The platform's `SO_RCVBUF` option, set at `SOCKET_LEVEL_SOCKET`. */
+#[Stub]
+const SOCKET_OPTION_RECEIVE_BUFFER = SOCKET_OPTION_RECEIVE_BUFFER;
+
+/** The platform's `SO_SNDBUF` option, set at `SOCKET_LEVEL_SOCKET`. */
+#[Stub]
+const SOCKET_OPTION_SEND_BUFFER = SOCKET_OPTION_SEND_BUFFER;
+
+/** The platform's `TCP_NODELAY` option, set at `SOCKET_LEVEL_TCP`. */
+#[Stub]
+const SOCKET_OPTION_NO_DELAY = SOCKET_OPTION_NO_DELAY;
+
+/** The platform's `IPV6_V6ONLY` option, set at `SOCKET_LEVEL_INET6`. */
+#[Stub]
+const SOCKET_OPTION_ONLY_INET6 = SOCKET_OPTION_ONLY_INET6;
+
+/** Reads at most `$maxBytes`; null if blocked and `''` at end of file. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function read_descriptor(
+  FileDescriptor $descriptor,
+  (1..) $maxBytes,
+): null|string {}
+
+/** Writes as much of `$bytes` as the descriptor accepts. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function write_descriptor(FileDescriptor $descriptor, string $bytes): (0..) {}
+
+/** Flushes a standard stream's libc buffer; a no-op on other descriptors. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function flush_descriptor(FileDescriptor $descriptor): void {}
+
+/** Sets or clears non-blocking mode. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_descriptor_non_blocking(
+  FileDescriptor $descriptor,
+  bool $enabled,
+): void {}
+
+/** Creates a pipe, readable end first. Both ends are close-on-exec. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_pipe(): (FileDescriptor, FileDescriptor) {}
+
+/** Creates a connected pair of stream sockets. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_socket_pair(): (FileDescriptor, FileDescriptor) {}
+
+/** The process's standard input, output, and error stream descriptors. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function standard_descriptors(
+): (FileDescriptor, FileDescriptor, FileDescriptor) {}
+
+/** Arms the current coroutine to resume when the descriptor is readable. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function arm_readable(FileDescriptor $descriptor): bool {}
+
+/** Arms the current coroutine to resume when the descriptor is writable. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function arm_writable(FileDescriptor $descriptor): bool {}
+
+/** Parks the current coroutine until the descriptor is readable. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function park_readable(FileDescriptor $descriptor): bool {}
+
+/** Parks the current coroutine until the descriptor is writable. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function park_writable(FileDescriptor $descriptor): bool {}
+
+/** Calls `$callback` once the descriptor has bytes or reaches its end. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function watch_readable(
+  FileDescriptor $descriptor,
+  (fn(): void) $callback,
+): TaskId {}
+
+/** Calls `$callback` once the descriptor can accept bytes. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function watch_writable(
+  FileDescriptor $descriptor,
+  (fn(): void) $callback,
+): TaskId {}
+
+/** Opens a directory without following a symbolic link. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function open_directory_descriptor((string&!'') $path): null|FileDescriptor {}
+
+/** Opens a regular file beneath a directory without following symbolic links. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function open_regular_file_beneath(
+  FileDescriptor $directory,
+  string $path,
+): null|(FileDescriptor, vec<int>) {}
+
+/** Whether a path exists at all, without raising when it does not. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function path_exists((string&!'') $path, bool $follow): bool {}
+
+/** Tests the caller's access to a path. Advisory: prefer opening. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function check_access(
+  (string&!'') $path,
+  bool $read,
+  bool $write,
+  bool $execute,
+  bool $effective,
+): bool {}
+
+/** Creates one directory. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_directory((string&!'') $path, 0..=4294967295 $mode): void {}
+
+/** Removes one empty directory. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function remove_directory((string&!'') $path): void {}
+
+/** Removes one file, symbolic link, or socket. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function remove_file((string&!'') $path): void {}
+
+/** Renames within one filesystem, replacing an existing destination. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function rename_path((string&!'') $from, (string&!'') $to): void {}
+
+/** Creates a hard link. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_link((string&!'') $target, (string&!'') $path): void {}
+
+/** Creates a symbolic link. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_symbolic_link((string&!'') $target, (string&!'') $path): void {}
+
+/** Reads a symbolic link's target without following it. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function read_symbolic_link((string&!'') $path): (string&!'') {}
+
+/** Resolves a path to an absolute one with no links or `.` components. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function resolve_path((string&!'') $path): (string&!'') {}
+
+/** Creates a named pipe. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_named_pipe((string&!'') $path, 0..=4294967295 $mode): void {}
+
+/** Sets a path's permission bits. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_path_mode((string&!'') $path, 0..=4294967295 $mode): void {}
+
+/** Sets a path's owner and group; `-1` leaves either unchanged. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_path_owner(
+  (string&!'') $path,
+  int $user,
+  int $group,
+  bool $follow,
+): void {}
+
+/** Sets a path's access and modification times, in seconds and nanoseconds. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_path_times(
+  (string&!'') $path,
+  int $accessedSeconds,
+  int $accessedNanoseconds,
+  int $modifiedSeconds,
+  int $modifiedNanoseconds,
+  bool $follow,
+): void {}
+
+/**
+ * Lists a directory's entries as `(name, typeBit)` pairs, without `.`
+ * and `..`. A `typeBit` of `0` means the platform did not report a type
+ * and the caller must inspect the path separately.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function read_directory((string&!'') $path): vec<((string&!''), int)> {}
+
+/** Filesystem capacity, as `(blockSize, blocks, freeBlocks, availableBlocks)`. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function filesystem_space((string&!'') $path): (int, int, int, int) {}
+
+/** The directory for temporary files. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function temporary_directory(): (string&!'') {}
+
+/**
+ * Creates a new file with a generated name under `$directory` and returns
+ * `(descriptor, path)`.
+ *
+ * One call, because the safe version is atomic: choosing a name, checking
+ * that nothing holds it, and creating it are the same step. A caller that
+ * builds a name first and opens it second has a window in which someone
+ * else can put a symbolic link there.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_temporary_file(
+  (string&!'') $directory,
+  string $prefix,
+  0..=4294967295 $mode,
+): (FileDescriptor, (string&!'')) {}
+
+/** Creates a new directory with a generated name and returns its path. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_temporary_directory(
+  (string&!'') $directory,
+  string $prefix,
+): (string&!'') {}
+
+/** The parent process identifier. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function parent_process_id(): (0..) {}
+
+/** The real and effective user identifiers. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function process_user(): ((0..), (0..)) {}
+
+/** The real and effective group identifiers. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function process_group(): ((0..), (0..)) {}
+
+/** The supplementary group identifiers. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function process_supplementary_groups(): vec<(0..)> {}
+
+/** Sets the real and effective user; `-1` leaves either unchanged. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_process_user(int $real, int $effective): void {}
+
+/** Sets the real and effective group; `-1` leaves either unchanged. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_process_group(int $real, int $effective): void {}
+
+/** Replaces the supplementary group set. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_process_supplementary_groups(vec<(0..)> $groups): void {}
+
+/** Loads a user's configured group set. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function initialize_groups((string&!'') $user, (0..) $group): void {}
+
+/** The session identifier of a process; `0` means the caller. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function session_id((0..) $process): (0..) {}
+
+/** Starts a new session and returns its identifier. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function start_session(): (0..) {}
+
+/** The process group of a process; `0` means the caller. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function process_group_id((0..) $process): (0..) {}
+
+/** Sets a process's group; `0` in either position means the caller. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_process_group_id((0..) $process, (0..) $group): void {}
+
+/** The scheduling priority of a process; `0` means the caller. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function process_priority((0..) $process): int {}
+
+/** Sets a process's scheduling priority. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_process_priority((0..) $process, int $priority): void {}
+
+/** A resource limit as `(soft, hard)`; `-1` means unlimited. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function resource_limit(int $resource): (int, int) {}
+
+/** Sets a resource limit; `-1` means unlimited. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_resource_limit(int $resource, int $soft, int $hard): void {}
+
+/** The file-creation mask, replacing it with `$mask`. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function exchange_file_mode_mask(0..=511 $mask): 0..=511 {}
+
+/**
+ * Processor time used, as
+ * `(userSeconds, systemSeconds, childUserSeconds, childSystemSeconds)`
+ * in microseconds.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function process_times(): (int, int, int, int) {}
+
+/**
+ * Replaces the running program. Returns only on failure.
+ *
+ * The engine has one thread, a scheduler, and live descriptors, so there is
+ * no `fork`: a child is made by `spawn_process`, and this call is the one
+ * way to leave the current image behind.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function replace_process(
+  (string&!'') $program,
+  vec<string> $arguments,
+  null|dict<(string&!''), string> $environment,
+): never {}
+
+/**
+ * Sends a signal. A `$signal` of `0` performs the permission and existence
+ * check without delivering anything.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function send_signal(int $process, (0..) $signal): void {}
+
+/** Reports whether a process identifier names a live process. */
+#[Stub]
+#[MustUse]
+#[TrackCaller]
+#[TraceBoundary]
+function process_exists((1..) $process): bool {}
+
+/**
+ * Calls `$callback` each time a signal arrives.
+ *
+ * The engine masks the signal and delivers it through the event loop, so no
+ * Whim code ever runs in handler context. `Kill` and `Stop` cannot be
+ * watched and raise here. Cancel with `cancel_task`.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function watch_signal((1..) $signal, (fn(): void) $callback): TaskId {}
+
+/**
+ * Starts a program and returns
+ * `(processId, standardInput, standardOutput, standardError)`.
+ *
+ * Each element of `$streams` is `(disposition, descriptor)` for standard
+ * input, output, and error in that order, using the `STREAM_DISPOSITION_*`
+ * constants. A returned descriptor is present only where the disposition
+ * was `STREAM_DISPOSITION_PIPE`.
+ *
+ * `$environment` of `null` inherits the caller's; a dict replaces it
+ * entirely. `$directory` of `null` inherits the caller's.
+ *
+ * `$inherited` names descriptors the child keeps, each as
+ * `(descriptor, childNumber)`; everything else is closed. This is how a
+ * listening socket reaches a worker.
+ *
+ * `$processGroup` of `0` puts the child in its own group, which is what
+ * lets a caller signal it and its descendants together; `-1` leaves it in
+ * the caller's.
+ *
+ * There is no shell: `$program` is executed directly, and `$arguments` are
+ * passed as written. A caller that wants a shell runs one as the program.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function spawn_process(
+  (string&!'') $program,
+  vec<string> $arguments,
+  null|dict<(string&!''), string> $environment,
+  null|(string&!'') $directory,
+  vec<(int, null|FileDescriptor)> $streams,
+  vec<(FileDescriptor, (0..))> $inherited,
+  int $processGroup,
+): ((0..), null|FileDescriptor, null|FileDescriptor, null|FileDescriptor) {}
+
+/**
+ * Calls `$callback` with a child's raw wait status once it ends.
+ *
+ * The engine is the only party that reaps, so there is no `waitpid` here:
+ * a second waiter would steal the status the first one needs. Decode the
+ * status in Whim.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function watch_process((0..) $process, (fn(int): void) $callback): TaskId {}
+
+/**
+ * The running system as
+ * `(systemName, nodeName, release, version, machine)`.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function system_information(): ((string&!''), string, string, string, string) {}
+
+/** The system's uptime in milliseconds. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function system_uptime(): (0..) {}
+
+/** Load averages over one, five, and fifteen minutes. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function load_averages(): (float, float, float) {}
+
+/** Physical memory as `(total, available)` in bytes. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function memory_information(): ((0..), (0..)) {}
+
+/** Creates a socket. The descriptor is close-on-exec and non-blocking. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function create_socket(int $family, int $kind): FileDescriptor {}
+
+/** Binds a socket to a local address. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function bind_socket(FileDescriptor $socket, string $host, (0..) $port): void {}
+
+/** Marks a bound socket as accepting connections. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function listen_socket(FileDescriptor $socket, (1..) $backlog): void {}
+
+/**
+ * Accepts one pending connection as `(socket, host, port)`, or `null` when
+ * none is waiting.
+ *
+ * The accepted descriptor is close-on-exec and non-blocking. Wait with
+ * `watch_readable` on the listening socket.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function accept_socket(
+  FileDescriptor $socket,
+): null|(FileDescriptor, string, (0..)) {}
+
+/**
+ * Starts connecting to an address.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function connect_socket(
+  FileDescriptor $socket,
+  string $host,
+  (0..) $port,
+): bool {}
+
+/** Completes a non-blocking connection after its socket becomes writable. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function complete_socket_connection(FileDescriptor $socket): void {}
+
+/** The socket's own address as `(host, port)`. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function socket_address(FileDescriptor $socket): (string, (0..)) {}
+
+/** Sets an integer socket option. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function set_socket_option(
+  FileDescriptor $socket,
+  int $level,
+  int $option,
+  int $value,
+): void {}
+
+/** Sends one datagram to an address and returns the bytes accepted. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function send_to(
+  FileDescriptor $socket,
+  string $bytes,
+  string $host,
+  (0..) $port,
+): (0..) {}
+
+/** Enables local-address and congestion metadata for received messages. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function enable_message_metadata(FileDescriptor $socket): void {}
+
+/**
+ * Receives one datagram with its peer, local address, and ECN bits.
+ *
+ * The result also carries the receiving interface and truncation status.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function receive_message(
+  FileDescriptor $socket,
+  (1..) $maxBytes,
+  (0..) $localPort,
+): null|(string, (string, (0..)), (string, (0..)), 0..=3, (0..), bool) {}
+
+/**
+ * Sends one datagram from a chosen local host with the given ECN bits.
+ *
+ * The source port is the port bound to the socket.
+ */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function send_message(
+  FileDescriptor $socket,
+  string $bytes,
+  null|string $host,
+  (0..) $port,
+  string $sourceHost,
+  (0..) $interfaceIndex,
+  0..=3 $explicitCongestion,
+): (0..) {}
+
+/** Closes one or both directions of a connection, leaving the descriptor. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function shutdown_socket(FileDescriptor $socket, int $direction): void {}
+
+/** Whether a descriptor refers to a terminal. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function is_terminal(FileDescriptor $descriptor): bool {}
+
+/** A terminal's device path, or `null` when the descriptor is not one. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function terminal_path(FileDescriptor $descriptor): null|(string&!'') {}
+
+/** A terminal's size as `(columns, rows)`, or `null` when it has none. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function terminal_size(FileDescriptor $descriptor): null|((1..), (1..)) {}

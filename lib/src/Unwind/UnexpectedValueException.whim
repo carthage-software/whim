@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports a value that is not valid in the current runtime context. */
+class UnexpectedValueException extends RuntimeException {}

@@ -1,0 +1,127 @@
+namespace Whim\MIME;
+
+use Whim\Convert\ToString;
+use Whim\Default\Default;
+use Whim\Iterate\ArrayIterator;
+use Whim\Iterate\Iterator;
+use Whim\Iterate\ToIterator;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** An immutable ordered collection of MIME parameters. */
+final readonly class Parameters implements
+  Default,
+  ToIterator<int, Parameter>,
+  ToString {
+  #[AlwaysInline]
+  private function __construct(private vec<Parameter> $pairs) {}
+
+  /** Parses MIME parameters, or returns null for malformed input. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $input): null|Parameters {
+    $pairs = _Private\parse_parameters($input) ?? return null;
+
+    return new Parameters($pairs);
+  }
+
+  /** Parses MIME parameters. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $input): Parameters {
+    $parameters = Parameters::parse($input);
+    if ($parameters == null) {
+      throw new InvalidArgumentException('invalid MIME parameter list');
+    }
+
+    return $parameters;
+  }
+
+  /** Creates parameters from ordered name-value pairs. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromPairs(Iterable<_, Parameter> $pairs): Parameters {
+    $normalized = vec[];
+    foreach ($pairs as ($name, $value)) {
+      $name = Str\lowercase($name);
+      if (!_Private\is_token($name)) {
+        throw new InvalidArgumentException(
+          'invalid MIME parameter name: `' . $name . '`',
+        );
+      }
+
+      $normalized[] = ($name, $value);
+    }
+
+    return new Parameters($normalized);
+  }
+
+  /** Creates an empty parameter collection. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new Parameters(vec[]);
+  }
+
+  /** Returns the first value for a parameter name. */
+  #[MustUse]
+  #[TrackCaller]
+  public function get(string $name): null|string {
+    $name = Str\lowercase($name);
+    foreach ($this->pairs as ($candidate, $value)) {
+      if ($candidate == $name) {
+        return $value;
+      }
+    }
+
+    return null;
+  }
+
+  /** Reports whether a parameter exists. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(string $name): bool {
+    return $this->get($name) != null;
+  }
+
+  /** Returns all parameter pairs. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toVec(): vec<Parameter> {
+    return $this->pairs;
+  }
+
+  /** Returns the number of parameters. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function count(): int {
+    return length!($this->pairs);
+  }
+
+  /** Iterates over parameter pairs. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toIterator(): Iterator<int, Parameter> {
+    return new ArrayIterator::<int, Parameter>($this->pairs);
+  }
+
+  /** Serializes the parameter suffix of a MIME value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    $result = '';
+    foreach ($this->pairs as ($name, $value)) {
+      $result .=
+        '; ' . $name . '=' . _Private\serialize_parameter_value($value);
+    }
+
+    return $result;
+  }
+}

@@ -1,0 +1,4 @@
+namespace Whim\HTTP\Server\Binding;
+
+/** A listener binding served by an HTTP server. */
+interface Binding for Stream {}

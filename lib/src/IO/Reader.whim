@@ -1,0 +1,189 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\_Private\memmem;
+use Whim\_Private\string_slice;
+
+/** Adds buffered byte-, line-, and delimiter-oriented reads to a handle. */
+final class Reader implements BufferedReadHandle {
+  private string $buffer = '';
+
+  /** Creates a buffered reader over another readable handle. */
+  #[TrackCaller]
+  public function __construct(private ReadHandle $handle) {}
+
+  /** Waits for the underlying source when the internal buffer is empty. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->buffer == '') {
+      $this->handle->waitUntilReadable($cancellation);
+    }
+  }
+
+  /** Reports exhaustion only after both the buffer and source are empty. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    return $this->buffer == '' && $this->handle->reachedEndOfDataSource();
+  }
+
+  /** Reads from the buffer before delegating to the wrapped handle. */
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->buffer == '') {
+      return $this->handle->tryRead($maxBytes);
+    }
+
+    $length = length!($this->buffer);
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+      $length = $maxBytes;
+    }
+
+    $result = string_slice($this->buffer, 0, $length);
+    $this->buffer = string_slice(
+      $this->buffer,
+      $length,
+      length!($this->buffer) - $length,
+    );
+
+    return $result;
+  }
+
+  /** Reads one byte, or null after the source ends. */
+  #[TrackCaller]
+  public function readByte(
+    null|CancellationToken $cancellation = null,
+  ): null|string {
+    if ($this->buffer == '' && !$this->pullChunk($cancellation)) {
+      return null;
+    }
+
+    if ($this->buffer == '') {
+      return null;
+    }
+
+    $byte = $this->buffer[0];
+    $this->buffer = string_slice($this->buffer, 1, length!($this->buffer) - 1);
+
+    return $byte;
+  }
+
+  /** Reads one line without its trailing LF or CRLF. */
+  #[TrackCaller]
+  public function readLine(
+    null|CancellationToken $cancellation = null,
+  ): null|string {
+    $line = $this->readUntil("\n", $cancellation) ?? return null;
+
+    if ($line != '' && $line[length!($line) - 1] == "\n") {
+      $line = string_slice($line, 0, length!($line) - 1);
+      if ($line != '' && $line[length!($line) - 1] == "\r") {
+        $line = string_slice($line, 0, length!($line) - 1);
+      }
+    }
+
+    return $line;
+  }
+
+  /** Reads through the first occurrence of a suffix. */
+  #[TrackCaller]
+  public function readUntil(
+    string $suffix,
+    null|CancellationToken $cancellation = null,
+  ): null|string {
+    while (true) {
+      $position = $this->findSuffix($suffix);
+      if ($position != null) {
+        return $this->consume($position + length!($suffix));
+      }
+
+      if (!$this->pullChunk($cancellation)) {
+        if ($this->buffer == '') {
+          return null;
+        }
+
+        return $this->consume(length!($this->buffer));
+      }
+    }
+  }
+
+  /**
+   * Reads through a suffix without exceeding a byte bound.
+   *
+   * @throws LimitExceededException when the byte limit is reached before the suffix.
+   * @throws Whim\Async\CancelledException when the cancellation token is cancelled.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function readUntilBounded(
+    string $suffix,
+    int $maxBytes,
+    null|CancellationToken $cancellation = null,
+  ): null|string {
+    while (true) {
+      $position = $this->findSuffix($suffix);
+      if ($position != null) {
+        $end = $position + length!($suffix);
+        if ($end > $maxBytes) {
+          throw new LimitExceededException(
+            'readUntilBounded reached the byte limit before the suffix',
+          );
+        }
+
+        return $this->consume($end);
+      }
+
+      if (length!($this->buffer) > $maxBytes) {
+        throw new LimitExceededException(
+          'readUntilBounded reached the byte limit before the suffix',
+        );
+      }
+
+      if (!$this->pullChunk($cancellation)) {
+        if ($this->buffer == '') {
+          return null;
+        }
+
+        return $this->consume(length!($this->buffer));
+      }
+    }
+  }
+
+  /** Pulls one chunk into the internal buffer. */
+  #[TrackCaller]
+  private function pullChunk(null|CancellationToken $cancellation): bool {
+    $chunk = match ($this->handle->read(null, $cancellation)) {
+      '' => return false,
+      $chunk => $chunk,
+    };
+
+    $this->buffer .= $chunk;
+    return true;
+  }
+
+  /** Finds a suffix, treating an empty suffix as the buffer's start. */
+  #[TrackCaller]
+  private function findSuffix(string $suffix): null|int {
+    if ($suffix == '') {
+      return 0;
+    }
+
+    return memmem($this->buffer, $suffix, 0, false);
+  }
+
+  /** Removes and returns a prefix of the internal buffer. */
+  #[TrackCaller]
+  private function consume(int $length): string {
+    $result = string_slice($this->buffer, 0, $length);
+    $this->buffer = string_slice(
+      $this->buffer,
+      $length,
+      length!($this->buffer) - $length,
+    );
+
+    return $result;
+  }
+}

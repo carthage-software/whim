@@ -1,0 +1,48 @@
+namespace Whim\HTTP\Client\Middleware\_Private;
+
+use Whim\Str;
+use Whim\URL\URL;
+
+/** Returns the canonical host text used for cookie matching. */
+function host(URL $url): string {
+  return Str\lowercase($url->authority->host->toString());
+}
+
+/** Returns the default cookie path for a request URL. */
+function default_path(URL $url): string {
+  $path = $url->path;
+  if ($path == '' || !Str\starts_with($path, '/')) {
+    return '/';
+  }
+
+  $last = Str\search_last($path, '/');
+  if ($last == null || $last == 0) {
+    return '/';
+  }
+
+  return Str\slice($path, 0, $last);
+}
+
+/** Reports whether a request host is within a cookie domain. */
+function domain_matches(string $host, string $domain): bool {
+  return $host == $domain || Str\ends_with($host, '.' . $domain);
+}
+
+/** Reports whether a request path is within a cookie path. */
+function path_matches(string $requestPath, string $cookiePath): bool {
+  if ($requestPath == $cookiePath) {
+    return true;
+  }
+
+  if (!Str\starts_with($requestPath, $cookiePath)) {
+    return false;
+  }
+
+  return (
+    Str\ends_with($cookiePath, '/')
+    || (
+      length!($requestPath) > length!($cookiePath)
+      && $requestPath[length!($cookiePath)] == '/'
+    )
+  );
+}

@@ -1,0 +1,78 @@
+namespace Whim\Compression;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Iterable;
+use Whim\Refine\NonEmptyString;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\http_valid_token;
+use Whim\_Private\string_lowercase;
+
+/** Stores codecs by their case-insensitive content-coding names. */
+final readonly class Registry {
+  private dict<string, Codec> $codecs;
+  private vec<NonEmptyString> $codings;
+
+  /** Creates a registry in server-preference order. */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(Iterable<_, Codec> $codecs) {
+    $indexed = dict[];
+    $codings = vec[];
+    foreach ($codecs as $codec) {
+      $coding = string_lowercase($codec->coding());
+      if (
+        !http_valid_token($coding)
+        || $coding == 'identity'
+        || $coding == '*'
+      ) {
+        throw new InvalidArgumentException(
+          'invalid compression content coding: `' . $coding . '`',
+        );
+      }
+
+      if (contains_key!($indexed, $coding)) {
+        throw new InvalidArgumentException(
+          'duplicate compression content coding: `' . $coding . '`',
+        );
+      }
+
+      $indexed[$coding] = $codec;
+      $codings[] = $coding as NonEmptyString;
+    }
+
+    $this->codecs = $indexed;
+    $this->codings = $codings;
+  }
+
+  /** Reports whether a codec exists for a content coding. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function contains(string $coding): bool {
+    return contains_key!($this->codecs, string_lowercase($coding));
+  }
+
+  /** Returns the codec for a content coding. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function get(string $coding): Codec {
+    $coding = string_lowercase($coding);
+    if (!contains_key!($this->codecs, $coding)) {
+      throw new InvalidArgumentException(
+        'unsupported compression content coding: `' . $coding . '`',
+      );
+    }
+
+    return $this->codecs[$coding];
+  }
+
+  /** Returns content codings in server-preference order. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function codings(): vec<NonEmptyString> {
+    return $this->codings;
+  }
+}

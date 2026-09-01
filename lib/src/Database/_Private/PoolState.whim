@@ -1,0 +1,316 @@
+namespace Whim\Database\_Private;
+
+use Whim;
+use Whim\Async\CancelledException;
+use Whim\Async\CancellationToken;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\Async\TimeoutException;
+use Whim\Database\AcquisitionTimeoutException;
+use Whim\Database\Connection;
+use Whim\Database\ConnectionException;
+use Whim\Database\Connector;
+use Whim\Database\PoolConfiguration;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\Throwable;
+use Whim\_Private\RingBuffer;
+
+/** Owns the mutable state of one connection pool. */
+final class PoolState {
+  private bool $closed = false;
+  private int $openConnections = 0;
+  private RingBuffer<Entry> $idle;
+  private RingBuffer<Waiter> $pending;
+
+  public function __construct(
+    private Connector $connector,
+    private PoolConfiguration $configuration,
+  ) {
+    $this->idle = new RingBuffer::<Entry>();
+    $this->pending = new RingBuffer::<Waiter>();
+  }
+
+  /** Acquires a pooled entry. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function acquire(null|CancellationToken $cancellation): Entry {
+    while (true) {
+      $this->ensureOpen();
+      if ($cancellation != null) {
+        $cancellation->throwIfCancellationRequested();
+      }
+
+      $entry = $this->takeIdle($cancellation);
+      if ($entry != null) {
+        return $entry;
+      }
+
+      if ($this->openConnections < $this->configuration->maximumConnections) {
+        return $this->open($cancellation);
+      }
+
+      $entry = $this->wait($cancellation);
+      if ($entry != null) {
+        return $entry;
+      }
+    }
+  }
+
+  /** Returns or discards a released entry. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function release(Entry $entry, bool $reusable): void {
+    if (
+      $this->closed
+      || !$reusable
+      || $entry->connection->isClosed()
+      || !$entry->connection->isReusable()
+      || $entry->exceededLifetime($this->configuration)
+    ) {
+      $this->discard($entry);
+      return;
+    }
+
+    $waiter = $this->takeWaiter();
+    if ($waiter != null) {
+      $waiter->active = false;
+      $waiter->suspension->resumeEagerly($entry);
+      return;
+    }
+
+    if (
+      $this->configuration->maximumIdleConnections == 0
+      || $this->idle->count() >= $this->configuration->maximumIdleConnections
+    ) {
+      $this->discard($entry);
+      return;
+    }
+
+    $this->idle->pushBack($entry->idle());
+  }
+
+  /** Reports whether the pool is closed. */
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  /** Returns the number of open and reserved connections. */
+  #[MustUse]
+  public function getOpenConnections(): NonNegativeInt {
+    return $this->openConnections as NonNegativeInt;
+  }
+
+  /** Returns the number of idle connections. */
+  #[MustUse]
+  public function getIdleConnections(): NonNegativeInt {
+    return $this->idle->count();
+  }
+
+  /** Returns the number of tasks waiting for a connection. */
+  #[MustUse]
+  public function getPendingConnections(): NonNegativeInt {
+    $count = 0;
+    foreach ($this->pending->toVec() as $waiter) {
+      if ($waiter->active) {
+        $count++;
+      }
+    }
+
+    return $count as NonNegativeInt;
+  }
+
+  /** Closes idle connections and rejects pending acquisitions. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    while (($item = $this->idle->popFront()) != null) {
+      $entry = $item[0];
+      $this->closeConnection($entry->connection);
+      $this->openConnections--;
+    }
+
+    $error = new ConnectionException('the database connection pool is closed');
+    while (($item = $this->pending->popFront()) != null) {
+      $waiter = $item[0];
+      if ($waiter->active) {
+        $waiter->active = false;
+        $waiter->suspension->throw($error);
+      }
+    }
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function open(null|CancellationToken $cancellation): Entry {
+    $this->openConnections++;
+    try {
+      $connection = $this->connector->connect($cancellation);
+    } catch (Throwable $error) {
+      $this->openConnections--;
+      $this->wakeForCapacity();
+      throw $error;
+    }
+
+    if ($this->closed) {
+      $this->closeConnection($connection);
+      $this->openConnections--;
+      throw new ConnectionException('the database connection pool is closed');
+    }
+
+    return Entry::create($connection);
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function takeIdle(null|CancellationToken $cancellation): null|Entry {
+    while (($item = $this->idle->popBack()) != null) {
+      $entry = $item[0];
+      if (
+        $entry->connection->isClosed()
+        || !$entry->connection->isReusable()
+        || $entry->isExpired($this->configuration)
+      ) {
+        $this->discard($entry);
+        continue;
+      }
+
+      if ($entry->needsValidation($this->configuration)) {
+        try {
+          $entry->connection->ping($cancellation);
+        } catch (ConnectionException $_) {
+          $this->discard($entry);
+          continue;
+        } catch (Throwable $error) {
+          $this->release($entry, true);
+          throw $error;
+        }
+      }
+
+      return $entry;
+    }
+
+    return null;
+  }
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function wait(null|CancellationToken $cancellation): null|Entry {
+    $timeout = $this->configuration->acquisitionTimeout;
+    $effectiveCancellation = match ($timeout) {
+      null => $cancellation,
+      $_ => new TimeoutCancellationToken($timeout, $cancellation),
+    };
+
+    $suspension = Whim\_Private\create_suspension::<null|Entry>();
+    $waiter = new Waiter($suspension);
+    $this->pending->pushBack($waiter);
+
+    $id = null;
+    if ($effectiveCancellation != null) {
+      $id = $effectiveCancellation->register(fn(): void {
+        if (!$waiter->active) {
+          return;
+        }
+
+        $waiter->active = false;
+        try {
+          $effectiveCancellation->throwIfCancellationRequested();
+        } catch (Throwable $error) {
+          $waiter->suspension->throw($error);
+        }
+      });
+    }
+
+    try {
+      try {
+        return $suspension->suspend();
+      } catch (CancelledException $error) {
+        if ($error->getPrevious() is TimeoutException) {
+          throw new AcquisitionTimeoutException(
+            'timed out while waiting for a database connection',
+            previous: $error,
+          );
+        }
+
+        throw $error;
+      }
+    } finally {
+      $waiter->active = false;
+      if ($effectiveCancellation != null && $id != null) {
+        $effectiveCancellation->unregister($id);
+      }
+    }
+  }
+
+  #[MustUse]
+  private function takeWaiter(): null|Waiter {
+    while (($item = $this->pending->popFront()) != null) {
+      $waiter = $item[0];
+      if ($waiter->active) {
+        return $waiter;
+      }
+    }
+
+    return null;
+  }
+
+  private function discard(Entry $entry): void {
+    $this->closeConnection($entry->connection);
+    $this->openConnections--;
+    $this->wakeForCapacity();
+  }
+
+  private function wakeForCapacity(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $waiter = $this->takeWaiter();
+    if ($waiter != null) {
+      $waiter->active = false;
+      $waiter->suspension->resume(null);
+    }
+  }
+
+  private function closeConnection(Connection $connection): void {
+    if ($connection->isClosed()) {
+      return;
+    }
+
+    try {
+      $connection->close();
+    } catch (Throwable $_) {
+    }
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  private function ensureOpen(): void {
+    if ($this->closed) {
+      throw new ConnectionException('the database connection pool is closed');
+    }
+  }
+
+  /** Closes the pool state when it is destructed. */
+  public function __destruct(): void {
+    $this->close();
+  }
+}

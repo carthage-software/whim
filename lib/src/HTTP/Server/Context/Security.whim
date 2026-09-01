@@ -1,0 +1,19 @@
+namespace Whim\HTTP\Server\Context;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Refine\NonEmptyString;
+use Whim\TLS\Certificate;
+use Whim\TLS\Version;
+
+/** Describes the encrypted transport of a request. */
+final readonly class Security {
+  #[AlwaysInline]
+  public function __construct(
+    public vec<Certificate> $peerCertificates = vec[],
+    public null|NonEmptyString $serverName = null,
+    public null|NonEmptyString $applicationProtocol = null,
+    public null|Version $tlsVersion = null,
+    public null|NonEmptyString $cipherSuite = null,
+    public bool $earlyDataAccepted = false,
+  ) {}
+}

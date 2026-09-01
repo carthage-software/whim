@@ -1,0 +1,77 @@
+namespace Whim\Reflection\Symbol;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\Generic\GenericDeclarationReflection;
+use Whim\Reflection\Generic\TypeParameterReflection;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Type\SymbolTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
+use Whim\Symbol\SymbolKind;
+
+/** Describes one nominal newtype declaration. */
+#[Stub]
+final class NewtypeReflection implements
+  SymbolReflection,
+  GenericDeclarationReflection {
+  private function __construct() {}
+
+  /** Returns where this newtype was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this newtype's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this newtype's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns the fully qualified newtype name. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the newtype name without its namespace. */
+  #[MustUse]
+  public function getShortName(): string {}
+
+  /** Returns the namespace name, or an empty string in the global namespace. */
+  #[MustUse]
+  public function getNamespaceName(): string {}
+
+  /** Returns the newtype symbol kind. */
+  #[MustUse]
+  public function getKind(): SymbolKind {}
+
+  /** Returns type parameters in declaration order. */
+  #[MustUse]
+  public function getTypeParameters(): vec<TypeParameterReflection> {}
+
+  /** Returns a type parameter by zero-based position or name. */
+  #[MustUse]
+  public function getTypeParameter(
+    int|string $parameter,
+  ): null|TypeParameterReflection {}
+
+  /** Returns the backing type with declaration parameters left unbound. */
+  #[MustUse]
+  public function getBackingType(): TypeReflection {}
+
+  /** Returns this newtype applied to references to its own parameters. */
+  #[MustUse]
+  public function getType(): SymbolTypeReflection {}
+}

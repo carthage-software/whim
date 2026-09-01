@@ -1,0 +1,71 @@
+namespace Whim\IO;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Restricts reads to a byte limit and throws when data remains beyond it. */
+final class BoundedReadHandle implements ReadHandle {
+  private int $consumed = 0;
+
+  /**
+   * Creates a bounded view over a readable handle.
+   *
+   * @throws InvalidArgumentException when the byte limit is negative.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function __construct(private ReadHandle $handle, private int $limit) {
+    if ($limit < 0) {
+      throw new InvalidArgumentException('the byte limit cannot be negative');
+    }
+  }
+
+  /** Waits for the underlying source while the bound has not been reached. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->consumed < $this->limit) {
+      $this->handle->waitUntilReadable($cancellation);
+    }
+  }
+
+  /** Reports the bound or underlying source as exhausted. */
+  #[TrackCaller]
+  public function reachedEndOfDataSource(): bool {
+    if ($this->consumed >= $this->limit) {
+      return true;
+    }
+
+    return $this->handle->reachedEndOfDataSource();
+  }
+
+  /**
+   * Attempts a read without crossing the configured byte limit.
+   *
+   * @throws LimitExceededException when a read would exceed the byte limit.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->consumed >= $this->limit) {
+      if ($this->handle->reachedEndOfDataSource()) {
+        return '';
+      }
+
+      throw new LimitExceededException("read exceeded the handle's byte limit");
+    }
+
+    $remaining = $this->limit - $this->consumed;
+    $wanted = $remaining;
+    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $remaining) {
+      $wanted = $maxBytes;
+    }
+
+    $data = $this->handle->tryRead($wanted);
+    $this->consumed += length!($data);
+    return $data;
+  }
+}

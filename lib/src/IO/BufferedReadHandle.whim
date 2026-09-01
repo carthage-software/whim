@@ -1,0 +1,34 @@
+namespace Whim\IO;
+
+use Whim\Marker\TrackCaller;
+use Whim\Async\CancellationToken;
+
+/** Defines a buffered source with delimiter-oriented reads. */
+interface BufferedReadHandle extends ReadHandle {
+  /** Reads one byte or null when the source ends. */
+  #[TrackCaller]
+  public function readByte(
+    null|CancellationToken $cancellation = null,
+  ): null|string;
+
+  /** Reads one line without its trailing line ending. */
+  #[TrackCaller]
+  public function readLine(
+    null|CancellationToken $cancellation = null,
+  ): null|string;
+
+  /** Reads through the first occurrence of a suffix. */
+  #[TrackCaller]
+  public function readUntil(
+    string $suffix,
+    null|CancellationToken $cancellation = null,
+  ): null|string;
+
+  /** Reads through a suffix without exceeding a byte bound. */
+  #[TrackCaller]
+  public function readUntilBounded(
+    string $suffix,
+    int $maxBytes,
+    null|CancellationToken $cancellation = null,
+  ): null|string;
+}

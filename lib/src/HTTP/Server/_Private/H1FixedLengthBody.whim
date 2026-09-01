@@ -1,0 +1,84 @@
+namespace Whim\HTTP\Server\_Private;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\Exception;
+use Whim\IO\ReadHandle;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TraceBoundary;
+use Whim\Marker\TrackCaller;
+
+/** Reads exactly one HTTP/1 request body's declared length. */
+final class H1FixedLengthBody implements ReadHandle {
+  private int $remaining;
+
+  public function __construct(
+    private ReadHandle $reader,
+    int $length,
+    private CancellationToken $cancellation,
+  ) {
+    $this->remaining = $length;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    if ($this->remaining != 0) {
+      $this->reader->waitUntilReadable($this->cancellation);
+    }
+  }
+
+  public function reachedEndOfDataSource(): bool {
+    return $this->remaining == 0;
+  }
+
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ($this->remaining == 0) {
+      return '';
+    }
+
+    $maximum = $this->limit($maxBytes);
+    $data = $this->reader->tryRead($maximum);
+    $this->consume($data);
+    return $data;
+  }
+
+  #[NeverInline]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function read(
+    null|int $maxBytes = null,
+    null|CancellationToken $cancellation = null,
+  ): string {
+    if ($this->remaining == 0) {
+      return '';
+    }
+
+    $data = match (
+      $this->reader->read($this->limit($maxBytes), $this->cancellation)
+    ) {
+      '' => throw new Exception(
+        'the request ended before its declared content length',
+      ),
+      $data => $data,
+    };
+
+    $this->consume($data);
+    return $data;
+  }
+
+  private function limit(null|int $maximum): int {
+    if ($maximum == null || $maximum < 0 || $maximum > $this->remaining) {
+      return $this->remaining;
+    }
+
+    return $maximum;
+  }
+
+  private function consume(string $data): void {
+    $this->remaining -= length!($data);
+  }
+}

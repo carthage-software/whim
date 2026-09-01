@@ -1,0 +1,159 @@
+namespace Whim\HTTP\Client;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Network\InternetEndpoint;
+use Whim\TCP;
+
+/** Opens direct HTTP/1 and HTTP/2 connections. */
+final readonly class DirectConnector implements Connector {
+  public function __construct(
+    private TCP\Connector $tcp = new TCP\DefaultConnector(),
+  ) {}
+
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function connect(
+    Origin $origin,
+    Request $request,
+    Configuration $configuration,
+    null|CancellationToken $cancellation = null,
+  ): Connection {
+    $versions = _Private\resolve_protocol_versions($request, $configuration);
+    $proxy = $configuration->proxy;
+    if ($proxy != null && _Private\should_use_proxy($origin, $proxy)) {
+      return $this->connectThroughProxy(
+        $origin,
+        $versions,
+        $configuration,
+        $proxy,
+        $cancellation,
+      );
+    }
+
+    ($host, $serverName) = _Private\origin_host($origin);
+    $tcpProxied = $this->tcp is TCP\ProxyConnector;
+
+    if ($origin->scheme == 'http') {
+      $stream = $this->tcp->connect($host, $origin->port, $cancellation);
+      $destination = match ($tcpProxied) {
+        true => _Private\known_destination($origin),
+        false => $stream->getPeerEndpoint(),
+      };
+
+      if (length!($versions) == 1 && $versions[0] == ProtocolVersion::V2) {
+        return new _Private\H2Connection(
+          $stream,
+          new ConnectionMetadata(
+            $stream->getLocalEndpoint(),
+            $stream->getPeerEndpoint(),
+            ProtocolVersion::V2,
+            null,
+            $destination,
+            $tcpProxied,
+          ),
+          _Private\h2_configuration($configuration),
+        );
+      }
+
+      $h1 = _Private\preferred_h1_protocol($versions);
+      if ($h1 != null) {
+        return new _Private\H1Connection(
+          $stream,
+          new ConnectionMetadata(
+            $stream->getLocalEndpoint(),
+            $stream->getPeerEndpoint(),
+            $h1,
+            null,
+            $destination,
+            $tcpProxied,
+          ),
+        );
+      }
+
+      $stream->close();
+      throw new ConnectionException(
+        'the HTTP/2 prior-knowledge mode must be selected alone',
+      );
+    }
+
+    $stream = $this->tcp->connect($host, $origin->port, $cancellation);
+    $destination = match ($tcpProxied) {
+      true => _Private\known_destination($origin),
+      false => $stream->getPeerEndpoint(),
+    };
+
+    return _Private\connect_secure::<InternetEndpoint>(
+      $stream,
+      $serverName,
+      $destination,
+      $versions,
+      $configuration,
+      $cancellation,
+      $tcpProxied,
+    );
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  private function connectThroughProxy(
+    Origin $origin,
+    vec<ProtocolVersion> $versions,
+    Configuration $configuration,
+    ProxyConfiguration $proxy,
+    null|CancellationToken $cancellation,
+  ): Connection {
+    if ($origin->scheme == 'http') {
+      $h1 = _Private\preferred_h1_protocol($versions);
+      if ($h1 == null) {
+        throw new ConnectionException(
+          'forward proxying over HTTP requires HTTP/1.0 or HTTP/1.1',
+        );
+      }
+
+      $stream = _Private\connect_proxy($this->tcp, $proxy, $cancellation);
+      $destination = _Private\known_destination($origin);
+
+      return new _Private\H1Connection(
+        $stream,
+        new ConnectionMetadata(
+          $stream->getLocalEndpoint(),
+          $stream->getPeerEndpoint(),
+          $h1,
+          null,
+          $destination,
+          true,
+        ),
+        true,
+        $proxy->authorization,
+      );
+    }
+
+    $stream = _Private\connect_proxy($this->tcp, $proxy, $cancellation);
+    $destination = _Private\known_destination($origin);
+
+    _Private\establish_tunnel(
+      $stream,
+      $origin,
+      $proxy,
+      $configuration->maximumResponseHeaderSize,
+      $cancellation,
+    );
+
+    ($_host, $serverName) = _Private\origin_host($origin);
+    return _Private\connect_secure::<InternetEndpoint>(
+      $stream,
+      $serverName,
+      $destination,
+      $versions,
+      $configuration,
+      $cancellation,
+      true,
+    );
+  }
+}

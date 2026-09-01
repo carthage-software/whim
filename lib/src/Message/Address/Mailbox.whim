@@ -1,0 +1,126 @@
+namespace Whim\Message\Address;
+
+use Whim\Convert\ToString;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Message\Address\_Private\is_valid_mailbox;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+
+/** A mailbox address with an optional display name and comment. */
+final readonly class Mailbox implements ToString {
+  #[AlwaysInline]
+  private function __construct(
+    public string $localPart,
+    public string $domain,
+    public null|string $displayName,
+    public null|string $comment,
+    public string $address,
+  ) {}
+
+  /** Creates a checked mailbox. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function fromParts(
+    string $localPart,
+    string $domain,
+    null|string $displayName = null,
+    null|string $comment = null,
+  ): Mailbox {
+    if (!is_valid_mailbox($localPart, $domain)) {
+      throw new InvalidArgumentException('invalid mailbox address');
+    }
+
+    return new Mailbox(
+      $localPart,
+      $domain,
+      $displayName,
+      $comment,
+      $localPart . '@' . $domain,
+    );
+  }
+
+  /** Parses a mailbox, or returns null when malformed. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function parse(string $input): null|Mailbox {
+    $parts = _Private\strip_comments(Str\trim($input));
+    $input = Str\trim($parts[0]);
+    $comment = $parts[1];
+    if ($input == '') {
+      return null;
+    }
+
+    $displayName = null;
+    $open = Str\search($input, '<');
+    if ($open != null) {
+      $close = Str\search($input, '>', $open + 1);
+      if ($close == null || $close + 1 != length!($input)) {
+        return null;
+      }
+
+      $displayName = _Private\parse_display(Str\slice($input, 0, $open));
+      $input = Str\trim(Str\slice($input, $open + 1, $close - $open - 1));
+    }
+
+    $at = Str\search_last($input, '@');
+    if ($at == null || $at == 0 || $at + 1 >= length!($input)) {
+      return null;
+    }
+
+    $localPart = Str\slice($input, 0, $at);
+    $domain = Str\slice($input, $at + 1);
+    if (
+      Str\contains($localPart, "\r")
+      || Str\contains($localPart, "\n")
+      || Str\contains($domain, "\r")
+      || Str\contains($domain, "\n")
+    ) {
+      return null;
+    }
+
+    return new Mailbox(
+      $localPart,
+      $domain,
+      $displayName,
+      $comment,
+      $localPart . '@' . $domain,
+    );
+  }
+
+  /** Parses a mailbox. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $input): Mailbox {
+    $mailbox = Mailbox::parse($input);
+    if ($mailbox == null) {
+      throw new InvalidArgumentException('invalid mailbox: `' . $input . '`');
+    }
+
+    return $mailbox;
+  }
+
+  /** Serializes the mailbox for a message header. */
+  #[MustUse]
+  #[TrackCaller]
+  public function toString(): string {
+    $result = $this->address;
+    if ($this->displayName != null && $this->displayName != '') {
+      $result =
+        _Private\serialize_display($this->displayName)
+        . ' <'
+        . $this->address
+        . '>';
+    }
+
+    if ($this->comment != null) {
+      $result .= ' (' . $this->comment . ')';
+    }
+
+    return $result;
+  }
+}

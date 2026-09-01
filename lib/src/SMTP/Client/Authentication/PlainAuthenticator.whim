@@ -1,0 +1,45 @@
+namespace Whim\SMTP\Client\Authentication;
+
+use Whim\Async\CancellationToken;
+use Whim\Encoding\Base64;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\SMTP\Client\Connection;
+
+/** Implements SASL PLAIN authentication. */
+final readonly class PlainAuthenticator implements Authenticator {
+  public function __construct(
+    private string $username,
+    #[SensitiveParameter] private string $password,
+    private string $authorizationIdentity = '',
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public function mechanism(): NonEmptyString {
+    return 'PLAIN';
+  }
+
+  #[TrackCaller]
+  public function authenticate(
+    Connection $connection,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    _Private\require_mechanism($connection, $this->mechanism());
+    $payload = Base64\encode(
+      $this->authorizationIdentity
+      . "\x00"
+      . $this->username
+      . "\x00"
+      . $this->password,
+    );
+
+    _Private\require_authentication_success(
+      $this->mechanism(),
+      $connection->sendCommand('AUTH PLAIN ' . $payload, $cancellation),
+    );
+  }
+}

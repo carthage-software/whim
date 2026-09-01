@@ -1,0 +1,76 @@
+namespace Whim\SecureRandom;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Refine\NonNegativeInt;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\_Private\random_bytes;
+
+/**
+ * Generates cryptographically secure random bytes.
+ *
+ * @throws InsufficientEntropyException when the operating system does not provide random bytes.
+ */
+#[NeverInline]
+#[TrackCaller]
+function bytes(NonNegativeInt $length): string {
+  $bytes = random_bytes($length);
+  if ($bytes is null) {
+    throw new InsufficientEntropyException(
+      'the operating system did not provide random bytes',
+    );
+  }
+
+  return $bytes;
+}
+
+/**
+ * Generates a cryptographically secure random string.
+ *
+ * @throws InvalidArgumentException when the alphabet holds fewer than two bytes.
+ */
+#[NeverInline]
+#[TrackCaller]
+function string(NonNegativeInt $length, null|string $alphabet = null): string {
+  $alphabet =
+    $alphabet
+    ?? '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  if (length!($alphabet) < 2) {
+    throw new InvalidArgumentException(
+      '$alphabet must contain at least two bytes',
+    );
+  }
+
+  $result = '';
+  $index = 0;
+  while ($index < $length) {
+    $position = _Private\SECURE_SEQUENCE->nextIn(0, length!($alphabet) - 1);
+    $result .= $alphabet[$position];
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Generates a cryptographically secure floating-point value in the unit interval. */
+#[NeverInline]
+#[TrackCaller]
+function float(): float {
+  return _Private\SECURE_SEQUENCE->nextFloat();
+}
+
+/**
+ * Generates a cryptographically secure integer within the requested bounds.
+ *
+ * @throws InvalidArgumentException when the minimum exceeds the maximum.
+ */
+#[NeverInline]
+#[TrackCaller]
+function int(null|int $min = null, null|int $max = null): int {
+  return _Private\SECURE_SEQUENCE->nextIn(
+    $min ?? Math\INT_MIN,
+    $max ?? Math\INT_MAX,
+  );
+}

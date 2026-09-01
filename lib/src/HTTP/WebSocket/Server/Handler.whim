@@ -1,0 +1,138 @@
+namespace Whim\HTTP\WebSocket\Server;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Context\Upgrade;
+use Whim\HTTP\Server\HTTPException;
+use Whim\HTTP\Server\Handler\Handler as HTTPHandler;
+use Whim\HTTP\Server\_Private\h1_tokens;
+use Whim\HTTP\WebSocket\Server\_Private\ConnectionImpl;
+use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Stream;
+use Whim\Str;
+use Whim\_Private\http_valid_token;
+use Whim\_Private\websocket_accept_key;
+
+/** Upgrades one HTTP/1.1 route to a WebSocket connection. */
+final readonly class Handler implements HTTPHandler {
+  public function __construct(
+    private ConnectionHandler $handler,
+    private Configuration $configuration = new Configuration(),
+  ) {}
+
+  #[TrackCaller]
+  public function handle(
+    Context $context,
+    Request $request,
+    CancellationToken $cancellation,
+  ): Response {
+    if ($request->method != Message\METHOD_GET) {
+      throw new HTTPException(400, 'a WebSocket handshake requires GET');
+    }
+
+    if (
+      $request->protocolVersion != ProtocolVersion::V11
+      || !($context is Upgrade)
+    ) {
+      throw new HTTPException(400, 'a WebSocket handshake requires HTTP/1.1');
+    }
+
+    if (
+      !contains!(h1_tokens($request->headers, 'connection'), 'upgrade')
+      || !contains!(h1_tokens($request->headers, 'upgrade'), 'websocket')
+    ) {
+      throw new HTTPException(400, 'the request is not a WebSocket upgrade');
+    }
+
+    $versions = $request->headers->getAll('sec-websocket-version');
+    if (length!($versions) != 1 || Str\trim($versions[0], " \t") != '13') {
+      return new Response(
+        426,
+        headers: FieldMap::from(vec[('Sec-WebSocket-Version', '13')]),
+      );
+    }
+
+    $keys = $request->headers->getAll('sec-websocket-key');
+    if (length!($keys) != 1) {
+      throw new HTTPException(400, 'a WebSocket handshake requires one key');
+    }
+
+    $accept = websocket_accept_key(Str\trim($keys[0], " \t"));
+    if ($accept == null) {
+      throw new HTTPException(400, 'the WebSocket handshake key is invalid');
+    }
+
+    $subprotocol = $this->selectSubprotocol($request);
+    $headers = vec[
+      ('Connection', 'Upgrade'),
+      ('Upgrade', 'websocket'),
+      ('Sec-WebSocket-Accept', $accept),
+    ];
+
+    if ($subprotocol != null) {
+      $headers[] = ('Sec-WebSocket-Protocol', $subprotocol);
+    }
+
+    $handler = $this->handler;
+    $configuration = $this->configuration;
+    $context->upgrade(
+      fn(
+        Stream<_> $_stream,
+        ReadHandle $read,
+        WriteHandle $write,
+        CancellationToken $cancellation,
+      ): void {
+        $connection = new ConnectionImpl(
+          $read,
+          $write,
+          $cancellation,
+          $configuration,
+          $subprotocol,
+        );
+
+        try {
+          $handler->handle($connection, $context, $request, $cancellation);
+        } finally {
+          if (!$connection->isClosed()) {
+            $connection->close(1000);
+          }
+        }
+      },
+    );
+
+    return new Response(101, headers: FieldMap::from($headers));
+  }
+
+  #[TrackCaller]
+  private function selectSubprotocol(Request $request): null|string {
+    $offered = vec[];
+    foreach ($request->headers->getAll('sec-websocket-protocol') as $field) {
+      foreach (Str\split($field, ',') as $candidate) {
+        $candidate = Str\trim($candidate, " \t");
+        if ($candidate == '' || !http_valid_token($candidate)) {
+          throw new HTTPException(
+            400,
+            'the WebSocket subprotocol list is invalid',
+          );
+        }
+
+        $offered[] = $candidate;
+      }
+    }
+
+    foreach ($this->configuration->subprotocols as $supported) {
+      if (contains!($offered, $supported)) {
+        return $supported;
+      }
+    }
+
+    return null;
+  }
+}

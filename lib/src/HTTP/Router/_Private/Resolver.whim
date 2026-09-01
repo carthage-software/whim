@@ -1,0 +1,65 @@
+namespace Whim\HTTP\Router\_Private;
+
+use Whim\HTTP\Message;
+use Whim\HTTP\Message\Method;
+use Whim\Marker\MustUse;
+
+/** Resolves paths within method-specific prefix maps. */
+final readonly class Resolver {
+  private function __construct(private dict<Method, PrefixMap> $maps) {}
+
+  /** Compiles registered routes. */
+  #[MustUse]
+  public static function fromRoutes(
+    dict<Method, dict<string, Route>> $routes,
+  ): Resolver {
+    $maps = dict[];
+    foreach ($routes as $method => $methodRoutes) {
+      $entries = vec[];
+      foreach ($methodRoutes as $route) {
+        ($pattern, $handler) = $route;
+        $entries[] = ($pattern->nodes, $handler);
+      }
+
+      $maps[$method] = PrefixMap::fromEntries($entries);
+    }
+
+    return new Resolver($maps);
+  }
+
+  /** Resolves a method and path. */
+  #[MustUse]
+  public function resolve(Method $method, string $path): null|Resolution {
+    if (!contains_key!($this->maps, $method)) {
+      return null;
+    }
+
+    return $this->maps[$method]->resolve($path);
+  }
+
+  /** Returns the methods that accept a path. */
+  #[MustUse]
+  public function allowedMethods(string $path): vec<Method> {
+    $methods = vec[];
+    $get = false;
+    $head = false;
+    foreach ($this->maps as $method => $map) {
+      if ($map->resolve($path) == null) {
+        continue;
+      }
+
+      $methods[] = $method;
+      if ($method == Message\METHOD_GET) {
+        $get = true;
+      } else if ($method == Message\METHOD_HEAD) {
+        $head = true;
+      }
+    }
+
+    if ($get && !$head) {
+      $methods[] = Message\METHOD_HEAD;
+    }
+
+    return $methods;
+  }
+}

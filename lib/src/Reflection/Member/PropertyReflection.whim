@@ -1,0 +1,90 @@
+namespace Whim\Reflection\Member;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one instance or static property declaration. */
+#[Stub]
+final class PropertyReflection implements MemberReflection {
+  private function __construct() {}
+
+  /** Returns where this property was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this property's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this property's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns the property name without its dollar sign. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the class-like that declares this property. */
+  #[MustUse]
+  public function getDeclaringType(): ClassLikeReflection {}
+
+  /** Returns the property visibility. */
+  #[MustUse]
+  public function getVisibility(): Visibility {}
+
+  /** Reports whether the property belongs to the class family. */
+  #[MustUse]
+  public function isStatic(): bool {}
+
+  /** Reports whether the property accepts only its initialization write. */
+  #[MustUse]
+  public function isReadonly(): bool {}
+
+  /** Reports whether constructor promotion declared the property. */
+  #[MustUse]
+  public function isPromoted(): bool {}
+
+  /** Returns the explicitly declared type, when present. */
+  #[MustUse]
+  public function getDeclaredType(): null|TypeReflection {}
+
+  /** Returns inherited declarations whose contracts this property fulfills. */
+  #[MustUse]
+  public function getPrototypes(): vec<PropertyReflection> {}
+
+  /** Reports whether the declaration supplies an initial value. */
+  #[MustUse]
+  public function hasDefaultValue(): bool {}
+
+  /** Evaluates and returns the declared initial value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getDefaultValue(): mixed {}
+
+  /** Reports whether a static property has been initialized. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isStaticInitialized(): bool {}
+
+  /** Returns the current static value without permitting a write. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getStaticValue(): mixed {}
+}

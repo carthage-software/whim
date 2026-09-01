@@ -1,0 +1,296 @@
+use Whim\Hash;
+use Whim\Hash\Algorithm;
+use Whim\Marker\SensitiveParameterValue;
+use Whim\Math;
+use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+
+function hex(string $bytes): string {
+  $rendered = '';
+  foreach (Str\to_bytes($bytes) as $byte) {
+    $rendered .= Str\pad_left(Math\to_base($byte, 16), 2, '0');
+  }
+
+  return $rendered;
+}
+
+assert!(
+  hex(Hash\digest(Algorithm::Md5, '')) == 'd41d8cd98f00b204e9800998ecf8427e',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Sha1, 'abc'))
+  == 'a9993e364706816aba3e25717850c26c9cd0d89d',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Sha2_256, 'abc'))
+  == 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Sha2_512, 'abc'))
+  == 'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a'
+  . '2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Sha2_512_256, 'abc'))
+  == '53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Sha3_256, 'abc'))
+  == '3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Keccak256, ''))
+  == 'c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Ripemd160, 'abc'))
+  == '8eb208f7e05d987a9b044a8e98c6b087f15a0bfc',
+);
+
+assert!(
+  hex(Hash\digest(Algorithm::Blake3, ''))
+  == 'af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262',
+);
+
+assert!(hex(Hash\digest(Algorithm::Crc32, '123456789')) == 'cbf43926');
+
+assert!(hex(Hash\digest(Algorithm::Crc32c, '123456789')) == 'e3069283');
+
+assert!(hex(Hash\digest(Algorithm::Adler32, 'Wikipedia')) == '11e60398');
+
+assert!(hex(Hash\digest(Algorithm::Xxhash64, '')) == 'ef46db3751d8e999');
+
+assert!(
+  length!(
+    Hash\digest(Algorithm::Xxhash3, 'abc'),
+  ) == Algorithm::Xxhash3->digestLength(),
+);
+
+assert!(
+  length!(
+    Hash\digest(Algorithm::Sha2_224, ''),
+  ) == Algorithm::Sha2_224->digestLength(),
+);
+
+assert!(
+  length!(
+    Hash\digest(Algorithm::Sha2_384, ''),
+  ) == Algorithm::Sha2_384->digestLength(),
+);
+
+assert!(
+  length!(
+    Hash\digest(Algorithm::Sha3_224, ''),
+  ) == Algorithm::Sha3_224->digestLength(),
+);
+
+assert!(
+  length!(
+    Hash\digest(Algorithm::Sha3_384, ''),
+  ) == Algorithm::Sha3_384->digestLength(),
+);
+
+assert!(
+  length!(
+    Hash\digest(Algorithm::Sha3_512, ''),
+  ) == Algorithm::Sha3_512->digestLength(),
+);
+
+assert!(
+  length!(
+    Hash\digest(Algorithm::Blake2b256, ''),
+  ) == Algorithm::Blake2b256->digestLength(),
+);
+
+assert!(
+  hex(Hash\hmac(Algorithm::Sha2_256, 'Jefe', 'what do ya want for nothing?'))
+  == '5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843',
+);
+
+assert!(
+  hex(
+    Hash\hmac(
+      Algorithm::Md5,
+      'key',
+      'The quick brown fox jumps over the lazy dog',
+    ),
+  )
+  == '80070713463e7749b90c2dc24911e275',
+);
+
+assert!(
+  hex(Hash\hmac(Algorithm::Sha3_256, 'test-key', 'test-message'))
+  == '91a5a3aa49de1401260b76e570c2bbdc49243064be0f11f20c780ea085c32c01',
+);
+
+assert!(
+  hex(Hash\hmac(Algorithm::Blake3, 'test-key', 'test-message'))
+  == '5ef42c4935f72a9b45030dc16aa09917110d0d3e210f6db4026bc358ab0706ac',
+);
+
+assert!(
+  hex(Hash\hmac(Algorithm::Blake2b256, 'test-key', 'test-message'))
+  == 'f77311937f3aba8ff18f07d6f902e8650c62ef01acad785d950c22709c306b4c',
+);
+
+assert!(
+  hex(Hash\pbkdf2_sha256('password', 'salt', 1))
+  == '120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b',
+);
+
+assert!(
+  hex(Hash\pbkdf2_sha256('password', 'salt', 2))
+  == 'ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43',
+);
+
+assert!(
+  hex(Hash\pbkdf2_sha256('password', 'salt', 4096))
+  == 'c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a',
+);
+
+$hasher = Hash\Hasher::create(Algorithm::Sha2_256);
+$hasher->update('a');
+$hasher->update('b');
+$hasher->update('c');
+assert!($hasher->finish() == Hash\digest(Algorithm::Sha2_256, 'abc'));
+
+$finishTwice = null;
+$assertion_callable_27 = fn(): string => $hasher->finish();
+try {
+  $assertion_callable_27();
+} catch (RuntimeException $assertion_caught_27) {
+  $finishTwice = $assertion_caught_27;
+}
+
+assert!($finishTwice is RuntimeException);
+
+assert!($finishTwice->getMessage() == 'the digest is already finished');
+
+$updateAfterFinish = null;
+$assertion_callable_29 = function() use ($hasher): void {
+  $hasher->update('more');
+};
+
+try {
+  $assertion_callable_29();
+} catch (RuntimeException $assertion_caught_29) {
+  $updateAfterFinish = $assertion_caught_29;
+}
+
+assert!($updateAfterFinish is RuntimeException);
+
+assert!($updateAfterFinish->getMessage() == 'the digest is already finished');
+
+$mac = Hash\HmacHasher::create(Algorithm::Sha2_256, 'Jefe');
+$mac->update('what do ya want ');
+$mac->update('for nothing?');
+assert!(
+  $mac->finish() == Hash\hmac(
+    Algorithm::Sha2_256,
+    'Jefe',
+    'what do ya want for nothing?',
+  ),
+);
+
+$finishedMac = null;
+$assertion_callable_32 = fn(): string => $mac->finish();
+try {
+  $assertion_callable_32();
+} catch (RuntimeException $assertion_caught_32) {
+  $finishedMac = $assertion_caught_32;
+}
+
+assert!($finishedMac is RuntimeException);
+
+assert!($finishedMac->getMessage() == 'the digest is already finished');
+
+$updateFinishedMac = null;
+$assertion_callable_34 = function() use ($mac): void {
+  $mac->update('more');
+};
+
+try {
+  $assertion_callable_34();
+} catch (RuntimeException $assertion_caught_34) {
+  $updateFinishedMac = $assertion_caught_34;
+}
+
+assert!($updateFinishedMac is RuntimeException);
+
+assert!($updateFinishedMac->getMessage() == 'the digest is already finished');
+
+$blakeMac = Hash\HmacHasher::create(Algorithm::Blake3, 'test-key');
+$blakeMac->update('test-');
+$blakeMac->update('message');
+assert!(
+  $blakeMac->finish() == Hash\hmac(
+    Algorithm::Blake3,
+    'test-key',
+    'test-message',
+  ),
+);
+
+$long = Hash\hmac(Algorithm::Sha2_256, Str\pad_left('', 200, 'k'), 'body');
+assert!(length!($long) == 32);
+
+$checksum = null;
+$assertion_callable_38 = fn(): string => (
+  Hash\hmac(Algorithm::Crc32, 'key', 'body')
+);
+
+try {
+  $assertion_callable_38();
+} catch (InvalidArgumentException $assertion_caught_38) {
+  $checksum = $assertion_caught_38;
+}
+
+assert!($checksum is InvalidArgumentException);
+
+assert!(
+  $checksum->getMessage()
+  == 'a message can only be authenticated with a cryptographic algorithm, Crc32 is a checksum',
+);
+
+$redactedFrames = 0;
+foreach ($checksum->getTrace() as $frame) {
+  if ($frame->function != 'Whim\Hash\hmac') {
+    continue;
+  }
+
+  $redactedFrames++;
+  foreach ($frame->arguments as $index => $argument) {
+    if ($index == 0) {
+      continue;
+    }
+
+    assert!($argument is SensitiveParameterValue);
+  }
+}
+
+assert!($redactedFrames == 1);
+
+assert!(
+  Hash\equals(
+    Hash\digest(Algorithm::Sha2_256, 'abc'),
+    Hash\digest(Algorithm::Sha2_256, 'abc'),
+  ),
+);
+
+assert!(
+  !(
+    Hash\equals(
+      Hash\digest(Algorithm::Sha2_256, 'abc'),
+      Hash\digest(Algorithm::Sha2_256, 'abd'),
+    )
+  ),
+);
+
+assert!(!(Hash\equals('short', 'longer value')));

@@ -1,0 +1,26 @@
+namespace Whim\Reference;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\Stub;
+
+/** Associates values with weakly held object keys. */
+#[Stub]
+final class WeakMap<K: object, V> {
+  public function __construct() {}
+
+  public function set(K $key, V $value): void {}
+
+  #[MustUse]
+  #[TrackCaller]
+  public function get(K $key): V {}
+
+  #[MustUse]
+  public function has(K $key): bool {}
+
+  #[TrackCaller]
+  public function remove(K $key): void {}
+
+  #[MustUse]
+  public function length(): int {}
+}

@@ -1,0 +1,18 @@
+use Whim\Env;
+use Whim\Filesystem;
+use Whim\Str;
+
+/**
+ * The absolute path of a file that sits beside the running test. Absolute
+ * because a path handed to an autoloader is resolved against whichever unit
+ * happens to be requiring, not against the test.
+ */
+function beside(string $relative): string {
+  $script = Env\current_script();
+  assert!($script is string);
+  $script = Filesystem\canonicalize($script);
+  $slash = Str\search_last($script, '/');
+  assert!($slash is int);
+
+  return Str\slice($script, 0, $slash) . '/' . $relative;
+}

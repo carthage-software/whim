@@ -1,0 +1,35 @@
+namespace Whim\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Represents one hostname lookup running on the blocking worker pool. */
+#[Stub]
+final class HostResolutionOperation {
+  private function __construct() {}
+
+  /** Starts resolving one hostname for an address family. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public static function start(
+    (string&!'') $host,
+    int $family,
+  ): HostResolutionOperation {}
+
+  /** Suspends until this lookup completes. */
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function wait(): void {}
+
+  /** Takes the resolved `(family, host)` pairs. */
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function take(): null|vec<(int, (string&!''))> {}
+
+  /** Abandons this lookup's result. */
+  public function cancel(): void {}
+}

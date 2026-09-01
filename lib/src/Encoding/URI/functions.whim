@@ -1,0 +1,34 @@
+namespace Whim\Encoding\URI;
+
+use Whim;
+use Whim\Encoding\DecodingException;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/** Percent-encodes bytes while preserving URI syntax and valid escapes. */
+#[AlwaysInline]
+#[MustUse]
+function encode(string $bytes): string {
+  return Whim\_Private\uri_encode($bytes);
+}
+
+/**
+ * Decodes non-reserved percent escapes without changing URI structure.
+ *
+ * @throws DecodingException when the input contains a malformed escape.
+ */
+#[MustUse]
+#[NeverInline]
+#[TrackCaller]
+function decode(string $encoded): string {
+  $decoded = Whim\_Private\uri_decode($encoded);
+  if ($decoded == null) {
+    throw new DecodingException(
+      'a percent escape must be two hexadecimal digits',
+    );
+  }
+
+  return $decoded;
+}

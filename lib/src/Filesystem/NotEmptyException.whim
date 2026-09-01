@@ -1,0 +1,6 @@
+namespace Whim\Filesystem;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports a directory that still contains entries. */
+final class NotEmptyException extends RuntimeException {}

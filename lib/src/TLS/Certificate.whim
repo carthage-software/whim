@@ -1,0 +1,157 @@
+namespace Whim\TLS;
+
+use Whim;
+use Whim\IP\Address;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Time\SystemTime;
+
+/** One validated DER-encoded X.509 certificate. */
+final readonly class Certificate {
+  #[AlwaysInline]
+  private function __construct(private NonEmptyString $der) {}
+
+  /** Decodes one PEM or DER certificate. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function from(string $bytes): Certificate {
+    $certificates = self::decode($bytes);
+    if (length!($certificates) != 1) {
+      throw new CertificateException('expected exactly one certificate');
+    }
+
+    return $certificates[0];
+  }
+
+  /** Decodes a PEM bundle or one DER certificate. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function decode(string $bytes): vec<Certificate> {
+    try {
+      $decoded = Whim\_Private\tls_decode_certificates($bytes);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    $certificates = vec[];
+    foreach ($decoded as $certificate) {
+      $certificates[] = new Certificate($certificate as NonEmptyString);
+    }
+
+    return $certificates;
+  }
+
+  /** Returns this certificate's DER encoding. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function toDer(): NonEmptyString {
+    return $this->der;
+  }
+
+  /** Returns the start of this certificate's validity period. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getNotBefore(): SystemTime {
+    try {
+      $timestamp = Whim\_Private\tls_certificate_not_before($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    return SystemTime::fromUnixTimestamp($timestamp);
+  }
+
+  /** Returns the end of this certificate's validity period. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getNotAfter(): SystemTime {
+    try {
+      $timestamp = Whim\_Private\tls_certificate_not_after($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    return SystemTime::fromUnixTimestamp($timestamp);
+  }
+
+  /** Returns this certificate's subject name. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getSubject(): string {
+    try {
+      return Whim\_Private\tls_certificate_subject($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+  }
+
+  /** Returns this certificate's issuer name. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getIssuer(): string {
+    try {
+      return Whim\_Private\tls_certificate_issuer($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+  }
+
+  /** Returns this certificate's DNS subject alternative names. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getDnsNames(): vec<NonEmptyString> {
+    try {
+      $values = Whim\_Private\tls_certificate_dns_names($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    return $values as vec<NonEmptyString>;
+  }
+
+  /** Returns this certificate's IP subject alternative names. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getIpAddresses(): vec<Address> {
+    try {
+      $values = Whim\_Private\tls_certificate_ip_addresses($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    $addresses = vec[];
+    foreach ($values as $value) {
+      $addresses[] = Address::fromBytes($value);
+    }
+
+    return $addresses;
+  }
+
+  /** Returns this certificate's email subject alternative names. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getEmailAddresses(): vec<NonEmptyString> {
+    try {
+      $values = Whim\_Private\tls_certificate_email_addresses($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    return $values as vec<NonEmptyString>;
+  }
+
+  /** Returns this certificate's URI subject alternative names. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getUris(): vec<NonEmptyString> {
+    try {
+      $values = Whim\_Private\tls_certificate_uris($this->der);
+    } catch (Whim\_Private\TlsError $error) {
+      _Private\failure($error);
+    }
+
+    return $values as vec<NonEmptyString>;
+  }
+}

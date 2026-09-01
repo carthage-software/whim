@@ -1,0 +1,84 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\AttributeReflection;
+use Whim\Reflection\DeclarationReflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Member\PropertyReflection;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one callable parameter. */
+#[Stub]
+final class ParameterReflection implements DeclarationReflection {
+  private function __construct() {}
+
+  /** Returns where this parameter was defined. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns this parameter's source span, when defined by user code. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+
+  /** Returns this parameter's documentation text, when retained. */
+  #[MustUse]
+  public function getDocumentation(): null|string {}
+
+  /** Returns attributes whose instances fit the requested type. */
+  #[MustUse]
+  public function getAttributes<T: object = object>(
+  ): vec<AttributeReflection<T>> {}
+
+  /** Returns attributes with the exact fully qualified class name. */
+  #[MustUse]
+  public function getAttributesByName(
+    string $class,
+  ): vec<AttributeReflection<object>> {}
+
+  /** Returns the parameter name without its dollar sign. */
+  #[MustUse]
+  public function getName(): string {}
+
+  /** Returns the zero-based parameter position. */
+  #[MustUse]
+  public function getPosition(): 0.. {}
+
+  /** Returns the callable that declares this parameter. */
+  #[MustUse]
+  public function getDeclaringCallable(): CallableReflection {}
+
+  /** Returns the explicitly declared type, when present. */
+  #[MustUse]
+  public function getDeclaredType(): null|TypeReflection {}
+
+  /** Returns the declared type after resolving known bindings. */
+  #[MustUse]
+  public function getType(
+    null|TypeEnvironmentReflection $environment = null,
+  ): null|TypeReflection {}
+
+  /** Reports whether a caller may omit this parameter. */
+  #[MustUse]
+  public function isOptional(): bool {}
+
+  /** Reports whether this parameter declares a default value. */
+  #[MustUse]
+  public function hasDefaultValue(): bool {}
+
+  /** Evaluates and returns the default value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function getDefaultValue(): mixed {}
+
+  /** Reports whether traces redact values passed to this parameter. */
+  #[MustUse]
+  public function isSensitive(): bool {}
+
+  /** Returns the property created by constructor promotion, when present. */
+  #[MustUse]
+  public function getPromotedProperty(): null|PropertyReflection {}
+}

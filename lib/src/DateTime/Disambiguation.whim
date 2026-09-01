@@ -1,0 +1,16 @@
+namespace Whim\DateTime;
+
+/** Chooses an instant when local time is skipped or repeated. */
+enum Disambiguation: int {
+  /** Match Temporal's compatible behavior. */
+  case Compatible = 0;
+
+  /** Choose the earlier possible instant. */
+  case Earlier = 1;
+
+  /** Choose the later possible instant. */
+  case Later = 2;
+
+  /** Reject skipped or repeated local time. */
+  case Reject = 3;
+}

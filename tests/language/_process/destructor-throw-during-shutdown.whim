@@ -1,0 +1,7 @@
+class ThrowingResource {
+  public function __destruct(): void {
+    throw new Whim\Unwind\RuntimeException('shutdown failed');
+  }
+}
+
+$resource = new ThrowingResource();

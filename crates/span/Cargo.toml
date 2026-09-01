@@ -1,0 +1,17 @@
+[package]
+name = "whim-span"
+description = "Source spans for Whim"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+version.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+target-guard = { workspace = true }
+
+[lints]
+workspace = true

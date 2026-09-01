@@ -1,0 +1,34 @@
+namespace Whim\TCP;
+
+use Whim;
+use Whim\Async\CancellationToken;
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\Host;
+use Whim\Network\Port;
+
+/** Establishes direct TCP connections with fixed configuration. */
+final readonly class DefaultConnector implements Connector, Default {
+  #[AlwaysInline]
+  public function __construct(
+    private ConnectConfiguration $configuration = new ConnectConfiguration(),
+  ) {}
+
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): static {
+    return new static();
+  }
+
+  #[MustUse]
+  #[TrackCaller]
+  public function connect(
+    Host $host,
+    Port $port,
+    null|CancellationToken $cancellation = null,
+  ): Stream {
+    return Whim\TCP\connect($host, $port, $this->configuration, $cancellation);
+  }
+}

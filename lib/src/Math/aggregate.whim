@@ -1,0 +1,249 @@
+namespace Whim\Math;
+
+use Whim\Comparison\Ordering;
+use Whim\Marker\TrackCaller;
+use Whim\Float;
+use Whim\Math\_Private;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\Iterable;
+use Whim\Refine\Transform;
+use Whim\Refine\Numeric;
+use Whim\Vec;
+use Whim;
+
+/** Adds a collection of integers. */
+#[TrackCaller]
+function sum(Iterable<_, int> $numbers): int {
+  if ($numbers is vec<int>) {
+    return Whim\_Private\math_sum_ints($numbers);
+  }
+
+  $result = 0;
+  foreach ($numbers as $number) {
+    $result += $number;
+  }
+
+  return $result;
+}
+
+/** Adds a collection of floating-point numbers. */
+#[TrackCaller]
+function sum_floats(Iterable<_, float> $numbers): float {
+  if ($numbers is vec<float>) {
+    return Whim\_Private\math_sum_floats($numbers);
+  }
+
+  $result = 0.0;
+  foreach ($numbers as $number) {
+    $result += $number;
+  }
+
+  return $result;
+}
+
+/** Finds the smallest number in a collection. */
+#[TrackCaller]
+function min(Iterable<_, Numeric> $numbers): null|Numeric {
+  $result = null;
+  foreach ($numbers as $number) {
+    if ($number is float && Float\is_nan($number)) {
+      return $number;
+    }
+
+    if ($result == null || Whim\_Private\math_compare($number, $result) < 0) {
+      $result = $number;
+    }
+  }
+
+  return $result;
+}
+
+/** Finds the largest number in a collection. */
+#[TrackCaller]
+function max(Iterable<_, Numeric> $numbers): null|Numeric {
+  $result = null;
+  foreach ($numbers as $number) {
+    if ($number is float && Float\is_nan($number)) {
+      return $number;
+    }
+
+    if ($result == null || Whim\_Private\math_compare($number, $result) > 0) {
+      $result = $number;
+    }
+  }
+
+  return $result;
+}
+
+/** Finds the smallest of two or more numbers. */
+#[TrackCaller]
+function minva(
+  Numeric $first,
+  Numeric $second,
+  Iterable<_, Numeric> $rest = vec[],
+): Numeric {
+  if ($first is float && Float\is_nan($first)) {
+    return $first;
+  }
+
+  if ($second is float && Float\is_nan($second)) {
+    return $second;
+  }
+
+  $result = match (Whim\_Private\math_compare($first, $second) < 0) {
+    true => $first,
+    false => $second,
+  };
+
+  foreach ($rest as $number) {
+    if ($number is float && Float\is_nan($number)) {
+      return $number;
+    }
+
+    if (Whim\_Private\math_compare($number, $result) < 0) {
+      $result = $number;
+    }
+  }
+
+  return $result;
+}
+
+/** Finds the largest of two or more numbers. */
+#[TrackCaller]
+function maxva(
+  Numeric $first,
+  Numeric $second,
+  Iterable<_, Numeric> $rest = vec[],
+): Numeric {
+  if ($first is float && Float\is_nan($first)) {
+    return $first;
+  }
+
+  if ($second is float && Float\is_nan($second)) {
+    return $second;
+  }
+
+  $result = match (Whim\_Private\math_compare($first, $second) > 0) {
+    true => $first,
+    false => $second,
+  };
+
+  foreach ($rest as $number) {
+    if ($number is float && Float\is_nan($number)) {
+      return $number;
+    }
+
+    if (Whim\_Private\math_compare($number, $result) > 0) {
+      $result = $number;
+    }
+  }
+
+  return $result;
+}
+
+/** Computes the arithmetic mean of a non-empty input. */
+#[TrackCaller]
+function mean(array<_, Numeric> $numbers): null|float {
+  $count = length!($numbers);
+  if ($count == 0) {
+    return null;
+  }
+
+  $result = 0.0;
+  foreach ($numbers as $number) {
+    $result += $number / $count;
+  }
+
+  return $result;
+}
+
+/** Computes the median of a non-empty input. */
+#[TrackCaller]
+function median(array<_, Numeric> $numbers): null|float {
+  if (length!($numbers) == 0) {
+    return null;
+  }
+
+  foreach ($numbers as $number) {
+    if ($number is float && Float\is_nan($number)) {
+      return NAN;
+    }
+  }
+
+  $numbers = Vec\sort::<Numeric>(
+    $numbers,
+    fn(
+      Numeric $left,
+      Numeric $right,
+    ): Ordering => Ordering::from(Whim\_Private\math_compare($left, $right)),
+  );
+
+  $middle = div(length!($numbers), 2);
+  if (length!($numbers) % 2 == 1) {
+    return _Private\midpoint($numbers[$middle], $numbers[$middle]);
+  }
+
+  return _Private\midpoint($numbers[$middle - 1], $numbers[$middle]);
+}
+
+/** Finds the value with the smallest derived number. */
+#[TrackCaller]
+function min_by<T>(
+  Iterable<_, T> $values,
+  Transform<T, Numeric> $numeric,
+): Option<T> {
+  $result = null;
+  foreach ($values as $value) {
+    $number = $numeric($value);
+    if ($result == null) {
+      $result = ($value, $number);
+      continue;
+    }
+
+    if ($number is float && Float\is_nan($number)) {
+      if (!($result[1] is float && Float\is_nan($result[1]))) {
+        $result = ($value, $number);
+      }
+    } else if (Whim\_Private\math_compare($number, $result[1]) < 0) {
+      $result = ($value, $number);
+    }
+  }
+
+  if ($result == null) {
+    return new None();
+  }
+
+  return new Some::<T>($result[0]);
+}
+
+/** Finds the value with the largest derived number. */
+#[TrackCaller]
+function max_by<T>(
+  Iterable<_, T> $values,
+  Transform<T, Numeric> $numeric,
+): Option<T> {
+  $result = null;
+  foreach ($values as $value) {
+    $number = $numeric($value);
+    if ($result == null) {
+      $result = ($value, $number);
+      continue;
+    }
+
+    if ($number is float && Float\is_nan($number)) {
+      if (!($result[1] is float && Float\is_nan($result[1]))) {
+        $result = ($value, $number);
+      }
+    } else if (Whim\_Private\math_compare($number, $result[1]) > 0) {
+      $result = ($value, $number);
+    }
+  }
+
+  if ($result == null) {
+    return new None();
+  }
+
+  return new Some::<T>($result[0]);
+}

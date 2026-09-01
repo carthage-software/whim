@@ -1,0 +1,13 @@
+// a leading line comment
+$a = 1; // a trailing comment
+
+/* a leading block comment */
+$b = 2;
+
+/**
+ * A doc comment above a function.
+ */
+function greet(): void {
+  // inside the body
+  write_line!('hi'); // after the call
+}

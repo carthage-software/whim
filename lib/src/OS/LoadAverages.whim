@@ -1,0 +1,13 @@
+namespace Whim\OS;
+
+use Whim\Marker\AlwaysInline;
+
+/** System load averages over one, five, and fifteen minutes. */
+final readonly class LoadAverages {
+  #[AlwaysInline]
+  public function __construct(
+    public float $oneMinute,
+    public float $fiveMinutes,
+    public float $fifteenMinutes,
+  ) {}
+}

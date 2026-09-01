@@ -1,0 +1,11 @@
+namespace Whim\HTTP\_Private;
+
+/** A connection-level protocol violation. */
+final class ProtocolException extends Exception {
+  public function __construct(
+    string $message,
+    public readonly ErrorCodeValue $errorCode = 0x1,
+  ) {
+    parent::__construct($message);
+  }
+}

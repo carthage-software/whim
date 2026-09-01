@@ -1,0 +1,53 @@
+namespace Whim\_Private;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+
+/** Returns the exact IEEE 754 representation of a float as a signed integer. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function float_to_bits(float $value): int {}
+
+/** Reinterprets a signed integer as an IEEE 754 float representation. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function bits_to_float(int $bits): float {}
+
+/** Narrows a double to single precision and returns its 32 bits. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function float_to_bits32(float $value): 0..=4294967295 {}
+
+/** Widens a single-precision value, given its 32 bits, to a double. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function bits32_to_float(int $bits): float {}
+
+/** Returns the big-endian IEEE 754 bytes of a float. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function float_to_be_bytes(float $value): string {}
+
+/** Reinterprets eight big-endian IEEE 754 bytes as a float. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function float_from_be_bytes(string $bytes): float {}
+
+/** Returns the little-endian IEEE 754 bytes of a float. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function float_to_le_bytes(float $value): string {}
+
+/** Reinterprets eight little-endian IEEE 754 bytes as a float. */
+#[Stub]
+#[TrackCaller]
+#[TraceBoundary]
+function float_from_le_bytes(string $bytes): float {}

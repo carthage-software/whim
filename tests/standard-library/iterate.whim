@@ -1,0 +1,143 @@
+use Whim\Iterate;
+use Whim\Iterate\Iterator;
+use Whim\Refine\Iterable;
+use Whim\Unwind\RuntimeException;
+
+final class PullCounter {
+  public int $count = 0;
+}
+
+final class CountingIterator<K, V> implements Iterator<K, V> {
+  private int $index = 0;
+
+  public function __construct(
+    private vec<(K, V)> $entries,
+    private PullCounter $counter,
+    private null|int $maximumPulls = null,
+  ) {}
+
+  public function next(): null|(K, V) {
+    $this->counter->count++;
+    if (
+      $this->maximumPulls != null
+      && $this->counter->count > $this->maximumPulls
+    ) {
+      throw new RuntimeException('the iterator was pulled past its limit');
+    }
+
+    if ($this->index >= length!($this->entries)) {
+      return null;
+    }
+
+    return $this->entries[$this->index++];
+  }
+}
+
+$mapPulls = new PullCounter();
+$mapped = Iterate\map::<string, int, string>(
+  new CountingIterator::<string, int>(vec[('first', 1)], $mapPulls),
+  fn(int $value): string => 'v' . $value,
+);
+
+assert!($mapPulls->count == 0);
+assert!($mapped is Iterate\MapIterator<string, int, string>);
+assert!($mapped->next() == ('first', 'v1'));
+assert!($mapPulls->count == 1);
+
+$filterPulls = new PullCounter();
+$filtered = Iterate\filter::<string, int>(
+  new CountingIterator::<string, int>(
+    vec[('one', 1), ('two', 2), ('three', 3)],
+    $filterPulls,
+  ),
+  fn(int $value): bool => $value % 2 == 0,
+);
+
+assert!($filterPulls->count == 0);
+assert!($filtered is Iterate\FilterIterator<string, int>);
+assert!($filtered->next() == ('two', 2));
+assert!($filterPulls->count == 2);
+
+$takePulls = new PullCounter();
+$taken = Iterate\take::<string, int>(
+  new CountingIterator::<string, int>(
+    vec[('one', 1), ('two', 2), ('three', 3)],
+    $takePulls,
+    2,
+  ),
+  2,
+);
+
+assert!($takePulls->count == 0);
+assert!($taken is Iterate\TakeIterator<string, int>);
+assert!(Iterate\to_vec::<string, int>($taken) == vec[1, 2]);
+assert!($takePulls->count == 2);
+
+$emptyTakePulls = new PullCounter();
+$empty = Iterate\take::<string, int>(
+  new CountingIterator::<string, int>(vec[('one', 1)], $emptyTakePulls, 0),
+  0,
+);
+
+assert!(Iterate\to_vec::<string, int>($empty) == vec[]);
+assert!($emptyTakePulls->count == 0);
+
+$dropPulls = new PullCounter();
+$dropped = Iterate\drop::<string, int>(
+  new CountingIterator::<string, int>(
+    vec[('one', 1), ('two', 2), ('three', 3)],
+    $dropPulls,
+    3,
+  ),
+  2,
+);
+
+assert!($dropPulls->count == 0);
+assert!($dropped is Iterate\DropIterator<string, int>);
+assert!($dropped->next() == ('three', 3));
+assert!($dropPulls->count == 3);
+
+$joinPulls = new PullCounter();
+$outer = new CountingIterator::<int, Iterable<string, int>>(
+  vec[
+    (0, dict['first' => 1] as Iterable<string, int>),
+    (1, dict['second' => 2] as Iterable<string, int>),
+  ],
+  $joinPulls,
+  1,
+);
+
+$lazyJoin = Iterate\join::<int, string, int>($outer);
+assert!($joinPulls->count == 0);
+assert!($lazyJoin is Iterate\JoinIterator<int, string, int>);
+assert!($lazyJoin->next() == ('first', 1));
+assert!($joinPulls->count == 1);
+
+$nested = vec[dict['first' => 1, 'second' => 2], dict['third' => 3]]
+  as vec<Iterable<string, int>>;
+
+$joined = Iterate\join::<int, string, int>($nested);
+assert!(
+  Iterate\to_dict::<string, int>($joined) == dict[
+    'first' => 1,
+    'second' => 2,
+    'third' => 3,
+  ],
+);
+
+assert!(Iterate\count::<int, string>(vec['a', 'b', 'c']) == 3);
+assert!(
+  Iterate\reduce::<int, int, int>(
+    vec[1, 2, 3, 4],
+    fn(int $sum, int $value): int => $sum + $value,
+    0,
+  )
+  == 10,
+);
+
+assert!(
+  Iterate\to_dict::<string, int>(dict['one' => 1, 'two' => 2]) == dict[
+    'one' => 1,
+    'two' => 2,
+  ],
+);

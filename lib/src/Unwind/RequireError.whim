@@ -1,0 +1,7 @@
+namespace Whim\Unwind;
+
+use Whim\Marker\Stub;
+
+/** Reports failure to locate or read a required source file. */
+#[Stub]
+class RequireError extends Error {}

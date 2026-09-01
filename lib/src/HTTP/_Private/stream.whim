@@ -1,0 +1,188 @@
+namespace Whim\HTTP\_Private;
+
+use Whim;
+use Whim\HTTP\_Private\ErrorCode;
+use Whim\HTTP\_Private\ErrorCodeValue;
+use Whim\HTTP\_Private\ProtocolException;
+use Whim\HTTP\_Private\Role;
+use Whim\HTTP\_Private\StreamException;
+use Whim\HTTP\_Private\StreamId;
+use Whim\HTTP\_Private\StreamState;
+
+function open_local_stream(State $state, StreamId $streamId): StreamEntry {
+  accept_local_stream_id($state, $streamId);
+  return $state->streams->openLocal($streamId);
+}
+
+function open_peer_stream(State $state, StreamId $streamId): StreamEntry {
+  accept_peer_stream_id($state, $streamId);
+  return $state->streams->openPeer($streamId);
+}
+
+function reserve_local_stream(State $state, StreamId $streamId): StreamEntry {
+  accept_local_stream_id($state, $streamId);
+  return $state->streams->reserveLocal($streamId);
+}
+
+function reserve_peer_stream(State $state, StreamId $streamId): StreamEntry {
+  accept_peer_stream_id($state, $streamId);
+  return $state->streams->reservePeer($streamId);
+}
+
+function accept_local_stream_id(State $state, StreamId $streamId): void {
+  $expectedOdd = $state->role == Role::Client;
+  if (($streamId % 2 == 1) != $expectedOdd) {
+    throw new ProtocolException(
+      'the local HTTP/2 stream identifier has the wrong parity',
+    );
+  }
+
+  if ($streamId <= $state->lastLocalStreamId) {
+    throw new ProtocolException(
+      'local HTTP/2 stream identifiers must increase',
+    );
+  }
+
+  $state->lastLocalStreamId = $streamId;
+}
+
+function accept_peer_stream_id(State $state, StreamId $streamId): void {
+  if (!$state->connected) {
+    throw new ProtocolException(
+      'the peer opened an HTTP/2 stream after GOAWAY',
+    );
+  }
+
+  $expectedOdd = $state->role == Role::Server;
+  if (($streamId % 2 == 1) != $expectedOdd) {
+    throw new ProtocolException(
+      'the peer HTTP/2 stream identifier has the wrong parity',
+    );
+  }
+
+  if ($streamId <= $state->lastPeerStreamId) {
+    throw new ProtocolException('peer HTTP/2 stream identifiers must increase');
+  }
+
+  $state->lastPeerStreamId = $streamId;
+}
+
+function stream_state(State $state, StreamId $streamId): StreamState {
+  $entry = $state->streams->get($streamId);
+  if ($entry != null) {
+    return $entry->state;
+  }
+
+  $locallyInitiated = (($streamId % 2) == 1) == ($state->role == Role::Client);
+  $lastStreamId = match ($locallyInitiated) {
+    true => $state->lastLocalStreamId,
+    false => $state->lastPeerStreamId,
+  };
+
+  return match ($streamId <= $lastStreamId) {
+    true => StreamState::Closed,
+    false => StreamState::Idle,
+  };
+}
+
+function send_entry(State $state, StreamId $streamId): StreamEntry {
+  $entry = $state->streams->get($streamId);
+  if ($entry == null) {
+    if (stream_state($state, $streamId) == StreamState::Closed) {
+      stream_error(
+        $streamId,
+        'the local side of the HTTP/2 stream is closed',
+        ErrorCode::StreamClosed->value,
+      );
+    }
+
+    stream_error($streamId, 'the HTTP/2 stream is not open');
+  }
+
+  if (!($entry->state is StreamState::Open|StreamState::HalfClosedRemote)) {
+    stream_error(
+      $streamId,
+      'the local side of the HTTP/2 stream is closed',
+      ErrorCode::StreamClosed->value,
+    );
+  }
+
+  return $entry;
+}
+
+function receive_entry(State $state, StreamId $streamId): StreamEntry {
+  $entry = $state->streams->get($streamId);
+  if ($entry == null) {
+    if (stream_state($state, $streamId) == StreamState::Closed) {
+      stream_error(
+        $streamId,
+        'the remote side of the HTTP/2 stream is closed',
+        ErrorCode::StreamClosed->value,
+      );
+    }
+
+    stream_error($streamId, 'the HTTP/2 stream is idle');
+  }
+
+  if (!($entry->state is StreamState::Open|StreamState::HalfClosedLocal)) {
+    stream_error(
+      $streamId,
+      'the remote side of the HTTP/2 stream is closed',
+      ErrorCode::StreamClosed->value,
+    );
+  }
+
+  return $entry;
+}
+
+function end_local(State $state, StreamId $streamId, StreamEntry $entry): bool {
+  if ($entry->state == StreamState::Open) {
+    $entry->state = StreamState::HalfClosedLocal;
+    return false;
+  }
+
+  if ($entry->state == StreamState::HalfClosedRemote) {
+    close_stream($state, $streamId);
+    return true;
+  }
+
+  stream_error(
+    $streamId,
+    'the local side of the HTTP/2 stream is closed',
+    ErrorCode::StreamClosed->value,
+  );
+}
+
+function end_remote(
+  State $state,
+  StreamId $streamId,
+  StreamEntry $entry,
+): bool {
+  if ($entry->state == StreamState::Open) {
+    $entry->state = StreamState::HalfClosedRemote;
+    return false;
+  }
+
+  if ($entry->state == StreamState::HalfClosedLocal) {
+    close_stream($state, $streamId);
+    return true;
+  }
+
+  stream_error(
+    $streamId,
+    'the remote side of the HTTP/2 stream is closed',
+    ErrorCode::StreamClosed->value,
+  );
+}
+
+function close_stream(State $state, StreamId $streamId): void {
+  $state->streams->close($streamId);
+}
+
+function stream_error(
+  StreamId $streamId,
+  string $message,
+  ErrorCodeValue $errorCode = 1,
+): never {
+  throw new StreamException($message, $streamId, $errorCode);
+}

@@ -1,0 +1,3 @@
+class C {
+  private function __destruct(): void {}
+}

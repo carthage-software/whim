@@ -1,0 +1,42 @@
+namespace Whim\Math;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Float;
+use Whim\Unwind\InvalidArgumentException;
+use Whim;
+
+/**
+ * Restricts a number to an inclusive interval.
+ *
+ * @throws InvalidArgumentException when the minimum exceeds the maximum.
+ */
+#[NeverInline]
+#[TrackCaller]
+function clamp(int|float $number, int|float $min, int|float $max): int|float {
+  if ($number is float && Float\is_nan($number)) {
+    return $number;
+  }
+
+  if ($min is float && Float\is_nan($min)) {
+    return $min;
+  }
+
+  if ($max is float && Float\is_nan($max)) {
+    return $max;
+  }
+
+  if (Whim\_Private\math_compare($min, $max) > 0) {
+    throw new InvalidArgumentException('$min must not exceed $max');
+  }
+
+  if (Whim\_Private\math_compare($number, $min) < 0) {
+    return $min;
+  }
+
+  if (Whim\_Private\math_compare($number, $max) > 0) {
+    return $max;
+  }
+
+  return $number;
+}

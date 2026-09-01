@@ -1,0 +1,57 @@
+namespace Whim\Command;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+
+/** A command that runs `$program` with the given arguments. */
+#[AlwaysInline]
+#[MustUse]
+function create(
+  NonEmptyString $program,
+  vec<string> $arguments = vec[],
+): Command {
+  return Command::create($program)->withArguments($arguments);
+}
+
+/** Runs a program and collects everything it produced. */
+#[MustUse]
+#[TrackCaller]
+function run(
+  NonEmptyString $program,
+  vec<string> $arguments = vec[],
+  null|CancellationToken $cancellation = null,
+): Output {
+  return create($program, $arguments)->run($cancellation);
+}
+
+/** Runs a program and returns its standard output, or raises. */
+#[MustUse]
+#[TrackCaller]
+function output(
+  NonEmptyString $program,
+  vec<string> $arguments = vec[],
+  null|CancellationToken $cancellation = null,
+): string {
+  return create($program, $arguments)->output($cancellation);
+}
+
+/** Runs a program and reports whether it succeeded. */
+#[MustUse]
+#[TrackCaller]
+function succeeds(
+  NonEmptyString $program,
+  vec<string> $arguments = vec[],
+  null|CancellationToken $cancellation = null,
+): bool {
+  return create($program, $arguments)->succeeds($cancellation);
+}
+
+/** Starts a program and returns without waiting for it. */
+#[MustUse]
+#[TrackCaller]
+function start(NonEmptyString $program, vec<string> $arguments = vec[]): Child {
+  return create($program, $arguments)->start();
+}

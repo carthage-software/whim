@@ -1,0 +1,16 @@
+namespace Whim\Unix;
+
+use Whim\Async\CancellationToken;
+use Whim\IO\FileDescriptorHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Network\UnixEndpoint;
+use Whim\Network\Listener as NetworkListener;
+
+/** A Unix-domain listener. */
+interface Listener extends NetworkListener<UnixEndpoint>, FileDescriptorHandle {
+  /** Waits for and accepts the next Unix-domain connection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function accept(null|CancellationToken $cancellation = null): Stream;
+}
