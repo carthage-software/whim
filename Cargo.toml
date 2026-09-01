@@ -136,7 +136,7 @@ tar = { version = "0.4.46", default-features = false }
 target-guard = { package = "whim-support", path = "crates/support", version = "0.1.2" }
 thiserror = "2.0.19"
 toml = "0.8"
-toml_edit = "0.22.27"
+toml_edit = "0.25.13"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 trybuild = "1"
