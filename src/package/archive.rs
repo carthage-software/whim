@@ -21,7 +21,7 @@ use crate::package::filesystem::sync_directory;
 use crate::package::git::Error as GitError;
 use crate::package::git::Repository;
 
-const MAXIMUM_FILES: usize = 100_000;
+const MAXIMUM_ENTRIES: usize = 100_000;
 const MAXIMUM_FILE_BYTES: u64 = 256 * 1024 * 1024;
 const MAXIMUM_TOTAL_BYTES: u64 = 1024 * 1024 * 1024;
 const MAXIMUM_PATH_BYTES: usize = 4_096;
@@ -263,9 +263,9 @@ fn extract(reader: impl Read, destination: &Path) -> Result<(), Error> {
         }
 
         count = count.checked_add(1).ok_or(Error::EntryCountOverflow)?;
-        if count > MAXIMUM_FILES {
+        if count > MAXIMUM_ENTRIES {
             return Err(Error::TooManyEntries {
-                limit: MAXIMUM_FILES,
+                limit: MAXIMUM_ENTRIES,
             });
         }
 
@@ -362,9 +362,9 @@ fn collect_entries(root: &Path, directory: &Path, entries: &mut Vec<PathBuf>) ->
                 });
             }
 
-            if entries.len() >= MAXIMUM_FILES {
+            if entries.len() >= MAXIMUM_ENTRIES {
                 return Err(Error::TooManyInstalledEntries {
-                    limit: MAXIMUM_FILES,
+                    limit: MAXIMUM_ENTRIES,
                 });
             }
 

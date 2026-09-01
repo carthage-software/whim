@@ -323,7 +323,7 @@ The fixed input limits are:
 - 1 MiB for a manifest, lock, or installed-state file;
 - 8,192 sources in one graph;
 - 100,000 tags from one source;
-- 100,000 files in one package;
+- 100,000 archive entries, including directories, in one package;
 - 4,096 bytes in one package path;
 - 256 MiB in one file;
 - 1 GiB of unpacked data in one package.

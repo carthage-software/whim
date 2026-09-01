@@ -132,5 +132,5 @@ standard-library sources.
 ## Adding to it
 
 Follow these rules and add new behavior under
-`tests/conformance/standard-library/`. Public APIs must also be reflected in
+`tests/standard-library/`. Public APIs must also be reflected in
 the standard-library reference under `docs/`.
