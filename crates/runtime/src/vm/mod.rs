@@ -48,7 +48,6 @@ use crate::symbols::CachedTurbofishEnvironment;
 use crate::symbols::ExactFunctionEntry;
 use crate::symbols::ExactMethodEntry;
 use crate::symbols::ExactMethodWays;
-use crate::symbols::FunctionLocator;
 use crate::symbols::FunctionTable;
 use crate::symbols::InlineCache;
 use crate::symbols::InstantiationWays;

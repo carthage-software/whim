@@ -1,4 +1,3 @@
-use Whim\Attribute;
 use Whim\Autoload;
 use Whim\File;
 use Whim\Filesystem;
@@ -60,22 +59,6 @@ try {
 }
 
 assert!($assertion_error_3 is TypeError);
-
-$assertion_value_4 = fn(): mixed => Attribute\get_attribute::<NotATask>(42);
-$assertion_error_4 = null;
-try {
-  $assertion_value_4();
-} catch (TypeError $assertion_caught_4) {
-  $assertion_error_4 = $assertion_caught_4;
-  assert!(
-    Whim\Str\contains(
-      $assertion_caught_4->getMessage(),
-      'argument 1 ($object) must be object, int given',
-    ),
-  );
-}
-
-assert!($assertion_error_4 is TypeError);
 
 $assertion_value_5 = fn(): TraceFrame => (
   new TraceFrame('f', 'x', 'NOPE', vec[])

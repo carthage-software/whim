@@ -1,7 +1,5 @@
 //! Value construction and engine operations used by Rust-backed core code.
 
-use core::str;
-
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
@@ -51,13 +49,6 @@ impl Context<'_, '_, '_> {
         let tuple = TupleObject::with_elements(self.vm.heap(), elements);
 
         Value::tuple(tuple)
-    }
-
-    #[must_use]
-    pub(crate) fn value_atom(&self, local: &Value) -> Option<Atom> {
-        let bytes = local.as_string_bytes()?;
-        str::from_utf8(bytes).ok()?;
-        Some(self.vm.intern(bytes))
     }
 
     pub(crate) fn call_method(

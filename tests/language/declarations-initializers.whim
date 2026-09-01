@@ -1,6 +1,7 @@
 use Whim\Attribute\Attribute;
 use Whim\File;
 use Whim\Filesystem;
+use Whim\Reflection;
 use Whim\Unwind\CompilerError;
 
 final class Counter {
@@ -84,9 +85,12 @@ assert!(
   )->values() == (42, 'value'),
 );
 
-$callAttributes = Whim\Attribute\get_attribute::<CallHolds>($callTarget);
+$callReflection = Reflection\reflect_class($callTarget);
+assert!($callReflection != null);
+$callAttributes = $callReflection->getAttributes::<CallHolds>();
 assert!(length!($callAttributes) == 1);
-assert!($callAttributes[0]->value == 42);
+$callAttribute = $callAttributes[0]->newInstance();
+assert!($callAttribute->value == 42);
 
 final class Box {
   public function __construct(public int $value) {}
@@ -146,13 +150,15 @@ $transform = $first->transform;
 assert!($transform(1) == 6);
 assert!(object_defaults() == (6, 8));
 
-$objectAttributes = Whim\Attribute\get_attribute::<ObjectHolds>($first);
+$objectReflection = Reflection\reflect_class($first);
+assert!($objectReflection != null);
+$objectAttributes = $objectReflection->getAttributes::<ObjectHolds>();
 assert!(length!($objectAttributes) == 2);
-$attributeBox = $objectAttributes[0]->value;
+$attributeBox = $objectAttributes[0]->newInstance()->value;
 assert!($attributeBox is Box);
 
 assert!($attributeBox->value == 2);
-$attributeFunction = $objectAttributes[1]->value;
+$attributeFunction = $objectAttributes[1]->newInstance()->value;
 assert!($attributeFunction is fn(int): int);
 
 assert!($attributeFunction(4) == 7);

@@ -1,5 +1,3 @@
-//! Attribute declarations and reflection.
+//! Attribute declarations.
 
 pub(crate) mod marker;
-pub(crate) mod member;
-pub(crate) mod object;

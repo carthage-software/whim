@@ -2,9 +2,9 @@ use Whim\Attribute\Attribute;
 use Whim\Filesystem;
 use Whim\Marker\ConsistentConstructor;
 use Whim\Marker\ConsistentGenerics;
+use Whim\Reflection;
 use Whim\Unwind\Error;
 use Whim\Unwind\Exception;
-use Whim\Unwind\InvalidArgumentException;
 
 require!('_reject.whim');
 
@@ -180,25 +180,6 @@ final class GenericSame<T: int|string> extends GenericBase<T> {}
 
 assert!(new GenericSame::<int>() is GenericBase<int>);
 
-#[Attribute(Attribute::TARGET_ALL)]
-final class Tag {
-  public function __construct(public readonly string $name) {}
-}
-
-enum Signal {
-  #[Tag('ready')]
-  case Ready;
-
-  case Waiting;
-}
-
-$ready = Whim\Attribute\get_enum_case_attributes(Signal::Ready);
-assert!(length!($ready) == 1);
-$tag = $ready[0];
-assert!($tag is Tag);
-assert!($tag->name == 'ready');
-assert!(length!(Whim\Attribute\get_enum_case_attributes(Signal::Waiting)) == 0);
-
 #[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
 final class Meta {
   public function __construct(public readonly mixed $value = null) {}
@@ -219,120 +200,18 @@ enum Suit: string {
   case Hearts = 'H';
 }
 
-$found = Whim\Attribute\get_attribute::<Meta>(new Described());
+$describedClass = Reflection\reflect_class(new Described());
+assert!($describedClass != null);
+$found = $describedClass->getAttributes::<Meta>();
+
 assert!(length!($found) == 5);
-assert!($found[0]->value == 14);
-assert!($found[1]->value == 'ab');
-assert!($found[2]->value == 7);
-assert!($found[3]->value[2] == 7);
-$suit = $found[4]->value['k'];
+assert!($found[0]->getArguments()[0] == 14);
+assert!($found[1]->getArguments()[0] == 'ab');
+assert!($found[2]->getArguments()[0] == 7);
+assert!($found[3]->getArguments()[0][2] == 7);
+$suit = $found[4]->getArguments()[0]['k'];
 assert!($suit is Suit);
 assert!($suit->value == 'H');
-
-#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
-final class Deprecated {
-  public function __construct(public readonly string $reason = '') {}
-}
-
-#[Attribute(Attribute::TARGET_ALL)]
-final class Note {
-  public function __construct(public readonly string $tag = '') {}
-}
-
-#[Deprecated('use tomorrow() instead')]
-function today(#[Note('parameter')] int $when): void {}
-
-class Holder {
-  #[Note('constant')]
-  public const int LIMIT = 1;
-
-  #[Note('property')]
-  public int $count = 0;
-
-  #[Deprecated('method reason')]
-  public function old(#[Note('method parameter')] int $n): void {}
-}
-
-function accept_function_probe((fn(string): vec<object>) $probe): void {}
-
-function accept_member_probe((fn(object, string): vec<object>) $probe): void {}
-
-function accept_parameter_probe(
-  (fn(object, string, int|string): vec<object>) $probe,
-): void {}
-
-$holder = new Holder();
-
-$deprecation = Whim\Attribute\get_function_attributes('today')[0];
-assert!($deprecation is Deprecated);
-
-assert!($deprecation->reason == 'use tomorrow() instead');
-
-$positional = Whim\Attribute\get_parameter_attributes($holder, 'old', 0)[0];
-assert!($positional is Note);
-
-assert!($positional->tag == 'method parameter');
-
-$named = Whim\Attribute\get_parameter_attributes($holder, 'old', 'n')[0];
-assert!($named is Note);
-
-assert!($named->tag == 'method parameter');
-
-$method = Whim\Attribute\get_method_attributes($holder, 'old')[0];
-assert!($method is Deprecated);
-
-assert!($method->reason == 'method reason');
-
-$property = Whim\Attribute\get_property_attributes($holder, 'count')[0];
-assert!($property is Note);
-
-assert!($property->tag == 'property');
-
-$constant = Whim\Attribute\get_constant_attributes($holder, 'LIMIT')[0];
-assert!($constant is Note);
-
-assert!($constant->tag == 'constant');
-
-assert!(
-  length!(Whim\Attribute\get_parameter_attributes($holder, 'old', 1)) == 0,
-);
-
-assert!(
-  length!(Whim\Attribute\get_parameter_attributes($holder, 'old', 'missing'))
-  == 0,
-);
-
-accept_function_probe(Whim\Attribute\get_function_attributes(...));
-accept_member_probe(Whim\Attribute\get_method_attributes(...));
-accept_member_probe(Whim\Attribute\get_property_attributes(...));
-accept_member_probe(Whim\Attribute\get_constant_attributes(...));
-accept_parameter_probe(Whim\Attribute\get_parameter_attributes(...));
-
-$assertion_value_29 = fn(): vec<object> => (
-  Whim\Attribute\get_parameter_attributes($holder, 'old', -1)
-);
-
-$assertion_error_29 = null;
-try {
-  $assertion_value_29();
-} catch (InvalidArgumentException $assertion_caught_29) {
-  $assertion_error_29 = $assertion_caught_29;
-}
-
-assert!($assertion_error_29 is InvalidArgumentException);
-
-$assertion_value_30 = fn(): vec<object> => (
-  Whim\Attribute\get_parameter_attributes($holder, 'old', '')
-);
-
-$assertion_error_30 = null;
-try {
-  $assertion_value_30();
-} catch (InvalidArgumentException $assertion_caught_30) {
-  $assertion_error_30 = $assertion_caught_30;
-}
-
-assert!($assertion_error_30 is InvalidArgumentException);
 
 #[Attribute(Attribute::TARGET_TYPE_ALIAS)]
 final class TypeMetadata {}
@@ -341,28 +220,6 @@ final class TypeMetadata {}
 type Number = int;
 
 assert!(1 is Number);
-
-#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
-class LazyTag {
-  public function __construct(public readonly string $label = 'default') {}
-}
-
-#[LazyTag('first')]
-#[LazyTag(label: 'second')]
-class LazilyTaggedPost {}
-
-$tagged_post = new LazilyTaggedPost();
-assert!(Whim\Attribute\has_attribute($tagged_post, 'LazyTag'));
-
-assert!(!(Whim\Attribute\has_attribute($tagged_post, 'Missing')));
-
-$lazy_tags = Whim\Attribute\get_attribute::<LazyTag>($tagged_post);
-assert!(length!($lazy_tags) == 2);
-assert!($lazy_tags[0]->label == 'first');
-assert!($lazy_tags[1]->label == 'second');
-$lazy_tags_again = Whim\Attribute\get_attribute::<LazyTag>($tagged_post);
-assert!($lazy_tags[0] != $lazy_tags_again[0]);
-assert!(length!(Whim\Attribute\get_attributes($tagged_post)) == 2);
 
 function sensitive_login(
   string $user,
@@ -422,84 +279,3 @@ assert!(
 );
 
 assert!(!Whim\Str\contains($sensitive_rendering, 'super-secret-pw-marker'));
-
-#[Attribute(Attribute::TARGET_PARAMETER)]
-final class ParameterOnly {}
-
-#[Attribute(Attribute::TARGET_PROPERTY)]
-final class PropertyOnly {}
-
-class LoginRequest {
-  public function __construct(
-    #[Whim\Marker\SensitiveParameter]
-    #[ParameterOnly]
-    #[PropertyOnly]
-    public string $password,
-  ) {}
-}
-
-$login_request = new LoginRequest('secret');
-assert!($login_request->password == 'secret');
-assert!(
-  length!(
-    Whim\Attribute\get_parameter_attributes(
-      $login_request,
-      '__construct',
-      'password',
-    ),
-  )
-  == 3,
-);
-
-assert!(
-  length!(Whim\Attribute\get_property_attributes($login_request, 'password'))
-  == 3,
-);
-
-$collect_markers = Whim\Attribute\get_function_attributes(
-  'Whim\GC\collect_cycles',
-);
-
-assert!(length!($collect_markers) == 1);
-assert!($collect_markers[0] is Whim\Marker\AlwaysInline);
-
-$random_markers = Whim\Attribute\get_function_attributes(
-  'Whim\_Private\random_bytes',
-);
-
-assert!(length!($random_markers) == 2);
-assert!($random_markers[0] is Whim\Marker\TrackCaller);
-assert!($random_markers[1] is Whim\Marker\TraceBoundary);
-
-$process_markers = Whim\Attribute\get_function_attributes(
-  'Whim\_Private\getmypid',
-);
-
-assert!(length!($process_markers) == 1);
-assert!($process_markers[0] is Whim\Marker\MustUse);
-
-$message_markers = Whim\Attribute\get_method_attributes(
-  new Exception('failed'),
-  'getMessage',
-);
-
-assert!(length!($message_markers) == 1);
-assert!($message_markers[0] is Whim\Marker\TrackCaller);
-
-$some_markers = Whim\Attribute\get_method_attributes(
-  new Whim\Option\Some::<int>(1),
-  'unwrap',
-);
-
-assert!(length!($some_markers) == 2);
-assert!($some_markers[0] is Whim\Marker\AlwaysInline);
-assert!($some_markers[1] is Whim\Marker\MustUse);
-
-$none_markers = Whim\Attribute\get_method_attributes(
-  new Whim\Option\None(),
-  'unwrap',
-);
-
-assert!(length!($none_markers) == 2);
-assert!($none_markers[0] is Whim\Marker\NeverInline);
-assert!($none_markers[1] is Whim\Marker\TrackCaller);

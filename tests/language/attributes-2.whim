@@ -144,16 +144,6 @@ File\write(
 require!($stub_backings_file);
 assert!('still linked' is ExistingAlias);
 
-#[MustUse('keep this value')]
-function kept_value(): int {
-  return 1;
-}
-
-$kept_markers = Whim\Attribute\get_function_attributes('kept_value');
-$kept = $kept_markers[0];
-assert!($kept is MustUse);
-assert!($kept->note == 'keep this value');
-
 rejects(
   $work,
   'never-inline-does-not-target-classes',

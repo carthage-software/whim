@@ -84,27 +84,45 @@ final readonly class Tag {
 final class Handler {}
 ```
 
-Each use creates its own attribute value. Source order stays intact.
+Each use stores its own arguments. Source order stays intact.
 
 ## Reading attributes
 
-The `Whim\Attribute` functions read stored attributes:
+Use `Whim\Reflection` to inspect attributes:
 
-- `has_attribute($object, $class)` checks the object's class.
-- `get_attribute::<T>($object)` gets class attributes of type `T`.
-- `get_attributes($object)` gets all attributes on the object's class.
-- `get_function_attributes($name)` gets function attributes.
-- `get_method_attributes($object, $method)` gets method attributes.
-- `get_property_attributes($object, $property)` gets property attributes.
-- `get_constant_attributes($object, $constant)` gets class constant
-  attributes.
-- `get_enum_case_attributes($case)` gets enum case attributes.
-- `get_parameter_attributes($object, $method, $parameter)` gets method
-  parameter attributes by name or position.
+```whim
+use Whim\Attribute\Attribute;
+use Whim\Reflection;
 
-The member functions throw `InvalidArgumentException` when the named member
-does not exist. They return an empty vec when the member exists but has no
-attributes.
+#[Attribute(Attribute::TARGET_CLASS | Attribute::IS_REPEATABLE)]
+final readonly class Tag {
+  public function __construct(public string $name) {}
+}
+
+#[Tag('http')]
+#[Tag('public')]
+final class Handler {}
+
+$handler = Reflection\reflect_class('Handler');
+assert!($handler != null);
+
+foreach ($handler->getAttributes::<Tag>() as $attribute) {
+  $tag = $attribute->newInstance();
+  write_line!($tag->name);
+}
+```
+
+Every declaration reflection provides `getAttributes::<T>()` and
+`getAttributesByName()`. Both return attribute reflections without running an
+attribute constructor. `AttributeReflection::newInstance()` constructs a fresh
+attribute value.
+
+Use `reflect_function()` for a function. A class-like reflection provides its
+methods, properties, and constants. A method reflection provides its
+parameters. `reflect_object($case)->getEnumCase()` finds an enum case. Missing
+declarations and members return `null`.
+
+See [Reflection](../standard-library/reflection.md) for the complete API.
 
 Attributes are values, not comments. The compiler rejects a bad target, a bad
 argument, a missing attribute class, or an illegal repeat before the program

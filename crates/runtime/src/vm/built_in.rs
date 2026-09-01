@@ -128,19 +128,6 @@ impl VirtualMachine<'_> {
         self.check_descriptor(&descriptor, value, called_class, environment, 0)
     }
 
-    pub(crate) fn built_in_named_type(
-        &self,
-        spec: &TypeSpec,
-        environment: TypeEnvironmentId,
-    ) -> Option<Atom> {
-        let descriptor = descriptor_from_built_in_spec(&self.heap, spec);
-        let descriptor = self.substitute_descriptor(&descriptor, environment, 0);
-        match descriptor {
-            TypeDescriptor::Named { name, .. } => Some(name),
-            _ => None,
-        }
-    }
-
     pub(crate) fn built_in_type_descriptor(
         &self,
         spec: &TypeSpec,

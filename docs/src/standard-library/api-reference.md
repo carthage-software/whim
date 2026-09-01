@@ -8,7 +8,7 @@ This index lists the public standard-library namespaces. Names that end in
 | Namespace | Purpose |
 | --- | --- |
 | `Whim` | the `VERSION` constant |
-| `Whim\Attribute` | read attributes from symbols and members |
+| `Whim\Attribute` | define attribute classes and targets |
 | `Whim\Autoload` | register and run symbol autoloaders |
 | `Whim\Comparison` | equality, order, and `Ordering` |
 | `Whim\Convert` | explicit value conversion contracts |
