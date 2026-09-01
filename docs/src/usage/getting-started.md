@@ -14,6 +14,30 @@ whim hello.whim
 
 Whim runs statements at file scope. You do not need a `main` function.
 
+## Start a project
+
+A single file is enough for a script. For a project, create an empty directory
+and initialize it:
+
+```console
+mkdir hello
+cd hello
+whim init
+```
+
+`whim init` creates `whim.toml`, `src/main.whim`, and `tests/main.whim`. It also
+starts a Git repository when needed and writes the Git rules used by Whim
+projects. Pass `--no-git` to skip Git setup.
+
+Run the generated program:
+
+```console
+whim src/main.whim
+```
+
+Use `whim init` when you start an application or library. The manifest lets
+Whim format the whole project and manage its Git dependencies.
+
 ## Variables
 
 A variable starts with `$`. Assignment creates it:
