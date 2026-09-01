@@ -111,9 +111,9 @@ jobs:
             shasum -a 256 "${archive}" > "${archive}.sha256"
           )
           echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
-      # - uses: actions/attest-build-provenance@v3
-      #   with:
-      #     subject-path: ${{ steps.package.outputs.archive }}
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.package.outputs.archive }}
       - uses: actions/upload-artifact@v4
         with:
           name: whim-${{ matrix.target }}
@@ -128,8 +128,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      # id-token: write
-      # attestations: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -142,9 +142,9 @@ jobs:
           set -euo pipefail
           cd release
           sha256sum -- *.tar.gz > SHA256SUMS
-      # - uses: actions/attest-build-provenance@v3
-      #   with:
-      #     subject-path: release/SHA256SUMS
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: release/SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           name: Whim ${{ needs.metadata.outputs.version }}
