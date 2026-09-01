@@ -1,0 +1,53 @@
+#!/usr/bin/env whim
+
+require_once!(directory!() . '/_shared.whim');
+
+use Whim\Str;
+use WhimScripts\command_output;
+use WhimScripts\ensure_clean;
+use WhimScripts\fail;
+use WhimScripts\get_cargo_version;
+use WhimScripts\project_root;
+use WhimScripts\run_git;
+use WhimScripts\verify_lock;
+
+($major, $minor, $patch) = get_cargo_version();
+$tag = "{$major}.{$minor}.{$patch}";
+$root = project_root();
+ensure_clean($root, 'releasing');
+verify_lock($root);
+
+if (Str\trim(command_output($root, 'git', vec['tag', '--list', $tag])) == '') {
+  fail('tag ' . $tag . ' does not exist; run scripts/tag.whim first');
+}
+
+$head = Str\trim(command_output($root, 'git', vec['rev-parse', 'HEAD']));
+$tagged = Str\trim(
+  command_output($root, 'git', vec['rev-list', '-n', '1', $tag]),
+);
+
+if ($tagged != $head) {
+  fail('tag ' . $tag . ' does not point to HEAD');
+}
+
+$published = Str\trim(
+  command_output(
+    $root,
+    'git',
+    vec['ls-remote', '--tags', 'origin', 'refs/tags/' . $tag],
+  ),
+);
+
+if ($published != '') {
+  fail('tag ' . $tag . ' is already published');
+}
+
+$branch = Str\trim(
+  command_output($root, 'git', vec['symbolic-ref', '--short', 'HEAD']),
+);
+
+run_git($root, vec['push', 'origin', 'HEAD:refs/heads/' . $branch]);
+run_git(
+  $root,
+  vec['push', 'origin', 'refs/tags/' . $tag . ':refs/tags/' . $tag],
+);

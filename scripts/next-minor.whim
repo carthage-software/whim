@@ -1,0 +1,10 @@
+#!/usr/bin/env whim
+
+require_once!(directory!() . '/_shared.whim');
+
+use WhimScripts\get_cargo_version;
+use WhimScripts\set_cargo_version;
+
+($major, $minor, $patch) = get_cargo_version();
+$next = ($major, $minor + 1, 0);
+set_cargo_version($next);

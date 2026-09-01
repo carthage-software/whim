@@ -1,0 +1,203 @@
+namespace WhimScripts;
+
+use Whim\Command\Command;
+use Whim\Command\discarded;
+use Whim\Command\inherited;
+use Whim\Command\terminal;
+use Whim\File;
+use Whim\File\WriteMode;
+use Whim\Filesystem;
+use Whim\Int;
+use Whim\Refine\NonEmptyString;
+use Whim\Str;
+
+const VERSION_PREFIX = "[workspace.package]\nversion = \"";
+
+function fail(string $message): never {
+  write_error_line!('error: ' . $message);
+  exit!(1);
+}
+
+function project_root(): NonEmptyString {
+  return Filesystem\canonicalize(directory!() . '/..');
+}
+
+function command_output(
+  NonEmptyString $root,
+  NonEmptyString $program,
+  vec<string> $arguments,
+): string {
+  final $stream = inherited();
+  final $output = Command::create($program)
+    ->withArguments($arguments)
+    ->withDirectory($root)
+    ->withStandardInput($stream)
+    ->withStandardError($stream)
+    ->run();
+
+  if (!$output->isSuccess()) {
+    fail($program . ' did not succeed');
+  }
+
+  return $output->standardOutput;
+}
+
+function run_cargo(
+  NonEmptyString $root,
+  vec<string> $arguments,
+  string $error,
+): void {
+  final $stream = inherited();
+  final $output = Command::create('cargo')
+    ->withArguments($arguments)
+    ->withDirectory($root)
+    ->withStandardOutput(discarded())
+    ->withStandardError($stream)
+    ->run();
+
+  if (!$output->isSuccess()) {
+    fail($error);
+  }
+}
+
+function run_git(NonEmptyString $root, vec<string> $arguments): void {
+  final $stream = terminal();
+  final $output = Command::create('git')
+    ->withArguments($arguments)
+    ->withDirectory($root)
+    ->withStandardInput($stream)
+    ->withStandardOutput($stream)
+    ->withStandardError($stream)
+    ->run();
+
+  if (!$output->isSuccess()) {
+    exit!(1);
+  }
+}
+
+function ensure_clean(NonEmptyString $root, string $action): void {
+  final $status = command_output(
+    $root,
+    'git',
+    vec['status', '--porcelain=v1', '--untracked-files=all'],
+  );
+
+  if (Str\trim($status) != '') {
+    fail('the working tree must be clean before ' . $action);
+  }
+}
+
+function get_cargo_version(): (int, int, int) {
+  $manifest = File\read((project_root() . '/Cargo.toml') as NonEmptyString);
+  $start =
+    Str\search($manifest, VERSION_PREFIX) ?? fail(
+      'Cargo.toml has no workspace package version',
+    );
+
+  $start += length!(VERSION_PREFIX);
+  $end =
+    Str\search($manifest, '"', $start) ?? fail(
+      'the workspace package version is incomplete',
+    );
+
+  $version = Str\slice($manifest, $start, $end - $start);
+  $parts = Str\split($version, '.');
+  if (length!($parts) != 3) {
+    fail('the workspace package version must have the form 0.x.z');
+  }
+
+  $major =
+    Int\try_parse($parts[0]) ?? fail(
+      'the workspace package version must have the form 0.x.z',
+    );
+
+  $minor =
+    Int\try_parse($parts[1]) ?? fail(
+      'the workspace package version must have the form 0.x.z',
+    );
+
+  $patch =
+    Int\try_parse($parts[2]) ?? fail(
+      'the workspace package version must have the form 0.x.z',
+    );
+
+  if (
+    $major != 0
+    || $minor < 0
+    || $patch < 0
+    || $version != "{$major}.{$minor}.{$patch}"
+  ) {
+    fail('the workspace package version must have the form 0.x.z');
+  }
+
+  return ($major, $minor, $patch);
+}
+
+function set_cargo_version((int, int, int) $next): void {
+  ($major, $minor, $patch) = $next;
+  if ($major != 0 || $minor < 0 || $patch < 0) {
+    fail('the next workspace package version must have the form 0.x.z');
+  }
+
+  ($currentMajor, $currentMinor, $currentPatch) = get_cargo_version();
+  $current = "{$currentMajor}.{$currentMinor}.{$currentPatch}";
+  $replacement = "{$major}.{$minor}.{$patch}";
+  $root = project_root();
+  ensure_clean($root, 'bumping the version');
+
+  $manifestPath = ($root . '/Cargo.toml') as NonEmptyString;
+  $manifest = File\read($manifestPath);
+  $old = 'version = "' . $current . '"';
+  $new = 'version = "' . $replacement . '"';
+  $workspace = VERSION_PREFIX . $current . '"';
+  if (Str\search($manifest, $workspace) == null) {
+    fail('Cargo.toml has no matching workspace package version');
+  }
+
+  $manifest = Str\replace(
+    $manifest,
+    $workspace,
+    VERSION_PREFIX . $replacement . '"',
+  );
+
+  $lines = Str\split($manifest, "\n");
+  foreach ($lines as $index => $line) {
+    $dependency = Str\trim_left($line);
+    $isWhim =
+      (
+        Str\starts_with($dependency, 'whim-')
+        || Str\contains($dependency, 'package = "whim-')
+      );
+
+    if (
+      $isWhim
+      && Str\contains($dependency, 'path = "')
+      && Str\contains($dependency, $old)
+    ) {
+      $lines[$index] = Str\replace($line, $old, $new);
+    }
+  }
+
+  File\write($manifestPath, Str\join("\n", $lines), WriteMode::Truncate);
+  run_cargo(
+    $root,
+    vec['update', '--package', 'whim', '--precise', $replacement],
+    'Cargo.lock could not be updated',
+  );
+
+  $changed = Str\trim(command_output($root, 'git', vec['diff', '--name-only']));
+  if ($changed != "Cargo.lock\nCargo.toml") {
+    fail('the version bump changed files other than Cargo.toml and Cargo.lock');
+  }
+
+  run_git($root, vec['add', '--', 'Cargo.toml', 'Cargo.lock']);
+  run_git($root, vec['commit', '-m', 'bump version to ' . $replacement]);
+}
+
+function verify_lock(NonEmptyString $root): void {
+  run_cargo(
+    $root,
+    vec['metadata', '--locked', '--format-version', '1', '--no-deps'],
+    'Cargo.lock does not match Cargo.toml',
+  );
+}

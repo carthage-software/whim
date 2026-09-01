@@ -1,0 +1,24 @@
+#!/usr/bin/env whim
+
+require_once!(directory!() . '/_shared.whim');
+
+use Whim\Str;
+use WhimScripts\command_output;
+use WhimScripts\ensure_clean;
+use WhimScripts\fail;
+use WhimScripts\get_cargo_version;
+use WhimScripts\project_root;
+use WhimScripts\run_git;
+use WhimScripts\verify_lock;
+
+($major, $minor, $patch) = get_cargo_version();
+$tag = "{$major}.{$minor}.{$patch}";
+$root = project_root();
+ensure_clean($root, 'creating a tag');
+verify_lock($root);
+
+if (Str\trim(command_output($root, 'git', vec['tag', '--list', $tag])) != '') {
+  fail('tag ' . $tag . ' already exists');
+}
+
+run_git($root, vec['tag', $tag]);
