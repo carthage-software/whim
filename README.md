@@ -62,9 +62,9 @@ The [Whim book] documents the language, command-line tools, package manager,
 and standard library. Start with [Installation], then write
 [Your First Program].
 
-[Whim book]: https://carthage-software.github.io/whim/
-[Installation]: https://carthage-software.github.io/whim/usage/installation.html
-[Your First Program]: https://carthage-software.github.io/whim/usage/getting-started.html
+[Whim book]: https://whim.carthage.software/
+[Installation]: https://whim.carthage.software/usage/installation.html
+[Your First Program]: https://whim.carthage.software/usage/getting-started.html
 
 ## Development
 

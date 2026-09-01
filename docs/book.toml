@@ -11,6 +11,6 @@ create-missing = false
 [output.html]
 default-theme = "rust"
 preferred-dark-theme = "navy"
-site-url = "/whim/"
+site-url = "/"
 git-repository-url = "https://github.com/carthage-software/whim"
 edit-url-template = "https://github.com/carthage-software/whim/edit/main/docs/{path}"
