@@ -21,4 +21,4 @@ if (Str\trim(command_output($root, 'git', vec['tag', '--list', $tag])) != '') {
   fail('tag ' . $tag . ' already exists');
 }
 
-run_git($root, vec['tag', $tag]);
+run_git($root, vec['tag', $tag, '-m', 'release ' . $tag, '-S']);
