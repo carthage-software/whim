@@ -1597,7 +1597,7 @@ fn conflicts_explanations_suggestions_funding_and_license_warnings_work_together
     );
     fs::write(
         library.join("whim.toml"),
-        "manifest-version = 1\n\n[package]\nrepository = \"https://fixtures.invalid/library\"\nhomepage = \"https://fixtures.invalid/library/home\"\nauthor = \"Library Author\"\ndescription = \"A package inspection fixture.\"\nlicense = \"GPL-3.0-only\"\nsponsor = \"https://github.com/sponsors/library\"\n\n[requirements]\nwhim = \"^0.1\"\n\n[autoload.namespaces]\n\"LibraryInspection\\\\\" = \"src/\"\n\n[dependencies]\n\"git+https://fixtures.invalid/common\" = \"*\"\n\n[dev-dependencies]\n\"git+https://fixtures.invalid/tool\" = \"^5\"\n\n[conflicts]\n\"git+https://fixtures.invalid/common\" = \"^2\"\n\n[suggests]\n\"git+https://fixtures.invalid/extra\" = \"^3\"\n",
+        "manifest-version = 1\n\n[package]\nrepository = \"https://fixtures.invalid/library\"\nhomepage = \"https://fixtures.invalid/library/home\"\nauthor = \"Library Author\"\ndescription = \"A package inspection fixture.\"\nlicense = \"GPL-3.0-only\"\nsponsor = \"https://github.com/sponsors/library\"\n\n[requirements]\nwhim = \"*\"\n\n[autoload.namespaces]\n\"LibraryInspection\\\\\" = \"src/\"\n\n[dependencies]\n\"git+https://fixtures.invalid/common\" = \"*\"\n\n[dev-dependencies]\n\"git+https://fixtures.invalid/tool\" = \"^5\"\n\n[conflicts]\n\"git+https://fixtures.invalid/common\" = \"^2\"\n\n[suggests]\n\"git+https://fixtures.invalid/extra\" = \"^3\"\n",
     )
     .expect("the package manifest is writable");
     Fixture::release(&library, "1.1.0");
@@ -1660,7 +1660,7 @@ fn conflicts_explanations_suggestions_funding_and_license_warnings_work_together
         "author          : Library Author",
         "sponsor         : https://github.com/sponsors/library",
         "autoload\n  LibraryInspection\\ => src/",
-        "requires\n  whim ^0.1\n  git+https://fixtures.invalid/common *",
+        "requires\n  whim *\n  git+https://fixtures.invalid/common *",
         "requires (development)\n  git+https://fixtures.invalid/tool ^5",
         "conflicts\n  git+https://fixtures.invalid/common ^2",
         "suggests\n  git+https://fixtures.invalid/extra ^3",
