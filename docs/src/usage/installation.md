@@ -31,6 +31,17 @@ Download the archive for your system from [GitHub Releases](https://github.com/c
 whim --version
 ```
 
+## Docker
+
+The image at `ghcr.io/carthage-software/whim` supports amd64, arm64, and
+RISC-V 64. Mount a project and pass its entry file:
+
+```sh
+docker run --rm -v "$PWD:/app" ghcr.io/carthage-software/whim:latest main.whim
+```
+
+Each release publishes `latest`, the full version, and the major-minor version.
+
 ## Build from source
 
 Install Rust 1.98 or later. From the repository root, run:

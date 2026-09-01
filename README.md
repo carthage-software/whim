@@ -50,6 +50,8 @@ You can also download an archive from [GitHub Releases]. After installation, run
 whim --version
 ```
 
+The container image is available at `ghcr.io/carthage-software/whim`.
+
 Whim supports macOS on x86-64 and Arm64, and glibc-based Linux on x86-64,
 Arm64, and RISC-V 64.
 

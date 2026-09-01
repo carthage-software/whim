@@ -154,3 +154,76 @@ jobs:
             release/*.tar.gz
             release/*.sha256
             release/SHA256SUMS
+
+  container:
+    if: github.ref_type == 'tag'
+    needs: [metadata, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: whim-x86_64-unknown-linux-gnu
+          path: ${{ runner.temp }}/whim-amd64
+      - uses: actions/download-artifact@v4
+        with:
+          name: whim-aarch64-unknown-linux-gnu
+          path: ${{ runner.temp }}/whim-arm64
+      - uses: actions/download-artifact@v4
+        with:
+          name: whim-riscv64gc-unknown-linux-gnu
+          path: ${{ runner.temp }}/whim-riscv64
+      - id: context
+        name: Prepare image context
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.metadata.outputs.version }}"
+          context="${{ runner.temp }}/whim-container"
+          mkdir -p "${context}/amd64" "${context}/arm64" "${context}/riscv64"
+          cp Dockerfile "${context}/Dockerfile"
+          tar -xzf "${{ runner.temp }}/whim-amd64/whim-${version}-x86_64-unknown-linux-gnu.tar.gz" \
+            -C "${context}/amd64" --strip-components=1
+          tar -xzf "${{ runner.temp }}/whim-arm64/whim-${version}-aarch64-unknown-linux-gnu.tar.gz" \
+            -C "${context}/arm64" --strip-components=1
+          tar -xzf "${{ runner.temp }}/whim-riscv64/whim-${version}-riscv64gc-unknown-linux-gnu.tar.gz" \
+            -C "${context}/riscv64" --strip-components=1
+          test -x "${context}/amd64/whim"
+          test -x "${context}/arm64/whim"
+          test -x "${context}/riscv64/whim"
+          echo "path=${context}" >> "$GITHUB_OUTPUT"
+      - id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/carthage-software/whim
+          tags: |
+            type=raw,value=latest
+            type=semver,pattern={{version}},value=${{ needs.metadata.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.metadata.outputs.version }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.context.outputs.path }}
+          file: ${{ steps.context.outputs.path }}/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/riscv64
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+      - name: Verify images
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="ghcr.io/carthage-software/whim:${{ needs.metadata.outputs.version }}"
+          docker run --rm --platform linux/amd64 "$image" --version
+          docker run --rm --platform linux/arm64 "$image" --version
+          docker run --rm --platform linux/riscv64 "$image" --version
