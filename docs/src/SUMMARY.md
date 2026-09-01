@@ -5,6 +5,7 @@
 # 1. Getting Started
 
 - [Installation](usage/installation.md)
+- [Editor Setup](usage/editors.md)
 - [Your First Program](usage/getting-started.md)
 - [A Small Program](usage/project.md)
 - [The `whim` Command](usage/cli.md)
