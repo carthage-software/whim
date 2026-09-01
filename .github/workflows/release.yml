@@ -211,7 +211,7 @@ jobs:
             type=raw,value=latest
             type=semver,pattern={{version}},value=${{ needs.metadata.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.metadata.outputs.version }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: ${{ steps.context.outputs.path }}
           file: ${{ steps.context.outputs.path }}/Dockerfile
