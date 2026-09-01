@@ -3,8 +3,8 @@
 
 use hashbrown::HashMap;
 
-use whim_span::Span;
 use whim_span::HasSpan;
+use whim_span::Span;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeParameterList;
@@ -13,12 +13,12 @@ use crate::bytecode::aliases::expand_aliases;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::Variance;
-use crate::optimizer::descriptors_equal;
-use crate::value::heap::Heap;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
 use crate::compiler::names::Resolver;
 use crate::limits::MAX_TYPE_DEPTH;
+use crate::optimizer::descriptors_equal;
+use crate::value::heap::Heap;
 
 pub(in crate::compiler) mod aliases;
 pub(in crate::compiler) mod bounds;
