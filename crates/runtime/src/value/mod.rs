@@ -32,8 +32,8 @@ use crate::value::string::short::ShortString;
 use crate::value::tuple::TupleObject;
 use crate::value::vec::VecObject;
 
+pub(crate) mod array;
 pub(crate) mod atom;
-pub(crate) mod collection;
 pub(crate) mod dict;
 pub(crate) mod function;
 mod gc;

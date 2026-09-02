@@ -82,7 +82,7 @@ fn return_is_proven(
         | (Instruction::ReturnNull, Some(TypeDescriptor::Void)) => true,
         (Instruction::Return { source }, Some(expected)) => {
             flow.proves(index, source, expected)
-                || flow.proves_constructed_collection(index, source, expected)
+                || flow.proves_constructed_array(index, source, expected)
         }
         (Instruction::ReturnNull, Some(expected)) => {
             matches!(expected, TypeDescriptor::Null | TypeDescriptor::Mixed)

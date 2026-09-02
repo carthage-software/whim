@@ -1,10 +1,10 @@
 //! Indexing, updating, and iterating vecs and dicts.
 
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::unwrap_result_invariant;
 use crate::value::ValueView;
 use crate::value::ops;
-use crate::vm::CollectionFault;
+use crate::vm::ArrayFault;
 use crate::vm::Fault;
 use crate::vm::Heap;
 use crate::vm::Key;
@@ -17,7 +17,7 @@ use crate::vm::unreachable_invariant;
 
 /// The dict key of a value, following the language's key strictness.
 #[inline(always)]
-pub(in crate::vm) fn dict_key(value: &Value) -> Result<Key, CollectionFault> {
+pub(in crate::vm) fn dict_key(value: &Value) -> Result<Key, ArrayFault> {
     match value.transparent() {
         ValueView::Int(key) => Ok(Key::Int(*key)),
         ValueView::Bool(key) => Ok(Key::Bool(*key)),
@@ -29,8 +29,8 @@ pub(in crate::vm) fn dict_key(value: &Value) -> Result<Key, CollectionFault> {
 
 #[cold]
 #[inline(never)]
-fn bad_dict_key(value: &Value) -> CollectionFault {
-    CollectionFault::type_error(format!(
+fn bad_dict_key(value: &Value) -> ArrayFault {
+    ArrayFault::type_error(format!(
         "a dict key must be int, bool, or string, {} given",
         value.kind_name()
     ))
@@ -38,14 +38,14 @@ fn bad_dict_key(value: &Value) -> CollectionFault {
 
 #[cold]
 #[inline(never)]
-fn bad_container(value: &Value) -> CollectionFault {
-    CollectionFault::type_error(format!("cannot index into {}", value.kind_name()))
+fn bad_container(value: &Value) -> ArrayFault {
+    ArrayFault::type_error(format!("cannot index into {}", value.kind_name()))
 }
 
 #[cold]
 #[inline(never)]
-fn missing_dict_key(heap: &Heap, index: &Value) -> CollectionFault {
-    CollectionFault::out_of_bounds(format!(
+fn missing_dict_key(heap: &Heap, index: &Value) -> ArrayFault {
+    ArrayFault::out_of_bounds(format!(
         "the dict key {} is not present",
         debug_render(heap, index, 0)
     ))
@@ -56,7 +56,7 @@ pub(in crate::vm) fn index_get(
     heap: &Heap,
     container: &Value,
     index: &Value,
-) -> Result<Value, CollectionFault> {
+) -> Result<Value, ArrayFault> {
     match container.transparent() {
         ValueView::Vec(vec) => {
             let position = vec_position(index, vec.len())?;
@@ -94,7 +94,7 @@ pub(in crate::vm) fn index_get(
 }
 
 #[inline(always)]
-fn dict_key_ref(value: &Value) -> Result<KeyRef<'_>, CollectionFault> {
+fn dict_key_ref(value: &Value) -> Result<KeyRef<'_>, ArrayFault> {
     match value.transparent() {
         ValueView::Int(key) => Ok(KeyRef::Int(*key)),
         ValueView::Bool(key) => Ok(KeyRef::Bool(*key)),
@@ -105,10 +105,10 @@ fn dict_key_ref(value: &Value) -> Result<KeyRef<'_>, CollectionFault> {
 }
 
 #[inline(always)]
-fn vec_position(index: &Value, length: usize) -> Result<usize, CollectionFault> {
+fn vec_position(index: &Value, length: usize) -> Result<usize, ArrayFault> {
     match index.transparent() {
         ValueView::Int(position) => int_position(*position, length),
-        _ => Err(CollectionFault::type_error(format!(
+        _ => Err(ArrayFault::type_error(format!(
             "an index must be int, {} given",
             index.kind_name()
         ))),
@@ -117,16 +117,13 @@ fn vec_position(index: &Value, length: usize) -> Result<usize, CollectionFault> 
 
 /// Appends to a vec, transparently mutating through a nominal newtype layer.
 #[inline(always)]
-pub(in crate::vm) fn append_value(
-    container: &mut Value,
-    value: Value,
-) -> Result<(), CollectionFault> {
+pub(in crate::vm) fn append_value(container: &mut Value, value: Value) -> Result<(), ArrayFault> {
     match container.as_vec_mut() {
         Some(vec) => {
             vec.make_mut().push(value);
             Ok(())
         }
-        None => Err(CollectionFault::type_error(format!(
+        None => Err(ArrayFault::type_error(format!(
             "cannot append to {}; `[]=` requires a vec",
             container.kind_name()
         ))),
@@ -135,7 +132,7 @@ pub(in crate::vm) fn append_value(
 
 /// The size of any value accepted by `length!()`.
 #[inline(always)]
-pub(in crate::vm) fn collection_length(value: &Value) -> Result<i64, CollectionFault> {
+pub(in crate::vm) fn array_length(value: &Value) -> Result<i64, ArrayFault> {
     match value.transparent() {
         ValueView::String(_) | ValueView::ShortString(_) => {
             // SAFETY: the value's tag proves this projection is valid.
@@ -144,7 +141,7 @@ pub(in crate::vm) fn collection_length(value: &Value) -> Result<i64, CollectionF
         ValueView::Vec(vec) => Ok(vec.len() as i64),
         ValueView::Dict(dict) => Ok(dict.len() as i64),
         ValueView::Tuple(tuple) => Ok(tuple.len() as i64),
-        _ => Err(CollectionFault::type_error(format!(
+        _ => Err(ArrayFault::type_error(format!(
             "length!() accepts a string, vec, dict, or tuple, {} given",
             value.kind_name()
         ))),
@@ -153,15 +150,12 @@ pub(in crate::vm) fn collection_length(value: &Value) -> Result<i64, CollectionF
 
 /// Whether an array contains a value, using the language's deep equality.
 #[inline]
-pub(in crate::vm) fn array_contains(
-    array: &Value,
-    needle: &Value,
-) -> Result<bool, CollectionFault> {
+pub(in crate::vm) fn array_contains(array: &Value, needle: &Value) -> Result<bool, ArrayFault> {
     match array.transparent() {
         ValueView::Vec(values) => Ok(values.iter().any(|value| ops::equals(value, needle))),
         ValueView::Dict(values) => Ok(values.iter().any(|(_, value)| ops::equals(value, needle))),
         ValueView::Tuple(values) => Ok(values.iter().any(|value| ops::equals(value, needle))),
-        other => Err(CollectionFault::type_error(format!(
+        other => Err(ArrayFault::type_error(format!(
             "contains!() accepts a vec, dict, or tuple, {} given",
             other.kind_name()
         ))),
@@ -170,15 +164,12 @@ pub(in crate::vm) fn array_contains(
 
 /// Whether an array contains a key.
 #[inline]
-pub(in crate::vm) fn array_contains_key(
-    array: &Value,
-    key: &Value,
-) -> Result<bool, CollectionFault> {
+pub(in crate::vm) fn array_contains_key(array: &Value, key: &Value) -> Result<bool, ArrayFault> {
     match array.transparent() {
         ValueView::Vec(values) => sequence_contains_key(values.len(), key),
         ValueView::Dict(values) => Ok(values.get_ref(dict_key_ref(key)?).is_some()),
         ValueView::Tuple(values) => sequence_contains_key(values.len(), key),
-        other => Err(CollectionFault::type_error(format!(
+        other => Err(ArrayFault::type_error(format!(
             "contains_key!() accepts a vec, dict, or tuple, {} given",
             other.kind_name()
         ))),
@@ -186,10 +177,10 @@ pub(in crate::vm) fn array_contains_key(
 }
 
 #[inline(always)]
-fn sequence_contains_key(length: usize, key: &Value) -> Result<bool, CollectionFault> {
+fn sequence_contains_key(length: usize, key: &Value) -> Result<bool, ArrayFault> {
     match key.transparent() {
         ValueView::Int(index) => Ok(usize::try_from(*index).is_ok_and(|index| index < length)),
-        other => Err(CollectionFault::type_error(format!(
+        other => Err(ArrayFault::type_error(format!(
             "a vec or tuple key must be int, {} given",
             other.kind_name()
         ))),
@@ -199,7 +190,7 @@ fn sequence_contains_key(length: usize, key: &Value) -> Result<bool, CollectionF
 /// The number of values a collection-backed `foreach` can yield, when it is
 /// available without invoking user code.
 #[inline]
-pub(in crate::vm) fn collection_length_hint(value: &Value) -> Option<usize> {
+pub(in crate::vm) fn array_length_hint(value: &Value) -> Option<usize> {
     match value.transparent() {
         ValueView::Vec(value) => Some(value.len()),
         ValueView::Dict(value) => Some(value.len()),
@@ -211,7 +202,7 @@ pub(in crate::vm) fn collection_length_hint(value: &Value) -> Option<usize> {
 /// Reserves capacity in a uniquely owned collection populated by a loop.
 /// Shared values keep their ordinary copy-on-write path.
 #[inline]
-pub(in crate::vm) fn reserve_collection_hint(value: &mut Value, additional: usize) {
+pub(in crate::vm) fn reserve_array_hint(value: &mut Value, additional: usize) {
     if additional == 0 {
         return;
     }
@@ -228,7 +219,7 @@ pub(in crate::vm) fn reserve_collection_hint(value: &mut Value, additional: usiz
 
 /// A bounded position from an index already proven to be an integer.
 #[inline(always)]
-pub(in crate::vm) fn int_position(position: i64, length: usize) -> Result<usize, CollectionFault> {
+pub(in crate::vm) fn int_position(position: i64, length: usize) -> Result<usize, ArrayFault> {
     if (position as u64) < length as u64 {
         Ok(position as usize)
     } else {
@@ -238,18 +229,15 @@ pub(in crate::vm) fn int_position(position: i64, length: usize) -> Result<usize,
 
 #[cold]
 #[inline(never)]
-fn out_of_bounds_position(position: i64, length: usize) -> CollectionFault {
-    CollectionFault::out_of_bounds(format!(
+fn out_of_bounds_position(position: i64, length: usize) -> ArrayFault {
+    ArrayFault::out_of_bounds(format!(
         "the index {position} is outside the range 0 to {}",
         length as i64 - 1
     ))
 }
 
 /// Reads a vec through optimizer-proven container and index types.
-pub(in crate::vm) fn vec_index_get(
-    container: &Value,
-    index: i64,
-) -> Result<Value, CollectionFault> {
+pub(in crate::vm) fn vec_index_get(container: &Value, index: i64) -> Result<Value, ArrayFault> {
     let Some(vec) = container.as_vec() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec read has a vec container") }
@@ -260,10 +248,7 @@ pub(in crate::vm) fn vec_index_get(
 }
 
 /// Reads an integer element through optimizer-proven vec and element types.
-pub(in crate::vm) fn vec_int_index_get(
-    container: &Value,
-    index: i64,
-) -> Result<i64, CollectionFault> {
+pub(in crate::vm) fn vec_int_index_get(container: &Value, index: i64) -> Result<i64, ArrayFault> {
     let Some(vec) = container.as_vec() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec read has a vec container") }
@@ -278,7 +263,7 @@ pub(in crate::vm) fn vec_index_set(
     container: &mut Value,
     index: i64,
     value: Value,
-) -> Result<(), CollectionFault> {
+) -> Result<(), ArrayFault> {
     let Some(vec) = container.as_vec_mut() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec write has a vec container") }
@@ -304,29 +289,27 @@ pub(in crate::vm) fn vec_append(container: &mut Value, value: Value) {
 pub(in crate::vm) fn dict_index_get_int_key(
     container: &Value,
     index: i64,
-) -> Result<Value, CollectionFault> {
+) -> Result<Value, ArrayFault> {
     let Some(dict) = container.as_dict() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized dict read has a dict container") }
     };
-    dict.get_int(index).cloned().ok_or_else(|| {
-        CollectionFault::out_of_bounds(format!("the dict key {index} is not present"))
-    })
+    dict.get_int(index)
+        .cloned()
+        .ok_or_else(|| ArrayFault::out_of_bounds(format!("the dict key {index} is not present")))
 }
 
 /// Reads an integer value through optimizer-proven dict key and value types.
 pub(in crate::vm) fn dict_index_get_int_key_int_value(
     container: &Value,
     index: i64,
-) -> Result<i64, CollectionFault> {
+) -> Result<i64, ArrayFault> {
     let Some(dict) = container.as_dict() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized dict read has a dict container") }
     };
     dict.get_int(index)
-        .ok_or_else(|| {
-            CollectionFault::out_of_bounds(format!("the dict key {index} is not present"))
-        })
+        .ok_or_else(|| ArrayFault::out_of_bounds(format!("the dict key {index} is not present")))
         // SAFETY: the value's tag proves this projection is valid.
         .map(|value| unsafe { value.as_int_unchecked() })
 }
@@ -346,8 +329,8 @@ pub(in crate::vm) fn dict_index_get_string_key(
     heap: &Heap,
     container: &Value,
     index: &Value,
-    value_mode: CollectionValueMode,
-) -> Result<Value, CollectionFault> {
+    value_mode: ArrayValueMode,
+) -> Result<Value, ArrayFault> {
     let Some(dict) = container.as_dict() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized dict read has a dict container") }
@@ -361,11 +344,11 @@ pub(in crate::vm) fn dict_index_get_string_key(
     found
         .map(|value| match value_mode {
             // SAFETY: the value's tag proves this projection is valid.
-            CollectionValueMode::Int => Value::int(unsafe { value.as_int_unchecked() }),
-            CollectionValueMode::Generic | CollectionValueMode::Float => value.clone(),
+            ArrayValueMode::Int => Value::int(unsafe { value.as_int_unchecked() }),
+            ArrayValueMode::Generic | ArrayValueMode::Float => value.clone(),
         })
         .ok_or_else(|| {
-            CollectionFault::out_of_bounds(format!(
+            ArrayFault::out_of_bounds(format!(
                 "the dict key {} is not present",
                 debug_render(heap, index, 0)
             ))
@@ -399,13 +382,13 @@ pub(in crate::vm) fn dict_index_set(
     container: &mut Value,
     index: Value,
     value: Value,
-) -> Result<(), CollectionFault> {
+) -> Result<(), ArrayFault> {
     let Some(dict) = container.as_dict_mut() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized dict write has a dict container") }
     };
     let Some(key) = Key::from_owned_value(index) else {
-        return Err(CollectionFault::type_error(
+        return Err(ArrayFault::type_error(
             "a dict key must be int, bool, or string".to_string(),
         ));
     };
@@ -418,7 +401,7 @@ pub(in crate::vm) fn index_set(
     container: &mut Value,
     index: &Value,
     value: Value,
-) -> Result<(), CollectionFault> {
+) -> Result<(), ArrayFault> {
     if let Some(vec) = container.as_vec_mut() {
         let position = vec_position(index, vec.len())?;
         let replaced = vec.make_mut().set(position, value);
@@ -434,10 +417,10 @@ pub(in crate::vm) fn index_set(
         return Ok(());
     }
     match container.transparent() {
-        ValueView::Tuple(_) => Err(CollectionFault::type_error(
+        ValueView::Tuple(_) => Err(ArrayFault::type_error(
             "a tuple element cannot be written".to_string(),
         )),
-        ValueView::String(_) | ValueView::ShortString(_) => Err(CollectionFault::type_error(
+        ValueView::String(_) | ValueView::ShortString(_) => Err(ArrayFault::type_error(
             "a string byte cannot be written".to_string(),
         )),
         _ => Err(bad_container(container)),
@@ -453,7 +436,7 @@ pub(in crate::vm) fn index_set_reversible(
     container: &mut Value,
     index: &Value,
     value: Value,
-) -> Result<IndexSetRollback, CollectionFault> {
+) -> Result<IndexSetRollback, ArrayFault> {
     if container.is_vec() {
         let Some(vector) = container.as_vec() else {
             // SAFETY: the surrounding invariant makes this path unreachable.
@@ -526,7 +509,7 @@ pub(in crate::vm) fn rollback_index_set(container: &mut Value, rollback: IndexSe
 /// A fault from an indexed `+=`: either locating the element or adding its
 /// current value failed.
 pub(in crate::vm) enum IndexAddFault {
-    Collection(CollectionFault),
+    Array(ArrayFault),
     Arithmetic {
         fault: Fault,
         left_kind: &'static str,
@@ -542,7 +525,7 @@ pub(in crate::vm) fn index_add_assign(
     increment: &Value,
 ) -> Result<(), IndexAddFault> {
     if let Some(vec) = container.as_vec_mut() {
-        let position = vec_position(index, vec.len()).map_err(IndexAddFault::Collection)?;
+        let position = vec_position(index, vec.len()).map_err(IndexAddFault::Array)?;
         let values = vec.make_mut();
         // SAFETY: the surrounding invariant keeps this index in bounds.
         let current = unsafe { values.get_unchecked(position) };
@@ -560,9 +543,9 @@ pub(in crate::vm) fn index_add_assign(
         return Ok(());
     }
     if let Some(dict) = container.as_dict_mut() {
-        let key = dict_key_ref(index).map_err(IndexAddFault::Collection)?;
+        let key = dict_key_ref(index).map_err(IndexAddFault::Array)?;
         let current = dict.make_mut().get_mut_ref(key).ok_or_else(|| {
-            IndexAddFault::Collection(CollectionFault::out_of_bounds(format!(
+            IndexAddFault::Array(ArrayFault::out_of_bounds(format!(
                 "the dict key {} is not present",
                 debug_render(heap, index, 0)
             )))
@@ -578,15 +561,16 @@ pub(in crate::vm) fn index_add_assign(
         return Ok(());
     }
     match container.transparent() {
-        ValueView::Tuple(_) => Err(IndexAddFault::Collection(CollectionFault::type_error(
+        ValueView::Tuple(_) => Err(IndexAddFault::Array(ArrayFault::type_error(
             "a tuple element cannot be written".to_string(),
         ))),
-        ValueView::String(_) | ValueView::ShortString(_) => Err(IndexAddFault::Collection(
-            CollectionFault::type_error("a string byte cannot be written".to_string()),
+        ValueView::String(_) | ValueView::ShortString(_) => Err(IndexAddFault::Array(
+            ArrayFault::type_error("a string byte cannot be written".to_string()),
         )),
-        _ => Err(IndexAddFault::Collection(CollectionFault::type_error(
-            format!("cannot index into {}", container.kind_name()),
-        ))),
+        _ => Err(IndexAddFault::Array(ArrayFault::type_error(format!(
+            "cannot index into {}",
+            container.kind_name()
+        )))),
     }
 }
 
@@ -612,7 +596,7 @@ pub(in crate::vm) fn dict_add_assign_string_key_int_value(
         _ => unsafe { unreachable_invariant("a specialized indexed add has a string key") },
     }
     .ok_or_else(|| {
-        IndexAddFault::Collection(CollectionFault::out_of_bounds(format!(
+        IndexAddFault::Array(ArrayFault::out_of_bounds(format!(
             "the dict key {} is not present",
             debug_render(heap, index, 0)
         )))
@@ -642,16 +626,14 @@ pub(in crate::vm) fn dict_add_assign_any_key_int_value(
         ValueView::String(key) => KeyRef::String(key),
         ValueView::ShortString(key) => KeyRef::ShortString(*key),
         other => {
-            return Err(IndexAddFault::Collection(CollectionFault::type_error(
-                format!(
-                    "a dict key must be int, bool, or string, {} given",
-                    other.kind_name()
-                ),
-            )));
+            return Err(IndexAddFault::Array(ArrayFault::type_error(format!(
+                "a dict key must be int, bool, or string, {} given",
+                other.kind_name()
+            ))));
         }
     };
     let slot = dict.make_mut().get_mut_ref(key).ok_or_else(|| {
-        IndexAddFault::Collection(CollectionFault::out_of_bounds(format!(
+        IndexAddFault::Array(ArrayFault::out_of_bounds(format!(
             "the dict key {} is not present",
             debug_render(heap, index, 0)
         )))
@@ -674,24 +656,26 @@ pub(in crate::vm) fn index_replace_existing(
     container: &mut Value,
     index: &Value,
     value: Value,
-) -> Result<Value, CollectionFault> {
+) -> Result<Value, ArrayFault> {
     if let Some(vec) = container.as_vec_mut() {
         let position = vec_position(index, vec.len())?;
-        return vec.make_mut().set(position, value).ok_or_else(|| {
-            CollectionFault::out_of_bounds("the vec index is not present".to_string())
-        });
+        return vec
+            .make_mut()
+            .set(position, value)
+            .ok_or_else(|| ArrayFault::out_of_bounds("the vec index is not present".to_string()));
     }
     if let Some(dict) = container.as_dict_mut() {
         let key = dict_key(index)?;
-        return dict.make_mut().insert(key, value).ok_or_else(|| {
-            CollectionFault::out_of_bounds("the dict key is not present".to_string())
-        });
+        return dict
+            .make_mut()
+            .insert(key, value)
+            .ok_or_else(|| ArrayFault::out_of_bounds("the dict key is not present".to_string()));
     }
     match container.transparent() {
-        ValueView::Tuple(_) => Err(CollectionFault::type_error(
+        ValueView::Tuple(_) => Err(ArrayFault::type_error(
             "a tuple element cannot be written".to_string(),
         )),
-        ValueView::String(_) | ValueView::ShortString(_) => Err(CollectionFault::type_error(
+        ValueView::String(_) | ValueView::ShortString(_) => Err(ArrayFault::type_error(
             "a string byte cannot be written".to_string(),
         )),
         _ => Err(bad_container(container)),
@@ -700,17 +684,14 @@ pub(in crate::vm) fn index_replace_existing(
 
 /// `vec[...$s]` and `dict[...$s]`: spreads every element of `value` into the
 /// literal under construction, following the container's kind.
-pub(in crate::vm) fn spread_into(
-    container: &mut Value,
-    value: &Value,
-) -> Result<(), CollectionFault> {
+pub(in crate::vm) fn spread_into(container: &mut Value, value: &Value) -> Result<(), ArrayFault> {
     let value = value.transparent();
     if let Some(vec) = container.as_vec_mut() {
         let elements: &[Value] = match value {
             ValueView::Vec(source) => source.as_slice(),
             ValueView::Tuple(source) => source.as_slice(),
             other => {
-                return Err(CollectionFault::type_error(format!(
+                return Err(ArrayFault::type_error(format!(
                     "a vec literal spreads a vec or a tuple, {} given",
                     other.kind_name()
                 )));
@@ -747,13 +728,13 @@ pub(in crate::vm) fn spread_into(
                 }
                 Ok(())
             }
-            other => Err(CollectionFault::type_error(format!(
+            other => Err(ArrayFault::type_error(format!(
                 "a dict literal spreads a vec, a tuple, or a dict, {} given",
                 other.kind_name()
             ))),
         }
     } else {
-        Err(CollectionFault::type_error(format!(
+        Err(ArrayFault::type_error(format!(
             "cannot spread into {}",
             container.kind_name()
         )))
@@ -766,7 +747,7 @@ pub(in crate::vm) fn remove_entry(
     heap: &Heap,
     container: &mut Value,
     key: &Value,
-) -> Result<Value, CollectionFault> {
+) -> Result<Value, ArrayFault> {
     if let Some(vec) = container.as_vec_mut() {
         let position = vec_position(key, vec.len())?;
         return match vec.make_mut().remove(position) {
@@ -782,7 +763,7 @@ pub(in crate::vm) fn remove_entry(
             None => Err(missing_dict_key(heap, key)),
         };
     }
-    Err(CollectionFault::type_error(format!(
+    Err(ArrayFault::type_error(format!(
         "remove!() accepts a vec or dict, {} given",
         container.kind_name()
     )))
@@ -792,7 +773,7 @@ pub(in crate::vm) fn remove_entry(
 pub(in crate::vm) fn swap_remove_entry(
     container: &mut Value,
     index: &Value,
-) -> Result<Value, CollectionFault> {
+) -> Result<Value, ArrayFault> {
     if let Some(vec) = container.as_vec_mut() {
         let position = vec_position(index, vec.len())?;
         return match vec.make_mut().swap_remove(position) {
@@ -802,17 +783,14 @@ pub(in crate::vm) fn swap_remove_entry(
         };
     }
 
-    Err(CollectionFault::type_error(format!(
+    Err(ArrayFault::type_error(format!(
         "swap_remove!() accepts a vec, {} given",
         container.kind_name()
     )))
 }
 
 /// `remove_first!`/`remove_last!` over a vec.
-pub(in crate::vm) fn remove_end(
-    container: &mut Value,
-    first: bool,
-) -> Result<Value, CollectionFault> {
+pub(in crate::vm) fn remove_end(container: &mut Value, first: bool) -> Result<Value, ArrayFault> {
     if let Some(vec) = container.as_vec_mut() {
         let removed = if first {
             vec.make_mut().remove_first()
@@ -821,12 +799,12 @@ pub(in crate::vm) fn remove_end(
         };
         return match removed {
             Some(value) => Ok(value),
-            None => Err(CollectionFault::out_of_bounds(
+            None => Err(ArrayFault::out_of_bounds(
                 "cannot remove from an empty vec".to_string(),
             )),
         };
     }
-    Err(CollectionFault::type_error(format!(
+    Err(ArrayFault::type_error(format!(
         "remove_first!() and remove_last!() accept a vec, {} given",
         container.kind_name()
     )))
@@ -951,10 +929,5 @@ fn index_value(index: &u32) -> usize {
 #[inline(always)]
 fn next_index(index: usize) -> u32 {
     // SAFETY: the surrounding invariant proves this result is successful.
-    unsafe {
-        unwrap_result_invariant(
-            u32::try_from(index + 1),
-            "a collection cursor index fits u32",
-        )
-    }
+    unsafe { unwrap_result_invariant(u32::try_from(index + 1), "an array cursor index fits u32") }
 }

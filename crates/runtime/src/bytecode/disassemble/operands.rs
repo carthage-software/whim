@@ -12,7 +12,7 @@ use crate::bytecode::disassemble::render::register;
 use crate::bytecode::disassemble::render::short_jump;
 use crate::bytecode::disassemble::render::table_reference;
 use crate::bytecode::disassemble::render::window;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
 use crate::bytecode::instruction::operands::PropertyReadMode;
 use crate::bytecode::instruction::operands::PropertyRemoveMode;
@@ -373,9 +373,9 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(container),
             register(subscript),
             match value_mode {
-                CollectionValueMode::Generic => "",
-                CollectionValueMode::Int => ", int",
-                CollectionValueMode::Float => ", float",
+                ArrayValueMode::Generic => "",
+                ArrayValueMode::Int => ", int",
+                ArrayValueMode::Float => ", float",
             }
         ),
         instructions!(
@@ -410,7 +410,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
         instructions!(Append | VecAppend | Spread; { container, value }) => {
             format!(" {}, {}", register(container), register(value))
         }
-        Instruction::ReserveCollection {
+        Instruction::ReserveArray {
             container,
             additional,
         } => format!(" {}, {}", register(container), register(additional)),
@@ -851,9 +851,9 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(key_destination),
             register(value_destination),
             match value_mode {
-                CollectionValueMode::Generic => "",
-                CollectionValueMode::Int => ", int",
-                CollectionValueMode::Float => ", float",
+                ArrayValueMode::Generic => "",
+                ArrayValueMode::Int => ", int",
+                ArrayValueMode::Float => ", float",
             }
         ),
         instructions!(Write | WriteLine | WriteError | WriteErrorLine | Debug; {

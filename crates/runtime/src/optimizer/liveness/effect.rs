@@ -345,7 +345,7 @@ pub(in crate::optimizer) fn effect_on(
                 descriptor.allocates && writes(object),
             )
         }
-        Instruction::ReserveCollection {
+        Instruction::ReserveArray {
             container,
             additional,
         } => {

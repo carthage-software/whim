@@ -319,7 +319,7 @@ impl TypeFlow<'_> {
 
     fn argument_proves(&self, index: usize, register: Register, expected: &TypeDescriptor) -> bool {
         self.proves(index, register, expected)
-            || self.proves_constructed_collection(index, register, expected)
+            || self.proves_constructed_array(index, register, expected)
     }
 
     pub(in crate::optimizer) fn destructure_proven(
@@ -340,7 +340,7 @@ impl TypeFlow<'_> {
 
     /// Whether a fresh vec or dict is populated exclusively with values that
     /// satisfy its declared return specialization.
-    pub(in crate::optimizer) fn proves_constructed_collection(
+    pub(in crate::optimizer) fn proves_constructed_array(
         &self,
         index: usize,
         register: Register,
@@ -355,10 +355,10 @@ impl TypeFlow<'_> {
         match expected.as_ref() {
             TypeDescriptor::Union(members) => members
                 .iter()
-                .any(|member| self.proves_constructed_collection(index, register, member)),
+                .any(|member| self.proves_constructed_array(index, register, member)),
             TypeDescriptor::Intersection(members) => members
                 .iter()
-                .all(|member| self.proves_constructed_collection(index, register, member)),
+                .all(|member| self.proves_constructed_array(index, register, member)),
             TypeDescriptor::Array(Some((key, value))) => {
                 self.descriptor_proves(&TypeDescriptor::integer_range(Some(0), None), key, 0)
                     && self.proves_constructed_vector(index, register, value)
@@ -386,7 +386,7 @@ impl TypeFlow<'_> {
             Box::new(expected_value.clone()),
         )));
         let Some((initializer, fresh)) =
-            self.typed_collection_initializer(index, register, &expected, |instruction| {
+            self.typed_array_initializer(index, register, &expected, |instruction| {
                 matches!(
                     instruction,
                     Instruction::NewDict { destination, .. } if destination == register
@@ -471,7 +471,7 @@ impl TypeFlow<'_> {
     ) -> bool {
         let expected = TypeDescriptor::Vector(Some(Box::new(expected_element.clone())));
         let Some((initializer, fresh)) =
-            self.typed_collection_initializer(index, register, &expected, |instruction| {
+            self.typed_array_initializer(index, register, &expected, |instruction| {
                 matches!(
                     instruction,
                     Instruction::NewVec { destination, .. } if destination == register
@@ -537,7 +537,7 @@ impl TypeFlow<'_> {
         true
     }
 
-    fn typed_collection_initializer(
+    fn typed_array_initializer(
         &self,
         index: usize,
         register: Register,
@@ -642,7 +642,7 @@ impl TypeFlow<'_> {
         }
     }
 
-    pub(in crate::optimizer) fn proves_collection_element(
+    pub(in crate::optimizer) fn proves_array_element(
         &self,
         index: usize,
         register: Register,
@@ -655,7 +655,7 @@ impl TypeFlow<'_> {
         if register >= usize::from(self.chunk.register_count) {
             return false;
         }
-        let collection = self.fact(index, Register::new(register as u16)).collection;
+        let collection = self.fact(index, Register::new(register as u16)).array;
         if collection == NO_ORIGIN {
             return false;
         }
@@ -663,7 +663,7 @@ impl TypeFlow<'_> {
             return false;
         };
         let elements = self
-            .collection_elements
+            .array_elements
             .get(collection as usize)
             .copied()
             .unwrap_or(0);
@@ -781,7 +781,7 @@ impl TypeFlow<'_> {
             TypeDescriptor::Array(arguments) => match fact.mask {
                 VECTOR => arguments.as_ref().is_none_or(|(key, value)| {
                     self.descriptor_proves(&TypeDescriptor::Int, key, depth + 1)
-                        && self.collection_proves(fact, Some(value), false, depth + 1)
+                        && self.array_proves(fact, Some(value), false, depth + 1)
                 }),
                 DICTIONARY => self.dictionary_proves(fact, arguments.as_ref(), depth + 1),
                 TUPLE => arguments.as_ref().is_none_or(|(_, value)| {
@@ -809,8 +809,7 @@ impl TypeFlow<'_> {
                 _ => false,
             },
             TypeDescriptor::Vector(element) => {
-                fact.mask == VECTOR
-                    && self.collection_proves(fact, element.as_deref(), false, depth)
+                fact.mask == VECTOR && self.array_proves(fact, element.as_deref(), false, depth)
             }
             TypeDescriptor::Dictionary(arguments) => {
                 fact.mask == DICTIONARY && self.dictionary_proves(fact, arguments.as_ref(), depth)
@@ -863,7 +862,7 @@ impl TypeFlow<'_> {
         }
     }
 
-    pub(in crate::optimizer::type_flow) fn collection_proves(
+    pub(in crate::optimizer::type_flow) fn array_proves(
         &self,
         fact: Fact,
         element: Option<&TypeDescriptor>,
@@ -874,10 +873,10 @@ impl TypeFlow<'_> {
             return true;
         };
 
-        if fact.collection != NO_ORIGIN {
+        if fact.array != NO_ORIGIN {
             let elements = self
-                .collection_elements
-                .get(fact.collection as usize)
+                .array_elements
+                .get(fact.array as usize)
                 .copied()
                 .unwrap_or(0);
             if elements == 0
@@ -935,13 +934,13 @@ impl TypeFlow<'_> {
         offset: usize,
         depth: usize,
     ) -> bool {
-        if fact.collection != NO_ORIGIN {
+        if fact.array != NO_ORIGIN {
             let observed = if offset == 0 {
-                &self.collection_keys
+                &self.array_keys
             } else {
-                &self.collection_elements
+                &self.array_elements
             }
-            .get(fact.collection as usize)
+            .get(fact.array as usize)
             .copied()
             .unwrap_or(0);
             if observed == 0

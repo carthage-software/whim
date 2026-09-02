@@ -1,4 +1,4 @@
-//! Lowering for recursive `match` patterns and collection destructuring.
+//! Lowering for recursive `match` patterns and array destructuring.
 
 use std::collections::HashSet;
 use std::ptr;

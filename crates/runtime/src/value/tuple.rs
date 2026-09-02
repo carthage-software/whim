@@ -9,8 +9,8 @@ use crate::unreachable_invariant;
 use crate::unwrap_option_invariant;
 use crate::unwrap_result_invariant;
 use crate::value::Value;
-use crate::value::collection::CollectionTypeCheck;
-use crate::value::collection::CollectionTypeCheckId;
+use crate::value::array::ArrayTypeCheck;
+use crate::value::array::ArrayTypeCheckId;
 use crate::value::heap::Heap;
 use crate::value::heap::handle::ManagedRef;
 use crate::value::heap::metadata::Header;
@@ -31,7 +31,7 @@ pub(crate) fn tuple_layout(len: usize) -> Layout {
 
     let size = size_of::<HeapBox<TupleObject>>()
         + len * size_of::<Value>()
-        + size_of::<Cell<Option<CollectionTypeCheckId>>>();
+        + size_of::<Cell<Option<ArrayTypeCheckId>>>();
     // SAFETY: the surrounding invariant proves this result is successful.
     unsafe {
         unwrap_result_invariant(
@@ -53,7 +53,7 @@ impl TupleObject {
             destination.add(1).write(second);
             destination
                 .add(2)
-                .cast::<Cell<Option<CollectionTypeCheckId>>>()
+                .cast::<Cell<Option<ArrayTypeCheckId>>>()
                 .write(Cell::new(None));
         }
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
@@ -90,7 +90,7 @@ impl TupleObject {
         unsafe {
             destination
                 .add(len)
-                .cast::<Cell<Option<CollectionTypeCheckId>>>()
+                .cast::<Cell<Option<ArrayTypeCheckId>>>()
                 .write(Cell::new(None));
         }
         #[cfg(debug_assertions)]
@@ -133,20 +133,20 @@ impl ManagedRef<TupleObject> {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn type_check(&self, id: CollectionTypeCheckId) -> CollectionTypeCheck {
+    pub(crate) fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
         if self.type_check_cache().get() == Some(id) {
-            CollectionTypeCheck::Clean(id)
+            ArrayTypeCheck::Clean(id)
         } else {
-            CollectionTypeCheck::Unknown
+            ArrayTypeCheck::Unknown
         }
     }
 
     #[inline(always)]
-    pub(crate) fn mark_type_checked(&self, id: CollectionTypeCheckId) {
+    pub(crate) fn mark_type_checked(&self, id: ArrayTypeCheckId) {
         self.type_check_cache().set(Some(id));
     }
 
-    fn type_check_cache(&self) -> &Cell<Option<CollectionTypeCheckId>> {
+    fn type_check_cache(&self) -> &Cell<Option<ArrayTypeCheckId>> {
         let offset = size_of::<HeapBox<TupleObject>>() + self.len() * size_of::<Value>();
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe {
@@ -154,7 +154,7 @@ impl ManagedRef<TupleObject> {
                 .raw_box()
                 .cast::<u8>()
                 .add(offset)
-                .cast::<Cell<Option<CollectionTypeCheckId>>>()
+                .cast::<Cell<Option<ArrayTypeCheckId>>>()
                 .as_ptr()
         }
     }
@@ -233,16 +233,16 @@ mod tests {
     fn remembers_one_successful_structural_check() {
         let heap = Heap::new();
         let tuple = TupleObject::with_pair(&heap, Value::int(1), Value::int(2));
-        let first = CollectionTypeCheckId::new(7);
-        let second = CollectionTypeCheckId::new(8);
+        let first = ArrayTypeCheckId::new(7);
+        let second = ArrayTypeCheckId::new(8);
 
-        assert_eq!(tuple.type_check(first), CollectionTypeCheck::Unknown);
+        assert_eq!(tuple.type_check(first), ArrayTypeCheck::Unknown);
         tuple.mark_type_checked(first);
-        assert_eq!(tuple.type_check(first), CollectionTypeCheck::Clean(first));
-        assert_eq!(tuple.type_check(second), CollectionTypeCheck::Unknown);
+        assert_eq!(tuple.type_check(first), ArrayTypeCheck::Clean(first));
+        assert_eq!(tuple.type_check(second), ArrayTypeCheck::Unknown);
 
         tuple.mark_type_checked(second);
-        assert_eq!(tuple.type_check(first), CollectionTypeCheck::Unknown);
-        assert_eq!(tuple.type_check(second), CollectionTypeCheck::Clean(second));
+        assert_eq!(tuple.type_check(first), ArrayTypeCheck::Unknown);
+        assert_eq!(tuple.type_check(second), ArrayTypeCheck::Clean(second));
     }
 }

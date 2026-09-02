@@ -3,7 +3,7 @@
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::ImmediateInt;
 use crate::bytecode::instruction::operands::IndexAddMode;
 use crate::bytecode::instruction::operands::Register;
@@ -28,11 +28,11 @@ pub(in crate::optimizer) fn optimize_unit(
     configuration: OptimizationConfiguration,
     statistics: &mut OptimizationStatistics,
 ) {
-    if !configuration.specialize_collections {
+    if !configuration.specialize_arrays {
         return;
     }
 
-    statistics.collection_operations_specialized += plan_type_specializations(
+    statistics.array_operations_specialized += plan_type_specializations(
         plan,
         analysis,
         CandidateSet::COLLECTION,
@@ -46,11 +46,11 @@ pub(in crate::optimizer) fn optimize_chunk(
     configuration: OptimizationConfiguration,
     statistics: &mut OptimizationStatistics,
 ) {
-    if !configuration.specialize_collections || chunk.code.is_empty() {
+    if !configuration.specialize_arrays || chunk.code.is_empty() {
         return;
     }
 
-    statistics.collection_operations_specialized +=
+    statistics.array_operations_specialized +=
         specialize_chunk_instructions(chunk, heap, specialized_instruction);
 }
 
@@ -81,7 +81,7 @@ pub(in crate::optimizer) fn specialized_instruction(
         |register| flow.proves(index, register, &TypeDescriptor::Int),
         |register| flow.proves(index, register, &vector),
         |register| flow.proves(index, register, &dictionary),
-        |destination, collection| collection_value_mode(flow, index, destination, collection),
+        |destination, array| array_value_mode(flow, index, destination, array),
     ) {
         return Some(replacement);
     }
@@ -91,8 +91,8 @@ pub(in crate::optimizer) fn specialized_instruction(
             destination,
             container,
             index: subscript,
-            value_mode: CollectionValueMode::Generic,
-        } => refined_collection_value_mode(flow, index, container).map(|value_mode| {
+            value_mode: ArrayValueMode::Generic,
+        } => refined_array_value_mode(flow, index, container).map(|value_mode| {
             Instruction::VecIndexGet {
                 destination,
                 container,
@@ -104,8 +104,8 @@ pub(in crate::optimizer) fn specialized_instruction(
             destination,
             container,
             index: subscript,
-            value_mode: CollectionValueMode::Generic,
-        } => refined_collection_value_mode(flow, index, container).map(|value_mode| {
+            value_mode: ArrayValueMode::Generic,
+        } => refined_array_value_mode(flow, index, container).map(|value_mode| {
             Instruction::DictIndexGetIntKey {
                 destination,
                 container,
@@ -117,8 +117,8 @@ pub(in crate::optimizer) fn specialized_instruction(
             destination,
             container,
             index: subscript,
-            value_mode: CollectionValueMode::Generic,
-        } => refined_collection_value_mode(flow, index, container).map(|value_mode| {
+            value_mode: ArrayValueMode::Generic,
+        } => refined_array_value_mode(flow, index, container).map(|value_mode| {
             Instruction::DictIndexGetStringKey {
                 destination,
                 container,
@@ -133,7 +133,7 @@ pub(in crate::optimizer) fn specialized_instruction(
             mode: IndexAddMode::Generic,
         } if flow.proves(index, container, &dictionary)
             && flow.proves(index, value, &TypeDescriptor::Int)
-            && flow.proves_collection_element(index, container, &TypeDescriptor::Int) =>
+            && flow.proves_array_element(index, container, &TypeDescriptor::Int) =>
         {
             Some(Instruction::IndexAddAssign {
                 container,
@@ -178,7 +178,7 @@ pub(in crate::optimizer) fn specialized_instruction(
         } => {
             let (initialization, subject) = foreach_subject(flow.chunk(), index, iterator)?;
             let value_mode =
-                collection_value_mode(flow, index.saturating_add(1), value_destination, subject);
+                array_value_mode(flow, index.saturating_add(1), value_destination, subject);
             if flow.proves(initialization, subject, &vector) {
                 Some(Instruction::VecForeachNext {
                     iterator,
@@ -207,7 +207,7 @@ pub(super) fn specialize_with(
     is_int: impl Fn(Register) -> bool,
     is_vector: impl Fn(Register) -> bool,
     is_dictionary: impl Fn(Register) -> bool,
-    value_mode: impl Fn(Register, Register) -> CollectionValueMode,
+    value_mode: impl Fn(Register, Register) -> ArrayValueMode,
 ) -> Option<Instruction> {
     match instruction {
         Instruction::Length {
@@ -385,32 +385,31 @@ fn foreach_reservation_target(
     None
 }
 
-fn collection_value_mode(
+fn array_value_mode(
     flow: &TypeFlow<'_>,
     index: usize,
     destination: Register,
-    collection: Register,
-) -> CollectionValueMode {
+    array: Register,
+) -> ArrayValueMode {
     let result = index.saturating_add(1);
     if flow.proves(result, destination, &TypeDescriptor::Int) {
-        CollectionValueMode::Int
+        ArrayValueMode::Int
     } else if flow.proves(result, destination, &TypeDescriptor::Float) {
-        CollectionValueMode::Float
+        ArrayValueMode::Float
     } else {
-        refined_collection_value_mode(flow, index, collection)
-            .unwrap_or(CollectionValueMode::Generic)
+        refined_array_value_mode(flow, index, array).unwrap_or(ArrayValueMode::Generic)
     }
 }
 
-fn refined_collection_value_mode(
+fn refined_array_value_mode(
     flow: &TypeFlow<'_>,
     index: usize,
-    collection: Register,
-) -> Option<CollectionValueMode> {
-    if flow.proves_collection_element(index, collection, &TypeDescriptor::Int) {
-        Some(CollectionValueMode::Int)
-    } else if flow.proves_collection_element(index, collection, &TypeDescriptor::Float) {
-        Some(CollectionValueMode::Float)
+    array: Register,
+) -> Option<ArrayValueMode> {
+    if flow.proves_array_element(index, array, &TypeDescriptor::Int) {
+        Some(ArrayValueMode::Int)
+    } else if flow.proves_array_element(index, array, &TypeDescriptor::Float) {
+        Some(ArrayValueMode::Float)
     } else {
         None
     }

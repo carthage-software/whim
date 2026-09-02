@@ -7,15 +7,15 @@ use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
 use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
 use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
 use crate::bytecode::instruction::NUMERIC_LOOP_REGISTER_LIMIT;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
 use crate::bytecode::unit::literal_value;
 use crate::optimizer::relative_target;
 use crate::value::ValueView;
 use crate::value::dict::keys::Key;
+use crate::vm::ArrayFault;
 use crate::vm::ByteStringObject;
 use crate::vm::Chunk;
-use crate::vm::CollectionFault;
 use crate::vm::Fault;
 use crate::vm::Instruction;
 use crate::vm::InstructionKind;
@@ -219,9 +219,9 @@ pub(in crate::vm) enum NumericLoopOutcome {
         left: Register,
         right: Option<Register>,
     },
-    Collection {
+    Array {
         resume_ip: usize,
-        fault: CollectionFault,
+        fault: ArrayFault,
     },
 }
 
@@ -295,7 +295,7 @@ impl VirtualMachine<'_> {
                         // SAFETY: `dirty` contains only active-frame numeric registers.
                         unsafe { flush(registers, &values, dirty) };
 
-                        return NumericLoopOutcome::Collection {
+                        return NumericLoopOutcome::Array {
                             resume_ip: cursor,
                             fault,
                         };
@@ -305,7 +305,7 @@ impl VirtualMachine<'_> {
                 // SAFETY: `position` is bounded by the pinned length.
                 let element = unsafe { &*elements.add(position) };
                 match $value_mode {
-                    CollectionValueMode::Int => {
+                    ArrayValueMode::Int => {
                         // SAFETY: the specialized mode proves the element is an int.
                         let value = NumericValue::int(unsafe { element.as_int_unchecked() });
 
@@ -321,7 +321,7 @@ impl VirtualMachine<'_> {
                             )
                         };
                     }
-                    CollectionValueMode::Float => {
+                    ArrayValueMode::Float => {
                         // SAFETY: the specialized mode proves the element is a float.
                         let value = NumericValue::float(unsafe { element.as_float_unchecked() });
 
@@ -337,10 +337,10 @@ impl VirtualMachine<'_> {
                             )
                         };
                     }
-                    CollectionValueMode::Generic => {
+                    ArrayValueMode::Generic => {
                         // SAFETY: the destination is in the active numeric register window.
                         unsafe {
-                            assign_collection_element(
+                            assign_array_element(
                                 registers,
                                 &mut values,
                                 &mut dirty,
@@ -376,7 +376,7 @@ impl VirtualMachine<'_> {
                     Err(fault) => {
                         // SAFETY: `dirty` contains only active-frame numeric registers.
                         unsafe { flush(registers, &values, dirty) };
-                        return NumericLoopOutcome::Collection {
+                        return NumericLoopOutcome::Array {
                             resume_ip: cursor,
                             fault,
                         };
@@ -425,7 +425,7 @@ impl VirtualMachine<'_> {
                 // SAFETY: `position` is bounded by the pinned length.
                 let element = unsafe { &*elements.add(position) };
                 match $value_mode {
-                    CollectionValueMode::Int => {
+                    ArrayValueMode::Int => {
                         // SAFETY: the specialized mode proves the element is an int.
                         let value = NumericValue::int(unsafe { element.as_int_unchecked() });
 
@@ -441,7 +441,7 @@ impl VirtualMachine<'_> {
                             )
                         };
                     }
-                    CollectionValueMode::Float => {
+                    ArrayValueMode::Float => {
                         // SAFETY: the specialized mode proves the element is a float.
                         let value = NumericValue::float(unsafe { element.as_float_unchecked() });
 
@@ -457,10 +457,10 @@ impl VirtualMachine<'_> {
                             )
                         };
                     }
-                    CollectionValueMode::Generic => {
+                    ArrayValueMode::Generic => {
                         // SAFETY: the destination is in the active numeric register window.
                         unsafe {
-                            assign_collection_element(
+                            assign_array_element(
                                 registers,
                                 &mut values,
                                 &mut dirty,
@@ -648,9 +648,9 @@ impl VirtualMachine<'_> {
             }};
         }
 
-        macro_rules! fused_collection_comparison_tail {
+        macro_rules! fused_array_comparison_tail {
             ($destination:expr, $value_mode:expr) => {{
-                if $value_mode != CollectionValueMode::Generic && cursor != exit {
+                if $value_mode != ArrayValueMode::Generic && cursor != exit {
                     let tail_current = cursor;
                     // SAFETY: `cursor` points inside the verified numeric-loop body.
                     let tail = unsafe { InstructionWord::read(chunk.code.as_ptr().add(cursor)) };
@@ -673,7 +673,7 @@ impl VirtualMachine<'_> {
                         let left_index = left.index() as usize;
                         let right_index = right.index() as usize;
                         let matches = match $value_mode {
-                            CollectionValueMode::Float
+                            ArrayValueMode::Float
                                 if left == $destination
                                     && values.kind(right_index) == NumericKind::Float =>
                             {
@@ -683,7 +683,7 @@ impl VirtualMachine<'_> {
                                     values.float(right_index),
                                 ))
                             }
-                            CollectionValueMode::Float
+                            ArrayValueMode::Float
                                 if right == $destination
                                     && values.kind(left_index) == NumericKind::Float =>
                             {
@@ -693,7 +693,7 @@ impl VirtualMachine<'_> {
                                     values.float(right_index),
                                 ))
                             }
-                            CollectionValueMode::Int
+                            ArrayValueMode::Int
                                 if left == $destination
                                     && values.kind(right_index) == NumericKind::Int =>
                             {
@@ -703,7 +703,7 @@ impl VirtualMachine<'_> {
                                     values.int(right_index),
                                 ))
                             }
-                            CollectionValueMode::Int
+                            ArrayValueMode::Int
                                 if right == $destination
                                     && values.kind(left_index) == NumericKind::Int =>
                             {
@@ -713,9 +713,9 @@ impl VirtualMachine<'_> {
                                     values.int(right_index),
                                 ))
                             }
-                            CollectionValueMode::Int
-                            | CollectionValueMode::Float
-                            | CollectionValueMode::Generic => comparison_matches_numeric(
+                            ArrayValueMode::Int
+                            | ArrayValueMode::Float
+                            | ArrayValueMode::Generic => comparison_matches_numeric(
                                 comparison,
                                 values.get(left_index),
                                 values.get(right_index),
@@ -1885,7 +1885,7 @@ impl VirtualMachine<'_> {
                 } => {
                     let index_value = values.int(index.index() as usize);
                     vec_element_read!(current, destination, container, index_value, value_mode);
-                    fused_collection_comparison_tail!(destination, value_mode);
+                    fused_array_comparison_tail!(destination, value_mode);
                 }
                 Instruction::IndexGet {
                     destination,
@@ -1904,7 +1904,7 @@ impl VirtualMachine<'_> {
                         destination,
                         container,
                         index_value,
-                        CollectionValueMode::Generic
+                        ArrayValueMode::Generic
                     );
                 }
                 Instruction::VecIndexSet {
@@ -1960,7 +1960,7 @@ impl VirtualMachine<'_> {
                 } => {
                     let index_value = values.int(index.index() as usize);
                     dict_element_read!(current, destination, container, index_value, value_mode);
-                    fused_collection_comparison_tail!(destination, value_mode);
+                    fused_array_comparison_tail!(destination, value_mode);
                 }
                 Instruction::DictIndexSetIntKey {
                     container,
@@ -4363,7 +4363,7 @@ unsafe fn try_concat_burst(
 }
 
 #[inline(always)]
-unsafe fn assign_collection_element(
+unsafe fn assign_array_element(
     registers: *mut Value,
     values: &mut NumericRegisters,
     dirty: &mut u64,

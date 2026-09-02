@@ -138,7 +138,7 @@ fn builtin_arity_error(name: &str, expected: usize, span: Span) -> CompileError 
     )
 }
 
-/// Checked built-in collection types always spell their complete arity. A
+/// Checked built-in array types always spell their complete arity. A
 /// bare named class remains a nominal check, but `vec` and `dict` are closed
 /// built-ins and must use wildcards for positions the check ignores.
 #[expect(

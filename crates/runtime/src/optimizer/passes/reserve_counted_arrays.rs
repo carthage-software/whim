@@ -1,4 +1,4 @@
-//! Capacity reservation for fresh collections populated by counted loops.
+//! Capacity reservation for fresh arrays populated by counted loops.
 
 use whim_span::Span;
 
@@ -16,7 +16,7 @@ pub(in crate::optimizer) fn optimize_chunk(
     chunk: &mut Chunk,
     configuration: OptimizationConfiguration,
 ) {
-    if !configuration.reserve_counted_collections || chunk.code.len() < 4 {
+    if !configuration.reserve_counted_arrays || chunk.code.len() < 4 {
         return;
     }
 
@@ -71,7 +71,7 @@ pub(in crate::optimizer) fn optimize_chunk(
                 _ => continue,
             };
             if !containers.contains(&container)
-                && fresh_collection_before(chunk, container, header)
+                && fresh_array_before(chunk, container, header)
                 && chunk.code[header..=tail]
                     .iter()
                     .all(|instruction| !effect_on(chunk, *instruction, container).writes())
@@ -95,7 +95,7 @@ pub(in crate::optimizer) fn optimize_chunk(
                 .into_iter()
                 .map(|container| {
                     (
-                        Instruction::ReserveCollection {
+                        Instruction::ReserveArray {
                             container,
                             additional: limit,
                         },
@@ -113,7 +113,7 @@ pub(in crate::optimizer) fn optimize_chunk(
     );
 }
 
-fn fresh_collection_before(chunk: &Chunk, container: Register, header: usize) -> bool {
+fn fresh_array_before(chunk: &Chunk, container: Register, header: usize) -> bool {
     for index in (0..header).rev() {
         let effect = effect_on(chunk, chunk.code[index], container);
         if effect.reads() {

@@ -18,7 +18,7 @@ use crate::limits::MAX_TYPE_DEPTH_U32;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::symbols::RuntimeTypeEnvironment;
 use crate::value::ValueView;
-use crate::value::collection::CollectionTypeCheckId;
+use crate::value::array::ArrayTypeCheckId;
 use crate::value::function::PresetArg;
 use crate::vm::Atom;
 use crate::vm::CallTarget;
@@ -40,7 +40,7 @@ use crate::vm::is_instance_of;
 use crate::vm::ops;
 use crate::vm::unreachable_invariant;
 
-fn collection_type_check_cacheable(descriptor: &TypeDescriptor) -> bool {
+fn array_type_check_cacheable(descriptor: &TypeDescriptor) -> bool {
     match descriptor {
         TypeDescriptor::Wildcard
         | TypeDescriptor::Mixed
@@ -61,23 +61,20 @@ fn collection_type_check_cacheable(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::TupleAny => true,
         TypeDescriptor::Array(Some((key, value)))
         | TypeDescriptor::Dictionary(Some((key, value))) => {
-            collection_type_check_cacheable(key) && collection_type_check_cacheable(value)
+            array_type_check_cacheable(key) && array_type_check_cacheable(value)
         }
         TypeDescriptor::Vector(Some(element)) | TypeDescriptor::Negated(element) => {
-            collection_type_check_cacheable(element)
+            array_type_check_cacheable(element)
         }
         TypeDescriptor::Tuple(members)
         | TypeDescriptor::Union(members)
-        | TypeDescriptor::Intersection(members) => {
-            members.iter().all(collection_type_check_cacheable)
-        }
+        | TypeDescriptor::Intersection(members) => members.iter().all(array_type_check_cacheable),
         TypeDescriptor::TupleRest { elements, rest } => {
-            elements.iter().all(collection_type_check_cacheable)
-                && collection_type_check_cacheable(rest)
+            elements.iter().all(array_type_check_cacheable) && array_type_check_cacheable(rest)
         }
         TypeDescriptor::Named { arguments, .. } => arguments
             .as_ref()
-            .is_none_or(|arguments| arguments.iter().all(collection_type_check_cacheable)),
+            .is_none_or(|arguments| arguments.iter().all(array_type_check_cacheable)),
         TypeDescriptor::Void
         | TypeDescriptor::Never
         | TypeDescriptor::StringLiteral(_)
@@ -102,16 +99,16 @@ use crate::vm::types::parser::push_runtime_union_member;
 use crate::vm::types::parser::runtime_union;
 
 impl VirtualMachine<'_> {
-    pub(in crate::vm) fn collection_type_check_id(
+    pub(in crate::vm) fn array_type_check_id(
         &mut self,
         descriptor: &TypeDescriptor,
-    ) -> Option<CollectionTypeCheckId> {
-        if !collection_type_check_cacheable(descriptor) {
+    ) -> Option<ArrayTypeCheckId> {
+        if !array_type_check_cacheable(descriptor) {
             return None;
         }
 
         let identifier = self.intern_type_descriptor_ref(descriptor);
-        Some(CollectionTypeCheckId::new(identifier.0))
+        Some(ArrayTypeCheckId::new(identifier.0))
     }
 
     /// Parses a runtime type-name spelling.
@@ -299,7 +296,7 @@ impl VirtualMachine<'_> {
         }
     }
 
-    /// Reconstructs the complete runtime type carried by a value. Collection
+    /// Reconstructs the complete runtime type carried by a value. array
     /// types describe their current contents; empty positions use `never`,
     /// the bottom type. `_` is only a written existential pattern and is
     /// never produced by runtime type reconstruction.

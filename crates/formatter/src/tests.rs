@@ -863,7 +863,7 @@ fn file_and_directory_constructs() {
 }
 
 #[test]
-fn nested_collections_and_keys() {
+fn nested_arrays_and_keys() {
     assert_idempotent("$x = dict['a' => vec[1, 2], 'b' => 3];");
     assert_idempotent("$t = (1, 'two', vec[3]);");
     assert_formats("$s = (1,);\n", "$s = (1,);\n");

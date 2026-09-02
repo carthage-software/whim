@@ -5,9 +5,9 @@ use std::ptr::NonNull;
 use std::slice;
 
 use crate::value::Value;
-use crate::value::collection::CollectionTypeCheck;
-use crate::value::collection::CollectionTypeCheckCache;
-use crate::value::collection::CollectionTypeCheckId;
+use crate::value::array::ArrayTypeCheck;
+use crate::value::array::ArrayTypeCheckCache;
+use crate::value::array::ArrayTypeCheckId;
 use crate::value::heap::Heap;
 use crate::value::heap::handle::ManagedRef;
 use crate::value::heap::metadata::CowClone;
@@ -20,7 +20,7 @@ use crate::value::heap::queue::DropQueue;
 
 pub(crate) struct VecObject {
     elements: Vec<Value>,
-    type_check: CollectionTypeCheckCache,
+    type_check: ArrayTypeCheckCache,
 }
 
 impl VecObject {
@@ -30,7 +30,7 @@ impl VecObject {
             heap,
             Self {
                 elements: Vec::new(),
-                type_check: CollectionTypeCheckCache::new(),
+                type_check: ArrayTypeCheckCache::new(),
             },
         )
     }
@@ -47,7 +47,7 @@ impl VecObject {
             heap,
             Self {
                 elements: storage,
-                type_check: CollectionTypeCheckCache::new(),
+                type_check: ArrayTypeCheckCache::new(),
             },
         )
     }
@@ -153,19 +153,19 @@ impl VecObject {
     #[must_use]
     #[expect(
         clippy::inline_always,
-        reason = "collection checks query this cache in the VM hot path"
+        reason = "array checks query this cache in the VM hot path"
     )]
     #[inline(always)]
-    pub(crate) const fn type_check(&self, id: CollectionTypeCheckId) -> CollectionTypeCheck {
+    pub(crate) const fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
         self.type_check.get(id)
     }
 
     #[expect(
         clippy::inline_always,
-        reason = "collection checks update this cache in the VM hot path"
+        reason = "array checks update this cache in the VM hot path"
     )]
     #[inline(always)]
-    pub(crate) fn mark_type_checked(&self, id: CollectionTypeCheckId) {
+    pub(crate) fn mark_type_checked(&self, id: ArrayTypeCheckId) {
         self.type_check.mark_checked(id);
     }
 
@@ -217,43 +217,43 @@ impl Trace for VecObject {
 #[cfg(test)]
 mod tests {
     use crate::value::Value;
-    use crate::value::collection::CollectionTypeCheck;
-    use crate::value::collection::CollectionTypeCheckCache;
-    use crate::value::collection::CollectionTypeCheckId;
+    use crate::value::array::ArrayTypeCheck;
+    use crate::value::array::ArrayTypeCheckCache;
+    use crate::value::array::ArrayTypeCheckId;
     use crate::value::heap::metadata::CowClone;
     use crate::value::vec::VecObject;
 
     fn vector() -> VecObject {
         VecObject {
             elements: vec![Value::int(1), Value::int(2)],
-            type_check: CollectionTypeCheckCache::new(),
+            type_check: ArrayTypeCheckCache::new(),
         }
     }
 
-    const fn id(value: u32) -> CollectionTypeCheckId {
-        CollectionTypeCheckId::new(value)
+    const fn id(value: u32) -> ArrayTypeCheckId {
+        ArrayTypeCheckId::new(value)
     }
 
     #[test]
     fn mutations_bound_the_cached_check_to_one_slot() {
         let mut vector = vector();
         vector.mark_type_checked(id(7));
-        assert_eq!(vector.type_check(id(7)), CollectionTypeCheck::Clean(id(7)));
+        assert_eq!(vector.type_check(id(7)), ArrayTypeCheck::Clean(id(7)));
 
         drop(vector.set(1, Value::int(3)));
         assert_eq!(
             vector.type_check(id(7)),
-            CollectionTypeCheck::Dirty { id: id(7), slot: 1 }
+            ArrayTypeCheck::Dirty { id: id(7), slot: 1 }
         );
 
         drop(vector.set(1, Value::int(4)));
-        assert_eq!(vector.type_check(id(7)), CollectionTypeCheck::Unknown);
+        assert_eq!(vector.type_check(id(7)), ArrayTypeCheck::Unknown);
 
         vector.mark_type_checked(id(7));
         vector.push(Value::int(5));
         assert_eq!(
             vector.type_check(id(7)),
-            CollectionTypeCheck::Dirty { id: id(7), slot: 2 }
+            ArrayTypeCheck::Dirty { id: id(7), slot: 2 }
         );
     }
 
@@ -262,15 +262,15 @@ mod tests {
         let mut vector = vector();
         vector.mark_type_checked(id(7));
         drop(vector.remove(0));
-        assert_eq!(vector.type_check(id(7)), CollectionTypeCheck::Clean(id(7)));
+        assert_eq!(vector.type_check(id(7)), ArrayTypeCheck::Clean(id(7)));
 
         vector.mark_type_checked(id(7));
         drop(vector.remove_last());
-        assert_eq!(vector.type_check(id(7)), CollectionTypeCheck::Clean(id(7)));
+        assert_eq!(vector.type_check(id(7)), ArrayTypeCheck::Clean(id(7)));
 
         vector.mark_type_checked(id(7));
         let _ = vector.as_mut_slice();
-        assert_eq!(vector.type_check(id(7)), CollectionTypeCheck::Unknown);
+        assert_eq!(vector.type_check(id(7)), ArrayTypeCheck::Unknown);
     }
 
     #[test]
@@ -278,26 +278,26 @@ mod tests {
         let vector = vector();
         vector.mark_type_checked(id(7));
         vector.mark_type_checked(id(8));
-        assert_eq!(vector.type_check(id(7)), CollectionTypeCheck::Clean(id(7)));
-        assert_eq!(vector.type_check(id(8)), CollectionTypeCheck::Clean(id(8)));
-        assert_eq!(vector.type_check(id(9)), CollectionTypeCheck::Unknown);
+        assert_eq!(vector.type_check(id(7)), ArrayTypeCheck::Clean(id(7)));
+        assert_eq!(vector.type_check(id(8)), ArrayTypeCheck::Clean(id(8)));
+        assert_eq!(vector.type_check(id(9)), ArrayTypeCheck::Unknown);
 
         let mut copy = vector.cow_clone();
         drop(copy.set(0, Value::int(3)));
-        assert_eq!(vector.type_check(id(7)), CollectionTypeCheck::Clean(id(7)));
-        assert_eq!(vector.type_check(id(8)), CollectionTypeCheck::Clean(id(8)));
+        assert_eq!(vector.type_check(id(7)), ArrayTypeCheck::Clean(id(7)));
+        assert_eq!(vector.type_check(id(8)), ArrayTypeCheck::Clean(id(8)));
         assert_eq!(
             copy.type_check(id(7)),
-            CollectionTypeCheck::Dirty { id: id(7), slot: 0 }
+            ArrayTypeCheck::Dirty { id: id(7), slot: 0 }
         );
-        assert_eq!(copy.type_check(id(8)), CollectionTypeCheck::Unknown);
+        assert_eq!(copy.type_check(id(8)), ArrayTypeCheck::Unknown);
 
         copy.mark_type_checked(id(7));
         drop(copy.set(1, Value::int(4)));
-        assert_eq!(copy.type_check(id(8)), CollectionTypeCheck::Unknown);
+        assert_eq!(copy.type_check(id(8)), ArrayTypeCheck::Unknown);
         assert_eq!(
             copy.type_check(id(7)),
-            CollectionTypeCheck::Dirty { id: id(7), slot: 1 }
+            ArrayTypeCheck::Dirty { id: id(7), slot: 1 }
         );
     }
 }

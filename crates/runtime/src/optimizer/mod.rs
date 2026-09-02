@@ -124,15 +124,15 @@ pub(crate) struct OptimizationConfiguration {
     /// Replace arithmetic over proven scalar types with unchecked opcodes.
     pub specialize_arithmetic: bool,
     /// Replace proven vec and dict operations with direct collection opcodes.
-    pub specialize_collections: bool,
+    pub specialize_arrays: bool,
     /// Replace comparisons over proven integers with direct integer opcodes.
     pub specialize_comparison: bool,
     /// Replace proven exact property reads with direct slot accesses.
     pub specialize_property_get: bool,
     /// Specialize counted loops whose counter and limit are proven integers.
     pub specialize_counter_loop: bool,
-    /// Reserve fresh collections populated by proven counted loops.
-    pub reserve_counted_collections: bool,
+    /// Reserve fresh arrays populated by proven counted loops.
+    pub reserve_counted_arrays: bool,
     /// Move straight-line branches that call cold symbols behind the hot exit.
     pub cold_block_layout: bool,
     /// The first function index the pipeline may rewrite.
@@ -207,11 +207,11 @@ impl Default for OptimizationConfiguration {
             sink_move: true,
             strength_reduction: true,
             specialize_arithmetic: true,
-            specialize_collections: true,
+            specialize_arrays: true,
             specialize_comparison: true,
             specialize_property_get: true,
             specialize_counter_loop: true,
-            reserve_counted_collections: true,
+            reserve_counted_arrays: true,
             cold_block_layout: true,
             immutable_function_floor: 0,
             immutable_class_floor: 0,
@@ -241,7 +241,7 @@ pub(crate) struct OptimizationStatistics {
     /// The number of arithmetic operations specialized by proven operand type.
     pub operations_specialized: usize,
     /// The number of collection operations specialized by proven container type.
-    pub collection_operations_specialized: usize,
+    pub array_operations_specialized: usize,
     /// The number of specialized collection loops whose unused key was elided.
     pub foreach_keys_elided: usize,
     /// The number of frame registers removed by temporary reuse.
@@ -258,7 +258,7 @@ impl OptimizationStatistics {
     fn specialized_total(&self) -> usize {
         self.constants_folded
             + self.operations_specialized
-            + self.collection_operations_specialized
+            + self.array_operations_specialized
             + self.property_gets_specialized
             + self.parameter_checks_elided
             + self.property_checks_elided
@@ -343,7 +343,7 @@ fn plan_specialization_round(
     passes::elide_parameter_checks::optimize_unit(&mut plan, &analysis, configuration, statistics);
     passes::elide_property_checks::optimize_unit(&mut plan, &analysis, configuration, statistics);
     passes::specialize_property_get::optimize_unit(&mut plan, &analysis, configuration, statistics);
-    passes::specialize_collections::optimize_unit(&mut plan, &analysis, configuration, statistics);
+    passes::specialize_arrays::optimize_unit(&mut plan, &analysis, configuration, statistics);
     passes::specialize_arithmetic::optimize_unit(&mut plan, &analysis, configuration, statistics);
     passes::const_fold::optimize_unit(&analysis, &mut plan, configuration, statistics);
     passes::strength_reduction::optimize_unit(&mut plan, &analysis, configuration, statistics);
@@ -386,12 +386,7 @@ fn specialize_operations_against_one_analysis(
         let indexed = IndexedUnit::with_world(unit, world);
         let analysis = analysis::Analysis::of_early_operations(&indexed, configuration, allocator);
         let mut plan = RewritePlan::for_analysis(&analysis);
-        passes::specialize_collections::optimize_unit(
-            &mut plan,
-            &analysis,
-            configuration,
-            statistics,
-        );
+        passes::specialize_arrays::optimize_unit(&mut plan, &analysis, configuration, statistics);
         passes::specialize_arithmetic::optimize_unit(
             &mut plan,
             &analysis,
@@ -660,7 +655,7 @@ fn optimize_function(
         configuration,
         statistics,
     );
-    passes::reserve_counted_collections::optimize_chunk(&mut function.chunk, configuration);
+    passes::reserve_counted_arrays::optimize_chunk(&mut function.chunk, configuration);
     passes::optimize_numeric_loop(&mut function.chunk, configuration);
     passes::optimize_integer_step_loops(&mut function.chunk, configuration, statistics);
     passes::fuse_int_constants::optimize_chunk(&mut function.chunk, configuration, statistics);
@@ -701,7 +696,7 @@ fn optimize_initializer_chunk(
     statistics: &mut OptimizationStatistics,
 ) {
     passes::fuse_index_add_assign::optimize_chunk(chunk, configuration, statistics);
-    passes::specialize_collections::optimize_chunk(chunk, allocator, configuration, statistics);
+    passes::specialize_arrays::optimize_chunk(chunk, allocator, configuration, statistics);
     passes::specialize_arithmetic::optimize_chunk(chunk, allocator, configuration, statistics);
     passes::optimize_initializer_chunk_before_numeric_loop(
         chunk,
@@ -743,7 +738,7 @@ fn optimize_chunk_after_numeric_loop_preparation(
     statistics: &mut OptimizationStatistics,
     analyze_locally: bool,
 ) {
-    passes::reserve_counted_collections::optimize_chunk(chunk, configuration);
+    passes::reserve_counted_arrays::optimize_chunk(chunk, configuration);
     passes::optimize_numeric_loop(chunk, configuration);
     if analyze_locally {
         specialize_comparison::optimize_chunk(chunk, allocator, configuration, statistics);

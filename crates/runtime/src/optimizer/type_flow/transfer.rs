@@ -1,6 +1,6 @@
 //! The per-instruction fact transfer function.
 
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Comparison;
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::BOOL;
@@ -36,8 +36,8 @@ pub(in crate::optimizer) fn transfer(
     chunk: &Chunk,
     index: usize,
     state: &mut [Fact],
-    collection_elements: Option<&[u16]>,
-    collection_keys: Option<&[u16]>,
+    array_elements: Option<&[u16]>,
+    array_keys: Option<&[u16]>,
 ) {
     let origin = index as u32 + 1;
     let state = Cell::from_mut(state).as_slice_of_cells();
@@ -258,16 +258,13 @@ pub(in crate::optimizer) fn transfer(
             } else {
                 TUPLE
             };
-            write(
-                destination,
-                Fact::collection(mask, origin, observable_release),
-            );
+            write(destination, Fact::array(mask, origin, observable_release));
         }
         Instruction::NewFilledVec {
             destination, value, ..
         } => write(
             destination,
-            Fact::collection(VECTOR, origin, read(value).observable_release),
+            Fact::array(VECTOR, origin, read(value).observable_release),
         ),
         Instruction::NewDict {
             pair_count,
@@ -280,7 +277,7 @@ pub(in crate::optimizer) fn transfer(
                 (0..count).any(|pair| state[first + pair * 2 + 1].get().observable_release);
             write(
                 destination,
-                Fact::collection(DICTIONARY, origin, observable_release),
+                Fact::array(DICTIONARY, origin, observable_release),
             );
         }
         Instruction::Rest {
@@ -289,7 +286,7 @@ pub(in crate::optimizer) fn transfer(
             ..
         } => write(
             destination,
-            Fact::collection(VECTOR, origin, read(subject).observable_release),
+            Fact::array(VECTOR, origin, read(subject).observable_release),
         ),
         Instruction::NewStatic { destination, .. }
         | Instruction::NewDynamic { destination, .. }
@@ -344,11 +341,11 @@ pub(in crate::optimizer) fn transfer(
             if container_fact.mask != 0 && container_fact.mask & !STRING == 0 {
                 write(destination, Fact::known(STRING));
             } else {
-                let collection = container_fact.collection;
-                let mask = collection_elements
-                    .and_then(|elements| elements.get(collection as usize))
+                let array = container_fact.array;
+                let mask = array_elements
+                    .and_then(|elements| elements.get(array as usize))
                     .copied()
-                    .filter(|_| collection != NO_ORIGIN)
+                    .filter(|_| array != NO_ORIGIN)
                     .unwrap_or(ALL);
                 write(destination, Fact::with_origin(mask, origin));
             }
@@ -369,11 +366,11 @@ pub(in crate::optimizer) fn transfer(
             container,
             ..
         } => {
-            let collection = read(container).collection;
-            let mask = collection_elements
-                .and_then(|elements| elements.get(collection as usize))
+            let array = read(container).array;
+            let mask = array_elements
+                .and_then(|elements| elements.get(array as usize))
                 .copied()
-                .filter(|_| collection != NO_ORIGIN)
+                .filter(|_| array != NO_ORIGIN)
                 .unwrap_or(ALL);
             write(destination, Fact::with_origin(mask, origin));
         }
@@ -491,7 +488,7 @@ pub(in crate::optimizer) fn transfer(
                 Fact {
                     mask: ALL,
                     origin: subject.origin,
-                    collection: subject.collection,
+                    array: subject.array,
                     observable_release: subject.observable_release,
                     non_negative: false,
                     positive: false,
@@ -504,20 +501,20 @@ pub(in crate::optimizer) fn transfer(
             value_destination,
             ..
         } => {
-            let collection = read(iterator).collection;
+            let array = read(iterator).array;
             if key_destination != Register::NONE {
-                let mask = collection_keys
-                    .and_then(|keys| keys.get(collection as usize))
+                let mask = array_keys
+                    .and_then(|keys| keys.get(array as usize))
                     .copied()
-                    .filter(|_| collection != NO_ORIGIN)
+                    .filter(|_| array != NO_ORIGIN)
                     .unwrap_or(ALL);
                 write(key_destination, Fact::with_origin(mask, origin));
             }
 
-            let mask = collection_elements
-                .and_then(|elements| elements.get(collection as usize))
+            let mask = array_elements
+                .and_then(|elements| elements.get(array as usize))
                 .copied()
-                .filter(|_| collection != NO_ORIGIN)
+                .filter(|_| array != NO_ORIGIN)
                 .unwrap_or(ALL);
             write(value_destination, Fact::with_origin(mask, origin));
         }
@@ -531,14 +528,14 @@ pub(in crate::optimizer) fn transfer(
                 write(key_destination, Fact::with_origin(INT, origin));
             }
 
-            let collection = read(iterator).collection;
+            let array = read(iterator).array;
             let mask = match value_mode {
-                CollectionValueMode::Int => INT,
-                CollectionValueMode::Float => FLOAT,
-                CollectionValueMode::Generic => collection_elements
-                    .and_then(|elements| elements.get(collection as usize))
+                ArrayValueMode::Int => INT,
+                ArrayValueMode::Float => FLOAT,
+                ArrayValueMode::Generic => array_elements
+                    .and_then(|elements| elements.get(array as usize))
                     .copied()
-                    .filter(|_| collection != NO_ORIGIN)
+                    .filter(|_| array != NO_ORIGIN)
                     .unwrap_or(ALL),
             };
 
@@ -550,22 +547,22 @@ pub(in crate::optimizer) fn transfer(
             value_destination,
             value_mode,
         } => {
-            let collection = read(iterator).collection;
+            let array = read(iterator).array;
             if key_destination != Register::NONE {
-                let mask = collection_keys
-                    .and_then(|keys| keys.get(collection as usize))
+                let mask = array_keys
+                    .and_then(|keys| keys.get(array as usize))
                     .copied()
-                    .filter(|_| collection != NO_ORIGIN)
+                    .filter(|_| array != NO_ORIGIN)
                     .unwrap_or(INT | STRING);
                 write(key_destination, Fact::with_origin(mask, origin));
             }
             let mask = match value_mode {
-                CollectionValueMode::Int => INT,
-                CollectionValueMode::Float => FLOAT,
-                CollectionValueMode::Generic => collection_elements
-                    .and_then(|elements| elements.get(collection as usize))
+                ArrayValueMode::Int => INT,
+                ArrayValueMode::Float => FLOAT,
+                ArrayValueMode::Generic => array_elements
+                    .and_then(|elements| elements.get(array as usize))
                     .copied()
-                    .filter(|_| collection != NO_ORIGIN)
+                    .filter(|_| array != NO_ORIGIN)
                     .unwrap_or(ALL),
             };
             write(value_destination, Fact::with_origin(mask, origin));
@@ -696,7 +693,7 @@ pub(in crate::optimizer) fn transfer(
         | Instruction::PropertyStepUnchecked { .. }
         | Instruction::PropertyAdd { .. }
         | Instruction::PropertyAddUnchecked { .. }
-        | Instruction::ReserveCollection { .. }
+        | Instruction::ReserveArray { .. }
         | Instruction::CheckSoleReference { .. }
         | Instruction::CheckDiscardedResult { .. }
         | Instruction::DrainFinalizers => {}

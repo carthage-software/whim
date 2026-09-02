@@ -449,7 +449,7 @@ fn unresolved_named_dictionary_keys_remain_generic() {
 }
 
 #[test]
-fn match_binding_expands_collection_aliases() {
+fn match_binding_expands_array_aliases() {
     let unit = compile(
         r"
         type Row = vec<mixed>;
@@ -925,7 +925,7 @@ fn dictionary_key_normalization_preserves_newtype_return_checks() {
 }
 
 #[test]
-fn mutable_collection_masks_do_not_prove_literal_members() {
+fn mutable_array_masks_do_not_prove_literal_members() {
     let unit = compile(
         r"
         final class ZeroKeyDictionary {
@@ -1232,7 +1232,7 @@ fn exact_calls_with_omitted_defaults_elide_parameter_checks() {
 }
 
 #[test]
-fn fresh_collection_arguments_prove_alias_intersections() {
+fn fresh_array_arguments_prove_alias_intersections() {
     let unit = compile(
         r#"
         type NonEmptyString = string & !"";
@@ -1368,7 +1368,7 @@ fn merged_enum_cases_elide_constructor_parameter_checks() {
 }
 
 #[test]
-fn typed_call_collections_refine_foreach_values() {
+fn typed_call_arrays_refine_foreach_values() {
     let unit = compile(
         r"
         use Whim\Marker\NeverInline;
@@ -2074,7 +2074,7 @@ fn lowered_property_updates_fuse_before_operation_specialization() {
 }
 
 #[test]
-fn direct_property_collection_writes_mutate_in_place() {
+fn direct_property_array_writes_mutate_in_place() {
     let source = r"
         final class Buffer {
             private vec<int> $values = vec[];

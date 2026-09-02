@@ -14,9 +14,9 @@ pub(crate) const MAIN_FRAME_REGISTER_HEADROOM: u16 = 24;
 
 pub(crate) mod operands;
 
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::AsMode;
 use crate::bytecode::instruction::operands::CallDescriptorIndex;
-use crate::bytecode::instruction::operands::CollectionValueMode;
 use crate::bytecode::instruction::operands::Comparison;
 use crate::bytecode::instruction::operands::ConstantIndex;
 use crate::bytecode::instruction::operands::Count;
@@ -237,7 +237,7 @@ macro_rules! instruction_set {
             /// instruction so the VM can deoptimize to ordinary dispatch at any body
             /// instruction whose dynamic operands are not numeric.
             NumericLoop { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 95,
-            /// Updates a collection held by an object property in place.
+            /// Updates an array held by an object property in place.
             PropertyIndexUpdate { object: Register, operand: Register, cache: IcSlot, mode: PropertyIndexUpdateMode, } = 96,
             PropertyStep { object: Register, cache: IcSlot, immediate: ImmediateInt, } = 97,
             PropertyAdd { object: Register, source: Register, cache: IcSlot, } = 98,
@@ -278,7 +278,7 @@ macro_rules! instruction_set {
             /// Writes a property after whole-unit type flow proved the receiver's
             /// exact property, its mutability, and the stored value's declared type.
             PropertySetUnchecked { object: Register, value: Register, slot: PropertySlot, value_mode: PropertyValueMode, } = 118,
-            /// Updates a proven mutable collection property in place.
+            /// Updates a proven mutable array property in place.
             PropertyIndexUpdateUnchecked { object: Register, operand: Register, slot: PropertySlot, mode: PropertyIndexUpdateMode, } = 119,
             /// Steps a numeric property after whole-unit type flow proved that the
             /// property is mutable and the result retains its declared type.
@@ -291,12 +291,12 @@ macro_rules! instruction_set {
             IntSubtract { destination: Register, left: Register, right: Register, } = 124,
             IntMultiply { destination: Register, left: Register, right: Register, } = 125,
             IntModulo { destination: Register, left: Register, right: Register, } = 126,
-            VecIndexGet { destination: Register, container: Register, index: Register, value_mode: CollectionValueMode, } = 127,
+            VecIndexGet { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 127,
             VecIndexSet { container: Register, index: Register, value: Register, } = 128,
             VecAppend { container: Register, value: Register, } = 129,
-            DictIndexGetIntKey { destination: Register, container: Register, index: Register, value_mode: CollectionValueMode, } = 130,
+            DictIndexGetIntKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 130,
             DictIndexSetIntKey { container: Register, index: Register, value: Register, } = 131,
-            DictIndexGetStringKey { destination: Register, container: Register, index: Register, value_mode: CollectionValueMode, } = 132,
+            DictIndexGetStringKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 132,
             DictIndexSetStringKey { container: Register, index: Register, value: Register, } = 133,
             IndexAddAssign { container: Register, index: Register, value: Register, mode: IndexAddMode, } = 146,
             NumericRegionJump { offset: JumpOffset, } = 147,
@@ -305,8 +305,8 @@ macro_rules! instruction_set {
             /// Calls an exact instance method directly from a proven caller-register
             /// window, borrowing the receiver for the duration of the frame.
             CallMethodDirect { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 136,
-            VecForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: CollectionValueMode, } = 137,
-            DictForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: CollectionValueMode, } = 138,
+            VecForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode, } = 137,
+            DictForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode, } = 138,
             StringLength { destination: Register, source: Register, } = 139,
             IntAddAssign { target: Register, source: Register, } = 140,
             CallNamedConstantUnchecked {
@@ -357,10 +357,10 @@ macro_rules! instruction_set {
             IntMultiplyImmediate { destination: Register, source: Register, immediate: ImmediateInt, } = 168,
             IntModuloImmediate { destination: Register, source: Register, immediate: ImmediateInt, } = 169,
             DictIndexSet { container: Register, index: Register, value: Register, } = 170,
-            /// Reserves capacity in a proven fresh collection before a counted fill
+            /// Reserves capacity in a proven fresh array before a counted fill
             /// loop. Non-positive and excessively large hints are ignored or capped
-            /// by the VM without changing collection semantics.
-            ReserveCollection { container: Register, additional: Register, } = 171,
+            /// by the VM without changing array semantics.
+            ReserveArray { container: Register, additional: Register, } = 171,
             Contains { destination: Register, array: Register, value: Register, } = 172,
             ContainsKey { destination: Register, array: Register, key: Register, } = 173,
             NewFilledVec { destination: Register, value: Register, size: Register, } = 174,
@@ -380,11 +380,11 @@ macro_rules! instruction_set {
             StringByteGreaterThanOrEqual { destination: Register, container: Register, index: Register, byte: u8, } = 184,
             /// Initializes several proven slots of one fresh object.
             InitializeProperties { object: Register, cache: IcSlot, descriptor: PropertyInitializationDescriptorIndex, } = 185,
-            /// Sets an element of a collection property in place.
+            /// Sets an element of an array property in place.
             PropertyIndexSet { object: Register, first_operand: Register, cache: IcSlot, } = 186,
             /// Sets an element after type flow proves the property access and value.
             PropertyIndexSetUnchecked { object: Register, first_operand: Register, slot: PropertySlot, } = 187,
-            /// Removes from a collection property and returns the removed value.
+            /// Removes from a array property and returns the removed value.
             /// For `Key`, the key follows `destination` in the register window.
             PropertyRemove { object: Register, destination: Register, cache: IcSlot, mode: PropertyRemoveMode, } = 188,
             /// The proven-property form of [`Instruction::PropertyRemove`].

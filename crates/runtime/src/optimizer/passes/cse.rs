@@ -521,7 +521,7 @@ fn transparent(instruction: Instruction) -> bool {
 mod tests {
     use whim_span::Span;
 
-    use crate::bytecode::instruction::operands::CollectionValueMode;
+    use crate::bytecode::instruction::operands::ArrayValueMode;
     use crate::bytecode::instruction::operands::Comparison;
     use crate::bytecode::instruction::operands::ImmediateInt;
     use crate::bytecode::instruction::operands::JumpOffset;
@@ -552,7 +552,7 @@ mod tests {
                 destination: value,
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
         );
         emit(
@@ -570,7 +570,7 @@ mod tests {
                 destination: value,
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
         );
         emit(&mut chunk, Instruction::ReturnNull);
@@ -590,7 +590,7 @@ mod tests {
                 destination: value,
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             }
         );
         assert!(matches!(chunk.code[2], Instruction::ReturnNull));
@@ -608,7 +608,7 @@ mod tests {
                 destination: value,
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
         );
         emit(
@@ -626,7 +626,7 @@ mod tests {
                 destination: value,
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
         );
         emit(
@@ -658,7 +658,7 @@ mod tests {
                 destination: Register::new(2),
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
         );
         emit(
@@ -667,7 +667,7 @@ mod tests {
                 destination: Register::new(3),
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
         );
         emit(
@@ -676,7 +676,7 @@ mod tests {
                 destination: Register::new(4),
                 container: vector,
                 index,
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
         );
         emit(

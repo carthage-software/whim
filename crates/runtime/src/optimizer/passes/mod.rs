@@ -170,11 +170,11 @@ pub(super) mod ownership_moves;
 pub(super) mod prune_clears;
 pub(super) mod prune_unreachable;
 pub(super) mod refine_reference_registers;
-pub(super) mod reserve_counted_collections;
+pub(super) mod reserve_counted_arrays;
 pub(super) mod reuse_temporaries;
 pub(super) mod scalar_replace_objects;
 pub(super) mod specialize_arithmetic;
-pub(super) mod specialize_collections;
+pub(super) mod specialize_arrays;
 pub(super) mod specialize_comparison;
 pub(super) mod specialize_counter_loop;
 pub(super) mod specialize_lowered;
@@ -254,7 +254,7 @@ pub(in crate::optimizer) fn optimize_isolated_live_tail(
         statistics,
         true,
     );
-    reserve_counted_collections::optimize_chunk(chunk, configuration);
+    reserve_counted_arrays::optimize_chunk(chunk, configuration);
     optimize_numeric_loop(chunk, configuration);
     optimize_integer_step_loops(chunk, configuration, statistics);
     fuse_int_constants::optimize_chunk(chunk, configuration, statistics);

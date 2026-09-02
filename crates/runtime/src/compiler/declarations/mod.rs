@@ -70,7 +70,7 @@ pub(in crate::compiler) struct Region<'source, 'arena> {
 }
 
 #[derive(Clone, Copy)]
-pub(in crate::compiler::declarations) struct Collection<'compilation, 'arena> {
+pub(in crate::compiler::declarations) struct Array<'compilation, 'arena> {
     heap: &'compilation Heap,
     path: &'compilation str,
     runtime_path: &'compilation [u8],
@@ -88,7 +88,7 @@ pub(in crate::compiler) fn collect<'source, 'arena>(
     unit: &mut CompiledUnit,
     compilation: &mut Compilation<'_, 'arena>,
 ) -> Result<Vec<Region<'source, 'arena>>, CompileError> {
-    let context = Collection {
+    let context = Array {
         heap,
         path: path.diagnostic,
         runtime_path: path.runtime,
@@ -111,7 +111,7 @@ pub(in crate::compiler) fn collect<'source, 'arena>(
 }
 
 fn collect_statements<'source, 'arena>(
-    context: &Collection<'_, 'arena>,
+    context: &Array<'_, 'arena>,
     statements: &'source [Statement<'arena>],
     resolver: Resolver,
     aliases: &mut AliasGraph,
@@ -162,7 +162,7 @@ fn collect_statements<'source, 'arena>(
 }
 
 fn collect_function(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &mut Region<'_, '_>,
     function: &Function<'_>,
     unit: &mut CompiledUnit,
@@ -193,7 +193,7 @@ fn collect_function(
 }
 
 fn collect_class(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &mut Region<'_, '_>,
     class: &Class<'_>,
     unit: &mut CompiledUnit,
@@ -205,7 +205,7 @@ fn collect_class(
 }
 
 fn collect_interface(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &mut Region<'_, '_>,
     interface: &Interface<'_>,
     unit: &mut CompiledUnit,
@@ -217,7 +217,7 @@ fn collect_interface(
 }
 
 fn collect_enum(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &mut Region<'_, '_>,
     declaration: &Enum<'_>,
     unit: &mut CompiledUnit,
@@ -229,7 +229,7 @@ fn collect_enum(
 }
 
 fn collect_constant(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &mut Region<'_, '_>,
     constant: &Constant<'_>,
     unit: &mut CompiledUnit,
@@ -280,7 +280,7 @@ fn collect_constant(
 }
 
 fn collect_type_alias(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &mut Region<'_, '_>,
     alias: &TypeAlias<'_>,
     aliases: &mut AliasGraph,
@@ -358,7 +358,7 @@ fn collect_type_alias(
 }
 
 fn collect_stub_type_alias(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &Region<'_, '_>,
     alias: &TypeAlias<'_>,
     scope: &Scope<'_>,
@@ -392,7 +392,7 @@ fn collect_stub_type_alias(
 }
 
 fn record_alias(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &Region<'_, '_>,
     alias: &TypeAlias<'_>,
     binders: &[String],
@@ -431,7 +431,7 @@ pub(in crate::compiler) fn validate_alias_cycles(aliases: &AliasGraph) -> Result
 }
 
 fn collect_newtype(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &mut Region<'_, '_>,
     newtype: &Newtype<'_>,
     unit: &mut CompiledUnit,
@@ -505,7 +505,7 @@ fn collect_newtype(
 }
 
 fn collect_stub_newtype(
-    context: &Collection<'_, '_>,
+    context: &Array<'_, '_>,
     region: &Region<'_, '_>,
     newtype: &Newtype<'_>,
     scope: &Scope<'_>,
@@ -555,7 +555,7 @@ fn note_declared_name(
 }
 
 fn collect_namespace<'source, 'arena>(
-    context: &Collection<'_, 'arena>,
+    context: &Array<'_, 'arena>,
     namespace: &'source Namespace<'arena>,
     region: &mut Region<'source, 'arena>,
     aliases: &mut AliasGraph,

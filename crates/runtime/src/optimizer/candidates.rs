@@ -42,7 +42,7 @@ impl CandidateSet {
         self.0 == 0
     }
 
-    pub(in crate::optimizer) const fn needs_collection_elements(self) -> bool {
+    pub(in crate::optimizer) const fn needs_array_elements(self) -> bool {
         self.contains(Self::CALL)
             || self.contains(Self::COLLECTION)
             || self.contains(Self::PROPERTY)
@@ -133,7 +133,7 @@ fn instruction_candidates(
         candidates.insert(CandidateSet::CALL);
     }
 
-    if configuration.specialize_collections
+    if configuration.specialize_arrays
         && matches!(
             instruction,
             Instruction::Length { .. }
@@ -151,7 +151,7 @@ fn instruction_candidates(
         candidates.insert(CandidateSet::COLLECTION);
     }
 
-    if configuration.specialize_collections
+    if configuration.specialize_arrays
         && matches!(
             instruction,
             Instruction::Length { .. }
@@ -343,7 +343,7 @@ mod tests {
         assert!(candidates.contains(CandidateSet::ARITHMETIC));
         assert!(candidates.contains(CandidateSet::CONSTANT));
         assert!(candidates.needs_constant_cache());
-        assert!(!candidates.needs_collection_elements());
+        assert!(!candidates.needs_array_elements());
     }
 
     #[test]

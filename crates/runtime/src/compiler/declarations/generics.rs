@@ -1,4 +1,4 @@
-//! Generic-declaration collection and type-parameter compilation.
+//! Generic-declaration array and type-parameter compilation.
 
 use whim_span::HasSpan;
 use whim_span::Span;

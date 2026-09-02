@@ -1,7 +1,7 @@
 //! Retargeting an instruction's destination register.
 
 use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Register;
 
 pub(in crate::optimizer) fn with_destination(
@@ -53,7 +53,7 @@ pub(in crate::optimizer) fn with_destination(
             destination,
             value_mode,
             ..
-        } if *value_mode != CollectionValueMode::Generic => destination,
+        } if *value_mode != ArrayValueMode::Generic => destination,
         Instruction::Move { destination, .. }
         | Instruction::LoadConstant { destination, .. }
         | Instruction::LoadNull { destination }

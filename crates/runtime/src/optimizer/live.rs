@@ -10,7 +10,7 @@ use crate::optimizer::cfg::successors;
 use crate::optimizer::passes::inline_leaf_calls::leaf::inline_live_tail;
 use crate::optimizer::passes::optimize_isolated_live_tail;
 use crate::optimizer::passes::specialize_arithmetic;
-use crate::optimizer::passes::specialize_collections;
+use crate::optimizer::passes::specialize_arrays;
 use crate::optimizer::passes::specialize_comparison;
 use crate::optimizer::type_flow::IndexedUnit;
 use crate::optimizer::type_flow::TypeFlow;
@@ -73,7 +73,7 @@ pub(crate) fn refine(refinement: Refinement<'_>) -> Option<Chunk> {
                             cache,
                         })
                     }
-                    _ => specialize_collections::specialized_instruction(&flow, index, instruction)
+                    _ => specialize_arrays::specialized_instruction(&flow, index, instruction)
                         .or_else(|| {
                             specialize_arithmetic::specialized_instruction(
                                 &flow,

@@ -179,7 +179,7 @@ impl BodyCompiler<'_, '_> {
                 },
                 vector.span(),
             );
-            self.reserve_collection(
+            self.reserve_array(
                 destination,
                 vector
                     .elements
@@ -306,7 +306,7 @@ impl BodyCompiler<'_, '_> {
             },
             dictionary.span(),
         );
-        self.reserve_collection(
+        self.reserve_array(
             destination,
             dictionary
                 .entries
@@ -347,7 +347,7 @@ impl BodyCompiler<'_, '_> {
         Ok(())
     }
 
-    fn reserve_collection(
+    fn reserve_array(
         &mut self,
         container: Register,
         count: usize,
@@ -356,17 +356,18 @@ impl BodyCompiler<'_, '_> {
         if count == 0 {
             return Ok(());
         }
-        // SAFETY: source collection lengths fit in the language's integer range.
+
+        // SAFETY: source array lengths fit in the language's integer range.
         let count = unsafe {
             unwrap_result_invariant(
                 i64::try_from(count),
-                "a source collection length fits in a Whim integer",
+                "a source array length fits in a Whim integer",
             )
         };
         let additional = self.allocate(span)?;
         self.load_integer(additional, count, span)?;
         self.chunk.emit(
-            Instruction::ReserveCollection {
+            Instruction::ReserveArray {
                 container,
                 additional,
             },

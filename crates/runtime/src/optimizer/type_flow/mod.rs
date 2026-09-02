@@ -15,7 +15,7 @@ use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
 use crate::bytecode::instruction::operands::IcSlot;
 use crate::bytecode::instruction::operands::IndexAddMode;
@@ -82,7 +82,7 @@ struct Fact {
     non_negative: bool,
     positive: bool,
     origin: u32,
-    collection: u32,
+    array: u32,
 }
 
 #[derive(Clone)]
@@ -98,7 +98,7 @@ impl Fact {
     const UNKNOWN: Self = Self {
         mask: ALL,
         origin: NO_ORIGIN,
-        collection: NO_ORIGIN,
+        array: NO_ORIGIN,
         observable_release: true,
         non_negative: false,
         positive: false,
@@ -108,7 +108,7 @@ impl Fact {
         Self {
             mask,
             origin: NO_ORIGIN,
-            collection: NO_ORIGIN,
+            array: NO_ORIGIN,
             observable_release: mask & (OBJECT | VECTOR | DICTIONARY | TUPLE | CALLABLE) != 0,
             non_negative: false,
             positive: false,
@@ -119,18 +119,18 @@ impl Fact {
         Self {
             mask,
             origin,
-            collection: NO_ORIGIN,
+            array: NO_ORIGIN,
             observable_release: mask & (OBJECT | VECTOR | DICTIONARY | TUPLE | CALLABLE) != 0,
             non_negative: false,
             positive: false,
         }
     }
 
-    const fn collection(mask: u16, identity: u32, observable_release: bool) -> Self {
+    const fn array(mask: u16, identity: u32, observable_release: bool) -> Self {
         Self {
             mask,
             origin: identity,
-            collection: identity,
+            array: identity,
             observable_release,
             non_negative: false,
             positive: false,
@@ -141,7 +141,7 @@ impl Fact {
         Self {
             mask: INT,
             origin,
-            collection: NO_ORIGIN,
+            array: NO_ORIGIN,
             observable_release: false,
             non_negative: value >= 0,
             positive: value > 0,
@@ -169,7 +169,7 @@ impl Fact {
         Self {
             mask: self.mask,
             origin: NO_ORIGIN,
-            collection: self.collection,
+            array: self.array,
             observable_release: self.observable_release,
             non_negative: self.non_negative,
             positive: self.positive,
@@ -189,8 +189,8 @@ impl Fact {
             } else {
                 NO_ORIGIN
             },
-            collection: if self.collection == other.collection {
-                self.collection
+            array: if self.array == other.array {
+                self.array
             } else {
                 NO_ORIGIN
             },
@@ -224,8 +224,8 @@ pub(in crate::optimizer) struct TypeFlow<'a> {
     declined: bool,
     linear: bool,
     reachable: Vec<bool>,
-    collection_elements: Vec<u16>,
-    collection_keys: Vec<u16>,
+    array_elements: Vec<u16>,
+    array_keys: Vec<u16>,
     settled: Cell<bool>,
     constants: RefCell<Vec<MemoizedConstant>>,
 }
@@ -240,7 +240,7 @@ pub(in crate::optimizer) struct TypeFlowOptions<'a> {
     pub(in crate::optimizer) has_receiver: bool,
     pub(in crate::optimizer) class_name: Option<&'a Atom>,
     pub(in crate::optimizer) class_type_parameters: &'a [CompiledTypeParameter],
-    pub(in crate::optimizer) track_collection_elements: bool,
+    pub(in crate::optimizer) track_array_elements: bool,
     pub(in crate::optimizer) cache_constants: bool,
     pub(in crate::optimizer) capture_types: Vec<Option<TypeDescriptor>>,
 }
@@ -282,7 +282,7 @@ impl<'a> TypeFlow<'a> {
                 .or_else(|| descriptor_mask(descriptor))
                 .unwrap_or(ALL),
             origin,
-            collection: NO_ORIGIN,
+            array: NO_ORIGIN,
             observable_release: descriptor_may_release_observably(descriptor),
             non_negative: matches!(
                 descriptor,
@@ -326,7 +326,7 @@ impl<'a> TypeFlow<'a> {
                 has_receiver,
                 class_name,
                 class_type_parameters,
-                track_collection_elements: true,
+                track_array_elements: true,
                 cache_constants: true,
                 capture_types: Vec::new(),
             },
@@ -352,7 +352,7 @@ impl<'a> TypeFlow<'a> {
                 has_receiver,
                 class_name,
                 class_type_parameters,
-                track_collection_elements: true,
+                track_array_elements: true,
                 cache_constants: true,
                 capture_types: Vec::new(),
             },
@@ -384,7 +384,7 @@ impl<'a> TypeFlow<'a> {
                 has_receiver: false,
                 class_name: None,
                 class_type_parameters: &[],
-                track_collection_elements: false,
+                track_array_elements: false,
                 cache_constants: true,
                 capture_types: Vec::new(),
             },
@@ -404,7 +404,7 @@ impl<'a> TypeFlow<'a> {
             has_receiver,
             class_name,
             class_type_parameters,
-            track_collection_elements,
+            track_array_elements,
             cache_constants,
             capture_types,
         } = options;
@@ -441,12 +441,12 @@ impl<'a> TypeFlow<'a> {
             declined,
             linear,
             reachable: vec![false; chunk.code.len()],
-            collection_elements: if track_collection_elements {
+            array_elements: if track_array_elements {
                 vec![0; chunk.code.len() + parameters.len() + capture_count + 1]
             } else {
                 Vec::new()
             },
-            collection_keys: if track_collection_elements {
+            array_keys: if track_array_elements {
                 vec![0; chunk.code.len() + parameters.len() + capture_count + 1]
             } else {
                 Vec::new()
@@ -470,11 +470,11 @@ impl<'a> TypeFlow<'a> {
 
         if let Some(values) = entry_values {
             flow.run_from_values(values, false);
-        } else if track_collection_elements {
-            flow.seed_parameter_collection_facts();
-            flow.seed_capture_collection_facts();
+        } else if track_array_elements {
+            flow.seed_parameter_array_facts();
+            flow.seed_capture_array_facts();
             flow.run_from_unknown(has_receiver, true);
-            while flow.infer_collection_facts() && flow.collection_facts_affect_flow() {
+            while flow.infer_array_facts() && flow.array_facts_affect_flow() {
                 flow.run(has_receiver, true);
             }
         } else {
@@ -485,28 +485,23 @@ impl<'a> TypeFlow<'a> {
         flow
     }
 
-    fn run_from_unknown(&mut self, has_receiver: bool, collections_ready: bool) {
-        self.run_over(has_receiver, collections_ready, None);
+    fn run_from_unknown(&mut self, has_receiver: bool, arrays_ready: bool) {
+        self.run_over(has_receiver, arrays_ready, None);
     }
 
-    fn run_from_values(&mut self, values: &[Value], collections_ready: bool) {
-        self.run_over(false, collections_ready, Some(values));
+    fn run_from_values(&mut self, values: &[Value], arrays_ready: bool) {
+        self.run_over(false, arrays_ready, Some(values));
     }
 
-    fn run(&mut self, has_receiver: bool, collections_ready: bool) {
+    fn run(&mut self, has_receiver: bool, arrays_ready: bool) {
         self.facts.fill(Fact::UNKNOWN);
         self.block_states.fill(Fact::UNKNOWN);
         self.block_reachable.fill(false);
         self.reachable.fill(false);
-        self.run_over(has_receiver, collections_ready, None);
+        self.run_over(has_receiver, arrays_ready, None);
     }
 
-    fn run_over(
-        &mut self,
-        has_receiver: bool,
-        collections_ready: bool,
-        entry_values: Option<&[Value]>,
-    ) {
+    fn run_over(&mut self, has_receiver: bool, arrays_ready: bool, entry_values: Option<&[Value]>) {
         let register_count = usize::from(self.chunk.register_count);
         let mut entry: Vec<_> = entry_values
             .into_iter()
@@ -516,7 +511,7 @@ impl<'a> TypeFlow<'a> {
             .collect();
         entry.resize(register_count, Fact::UNKNOWN);
         if entry_values.is_some() {
-            self.propagate(entry, collections_ready);
+            self.propagate(entry, arrays_ready);
             return;
         }
 
@@ -544,12 +539,11 @@ impl<'a> TypeFlow<'a> {
             {
                 let descriptor = self.expanded_aliases(descriptor);
                 let mut fact = self.descriptor_fact(&descriptor, PARAMETER_ORIGIN | index as u32);
-                let collection = self.parameter_collection_identity(index);
-                if !self.collection_elements.is_empty()
-                    && (self.collection_elements[collection] != 0
-                        || self.collection_keys[collection] != 0)
+                let array = self.parameter_array_identity(index);
+                if !self.array_elements.is_empty()
+                    && (self.array_elements[array] != 0 || self.array_keys[array] != 0)
                 {
-                    fact.collection = collection as u32;
+                    fact.array = array as u32;
                 }
 
                 entry[register] = fact;
@@ -574,23 +568,22 @@ impl<'a> TypeFlow<'a> {
             };
             let descriptor = self.expanded_aliases(descriptor);
             let mut fact = self.descriptor_fact(&descriptor, CAPTURE_ORIGIN | index as u32);
-            let collection = self.capture_collection_identity(index);
-            if !self.collection_elements.is_empty()
-                && (self.collection_elements[collection] != 0
-                    || self.collection_keys[collection] != 0)
+            let array = self.capture_array_identity(index);
+            if !self.array_elements.is_empty()
+                && (self.array_elements[array] != 0 || self.array_keys[array] != 0)
             {
-                fact.collection = collection as u32;
+                fact.array = array as u32;
             }
             entry[register] = fact;
         }
 
-        self.propagate(entry, collections_ready);
+        self.propagate(entry, arrays_ready);
     }
 
-    fn propagate(&mut self, entry: Vec<Fact>, collections_ready: bool) {
+    fn propagate(&mut self, entry: Vec<Fact>, arrays_ready: bool) {
         let register_count = usize::from(self.chunk.register_count);
         if self.linear {
-            self.run_linear(&entry, collections_ready);
+            self.run_linear(&entry, arrays_ready);
             return;
         }
 
@@ -621,8 +614,8 @@ impl<'a> TypeFlow<'a> {
                     self.chunk,
                     index,
                     &mut scratch,
-                    collections_ready.then_some(self.collection_elements.as_slice()),
-                    collections_ready.then_some(self.collection_keys.as_slice()),
+                    arrays_ready.then_some(self.array_elements.as_slice()),
+                    arrays_ready.then_some(self.array_keys.as_slice()),
                 );
 
                 if let Some((destination, fact)) = precise_result {
@@ -666,7 +659,7 @@ impl<'a> TypeFlow<'a> {
     }
 
     /// Propagates facts through a chunk whose only path is straight through.
-    fn run_linear(&mut self, entry: &[Fact], collections_ready: bool) {
+    fn run_linear(&mut self, entry: &[Fact], arrays_ready: bool) {
         let mut state = entry.to_vec();
         for index in 0..self.chunk.code.len() {
             self.reachable[index] = true;
@@ -676,8 +669,8 @@ impl<'a> TypeFlow<'a> {
                 self.chunk,
                 index,
                 &mut state,
-                collections_ready.then_some(self.collection_elements.as_slice()),
-                collections_ready.then_some(self.collection_keys.as_slice()),
+                arrays_ready.then_some(self.array_elements.as_slice()),
+                arrays_ready.then_some(self.array_keys.as_slice()),
             );
             if let Some((destination, fact)) = precise_result {
                 state[usize::from(destination.index())] = fact;
@@ -801,14 +794,14 @@ impl<'a> TypeFlow<'a> {
         comparison_lower_bound(comparison, constant, truth).map(|bound| (subject, bound))
     }
 
-    fn infer_collection_facts(&mut self) -> bool {
+    fn infer_array_facts(&mut self) -> bool {
         let mut changed = false;
         for index in 0..self.chunk.code.len() {
             if !self.reachable[index] {
                 continue;
             }
 
-            let (collection, elements, keys) = match self.chunk.code[index] {
+            let (array, elements, keys) = match self.chunk.code[index] {
                 Instruction::PropertyGet { .. }
                 | Instruction::PropertyGetUnchecked { .. }
                 | Instruction::ConstantGet { .. }
@@ -822,14 +815,14 @@ impl<'a> TypeFlow<'a> {
                 | Instruction::CallNamedUnchecked { .. }
                 | Instruction::CallNamedConstantUnchecked { .. }
                 | Instruction::CallSelfUnchecked { .. } => {
-                    let collection = index as u32 + 1;
-                    let Some(descriptor) = self.origin_type(collection, 0) else {
+                    let array = index as u32 + 1;
+                    let Some(descriptor) = self.origin_type(array, 0) else {
                         continue;
                     };
-                    let Some((keys, element)) = collection_shape(&descriptor) else {
+                    let Some((keys, element)) = array_shape(&descriptor) else {
                         continue;
                     };
-                    (collection, descriptor_mask(element).unwrap_or(ALL), keys)
+                    (array, descriptor_mask(element).unwrap_or(ALL), keys)
                 }
                 Instruction::NewVec {
                     element_count,
@@ -884,7 +877,7 @@ impl<'a> TypeFlow<'a> {
                     index: subscript,
                     value,
                 } => (
-                    self.fact(index, container).collection,
+                    self.fact(index, container).array,
                     self.fact(index, value).mask,
                     self.fact(index, subscript).mask,
                 ),
@@ -896,14 +889,14 @@ impl<'a> TypeFlow<'a> {
                 | Instruction::DictIndexSetIntKey {
                     container, value, ..
                 } => (
-                    self.fact(index, container).collection,
+                    self.fact(index, container).array,
                     self.fact(index, value).mask,
                     INT,
                 ),
                 Instruction::DictIndexSetStringKey {
                     container, value, ..
                 } => (
-                    self.fact(index, container).collection,
+                    self.fact(index, container).array,
                     self.fact(index, value).mask,
                     STRING,
                 ),
@@ -913,9 +906,9 @@ impl<'a> TypeFlow<'a> {
                     mode,
                     ..
                 } => {
-                    let collection = self.fact(index, container).collection;
-                    let current = if collection != NO_ORIGIN {
-                        self.collection_elements[collection as usize]
+                    let array = self.fact(index, container).array;
+                    let current = if array != NO_ORIGIN {
+                        self.array_elements[array as usize]
                     } else {
                         0
                     };
@@ -928,29 +921,29 @@ impl<'a> TypeFlow<'a> {
                             numeric_result(Fact::known(current), self.fact(index, value)).mask
                         }
                     };
-                    (collection, elements, 0)
+                    (array, elements, 0)
                 }
                 Instruction::Spread { container, .. } => {
-                    (self.fact(index, container).collection, ALL, ALL)
+                    (self.fact(index, container).array, ALL, ALL)
                 }
                 _ => continue,
             };
 
-            if collection != NO_ORIGIN {
-                let collection = collection as usize;
-                let previous_elements = self.collection_elements[collection];
-                let previous_keys = self.collection_keys[collection];
-                self.collection_elements[collection] |= elements;
-                self.collection_keys[collection] |= keys;
-                changed |= previous_elements != self.collection_elements[collection]
-                    || previous_keys != self.collection_keys[collection];
+            if array != NO_ORIGIN {
+                let array = array as usize;
+                let previous_elements = self.array_elements[array];
+                let previous_keys = self.array_keys[array];
+                self.array_elements[array] |= elements;
+                self.array_keys[array] |= keys;
+                changed |= previous_elements != self.array_elements[array]
+                    || previous_keys != self.array_keys[array];
             }
         }
 
         changed
     }
 
-    fn collection_facts_affect_flow(&self) -> bool {
+    fn array_facts_affect_flow(&self) -> bool {
         self.chunk.code.iter().any(|instruction| {
             matches!(
                 instruction,
@@ -960,11 +953,11 @@ impl<'a> TypeFlow<'a> {
                     | Instruction::DictIndexGetStringKey { .. }
                     | Instruction::ForeachNext { .. }
                     | Instruction::VecForeachNext {
-                        value_mode: CollectionValueMode::Generic,
+                        value_mode: ArrayValueMode::Generic,
                         ..
                     }
                     | Instruction::DictForeachNext {
-                        value_mode: CollectionValueMode::Generic,
+                        value_mode: ArrayValueMode::Generic,
                         ..
                     }
                     | Instruction::PropertyGet { .. }
@@ -973,7 +966,7 @@ impl<'a> TypeFlow<'a> {
         })
     }
 
-    fn seed_parameter_collection_facts(&mut self) {
+    fn seed_parameter_array_facts(&mut self) {
         for (index, parameter) in self.parameters.iter().enumerate() {
             let Some(descriptor) = &parameter.declared_type else {
                 continue;
@@ -981,42 +974,42 @@ impl<'a> TypeFlow<'a> {
 
             let descriptor = self.expanded_aliases(descriptor);
 
-            let Some((keys, element)) = collection_shape(&descriptor) else {
+            let Some((keys, element)) = array_shape(&descriptor) else {
                 continue;
             };
 
-            let identity = self.parameter_collection_identity(index);
-            self.collection_keys[identity] = keys;
+            let identity = self.parameter_array_identity(index);
+            self.array_keys[identity] = keys;
             if let Some(mask) = descriptor_mask(element) {
-                self.collection_elements[identity] = mask;
+                self.array_elements[identity] = mask;
             }
         }
     }
 
-    fn seed_capture_collection_facts(&mut self) {
+    fn seed_capture_array_facts(&mut self) {
         for index in 0..self.capture_types.len() {
             let Some(descriptor) = &self.capture_types[index] else {
                 continue;
             };
 
             let descriptor = self.expanded_aliases(descriptor);
-            let Some((keys, element)) = collection_shape(&descriptor) else {
+            let Some((keys, element)) = array_shape(&descriptor) else {
                 continue;
             };
 
-            let identity = self.capture_collection_identity(index);
-            self.collection_keys[identity] = keys;
+            let identity = self.capture_array_identity(index);
+            self.array_keys[identity] = keys;
             if let Some(mask) = descriptor_mask(element) {
-                self.collection_elements[identity] = mask;
+                self.array_elements[identity] = mask;
             }
         }
     }
 
-    fn parameter_collection_identity(&self, index: usize) -> usize {
+    fn parameter_array_identity(&self, index: usize) -> usize {
         self.chunk.code.len() + index + 1
     }
 
-    fn capture_collection_identity(&self, index: usize) -> usize {
+    fn capture_array_identity(&self, index: usize) -> usize {
         self.chunk.code.len() + self.parameters.len() + index + 1
     }
 
@@ -1190,7 +1183,7 @@ impl<'a> TypeFlow<'a> {
     }
 }
 
-fn collection_shape(descriptor: &TypeDescriptor) -> Option<(u16, &TypeDescriptor)> {
+fn array_shape(descriptor: &TypeDescriptor) -> Option<(u16, &TypeDescriptor)> {
     match descriptor {
         TypeDescriptor::Array(Some((key, value)))
         | TypeDescriptor::Dictionary(Some((key, value))) => {
@@ -1381,7 +1374,7 @@ fn fact_bits(fact: Fact) -> impl Iterator<Item = Fact> {
         (fact.mask & mask != 0).then_some(Fact {
             mask,
             origin: fact.origin,
-            collection: fact.collection,
+            array: fact.array,
             observable_release: fact.observable_release,
             non_negative: fact.non_negative,
             positive: fact.positive,

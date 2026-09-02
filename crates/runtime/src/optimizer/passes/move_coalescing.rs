@@ -392,7 +392,7 @@ mod tests {
 
     use crate::bytecode::chunk::Chunk;
     use crate::bytecode::instruction::Instruction;
-    use crate::bytecode::instruction::operands::CollectionValueMode;
+    use crate::bytecode::instruction::operands::ArrayValueMode;
     use crate::bytecode::instruction::operands::JumpOffset;
     use crate::bytecode::instruction::operands::Register;
     use crate::optimizer::OptimizationConfiguration;
@@ -400,14 +400,14 @@ mod tests {
     use crate::optimizer::passes::move_coalescing::optimize_chunk;
 
     #[test]
-    fn coalesces_a_specialized_collection_read_into_its_local() {
+    fn coalesces_a_specialized_array_read_into_its_local() {
         let mut chunk = Chunk::new();
         chunk.emit(
             Instruction::VecIndexGet {
                 destination: Register::new(2),
                 container: Register::new(0),
                 index: Register::new(1),
-                value_mode: CollectionValueMode::Float,
+                value_mode: ArrayValueMode::Float,
             },
             Span::zero(),
         );
@@ -440,7 +440,7 @@ mod tests {
                     destination: Register::new(3),
                     container: Register::new(0),
                     index: Register::new(1),
-                    value_mode: CollectionValueMode::Float,
+                    value_mode: ArrayValueMode::Float,
                 },
                 Instruction::Return {
                     source: Register::new(3),
@@ -490,14 +490,14 @@ mod tests {
     }
 
     #[test]
-    fn keeps_a_generic_collection_read_before_an_owned_move() {
+    fn keeps_a_generic_array_read_before_an_owned_move() {
         let mut chunk = Chunk::new();
         chunk.emit(
             Instruction::VecIndexGet {
                 destination: Register::new(2),
                 container: Register::new(0),
                 index: Register::new(1),
-                value_mode: CollectionValueMode::Generic,
+                value_mode: ArrayValueMode::Generic,
             },
             Span::zero(),
         );

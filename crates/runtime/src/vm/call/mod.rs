@@ -228,17 +228,17 @@ impl VirtualMachine<'_> {
                 }
                 CachedParameterGuard::Descriptor {
                     descriptor,
-                    collection_id,
+                    array_id,
                 } => {
                     let value =
                         // SAFETY: the surrounding invariant keeps this index in bounds.
                         unsafe { self.stack.get_unchecked(window.start + position).clone() };
-                    if !self.check_descriptor_with_collection_id(
+                    if !self.check_descriptor_with_array_id(
                         &descriptor,
                         &value,
                         called,
                         TypeEnvironmentId::default(),
-                        collection_id,
+                        array_id,
                         0,
                     )? {
                         return Ok(false);
@@ -292,7 +292,7 @@ impl VirtualMachine<'_> {
                             Some(guard) => CachedParameterGuard::Cheap(guard),
                             None => CachedParameterGuard::Descriptor {
                                 descriptor: Rc::new(concrete),
-                                collection_id: None,
+                                array_id: None,
                             },
                         }
                     }
@@ -304,10 +304,10 @@ impl VirtualMachine<'_> {
         for guard in &mut guards {
             if let CachedParameterGuard::Descriptor {
                 descriptor,
-                collection_id,
+                array_id,
             } = guard
             {
-                *collection_id = self.collection_type_check_id(descriptor);
+                *array_id = self.array_type_check_id(descriptor);
             }
         }
 

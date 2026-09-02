@@ -134,7 +134,7 @@ pub(in crate::compiler) struct AliasExpansion<'arena> {
 pub(crate) struct AliasEdge {
     pub target: String,
     pub through_union: bool,
-    pub through_collection: bool,
+    pub through_array: bool,
 }
 
 #[derive(Default)]

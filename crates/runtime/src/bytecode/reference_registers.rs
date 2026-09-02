@@ -4,7 +4,7 @@ use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Register;
 
 /// Bitmask of registers that may own a reference-counted value; a full mask
@@ -124,7 +124,7 @@ pub(crate) fn mask_with_classification(
                     mask |= 1u64 << key_destination.index();
                 }
 
-                (value_mode == CollectionValueMode::Generic).then_some(value_destination)
+                (value_mode == ArrayValueMode::Generic).then_some(value_destination)
             }
             Instruction::VecIndexGet {
                 destination,
@@ -135,7 +135,7 @@ pub(crate) fn mask_with_classification(
                 destination,
                 value_mode,
                 ..
-            } => (value_mode == CollectionValueMode::Generic).then_some(destination),
+            } => (value_mode == ArrayValueMode::Generic).then_some(destination),
             Instruction::MoveOwned { .. }
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
@@ -256,7 +256,7 @@ pub(crate) fn mask_with_classification(
             | Instruction::DictIndexSetIntKey { .. }
             | Instruction::DictIndexSetStringKey { .. }
             | Instruction::DictIndexSet { .. }
-            | Instruction::ReserveCollection { .. }
+            | Instruction::ReserveArray { .. }
             | Instruction::Contains { .. }
             | Instruction::ContainsKey { .. }
             | Instruction::StringIndexGet { .. }

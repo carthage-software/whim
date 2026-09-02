@@ -302,7 +302,7 @@ mod tests {
     use crate::compiler::new_unit;
 
     #[test]
-    fn expands_aliases_nested_in_collection_shapes() {
+    fn expands_aliases_nested_in_array_shapes() {
         let heap = Heap::new();
         let alias_name = heap.intern(b"Scalar");
         let alias = CompiledTypeAlias {

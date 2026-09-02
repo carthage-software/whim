@@ -12,8 +12,8 @@ use crate::engine::builtins::built_in_type_parameters;
 use crate::limits::MAX_TYPE_DEPTH_U32;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolEntry;
-use crate::value::collection::CollectionTypeCheck;
-use crate::value::collection::CollectionTypeCheckId;
+use crate::value::array::ArrayTypeCheck;
+use crate::value::array::ArrayTypeCheckId;
 use crate::value::dict::DictObject;
 use crate::value::function::BuiltInId;
 use crate::value::function::CallTarget;
@@ -2068,16 +2068,16 @@ impl VirtualMachine<'_> {
         dictionary: &ManagedRef<DictObject>,
         called: Option<ClassId>,
         environment: TypeEnvironmentId,
-        collection_id: Option<CollectionTypeCheckId>,
+        array_id: Option<ArrayTypeCheckId>,
     ) -> Result<bool, VirtualMachineControl> {
         let (key_type, value_type) = element_types;
         let check_key = !matches!(key_type, TypeDescriptor::Wildcard);
         let check_value = !matches!(value_type, TypeDescriptor::Wildcard);
-        let cache_id = collection_id.or_else(|| self.collection_type_check_id(descriptor));
+        let cache_id = array_id.or_else(|| self.array_type_check_id(descriptor));
         if let Some(cache_id) = cache_id {
             match dictionary.type_check(cache_id) {
-                CollectionTypeCheck::Clean(_) => return Ok(true),
-                CollectionTypeCheck::Dirty { slot, .. } => {
+                ArrayTypeCheck::Clean(_) => return Ok(true),
+                ArrayTypeCheck::Dirty { slot, .. } => {
                     let Some(Some((key, value))) = dictionary.entry_at_slot(slot as usize) else {
                         return Ok(false);
                     };
@@ -2096,7 +2096,7 @@ impl VirtualMachine<'_> {
                     }
                     return Ok(valid);
                 }
-                CollectionTypeCheck::Unknown => {}
+                ArrayTypeCheck::Unknown => {}
             }
         }
 
@@ -2395,23 +2395,16 @@ impl VirtualMachine<'_> {
         environment: TypeEnvironmentId,
         depth: u32,
     ) -> Result<bool, VirtualMachineControl> {
-        self.check_descriptor_with_collection_id(
-            descriptor,
-            value,
-            called,
-            environment,
-            None,
-            depth,
-        )
+        self.check_descriptor_with_array_id(descriptor, value, called, environment, None, depth)
     }
 
-    pub(in crate::vm) fn check_descriptor_with_collection_id(
+    pub(in crate::vm) fn check_descriptor_with_array_id(
         &mut self,
         descriptor: &TypeDescriptor,
         value: &Value,
         called: Option<ClassId>,
         environment: TypeEnvironmentId,
-        collection_id: Option<CollectionTypeCheckId>,
+        array_id: Option<ArrayTypeCheckId>,
         depth: u32,
     ) -> Result<bool, VirtualMachineControl> {
         if depth > MAX_TYPE_DEPTH_U32 {
@@ -2679,7 +2672,7 @@ impl VirtualMachine<'_> {
                         dictionary,
                         called,
                         environment,
-                        collection_id,
+                        array_id,
                     )?
                 } else if let Some(tuple) = value.as_tuple() {
                     let mut all = true;
@@ -2713,14 +2706,14 @@ impl VirtualMachine<'_> {
             TypeDescriptor::Vector(None) => value.is_vec(),
             TypeDescriptor::Vector(Some(element)) => match value.as_vec() {
                 Some(vector) => {
-                    let cache_id = match collection_id {
+                    let cache_id = match array_id {
                         Some(id) => Some(id),
-                        None => self.collection_type_check_id(descriptor),
+                        None => self.array_type_check_id(descriptor),
                     };
                     if let Some(cache_id) = cache_id {
                         match vector.type_check(cache_id) {
-                            CollectionTypeCheck::Clean(_) => return Ok(true),
-                            CollectionTypeCheck::Dirty { slot, .. } => {
+                            ArrayTypeCheck::Clean(_) => return Ok(true),
+                            ArrayTypeCheck::Dirty { slot, .. } => {
                                 let Some(value) = vector.get(slot as usize) else {
                                     return Ok(false);
                                 };
@@ -2731,7 +2724,7 @@ impl VirtualMachine<'_> {
                                 }
                                 return Ok(valid);
                             }
-                            CollectionTypeCheck::Unknown => {}
+                            ArrayTypeCheck::Unknown => {}
                         }
                     }
                     let Some((element, environment)) =
@@ -2810,7 +2803,7 @@ impl VirtualMachine<'_> {
                     dictionary,
                     called,
                     environment,
-                    collection_id,
+                    array_id,
                 )?,
                 None => false,
             },
@@ -2947,12 +2940,12 @@ impl VirtualMachine<'_> {
             },
             TypeDescriptor::Tuple(members) => match value.as_tuple() {
                 Some(tuple) if tuple.len() == members.len() => {
-                    let cache_id = match collection_id {
+                    let cache_id = match array_id {
                         Some(id) => Some(id),
-                        None => self.collection_type_check_id(descriptor),
+                        None => self.array_type_check_id(descriptor),
                     };
                     if let Some(cache_id) = cache_id
-                        && tuple.type_check(cache_id) == CollectionTypeCheck::Clean(cache_id)
+                        && tuple.type_check(cache_id) == ArrayTypeCheck::Clean(cache_id)
                     {
                         return Ok(true);
                     }
@@ -2972,12 +2965,12 @@ impl VirtualMachine<'_> {
             },
             TypeDescriptor::TupleRest { elements, rest } => match value.as_tuple() {
                 Some(tuple) if tuple.len() >= elements.len() => {
-                    let cache_id = match collection_id {
+                    let cache_id = match array_id {
                         Some(id) => Some(id),
-                        None => self.collection_type_check_id(descriptor),
+                        None => self.array_type_check_id(descriptor),
                     };
                     if let Some(cache_id) = cache_id
-                        && tuple.type_check(cache_id) == CollectionTypeCheck::Clean(cache_id)
+                        && tuple.type_check(cache_id) == ArrayTypeCheck::Clean(cache_id)
                     {
                         return Ok(true);
                     }

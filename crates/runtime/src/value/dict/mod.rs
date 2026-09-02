@@ -12,9 +12,9 @@ use hashbrown::hash_table::Entry;
 use crate::unreachable_invariant;
 use crate::unwrap_result_invariant;
 use crate::value::Value;
-use crate::value::collection::CollectionTypeCheck;
-use crate::value::collection::CollectionTypeCheckCache;
-use crate::value::collection::CollectionTypeCheckId;
+use crate::value::array::ArrayTypeCheck;
+use crate::value::array::ArrayTypeCheckCache;
+use crate::value::array::ArrayTypeCheckId;
 use crate::value::hash::HashState;
 use crate::value::heap::Heap;
 use crate::value::heap::handle::ManagedRef;
@@ -47,7 +47,7 @@ pub(crate) struct DictObject {
     entries: Vec<Slot>,
     index: HashTable<IndexEntry>,
     live: usize,
-    type_check: CollectionTypeCheckCache,
+    type_check: ArrayTypeCheckCache,
 }
 
 #[derive(Clone, Copy)]
@@ -141,7 +141,7 @@ impl DictObject {
                 entries: Vec::new(),
                 index: HashTable::new(),
                 live: 0,
-                type_check: CollectionTypeCheckCache::new(),
+                type_check: ArrayTypeCheckCache::new(),
             },
         )
     }
@@ -588,11 +588,11 @@ impl DictObject {
 
     /// The cached check state for `id`; a different descriptor has no cache.
     #[must_use]
-    pub(crate) const fn type_check(&self, id: CollectionTypeCheckId) -> CollectionTypeCheck {
+    pub(crate) const fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
         self.type_check.get(id)
     }
 
-    pub(crate) fn mark_type_checked(&self, id: CollectionTypeCheckId) {
+    pub(crate) fn mark_type_checked(&self, id: ArrayTypeCheckId) {
         self.type_check.mark_checked(id);
     }
 

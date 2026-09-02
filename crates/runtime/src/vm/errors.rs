@@ -24,11 +24,11 @@ use crate::path::path_from_bytes;
 use crate::symbols::UnitSourceFile;
 use crate::value::ValueView;
 use crate::value::function::PresetArg;
+use crate::vm::ArrayFault;
 use crate::vm::Atom;
 use crate::vm::ByteStringObject;
 use crate::vm::CallTarget;
 use crate::vm::ClassId;
-use crate::vm::CollectionFault;
 use crate::vm::DictObject;
 use crate::vm::Fault;
 use crate::vm::FaultKind;
@@ -617,7 +617,7 @@ impl VirtualMachine<'_> {
     }
 
     /// The class-aware debug rendering used by a failed assertion. Unlike
-    /// `debug!`, this stops traversing a collection once the diagnostic has
+    /// `debug!`, this stops traversing an array once the diagnostic has
     /// reached its fixed byte budget.
     pub(in crate::vm) fn assertion_debug_render(&self, value: &Value) -> String {
         let mut rendered = BoundedDebug::new();
@@ -834,11 +834,8 @@ impl VirtualMachine<'_> {
 }
 
 impl VirtualMachine<'_> {
-    /// Maps a collection fault to its error class.
-    pub(in crate::vm) fn collection_fault(
-        &mut self,
-        fault: CollectionFault,
-    ) -> VirtualMachineControl {
+    /// Maps an array fault to its error class.
+    pub(in crate::vm) fn array_fault(&mut self, fault: ArrayFault) -> VirtualMachineControl {
         let class = match fault.kind {
             FaultKind::TypeError => self.engine.tables.well_known.type_error,
             FaultKind::OutOfBounds => self.engine.tables.well_known.out_of_bounds_error,

@@ -5,7 +5,7 @@ use hashbrown::HashSet;
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Register;
 use crate::bytecode::unit::CompiledParameter;
 use crate::bytecode::unit::CompiledTypeParameter;
@@ -344,11 +344,11 @@ fn writes_non_owning_value(instruction: Instruction) -> bool {
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInt { .. }
             | Instruction::VecIndexGet {
-                value_mode: CollectionValueMode::Int,
+                value_mode: ArrayValueMode::Int,
                 ..
             }
             | Instruction::DictIndexGetIntKey {
-                value_mode: CollectionValueMode::Int,
+                value_mode: ArrayValueMode::Int,
                 ..
             }
     )

@@ -584,7 +584,7 @@ fn unique_values<'value>(
     let mut keys = None;
     let mut floats = HashSet::new();
     let mut identities = HashSet::new();
-    let mut collections = HashTable::new();
+    let mut arrays = HashTable::new();
     let mut has_null = false;
 
     for value in values {
@@ -599,7 +599,7 @@ fn unique_values<'value>(
                 ValueView::Function(function) => identities.insert(function.raw_box().addr().get()),
                 ValueView::Object(object) => identities.insert(object.raw_box().addr().get()),
                 ValueView::Vec(_) | ValueView::Dict(_) | ValueView::Tuple(_) => {
-                    remember_unique(&mut collections, value, heap)
+                    remember_unique(&mut arrays, value, heap)
                 }
                 ValueView::Uninitialized | ValueView::Iter(_) => true,
                 ValueView::Bool(_)

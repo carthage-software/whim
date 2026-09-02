@@ -66,12 +66,12 @@ pub(crate) fn dispatch(
         Operation::InnerType => inner_type(context, reflected),
         Operation::Parameters => function_parameters(context, reflected),
         Operation::ReturnType => function_return_type(context, reflected),
-        Operation::KeyType => collection_type(context, reflected, CollectionPart::Key),
-        Operation::ValueType => collection_type(context, reflected, CollectionPart::Value),
+        Operation::KeyType => array_type(context, reflected, ArrayPart::Key),
+        Operation::ValueType => array_type(context, reflected, ArrayPart::Value),
         Operation::RestType => rest_type(context, reflected),
         Operation::Entries => shape_entries(context, reflected),
-        Operation::RestKeyType => collection_type(context, reflected, CollectionPart::RestKey),
-        Operation::RestValueType => collection_type(context, reflected, CollectionPart::RestValue),
+        Operation::RestKeyType => array_type(context, reflected, ArrayPart::RestKey),
+        Operation::RestValueType => array_type(context, reflected, ArrayPart::RestValue),
         Operation::ObjectType => object_type(context, reflected),
         _ => Err(context.type_error("the operation is not valid for this reflected type")),
     }
@@ -559,36 +559,36 @@ fn function_return_type(
 }
 
 #[derive(Clone, Copy)]
-enum CollectionPart {
+enum ArrayPart {
     Key,
     Value,
     RestKey,
     RestValue,
 }
 
-fn collection_type(
+fn array_type(
     context: &mut Context<'_, '_, '_>,
     reflected: &ReflectedType,
-    part: CollectionPart,
+    part: ArrayPart,
 ) -> Result<Value, Throw> {
     let descriptor = match part {
-        CollectionPart::Key => match &reflected.descriptor {
+        ArrayPart::Key => match &reflected.descriptor {
             TypeDescriptor::Array(Some((key, _))) | TypeDescriptor::Dictionary(Some((key, _))) => {
                 Some(key.as_ref())
             }
             TypeDescriptor::Array(None) | TypeDescriptor::Dictionary(None) => None,
-            _ => return Err(context.type_error("the reflected collection has no key type")),
+            _ => return Err(context.type_error("the reflected array has no key type")),
         },
-        CollectionPart::Value => match &reflected.descriptor {
+        ArrayPart::Value => match &reflected.descriptor {
             TypeDescriptor::Array(Some((_, value)))
             | TypeDescriptor::Dictionary(Some((_, value)))
             | TypeDescriptor::Vector(Some(value)) => Some(value.as_ref()),
             TypeDescriptor::Array(None)
             | TypeDescriptor::Dictionary(None)
             | TypeDescriptor::Vector(None) => None,
-            _ => return Err(context.type_error("the reflected collection has no value type")),
+            _ => return Err(context.type_error("the reflected array has no value type")),
         },
-        CollectionPart::RestKey => match &reflected.descriptor {
+        ArrayPart::RestKey => match &reflected.descriptor {
             TypeDescriptor::DictionaryShape {
                 rest: Some((key, _)),
                 ..
@@ -596,7 +596,7 @@ fn collection_type(
             TypeDescriptor::DictionaryShape { rest: None, .. } => None,
             _ => return Err(context.type_error("the reflected dict shape has no rest key type")),
         },
-        CollectionPart::RestValue => match &reflected.descriptor {
+        ArrayPart::RestValue => match &reflected.descriptor {
             TypeDescriptor::DictionaryShape {
                 rest: Some((_, value)),
                 ..

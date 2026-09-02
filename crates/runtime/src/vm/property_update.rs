@@ -1,8 +1,8 @@
 //! Checked compound updates of object properties.
 
 use crate::bytecode::instruction::operands::PropertyRemoveMode;
+use crate::vm::ArrayFault;
 use crate::vm::Chunk;
-use crate::vm::CollectionFault;
 use crate::vm::Fault;
 use crate::vm::Heap;
 use crate::vm::InstanceObject;
@@ -72,7 +72,7 @@ impl VirtualMachine<'_> {
             .mutate_slot(slot as usize, |property| {
                 remove_property_value(&self.heap, property, operand.as_ref(), mode)
             })
-            .map_err(|fault| self.collection_fault(fault))
+            .map_err(|fault| self.array_fault(fault))
     }
 
     pub(in crate::vm) fn remove_property_unchecked(
@@ -90,7 +90,7 @@ impl VirtualMachine<'_> {
             .mutate_slot(slot as usize, |property| {
                 remove_property_value(&self.heap, property, operand.as_ref(), mode)
             })
-            .map_err(|fault| self.collection_fault(fault))
+            .map_err(|fault| self.array_fault(fault))
     }
 
     pub(in crate::vm) fn set_property_index(
@@ -116,7 +116,7 @@ impl VirtualMachine<'_> {
             .mutate_slot(slot as usize, |property| {
                 index_set_reversible(property, &index, value)
             })
-            .map_err(|fault| self.collection_fault(fault))?;
+            .map_err(|fault| self.array_fault(fault))?;
 
         let validation = self.check_readonly_write(&receiver, slot, chunk, site);
         let validation = if validation.is_ok() && !preserves_type {
@@ -153,7 +153,7 @@ impl VirtualMachine<'_> {
 
         receiver
             .mutate_slot(slot as usize, |property| index_set(property, &index, value))
-            .map_err(|fault| self.collection_fault(fault))
+            .map_err(|fault| self.array_fault(fault))
     }
 
     pub(in crate::vm) fn append_property(
@@ -176,7 +176,7 @@ impl VirtualMachine<'_> {
             self.instance_property_index_update_preserves_type(&receiver, slot, &value);
         receiver
             .mutate_slot(slot as usize, |property| append_value(property, value))
-            .map_err(|fault| self.collection_fault(fault))?;
+            .map_err(|fault| self.array_fault(fault))?;
 
         let validation = self.check_readonly_write(&receiver, slot, chunk, site);
         let validation = if validation.is_ok() && !preserves_type {
@@ -231,8 +231,8 @@ impl VirtualMachine<'_> {
         }
 
         let property = receiver.read_slot(slot as usize);
-        let previous = index_get(&self.heap, &property, &index)
-            .map_err(|fault| self.collection_fault(fault))?;
+        let previous =
+            index_get(&self.heap, &property, &index).map_err(|fault| self.array_fault(fault))?;
         drop(property);
         let incremented = step_by(&previous, 1).map_err(|fault| {
             let kind = previous.kind_name();
@@ -242,7 +242,7 @@ impl VirtualMachine<'_> {
             .mutate_slot(slot as usize, |property| {
                 index_replace_existing(property, &index, incremented)
             })
-            .map_err(|fault| self.collection_fault(fault))?;
+            .map_err(|fault| self.array_fault(fault))?;
         drop(replaced);
         Ok(())
     }
@@ -273,7 +273,7 @@ impl VirtualMachine<'_> {
         }
 
         index_set(&mut updated, &Value::int(0), value.clone())
-            .map_err(|fault| self.collection_fault(fault))?;
+            .map_err(|fault| self.array_fault(fault))?;
         self.check_readonly_write(&receiver, slot, chunk, site)?;
         self.check_instance_property_value(&receiver, slot, &updated)?;
         drop(receiver.write_slot(slot as usize, updated));
@@ -324,7 +324,7 @@ impl VirtualMachine<'_> {
             } else {
                 let mut updated = receiver.read_slot(slot as usize);
                 index_set(&mut updated, &Value::int(key), value.clone())
-                    .map_err(|fault| self.collection_fault(fault))?;
+                    .map_err(|fault| self.array_fault(fault))?;
                 self.check_instance_property_value(&receiver, slot, &updated)?;
                 drop(receiver.write_slot(slot as usize, updated));
             }
@@ -466,7 +466,7 @@ fn remove_property_value(
     property: &mut Value,
     operand: Option<&Value>,
     mode: PropertyRemoveMode,
-) -> Result<Value, CollectionFault> {
+) -> Result<Value, ArrayFault> {
     match mode {
         PropertyRemoveMode::Key => {
             let Some(key) = operand else {

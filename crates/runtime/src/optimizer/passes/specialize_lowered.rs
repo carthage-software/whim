@@ -4,7 +4,7 @@ use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Register;
 use crate::bytecode::unit::CompiledFunction;
 use crate::bytecode::unit::CompiledParameter;
@@ -189,8 +189,8 @@ fn optimize_chunk(
             chunk.code[index] = replacement;
             match category {
                 Specialization::Operation => statistics.operations_specialized += 1,
-                Specialization::Collection => {
-                    statistics.collection_operations_specialized += 1;
+                Specialization::Array => {
+                    statistics.array_operations_specialized += 1;
                 }
             }
         }
@@ -373,7 +373,7 @@ fn return_null_satisfies(expected: &TypeDescriptor) -> bool {
 #[derive(Clone, Copy)]
 enum Specialization {
     Operation,
-    Collection,
+    Array,
 }
 
 fn specialize(
@@ -386,10 +386,10 @@ fn specialize(
     {
         return (Some(replacement), Specialization::Operation);
     }
-    if configuration.specialize_collections
-        && let Some(replacement) = specialize_collection(instruction, facts)
+    if configuration.specialize_arrays
+        && let Some(replacement) = specialize_array(instruction, facts)
     {
-        return (Some(replacement), Specialization::Collection);
+        return (Some(replacement), Specialization::Array);
     }
     if configuration.specialize_comparison
         && let Some(replacement) = specialize_comparison(instruction, facts)
@@ -413,14 +413,14 @@ fn specialize_arithmetic(instruction: Instruction, facts: &Facts) -> Option<Inst
     )
 }
 
-fn specialize_collection(instruction: Instruction, facts: &Facts) -> Option<Instruction> {
-    super::specialize_collections::specialize_with(
+fn specialize_array(instruction: Instruction, facts: &Facts) -> Option<Instruction> {
+    super::specialize_arrays::specialize_with(
         instruction,
         |register| facts.get(register) == KnownKind::String,
         |register| facts.get(register) == KnownKind::Int,
         |register| facts.get(register) == KnownKind::Vec,
         |register| facts.get(register) == KnownKind::Dict,
-        |_, _| CollectionValueMode::Generic,
+        |_, _| ArrayValueMode::Generic,
     )
 }
 
@@ -593,7 +593,7 @@ fn transfer(
             destination,
             value_mode,
             ..
-        } => (destination, collection_value_kind(value_mode)),
+        } => (destination, array_value_kind(value_mode)),
         _ => return,
     };
 
@@ -612,11 +612,11 @@ fn literal_kind(literal: &Literal) -> KnownKind {
     }
 }
 
-fn collection_value_kind(mode: CollectionValueMode) -> KnownKind {
+fn array_value_kind(mode: ArrayValueMode) -> KnownKind {
     match mode {
-        CollectionValueMode::Int => KnownKind::Int,
-        CollectionValueMode::Float => KnownKind::Float,
-        CollectionValueMode::Generic => KnownKind::Unknown,
+        ArrayValueMode::Int => KnownKind::Int,
+        ArrayValueMode::Float => KnownKind::Float,
+        ArrayValueMode::Generic => KnownKind::Unknown,
     }
 }
 

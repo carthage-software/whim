@@ -23,7 +23,7 @@ use crate::value::string::ByteStringObject;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Incomparable;
 
-/// The language's `==`: total, never converting, deep for collections.
+/// The language's `==`: total, never converting, deep for arrays.
 #[must_use]
 #[inline(never)]
 pub(crate) fn equals(a: &Value, b: &Value) -> bool {
@@ -50,11 +50,11 @@ pub(crate) fn equals(a: &Value, b: &Value) -> bool {
         _ => return false,
     }
 
-    equals_collections(a, b)
+    equals_arrays(a, b)
 }
 
 #[inline(never)]
-fn equals_collections(a: &Value, b: &Value) -> bool {
+fn equals_arrays(a: &Value, b: &Value) -> bool {
     let mut cursors = Vec::new();
     let mut pair = Some((a, b));
     loop {

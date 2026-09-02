@@ -313,10 +313,10 @@ impl<'a> TypeFlow<'a> {
                     };
                     return Some((*destination, self.descriptor_fact(&descriptor, origin)));
                 }
-                if fact.collection != 0 {
+                if fact.array != 0 {
                     let mask = self
-                        .collection_elements
-                        .get(fact.collection as usize)
+                        .array_elements
+                        .get(fact.array as usize)
                         .copied()
                         .unwrap_or(0);
                     if mask != 0 {
@@ -330,15 +330,15 @@ impl<'a> TypeFlow<'a> {
         let descriptor = self.expanded_aliases(descriptor);
         let mut fact = self.descriptor_fact(&descriptor, origin);
         if self
-            .collection_elements
+            .array_elements
             .get(origin as usize)
             .is_some_and(|elements| *elements != 0)
             || self
-                .collection_keys
+                .array_keys
                 .get(origin as usize)
                 .is_some_and(|keys| *keys != 0)
         {
-            fact.collection = origin;
+            fact.array = origin;
         }
         Some((destination, fact))
     }

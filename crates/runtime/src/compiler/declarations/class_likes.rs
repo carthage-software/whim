@@ -20,7 +20,7 @@ use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::unit::EnumBacking;
 use crate::bytecode::unit::Variance;
-use crate::compiler::declarations::Collection;
+use crate::compiler::declarations::Array;
 use crate::compiler::declarations::functions::DeclarationContext;
 use crate::compiler::declarations::functions::compile_attributes;
 use crate::compiler::declarations::generics::binder_names;
@@ -231,12 +231,12 @@ fn class_like(heap: &Heap, name: &str, kind: ClassLikeKind, span: Span) -> Compi
 }
 
 pub(in crate::compiler::declarations) fn compile_class<'arena>(
-    collection: &Collection<'_, 'arena>,
+    array: &Array<'_, 'arena>,
     resolver: &Resolver,
     class: &Class<'arena>,
     unit: &mut CompiledUnit,
 ) -> Result<CompiledClassLike, CompileError> {
-    let &Collection {
+    let &Array {
         heap,
         path,
         runtime_path,
@@ -245,7 +245,7 @@ pub(in crate::compiler::declarations) fn compile_class<'arena>(
         generics,
         embedded_files,
         trusted_returns,
-    } = collection;
+    } = array;
     rules::check_class(class)?;
     let name = resolver.qualify(class.name.value);
     let parent = class_parent(resolver, class)?;
@@ -348,12 +348,12 @@ pub(in crate::compiler::declarations) fn compile_class<'arena>(
 }
 
 pub(in crate::compiler::declarations) fn compile_interface<'arena>(
-    collection: &Collection<'_, 'arena>,
+    array: &Array<'_, 'arena>,
     resolver: &Resolver,
     interface: &Interface<'arena>,
     unit: &mut CompiledUnit,
 ) -> Result<CompiledClassLike, CompileError> {
-    let &Collection {
+    let &Array {
         heap,
         path,
         runtime_path,
@@ -362,7 +362,7 @@ pub(in crate::compiler::declarations) fn compile_interface<'arena>(
         generics,
         embedded_files,
         trusted_returns,
-    } = collection;
+    } = array;
     let name = resolver.qualify(interface.name.value);
     let mut output = class_like(heap, &name, ClassLikeKind::Interface, interface.span());
     let type_parameters = binder_names(interface.type_parameters.as_ref());
@@ -438,12 +438,12 @@ pub(in crate::compiler::declarations) fn compile_interface<'arena>(
 }
 
 pub(in crate::compiler::declarations) fn compile_enum<'arena>(
-    collection: &Collection<'_, 'arena>,
+    array: &Array<'_, 'arena>,
     resolver: &Resolver,
     declaration: &Enum<'arena>,
     unit: &mut CompiledUnit,
 ) -> Result<CompiledClassLike, CompileError> {
-    let &Collection {
+    let &Array {
         heap,
         path,
         runtime_path,
@@ -452,7 +452,7 @@ pub(in crate::compiler::declarations) fn compile_enum<'arena>(
         generics,
         embedded_files,
         trusted_returns,
-    } = collection;
+    } = array;
     rules::check_enum(declaration)?;
     let name = resolver.qualify(declaration.name.value);
     if let Some(type_parameters) = &declaration.type_parameters {

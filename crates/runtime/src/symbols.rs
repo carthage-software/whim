@@ -26,8 +26,8 @@ use crate::bytecode::unit::CompiledUnit;
 use crate::classes::MethodEntry;
 use crate::unwrap_option_invariant;
 use crate::value::Value;
+use crate::value::array::ArrayTypeCheckId;
 use crate::value::atom::Atom;
-use crate::value::collection::CollectionTypeCheckId;
 use crate::value::function::BuiltInId;
 use crate::value::function::CallTarget;
 use crate::value::function::FuncId;
@@ -219,7 +219,7 @@ pub(crate) enum CachedParameterGuard {
     Cheap(ArgumentGuard),
     Descriptor {
         descriptor: Rc<TypeDescriptor>,
-        collection_id: Option<CollectionTypeCheckId>,
+        array_id: Option<ArrayTypeCheckId>,
     },
 }
 

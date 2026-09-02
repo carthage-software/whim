@@ -103,38 +103,38 @@ use crate::vm::arithmetic::negate;
 use crate::vm::arithmetic::shift_left;
 use crate::vm::arithmetic::shift_right;
 use crate::vm::arithmetic::step_by;
+use crate::vm::arrays::IndexAddFault;
+use crate::vm::arrays::advance_cursor;
+use crate::vm::arrays::advance_dict_cursor;
+use crate::vm::arrays::advance_dict_cursor_int_values;
+use crate::vm::arrays::advance_vec_cursor;
+use crate::vm::arrays::advance_vec_int_cursor;
+use crate::vm::arrays::append_value;
+use crate::vm::arrays::array_length;
+use crate::vm::arrays::dict_add_assign_any_key_int_value;
+use crate::vm::arrays::dict_add_assign_string_key_int_value;
+use crate::vm::arrays::dict_index_get_int_key;
+use crate::vm::arrays::dict_index_get_int_key_int_value;
+use crate::vm::arrays::dict_index_get_string_key;
+use crate::vm::arrays::dict_index_set_int_key;
+use crate::vm::arrays::dict_index_set_string_key;
+use crate::vm::arrays::dict_key;
+use crate::vm::arrays::index_add_assign;
+use crate::vm::arrays::index_get;
+use crate::vm::arrays::index_replace_existing;
+use crate::vm::arrays::index_set;
+use crate::vm::arrays::index_set_reversible;
+use crate::vm::arrays::int_position;
+use crate::vm::arrays::remove_end;
+use crate::vm::arrays::remove_entry;
+use crate::vm::arrays::rollback_index_set;
+use crate::vm::arrays::spread_into;
+use crate::vm::arrays::swap_remove_entry;
+use crate::vm::arrays::vec_append;
+use crate::vm::arrays::vec_index_get;
+use crate::vm::arrays::vec_index_set;
+use crate::vm::arrays::vec_int_index_get;
 use crate::vm::built_in::reduce_signature;
-use crate::vm::collections::IndexAddFault;
-use crate::vm::collections::advance_cursor;
-use crate::vm::collections::advance_dict_cursor;
-use crate::vm::collections::advance_dict_cursor_int_values;
-use crate::vm::collections::advance_vec_cursor;
-use crate::vm::collections::advance_vec_int_cursor;
-use crate::vm::collections::append_value;
-use crate::vm::collections::collection_length;
-use crate::vm::collections::dict_add_assign_any_key_int_value;
-use crate::vm::collections::dict_add_assign_string_key_int_value;
-use crate::vm::collections::dict_index_get_int_key;
-use crate::vm::collections::dict_index_get_int_key_int_value;
-use crate::vm::collections::dict_index_get_string_key;
-use crate::vm::collections::dict_index_set_int_key;
-use crate::vm::collections::dict_index_set_string_key;
-use crate::vm::collections::dict_key;
-use crate::vm::collections::index_add_assign;
-use crate::vm::collections::index_get;
-use crate::vm::collections::index_replace_existing;
-use crate::vm::collections::index_set;
-use crate::vm::collections::index_set_reversible;
-use crate::vm::collections::int_position;
-use crate::vm::collections::remove_end;
-use crate::vm::collections::remove_entry;
-use crate::vm::collections::rollback_index_set;
-use crate::vm::collections::spread_into;
-use crate::vm::collections::swap_remove_entry;
-use crate::vm::collections::vec_append;
-use crate::vm::collections::vec_index_get;
-use crate::vm::collections::vec_index_set;
-use crate::vm::collections::vec_int_index_get;
 use crate::vm::errors::debug_render;
 use crate::vm::errors::literal_text;
 use crate::vm::errors::visibility_name;
@@ -143,11 +143,11 @@ use crate::vm::errors::visibility_name;
 mod macros;
 
 pub(crate) mod arithmetic;
+pub(crate) mod arrays;
 pub(crate) mod async_runtime;
 pub(crate) mod attributes;
 pub(crate) mod built_in;
 pub(crate) mod call;
-pub(crate) mod collections;
 pub(crate) mod coroutines;
 pub(crate) mod embed;
 pub(crate) mod errors;
@@ -522,7 +522,7 @@ fn class_member_names(chunk: &Chunk, site: usize) -> (String, String) {
     )
 }
 
-pub(crate) struct CollectionFault {
+pub(crate) struct ArrayFault {
     kind: FaultKind,
     message: String,
 }
@@ -533,16 +533,16 @@ pub(crate) enum FaultKind {
     OutOfBounds,
 }
 
-impl CollectionFault {
-    fn type_error(message: String) -> CollectionFault {
-        CollectionFault {
+impl ArrayFault {
+    fn type_error(message: String) -> ArrayFault {
+        ArrayFault {
             kind: FaultKind::TypeError,
             message,
         }
     }
 
-    fn out_of_bounds(message: String) -> CollectionFault {
-        CollectionFault {
+    fn out_of_bounds(message: String) -> ArrayFault {
+        ArrayFault {
             kind: FaultKind::OutOfBounds,
             message,
         }

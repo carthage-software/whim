@@ -152,7 +152,7 @@ impl VirtualMachine<'_> {
             let value = self.stack[window_start + position].clone();
             let valid = match check_trivial_descriptor(descriptor, &value) {
                 Some(valid) => valid,
-                None => self.check_descriptor_with_collection_id(
+                None => self.check_descriptor_with_array_id(
                     descriptor,
                     &value,
                     called,

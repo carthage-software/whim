@@ -18,7 +18,7 @@ use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::SwitchTable;
 use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
 use crate::bytecode::chunk::descriptors::string_switch_lookup;
-use crate::bytecode::instruction::operands::CollectionValueMode;
+use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
 use crate::bytecode::instruction::operands::IndexAddMode;
 use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
@@ -75,17 +75,17 @@ use crate::vm::arithmetic_modulo;
 use crate::vm::arithmetic_multiply;
 use crate::vm::arithmetic_power;
 use crate::vm::arithmetic_subtract;
+use crate::vm::array_length;
+use crate::vm::arrays::array_contains;
+use crate::vm::arrays::array_contains_key;
+use crate::vm::arrays::array_length_hint;
+use crate::vm::arrays::dict_index_set;
+use crate::vm::arrays::int_position;
+use crate::vm::arrays::reserve_array_hint;
 use crate::vm::bitwise_and;
 use crate::vm::bitwise_or;
 use crate::vm::bitwise_xor;
 use crate::vm::class_member_names;
-use crate::vm::collection_length;
-use crate::vm::collections::array_contains;
-use crate::vm::collections::array_contains_key;
-use crate::vm::collections::collection_length_hint;
-use crate::vm::collections::dict_index_set;
-use crate::vm::collections::int_position;
-use crate::vm::collections::reserve_collection_hint;
 use crate::vm::compare_greater;
 use crate::vm::compare_greater_or_equal;
 use crate::vm::compare_less;
@@ -130,7 +130,7 @@ use crate::vm::vec_index_set;
 use crate::vm::vec_int_index_get;
 
 enum ForeachAdvance {
-    Collection(Option<(Value, Value)>),
+    Array(Option<(Value, Value)>),
     Object {
         instance: NonNull<HeapBox<InstanceObject>>,
         next: Option<(FuncId, ClassId)>,
@@ -564,9 +564,9 @@ impl VirtualMachine<'_> {
                     control: self.binary_fault(fault, operator, left_kind, right_kind),
                 }
             }
-            NumericLoopOutcome::Collection { resume_ip, fault } => NumericLoopTransition::Control {
+            NumericLoopOutcome::Array { resume_ip, fault } => NumericLoopTransition::Control {
                 resume_ip,
-                control: self.collection_fault(fault),
+                control: self.array_fault(fault),
             },
         }
     }
@@ -701,7 +701,7 @@ impl VirtualMachine<'_> {
                             $ip,
                             $floor,
                             $label,
-                            $self.collection_fault(fault)
+                            $self.array_fault(fault)
                         );
                     }
                 }
@@ -1067,7 +1067,7 @@ impl VirtualMachine<'_> {
                                         $ip,
                                         $floor,
                                         $dispatch,
-                                        $vm.collection_fault(fault)
+                                        $vm.array_fault(fault)
                                     );
                                 }
                             }
@@ -3588,7 +3588,7 @@ impl VirtualMachine<'_> {
                                         ip,
                                         floor,
                                         'dispatch,
-                                        self.collection_fault(fault)
+                                        self.array_fault(fault)
                                     );
                                 }
                             };
@@ -3616,7 +3616,7 @@ impl VirtualMachine<'_> {
                         let previous = match index_get(&self.heap, &property, &index_value) {
                             Ok(previous) => previous,
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         };
 
@@ -3657,7 +3657,7 @@ impl VirtualMachine<'_> {
                         let replaced = match replaced {
                             Ok(replaced) => replaced,
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         };
 
@@ -3722,7 +3722,7 @@ impl VirtualMachine<'_> {
                                             ip,
                                             floor,
                                             'dispatch,
-                                            self.collection_fault(fault)
+                                            self.array_fault(fault)
                                         );
                                     }
                                 }
@@ -4214,7 +4214,7 @@ impl VirtualMachine<'_> {
                         }
 
                         if let Some(fault) = fault {
-                            fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                         }
 
                         write_register!(registers, destination, Value::dict(dict));
@@ -4236,7 +4236,7 @@ impl VirtualMachine<'_> {
                         match outcome {
                             Ok(value) => write_register!(registers, destination, value),
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4267,7 +4267,7 @@ impl VirtualMachine<'_> {
                                     ip,
                                     floor,
                                     'dispatch,
-                                    self.collection_fault(fault)
+                                    self.array_fault(fault)
                                 );
                             }
                         }
@@ -4284,10 +4284,10 @@ impl VirtualMachine<'_> {
                         // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                         let index = unsafe { int_register(registers, index) };
                         let outcome = match value_mode {
-                            CollectionValueMode::Generic | CollectionValueMode::Float => {
+                            ArrayValueMode::Generic | ArrayValueMode::Float => {
                                 vec_index_get(container, index)
                             }
-                            CollectionValueMode::Int => {
+                            ArrayValueMode::Int => {
                                 vec_int_index_get(container, index).map(Value::int)
                             }
                         };
@@ -4300,7 +4300,7 @@ impl VirtualMachine<'_> {
                                     ip,
                                     floor,
                                     'dispatch,
-                                    self.collection_fault(fault)
+                                    self.array_fault(fault)
                                 );
                             }
                         }
@@ -4318,10 +4318,10 @@ impl VirtualMachine<'_> {
                         let index = unsafe { int_register(registers, index) };
 
                         let outcome = match value_mode {
-                            CollectionValueMode::Generic | CollectionValueMode::Float => {
+                            ArrayValueMode::Generic | ArrayValueMode::Float => {
                                 dict_index_get_int_key(container, index)
                             }
-                            CollectionValueMode::Int => {
+                            ArrayValueMode::Int => {
                                 dict_index_get_int_key_int_value(container, index).map(Value::int)
                             }
                         };
@@ -4334,7 +4334,7 @@ impl VirtualMachine<'_> {
                                     ip,
                                     floor,
                                     'dispatch,
-                                    self.collection_fault(fault)
+                                    self.array_fault(fault)
                                 );
                             }
                         }
@@ -4357,7 +4357,7 @@ impl VirtualMachine<'_> {
                         match outcome {
                             Ok(value) => write_register!(registers, destination, value),
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4375,7 +4375,7 @@ impl VirtualMachine<'_> {
                         };
 
                         if let Err(fault) = outcome {
-                            fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                         }
                     }
                     Instruction::IndexAddAssign {
@@ -4416,13 +4416,13 @@ impl VirtualMachine<'_> {
                             };
                             match outcome {
                                 Ok(()) => {}
-                                Err(IndexAddFault::Collection(fault)) => {
+                                Err(IndexAddFault::Array(fault)) => {
                                     fail!(
                                         self,
                                         ip,
                                         floor,
                                         'dispatch,
-                                        self.collection_fault(fault)
+                                        self.array_fault(fault)
                                     );
                                 }
                                 Err(IndexAddFault::Arithmetic { fault, .. }) => {
@@ -4446,13 +4446,13 @@ impl VirtualMachine<'_> {
                             unsafe { &mut *registers.add(container.index() as usize) };
                         match index_add_assign(&self.heap, container, &index, &increment) {
                             Ok(()) => {}
-                            Err(IndexAddFault::Collection(fault)) => {
+                            Err(IndexAddFault::Array(fault)) => {
                                 fail!(
                                     self,
                                     ip,
                                     floor,
                                     'dispatch,
-                                    self.collection_fault(fault)
+                                    self.array_fault(fault)
                                 );
                             }
                             Err(IndexAddFault::Arithmetic {
@@ -4486,7 +4486,7 @@ impl VirtualMachine<'_> {
                         };
 
                         if let Err(fault) = outcome {
-                            fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                         }
                     }
                     Instruction::DictIndexSetIntKey {
@@ -4522,7 +4522,7 @@ impl VirtualMachine<'_> {
                         // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                         let container = unsafe { &mut *registers.add(container.index() as usize) };
                         if let Err(fault) = dict_index_set(container, index, value) {
-                            fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                         }
                     }
                     Instruction::Append { container, value } => {
@@ -4534,7 +4534,7 @@ impl VirtualMachine<'_> {
                         };
 
                         if let Err(fault) = outcome {
-                            fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                         }
                     }
                     Instruction::VecAppend { container, value } => {
@@ -4543,7 +4543,7 @@ impl VirtualMachine<'_> {
                         let container = unsafe { &mut *registers.add(container.index() as usize) };
                         vec_append(container, value);
                     }
-                    Instruction::ReserveCollection {
+                    Instruction::ReserveArray {
                         container,
                         additional,
                     } => {
@@ -4556,7 +4556,7 @@ impl VirtualMachine<'_> {
                             let container =
                                 // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                                 unsafe { &mut *registers.add(container.index() as usize) };
-                            reserve_collection_hint(container, additional);
+                            reserve_array_hint(container, additional);
                         }
                     }
                     Instruction::Spread { container, value } => {
@@ -4568,7 +4568,7 @@ impl VirtualMachine<'_> {
                         };
 
                         if let Err(fault) = outcome {
-                            fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                         }
                     }
                     Instruction::Length {
@@ -4578,7 +4578,7 @@ impl VirtualMachine<'_> {
                         let outcome = {
                             // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                             let value = unsafe { &*registers.add(source.index() as usize) };
-                            collection_length(value)
+                            array_length(value)
                         };
 
                         match outcome {
@@ -4586,7 +4586,7 @@ impl VirtualMachine<'_> {
                                 write_register!(registers, destination, Value::int(length))
                             }
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4607,7 +4607,7 @@ impl VirtualMachine<'_> {
                                 write_register!(registers, destination, Value::bool(found));
                             }
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4628,7 +4628,7 @@ impl VirtualMachine<'_> {
                                 write_register!(registers, destination, Value::bool(found));
                             }
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4661,7 +4661,7 @@ impl VirtualMachine<'_> {
                         match outcome {
                             Ok(removed) => write_register!(registers, destination, removed),
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4678,7 +4678,7 @@ impl VirtualMachine<'_> {
                         match outcome {
                             Ok(removed) => write_register!(registers, destination, removed),
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4695,7 +4695,7 @@ impl VirtualMachine<'_> {
                         match outcome {
                             Ok(removed) => write_register!(registers, destination, removed),
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -4714,7 +4714,7 @@ impl VirtualMachine<'_> {
                         match outcome {
                             Ok(removed) => write_register!(registers, destination, removed),
                             Err(fault) => {
-                                fail!(self, ip, floor, 'dispatch, self.collection_fault(fault));
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
                             }
                         }
                     }
@@ -5027,14 +5027,14 @@ impl VirtualMachine<'_> {
                         if reserve != Register::NONE {
                             // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                             let additional = unsafe {
-                                collection_length_hint(&*registers.add(subject.index() as usize))
+                                array_length_hint(&*registers.add(subject.index() as usize))
                             };
                             if let Some(additional) = additional {
                                 // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                                 let target = unsafe {
                                     &mut *registers.add(reserve.index() as usize)
                                 };
-                                reserve_collection_hint(target, additional.min(1 << 24));
+                                reserve_array_hint(target, additional.min(1 << 24));
                             }
                         }
 
@@ -5107,12 +5107,12 @@ impl VirtualMachine<'_> {
                                     next: cursor.next_method(),
                                     environment: cursor.next_environment(),
                                 },
-                                None => ForeachAdvance::Collection(advance_cursor(cursor)),
+                                None => ForeachAdvance::Array(advance_cursor(cursor)),
                             }
                         };
 
                         let advanced = match advanced {
-                            ForeachAdvance::Collection(advanced) => advanced,
+                            ForeachAdvance::Array(advanced) => advanced,
                             ForeachAdvance::Returned(returned) => {
                                 match self.decode_object_cursor_result(&returned) {
                                     Ok(advanced) => advanced,
@@ -5211,7 +5211,7 @@ impl VirtualMachine<'_> {
                         value_destination,
                         value_mode,
                     } => {
-                        if value_mode == CollectionValueMode::Int {
+                        if value_mode == ArrayValueMode::Int {
                             let advanced = {
                                 let cursor =
                                     // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
@@ -5275,7 +5275,7 @@ impl VirtualMachine<'_> {
                         value_destination,
                         value_mode,
                     } => {
-                        if value_mode == CollectionValueMode::Int {
+                        if value_mode == ArrayValueMode::Int {
                             let advanced = {
                                 let cursor =
                                     // SAFETY: verified bytecode keeps operands in the live frame and proves their types.

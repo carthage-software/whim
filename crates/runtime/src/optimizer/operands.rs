@@ -220,7 +220,7 @@ pub(in crate::optimizer) fn operands(kind: InstructionKind) -> Option<&'static [
         instruction_kinds!(
             StringByteJumpUnlessEqual
                 | StringByteJumpUnlessNotEqual
-                | ReserveCollection
+                | ReserveArray
                 | Append
                 | VecAppend
                 | Spread

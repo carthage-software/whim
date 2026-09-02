@@ -167,7 +167,7 @@ impl Count {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum CollectionValueMode {
+pub(crate) enum ArrayValueMode {
     /// The element may be any value.
     Generic,
     Int,
