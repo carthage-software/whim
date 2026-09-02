@@ -52,7 +52,7 @@ wildcard_imports = { level = "deny" }
 [workspace.dependencies]
 allocator-api2 = "0.2"
 annotate-snippets = "0.12"
-argon2 = "0.5.3"
+argon2 = "0.6.0"
 base16ct = { version = "1.0.0", features = ["alloc"] }
 base32ct = { version = "0.3.1", features = ["alloc"] }
 base64ct = "1.8.3"
