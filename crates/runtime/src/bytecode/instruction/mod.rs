@@ -401,6 +401,8 @@ macro_rules! instruction_set {
             Panic { message: ConstantIndex, } = 197,
             /// `destination = swap_remove!(container, index)`; does not preserve order.
             SwapRemove { destination: Register, container: Register, index: Register, } = 198,
+            /// `destination = source . constants[constant]`; the constant is a string.
+            ConcatenateConstant { destination: Register, source: Register, constant: ConstantIndex, } = 199,
         }
     };
 }

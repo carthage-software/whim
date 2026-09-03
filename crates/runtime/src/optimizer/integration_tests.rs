@@ -566,6 +566,57 @@ fn scalar_this_properties_do_not_widen_the_frame_ownership_mask() {
 }
 
 #[test]
+fn optimizer_fuses_string_constants_into_concatenation() {
+    let unit = compile(
+        r#"
+        function decorate(string $value): string {
+            return $value . ": " . $value . ".";
+        }
+        "#,
+        OptimizationConfiguration::default(),
+    );
+    let code = &unit.functions[0].chunk.code;
+
+    let fused = code
+        .iter()
+        .filter(|instruction| matches!(instruction, Instruction::ConcatenateConstant { .. }))
+        .count();
+    assert_eq!(fused, 2, "{code:#?}");
+    assert!(code.iter().any(|instruction| matches!(
+        instruction,
+        Instruction::ConcatenateConstant {
+            destination,
+            source,
+            ..
+        } if destination == source
+    )));
+}
+
+#[test]
+fn optimizer_fuses_string_constants_after_cleared_temporaries() {
+    let unit = compile(
+        r#"
+        final readonly class Person {
+            public function __construct(public string $name, public int $age) {}
+        }
+
+        $person = new Person("Ada", 36);
+        write_line!($person->name . " is " . $person->age . ".");
+        "#,
+        OptimizationConfiguration::default(),
+    );
+    let code = &unit.main.code;
+
+    assert_eq!(
+        code.iter()
+            .filter(|instruction| matches!(instruction, Instruction::ConcatenateConstant { .. }))
+            .count(),
+        2,
+        "{code:#?}"
+    );
+}
+
+#[test]
 fn abstract_class_methods_specialize_their_own_property_slots() {
     let unit = compile(
         r#"

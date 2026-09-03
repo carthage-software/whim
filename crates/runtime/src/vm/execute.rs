@@ -92,6 +92,7 @@ use crate::vm::compare_less;
 use crate::vm::compare_less_or_equal;
 use crate::vm::compare_spaceship;
 use crate::vm::concatenate;
+use crate::vm::concatenate_constant;
 use crate::vm::debug_render;
 use crate::vm::dict_add_assign_any_key_int_value;
 use crate::vm::dict_add_assign_string_key_int_value;
@@ -1656,6 +1657,45 @@ impl VirtualMachine<'_> {
                                 concatenate,
                                 "."
                             );
+                        }
+                    }
+                    Instruction::ConcatenateConstant {
+                        destination,
+                        source,
+                        constant,
+                    } => {
+                        // SAFETY: verification proves this constant is a string.
+                        let Literal::String(extra) = (unsafe {
+                            chunk.constants.get_unchecked(usize::from(constant.index()))
+                        }) else {
+                            // SAFETY: verification rejects every other literal kind.
+                            unsafe {
+                                unreachable_invariant(
+                                    "a concatenation constant is always a string",
+                                )
+                            }
+                        };
+                        // SAFETY: verified bytecode keeps the source in the live frame.
+                        let source_value = unsafe { &*registers.add(source.index() as usize) };
+                        let outcome = concatenate_constant(
+                            &self.heap,
+                            source_value,
+                            extra,
+                            destination == source,
+                        );
+                        match outcome {
+                            Ok(None) => continue 'instructions,
+                            Ok(Some(value)) => write_register!(registers, destination, value),
+                            Err(fault) => {
+                                let source_kind = source_value.kind_name();
+                                fail!(
+                                    self,
+                                    ip,
+                                    floor,
+                                    'dispatch,
+                                    self.binary_fault(fault, ".", source_kind, "string")
+                                );
+                            }
                         }
                     }
                     Instruction::IncrementJump {

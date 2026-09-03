@@ -62,7 +62,10 @@ pub(in crate::bytecode::verify) fn verify_instruction(
     instruction.try_visit_operands(|operand| verify_operand(chunk, at, operand))?;
 
     match instruction {
-        Instruction::Panic { message } => check_string_constant(chunk, at, message),
+        Instruction::Panic { message }
+        | Instruction::ConcatenateConstant {
+            constant: message, ..
+        } => check_string_constant(chunk, at, message),
         Instruction::FloatDifferenceAdd { first_operand, .. }
         | Instruction::PropertyFillIntRange { first_operand, .. }
         | Instruction::PropertyIndexSet { first_operand, .. }

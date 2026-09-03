@@ -93,6 +93,7 @@ use crate::vm::arithmetic::compare_less;
 use crate::vm::arithmetic::compare_less_or_equal;
 use crate::vm::arithmetic::compare_spaceship;
 use crate::vm::arithmetic::concatenate;
+use crate::vm::arithmetic::concatenate_constant;
 use crate::vm::arithmetic::integer_add;
 use crate::vm::arithmetic::integer_modulo;
 use crate::vm::arithmetic::integer_multiply;

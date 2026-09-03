@@ -552,6 +552,7 @@ fn transfer(
         | Instruction::AddImmediate { destination, .. }
         | Instruction::SubtractImmediate { destination, .. } => (destination, moved),
         Instruction::Concatenate { destination, .. }
+        | Instruction::ConcatenateConstant { destination, .. }
         | Instruction::StringIndexGet { destination, .. } => (destination, KnownKind::String),
         Instruction::NewVec { destination, .. }
         | Instruction::NewFilledVec { destination, .. }

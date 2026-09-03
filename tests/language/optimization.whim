@@ -81,6 +81,15 @@ function duplicate_pair(PairSource $source): (string, string) {
 assert!($firstPairValue == 'kept');
 assert!($secondPairValue == 'kept');
 
+final readonly class ConcatSource {
+  public function __construct(public int $count) {}
+}
+
+$concatPrefix = 'count';
+$concatResult = $concatPrefix . ': ' . new ConcatSource(42)->count . '.';
+assert!($concatPrefix == 'count');
+assert!($concatResult == 'count: 42.');
+
 /** Scans with a loop-invariant byte read hoisted before the loop. */
 function scan(string $source, int $limit): int {
   $index = 0;

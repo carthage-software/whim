@@ -82,11 +82,11 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(source),
             immediate.value()
         ),
-        Instruction::FloatMultiplyConstant {
+        instructions!(ConcatenateConstant | FloatMultiplyConstant; {
             destination,
             source,
             constant,
-        } => format!(
+        }) => format!(
             " {}, {}, {}",
             register(destination),
             register(source),

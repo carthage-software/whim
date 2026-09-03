@@ -243,6 +243,24 @@ impl TypeFlow<'_> {
                 destination,
                 constant_concatenate(value(left)?, value(right)?, self.allocator)?,
             )),
+            Instruction::ConcatenateConstant {
+                destination,
+                source,
+                constant,
+            } => {
+                let Literal::String(right) = &self.chunk.constants[usize::from(constant.index())]
+                else {
+                    return None;
+                };
+                Some((
+                    destination,
+                    constant_concatenate(
+                        value(source)?,
+                        ConstantValue::String(right.clone()),
+                        self.allocator,
+                    )?,
+                ))
+            }
             Instruction::BitwiseAnd {
                 destination,
                 left,
@@ -520,6 +538,16 @@ impl TypeFlow<'_> {
                 let left = self.constant_length_fact(self.fact(index, left), depth + 1)?;
                 let right = self.constant_length_fact(self.fact(index, right), depth + 1)?;
                 left.checked_add(right)
+            }
+            Instruction::ConcatenateConstant {
+                source, constant, ..
+            } => {
+                let left = self.constant_length_fact(self.fact(index, source), depth + 1)?;
+                let Literal::String(right) = &self.chunk.constants[usize::from(constant.index())]
+                else {
+                    return None;
+                };
+                left.checked_add(i64::try_from(right.as_bytes().len()).ok()?)
             }
             _ => None,
         }

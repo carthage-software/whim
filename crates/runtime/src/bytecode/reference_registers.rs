@@ -46,6 +46,7 @@ pub(crate) fn mask_with_classification(
             | Instruction::AsCheck { destination, .. }
             | Instruction::AsOrNull { destination, .. }
             | Instruction::Concatenate { destination, .. }
+            | Instruction::ConcatenateConstant { destination, .. }
             | Instruction::NewVec { destination, .. }
             | Instruction::NewFilledVec { destination, .. }
             | Instruction::NewDict { destination, .. }

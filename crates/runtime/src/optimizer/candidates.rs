@@ -280,6 +280,7 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::Compare { .. }
             | Instruction::Not { .. }
             | Instruction::Concatenate { .. }
+            | Instruction::ConcatenateConstant { .. }
             | Instruction::Length { .. }
             | Instruction::StringLength { .. }
             | Instruction::IndexGet { .. }

@@ -444,6 +444,9 @@ fn record_implicit_writes(
     if let Instruction::MoveOwned { source, .. } = instruction {
         states[usize::from(source.index())] = Some((segment, false));
     }
+    if let Instruction::Clear { target } = instruction {
+        states[usize::from(target.index())] = Some((segment, true));
+    }
     if let Instruction::PropertySetUnchecked {
         value, value_mode, ..
     } = instruction

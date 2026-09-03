@@ -3,6 +3,7 @@
 use std::cmp::Ordering;
 
 use crate::value::ValueView;
+use crate::value::atom::Atom;
 use crate::vm::ByteStringObject;
 use crate::vm::Fault;
 use crate::vm::Heap;
@@ -334,6 +335,25 @@ pub(in crate::vm) fn concatenate(heap: &Heap, left: &Value, right: &Value) -> Re
         &left_text,
         &right_text,
     )))
+}
+
+#[inline(never)]
+pub(in crate::vm) fn concatenate_constant(
+    heap: &Heap,
+    source: &Value,
+    extra: &Atom,
+    in_place: bool,
+) -> Result<Option<Value>, Fault> {
+    if in_place
+        && let ValueView::String(target) = source.transparent()
+        // SAFETY: constant storage cannot overlap a uniquely owned target.
+        && unsafe { ByteStringObject::append_unique(target, extra.as_bytes()) }
+    {
+        return Ok(None);
+    }
+
+    let extra = Value::string(extra.to_handle());
+    concatenate(heap, source, &extra).map(Some)
 }
 
 /// `<`: ordered strictly below; an unordered comparison (NaN) is `false`.

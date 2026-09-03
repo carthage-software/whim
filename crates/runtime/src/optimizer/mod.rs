@@ -71,6 +71,8 @@ pub(crate) struct OptimizationConfiguration {
     pub fuse_comparison: bool,
     /// Fuse a one-literal exact function call with its adjacent literal load.
     pub fuse_call_constant: bool,
+    /// Fuse adjacent string constants into concatenation.
+    pub fuse_concatenation: bool,
     /// Fuse literal loads into adjacent float and comparison consumers.
     pub fuse_float_constants: bool,
     /// Fuse integer literal loads into adjacent proven comparisons.
@@ -181,6 +183,7 @@ impl Default for OptimizationConfiguration {
             elide_property_checks: true,
             fuse_comparison: true,
             fuse_call_constant: true,
+            fuse_concatenation: true,
             fuse_float_constants: true,
             fuse_int_constants: true,
             fuse_float_pair_update: true,
@@ -594,6 +597,7 @@ pub(crate) fn optimize_unit_with_world(
         passes::hoist_string_property_reads::optimize_unit(unit, configuration, &mut statistics);
         passes::cse::optimize_unit(unit, configuration, &mut statistics);
     }
+    passes::fuse_concatenation::optimize_unit(unit, configuration, &mut statistics);
     passes::optimize_unit_numeric_loops(unit, configuration);
     passes::reuse_temporaries::optimize_unit(unit, configuration, &mut statistics);
     passes::finalize_property_moves::optimize_unit(unit, configuration);

@@ -128,6 +128,7 @@ pub(in crate::optimizer) fn operands(kind: InstructionKind) -> Option<&'static [
                 | AsOrNull
                 | StringLength
                 | FloatMultiplyConstant
+                | ConcatenateConstant
                 | IntBitwiseNot
                 | AddImmediate
                 | SubtractImmediate

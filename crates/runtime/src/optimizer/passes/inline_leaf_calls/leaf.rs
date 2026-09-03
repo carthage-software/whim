@@ -119,6 +119,7 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::AddImmediate { .. }
             | Instruction::SubtractImmediate { .. }
             | Instruction::Concatenate { .. }
+            | Instruction::ConcatenateConstant { .. }
             | Instruction::BitwiseAnd { .. }
             | Instruction::BitwiseOr { .. }
             | Instruction::BitwiseXor { .. }
@@ -615,6 +616,15 @@ pub(super) fn remap_instruction(
             *constant = remap_constant(chunk, *constant)?;
         }
         Instruction::FloatMultiplyConstant {
+            destination,
+            source,
+            constant,
+        } => {
+            *destination = remap(*destination);
+            *source = remap(*source);
+            *constant = remap_constant(chunk, *constant)?;
+        }
+        Instruction::ConcatenateConstant {
             destination,
             source,
             constant,

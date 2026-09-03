@@ -82,6 +82,7 @@ pub(in crate::optimizer) fn with_destination(
         | Instruction::FloatDifferenceAdd { destination, .. }
         | Instruction::FloatScaleProductAdd { destination, .. }
         | Instruction::Concatenate { destination, .. }
+        | Instruction::ConcatenateConstant { destination, .. }
         | Instruction::BitwiseAnd { destination, .. }
         | Instruction::IntBitwiseAnd { destination, .. }
         | Instruction::BitwiseOr { destination, .. }
