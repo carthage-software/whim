@@ -22,5 +22,7 @@ This book explains the language as it works now. Whim has no promise of
 backward compatibility. A later release may change or remove any rule in this
 book.
 
+Try Whim in the [Whim playground](https://play.whim.sh/) without installing it.
+
 Start with [Installation](usage/installation.md), then write
 [Your First Program](usage/getting-started.md).

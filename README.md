@@ -66,10 +66,11 @@ cargo build --locked --release
 
 ## Learn Whim
 
-The [Whim book] documents the language, command-line tools, package manager,
-and standard library. Start with [Installation], then write
-[Your First Program].
+Try Whim in the [Whim playground] without installing it. The [Whim book]
+documents the language, command-line tools, package manager, and standard
+library. Start with [Installation], then write [Your First Program].
 
+[Whim playground]: https://play.whim.sh/
 [Whim book]: https://whim.sh/
 [Installation]: https://whim.sh/usage/installation.html
 [Your First Program]: https://whim.sh/usage/getting-started.html
