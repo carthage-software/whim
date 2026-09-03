@@ -82,7 +82,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(source),
             immediate.value()
         ),
-        instructions!(ConcatenateConstant | FloatMultiplyConstant; {
+        instructions!(ConcatenateRightConstant | FloatMultiplyConstant; {
             destination,
             source,
             constant,
@@ -91,6 +91,16 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(destination),
             register(source),
             constant_reference(chunk, constant)
+        ),
+        Instruction::ConcatenateLeftConstant {
+            destination,
+            source,
+            constant,
+        } => format!(
+            " {}, {}, {}",
+            register(destination),
+            constant_reference(chunk, constant),
+            register(source)
         ),
         Instruction::FloatDifferenceAdd {
             destination,

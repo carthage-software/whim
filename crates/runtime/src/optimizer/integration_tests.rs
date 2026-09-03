@@ -676,12 +676,12 @@ fn optimizer_fuses_string_constants_into_concatenation() {
 
     let fused = code
         .iter()
-        .filter(|instruction| matches!(instruction, Instruction::ConcatenateConstant { .. }))
+        .filter(|instruction| matches!(instruction, Instruction::ConcatenateRightConstant { .. }))
         .count();
     assert_eq!(fused, 2, "{code:#?}");
     assert!(code.iter().any(|instruction| matches!(
         instruction,
-        Instruction::ConcatenateConstant {
+        Instruction::ConcatenateRightConstant {
             destination,
             source,
             ..
@@ -690,7 +690,7 @@ fn optimizer_fuses_string_constants_into_concatenation() {
 }
 
 #[test]
-fn optimizer_fuses_string_constants_after_cleared_temporaries() {
+fn optimizer_fuses_string_constants_on_both_sides() {
     let unit = compile(
         r#"
         final readonly class Person {
@@ -698,7 +698,7 @@ fn optimizer_fuses_string_constants_after_cleared_temporaries() {
         }
 
         $person = new Person("Ada", 36);
-        write_line!($person->name . " is " . $person->age . ".");
+        write_line!("Hi!" . $person->name . " is " . $person->age . ".");
         "#,
         OptimizationConfiguration::default(),
     );
@@ -706,11 +706,36 @@ fn optimizer_fuses_string_constants_after_cleared_temporaries() {
 
     assert_eq!(
         code.iter()
-            .filter(|instruction| matches!(instruction, Instruction::ConcatenateConstant { .. }))
+            .filter(|instruction| matches!(
+                instruction,
+                Instruction::ConcatenateRightConstant { .. }
+            ))
             .count(),
         2,
         "{code:#?}"
     );
+    let (index, source, constant) = code
+        .iter()
+        .enumerate()
+        .find_map(|(index, instruction)| match instruction {
+            Instruction::ConcatenateLeftConstant {
+                source, constant, ..
+            } => Some((index, *source, *constant)),
+            _ => None,
+        })
+        .expect("the leading string constant is fused");
+    assert!(matches!(
+        code[index - 1],
+        Instruction::PropertyGetUnchecked { destination, .. } if destination == source
+    ));
+    assert!(matches!(
+        &unit.main.constants[usize::from(constant.index())],
+        Literal::String(value) if value.as_bytes() == b"Hi!"
+    ));
+    assert!(!code.iter().any(|instruction| matches!(
+        instruction,
+        Instruction::LoadConstant { constant: loaded, .. } if *loaded == constant
+    )));
 }
 
 #[test]

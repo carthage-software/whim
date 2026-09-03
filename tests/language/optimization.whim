@@ -90,6 +90,12 @@ $concatResult = $concatPrefix . ': ' . new ConcatSource(42)->count . '.';
 assert!($concatPrefix == 'count');
 assert!($concatResult == 'count: 42.');
 
+function prefix_count(int $count): string {
+  return 'count: ' . $count;
+}
+
+assert!(prefix_count(42) == 'count: 42');
+
 /** Scans with a loop-invariant byte read hoisted before the loop. */
 function scan(string $source, int $limit): int {
   $index = 0;

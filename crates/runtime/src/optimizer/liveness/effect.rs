@@ -39,8 +39,8 @@ pub(in crate::optimizer) fn effect_on(
         instructions!(
             Move | Negate | UnaryPlus | BitwiseNot | IntBitwiseNot | Not | Length | StringLength
                 | CloneObject | AddImmediate | SubtractImmediate | IntMultiplyImmediate
-                | IntModuloImmediate | FloatMultiplyConstant | ConcatenateConstant | Is | AsCheck
-                | AsOrNull;
+                | IntModuloImmediate | FloatMultiplyConstant | ConcatenateRightConstant
+                | ConcatenateLeftConstant | Is | AsCheck | AsOrNull;
             { destination, source, .. }
         ) => read_then_write(reads(source), writes(destination)),
         Instruction::MoveOwned {

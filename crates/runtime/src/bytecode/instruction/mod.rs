@@ -402,7 +402,9 @@ macro_rules! instruction_set {
             /// `destination = swap_remove!(container, index)`; does not preserve order.
             SwapRemove { destination: Register, container: Register, index: Register, } = 198,
             /// `destination = source . constants[constant]`; the constant is a string.
-            ConcatenateConstant { destination: Register, source: Register, constant: ConstantIndex, } = 199,
+            ConcatenateRightConstant { destination: Register, source: Register, constant: ConstantIndex, } = 199,
+            /// `destination = constants[constant] . source`; the constant is a string.
+            ConcatenateLeftConstant { destination: Register, source: Register, constant: ConstantIndex, } = 200,
         }
     };
 }

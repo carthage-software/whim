@@ -237,7 +237,8 @@ pub(in crate::optimizer) fn transfer(
             write(destination, with_origin(fact, origin));
         }
         Instruction::Concatenate { destination, .. }
-        | Instruction::ConcatenateConstant { destination, .. } => {
+        | Instruction::ConcatenateRightConstant { destination, .. }
+        | Instruction::ConcatenateLeftConstant { destination, .. } => {
             write(destination, Fact::with_origin(STRING, origin))
         }
         instruction @ (Instruction::NewVec {

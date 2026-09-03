@@ -92,7 +92,8 @@ use crate::vm::compare_less;
 use crate::vm::compare_less_or_equal;
 use crate::vm::compare_spaceship;
 use crate::vm::concatenate;
-use crate::vm::concatenate_constant;
+use crate::vm::concatenate_left_constant;
+use crate::vm::concatenate_right_constant;
 use crate::vm::debug_render;
 use crate::vm::dict_add_assign_any_key_int_value;
 use crate::vm::dict_add_assign_string_key_int_value;
@@ -1659,7 +1660,7 @@ impl VirtualMachine<'_> {
                             );
                         }
                     }
-                    Instruction::ConcatenateConstant {
+                    Instruction::ConcatenateRightConstant {
                         destination,
                         source,
                         constant,
@@ -1677,7 +1678,7 @@ impl VirtualMachine<'_> {
                         };
                         // SAFETY: verified bytecode keeps the source in the live frame.
                         let source_value = unsafe { &*registers.add(source.index() as usize) };
-                        let outcome = concatenate_constant(
+                        let outcome = concatenate_right_constant(
                             &self.heap,
                             source_value,
                             extra,
@@ -1694,6 +1695,38 @@ impl VirtualMachine<'_> {
                                     floor,
                                     'dispatch,
                                     self.binary_fault(fault, ".", source_kind, "string")
+                                );
+                            }
+                        }
+                    }
+                    Instruction::ConcatenateLeftConstant {
+                        destination,
+                        source,
+                        constant,
+                    } => {
+                        // SAFETY: verification proves this constant is a string.
+                        let Literal::String(extra) = (unsafe {
+                            chunk.constants.get_unchecked(usize::from(constant.index()))
+                        }) else {
+                            // SAFETY: verification rejects every other literal kind.
+                            unsafe {
+                                unreachable_invariant(
+                                    "a concatenation constant is always a string",
+                                )
+                            }
+                        };
+                        // SAFETY: verified bytecode keeps the source in the live frame.
+                        let source_value = unsafe { &*registers.add(source.index() as usize) };
+                        match concatenate_left_constant(&self.heap, extra, source_value) {
+                            Ok(value) => write_register!(registers, destination, value),
+                            Err(fault) => {
+                                let source_kind = source_value.kind_name();
+                                fail!(
+                                    self,
+                                    ip,
+                                    floor,
+                                    'dispatch,
+                                    self.binary_fault(fault, ".", "string", source_kind)
                                 );
                             }
                         }

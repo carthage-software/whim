@@ -63,7 +63,10 @@ pub(in crate::bytecode::verify) fn verify_instruction(
 
     match instruction {
         Instruction::Panic { message }
-        | Instruction::ConcatenateConstant {
+        | Instruction::ConcatenateRightConstant {
+            constant: message, ..
+        }
+        | Instruction::ConcatenateLeftConstant {
             constant: message, ..
         } => check_string_constant(chunk, at, message),
         Instruction::FloatDifferenceAdd { first_operand, .. }

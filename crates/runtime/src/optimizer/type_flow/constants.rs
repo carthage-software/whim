@@ -243,7 +243,7 @@ impl TypeFlow<'_> {
                 destination,
                 constant_concatenate(value(left)?, value(right)?, self.allocator)?,
             )),
-            Instruction::ConcatenateConstant {
+            Instruction::ConcatenateRightConstant {
                 destination,
                 source,
                 constant,
@@ -257,6 +257,24 @@ impl TypeFlow<'_> {
                     constant_concatenate(
                         value(source)?,
                         ConstantValue::String(right.clone()),
+                        self.allocator,
+                    )?,
+                ))
+            }
+            Instruction::ConcatenateLeftConstant {
+                destination,
+                source,
+                constant,
+            } => {
+                let Literal::String(left) = &self.chunk.constants[usize::from(constant.index())]
+                else {
+                    return None;
+                };
+                Some((
+                    destination,
+                    constant_concatenate(
+                        ConstantValue::String(left.clone()),
+                        value(source)?,
                         self.allocator,
                     )?,
                 ))
@@ -539,7 +557,7 @@ impl TypeFlow<'_> {
                 let right = self.constant_length_fact(self.fact(index, right), depth + 1)?;
                 left.checked_add(right)
             }
-            Instruction::ConcatenateConstant {
+            Instruction::ConcatenateRightConstant {
                 source, constant, ..
             } => {
                 let left = self.constant_length_fact(self.fact(index, source), depth + 1)?;
@@ -548,6 +566,18 @@ impl TypeFlow<'_> {
                     return None;
                 };
                 left.checked_add(i64::try_from(right.as_bytes().len()).ok()?)
+            }
+            Instruction::ConcatenateLeftConstant {
+                source, constant, ..
+            } => {
+                let Literal::String(left) = &self.chunk.constants[usize::from(constant.index())]
+                else {
+                    return None;
+                };
+                let right = self.constant_length_fact(self.fact(index, source), depth + 1)?;
+                i64::try_from(left.as_bytes().len())
+                    .ok()?
+                    .checked_add(right)
             }
             _ => None,
         }

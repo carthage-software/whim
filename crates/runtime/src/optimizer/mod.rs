@@ -71,7 +71,7 @@ pub(crate) struct OptimizationConfiguration {
     pub fuse_comparison: bool,
     /// Fuse a one-literal exact function call with its adjacent literal load.
     pub fuse_call_constant: bool,
-    /// Fuse adjacent string constants into concatenation.
+    /// Fuse string constants into concatenation.
     pub fuse_concatenation: bool,
     /// Fuse literal loads into adjacent float and comparison consumers.
     pub fuse_float_constants: bool,

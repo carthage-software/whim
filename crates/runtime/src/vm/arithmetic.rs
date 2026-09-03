@@ -338,7 +338,7 @@ pub(in crate::vm) fn concatenate(heap: &Heap, left: &Value, right: &Value) -> Re
 }
 
 #[inline(never)]
-pub(in crate::vm) fn concatenate_constant(
+pub(in crate::vm) fn concatenate_right_constant(
     heap: &Heap,
     source: &Value,
     extra: &Atom,
@@ -354,6 +354,30 @@ pub(in crate::vm) fn concatenate_constant(
 
     let extra = Value::string(extra.to_handle());
     concatenate(heap, source, &extra).map(Some)
+}
+
+#[inline(never)]
+pub(in crate::vm) fn concatenate_left_constant(
+    heap: &Heap,
+    extra: &Atom,
+    source: &Value,
+) -> Result<Value, Fault> {
+    let Some(source) = ops::stringify_for_concat(heap, source) else {
+        return Err(Fault::Incompatible);
+    };
+
+    if extra.as_bytes().is_empty() {
+        return Ok(Value::string(source));
+    }
+    if source.is_empty() {
+        return Ok(Value::string(extra.to_handle()));
+    }
+
+    Ok(Value::string(ByteStringObject::concat(
+        heap,
+        extra.as_handle(),
+        &source,
+    )))
 }
 
 /// `<`: ordered strictly below; an unordered comparison (NaN) is `false`.
