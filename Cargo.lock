@@ -3265,7 +3265,7 @@ dependencies = [
 
 [[package]]
 name = "whim"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "blake3",
  "clap",
@@ -3301,7 +3301,7 @@ dependencies = [
 
 [[package]]
 name = "whim-formatter"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "unicode-width",
@@ -3312,7 +3312,7 @@ dependencies = [
 
 [[package]]
 name = "whim-lib"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "whim-runtime",
  "whim-support",
@@ -3320,7 +3320,7 @@ dependencies = [
 
 [[package]]
 name = "whim-loop"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "corosensei",
  "hashbrown 0.17.1",
@@ -3330,7 +3330,7 @@ dependencies = [
 
 [[package]]
 name = "whim-macros"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3342,7 +3342,7 @@ dependencies = [
 
 [[package]]
 name = "whim-pgsql"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "itoa",
  "openssl-sys",
@@ -3355,7 +3355,7 @@ dependencies = [
 
 [[package]]
 name = "whim-runtime"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argon2",
  "base16ct",
@@ -3432,7 +3432,7 @@ dependencies = [
 
 [[package]]
 name = "whim-span"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "whim-support",
@@ -3440,7 +3440,7 @@ dependencies = [
 
 [[package]]
 name = "whim-sqlite"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "rusqlite",
  "whim-support",
@@ -3448,11 +3448,11 @@ dependencies = [
 
 [[package]]
 name = "whim-support"
-version = "0.2.0"
+version = "0.2.1"
 
 [[package]]
 name = "whim-syn"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "allocator-api2",
  "annotate-snippets",
