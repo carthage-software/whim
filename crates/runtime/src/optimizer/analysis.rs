@@ -34,6 +34,7 @@ pub(in crate::optimizer) struct AnalyzedChunk<'a> {
     pub(in crate::optimizer) function_name: Option<&'a Atom>,
     /// Whether register zero holds a receiver.
     pub(in crate::optimizer) has_receiver: bool,
+    pub(in crate::optimizer) incoming_register_count: u16,
     pub(in crate::optimizer) return_type: Option<&'a TypeDescriptor>,
     pub(in crate::optimizer) candidates: CandidateSet,
     pub(in crate::optimizer) flow: TypeFlow<'a>,
@@ -114,7 +115,8 @@ impl<'a> Analysis<'a> {
                        function_name,
                        return_type,
                        class_type_parameters: &'a [CompiledTypeParameter],
-                       capture_types: Vec<Option<TypeDescriptor>>| {
+                       capture_types: Vec<Option<TypeDescriptor>>,
+                       incoming_register_count: u16| {
             if chunk.code.is_empty() {
                 return None;
             }
@@ -138,6 +140,7 @@ impl<'a> Analysis<'a> {
                 class_name,
                 function_name,
                 has_receiver,
+                incoming_register_count: incoming_register_count.min(chunk.local_register_count),
                 return_type,
                 candidates,
                 flow: TypeFlow::analyze_with_unit_options(
@@ -167,6 +170,7 @@ impl<'a> Analysis<'a> {
             None,
             &[],
             Vec::new(),
+            0,
         ));
 
         for (index, function) in image
@@ -185,6 +189,7 @@ impl<'a> Analysis<'a> {
                 function.return_type.as_ref(),
                 &[],
                 function.capture_types.clone(),
+                function.incoming_register_count(function.captures_this),
             ));
         }
 
@@ -205,6 +210,9 @@ impl<'a> Analysis<'a> {
                     compiled_method.function.return_type.as_ref(),
                     &compiled.type_parameters,
                     compiled_method.function.capture_types.clone(),
+                    compiled_method.function.incoming_register_count(
+                        !compiled_method.is_static || compiled_method.function.captures_this,
+                    ),
                 ));
             }
         }

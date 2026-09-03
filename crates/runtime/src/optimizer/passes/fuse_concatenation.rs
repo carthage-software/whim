@@ -34,7 +34,7 @@ fn fuse_constants(chunk: &mut Chunk, statistics: &mut OptimizationStatistics) {
 
     let targets = control_flow_targets(chunk);
     let loop_members = loop_members(chunk);
-    let previous_values = PreviousValueSafety::analyze(chunk, &targets);
+    let previous_values = PreviousValueSafety::analyze(chunk, &targets, chunk.local_register_count);
     let mut remove = vec![false; chunk.code.len()];
     for index in 0..chunk.code.len() - 1 {
         if loop_members[index] || targets.contains(&(index + 1)) {

@@ -86,6 +86,103 @@ fn method<'a>(unit: &'a CompiledUnit, name: &[u8]) -> &'a [Instruction] {
 }
 
 #[test]
+fn removes_dead_initial_writes_to_fresh_locals() {
+    let unit = compile(
+        r"
+        $language = 'Whim';
+        write_line!('Hello from ' . $language . '!');
+
+        function greet(): void {
+            $language = 'Whim';
+            write_line!('Hello from ' . $language . '!');
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    for chunk in [
+        &unit.main,
+        &unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == b"greet")
+            .expect("the function exists")
+            .chunk,
+    ] {
+        let loads = chunk
+            .code
+            .iter()
+            .filter_map(|instruction| match instruction {
+                Instruction::LoadConstant {
+                    destination,
+                    constant,
+                } => Some((*destination, *constant)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(loads.len(), 1);
+        let (destination, constant) = loads[0];
+        assert_eq!(chunk.register_count, 1);
+        assert_eq!(destination.index(), 0);
+        assert!(matches!(
+            &chunk.constants[usize::from(constant.index())],
+            Literal::String(value) if value.as_bytes() == b"Hello from Whim!"
+        ));
+        assert!(
+            chunk.code.iter().any(|instruction| matches!(
+                instruction,
+                Instruction::WriteLine {
+                    value_count,
+                    first_value,
+                } if value_count.value() == 1 && *first_value == destination
+            )),
+            "{:?}",
+            chunk.code
+        );
+    }
+}
+
+#[test]
+fn keeps_dead_writes_that_release_parameters_and_captures() {
+    let unit = compile(
+        r"
+        function overwrite(mixed $value): void {
+            $value = null;
+            write_line!('done');
+        }
+
+        function capture(mixed $value): fn(): void {
+            return function() use ($value): void {
+                $value = null;
+                write_line!('done');
+            };
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    let overwrite = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"overwrite")
+        .expect("the function exists");
+    assert!(matches!(
+        overwrite.chunk.code.first(),
+        Some(Instruction::LoadNull { destination }) if destination.index() == 0
+    ));
+
+    let closure = unit
+        .functions
+        .iter()
+        .find(|function| !function.capture_types.is_empty())
+        .expect("the closure exists");
+    assert!(matches!(
+        closure.chunk.code.first(),
+        Some(Instruction::LoadNull { destination }) if destination.index() == 0
+    ));
+}
+
+#[test]
 fn compiler_emits_canonical_bytecode_without_optimization() {
     let unit = compile(
         r"

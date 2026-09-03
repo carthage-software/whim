@@ -39,7 +39,11 @@ pub(in crate::optimizer) fn optimize_unit(
             continue;
         }
 
-        let remove = removable_stores_with_flow(analyzed.chunk, Some(&analyzed.flow));
+        let remove = removable_stores_with_flow(
+            analyzed.chunk,
+            Some(&analyzed.flow),
+            analyzed.incoming_register_count,
+        );
         if !remove.iter().any(|removed| *removed) {
             continue;
         }
@@ -108,13 +112,17 @@ fn removable_stores<'a>(
             allocator,
         )
     });
-    removable_stores_with_flow(chunk, flow.as_ref())
+    removable_stores_with_flow(chunk, flow.as_ref(), chunk.local_register_count)
 }
 
-fn removable_stores_with_flow(chunk: &Chunk, flow: Option<&TypeFlow<'_>>) -> Vec<bool> {
+fn removable_stores_with_flow(
+    chunk: &Chunk,
+    flow: Option<&TypeFlow<'_>>,
+    first_fresh_local: u16,
+) -> Vec<bool> {
     let mut remove = vec![false; chunk.code.len()];
     let targets = control_flow_targets(chunk);
-    let previous_values = PreviousValueSafety::analyze(chunk, &targets);
+    let previous_values = PreviousValueSafety::analyze(chunk, &targets, first_fresh_local);
     let query_count = chunk
         .code
         .iter()
@@ -265,7 +273,11 @@ pub(in crate::optimizer::passes) struct PreviousValueSafety {
 }
 
 impl PreviousValueSafety {
-    pub(in crate::optimizer::passes) fn analyze(chunk: &Chunk, targets: &HashSet<usize>) -> Self {
+    pub(in crate::optimizer::passes) fn analyze(
+        chunk: &Chunk,
+        targets: &HashSet<usize>,
+        first_fresh_local: u16,
+    ) -> Self {
         let mut safe_before = vec![None; chunk.code.len()];
         let mut states = vec![None; usize::from(chunk.register_count)];
         let mut segment = 0usize;
@@ -285,7 +297,7 @@ impl PreviousValueSafety {
             });
             if !multiple_writes
                 && let Some(register) = first_write
-                && value_is_safe_before(chunk, &states, segment, register)
+                && value_is_safe_before(chunk, &states, segment, register, first_fresh_local)
             {
                 safe_before[index] = Some(register);
             }
@@ -324,13 +336,14 @@ fn value_is_safe_before(
     states: &[Option<(usize, bool)>],
     segment: usize,
     register: Register,
+    first_fresh_local: u16,
 ) -> bool {
     if chunk.trace_argument_registers.contains(&register) {
         return false;
     }
 
     states[usize::from(register.index())].map_or_else(
-        || register.index() >= chunk.local_register_count,
+        || register.index() >= first_fresh_local,
         |(known_segment, safe)| known_segment == segment && safe,
     )
 }

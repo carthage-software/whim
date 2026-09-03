@@ -307,6 +307,19 @@ pub(crate) struct CompiledFunction {
     pub chunk: Chunk,
 }
 
+impl CompiledFunction {
+    pub(crate) fn incoming_register_count(&self, has_receiver: bool) -> u16 {
+        let captures = self
+            .capture_names
+            .len()
+            .saturating_sub(usize::from(self.captures_this));
+        let count = usize::from(has_receiver)
+            .saturating_add(self.parameters.len())
+            .saturating_add(captures);
+        u16::try_from(count).unwrap_or(u16::MAX)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
 pub(crate) struct CompiledAttribute {

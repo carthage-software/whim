@@ -74,7 +74,11 @@ pub(in crate::optimizer) fn remove_unit(
         }
 
         let targets = control_flow_targets(analyzed.chunk);
-        let previous_values = PreviousValueSafety::analyze(analyzed.chunk, &targets);
+        let previous_values = PreviousValueSafety::analyze(
+            analyzed.chunk,
+            &targets,
+            analyzed.incoming_register_count,
+        );
         let mut effective = Vec::new();
         let code = if plan.has_replacements(analyzed) {
             effective.clone_from(&analyzed.chunk.code);
@@ -193,7 +197,8 @@ pub(in crate::optimizer::passes) fn optimize_chunk(
     loop {
         let mut remove = vec![false; chunk.code.len()];
         let targets = control_flow_targets(chunk);
-        let previous_values = PreviousValueSafety::analyze(chunk, &targets);
+        let previous_values =
+            PreviousValueSafety::analyze(chunk, &targets, chunk.local_register_count);
         let flow = TypeFlow::analyze(chunk, &[], false, None, &[], allocator);
         for (index, removed) in remove.iter_mut().enumerate() {
             let Some(destination) = flow.pure_constant_destination(index) else {

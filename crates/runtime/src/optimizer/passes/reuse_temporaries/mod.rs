@@ -13,12 +13,13 @@ use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::register_is_dead_after;
+use crate::optimizer::liveness::register_is_unused_after;
 use crate::optimizer::operands::Access;
 use crate::optimizer::operands::implicit_reads;
 use crate::optimizer::operands::instruction_bytes;
 use crate::optimizer::operands::operands;
 use crate::optimizer::operands::register_at;
-use crate::optimizer::operands::remap;
+use crate::optimizer::operands::remap as remap_operands;
 use crate::optimizer::operands::write_may_alias_inputs;
 use crate::optimizer::passes::for_each_mutable_chunk;
 use crate::optimizer::passes::reuse_temporaries::coloring::coalesce_single_argument_call_results;
@@ -46,6 +47,7 @@ pub(in crate::optimizer) fn optimize_unit(
     configuration: OptimizationConfiguration,
     statistics: &mut OptimizationStatistics,
 ) {
+    trim_unused_local_tails(unit, configuration);
     for_each_mutable_chunk(unit, configuration, |chunk| {
         optimize_chunk_inner(chunk, configuration, statistics);
         coalesce_single_argument_call_results(chunk);
@@ -59,6 +61,61 @@ pub(in crate::optimizer) fn optimize_chunk(
     statistics: &mut OptimizationStatistics,
 ) {
     optimize_chunk_inner(chunk, configuration, statistics);
+}
+
+fn trim_unused_local_tails(unit: &mut CompiledUnit, configuration: OptimizationConfiguration) {
+    if !configuration.reuse_temporaries {
+        return;
+    }
+
+    trim_unused_local_tail(&mut unit.main, 0);
+
+    let function_floor = configuration.function_floor(unit.functions.len());
+    for function in &mut unit.functions[function_floor..] {
+        let protected = function.incoming_register_count(function.captures_this);
+        trim_unused_local_tail(&mut function.chunk, protected);
+    }
+
+    let class_floor = configuration.class_floor(unit.classes.len());
+    for class in &mut unit.classes[class_floor..] {
+        for method in &mut class.methods {
+            let has_receiver = !method.is_static || method.function.captures_this;
+            let protected = method.function.incoming_register_count(has_receiver);
+            trim_unused_local_tail(&mut method.function.chunk, protected);
+        }
+    }
+}
+
+fn trim_unused_local_tail(chunk: &mut Chunk, incoming: u16) {
+    if chunk.local_register_count <= incoming || !chunk.catch_table.is_empty() {
+        return;
+    }
+
+    let trace = chunk
+        .trace_argument_registers
+        .iter()
+        .filter(|register| **register != Register::NONE)
+        .map(|register| register.index().saturating_add(1))
+        .max()
+        .unwrap_or_default();
+    let minimum = incoming.max(trace);
+    let mut local_count = chunk.local_register_count;
+    while local_count > minimum {
+        let register = Register::new(local_count - 1);
+        if !register_is_unused_after(chunk, register, 0) {
+            break;
+        }
+        local_count -= 1;
+    }
+
+    if local_count == chunk.local_register_count {
+        return;
+    }
+
+    chunk.local_register_count = local_count;
+    chunk
+        .uninitialized_registers
+        .retain(|register| register.index() < local_count);
 }
 
 fn optimize_chunk_inner(
@@ -226,7 +283,7 @@ fn optimize_chunk_inner(
 
     if high_water < chunk.register_count {
         for instruction in &mut chunk.code {
-            *instruction = remap(*instruction, &mapping);
+            *instruction = remap_registers(*instruction, &mapping);
         }
 
         statistics.registers_removed += usize::from(chunk.register_count - high_water);
@@ -362,11 +419,65 @@ fn pinned_window_registers(chunk: &Chunk) -> HashSet<u16> {
         let Some((first, count)) = window else {
             continue;
         };
+        if count == 1
+            && matches!(
+                instruction,
+                Instruction::Write { .. }
+                    | Instruction::WriteLine { .. }
+                    | Instruction::WriteError { .. }
+                    | Instruction::WriteErrorLine { .. }
+                    | Instruction::Debug { .. }
+            )
+        {
+            continue;
+        }
         for register in first.index()..first.index() + count as u16 {
             registers.insert(register);
         }
     }
     registers
+}
+
+fn remap_registers(instruction: Instruction, mapping: &[Register]) -> Instruction {
+    let remapped = remap_operands(instruction, mapping);
+    match remapped {
+        Instruction::Write {
+            value_count,
+            first_value,
+        } if value_count.value() == 1 => Instruction::Write {
+            value_count,
+            first_value: mapping[usize::from(first_value.index())],
+        },
+        Instruction::WriteLine {
+            value_count,
+            first_value,
+        } if value_count.value() == 1 => Instruction::WriteLine {
+            value_count,
+            first_value: mapping[usize::from(first_value.index())],
+        },
+        Instruction::WriteError {
+            value_count,
+            first_value,
+        } if value_count.value() == 1 => Instruction::WriteError {
+            value_count,
+            first_value: mapping[usize::from(first_value.index())],
+        },
+        Instruction::WriteErrorLine {
+            value_count,
+            first_value,
+        } if value_count.value() == 1 => Instruction::WriteErrorLine {
+            value_count,
+            first_value: mapping[usize::from(first_value.index())],
+        },
+        Instruction::Debug {
+            value_count,
+            first_value,
+        } if value_count.value() == 1 => Instruction::Debug {
+            value_count,
+            first_value: mapping[usize::from(first_value.index())],
+        },
+        _ => remapped,
+    }
 }
 
 fn pinned_high_water(pinned: &HashSet<u16>, local_count: u16) -> u16 {

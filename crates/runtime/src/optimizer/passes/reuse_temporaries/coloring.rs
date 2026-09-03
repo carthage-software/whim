@@ -8,7 +8,6 @@ use crate::optimizer::operands::implicit_reads;
 use crate::optimizer::operands::instruction_bytes;
 use crate::optimizer::operands::operands;
 use crate::optimizer::operands::register_at;
-use crate::optimizer::operands::remap;
 use crate::optimizer::operands::write_may_alias_inputs;
 use crate::optimizer::passes::reuse_temporaries::Chunk;
 use crate::optimizer::passes::reuse_temporaries::Instruction;
@@ -20,6 +19,7 @@ use crate::optimizer::passes::reuse_temporaries::normalize_empty_window_starts;
 use crate::optimizer::passes::reuse_temporaries::pinned_high_water;
 use crate::optimizer::passes::reuse_temporaries::pinned_window_registers;
 use crate::optimizer::passes::reuse_temporaries::register_is_dead_after;
+use crate::optimizer::passes::reuse_temporaries::remap_registers;
 use crate::optimizer::passes::reuse_temporaries::successors;
 use crate::unwrap_option_invariant;
 
@@ -338,7 +338,7 @@ pub(super) fn recolor_interference_graph(
     }
 
     for instruction in &mut chunk.code {
-        *instruction = remap(*instruction, &mapping);
+        *instruction = remap_registers(*instruction, &mapping);
     }
 
     statistics.registers_removed += usize::from(chunk.register_count - high_water);
