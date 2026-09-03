@@ -12,18 +12,13 @@ folding, selection ranges, and occurrence highlighting.
 
 ## Zed
 
-Zed has not yet merged the [Whim extension](https://github.com/zed-industries/extensions/pull/7441).
-Until it does, install the extension from its [source repository](https://github.com/carthage-software/whim-zed):
+Install **Whim Language Support** (`whim-lang`) from Zed's Extensions page:
 
-1. Install Rust with `rustup`. Zed uses it to build the development extension.
-2. Clone the extension:
+1. Open Zed's Extensions page.
+2. Search for `whim-lang` or **Whim Language Support**.
+3. Select **Install**.
 
-   ```console
-   git clone https://github.com/carthage-software/whim-zed.git
-   ```
-
-3. Open Zed's Extensions page.
-4. Select **Install Dev Extension** and choose the cloned directory.
+The extension's source is available in the [Whim Zed repository](https://github.com/carthage-software/whim-zed).
 
 Zed turns language-server semantic tokens off by default. Add this to Zed's
 settings for full highlighting:
