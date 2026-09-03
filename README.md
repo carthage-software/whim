@@ -41,7 +41,7 @@ We also maintain [Trifle packages on Codeberg](https://codeberg.org/trifle).
 Install the latest release on macOS or Linux:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/whim.sh | bash
+curl --proto '=https' --tlsv1.2 -sSf https://whim.sh/install.sh | bash
 ```
 
 You can also download an archive from [GitHub Releases]. After installation, run:
@@ -70,9 +70,9 @@ The [Whim book] documents the language, command-line tools, package manager,
 and standard library. Start with [Installation], then write
 [Your First Program].
 
-[Whim book]: https://whim.carthage.software/
-[Installation]: https://whim.carthage.software/usage/installation.html
-[Your First Program]: https://whim.carthage.software/usage/getting-started.html
+[Whim book]: https://whim.sh/
+[Installation]: https://whim.sh/usage/installation.html
+[Your First Program]: https://whim.sh/usage/getting-started.html
 
 ## Development
 

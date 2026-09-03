@@ -8,13 +8,13 @@ x86-64, Arm64, and RISC-V 64. Run it through the `whim` command.
 Install the latest release on macOS or Linux:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/whim.sh | bash
+curl --proto '=https' --tlsv1.2 -sSf https://whim.sh/install.sh | bash
 ```
 
 Pass a version to install a specific release:
 
 ```sh
-curl --proto '=https' --tlsv1.2 -sSf https://carthage.software/whim.sh | bash -s -- --version=0.1.0
+curl --proto '=https' --tlsv1.2 -sSf https://whim.sh/install.sh | bash -s -- --version=0.2.0
 ```
 
 The installer verifies build attestations when a compatible
