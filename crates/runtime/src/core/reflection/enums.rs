@@ -88,6 +88,8 @@ pub(crate) enum TypeKind {
     Float,
     #[whim_case("String")]
     String,
+    #[whim_case("StringLength")]
+    StringLength,
     #[whim_case("Object")]
     Object,
     #[whim_case("Literal")]

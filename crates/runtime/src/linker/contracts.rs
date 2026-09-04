@@ -534,7 +534,7 @@ impl Engine {
                                 TypeDescriptor::Union(vec![argument.clone(), candidate.clone()]);
                         }
                         Variance::Covariant => {
-                            *argument = TypeDescriptor::Intersection(vec![
+                            *argument = TypeDescriptor::intersection(vec![
                                 argument.clone(),
                                 candidate.clone(),
                             ]);
@@ -1508,7 +1508,7 @@ fn resolve_final_static(
                 .map(|member| resolve_final_static(member, current_type))
                 .collect(),
         ),
-        TypeDescriptor::Intersection(members) => TypeDescriptor::Intersection(
+        TypeDescriptor::Intersection(members) => TypeDescriptor::intersection(
             members
                 .iter()
                 .map(|member| resolve_final_static(member, current_type))

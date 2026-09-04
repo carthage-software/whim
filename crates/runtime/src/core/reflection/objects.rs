@@ -169,6 +169,7 @@ fn type_class_name(context: &Context<'_, '_, '_>, descriptor: &TypeDescriptor) -
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::Object => "Whim\\Reflection\\Type\\PrimitiveTypeReflection",
+        TypeDescriptor::StringLength { .. } => "Whim\\Reflection\\Type\\StringLengthTypeReflection",
         TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)

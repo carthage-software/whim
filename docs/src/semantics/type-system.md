@@ -61,8 +61,8 @@ function describe(int|string $value): string {
 }
 ```
 
-The value expression runs once. The type may contain aliases, ranges,
-collections, type parameters, and symbol types.
+The value expression runs once. The type may contain aliases, integer ranges,
+string length limits, collections, type parameters, and symbol types.
 
 An unknown name may run the autoloader. If the name remains unknown, the check
 returns `false` instead of throwing. A later declaration can make a later check

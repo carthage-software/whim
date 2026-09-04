@@ -95,6 +95,32 @@ assert!(choose('yes'));
 `true`, `42`, and `'yes'` each describe one value. Literal types make unions,
 ranges, enum cases, and constants precise.
 
+## String length types
+
+Put an integer or integer range after `string` to limit its byte length:
+
+| Type | Accepted strings |
+| --- | --- |
+| `string[0]` | empty strings |
+| `string[5]` | strings with five bytes |
+| `string[1..]` | strings with at least one byte |
+| `string[1..=64]` | strings with one through 64 bytes |
+
+The range uses the same bounds as an integer range. Its lower bound is
+inclusive. `..` excludes the upper bound, while `..=` includes it.
+
+Whim treats `string[0]` as `''`, `string[1..]` as `string&!''`, and
+`string[0..]` as `string`.
+
+String lengths count bytes. For example, the UTF-8 form of `é` has two bytes:
+
+```whim
+assert!('é' is string[2]);
+```
+
+String length types work in aliases, parameters, properties, generic bounds,
+casts, and patterns.
+
 ## Conditions
 
 Conditions must be `bool`. Whim has no truthy or falsy conversion:

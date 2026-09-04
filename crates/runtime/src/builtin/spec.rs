@@ -42,6 +42,7 @@ pub(crate) enum TypeSpec {
     IntRange(Option<i64>, Option<i64>),
     Float,
     String,
+    StringLength(i64, Option<i64>),
     StringLiteral(&'static [u8]),
     Array,
     Vec,

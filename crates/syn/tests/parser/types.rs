@@ -5,7 +5,9 @@ use whim_syn::cst::expression::Expression;
 use whim_syn::cst::statement::Statement;
 use whim_syn::cst::r#type::IntegerRangeBound;
 use whim_syn::cst::r#type::IntegerRangeOperator;
+use whim_syn::cst::r#type::IntegerRangeType;
 use whim_syn::cst::r#type::NegativeLiteralType;
+use whim_syn::cst::r#type::StringLength;
 use whim_syn::cst::r#type::Type;
 use whim_syn::error::ParseError;
 use whim_syn::token::kind::TokenKind;
@@ -360,6 +362,56 @@ fn integer_range_types_preserve_their_bounds_and_operator() {
         error("type Alias = 0..1.5;"),
         ParseError::UnexpectedToken(..)
     ));
+}
+
+#[test]
+fn string_length_types_preserve_their_length_and_range() {
+    let arena = LocalArena::new();
+
+    let Type::StringLength(exact) = aliased_type(&arena, "string[5]") else {
+        panic!("expected an exact string length type");
+    };
+    assert!(matches!(exact.length, StringLength::Exact(length) if length.value == 5));
+
+    let Type::StringLength(bounded) = aliased_type(&arena, "string[1..=64]") else {
+        panic!("expected a bounded string length type");
+    };
+    let StringLength::Range(bounded) = bounded.length else {
+        panic!("expected a string length range");
+    };
+    assert!(matches!(
+        bounded.lower,
+        Some(IntegerRangeBound::Positive(length)) if length.value == 1
+    ));
+    assert!(matches!(
+        bounded.operator,
+        IntegerRangeOperator::Inclusive(_)
+    ));
+    assert!(matches!(
+        bounded.upper,
+        Some(IntegerRangeBound::Positive(length)) if length.value == 64
+    ));
+
+    let Type::StringLength(open) = aliased_type(&arena, "string[1..]") else {
+        panic!("expected an open string length type");
+    };
+    assert!(matches!(
+        open.length,
+        StringLength::Range(IntegerRangeType { upper: None, .. })
+    ));
+}
+
+#[test]
+fn string_length_types_reject_invalid_lengths() {
+    for source in [
+        "type Alias = string[];",
+        "type Alias = string[-1];",
+        "type Alias = string[1.5];",
+        "type Alias = string[..];",
+        "type Alias = string[1..-2];",
+    ] {
+        assert!(matches!(error(source), ParseError::UnexpectedToken(..)));
+    }
 }
 
 #[test]

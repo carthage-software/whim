@@ -18,6 +18,7 @@ use whim_syn::cst::r#type::IntersectionType;
 use whim_syn::cst::r#type::NamedType;
 use whim_syn::cst::r#type::NegativeLiteralType;
 use whim_syn::cst::r#type::SelfType;
+use whim_syn::cst::r#type::StringLength;
 use whim_syn::cst::r#type::TupleType;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeArgumentList;
@@ -126,7 +127,7 @@ pub(in crate::compiler::types) fn validate_composition(
                 | Type::IntegerRange(_) => Some("int"),
                 Type::Literal(Literal::Float(_))
                 | Type::NegativeLiteral(NegativeLiteralType::Float { .. }) => Some("float"),
-                Type::Literal(Literal::String(_)) => Some("string"),
+                Type::Literal(Literal::String(_)) | Type::StringLength(_) => Some("string"),
                 Type::Literal(Literal::True(_) | Literal::False(_)) => Some("bool"),
                 _ => None,
             };
@@ -376,6 +377,13 @@ fn render_type_with_state(
         Type::Int(_) => "int".to_string(),
         Type::Float(_) => "float".to_string(),
         Type::String(_) => "string".to_string(),
+        Type::StringLength(string) => format!(
+            "string[{}]",
+            match &string.length {
+                StringLength::Exact(length) => length.raw.to_string(),
+                StringLength::Range(range) => render_integer_range(range),
+            }
+        ),
         Type::Object(_) => "object".to_string(),
         Type::Void(_) => "void".to_string(),
         Type::Never(_) => "never".to_string(),

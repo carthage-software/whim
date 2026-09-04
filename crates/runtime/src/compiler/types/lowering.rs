@@ -19,6 +19,8 @@ use whim_syn::cst::r#type::NamedType;
 use whim_syn::cst::r#type::NegatedType;
 use whim_syn::cst::r#type::NegativeLiteralType;
 use whim_syn::cst::r#type::SelfType;
+use whim_syn::cst::r#type::StringLength;
+use whim_syn::cst::r#type::StringLengthType;
 use whim_syn::cst::r#type::TupleType;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeArgumentList;
@@ -1047,7 +1049,7 @@ fn lower_intersection_type(
         .map(|member| lower_type_inner(scope, member, defer_named_arity))
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(TypeDescriptor::Intersection(members))
+    Ok(TypeDescriptor::intersection(members))
 }
 
 fn lower_function_type(
@@ -1117,6 +1119,7 @@ fn lower_type_inner(
         Type::Int(_) => Ok(TypeDescriptor::Int),
         Type::Float(_) => Ok(TypeDescriptor::Float),
         Type::String(_) => Ok(TypeDescriptor::String),
+        Type::StringLength(string) => lower_string_length_type(scope.heap, string),
         Type::Object(_) => Ok(TypeDescriptor::Object),
         Type::Void(_) => Ok(TypeDescriptor::Void),
         Type::Never(_) => Ok(TypeDescriptor::Never),
@@ -1162,6 +1165,7 @@ fn descriptor_may_be_class_like(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Int
         | TypeDescriptor::Float
         | TypeDescriptor::String
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
@@ -1235,6 +1239,7 @@ fn descriptor_has_parameter(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Int
         | TypeDescriptor::Float
         | TypeDescriptor::String
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::Object
         | TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
@@ -1319,6 +1324,48 @@ fn lower_integer_range(range: &IntegerRangeType<'_>) -> Result<TypeDescriptor, C
     }
 
     Ok(TypeDescriptor::integer_range(min, max))
+}
+
+fn lower_string_length_type(
+    heap: &Heap,
+    string: &StringLengthType<'_>,
+) -> Result<TypeDescriptor, CompileError> {
+    let (min, max) = match &string.length {
+        StringLength::Exact(length) => {
+            let length = i64::try_from(length.value).map_err(|_| {
+                CompileError::new(
+                    CompileErrorKind::IntegerLiteralOutOfRange,
+                    format!("`{}` does not fit a 64-bit signed integer", length.raw),
+                    length.span,
+                )
+            })?;
+            (length, Some(length))
+        }
+        StringLength::Range(range) => {
+            let min = range
+                .lower
+                .as_ref()
+                .map(lower_integer_range_bound)
+                .transpose()?
+                .unwrap_or(0);
+            let mut max = range
+                .upper
+                .as_ref()
+                .map(lower_integer_range_bound)
+                .transpose()?;
+            if matches!(range.operator, IntegerRangeOperator::Exclusive(_))
+                && let Some(upper) = max
+            {
+                let Some(inclusive) = upper.checked_sub(1) else {
+                    return Ok(TypeDescriptor::Never);
+                };
+                max = Some(inclusive);
+            }
+            (min, max)
+        }
+    };
+
+    Ok(TypeDescriptor::string_length(heap, min, max))
 }
 
 fn lower_integer_range_bound(bound: &IntegerRangeBound<'_>) -> Result<i64, CompileError> {

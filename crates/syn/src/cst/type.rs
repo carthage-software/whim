@@ -33,6 +33,7 @@ pub enum Type<'arena> {
     Classname(ClassnameType<'arena>),
     Tuple(TupleType<'arena>),
     String(Keyword<'arena>),
+    StringLength(StringLengthType<'arena>),
     Int(Keyword<'arena>),
     Float(Keyword<'arena>),
     Bool(Keyword<'arena>),
@@ -71,6 +72,23 @@ pub struct IntegerRangeType<'arena> {
     pub lower: Option<IntegerRangeBound<'arena>>,
     pub operator: IntegerRangeOperator,
     pub upper: Option<IntegerRangeBound<'arena>>,
+}
+
+/// A string constrained by its byte length, such as `string[5]` or
+/// `string[1..=64]`.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct StringLengthType<'arena> {
+    pub string: Keyword<'arena>,
+    pub left_bracket: Span,
+    pub length: StringLength<'arena>,
+    pub right_bracket: Span,
+}
+
+/// The exact length or length range inside a [`StringLengthType`].
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum StringLength<'arena> {
+    Exact(LiteralInteger<'arena>),
+    Range(IntegerRangeType<'arena>),
 }
 
 /// One signed integer-literal endpoint of an [`IntegerRangeType`].
@@ -352,6 +370,7 @@ impl HasSpan for Type<'_> {
             Type::Literal(literal) => literal.span(),
             Type::NegativeLiteral(literal) => literal.span(),
             Type::IntegerRange(range) => range.span(),
+            Type::StringLength(string) => string.span(),
             Type::Union(union) => union.span(),
             Type::Intersection(intersection) => intersection.span(),
             Type::Negated(negated) => negated.span(),
@@ -409,6 +428,21 @@ impl HasSpan for IntegerRangeType<'_> {
             .map_or_else(|| self.operator.span(), HasSpan::span);
 
         start.join(end)
+    }
+}
+
+impl HasSpan for StringLengthType<'_> {
+    fn span(&self) -> Span {
+        self.string.span().join(self.right_bracket)
+    }
+}
+
+impl HasSpan for StringLength<'_> {
+    fn span(&self) -> Span {
+        match self {
+            Self::Exact(length) => length.span(),
+            Self::Range(range) => range.span(),
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 //! Descriptor-level subtyping, equality, and substitution helpers.
 
 use crate::bytecode::chunk::descriptors::ShapeKey;
+use crate::bytecode::chunk::descriptors::string_length_matches;
 use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::BOOL;
@@ -56,6 +57,7 @@ pub(in crate::optimizer) fn descriptor_mask(descriptor: &TypeDescriptor) -> Opti
         }
         TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => Some(FLOAT),
         TypeDescriptor::String
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Classname(_) => Some(STRING),
         TypeDescriptor::Object | TypeDescriptor::StaticClass => Some(OBJECT),
@@ -141,6 +143,7 @@ pub(in crate::optimizer::type_flow) fn descriptor_may_release_observably(
         | TypeDescriptor::Int
         | TypeDescriptor::Float
         | TypeDescriptor::String
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
@@ -334,6 +337,7 @@ pub(crate) fn descriptor_proves(
             | (TypeDescriptor::IntRange { .. }, TypeDescriptor::Int)
             | (TypeDescriptor::FloatLiteral(_), TypeDescriptor::Float)
             | (TypeDescriptor::StringLiteral(_), TypeDescriptor::String)
+            | (TypeDescriptor::StringLength { .. }, TypeDescriptor::String)
             | (TypeDescriptor::StaticClass, TypeDescriptor::Object)
     ) || matches!(
         (actual, expected),
@@ -353,6 +357,25 @@ pub(crate) fn descriptor_proves(
                 max: expected_max,
             }
         ) if range_lower_contains(*expected_min, *actual_min)
+            && range_upper_contains(*expected_max, *actual_max)
+    ) || matches!(
+        (actual, expected),
+        (
+            TypeDescriptor::StringLiteral(value),
+            TypeDescriptor::StringLength { min, max },
+        ) if string_length_matches(value.as_bytes().len(), *min, *max)
+    ) || matches!(
+        (actual, expected),
+        (
+            TypeDescriptor::StringLength {
+                min: actual_min,
+                max: actual_max,
+            },
+            TypeDescriptor::StringLength {
+                min: expected_min,
+                max: expected_max,
+            },
+        ) if actual_min >= expected_min
             && range_upper_contains(*expected_max, *actual_max)
     )
 }
@@ -427,6 +450,23 @@ pub(in crate::optimizer) fn descriptors_disjoint(
         (TypeDescriptor::StringLiteral(left), TypeDescriptor::StringLiteral(right)) => {
             left != right
         }
+        (TypeDescriptor::StringLiteral(value), TypeDescriptor::StringLength { min, max })
+        | (TypeDescriptor::StringLength { min, max }, TypeDescriptor::StringLiteral(value)) => {
+            !string_length_matches(value.as_bytes().len(), *min, *max)
+        }
+        (
+            TypeDescriptor::StringLength {
+                min: left_min,
+                max: left_max,
+            },
+            TypeDescriptor::StringLength {
+                min: right_min,
+                max: right_max,
+            },
+        ) => {
+            left_max.is_some_and(|max| max < *right_min)
+                || right_max.is_some_and(|max| max < *left_min)
+        }
         (TypeDescriptor::Tuple(left), TypeDescriptor::Tuple(right)) => {
             left.len() != right.len()
                 || left
@@ -463,6 +503,16 @@ pub(crate) fn descriptors_equal(
         | (TypeDescriptor::TupleAny, TypeDescriptor::TupleAny)
         | (TypeDescriptor::Callable(None), TypeDescriptor::Callable(None)) => true,
         (TypeDescriptor::IntLiteral(left), TypeDescriptor::IntLiteral(right)) => left == right,
+        (
+            TypeDescriptor::StringLength {
+                min: left_min,
+                max: left_max,
+            },
+            TypeDescriptor::StringLength {
+                min: right_min,
+                max: right_max,
+            },
+        ) => left_min == right_min && left_max == right_max,
         (
             TypeDescriptor::IntRange {
                 min: left_min,
@@ -597,6 +647,9 @@ pub(in crate::optimizer) fn literal_descriptor_matches(
             left.to_bits() == right.to_bits()
         }
         (Literal::String(left), TypeDescriptor::StringLiteral(right)) => same_atom(left, right),
+        (Literal::String(value), TypeDescriptor::StringLength { min, max }) => {
+            string_length_matches(value.as_bytes().len(), *min, *max)
+        }
         _ => false,
     }
 }

@@ -203,6 +203,10 @@ pub(crate) enum ArgumentGuard {
         min: Option<i64>,
         max: Option<i64>,
     },
+    StringLength {
+        min: i64,
+        max: Option<i64>,
+    },
     ExactFloat(u64),
     ExactObject {
         class: ClassId,

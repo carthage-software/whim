@@ -345,6 +345,7 @@ fn return_kind_satisfies(
         | TypeDescriptor::IntLiteral(_)
         | TypeDescriptor::IntRange { .. }
         | TypeDescriptor::FloatLiteral(_)
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Member { .. }
         | TypeDescriptor::Parameter(_)
@@ -641,6 +642,7 @@ fn descriptor_kind(descriptor: &TypeDescriptor) -> KnownKind {
         }
         TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => KnownKind::Float,
         TypeDescriptor::String
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Classname(_) => KnownKind::String,
         TypeDescriptor::Object | TypeDescriptor::StaticClass => KnownKind::Object,

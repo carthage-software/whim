@@ -165,6 +165,7 @@ reflection_interface! {
         "Whim\\Reflection\\Type\\PrimitiveTypeReflection",
         "Whim\\Reflection\\Type\\LiteralTypeReflection",
         "Whim\\Reflection\\Type\\IntegerRangeTypeReflection",
+        "Whim\\Reflection\\Type\\StringLengthTypeReflection",
         "Whim\\Reflection\\Type\\NamedTypeReflection",
         "Whim\\Reflection\\Type\\ClassTypeReflection",
         "Whim\\Reflection\\Type\\SymbolTypeReflection",

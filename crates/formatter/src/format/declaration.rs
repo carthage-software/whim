@@ -32,9 +32,11 @@ use whim_syn::cst::r#type::DictShapeTypeEntry;
 use whim_syn::cst::r#type::FunctionTypeParameter;
 use whim_syn::cst::r#type::IntegerRangeBound;
 use whim_syn::cst::r#type::IntegerRangeOperator;
+use whim_syn::cst::r#type::IntegerRangeType;
 use whim_syn::cst::r#type::NamedType;
 use whim_syn::cst::r#type::NegativeLiteralType;
 use whim_syn::cst::r#type::Newtype;
+use whim_syn::cst::r#type::StringLength;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeAlias;
 use whim_syn::cst::r#type::TypeArgument;
@@ -331,20 +333,13 @@ where
                     f.concat([f.text("-"), f.text(literal.raw)])
                 }
             },
-            Type::IntegerRange(range) => {
-                let lower = match &range.lower {
-                    Some(bound) => format_integer_range_bound(f, bound),
-                    None => f.empty(),
+            Type::IntegerRange(range) => format_integer_range(f, range),
+            Type::StringLength(string) => {
+                let length = match &string.length {
+                    StringLength::Exact(length) => f.text(length.raw),
+                    StringLength::Range(range) => format_integer_range(f, range),
                 };
-                let operator = match range.operator {
-                    IntegerRangeOperator::Exclusive(_) => f.text(".."),
-                    IntegerRangeOperator::Inclusive(_) => f.text("..="),
-                };
-                let upper = match &range.upper {
-                    Some(bound) => format_integer_range_bound(f, bound),
-                    None => f.empty(),
-                };
-                f.concat([lower, operator, upper])
+                f.concat([f.text("string["), length, f.text("]")])
             }
             Type::Union(union) => {
                 let mut members = Vec::new();
@@ -481,6 +476,29 @@ where
         let value = self.value.format(f);
         f.concat([key, f.text(" => "), value])
     }
+}
+
+fn format_integer_range<'arena, A>(
+    f: &FormatterState<'arena, A>,
+    range: &IntegerRangeType<'arena>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let lower = match &range.lower {
+        Some(bound) => format_integer_range_bound(f, bound),
+        None => f.empty(),
+    };
+    let operator = match range.operator {
+        IntegerRangeOperator::Exclusive(_) => f.text(".."),
+        IntegerRangeOperator::Inclusive(_) => f.text("..="),
+    };
+    let upper = match &range.upper {
+        Some(bound) => format_integer_range_bound(f, bound),
+        None => f.empty(),
+    };
+
+    f.concat([lower, operator, upper])
 }
 
 fn format_integer_range_bound<'arena, A>(

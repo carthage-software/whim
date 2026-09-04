@@ -68,6 +68,20 @@ fn short_closure_bodies_are_nodes() {
 }
 
 #[test]
+fn string_length_parts_are_nodes() {
+    let exact = kinds("type Exact = string[5];");
+    assert!(exact.contains(&NodeKind::StringLengthType));
+    assert!(exact.contains(&NodeKind::StringLength));
+    assert!(exact.contains(&NodeKind::LiteralInteger));
+
+    let range = kinds("type Bounded = string[1..=64];");
+    assert!(range.contains(&NodeKind::StringLengthType));
+    assert!(range.contains(&NodeKind::StringLength));
+    assert!(range.contains(&NodeKind::IntegerRangeType));
+    assert!(range.contains(&NodeKind::IntegerRangeOperator));
+}
+
+#[test]
 fn descends_into_dictionary_pattern_keys() {
     let ks = kinds("$x = match ($v) { dict[-0x10 => $_, 'name' => $_] => 1, $_ => 0 };");
     assert_eq!(

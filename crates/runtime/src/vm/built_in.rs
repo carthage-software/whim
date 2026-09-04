@@ -13,6 +13,7 @@ use crate::builtin::spec::FunctionSpec;
 use crate::builtin::spec::ParameterSpec;
 use crate::builtin::spec::TypeSpec;
 use crate::builtin::throw::Throw;
+use crate::bytecode::chunk::descriptors::string_length_matches;
 use crate::bytecode::unit::BuiltInCallableAttributes;
 use crate::bytecode::unit::CompiledParameter;
 use crate::classes::BuiltInMethodBody;
@@ -101,6 +102,9 @@ impl VirtualMachine<'_> {
             }),
             TypeSpec::Float => value.is_float(),
             TypeSpec::String => value.is_string(),
+            TypeSpec::StringLength(min, max) => value
+                .as_string_bytes()
+                .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
             TypeSpec::StringLiteral(expected) => value
                 .as_string_bytes()
                 .is_some_and(|value| value == *expected),

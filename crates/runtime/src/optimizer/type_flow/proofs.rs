@@ -769,7 +769,8 @@ impl TypeFlow<'_> {
             | TypeDescriptor::IntLiteral(_)
             | TypeDescriptor::IntRange { .. }
             | TypeDescriptor::FloatLiteral(_)
-            | TypeDescriptor::StringLiteral(_) => self.literal_matches(fact, expected),
+            | TypeDescriptor::StringLiteral(_)
+            | TypeDescriptor::StringLength { .. } => self.literal_matches(fact, expected),
             TypeDescriptor::Named {
                 name, arguments, ..
             } => {

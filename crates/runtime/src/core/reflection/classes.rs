@@ -698,6 +698,15 @@ reflection_class! {
 }
 
 reflection_class! {
+    StringLengthTypeReflection = "Whim\\Reflection\\Type\\StringLengthTypeReflection"
+    implements ["Whim\\Reflection\\Type\\TypeReflection"]
+    with [type_reflection] {
+        get_minimum_length: "getMinimumLength(): (0..)" => MinimumLength;
+        get_maximum_length: "getMaximumLength(): null|(0..)" => MaximumLength;
+    }
+}
+
+reflection_class! {
     ClassTypeReflection = "Whim\\Reflection\\Type\\ClassTypeReflection"
     implements ["Whim\\Reflection\\Type\\NamedTypeReflection"]
     with [type_reflection, named_type] {
@@ -894,6 +903,7 @@ pub(crate) fn state(value: &Value) -> Option<&ReflectionState> {
         PrimitiveTypeReflection,
         LiteralTypeReflection,
         IntegerRangeTypeReflection,
+        StringLengthTypeReflection,
         ClassTypeReflection,
         SymbolTypeReflection,
         MemberTypeReflection,

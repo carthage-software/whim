@@ -1,0 +1,106 @@
+use Whim\Str;
+use Whim\Type;
+use Whim\Unwind\TypeError;
+
+type Empty = string[0];
+type NonEmpty = string[1..];
+type Short = string[1..=4];
+type LegacyNonEmpty = string&!'';
+
+function opaque(string $value): string {
+  return $value;
+}
+
+function accept_short(Short $value): Short {
+  return $value;
+}
+
+function return_short(string $value): Short {
+  return $value;
+}
+
+function generic_non_empty_is_canonical<T>(): bool {
+  return Type\id::<T&!''>() == Type\id::<string[1..]>();
+}
+
+assert!('' is string[0]);
+assert!(!('a' is string[0]));
+assert!('a' is string[1..]);
+assert!(!('' is string[1..]));
+assert!('hello' is string[5]);
+assert!(!('hello' is string[4]));
+assert!('a' is string[1..=4]);
+assert!('four' is string[1..=4]);
+assert!(!('fives' is string[1..=4]));
+assert!('abc' is string[..=3]);
+assert!(!('abcd' is string[..=3]));
+assert!('abc' is string[1..4]);
+assert!(!('abcd' is string[1..4]));
+assert!(!('' is string[..0]));
+assert!(!('' is string[1..=0]));
+
+assert!('é' is string[2]);
+assert!(!('é' is string[1]));
+assert!("\xFF" is string[1]);
+
+$empty = opaque('');
+$short = opaque('okay');
+$long = opaque('too long');
+assert!($empty is Empty);
+assert!(!($empty is NonEmpty));
+assert!($short is NonEmpty);
+assert!(accept_short($short) == 'okay');
+assert!(($short ?as Short) == 'okay');
+assert!(($long ?as Short) == null);
+assert!(vec['a', 'é'] is vec<string[1..=2]>);
+
+$matched = match (opaque('abc')) {
+  $value @ string[3] => $value,
+  $_ => 'wrong',
+};
+
+assert!($matched == 'abc');
+
+final class Holder {
+  public Short $value = 'a';
+}
+
+$holder = new Holder();
+$error = null;
+try {
+  $holder->value = $long;
+} catch (TypeError $caught) {
+  $error = $caught;
+}
+
+assert!($error is TypeError);
+assert!(Str\contains($error->getMessage(), 'string[1..=4]'));
+assert!($holder->value == 'a');
+
+$returnError = null;
+try {
+  return_short($long);
+} catch (TypeError $caught) {
+  $returnError = $caught;
+}
+
+assert!($returnError is TypeError);
+assert!(Str\contains($returnError->getMessage(), 'string[1..=4]'));
+
+final class Bounded<T: NonEmpty> {}
+
+final class LegacyBounded<T: LegacyNonEmpty> {}
+
+new Bounded::<LegacyNonEmpty>();
+new LegacyBounded::<NonEmpty>();
+
+final class Invariant<T> {}
+
+function accept_invariant(Invariant<NonEmpty> $_): void {}
+
+accept_invariant(new Invariant::<LegacyNonEmpty>());
+
+assert!(Type\id::<string[0]>() == Type\id::<''>());
+assert!(Type\id::<string[0..]>() == Type\id::<string>());
+assert!(Type\id::<string[1..]>() == Type\id::<string&!''>());
+assert!(generic_non_empty_is_canonical::<string>());

@@ -236,7 +236,7 @@ fn expand_descriptor<L: TypeAliasLookup + ?Sized>(
             match expanded.len() {
                 0 => TypeDescriptor::Mixed,
                 1 => expanded.remove(0),
-                _ => TypeDescriptor::Intersection(expanded),
+                _ => TypeDescriptor::intersection(expanded),
             }
         }
         _ => descriptor

@@ -185,6 +185,8 @@ use crate::cst::r#type::NegatedType;
 use crate::cst::r#type::NegativeLiteralType;
 use crate::cst::r#type::Newtype;
 use crate::cst::r#type::ParenthesizedType;
+use crate::cst::r#type::StringLength;
+use crate::cst::r#type::StringLengthType;
 use crate::cst::r#type::TupleType;
 use crate::cst::r#type::Type;
 use crate::cst::r#type::TypeAlias;
@@ -404,6 +406,8 @@ define_nodes! {
     NegatedType(NegatedType<'arena>),
     NegativeLiteralType(NegativeLiteralType<'arena>),
     IntegerRangeType(IntegerRangeType<'arena>),
+    StringLengthType(StringLengthType<'arena>),
+    StringLength(StringLength<'arena>),
     IntegerRangeBound(IntegerRangeBound<'arena>),
     IntegerRangeOperator(IntegerRangeOperator),
     ParenthesizedType(ParenthesizedType<'arena>),

@@ -34,6 +34,7 @@ pub(crate) fn descriptor_from_built_in_spec(heap: &Heap, spec: &TypeSpec) -> Typ
         TypeSpec::IntRange(min, max) => TypeDescriptor::integer_range(*min, *max),
         TypeSpec::Float => TypeDescriptor::Float,
         TypeSpec::String => TypeDescriptor::String,
+        TypeSpec::StringLength(min, max) => TypeDescriptor::string_length(heap, *min, *max),
         TypeSpec::StringLiteral(value) => TypeDescriptor::StringLiteral(heap.intern(value)),
         TypeSpec::Array => TypeDescriptor::Array(None),
         TypeSpec::Vec => TypeDescriptor::Vector(None),
@@ -107,7 +108,7 @@ pub(crate) fn descriptor_from_built_in_spec(heap: &Heap, spec: &TypeSpec) -> Typ
                 .map(|member| descriptor_from_built_in_spec(heap, member))
                 .collect(),
         ),
-        TypeSpec::Intersection(members) => TypeDescriptor::Intersection(
+        TypeSpec::Intersection(members) => TypeDescriptor::intersection(
             members
                 .iter()
                 .map(|member| descriptor_from_built_in_spec(heap, member))

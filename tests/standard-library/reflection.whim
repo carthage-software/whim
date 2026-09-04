@@ -556,6 +556,38 @@ assert!($inclusiveRange->getUpperBound() == 10);
 assert!(Reflection\reflect_type::<(..10)>()->getLowerBound() == null);
 assert!(Reflection\reflect_type::<(10..)>()->getUpperBound() == null);
 
+$stringLength = Reflection\reflect_type::<string[1..=64]>();
+assert!($stringLength is Reflection\Type\StringLengthTypeReflection);
+assert!($stringLength->getKind() == TypeKind::StringLength);
+assert!($stringLength->getMinimumLength() == 1);
+assert!($stringLength->getMaximumLength() == 64);
+assert!($stringLength->toString() == 'string[1..=64]');
+assert!($stringLength->accepts('hello'));
+assert!(!$stringLength->accepts(''));
+assert!($stringLength->isSubtypeOf(Reflection\reflect_type::<string>()));
+assert!(
+  Reflection\reflect_type::<string[5]>()->isSubtypeOf(
+    Reflection\reflect_type::<string[1..=64]>(),
+  ),
+);
+
+assert!(
+  Reflection\reflect_type::<string[1..]>()->equals(
+    Reflection\reflect_type::<string&!''>(),
+  ),
+);
+
+assert!(Reflection\reflect_type::<string[1..]>()->getMaximumLength() == null);
+
+$emptyStringType = Reflection\reflect_type::<string[0]>();
+assert!($emptyStringType is Reflection\Type\LiteralTypeReflection);
+assert!($emptyStringType->getValue() == '');
+assert!(
+  Reflection\reflect_type::<string[0..]>()->equals(
+    Reflection\reflect_type::<string>(),
+  ),
+);
+
 $boxType = Reflection\reflect_type::<Box<int>>();
 assert!($boxType is Reflection\Type\ClassTypeReflection);
 assert!($boxType->getDeclaration()->getName() == 'ReflectionTest\\Box');

@@ -17,6 +17,7 @@ use whim_syn::cst::r#type::IntegerRangeType;
 use whim_syn::cst::r#type::NamedType;
 use whim_syn::cst::r#type::NegatedType;
 use whim_syn::cst::r#type::NegativeLiteralType;
+use whim_syn::cst::r#type::StringLength;
 use whim_syn::cst::r#type::TupleType;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::VecType;
@@ -33,6 +34,7 @@ pub(super) fn type_spec(
         Type::Float(_) => quote!(#path::Float),
         Type::Bool(_) => quote!(#path::Bool),
         Type::String(_) => quote!(#path::String),
+        Type::StringLength(string) => string_length_spec(&string.length, &path)?,
         Type::Mixed(_) => quote!(#path::Mixed),
         Type::Void(_) => quote!(#path::Void),
         Type::Never(_) => quote!(#path::Never),
@@ -294,6 +296,13 @@ pub(super) fn render(subject: &Type<'_>) -> String {
         Type::Float(_) => "float".to_owned(),
         Type::Bool(_) => "bool".to_owned(),
         Type::String(_) => "string".to_owned(),
+        Type::StringLength(string) => format!(
+            "string[{}]",
+            match &string.length {
+                StringLength::Exact(length) => length.raw.to_string(),
+                StringLength::Range(range) => render_integer_range(range),
+            }
+        ),
         Type::Mixed(_) | Type::VecShape(_) | Type::DictShape(_) => "mixed".to_owned(),
         Type::Void(_) => "void".to_owned(),
         Type::Never(_) => "never".to_owned(),
@@ -409,6 +418,43 @@ fn integer_range_spec(
     let max = option_integer(max);
 
     Ok(quote!(#path::IntRange(#min, #max)))
+}
+
+fn string_length_spec(subject: &StringLength<'_>, path: &TokenStream) -> syn::Result<TokenStream> {
+    let (min, max) = match subject {
+        StringLength::Exact(literal) => {
+            let value = i64::try_from(literal.value)
+                .map_err(|_| syn::Error::new(Span::call_site(), "string length is too large"))?;
+            (value, Some(value))
+        }
+        StringLength::Range(range) => {
+            let min = range
+                .lower
+                .as_ref()
+                .map(integer_bound)
+                .transpose()?
+                .unwrap_or(0);
+            let mut max = range.upper.as_ref().map(integer_bound).transpose()?;
+            if matches!(range.operator, IntegerRangeOperator::Exclusive(_))
+                && let Some(upper) = max
+            {
+                let Some(inclusive) = upper.checked_sub(1) else {
+                    return Ok(quote!(#path::Never));
+                };
+                max = Some(inclusive);
+            }
+            (min, max)
+        }
+    };
+    if max.is_some_and(|max| min > max) {
+        return Ok(quote!(#path::Never));
+    }
+    if min == 0 && max.is_none() {
+        return Ok(quote!(#path::String));
+    }
+
+    let max = option_integer(max);
+    Ok(quote!(#path::StringLength(#min, #max)))
 }
 
 fn integer_bound(bound: &IntegerRangeBound<'_>) -> syn::Result<i64> {

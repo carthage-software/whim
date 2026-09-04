@@ -31,6 +31,7 @@ use crate::cst::pattern::Pattern;
 use crate::cst::statement::Statement;
 use crate::cst::r#type::IntegerRangeBound;
 use crate::cst::r#type::NegativeLiteralType;
+use crate::cst::r#type::StringLength;
 use crate::cst::r#type::Type;
 use crate::cst::r#type::TypeVariance;
 
@@ -1044,6 +1045,7 @@ impl Node<'_, '_> {
                 Type::Literal(inner) => f(Node::Literal(inner)),
                 Type::NegativeLiteral(inner) => f(Node::NegativeLiteralType(inner)),
                 Type::IntegerRange(inner) => f(Node::IntegerRangeType(inner)),
+                Type::StringLength(inner) => f(Node::StringLengthType(inner)),
                 Type::Union(inner) => f(Node::UnionType(inner)),
                 Type::Intersection(inner) => f(Node::IntersectionType(inner)),
                 Type::Negated(inner) => f(Node::NegatedType(inner)),
@@ -1164,6 +1166,14 @@ impl Node<'_, '_> {
                     f(Node::IntegerRangeBound(upper));
                 }
             }
+            Node::StringLengthType(node) => {
+                f(Node::Keyword(&node.string));
+                f(Node::StringLength(&node.length));
+            }
+            Node::StringLength(node) => match node {
+                StringLength::Exact(length) => f(Node::LiteralInteger(length)),
+                StringLength::Range(range) => f(Node::IntegerRangeType(range)),
+            },
             Node::IntegerRangeBound(node) => match node {
                 IntegerRangeBound::Positive(literal)
                 | IntegerRangeBound::Negative { literal, .. } => {

@@ -476,6 +476,7 @@ whim_core! {
         reflection::PrimitiveTypeReflection,
         reflection::LiteralTypeReflection,
         reflection::IntegerRangeTypeReflection,
+        reflection::StringLengthTypeReflection,
         reflection::ClassTypeReflection,
         reflection::SymbolTypeReflection,
         reflection::MemberTypeReflection,

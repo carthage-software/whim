@@ -73,6 +73,19 @@ assert!(length!($text) == 3);
 assert!($text[1] == 'b');
 ```
 
+A string length type limits the same byte count:
+
+```whim
+function read_name(string[1..=64] $name): string {
+  return $name;
+}
+
+assert!('Ada' is string[3]);
+```
+
+`string[0]` is the same type as `''`. `string[1..]` is the same type as
+`string&!''`.
+
 An index must be an in-range integer. An invalid index throws
 `OutOfBoundsError`. Strings are immutable, so indexed assignment fails.
 

@@ -396,6 +396,7 @@ primary-type    := built-in-type
                  | named-type
                  | literal-type
                  | range-type
+                 | string-length-type
                  | tuple-type
                  | vec-type
                  | dict-type
@@ -423,6 +424,11 @@ literal-type    := literal | "-" (integer-literal | float-literal)
 range-type      := signed-integer-literal (".." | "..=")
                    signed-integer-literal?
                  | (".." | "..=") signed-integer-literal
+string-length-type
+                := "string" "[" (integer-literal | string-length-range) "]"
+string-length-range
+                := integer-literal (".." | "..=") integer-literal?
+                 | (".." | "..=") integer-literal
 
 tuple-type      := "(" type "," ")"
                  | "(" type "," tuple-type-tail ","? ")"

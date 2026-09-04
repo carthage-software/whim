@@ -42,6 +42,11 @@ where
             TypeDescriptor::Int => "int".to_string(),
             TypeDescriptor::Float => "float".to_string(),
             TypeDescriptor::String => "string".to_string(),
+            TypeDescriptor::StringLength { min, max } => match max {
+                Some(max) if min == max => format!("string[{min}]"),
+                Some(max) => format!("string[{min}..={max}]"),
+                None => format!("string[{min}..]"),
+            },
             TypeDescriptor::Object => "object".to_string(),
             TypeDescriptor::TrueLiteral => "true".to_string(),
             TypeDescriptor::FalseLiteral => "false".to_string(),

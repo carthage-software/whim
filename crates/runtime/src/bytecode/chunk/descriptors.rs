@@ -75,6 +75,12 @@ pub(crate) enum TypeDescriptor {
     Int,
     Float,
     String,
+    StringLength {
+        #[seeded(with(serde_seeded::unseeded))]
+        min: i64,
+        #[seeded(with(serde_seeded::unseeded))]
+        max: Option<i64>,
+    },
     Object,
     TrueLiteral,
     FalseLiteral,
@@ -158,6 +164,58 @@ impl TypeDescriptor {
         }
     }
 
+    #[must_use]
+    pub(crate) fn string_length(heap: &Heap, min: i64, max: Option<i64>) -> Self {
+        if max.is_some_and(|max| min > max) {
+            Self::Never
+        } else if min == 0 && max.is_none() {
+            Self::String
+        } else if min == 0 && max == Some(0) {
+            Self::StringLiteral(heap.intern(b""))
+        } else {
+            Self::StringLength { min, max }
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn intersection(mut members: Vec<Self>) -> Self {
+        let string = members
+            .iter()
+            .enumerate()
+            .find_map(|(index, member)| match member {
+                Self::String => Some((index, 0, None)),
+                Self::StringLength { min, max } => Some((index, *min, *max)),
+                _ => None,
+            });
+        let non_empty = members.iter().position(|member| {
+            matches!(
+                member,
+                Self::Negated(inner)
+                    if matches!(inner.as_ref(), Self::StringLiteral(value) if value.as_bytes().is_empty())
+            )
+        });
+        if let (Some((string, min, max)), Some(non_empty)) = (string, non_empty) {
+            if max == Some(0) {
+                return Self::Never;
+            }
+            let length = Self::StringLength {
+                min: min.max(1),
+                max,
+            };
+            let last = string.max(non_empty);
+            let first = string.min(non_empty);
+            members.remove(last);
+            members.remove(first);
+            members.push(length);
+        }
+
+        if members.len() == 1 {
+            members.remove(0)
+        } else {
+            Self::Intersection(members)
+        }
+    }
+
     /// Rebuilds this descriptor after transforming each direct child.
     pub(crate) fn map_children(&self, mut map: impl FnMut(&Self) -> Self) -> Self {
         match self {
@@ -234,7 +292,7 @@ impl TypeDescriptor {
             },
             Self::Union(members) => Self::Union(members.iter().map(&mut map).collect()),
             Self::Intersection(members) => {
-                Self::Intersection(members.iter().map(&mut map).collect())
+                Self::intersection(members.iter().map(&mut map).collect())
             }
             Self::Negated(inner) => Self::Negated(Box::new(map(inner))),
             _ => self.clone(),
@@ -262,6 +320,7 @@ impl TypeDescriptor {
             Self::Wildcard
             | Self::Mixed
             | Self::String
+            | Self::StringLength { .. }
             | Self::Object
             | Self::StringLiteral(_)
             | Self::Named { .. }
@@ -296,6 +355,7 @@ pub(crate) fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Int
         | TypeDescriptor::Float
         | TypeDescriptor::String
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::Object
         | TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
@@ -342,6 +402,11 @@ pub(crate) fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Callable(Some(_))
         | TypeDescriptor::Classname(_) => false,
     }
+}
+
+#[must_use]
+pub(crate) fn string_length_matches(length: usize, min: i64, max: Option<i64>) -> bool {
+    i64::try_from(length).is_ok_and(|length| length >= min && max.is_none_or(|max| length <= max))
 }
 
 fn check_vector_shape(
@@ -494,6 +559,9 @@ pub(crate) fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Valu
         TypeDescriptor::Int => value.is_int(),
         TypeDescriptor::Float => value.is_float(),
         TypeDescriptor::String => value.is_string(),
+        TypeDescriptor::StringLength { min, max } => value
+            .as_string_bytes()
+            .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
         TypeDescriptor::Object => value.is_object(),
         TypeDescriptor::TrueLiteral => value.as_bool() == Some(true),
         TypeDescriptor::FalseLiteral => value.as_bool() == Some(false),

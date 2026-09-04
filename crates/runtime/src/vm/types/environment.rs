@@ -311,6 +311,7 @@ impl VirtualMachine<'_> {
                 | TypeDescriptor::Int
                 | TypeDescriptor::Float
                 | TypeDescriptor::String
+                | TypeDescriptor::StringLength { .. }
                 | TypeDescriptor::Object
                 | TypeDescriptor::TrueLiteral
                 | TypeDescriptor::FalseLiteral
@@ -457,7 +458,7 @@ impl VirtualMachine<'_> {
                     .map(|member| self.substitute_descriptor(member, environment, depth + 1))
                     .collect(),
             ),
-            TypeDescriptor::Intersection(members) => TypeDescriptor::Intersection(
+            TypeDescriptor::Intersection(members) => TypeDescriptor::intersection(
                 members
                     .iter()
                     .map(|member| self.substitute_descriptor(member, environment, depth + 1))
@@ -573,6 +574,10 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
         | TypeDescriptor::TupleAny => {}
         TypeDescriptor::IntLiteral(value) => value.hash(state),
         TypeDescriptor::IntRange { min, max } => {
+            min.hash(state);
+            max.hash(state);
+        }
+        TypeDescriptor::StringLength { min, max } => {
             min.hash(state);
             max.hash(state);
         }
@@ -698,6 +703,16 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
         | (TypeDescriptor::StaticClass, TypeDescriptor::StaticClass)
         | (TypeDescriptor::TupleAny, TypeDescriptor::TupleAny) => true,
         (TypeDescriptor::IntLiteral(left), TypeDescriptor::IntLiteral(right)) => left == right,
+        (
+            TypeDescriptor::StringLength {
+                min: left_min,
+                max: left_max,
+            },
+            TypeDescriptor::StringLength {
+                min: right_min,
+                max: right_max,
+            },
+        ) => left_min == right_min && left_max == right_max,
         (
             TypeDescriptor::IntRange {
                 min: left_min,

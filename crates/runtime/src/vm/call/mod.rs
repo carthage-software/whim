@@ -10,6 +10,7 @@ use crate::bytecode::chunk::descriptors::CallDescriptor;
 use crate::bytecode::chunk::descriptors::PresetDescriptor;
 use crate::bytecode::chunk::descriptors::PresetSlot;
 use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
+use crate::bytecode::chunk::descriptors::string_length_matches;
 use crate::bytecode::unit::literal_value;
 use crate::engine::builtins::BuiltInCallable;
 use crate::engine::builtins::built_in_type_parameters;
@@ -92,6 +93,9 @@ pub(in crate::vm) fn guard_allows(guard: &ArgumentGuard, value: &Value) -> bool 
         ArgumentGuard::IntRange { min, max } => value.as_int().is_some_and(|value| {
             min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
         }),
+        ArgumentGuard::StringLength { min, max } => value
+            .as_string_bytes()
+            .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
         ArgumentGuard::ExactFloat(expected) => value
             .as_float()
             .is_some_and(|value| value.to_bits() == *expected),
@@ -123,6 +127,10 @@ pub(in crate::vm) fn argument_guard(
         TypeDescriptor::Int => ArgumentGuard::Int,
         TypeDescriptor::Float => ArgumentGuard::Float,
         TypeDescriptor::String => ArgumentGuard::String,
+        TypeDescriptor::StringLength { min, max } => ArgumentGuard::StringLength {
+            min: *min,
+            max: *max,
+        },
         TypeDescriptor::Object => ArgumentGuard::Object,
         TypeDescriptor::TrueLiteral => ArgumentGuard::ExactBool(true),
         TypeDescriptor::FalseLiteral => ArgumentGuard::ExactBool(false),

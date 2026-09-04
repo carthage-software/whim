@@ -26,6 +26,8 @@ use crate::cst::r#type::NegatedType;
 use crate::cst::r#type::NegativeLiteralType;
 use crate::cst::r#type::ParenthesizedType;
 use crate::cst::r#type::SelfType;
+use crate::cst::r#type::StringLength;
+use crate::cst::r#type::StringLengthType;
 use crate::cst::r#type::TrailingType;
 use crate::cst::r#type::TupleType;
 use crate::cst::r#type::Type;
@@ -122,7 +124,7 @@ where
             TokenKind::Self_ => Type::Self_(self.parse_self_type()?),
             TokenKind::Parent => Type::Parent(self.expect_keyword(TokenKind::Parent)?),
             TokenKind::Static => Type::Static(self.expect_keyword(TokenKind::Static)?),
-            TokenKind::String => Type::String(self.expect_keyword(TokenKind::String)?),
+            TokenKind::String => self.parse_string_type()?,
             TokenKind::Int => Type::Int(self.expect_keyword(TokenKind::Int)?),
             TokenKind::Float => Type::Float(self.expect_keyword(TokenKind::Float)?),
             TokenKind::Bool => Type::Bool(self.expect_keyword(TokenKind::Bool)?),
@@ -159,6 +161,44 @@ where
         };
 
         Ok(self.arena.alloc(r#type))
+    }
+
+    fn parse_string_type(&mut self) -> Result<Type<'arena>, ParseError> {
+        let string = self.expect_keyword(TokenKind::String)?;
+        if !self.is_at(TokenKind::LeftBracket)? {
+            return Ok(Type::String(string));
+        }
+
+        let left_bracket = self.expect_span(TokenKind::LeftBracket)?;
+        let length = match self.peek()?.map(|token| token.kind) {
+            Some(TokenKind::LiteralInteger) => {
+                let literal = self.parse_integer_literal()?;
+                if self.is_at(TokenKind::DotDot)? || self.is_at(TokenKind::DotDotEqual)? {
+                    StringLength::Range(self.parse_nonnegative_integer_range(
+                        Some(IntegerRangeBound::Positive(literal)),
+                        false,
+                    )?)
+                } else {
+                    StringLength::Exact(literal)
+                }
+            }
+            Some(TokenKind::DotDot | TokenKind::DotDotEqual) => {
+                StringLength::Range(self.parse_nonnegative_integer_range(None, true)?)
+            }
+            _ => {
+                return Err(self.unexpected(Expected::Description(
+                    "a non-negative integer or integer range",
+                )));
+            }
+        };
+        let right_bracket = self.expect_span(TokenKind::RightBracket)?;
+
+        Ok(Type::StringLength(StringLengthType {
+            string,
+            left_bracket,
+            length,
+            right_bracket,
+        }))
     }
 
     fn parse_negative_numeric_type(&mut self) -> Result<Type<'arena>, ParseError> {
@@ -222,6 +262,29 @@ where
         };
         let upper = if upper_required || self.integer_range_bound_starts()? {
             Some(self.parse_integer_range_bound()?)
+        } else {
+            None
+        };
+
+        Ok(IntegerRangeType {
+            lower,
+            operator,
+            upper,
+        })
+    }
+
+    fn parse_nonnegative_integer_range(
+        &mut self,
+        lower: Option<IntegerRangeBound<'arena>>,
+        upper_required: bool,
+    ) -> Result<IntegerRangeType<'arena>, ParseError> {
+        let operator = if self.is_at(TokenKind::DotDotEqual)? {
+            IntegerRangeOperator::Inclusive(self.expect_span(TokenKind::DotDotEqual)?)
+        } else {
+            IntegerRangeOperator::Exclusive(self.expect_span(TokenKind::DotDot)?)
+        };
+        let upper = if upper_required || self.is_at(TokenKind::LiteralInteger)? {
+            Some(IntegerRangeBound::Positive(self.parse_integer_literal()?))
         } else {
             None
         };

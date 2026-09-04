@@ -140,6 +140,30 @@ function clamp_input<T: 0..=100>(T $value): T {
 assert!(clamp_input::<25>(25) == 25);
 ```
 
+## String length types
+
+Square brackets after `string` limit its byte length:
+
+| Type | Accepted lengths |
+| --- | --- |
+| `string[5]` | exactly five bytes |
+| `string[1..]` | one byte or more |
+| `string[..64]` | fewer than 64 bytes |
+| `string[1..=64]` | one through 64 bytes |
+
+These types follow integer range rules. Empty ranges accept no value.
+
+```whim
+type Name = string[1..=64];
+
+function greet(Name $name): string {
+  return 'Hello, ' . $name;
+}
+```
+
+Whim treats `string[0]` as `''`, `string[1..]` as `string&!''`, and
+`string[0..]` as `string`.
+
 ## `never`
 
 `never` contains no values. A function that returns `never` must throw, exit,

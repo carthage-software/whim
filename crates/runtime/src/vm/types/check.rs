@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
+use crate::bytecode::chunk::descriptors::string_length_matches;
 use crate::bytecode::unit::Visibility;
 use crate::classes::ClassMemberEntry;
 use crate::classes::MethodBodyKind;
@@ -508,6 +509,7 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::Int
             | TypeDescriptor::Float
             | TypeDescriptor::String
+            | TypeDescriptor::StringLength { .. }
             | TypeDescriptor::Object
             | TypeDescriptor::TrueLiteral
             | TypeDescriptor::FalseLiteral
@@ -899,7 +901,8 @@ impl VirtualMachine<'_> {
             | (TypeDescriptor::IntLiteral(_), TypeDescriptor::Int)
             | (TypeDescriptor::IntRange { .. }, TypeDescriptor::Int)
             | (TypeDescriptor::FloatLiteral(_), TypeDescriptor::Float)
-            | (TypeDescriptor::StringLiteral(_), TypeDescriptor::String) => true,
+            | (TypeDescriptor::StringLiteral(_), TypeDescriptor::String)
+            | (TypeDescriptor::StringLength { .. }, TypeDescriptor::String) => true,
             (TypeDescriptor::IntLiteral(value), TypeDescriptor::IntRange { min, max }) => {
                 min.is_none_or(|min| *value >= min) && max.is_none_or(|max| *value <= max)
             }
@@ -916,6 +919,19 @@ impl VirtualMachine<'_> {
                 range_lower_contains(*expected_min, *actual_min)
                     && range_upper_contains(*expected_max, *actual_max)
             }
+            (TypeDescriptor::StringLiteral(value), TypeDescriptor::StringLength { min, max }) => {
+                string_length_matches(value.as_bytes().len(), *min, *max)
+            }
+            (
+                TypeDescriptor::StringLength {
+                    min: actual_min,
+                    max: actual_max,
+                },
+                TypeDescriptor::StringLength {
+                    min: expected_min,
+                    max: expected_max,
+                },
+            ) => actual_min >= expected_min && range_upper_contains(*expected_max, *actual_max),
             (TypeDescriptor::Named { name: actual, .. }, TypeDescriptor::Object) => self
                 .resolve_checked_name(actual.clone())?
                 .is_some_and(|entry| matches!(entry.kind, SymbolKind::Class | SymbolKind::Enum)),
@@ -1706,6 +1722,23 @@ impl VirtualMachine<'_> {
             (TypeDescriptor::StringLiteral(left), TypeDescriptor::StringLiteral(right)) => {
                 left != right
             }
+            (TypeDescriptor::StringLiteral(value), TypeDescriptor::StringLength { min, max })
+            | (TypeDescriptor::StringLength { min, max }, TypeDescriptor::StringLiteral(value)) => {
+                !string_length_matches(value.as_bytes().len(), *min, *max)
+            }
+            (
+                TypeDescriptor::StringLength {
+                    min: left_min,
+                    max: left_max,
+                },
+                TypeDescriptor::StringLength {
+                    min: right_min,
+                    max: right_max,
+                },
+            ) => {
+                left_max.is_some_and(|max| max < *right_min)
+                    || right_max.is_some_and(|max| max < *left_min)
+            }
             (TypeDescriptor::Tuple(left), TypeDescriptor::Tuple(right))
                 if left.len() != right.len() =>
             {
@@ -1729,6 +1762,7 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::IntRange { .. } => Some(2),
             TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => Some(3),
             TypeDescriptor::String
+            | TypeDescriptor::StringLength { .. }
             | TypeDescriptor::StringLiteral(_)
             | TypeDescriptor::Classname(_) => Some(4),
             TypeDescriptor::Vector(_) | TypeDescriptor::VectorShape { .. } => Some(5),
@@ -2421,6 +2455,9 @@ impl VirtualMachine<'_> {
             TypeDescriptor::Int => value.is_int(),
             TypeDescriptor::Float => value.is_float(),
             TypeDescriptor::String => value.is_string(),
+            TypeDescriptor::StringLength { min, max } => value
+                .as_string_bytes()
+                .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
             TypeDescriptor::Object => value.is_object(),
             TypeDescriptor::TrueLiteral => value.as_bool() == Some(true),
             TypeDescriptor::FalseLiteral => value.as_bool() == Some(false),

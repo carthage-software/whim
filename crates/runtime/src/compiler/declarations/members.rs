@@ -15,6 +15,7 @@ use whim_syn::cst::r#type::Type;
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
+use crate::bytecode::chunk::descriptors::string_length_matches;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::unit::CompiledAttribute;
 use crate::bytecode::unit::CompiledClassConstant;
@@ -716,6 +717,11 @@ fn literal_satisfies_in<'a>(
         TypeDescriptor::Int => matches!(literal, BytecodeLiteral::Int(_)),
         TypeDescriptor::Float => matches!(literal, BytecodeLiteral::Float(_)),
         TypeDescriptor::String => matches!(literal, BytecodeLiteral::String(_)),
+        TypeDescriptor::StringLength { min, max } => matches!(
+            literal,
+            BytecodeLiteral::String(value)
+                if string_length_matches(value.as_bytes().len(), *min, *max)
+        ),
         TypeDescriptor::Void
         | TypeDescriptor::Never
         | TypeDescriptor::Object

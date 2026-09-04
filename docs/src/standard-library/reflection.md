@@ -102,9 +102,12 @@ resolved type, `accepts()` tests a value, `equals()` compares types, and
 `isSubtypeOf()` tests the subtype relation.
 
 `Whim\Reflection\Type` has a reflection class for each type form: primitive
-values, literals, integer ranges, named types, unions, intersections, negation,
-functions, collections, shapes, class names, tuples, wildcards, type
-parameters, and `static`.
+values, literals, integer ranges, string lengths, named types, unions,
+intersections, negation, functions, collections, shapes, class names, tuples,
+wildcards, type parameters, and `static`.
+
+`StringLengthTypeReflection` reports the least byte length and the optional
+greatest byte length.
 
 `toString()` returns text for logs and error messages. The text is neither a
 type ID nor valid source code. `getId()` and `equals()` compare types.

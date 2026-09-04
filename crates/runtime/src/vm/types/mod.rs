@@ -49,6 +49,7 @@ fn array_type_check_cacheable(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Int
         | TypeDescriptor::Float
         | TypeDescriptor::String
+        | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::Object
         | TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral

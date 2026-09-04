@@ -65,7 +65,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         if members.len() == 1 {
             members.pop()
         } else {
-            Some(TypeDescriptor::Intersection(members))
+            Some(TypeDescriptor::intersection(members))
         }
     }
 
@@ -147,7 +147,13 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
             b"bool" => TypeDescriptor::Bool,
             b"int" => TypeDescriptor::Int,
             b"float" => TypeDescriptor::Float,
-            b"string" => TypeDescriptor::String,
+            b"string" => {
+                if self.consume(b'[') {
+                    self.parse_string_length()?
+                } else {
+                    TypeDescriptor::String
+                }
+            }
             b"object" => TypeDescriptor::Object,
             b"true" => TypeDescriptor::TrueLiteral,
             b"false" => TypeDescriptor::FalseLiteral,
@@ -303,6 +309,61 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         Some(TypeDescriptor::integer_range(lower, max))
     }
 
+    fn parse_string_length(&mut self) -> Option<TypeDescriptor> {
+        let min = self.parse_nonnegative_integer_endpoint();
+        if self.consume(b']') {
+            let length = min?;
+            return Some(TypeDescriptor::string_length(
+                self.heap,
+                length,
+                Some(length),
+            ));
+        }
+
+        self.skip_space();
+        let inclusive = if self.bytes.get(self.position..self.position + 3) == Some(b"..=") {
+            self.position += 3;
+            true
+        } else if self.bytes.get(self.position..self.position + 2) == Some(b"..") {
+            self.position += 2;
+            false
+        } else {
+            return None;
+        };
+        let upper = self.parse_nonnegative_integer_endpoint();
+        self.expect(b']')?;
+        if min.is_none() && upper.is_none() {
+            return None;
+        }
+        let min = min.unwrap_or(0);
+        let max = if inclusive {
+            upper
+        } else if let Some(upper) = upper {
+            let Some(max) = upper.checked_sub(1) else {
+                return Some(TypeDescriptor::Never);
+            };
+            Some(max)
+        } else {
+            None
+        };
+        Some(TypeDescriptor::string_length(self.heap, min, max))
+    }
+
+    fn parse_nonnegative_integer_endpoint(&mut self) -> Option<i64> {
+        self.skip_space();
+        let start = self.position;
+        while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
+            self.position += 1;
+        }
+        if self.position == start {
+            return None;
+        }
+        str::from_utf8(&self.bytes[start..self.position])
+            .ok()?
+            .parse()
+            .ok()
+    }
+
     fn parse_integer_endpoint(&mut self) -> Option<i64> {
         self.skip_space();
         let start = self.position;
@@ -348,7 +409,17 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
             if byte.is_ascii_whitespace()
                 || matches!(
                     byte,
-                    b'<' | b'>' | b',' | b'(' | b')' | b':' | b'|' | b'&' | b'!' | b'='
+                    b'<' | b'>'
+                        | b','
+                        | b'('
+                        | b')'
+                        | b'['
+                        | b']'
+                        | b':'
+                        | b'|'
+                        | b'&'
+                        | b'!'
+                        | b'='
                 )
             {
                 break;

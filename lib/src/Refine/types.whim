@@ -59,7 +59,7 @@ type NonEmptyVec<T> = Exclude<vec<T>, vec<never>>;
 type NonEmptyDict<K: ArrayKey, V> = Exclude<dict<K, V>, dict<never, never>>;
 
 /** A string containing at least one byte. */
-type NonEmptyString = Exclude<string, ''>;
+type NonEmptyString = string[1..];
 
 /** An integer greater than zero. */
 type PositiveInt = 1..;

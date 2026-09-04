@@ -52,6 +52,8 @@ pub(crate) fn dispatch(
         Operation::Value => literal_value(context, &reflected.descriptor),
         Operation::LowerBound => Ok(range_bound(&reflected.descriptor, true)),
         Operation::UpperBound => Ok(range_bound(&reflected.descriptor, false)),
+        Operation::MinimumLength => Ok(string_length_bound(&reflected.descriptor, true)),
+        Operation::MaximumLength => Ok(string_length_bound(&reflected.descriptor, false)),
         Operation::Declaration => declaration(context, reflected),
         Operation::TypeArguments => type_arguments(context, reflected),
         Operation::TypeEnvironment => type_environment(context, reflected),
@@ -180,6 +182,7 @@ fn type_kind(
         TypeDescriptor::Int => "Int",
         TypeDescriptor::Float => "Float",
         TypeDescriptor::String => "String",
+        TypeDescriptor::StringLength { .. } => "StringLength",
         TypeDescriptor::Object => "Object",
         TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
@@ -295,6 +298,13 @@ fn range_bound(descriptor: &TypeDescriptor, lower: bool) -> Value {
         return Value::null();
     };
     if lower { *min } else { *max }.map_or_else(Value::null, Value::int)
+}
+
+fn string_length_bound(descriptor: &TypeDescriptor, minimum: bool) -> Value {
+    let TypeDescriptor::StringLength { min, max } = descriptor else {
+        return Value::null();
+    };
+    if minimum { Some(*min) } else { *max }.map_or_else(Value::null, Value::int)
 }
 
 fn declaration(

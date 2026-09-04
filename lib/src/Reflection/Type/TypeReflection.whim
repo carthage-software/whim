@@ -17,6 +17,7 @@ interface TypeReflection extends
   PrimitiveTypeReflection,
   LiteralTypeReflection,
   IntegerRangeTypeReflection,
+  StringLengthTypeReflection,
   NamedTypeReflection,
   ClassTypeReflection,
   SymbolTypeReflection,
