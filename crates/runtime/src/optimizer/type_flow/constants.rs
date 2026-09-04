@@ -1,5 +1,7 @@
 //! Constant tracking: which instruction results are known values.
 
+use hashbrown::HashSet;
+
 use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::Fact;
@@ -13,7 +15,15 @@ use crate::optimizer::type_flow::TypeDescriptor;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::append_constant_text;
 use crate::optimizer::type_flow::instruction_index;
+use crate::value::atom::Atom;
 use crate::value::ops::compare_int_float;
+
+#[derive(PartialEq, Eq, Hash)]
+enum ConstantDictionaryKey {
+    Bool(bool),
+    Int(i64),
+    String(Atom),
+}
 
 #[derive(Clone, Copy)]
 enum ConstantOrdering {
@@ -551,7 +561,30 @@ impl TypeFlow<'_> {
             }
             Instruction::NewVec { element_count, .. }
             | Instruction::NewTuple { element_count, .. } => Some(i64::from(element_count.value())),
-            Instruction::NewDict { pair_count, .. } => Some(i64::from(pair_count.value())),
+            Instruction::NewDict {
+                pair_count,
+                first_pair,
+                ..
+            } => {
+                if pair_count.value() <= 1 {
+                    return Some(i64::from(pair_count.value()));
+                }
+
+                let mut keys = HashSet::with_capacity(usize::from(pair_count.value()));
+                for pair in 0..u16::from(pair_count.value()) {
+                    let register = Register::new(first_pair.index() + pair * 2);
+                    let key =
+                        match self.constant_value_fact(self.fact(index, register), depth + 1)? {
+                            ConstantValue::Bool(value) => ConstantDictionaryKey::Bool(value),
+                            ConstantValue::Int(value) => ConstantDictionaryKey::Int(value),
+                            ConstantValue::String(value) => ConstantDictionaryKey::String(value),
+                            _ => return None,
+                        };
+                    keys.insert(key);
+                }
+
+                i64::try_from(keys.len()).ok()
+            }
             Instruction::Concatenate { left, right, .. } => {
                 let left = self.constant_length_fact(self.fact(index, left), depth + 1)?;
                 let right = self.constant_length_fact(self.fact(index, right), depth + 1)?;

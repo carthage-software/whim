@@ -1,0 +1,88 @@
+use Whim\Marker\NeverInline;
+use Whim\Unwind\TypeError;
+
+$key = 'a';
+$values = dict[$key => 1, $key => 2];
+assert!(length!($values) == 1);
+assert!($values['a'] == 2);
+
+$integer = 1;
+$string = '1';
+$boolean = true;
+$strictKeys = dict[
+  $integer => 0,
+  $string => 0,
+  $boolean => 0,
+  0 => 0,
+  false => 0,
+  $integer => 1,
+  $string => 1,
+  $boolean => 1,
+];
+
+assert!(length!($strictKeys) == 5);
+
+$prefix = 'same';
+$longKey = $prefix . '-long-key';
+$composedKeys = dict[$longKey => 1, 'same-long-key' => 2];
+assert!(length!($composedKeys) == 1);
+
+/** Counts runtime keys that may collide. */
+#[NeverInline]
+function dynamic_length(int|string|bool $first, int|string|bool $second): int {
+  return length!(dict[$first => 1, $second => 2]);
+}
+
+assert!(dynamic_length('a', 'a') == 1);
+assert!(dynamic_length('a', 'b') == 2);
+assert!(dynamic_length(1, 1) == 1);
+assert!(dynamic_length(true, true) == 1);
+assert!(dynamic_length(1, '1') == 2);
+assert!(dynamic_length(1, true) == 2);
+
+newtype UserId = int;
+newtype PostId = int;
+
+$taggedKeys = dict[UserId(7) => 'user', PostId(7) => 'post'];
+assert!(length!($taggedKeys) == 1);
+assert!($taggedKeys[7] == 'post');
+
+final class KeySource {
+  public int $calls = 0;
+
+  /** Produces the same key with an observable side effect. */
+  public function next(): string {
+    $this->calls++;
+    return 'a';
+  }
+}
+
+$source = new KeySource();
+$computedKeys = dict[$source->next() => 1, $source->next() => 2];
+assert!(length!($computedKeys) == 1);
+assert!($source->calls == 2);
+
+/** Counts a single entry without skipping key validation. */
+#[NeverInline]
+function single_length(mixed $key): int {
+  return length!(dict[$key => 1]);
+}
+
+assert!(single_length('a') == 1);
+$failed = false;
+try {
+  single_length(null);
+} catch (TypeError) {
+  $failed = true;
+}
+
+assert!($failed);
+assert!(length!(dict[]) == 0);
+
+$values['b'] = 3;
+assert!(length!($values) == 2);
+remove!($values, 'a');
+assert!(length!($values) == 1);
+
+$spread = dict[...$values, 'b' => 4];
+assert!(length!($spread) == 1);

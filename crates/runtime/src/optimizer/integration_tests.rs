@@ -423,6 +423,111 @@ fn nonescaping_static_dict_reads_are_replaced() {
 }
 
 #[test]
+fn dictionary_lengths_fold_distinct_constant_keys() {
+    let unit = compile(
+        r"
+        function empty(): int {
+            return length!(dict[]);
+        }
+
+        function single(string $key): int {
+            return length!(dict[$key => 0]);
+        }
+
+        function repeated(): int {
+            $key = 'a';
+            return length!(dict[$key => 1, 'b' => 2, $key => 3]);
+        }
+
+        function strict(): int {
+            $integer = 1;
+            $string = '1';
+            $boolean = true;
+            return length!(dict[
+                $integer => 0, $string => 0, $boolean => 0,
+                0 => 0, false => 0,
+                $integer => 1, $string => 1, $boolean => 1,
+            ]);
+        }
+
+        function composed(): int {
+            $prefix = 'same';
+            $key = $prefix . '-long-key';
+            return length!(dict[$key => 1, 'same-long-key' => 2]);
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    for (name, expected) in [
+        (b"empty".as_slice(), 0),
+        (b"single", 1),
+        (b"repeated", 2),
+        (b"strict", 5),
+        (b"composed", 1),
+    ] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name)
+            .expect("the function exists");
+        assert!(
+            function.chunk.code.iter().any(|instruction| {
+                matches!(
+                    instruction,
+                    Instruction::ReturnIntUnchecked { immediate } if immediate.value() == expected
+                )
+            }),
+            "{}: {:#?}",
+            String::from_utf8_lossy(name),
+            function.chunk.code,
+        );
+    }
+    verify_unit(&unit).expect("the optimized unit verifies");
+}
+
+#[test]
+fn dictionary_lengths_keep_checks_for_unknown_keys() {
+    let unit = compile(
+        r"
+        newtype Key = int;
+
+        function dynamic(string $first, string $second): int {
+            return length!(dict[$first => 1, $second => 2]);
+        }
+
+        function partly_known(string $key): int {
+            return length!(dict['known' => 1, $key => 2]);
+        }
+
+        function tagged(int $first, int $second): int {
+            return length!(dict[Key($first) => 1, Key($second) => 2]);
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    for name in [b"dynamic".as_slice(), b"partly_known", b"tagged"] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name)
+            .expect("the function exists");
+        assert!(
+            function
+                .chunk
+                .code
+                .iter()
+                .any(|instruction| matches!(instruction, Instruction::Length { .. })),
+            "{}: {:#?}",
+            String::from_utf8_lossy(name),
+            function.chunk.code,
+        );
+    }
+    verify_unit(&unit).expect("the optimized unit verifies");
+}
+
+#[test]
 fn tuple_index_specialization_requires_proven_bounds() {
     let unit = compile(
         r"
