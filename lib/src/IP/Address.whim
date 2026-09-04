@@ -20,7 +20,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[TrackCaller]
   private function __construct(
     public Family $family,
-    private NonEmptyString $bytes,
+    private string[4]|string[16] $bytes,
   ) {}
 
   /** Parses an address, or returns null when the text is invalid. */
@@ -29,15 +29,10 @@ final readonly class Address implements Order<Address>, ToString {
   public static function parse(string $address): null|Address {
     $bytes = Whim\_Private\ip_parse($address) ?? return null;
 
-    if (length!($bytes) == 4) {
-      return new Address(Family::V4, $bytes as NonEmptyString);
-    }
-
-    if (length!($bytes) == 16) {
-      return new Address(Family::V6, $bytes as NonEmptyString);
-    }
-
-    return null;
+    return match ($bytes) {
+      string[4] => new Address(Family::V4, $bytes),
+      string[16] => new Address(Family::V6, $bytes),
+    };
   }
 
   /**
@@ -97,32 +92,21 @@ final readonly class Address implements Order<Address>, ToString {
     return $parsed;
   }
 
-  /**
-   * Creates an address from its 4 or 16 raw bytes.
-   *
-   * @throws InvalidArgumentException when the byte length is not 4 or 16.
-   */
+  /** Creates an address from its 4 or 16 raw bytes. */
   #[MustUse]
   #[NeverInline]
   #[TrackCaller]
-  public static function fromBytes(string $bytes): Address {
-    if (length!($bytes) == 4) {
-      return new Address(Family::V4, $bytes as NonEmptyString);
-    }
-
-    if (length!($bytes) == 16) {
-      return new Address(Family::V6, $bytes as NonEmptyString);
-    }
-
-    throw new InvalidArgumentException(
-      'an IP address must contain exactly 4 or 16 bytes',
-    );
+  public static function fromBytes(string[4]|string[16] $bytes): Address {
+    return match ($bytes) {
+      string[4] => new Address(Family::V4, $bytes),
+      string[16] => new Address(Family::V6, $bytes),
+    };
   }
 
   /** Returns the raw address bytes. */
   #[AlwaysInline]
   #[MustUse]
-  public function toBytes(): NonEmptyString {
+  public function toBytes(): string[4]|string[16] {
     return $this->bytes;
   }
 

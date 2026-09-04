@@ -120,7 +120,7 @@ function pbkdf2_sha256(
   #[SensitiveParameter] string $password,
   string $salt,
   1..=1000000 $iterations,
-): string {}
+): string[32] {}
 
 /** Begins an incremental digest. */
 #[Stub]

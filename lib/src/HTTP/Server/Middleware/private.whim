@@ -140,15 +140,15 @@ function quality(string $value): null|int {
     return 1000;
   }
 
-  $length = length!($value);
   if (
-    $length < 2
-    || $length > 5
+    !($value is string[2..=5])
     || $value[1] != '.'
     || !($value[0] is '0'|'1')
   ) {
     return null;
   }
+
+  $length = length!($value);
 
   $result = match ($value[0]) {
     '0' => 0,

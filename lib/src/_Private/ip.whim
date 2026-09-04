@@ -8,10 +8,10 @@ use Whim\Marker\TraceBoundary;
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function ip_parse(string $address): null|string {}
+function ip_parse(string $address): null|string[4]|string[16] {}
 
 /** Formats 4 or 16 address bytes into canonical text. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function ip_format(string $bytes): null|string {}
+function ip_format(string[4]|string[16] $bytes): string[2..=39] {}

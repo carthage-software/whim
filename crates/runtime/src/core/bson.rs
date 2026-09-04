@@ -149,13 +149,13 @@ impl DBPointer {
 
 #[whim_class("Whim\\BSON\\Decimal128", final, readonly)]
 #[whim_implements("Whim\\Comparison\\Equal<Whim\\BSON\\Decimal128>")]
-#[whim_property("private Whim\\Refine\\NonEmptyString $bytes")]
+#[whim_property("private string[16] $bytes")]
 pub(crate) struct Decimal128;
 
 #[whim_methods]
 impl Decimal128 {
     #[whim_method(
-        "__construct(Whim\\Refine\\NonEmptyString $bytes): void",
+        "__construct(string[16] $bytes): void",
         visibility = "private",
         no_track_caller,
         no_trace_boundary
@@ -167,28 +167,20 @@ impl Decimal128 {
         set_property(context, arguments.local(0), "bytes")
     }
 
-    #[whim_method("fromBytes(string $bytes): Whim\\BSON\\Decimal128", static, must_use)]
+    #[whim_method(
+        "fromBytes(string[16] $bytes): Whim\\BSON\\Decimal128",
+        static,
+        must_use
+    )]
     fn from_bytes(
         context: &mut Context<'_, '_, '_>,
         arguments: Arguments<'_>,
     ) -> Result<Value, Throw> {
-        let bytes = arguments.bytes(0);
-        if bytes.len() != 16 {
-            return Err(invalid_argument(
-                context,
-                "a BSON decimal128 value must contain exactly 16 bytes",
-            ));
-        }
         let bytes = arguments.local(0);
         new_instance(context, DECIMAL128_CLASS, [bytes])
     }
 
-    #[whim_method(
-        "toBytes(): Whim\\Refine\\NonEmptyString",
-        no_track_caller,
-        no_trace_boundary,
-        must_use
-    )]
+    #[whim_method("toBytes(): string[16]", no_track_caller, no_trace_boundary, must_use)]
     fn to_bytes(context: &Context<'_, '_, '_>) -> Value {
         receiver(context).read_slot(0)
     }
@@ -231,13 +223,13 @@ impl JavaScriptWithScope {
 #[whim_class("Whim\\BSON\\ObjectId", final, readonly)]
 #[whim_implements("Whim\\Comparison\\Equal<Whim\\BSON\\ObjectId>")]
 #[whim_implements("Whim\\Convert\\ToString")]
-#[whim_property("private Whim\\Refine\\NonEmptyString $bytes")]
+#[whim_property("private string[12] $bytes")]
 pub(crate) struct ObjectId;
 
 #[whim_methods]
 impl ObjectId {
     #[whim_method(
-        "__construct(Whim\\Refine\\NonEmptyString $bytes): void",
+        "__construct(string[12] $bytes): void",
         visibility = "private",
         no_track_caller,
         no_trace_boundary
@@ -304,37 +296,21 @@ impl ObjectId {
         Value::bool(parse_object_id(arguments.bytes(0)).is_some())
     }
 
-    #[whim_method("fromBytes(string $bytes): Whim\\BSON\\ObjectId", static, must_use)]
+    #[whim_method("fromBytes(string[12] $bytes): Whim\\BSON\\ObjectId", static, must_use)]
     fn from_bytes(
         context: &mut Context<'_, '_, '_>,
         arguments: Arguments<'_>,
     ) -> Result<Value, Throw> {
-        if arguments.bytes(0).len() != 12 {
-            return Err(invalid_argument(
-                context,
-                "a BSON object identifier must contain exactly 12 bytes",
-            ));
-        }
         let bytes = arguments.local(0);
         new_instance(context, OBJECT_ID_CLASS, [bytes])
     }
 
-    #[whim_method(
-        "toBytes(): Whim\\Refine\\NonEmptyString",
-        no_track_caller,
-        no_trace_boundary,
-        must_use
-    )]
+    #[whim_method("toBytes(): string[12]", no_track_caller, no_trace_boundary, must_use)]
     fn to_bytes(context: &Context<'_, '_, '_>) -> Value {
         receiver(context).read_slot(0)
     }
 
-    #[whim_method(
-        "toString(): Whim\\Refine\\NonEmptyString",
-        no_track_caller,
-        no_trace_boundary,
-        must_use
-    )]
+    #[whim_method("toString(): string[24]", no_track_caller, no_trace_boundary, must_use)]
     fn to_string(context: &Context<'_, '_, '_>) -> Value {
         let receiver = receiver(context);
         let bytes = receiver.read_slot(0);

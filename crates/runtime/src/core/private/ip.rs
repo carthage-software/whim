@@ -11,6 +11,7 @@ use whim_macros::whim_function;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
+use crate::unreachable_invariant;
 use crate::unwrap_result_invariant;
 use crate::value::Value;
 
@@ -51,7 +52,7 @@ impl Write for AddressBuffer {
     }
 }
 
-#[whim_function("Whim\\_Private\\ip_parse(string $address): null|string")]
+#[whim_function("Whim\\_Private\\ip_parse(string $address): null|string[4]|string[16]")]
 pub(crate) fn parse(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let address = arguments.bytes(0);
     let Ok(address) = from_utf8(address) else {
@@ -68,18 +69,20 @@ pub(crate) fn parse(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> 
     }
 }
 
-#[whim_function("Whim\\_Private\\ip_format(string $bytes): null|string")]
+#[whim_function("Whim\\_Private\\ip_format(string[4]|string[16] $bytes): string[2..=39]")]
 pub(crate) fn format(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let bytes = arguments.bytes(0);
     let address = match bytes.len() {
         4 => IpAddr::V4(Ipv4Addr::from(fixed(bytes))),
         16 => IpAddr::V6(Ipv6Addr::from(fixed(bytes))),
-        _ => return Value::null(),
+        // SAFETY: the argument type permits only four or 16 bytes.
+        _ => unsafe { unreachable_invariant("an IP address has a valid byte length") },
     };
 
     let mut formatted = AddressBuffer::new();
     if write!(formatted, "{address}").is_err() {
-        return Value::null();
+        // SAFETY: the buffer holds the longest possible IP address text.
+        unsafe { unreachable_invariant("an IP address fits its formatting buffer") }
     }
 
     context.string(formatted.as_bytes())

@@ -16,7 +16,7 @@ interface ConnectedSocket extends DatagramSocket {
   #[MustUse]
   #[TrackCaller]
   public function send(
-    string $bytes,
+    string[..=65_507] $bytes,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,
   ): int;

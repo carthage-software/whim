@@ -7,13 +7,12 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonEmptyString;
 
 /** A 12-byte BSON object identifier. */
 #[Stub]
 final readonly class ObjectId implements Equal<ObjectId>, ToString {
   #[AlwaysInline]
-  private function __construct(private NonEmptyString $bytes) {}
+  private function __construct(private string[12] $bytes) {}
 
   /** Generates an object identifier. */
   #[MustUse]
@@ -38,17 +37,17 @@ final readonly class ObjectId implements Equal<ObjectId>, ToString {
   #[MustUse]
   #[NeverInline]
   #[TrackCaller]
-  public static function fromBytes(string $bytes): ObjectId {}
+  public static function fromBytes(string[12] $bytes): ObjectId {}
 
   /** Returns the 12 raw bytes. */
   #[AlwaysInline]
   #[MustUse]
-  public function toBytes(): NonEmptyString {}
+  public function toBytes(): string[12] {}
 
   /** Returns canonical lowercase hexadecimal text. */
   #[AlwaysInline]
   #[MustUse]
-  public function toString(): NonEmptyString {}
+  public function toString(): string[24] {}
 
   /** Reports whether two identifiers contain the same bytes. */
   #[AlwaysInline]

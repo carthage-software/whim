@@ -416,7 +416,7 @@ fn hash_hmac(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Res
 }
 
 #[whim_function(
-    "Whim\\_Private\\pbkdf2_sha256(#[SensitiveParameter] string $password, string $salt, 1..=1000000 $iterations): string"
+    "Whim\\_Private\\pbkdf2_sha256(#[SensitiveParameter] string $password, string $salt, 1..=1000000 $iterations): string[32]"
 )]
 fn pbkdf2_sha256(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let password = arguments.bytes(0);

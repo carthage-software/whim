@@ -104,7 +104,7 @@ pub(crate) fn code_point_before(arguments: Arguments<'_>) -> Value {
     Value::int(i64::from(code_point))
 }
 
-#[whim_function("Whim\\_Private\\unicode_from_code_point(int $codePoint): (string&!'')")]
+#[whim_function("Whim\\_Private\\unicode_from_code_point(int $codePoint): string[1..=4]")]
 pub(crate) fn from_code_point(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let code_point = u32::try_from(arguments.int(0))
         .ok()

@@ -38,7 +38,7 @@ type SettingsFrame = (4, dict<SettingId, SettingValue>, bool);
 type PushPromiseFrame = (5, StreamId, StreamId, string, bool, Uint8);
 
 /** An eight-byte liveness probe or acknowledgment. */
-type PingFrame = (6, string, bool);
+type PingFrame = (6, string[8], bool);
 
 /** Starts graceful connection shutdown. */
 type GoAwayFrame = (7, ConnectionStreamId, ErrorCodeValue, string);

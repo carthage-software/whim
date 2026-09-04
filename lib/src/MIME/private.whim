@@ -12,7 +12,7 @@ use Whim\Str;
 /** Reports whether bytes form an RFC 2045 token. */
 #[AlwaysInline]
 function is_token(string $value): bool {
-  if ($value == '') {
+  if (!($value is string[1..])) {
     return false;
   }
 
@@ -36,7 +36,7 @@ function is_token(string $value): bool {
 /** Reports whether a media type component follows RFC 6838. */
 #[AlwaysInline]
 function is_media_component(string $value): bool {
-  if ($value == '' || length!($value) > 127) {
+  if (!($value is string[1..=127])) {
     return false;
   }
 
@@ -209,6 +209,6 @@ function fold_header(
 
 /** Generates a MIME multipart boundary. */
 #[MustUse]
-function generate_boundary(): NonEmptyString {
-  return ('=_whim_' . SecureRandom\string(48)) as NonEmptyString;
+function generate_boundary(): string[55] {
+  return ('=_whim_' . SecureRandom\string(48)) as string[55];
 }

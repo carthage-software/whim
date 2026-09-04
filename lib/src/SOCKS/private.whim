@@ -8,7 +8,6 @@ use Whim\Marker\SensitiveParameter;
 use Whim\Marker\TrackCaller;
 use Whim\Network\Host;
 use Whim\Network\Port;
-use Whim\Refine\NonEmptyString;
 use Whim\SOCKS\AuthenticationException;
 use Whim\SOCKS\Configuration;
 use Whim\SOCKS\ConnectionException;
@@ -81,8 +80,8 @@ function handshake(
 #[TrackCaller]
 function authenticate(
   Stream $stream,
-  NonEmptyString $username,
-  #[SensitiveParameter] NonEmptyString $password,
+  string[1..=255] $username,
+  #[SensitiveParameter] string[1..=255] $password,
   null|CancellationToken $cancellation,
 ): void {
   $request = "\x01" . Str\chr(length!($username)) . $username;
@@ -104,12 +103,10 @@ function encode_host(Host $host): string {
       Family::V4 => "\x01" . $address->toBytes(),
       Family::V6 => "\x04" . $address->toBytes(),
     },
-    $name @ string => match (length!($name) <= 255) {
-      true => "\x03" . Str\chr(length!($name)) . $name,
-      false => throw new ProtocolException(
-        'a SOCKS destination name cannot exceed 255 bytes',
-      ),
-    },
+    $name @ string[..=255] => "\x03" . Str\chr(length!($name)) . $name,
+    string => throw new ProtocolException(
+      'a SOCKS destination name cannot exceed 255 bytes',
+    ),
   };
 }
 

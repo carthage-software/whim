@@ -10,9 +10,9 @@ use Whim\MIME\ContentDisposition;
 use Whim\MIME\ContentId;
 use Whim\MIME\Headers;
 use Whim\MIME\MediaType;
+use Whim\MIME\MultiPartException;
 use Whim\MIME\MultiPart\MultiPart;
 use Whim\MIME\MultiPart\Parser;
-use Whim\MIME\MultiPartException;
 use Whim\MIME\Parameters;
 use Whim\MIME\Part\Data;
 use Whim\MIME\Part\Part;
@@ -20,6 +20,7 @@ use Whim\MIME\Part\Text;
 use Whim\MIME\Sniff;
 use Whim\MIME\TransferEncoding;
 use Whim\Str;
+use Whim\Unwind\TypeError;
 
 final class MIMEStreamingReadHandle implements ReadHandle {
   public int $bytesRead = 0;
@@ -271,11 +272,11 @@ $assertion_value_58 = fn(): Parser => new Parser('');
 $assertion_error_58 = null;
 try {
   $assertion_value_58();
-} catch (MultiPartException $assertion_caught_58) {
+} catch (TypeError $assertion_caught_58) {
   $assertion_error_58 = $assertion_caught_58;
 }
 
-assert!($assertion_error_58 is MultiPartException);
+assert!($assertion_error_58 is TypeError);
 $longBoundary = '';
 $boundaryIndex = 0;
 while ($boundaryIndex < 71) {
@@ -287,11 +288,11 @@ $assertion_value_59 = fn(): Parser => new Parser($longBoundary);
 $assertion_error_59 = null;
 try {
   $assertion_value_59();
-} catch (MultiPartException $assertion_caught_59) {
+} catch (TypeError $assertion_caught_59) {
   $assertion_error_59 = $assertion_caught_59;
 }
 
-assert!($assertion_error_59 is MultiPartException);
+assert!($assertion_error_59 is TypeError);
 
 $assertion_value_60 = function(): void {
   $parts = new Parser('limit', maximumPartSize: 3)->parse(

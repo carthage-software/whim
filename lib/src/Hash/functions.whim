@@ -40,7 +40,7 @@ function pbkdf2_sha256(
   #[SensitiveParameter] string $password,
   string $salt,
   1..=1_000_000 $iterations,
-): string {
+): string[32] {
   return Whim\_Private\pbkdf2_sha256($password, $salt, $iterations);
 }
 

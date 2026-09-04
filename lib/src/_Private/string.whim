@@ -93,13 +93,13 @@ function string_replace(
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function string_ord(string&!'' $character): 0..=255 {}
+function string_ord(string[1] $character): 0..=255 {}
 
 /** Builds a one-byte string from a byte value. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function string_chr(0..=255 $byte): string {}
+function string_chr(0..=255 $byte): string[1] {}
 
 /** Trims mask bytes from the start (0), both ends (1), or the end (2). */
 #[Stub]

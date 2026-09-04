@@ -9,7 +9,7 @@ interface BufferedReadHandle extends ReadHandle {
   #[TrackCaller]
   public function readByte(
     null|CancellationToken $cancellation = null,
-  ): null|string;
+  ): null|string[1];
 
   /** Reads one line without its trailing line ending. */
   #[TrackCaller]

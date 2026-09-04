@@ -5,7 +5,6 @@ use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\ArrayKey;
 use Whim\Refine\NonNegativeInt;
-use Whim\Refine\NonEmptyString;
 use Whim\Refine\Iterable;
 use Whim\Refine\Uint8;
 use Whim\Str\_Private;
@@ -24,21 +23,21 @@ function length(string $string): NonNegativeInt {
 /** Returns the byte value of a one-byte string. */
 #[MustUse]
 #[TrackCaller]
-function ord(NonEmptyString $character): Uint8 {
+function ord(string[1] $character): Uint8 {
   return Whim\_Private\string_ord($character);
 }
 
 /** Creates a one-byte string from a byte value. */
 #[MustUse]
 #[TrackCaller]
-function chr(Uint8 $ascii): string {
+function chr(Uint8 $ascii): string[1] {
   return Whim\_Private\string_chr($ascii);
 }
 
 /** Encodes a Unicode scalar value as UTF-8. */
 #[AlwaysInline]
 #[MustUse]
-function from_code_point(ScalarValue $codePoint): NonEmptyString {
+function from_code_point(ScalarValue $codePoint): string[1..=4] {
   return Whim\_Private\unicode_from_code_point($codePoint);
 }
 
@@ -66,59 +65,51 @@ function from_bytes(vec<Uint8> $bytes): string {
 /** Reports whether a one-byte string is ASCII whitespace. */
 #[AlwaysInline]
 #[MustUse]
-function is_whitespace(string $byte): bool {
+function is_whitespace(string[1] $byte): bool {
   return $byte is ' '|"\t"|"\n"|"\r"|"\f"|"\v";
 }
 
 /** Reports whether a one-byte string is an ASCII digit. */
 #[AlwaysInline]
 #[MustUse]
-function is_digit(string $byte): bool {
-  return length!($byte) == 1 && $byte >= '0' && $byte <= '9';
+function is_digit(string[1] $byte): bool {
+  return $byte >= '0' && $byte <= '9';
 }
 
 /** Reports whether a one-byte string is an ASCII letter. */
 #[AlwaysInline]
 #[MustUse]
-function is_letter(string $byte): bool {
-  return (
-    length!($byte) == 1
-    && (($byte >= 'a' && $byte <= 'z') || ($byte >= 'A' && $byte <= 'Z'))
-  );
+function is_letter(string[1] $byte): bool {
+  return ($byte >= 'a' && $byte <= 'z') || ($byte >= 'A' && $byte <= 'Z');
 }
 
 /** Reports whether a one-byte string is an ASCII letter or digit. */
 #[AlwaysInline]
 #[MustUse]
-function is_alphanumeric(string $byte): bool {
+function is_alphanumeric(string[1] $byte): bool {
   return is_letter($byte) || is_digit($byte);
 }
 
 /** Reports whether a one-byte string is an ASCII hexadecimal digit. */
 #[AlwaysInline]
 #[MustUse]
-function is_hex_digit(string $byte): bool {
+function is_hex_digit(string[1] $byte): bool {
   return (
     is_digit($byte)
-    || (
-      length!($byte) == 1
-      && (($byte >= 'a' && $byte <= 'f') || ($byte >= 'A' && $byte <= 'F'))
-    )
+    || ($byte >= 'a' && $byte <= 'f')
+    || ($byte >= 'A' && $byte <= 'F')
   );
 }
 
 /** Reports whether a one-byte string is ASCII punctuation. */
 #[AlwaysInline]
 #[MustUse]
-function is_ascii_punctuation(string $byte): bool {
+function is_ascii_punctuation(string[1] $byte): bool {
   return (
-    length!($byte) == 1
-    && (
-      ($byte >= '!' && $byte <= '/')
-      || ($byte >= ':' && $byte <= '@')
-      || ($byte >= '[' && $byte <= '`')
-      || ($byte >= '{' && $byte <= '~')
-    )
+    ($byte >= '!' && $byte <= '/')
+    || ($byte >= ':' && $byte <= '@')
+    || ($byte >= '[' && $byte <= '`')
+    || ($byte >= '{' && $byte <= '~')
   );
 }
 

@@ -47,7 +47,7 @@ function parse_headers(
   $weight = null;
   $exclusive = false;
   if (($flags & 0x20) != 0) {
-    if (length!($payload) < 5) {
+    if (!($payload is string[5..])) {
       frame_size_error('the `HEADERS` payload is missing priority data');
     }
 
@@ -73,7 +73,7 @@ function parse_headers(
 
 function parse_priority(int $stream, string $payload): Frame\PriorityFrame {
   require_stream($stream, 'PRIORITY');
-  if (length!($payload) != 5) {
+  if (!($payload is string[5])) {
     throw new StreamException(
       '`PRIORITY` requires exactly 5 payload bytes',
       $stream,
@@ -94,7 +94,9 @@ function parse_priority(int $stream, string $payload): Frame\PriorityFrame {
 
 function parse_reset(int $stream, string $payload): Frame\RstStreamFrame {
   require_stream($stream, 'RST_STREAM');
-  require_length($payload, 4, 'RST_STREAM');
+  if (!($payload is string[4])) {
+    frame_size_error('`RST_STREAM` requires exactly 4 payload bytes');
+  }
 
   return (3, $stream, Binary\decode_u32($payload));
 }
@@ -137,7 +139,7 @@ function parse_push_promise(
   string $payload,
 ): Frame\PushPromiseFrame {
   require_stream($stream, 'PUSH_PROMISE');
-  if (length!($payload) < 4) {
+  if (!($payload is string[4..])) {
     frame_size_error('a PUSH_PROMISE payload must contain a stream identifier');
   }
 
@@ -157,14 +159,16 @@ function parse_push_promise(
 
 function parse_ping(int $flags, int $stream, string $payload): Frame\PingFrame {
   require_connection($stream, 'PING');
-  require_length($payload, 8, 'PING');
+  if (!($payload is string[8])) {
+    frame_size_error('`PING` requires exactly 8 payload bytes');
+  }
 
   return (6, $payload, ($flags & 0x1) != 0);
 }
 
 function parse_go_away(int $stream, string $payload): Frame\GoAwayFrame {
   require_connection($stream, 'GOAWAY');
-  if (length!($payload) < 8) {
+  if (!($payload is string[8..])) {
     frame_size_error('a GOAWAY payload must contain at least eight bytes');
   }
 
@@ -180,7 +184,10 @@ function parse_window_update(
   int $stream,
   string $payload,
 ): Frame\WindowUpdateFrame {
-  require_length($payload, 4, 'WINDOW_UPDATE');
+  if (!($payload is string[4])) {
+    frame_size_error('`WINDOW_UPDATE` requires exactly 4 payload bytes');
+  }
+
   $increment = Binary\decode_u32($payload) & 0x7fffffff;
   if ($increment == 0) {
     if ($stream != 0) {
@@ -309,8 +316,6 @@ function encode_push_promise(
 }
 
 function encode_ping(Frame\PingFrame $frame): (int, int, int, string) {
-  require_length($frame[1], 8, 'PING');
-
   $flags = match ($frame[2]) {
     true => 0x1,
     false => 0,
@@ -386,14 +391,6 @@ function require_stream(int $stream, string $type): void {
 function require_connection(int $stream, string $type): void {
   if ($stream != 0) {
     malformed('`' . $type . '` must use stream zero');
-  }
-}
-
-function require_length(string $payload, int $length, string $type): void {
-  if (length!($payload) != $length) {
-    frame_size_error(
-      '`' . $type . '` requires exactly ' . $length . ' payload bytes',
-    );
   }
 }
 

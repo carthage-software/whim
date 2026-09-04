@@ -2,7 +2,7 @@ use Whim\Binary;
 use Whim\IO\MemoryHandle;
 use Whim\Math;
 use Whim\Unwind\OverflowException;
-use Whim\Unwind\UnderflowException;
+use Whim\Unwind\TypeError;
 
 $big = Binary\Endianness::Big;
 $little = Binary\Endianness::Little;
@@ -101,11 +101,11 @@ $assertion_value_52 = fn(): int => Binary\decode_u32("\x00\x01");
 $assertion_error_52 = null;
 try {
   $assertion_value_52();
-} catch (UnderflowException $assertion_caught_52) {
+} catch (TypeError $assertion_caught_52) {
   $assertion_error_52 = $assertion_caught_52;
 }
 
-assert!($assertion_error_52 is UnderflowException);
+assert!($assertion_error_52 is TypeError);
 
 $assertion_value_53 = fn(): int => (
   Binary\decode_u64("\xff\xff\xff\xff\xff\xff\xff\xff")

@@ -28,7 +28,7 @@ final readonly class Reader {
       $prefix => $prefix,
     };
 
-    if (length!($prefix) < 4) {
+    if (!($prefix is string[4])) {
       throw new DecodingException('the BSON document length is incomplete');
     }
 

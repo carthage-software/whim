@@ -20,7 +20,7 @@ final class SinkReadHandle implements ReadHandle {
 
   /** Always returns an empty string. */
   #[AlwaysInline]
-  public function tryRead(null|int $maxBytes = null): string {
+  public function tryRead(null|int $maxBytes = null): string[0] {
     return '';
   }
 }

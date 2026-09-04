@@ -3,6 +3,7 @@ use Whim\Comparison\Ordering;
 use Whim\IP\Address;
 use Whim\IP\Family;
 use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\TypeError;
 
 assert!(Family::V4->byteLength() == 4);
 assert!(Family::V6->byteLength() == 16);
@@ -51,11 +52,11 @@ $assertion_value_20 = fn(): Address => Address::fromBytes('bad');
 $assertion_error_20 = null;
 try {
   $assertion_value_20();
-} catch (InvalidArgumentException $assertion_caught_20) {
+} catch (TypeError $assertion_caught_20) {
   $assertion_error_20 = $assertion_caught_20;
 }
 
-assert!($assertion_error_20 is InvalidArgumentException);
+assert!($assertion_error_20 is TypeError);
 
 $mapped = Address::v4('10.0.0.1')->toIPv4Mapped();
 assert!($mapped->family == Family::V6);

@@ -98,17 +98,11 @@ abstract class DatagramSocketImpl implements
   #[TrackCaller]
   #[TraceBoundary]
   protected function sendTo(
-    string $bytes,
+    string[..=65_507] $bytes,
     InternetEndpoint $peer,
     null|SendMetadata $metadata,
     null|CancellationToken $cancellation,
   ): int {
-    if (length!($bytes) > 65507) {
-      throw new InvalidArgumentException(
-        'a UDP datagram cannot exceed 65507 bytes',
-      );
-    }
-
     if (
       $peer->address->family != $this->localEndpoint->address->family
       || (

@@ -6,7 +6,6 @@ use Whim\Iterate\Iterator;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonEmptyString;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\_Private\CSVReader;
 use Whim\_Private\string_slice;
@@ -23,14 +22,12 @@ final class Reader implements Iterator<int, vec<string>> {
   #[TrackCaller]
   public function __construct(
     private ReadHandle $handle,
-    NonEmptyString $delimiter = ',',
-    NonEmptyString $enclosure = '"',
+    string[1] $delimiter = ',',
+    string[1] $enclosure = '"',
     private null|CancellationToken $cancellation = null,
   ) {
     if (
-      length!($delimiter) != 1
-      || length!($enclosure) != 1
-      || $delimiter == $enclosure
+      $delimiter == $enclosure
       || ($delimiter is "\r"|"\n")
       || ($enclosure is "\r"|"\n")
     ) {

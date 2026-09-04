@@ -35,7 +35,7 @@ final class ParserIterator implements Iterator<int, Part> {
   /** Creates parser state over one source handle. */
   public function __construct(
     private ReadHandle $source,
-    private string $delimiter,
+    private string[3..=72] $delimiter,
     private NonNegativeInt $spoolThreshold,
     private NonNegativeInt $maximumParts,
     private NonNegativeInt $maximumPartSize,

@@ -12,7 +12,7 @@ use Whim\Time\SystemTime;
 
 /** Shares one current HTTP date across every server connection. */
 final class DateHeader {
-  private static string $value = '';
+  private static string[0]|string[29] $value = '';
   private static null|TaskId $task = null;
   private static int $registrations = 0;
 
@@ -51,7 +51,7 @@ final class DateHeader {
 
   /** Returns the current HTTP date. */
   #[AlwaysInline]
-  public static function getValue(): string {
+  public static function getValue(): string[29] {
     if (DateHeader::$value == '') {
       DateHeader::update();
     }

@@ -32,22 +32,22 @@ function bits32_to_float(int $bits): float {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function float_to_be_bytes(float $value): string {}
+function float_to_be_bytes(float $value): string[8] {}
 
 /** Reinterprets eight big-endian IEEE 754 bytes as a float. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function float_from_be_bytes(string $bytes): float {}
+function float_from_be_bytes(string[8] $bytes): float {}
 
 /** Returns the little-endian IEEE 754 bytes of a float. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function float_to_le_bytes(float $value): string {}
+function float_to_le_bytes(float $value): string[8] {}
 
 /** Reinterprets eight little-endian IEEE 754 bytes as a float. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function float_from_le_bytes(string $bytes): float {}
+function float_from_le_bytes(string[8] $bytes): float {}

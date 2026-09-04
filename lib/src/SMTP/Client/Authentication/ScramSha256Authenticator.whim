@@ -9,7 +9,6 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\SensitiveParameter;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonEmptyString;
 use Whim\SMTP\AuthenticationException;
 use Whim\SMTP\Client\Connection;
 use Whim\SecureRandom;
@@ -24,7 +23,7 @@ final readonly class ScramSha256Authenticator implements Authenticator {
 
   #[AlwaysInline]
   #[MustUse]
-  public function mechanism(): NonEmptyString {
+  public function mechanism(): string[13] {
     return 'SCRAM-SHA-256';
   }
 

@@ -34,16 +34,10 @@ final class ConnectedSocketImpl extends DatagramSocketImpl implements
   #[TrackCaller]
   #[TraceBoundary]
   public function send(
-    string $bytes,
+    string[..=65_507] $bytes,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,
   ): int {
-    if (length!($bytes) > 65507) {
-      throw new InvalidArgumentException(
-        'a UDP datagram cannot exceed 65507 bytes',
-      );
-    }
-
     if (
       $metadata != null
       && $metadata->sourceAddress->family

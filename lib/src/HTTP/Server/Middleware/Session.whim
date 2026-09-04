@@ -143,8 +143,8 @@ final readonly class Session implements Middleware {
   /** Generates an unguessable session identifier. */
   #[MustUse]
   #[TrackCaller]
-  private function generateIdentifier(): NonEmptyString {
-    return encode(bytes(32)) as NonEmptyString;
+  private function generateIdentifier(): string[44] {
+    return encode(bytes(32));
   }
 
   /** Creates the active session cookie. */

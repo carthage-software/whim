@@ -7,7 +7,7 @@ use Whim\Str;
 
 /** Reports whether a local part has strict dot-atom form. */
 function is_valid_dot_atom(string $localPart): bool {
-  if ($localPart == '' || length!($localPart) > 64) {
+  if (!($localPart is string[1..=64])) {
     return false;
   }
 

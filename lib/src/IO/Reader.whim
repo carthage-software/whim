@@ -56,7 +56,7 @@ final class Reader implements BufferedReadHandle {
   #[TrackCaller]
   public function readByte(
     null|CancellationToken $cancellation = null,
-  ): null|string {
+  ): null|string[1] {
     if ($this->buffer == '' && !$this->pullChunk($cancellation)) {
       return null;
     }

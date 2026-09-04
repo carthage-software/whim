@@ -84,4 +84,4 @@ final class WebSocketCodec {
 #[MustUse]
 #[TrackCaller]
 #[TraceBoundary]
-function websocket_accept_key(string $key): null|string {}
+function websocket_accept_key(string $key): null|string[28] {}

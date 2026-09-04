@@ -52,7 +52,7 @@ function to_bits(float $value): int {
 /** Reinterprets eight bytes in the selected byte order as a float. */
 #[AlwaysInline]
 #[MustUse]
-function from_bytes(string $bytes, Endianness $endianness): float {
+function from_bytes(string[8] $bytes, Endianness $endianness): float {
   return match ($endianness) {
     Endianness::Big => Whim\_Private\float_from_be_bytes($bytes),
     Endianness::Little => Whim\_Private\float_from_le_bytes($bytes),
@@ -62,7 +62,7 @@ function from_bytes(string $bytes, Endianness $endianness): float {
 /** Returns the eight IEEE 754 bytes in the selected byte order. */
 #[AlwaysInline]
 #[MustUse]
-function to_bytes(float $value, Endianness $endianness): string {
+function to_bytes(float $value, Endianness $endianness): string[8] {
   return match ($endianness) {
     Endianness::Big => Whim\_Private\float_to_be_bytes($value),
     Endianness::Little => Whim\_Private\float_to_le_bytes($value),

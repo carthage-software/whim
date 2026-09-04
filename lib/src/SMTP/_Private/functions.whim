@@ -22,7 +22,7 @@ function parse_reply(
     }
 
     $line = Str\slice($wireLine, 0, length!($wireLine) - 2);
-    if (length!($line) < 3) {
+    if (!($line is string[3..])) {
       throw new ProtocolException(
         'the SMTP server sent a malformed reply: `' . $line . '`',
       );
@@ -45,7 +45,7 @@ function parse_reply(
 
     $separator = '';
     $text = '';
-    if (length!($line) > 3) {
+    if ($line is string[4..]) {
       $separator = $line[3];
       if (!($separator is ' '|'-')) {
         throw new ProtocolException(
@@ -53,7 +53,7 @@ function parse_reply(
         );
       }
 
-      if (length!($line) > 4) {
+      if ($line is string[5..]) {
         $text = Str\slice($line, 4);
       }
     }

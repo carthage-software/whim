@@ -14,8 +14,8 @@ final class CSVReader {
   #[TrackCaller]
   #[TraceBoundary]
   public static function create(
-    string $delimiter,
-    string $enclosure,
+    string[1] $delimiter,
+    string[1] $enclosure,
   ): CSVReader {}
 
   #[TrackCaller]
@@ -33,9 +33,9 @@ final class CSVWriter {
   #[TrackCaller]
   #[TraceBoundary]
   public static function create(
-    string $delimiter,
-    string $enclosure,
-    string $lineEnding,
+    string[1] $delimiter,
+    string[1] $enclosure,
+    "\n"|"\r\n" $lineEnding,
   ): CSVWriter {}
 
   #[TrackCaller]

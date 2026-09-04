@@ -219,7 +219,7 @@ impl CsvReader {
     const fn construct() {}
 
     #[whim_method(
-        "create(string $delimiter, string $enclosure): Whim\\_Private\\CSVReader",
+        "create(string[1] $delimiter, string[1] $enclosure): Whim\\_Private\\CSVReader",
         static
     )]
     fn create<'call>(
@@ -303,7 +303,7 @@ impl CsvWriter {
     const fn construct() {}
 
     #[whim_method(
-        "create(string $delimiter, string $enclosure, string $lineEnding): Whim\\_Private\\CSVWriter",
+        "create(string[1] $delimiter, string[1] $enclosure, (\"\\n\"|\"\\r\\n\") $lineEnding): Whim\\_Private\\CSVWriter",
         static
     )]
     fn create<'call>(

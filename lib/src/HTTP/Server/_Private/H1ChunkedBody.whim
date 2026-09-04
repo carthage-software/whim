@@ -129,7 +129,7 @@ final class H1ChunkedBody implements ReadHandle {
     $extension = Str\search($line, ';');
     if ($extension != null) {
       $value = Str\slice($line, $extension + 1);
-      if (length!($value) > 4096 || !$this->validExtension($value)) {
+      if (!($value is string[..=4096]) || !$this->validExtension($value)) {
         $this->fail('the request contains an invalid chunk extension');
       }
 
@@ -137,7 +137,7 @@ final class H1ChunkedBody implements ReadHandle {
     }
 
     $line = Str\trim($line, " \t");
-    if ($line == '' || length!($line) > 15) {
+    if (!($line is string[1..=15])) {
       $this->fail('the request chunk size is invalid');
     }
 

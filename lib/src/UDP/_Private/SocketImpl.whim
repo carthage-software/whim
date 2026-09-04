@@ -26,7 +26,7 @@ final class SocketImpl extends DatagramSocketImpl implements Whim\UDP\Socket {
   #[TrackCaller]
   #[TraceBoundary]
   public function sendTo(
-    string $bytes,
+    string[..=65_507] $bytes,
     InternetEndpoint $peer,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,

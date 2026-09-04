@@ -6,7 +6,6 @@ use Whim\Marker\SensitiveParameter;
 use Whim\Marker\TrackCaller;
 use Whim\Network\Host;
 use Whim\Network\Port;
-use Whim\Refine\NonEmptyString;
 use Whim\Unwind\InvalidArgumentException;
 
 /** Configures a SOCKS5 proxy. */
@@ -15,24 +14,12 @@ final readonly class Configuration {
   public function __construct(
     public Host $host,
     public Port $port = 1080,
-    public null|NonEmptyString $username = null,
-    #[SensitiveParameter] public null|NonEmptyString $password = null,
+    public null|string[1..=255] $username = null,
+    #[SensitiveParameter] public null|string[1..=255] $password = null,
   ) {
     if (($username == null) != ($password == null)) {
       throw new InvalidArgumentException(
         'a SOCKS username and password must be configured together',
-      );
-    }
-
-    if ($username != null && length!($username) > 255) {
-      throw new InvalidArgumentException(
-        'a SOCKS username cannot exceed 255 bytes',
-      );
-    }
-
-    if ($password != null && length!($password) > 255) {
-      throw new InvalidArgumentException(
-        'a SOCKS password cannot exceed 255 bytes',
       );
     }
   }
@@ -52,8 +39,8 @@ final readonly class Configuration {
   #[MustUse]
   #[TrackCaller]
   public function withCredentials(
-    null|NonEmptyString $username,
-    #[SensitiveParameter] null|NonEmptyString $password,
+    null|string[1..=255] $username,
+    #[SensitiveParameter] null|string[1..=255] $password,
   ): Configuration {
     return new Configuration($this->host, $this->port, $username, $password);
   }

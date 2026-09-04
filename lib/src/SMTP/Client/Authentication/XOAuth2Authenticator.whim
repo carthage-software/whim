@@ -6,7 +6,6 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\SensitiveParameter;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonEmptyString;
 use Whim\SMTP\Client\Connection;
 
 /** Implements Google's XOAUTH2 SMTP mechanism. */
@@ -18,7 +17,7 @@ final readonly class XOAuth2Authenticator implements Authenticator {
 
   #[AlwaysInline]
   #[MustUse]
-  public function mechanism(): NonEmptyString {
+  public function mechanism(): string[7] {
     return 'XOAUTH2';
   }
 

@@ -444,7 +444,7 @@ function parse_length(StreamId $streamId, string $value): int {
 }
 
 function parse_status(StreamId $streamId, string $value): 100..=599 {
-  if (length!($value) != 3) {
+  if (!($value is string[3])) {
     fail($streamId, 'the HTTP/2 :status field is malformed');
   }
 

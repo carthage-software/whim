@@ -26,4 +26,4 @@ function unicode_code_point_before(
 
 /** Encodes a scalar value as UTF-8. */
 #[Stub]
-function unicode_from_code_point(int $codePoint): string&!'' {}
+function unicode_from_code_point(int $codePoint): string[1..=4] {}

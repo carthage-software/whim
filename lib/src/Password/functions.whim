@@ -24,7 +24,7 @@ function hash(
   #[SensitiveParameter] string $password,
   Algorithm $algorithm,
 ): string {
-  if ($algorithm is Bcrypt && length!($password) > 72) {
+  if ($algorithm is Bcrypt && !($password is string[..=72])) {
     throw new InvalidArgumentException(
       'bcrypt reads at most 72 password bytes; hash a digest of longer input instead',
     );

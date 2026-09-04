@@ -1,5 +1,6 @@
 use Whim\UUID\UUID;
 use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\TypeError;
 
 $v4 = UUID::v4();
 assert!($v4->version == 4);
@@ -37,8 +38,8 @@ $assertion_value_16 = fn(): UUID => UUID::fromBytes('too short');
 $assertion_error_16 = null;
 try {
   $assertion_value_16();
-} catch (InvalidArgumentException $assertion_caught_16) {
+} catch (TypeError $assertion_caught_16) {
   $assertion_error_16 = $assertion_caught_16;
 }
 
-assert!($assertion_error_16 is InvalidArgumentException);
+assert!($assertion_error_16 is TypeError);

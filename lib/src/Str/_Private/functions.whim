@@ -121,7 +121,7 @@ function mask_contains(string $mask, int $byte): bool {
 /** Returns the default ASCII whitespace mask. */
 #[TrackCaller]
 #[TraceBoundary]
-function default_whitespace(): string {
+function default_whitespace(): string[6] {
   return " \t\n\r" . Str\chr(0) . Str\chr(11);
 }
 

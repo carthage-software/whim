@@ -4,7 +4,6 @@ use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Math;
 use Whim\Refine\NonNegativeInt;
-use Whim\Unwind\InvalidArgumentException;
 use Whim\_Private\random_bytes;
 
 /**
@@ -25,23 +24,16 @@ function bytes(NonNegativeInt $length): string {
   return $bytes;
 }
 
-/**
- * Generates a cryptographically secure random string.
- *
- * @throws InvalidArgumentException when the alphabet holds fewer than two bytes.
- */
+/** Generates a cryptographically secure random string. */
 #[NeverInline]
 #[TrackCaller]
-function string(NonNegativeInt $length, null|string $alphabet = null): string {
+function string(
+  NonNegativeInt $length,
+  null|string[2..] $alphabet = null,
+): string {
   $alphabet =
     $alphabet
     ?? '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-  if (length!($alphabet) < 2) {
-    throw new InvalidArgumentException(
-      '$alphabet must contain at least two bytes',
-    );
-  }
 
   $result = '';
   $index = 0;

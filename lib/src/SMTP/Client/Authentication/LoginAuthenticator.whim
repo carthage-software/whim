@@ -6,7 +6,6 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\SensitiveParameter;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonEmptyString;
 use Whim\SMTP\Client\Connection;
 
 /** Implements the SASL LOGIN exchange. */
@@ -18,7 +17,7 @@ final readonly class LoginAuthenticator implements Authenticator {
 
   #[AlwaysInline]
   #[MustUse]
-  public function mechanism(): NonEmptyString {
+  public function mechanism(): string[5] {
     return 'LOGIN';
   }
 

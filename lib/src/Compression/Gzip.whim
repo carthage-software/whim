@@ -7,7 +7,6 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
-use Whim\Refine\NonEmptyString;
 use Whim\_Private\CompressionDecoder;
 use Whim\_Private\CompressionEncoder;
 
@@ -17,7 +16,7 @@ final readonly class Gzip implements Codec {
 
   #[AlwaysInline]
   #[MustUse]
-  public function coding(): NonEmptyString {
+  public function coding(): 'gzip' {
     return 'gzip';
   }
 

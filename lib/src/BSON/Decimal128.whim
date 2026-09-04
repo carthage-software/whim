@@ -6,24 +6,23 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonEmptyString;
 
 /** The exact 16-byte IEEE 754 decimal128 representation. */
 #[Stub]
 final readonly class Decimal128 implements Equal<Decimal128> {
   #[AlwaysInline]
-  private function __construct(private NonEmptyString $bytes) {}
+  private function __construct(private string[16] $bytes) {}
 
   /** Creates a decimal128 value from exactly 16 bytes. */
   #[MustUse]
   #[NeverInline]
   #[TrackCaller]
-  public static function fromBytes(string $bytes): Decimal128 {}
+  public static function fromBytes(string[16] $bytes): Decimal128 {}
 
   /** Returns the exact 16-byte representation. */
   #[AlwaysInline]
   #[MustUse]
-  public function toBytes(): NonEmptyString {}
+  public function toBytes(): string[16] {}
 
   /** Reports whether two values have the same representation. */
   #[AlwaysInline]

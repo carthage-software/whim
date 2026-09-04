@@ -1,7 +1,6 @@
 namespace Whim\Binary;
 
 use Whim;
-use Whim\Binary\_Private;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
@@ -14,45 +13,27 @@ use Whim\Refine\Uint32;
 use Whim\Refine\Uint8;
 use Whim\Unwind\OverflowException;
 
-/**
- * Reads one byte as an unsigned 8-bit integer.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads one byte as an unsigned 8-bit integer. */
 #[MustUse]
 #[TrackCaller]
-function decode_u8(string $bytes): Uint8 {
-  _Private\require_length($bytes, 1);
-
+function decode_u8(string[1..] $bytes): Uint8 {
   return Whim\_Private\binary_decode($bytes, 0, 1, false, false) as int;
 }
 
-/**
- * Reads one byte as a signed 8-bit integer.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads one byte as a signed 8-bit integer. */
 #[MustUse]
 #[TrackCaller]
-function decode_i8(string $bytes): Int8 {
-  _Private\require_length($bytes, 1);
-
+function decode_i8(string[1..] $bytes): Int8 {
   return Whim\_Private\binary_decode($bytes, 0, 1, true, false) as int;
 }
 
-/**
- * Reads two bytes as an unsigned 16-bit integer.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads two bytes as an unsigned 16-bit integer. */
 #[MustUse]
 #[TrackCaller]
 function decode_u16(
-  string $bytes,
+  string[2..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): Uint16 {
-  _Private\require_length($bytes, 2);
-
   return (
     Whim\_Private\binary_decode(
       $bytes,
@@ -65,19 +46,13 @@ function decode_u16(
   );
 }
 
-/**
- * Reads two bytes as a signed 16-bit integer.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads two bytes as a signed 16-bit integer. */
 #[MustUse]
 #[TrackCaller]
 function decode_i16(
-  string $bytes,
+  string[2..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): Int16 {
-  _Private\require_length($bytes, 2);
-
   return (
     Whim\_Private\binary_decode(
       $bytes,
@@ -90,19 +65,13 @@ function decode_i16(
   );
 }
 
-/**
- * Reads four bytes as an unsigned 32-bit integer.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads four bytes as an unsigned 32-bit integer. */
 #[MustUse]
 #[TrackCaller]
 function decode_u32(
-  string $bytes,
+  string[4..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): Uint32 {
-  _Private\require_length($bytes, 4);
-
   return (
     Whim\_Private\binary_decode(
       $bytes,
@@ -115,19 +84,13 @@ function decode_u32(
   );
 }
 
-/**
- * Reads four bytes as a signed 32-bit integer.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads four bytes as a signed 32-bit integer. */
 #[MustUse]
 #[TrackCaller]
 function decode_i32(
-  string $bytes,
+  string[4..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): Int32 {
-  _Private\require_length($bytes, 4);
-
   return (
     Whim\_Private\binary_decode(
       $bytes,
@@ -143,17 +106,15 @@ function decode_i32(
 /**
  * Reads eight bytes as an unsigned 64-bit integer.
  *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
  * @throws OverflowException when the value does not fit in a signed 64-bit integer.
  */
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
 function decode_u64(
-  string $bytes,
+  string[8..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): NonNegativeInt {
-  _Private\require_length($bytes, 8);
   $value = Whim\_Private\binary_decode(
     $bytes,
     0,
@@ -171,19 +132,13 @@ function decode_u64(
   return $value;
 }
 
-/**
- * Reads eight bytes as a signed 64-bit integer.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads eight bytes as a signed 64-bit integer. */
 #[MustUse]
 #[TrackCaller]
 function decode_i64(
-  string $bytes,
+  string[8..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): int {
-  _Private\require_length($bytes, 8);
-
   return (
     Whim\_Private\binary_decode(
       $bytes,
@@ -196,18 +151,13 @@ function decode_i64(
   );
 }
 
-/**
- * Reads four bytes as a single-precision floating-point value.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads four bytes as a single-precision floating-point value. */
 #[MustUse]
 #[TrackCaller]
 function decode_f32(
-  string $bytes,
+  string[4..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): float {
-  _Private\require_length($bytes, 4);
   $bits = Whim\_Private\binary_decode(
     $bytes,
     0,
@@ -220,18 +170,13 @@ function decode_f32(
   return Whim\_Private\bits32_to_float($bits);
 }
 
-/**
- * Reads eight bytes as a double-precision floating-point value.
- *
- * @throws UnderflowException when the input holds fewer bytes than the value needs.
- */
+/** Reads eight bytes as a double-precision floating-point value. */
 #[MustUse]
 #[TrackCaller]
 function decode_f64(
-  string $bytes,
+  string[8..] $bytes,
   Endianness $endianness = Endianness::Big,
 ): float {
-  _Private\require_length($bytes, 8);
   $bits = Whim\_Private\binary_decode(
     $bytes,
     0,

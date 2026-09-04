@@ -5,7 +5,6 @@ use Whim\IO\WriteHandle;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\Iterable;
-use Whim\Refine\NonEmptyString;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\_Private\CSVWriter;
 
@@ -18,17 +17,14 @@ final readonly class Writer {
   #[TrackCaller]
   public function __construct(
     private WriteHandle $handle,
-    NonEmptyString $delimiter = ',',
-    NonEmptyString $enclosure = '"',
-    NonEmptyString $lineEnding = "\r\n",
+    string[1] $delimiter = ',',
+    string[1] $enclosure = '"',
+    "\n"|"\r\n" $lineEnding = "\r\n",
   ) {
     if (
-      length!($delimiter) != 1
-      || length!($enclosure) != 1
-      || $delimiter == $enclosure
+      $delimiter == $enclosure
       || ($delimiter is "\r"|"\n")
       || ($enclosure is "\r"|"\n")
-      || ($lineEnding != "\n" && $lineEnding != "\r\n")
     ) {
       throw new InvalidArgumentException('invalid CSV writer dialect');
     }

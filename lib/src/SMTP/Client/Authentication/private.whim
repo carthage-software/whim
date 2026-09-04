@@ -57,7 +57,7 @@ function require_authentication_success(
 function parse_scram_attributes(string $message): dict<string, string> {
   $attributes = dict[];
   foreach (Str\split($message, ',') as $attribute) {
-    if (length!($attribute) < 3 || $attribute[1] != '=') {
+    if (!($attribute is string[3..]) || $attribute[1] != '=') {
       throw new AuthenticationException(
         'the SMTP server sent malformed SCRAM data',
       );

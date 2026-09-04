@@ -14,14 +14,14 @@ use Whim\Refine\Uint8;
 /** Writes an unsigned 8-bit integer as one byte. */
 #[AlwaysInline]
 #[MustUse]
-function encode_u8(Uint8 $value): string {
+function encode_u8(Uint8 $value): string[1] {
   return _Private\binary_encode($value, 1, false);
 }
 
 /** Writes a signed 8-bit integer as one byte. */
 #[AlwaysInline]
 #[MustUse]
-function encode_i8(Int8 $value): string {
+function encode_i8(Int8 $value): string[1] {
   return _Private\binary_encode($value, 1, false);
 }
 
@@ -31,7 +31,7 @@ function encode_i8(Int8 $value): string {
 function encode_u16(
   Uint16 $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[2] {
   return _Private\binary_encode($value, 2, $endianness == Endianness::Little);
 }
 
@@ -41,7 +41,7 @@ function encode_u16(
 function encode_i16(
   Int16 $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[2] {
   return _Private\binary_encode($value, 2, $endianness == Endianness::Little);
 }
 
@@ -51,7 +51,7 @@ function encode_i16(
 function encode_u32(
   Uint32 $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[4] {
   return _Private\binary_encode($value, 4, $endianness == Endianness::Little);
 }
 
@@ -61,7 +61,7 @@ function encode_u32(
 function encode_i32(
   Int32 $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[4] {
   return _Private\binary_encode($value, 4, $endianness == Endianness::Little);
 }
 
@@ -71,7 +71,7 @@ function encode_i32(
 function encode_u64(
   NonNegativeInt $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[8] {
   return _Private\binary_encode($value, 8, $endianness == Endianness::Little);
 }
 
@@ -81,7 +81,7 @@ function encode_u64(
 function encode_i64(
   int $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[8] {
   return _Private\binary_encode($value, 8, $endianness == Endianness::Little);
 }
 
@@ -91,7 +91,7 @@ function encode_i64(
 function encode_f32(
   float $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[4] {
   return _Private\binary_encode(
     _Private\float_to_bits32($value),
     4,
@@ -105,7 +105,7 @@ function encode_f32(
 function encode_f64(
   float $value,
   Endianness $endianness = Endianness::Big,
-): string {
+): string[8] {
   return _Private\binary_encode(
     _Private\float_to_bits($value),
     8,

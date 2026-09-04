@@ -300,7 +300,7 @@ pub(crate) fn string_replace<'call>(
     context.string(&result)
 }
 
-#[whim_function("Whim\\_Private\\string_ord((string&!'') $character): 0..=255")]
+#[whim_function("Whim\\_Private\\string_ord(string[1] $character): 0..=255")]
 pub(crate) fn string_ord(arguments: Arguments<'_>) -> Value {
     let value = arguments.bytes(0);
     // SAFETY: the surrounding invariant proves this option contains a value.
@@ -314,7 +314,7 @@ pub(crate) fn string_ord(arguments: Arguments<'_>) -> Value {
     Value::int(i64::from(*byte))
 }
 
-#[whim_function("Whim\\_Private\\string_chr(0..=255 $byte): string")]
+#[whim_function("Whim\\_Private\\string_chr(0..=255 $byte): string[1]")]
 pub(crate) fn string_chr<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,

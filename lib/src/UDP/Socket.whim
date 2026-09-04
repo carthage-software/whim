@@ -11,7 +11,7 @@ interface Socket extends DatagramSocket {
   #[MustUse]
   #[TrackCaller]
   public function sendTo(
-    string $bytes,
+    string[..=65_507] $bytes,
     InternetEndpoint $peer,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,

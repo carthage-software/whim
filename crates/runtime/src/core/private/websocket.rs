@@ -328,7 +328,7 @@ fn create_codec<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\websocket_accept_key(string $key): null|string",
+    "Whim\\_Private\\websocket_accept_key(string $key): null|string[28]",
     must_use
 )]
 pub(crate) fn accept_key(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {

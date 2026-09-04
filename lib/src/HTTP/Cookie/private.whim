@@ -101,6 +101,6 @@ function parse_integer(string $value): null|int {
 }
 
 /** Formats a wall-clock time as an IMF-fixdate. */
-function format_expires(SystemTime $time): string {
+function format_expires(SystemTime $time): string[29] {
   return Formatter::httpDate()->formatZonedDateTime(TimeZone::utc()->at($time));
 }

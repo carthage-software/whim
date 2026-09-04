@@ -10,32 +10,32 @@ use Whim\Marker\TraceBoundary;
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function uuid_v4(): string {}
+function uuid_v4(): string[16] {}
 
 /** Generates the 16 bytes of a time-ordered UUID version 7. */
 #[MustUse]
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function uuid_v7(): string {}
+function uuid_v7(): string[16] {}
 
 /** Parses canonical UUID text into its 16 bytes. */
 #[MustUse]
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function uuid_parse(string $value): null|string {}
+function uuid_parse(string $value): null|string[16] {}
 
 /** Formats 16 UUID bytes as canonical text. */
 #[MustUse]
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function uuid_format(string $bytes): null|string {}
+function uuid_format(string[16] $bytes): string[36] {}
 
 /** Returns the recognized UUID version encoded in 16 bytes. */
 #[MustUse]
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function uuid_version(string $bytes): null|1..=8 {}
+function uuid_version(string[16] $bytes): null|1..=8 {}
