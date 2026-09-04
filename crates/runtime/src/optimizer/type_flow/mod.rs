@@ -44,6 +44,7 @@ mod constants;
 mod descriptors;
 mod proofs;
 mod resolve;
+mod string_lengths;
 mod transfer;
 mod world;
 

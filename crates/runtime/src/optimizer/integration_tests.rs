@@ -1616,6 +1616,263 @@ fn named_calls_with_omitted_defaults_elide_parameter_checks() {
 }
 
 #[test]
+fn string_length_ranges_elide_only_proven_type_checks() {
+    let unit = compile(
+        r#"
+        use Whim\Marker\NeverInline;
+
+        #[NeverInline]
+        function exact(): string[4] {
+            return "four";
+        }
+
+        #[NeverInline]
+        function minimum(): string[4..] {
+            return "four";
+        }
+
+        #[NeverInline]
+        function maximum(): string[..=4] {
+            return "four";
+        }
+
+        #[NeverInline]
+        function bounded(): string[2..=4] {
+            return "four";
+        }
+
+        #[NeverInline]
+        function empty(): string[0] {
+            return "";
+        }
+
+        #[NeverInline]
+        function covered(): string[1..=8] {
+            return "four";
+        }
+
+        #[NeverInline]
+        function intersected(): string[1..=8]&string[4..=12] {
+            return "four";
+        }
+
+        #[NeverInline]
+        function except_four(): string&!string[4] {
+            return "five!";
+        }
+
+        function exact_to_minimum(): string[1..] {
+            return exact();
+        }
+
+        function exact_to_maximum(): string[..=8] {
+            return exact();
+        }
+
+        function exact_to_bounded(): string[1..=8] {
+            return exact();
+        }
+
+        function minimum_to_minimum(): string[1..] {
+            return minimum();
+        }
+
+        function maximum_to_maximum(): string[..=8] {
+            return maximum();
+        }
+
+        function bounded_to_minimum(): string[1..] {
+            return bounded();
+        }
+
+        function bounded_to_maximum(): string[..=8] {
+            return bounded();
+        }
+
+        function bounded_to_bounded(): string[1..=8] {
+            return bounded();
+        }
+
+        function empty_to_maximum(): string[..=8] {
+            return empty();
+        }
+
+        function covered_by_union(): string[1..=4]|string[5..=8] {
+            return covered();
+        }
+
+        function narrowed_by_intersection(): string[4..=8] {
+            return intersected();
+        }
+
+        function covered_by_complement(): string[..=3]|string[5..] {
+            return except_four();
+        }
+
+        type Four = string[4];
+        type NonEmpty = string[1..];
+
+        #[NeverInline]
+        function alias_exact(): Four {
+            return "four";
+        }
+
+        function alias_to_alias(): NonEmpty {
+            return alias_exact();
+        }
+
+        #[NeverInline]
+        function identity<T>(T $value): T {
+            return $value;
+        }
+
+        function generic_to_minimum(): string[1..] {
+            return identity::<string[4]>("four");
+        }
+
+        #[NeverInline]
+        function consume(string[1..=8] $_): void {}
+
+        function pass_exact(): void {
+            consume(exact());
+        }
+
+        #[NeverInline]
+        function consume_exact(string[4] $_): void {}
+
+        function pass_covered(): void {
+            consume_exact(covered());
+        }
+
+        final class LengthBox {
+            public string[1..=8] $value = "a";
+            public string[4] $exact = "four";
+
+            public function set(): void {
+                $this->value = exact();
+            }
+
+            public function setUnproven(string[1..=8] $value): void {
+                $this->exact = $value;
+            }
+        }
+
+        function uncovered_gap(): string[1..=3]|string[5..=8] {
+            return covered();
+        }
+
+        function narrower_than_source(): string[4] {
+            return covered();
+        }
+        "#,
+        OptimizationConfiguration::default(),
+    );
+
+    for name in [
+        b"exact_to_minimum".as_slice(),
+        b"exact_to_maximum".as_slice(),
+        b"exact_to_bounded".as_slice(),
+        b"minimum_to_minimum".as_slice(),
+        b"maximum_to_maximum".as_slice(),
+        b"bounded_to_minimum".as_slice(),
+        b"bounded_to_maximum".as_slice(),
+        b"bounded_to_bounded".as_slice(),
+        b"empty_to_maximum".as_slice(),
+        b"covered_by_union".as_slice(),
+        b"narrowed_by_intersection".as_slice(),
+        b"covered_by_complement".as_slice(),
+        b"alias_to_alias".as_slice(),
+        b"generic_to_minimum".as_slice(),
+    ] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name)
+            .expect("the checked function exists");
+        assert!(
+            function.chunk.code.iter().any(|instruction| matches!(
+                instruction,
+                Instruction::ReturnUnchecked { .. }
+                    | Instruction::ReturnReferenceUnchecked { .. }
+                    | Instruction::ReturnScalarUnchecked { .. }
+            )),
+            "{}: {:#?}",
+            String::from_utf8_lossy(name),
+            function.chunk.code,
+        );
+        assert!(
+            function
+                .chunk
+                .code
+                .iter()
+                .all(|instruction| !matches!(instruction, Instruction::Return { .. })),
+            "{}: {:#?}",
+            String::from_utf8_lossy(name),
+            function.chunk.code,
+        );
+    }
+
+    let pass_exact = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"pass_exact")
+        .expect("the caller exists");
+    assert!(pass_exact.chunk.code.iter().any(|instruction| matches!(
+        instruction,
+        Instruction::CallNamedUnchecked { .. }
+            | Instruction::CallNamedConstantUnchecked { .. }
+            | Instruction::CallSelfUnchecked { .. }
+    )));
+    assert!(
+        pass_exact
+            .chunk
+            .code
+            .iter()
+            .all(|instruction| !matches!(instruction, Instruction::CallNamed { .. }))
+    );
+    assert!(
+        method(&unit, b"LengthBox::set")
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::PropertySetUnchecked { .. }))
+    );
+    let pass_covered = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"pass_covered")
+        .expect("the checked caller exists");
+    assert!(
+        pass_covered
+            .chunk
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::CallNamed { .. }))
+    );
+    assert!(
+        method(&unit, b"LengthBox::setUnproven")
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::PropertySet { .. }))
+    );
+
+    for name in [b"uncovered_gap".as_slice(), b"narrower_than_source"] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name)
+            .expect("the checked function exists");
+        assert!(
+            function
+                .chunk
+                .code
+                .iter()
+                .any(|instruction| matches!(instruction, Instruction::Return { .. })),
+            "{}: {:#?}",
+            String::from_utf8_lossy(name),
+            function.chunk.code,
+        );
+    }
+}
+
+#[test]
 fn foreach_tuple_elements_elide_named_call_parameter_checks() {
     let unit = compile(
         r#"

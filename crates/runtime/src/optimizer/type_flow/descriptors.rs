@@ -19,6 +19,7 @@ use crate::optimizer::type_flow::TUPLE;
 use crate::optimizer::type_flow::TypeDescriptor;
 use crate::optimizer::type_flow::VECTOR;
 use crate::optimizer::type_flow::same_atom;
+use crate::optimizer::type_flow::string_lengths::string_lengths_prove;
 
 pub(in crate::optimizer) fn substitute_parameters(
     descriptor: &TypeDescriptor,
@@ -194,6 +195,9 @@ pub(crate) fn descriptor_proves(
         return depth <= MAX_TYPE_DEPTH;
     }
     if descriptors_equal(actual, expected, depth + 1) || matches!(actual, TypeDescriptor::Never) {
+        return true;
+    }
+    if string_lengths_prove(actual, expected, depth + 1) {
         return true;
     }
     if let TypeDescriptor::Union(members) = actual {
