@@ -6,6 +6,7 @@ use crate::bytecode::instruction::operands::PropertyReadMode;
 use crate::classes::MethodEntry;
 use crate::engine::builtins;
 use crate::engine::builtins::BuiltInCallable;
+use crate::symbols::CachedExactMethodFrame;
 use crate::symbols::GuardedMethodWays;
 use crate::vm::Atom;
 use crate::vm::CacheEntry;
@@ -50,7 +51,7 @@ fn returned_register(instruction: Instruction) -> Option<u16> {
 impl VirtualMachine<'_> {
     /// Dispatches a method site whose exact final receiver, non-generic
     /// method, arity, and argument types were proven by whole-unit type flow.
-    #[inline(always)]
+    #[inline(never)]
     pub(in crate::vm) fn call_exact_method_site(
         &mut self,
         site: usize,
@@ -71,10 +72,60 @@ impl VirtualMachine<'_> {
         }
 
         // SAFETY: the value's tag proves this projection is valid.
-        let receiver = unsafe {
+        let mut receiver = unsafe {
             mem::replace(&mut self.stack[window_start], Value::uninitialized())
                 .into_object_unchecked()
         };
+        let receiver_class = receiver.class();
+        let Some(cached) = self
+            .cached_exact_method_frame(site, receiver_class)
+            .copied()
+        else {
+            return self.call_uncached_exact_method_site(
+                site,
+                chunk,
+                destination,
+                window_start,
+                count,
+                receiver,
+            );
+        };
+        match self.call_cached_method_fast_path(
+            cached.fast_path,
+            destination,
+            receiver,
+            window_start + 1,
+            count - 1,
+        ) {
+            Ok(()) => return Ok(()),
+            Err(returned_receiver) => receiver = returned_receiver,
+        }
+        let type_environment = self.exact_method_environment(
+            receiver_class,
+            receiver.type_environment(),
+            cached.entry.scope,
+        )?;
+        self.push_exact_method_frame(
+            cached.entry,
+            destination,
+            receiver,
+            window_start + 1,
+            count - 1,
+            type_environment,
+            false,
+        )
+    }
+
+    #[inline(never)]
+    fn call_uncached_exact_method_site(
+        &mut self,
+        site: usize,
+        chunk: &Chunk,
+        destination: u16,
+        window_start: usize,
+        count: usize,
+        mut receiver: ManagedRef<InstanceObject>,
+    ) -> Result<(), VirtualMachineControl> {
         let receiver_class = receiver.class();
         let (method, is_constructor) = self.exact_method_entry_for(site, chunk, receiver_class)?;
         if matches!(method.body, MethodBodyKind::BuiltIn(_)) {
@@ -90,19 +141,33 @@ impl VirtualMachine<'_> {
             );
         }
 
-        let entry = self.exact_bytecode_method_frame_entry_for(
-            site,
-            chunk,
-            method,
-            receiver_class,
-            is_constructor,
-            destination,
-        );
+        let CachedExactMethodFrame { entry, fast_path } = self
+            .exact_bytecode_method_frame_entry_for(
+                site,
+                chunk,
+                method,
+                receiver_class,
+                is_constructor,
+                destination,
+                count - 1,
+            )?;
+
         let type_environment = self.exact_method_environment(
             receiver_class,
             receiver.type_environment(),
             entry.scope,
         )?;
+
+        match self.call_cached_method_fast_path(
+            fast_path,
+            destination,
+            receiver,
+            window_start + 1,
+            count - 1,
+        ) {
+            Ok(()) => return Ok(()),
+            Err(returned_receiver) => receiver = returned_receiver,
+        }
 
         self.push_exact_method_frame(
             entry,
@@ -126,7 +191,7 @@ impl VirtualMachine<'_> {
         count: usize,
     ) -> Result<(), VirtualMachineControl> {
         // SAFETY: the value's tag proves this projection is valid.
-        let receiver = unsafe {
+        let mut receiver = unsafe {
             mem::replace(&mut self.stack[window_start], Value::uninitialized())
                 .into_object_unchecked()
         };
@@ -137,6 +202,17 @@ impl VirtualMachine<'_> {
         if let Some(cached) =
             self.cached_guarded_method(caller_cache, site, receiver_class, receiver_environment)
         {
+            match self.call_cached_method_fast_path(
+                cached.fast_path,
+                destination,
+                receiver,
+                window_start + 1,
+                count - 1,
+            ) {
+                Ok(()) => return Ok(()),
+                Err(returned_receiver) => receiver = returned_receiver,
+            }
+
             if let Some(parameter_count) = cached.trivial_constructor_parameters {
                 self.call_trivial_constructor(
                     cached.entry,
@@ -174,15 +250,17 @@ impl VirtualMachine<'_> {
             );
         }
 
-        let mut entry = self.exact_bytecode_method_frame_entry_for(
-            site,
-            chunk,
-            method,
-            receiver_class,
-            is_constructor,
-            destination,
-        );
-        entry.function = self.ensure_function_entry_finalized(entry.function)?;
+        let CachedExactMethodFrame { entry, fast_path } = self
+            .exact_bytecode_method_frame_entry_for(
+                site,
+                chunk,
+                method,
+                receiver_class,
+                is_constructor,
+                destination,
+                count - 1,
+            )?;
+
         let outer =
             self.exact_method_environment(receiver_class, receiver_environment, entry.scope)?;
         let name = name_atom(chunk, site);
@@ -202,7 +280,7 @@ impl VirtualMachine<'_> {
                 entry,
                 arguments: CachedMethodArguments::Proven,
                 trivial_constructor_parameters,
-                fast_path: CachedMethodFastPath::None,
+                fast_path,
             },
         );
 
@@ -216,6 +294,17 @@ impl VirtualMachine<'_> {
                 false,
             );
             return Ok(());
+        }
+
+        match self.call_cached_method_fast_path(
+            fast_path,
+            destination,
+            receiver,
+            window_start + 1,
+            count - 1,
+        ) {
+            Ok(()) => return Ok(()),
+            Err(returned_receiver) => receiver = returned_receiver,
         }
 
         self.push_exact_method_frame(
@@ -232,7 +321,30 @@ impl VirtualMachine<'_> {
     /// Dispatches a whole-unit-proven method directly from caller registers.
     /// The caller remains suspended with the receiver alive, so a narrow
     /// callee frame can borrow it instead of retaining and releasing it.
+    #[inline(never)]
     pub(in crate::vm) fn call_direct_method_site(
+        &mut self,
+        site: usize,
+        chunk: &Chunk,
+        destination: u16,
+        window_start: usize,
+        count: usize,
+    ) -> Result<(), VirtualMachineControl> {
+        if site_type_arguments(chunk, site).is_none() {
+            let receiver = self.stack[window_start]
+                .as_object()
+                .expect("a direct method call has a proven object receiver");
+            let fast_path = self.cached_exact_method_fast_path(site, receiver.class());
+            if self.call_direct_method_fast_path(fast_path, destination, window_start) {
+                return Ok(());
+            }
+        }
+
+        self.call_uncached_direct_method_site(site, chunk, destination, window_start, count)
+    }
+
+    #[inline(never)]
+    fn call_uncached_direct_method_site(
         &mut self,
         site: usize,
         chunk: &Chunk,
@@ -251,6 +363,10 @@ impl VirtualMachine<'_> {
             if let Some(cached) =
                 self.cached_guarded_method(caller_cache, site, receiver_class, receiver_environment)
             {
+                if self.call_direct_method_fast_path(cached.fast_path, destination, window_start) {
+                    return Ok(());
+                }
+
                 return self.push_direct_method_frame(
                     cached.entry,
                     destination,
@@ -277,14 +393,17 @@ impl VirtualMachine<'_> {
                 );
             }
 
-            let entry = self.exact_bytecode_method_frame_entry_for(
-                site,
-                chunk,
-                method,
-                receiver_class,
-                is_constructor,
-                destination,
-            );
+            let CachedExactMethodFrame { entry, fast_path } = self
+                .exact_bytecode_method_frame_entry_for(
+                    site,
+                    chunk,
+                    method,
+                    receiver_class,
+                    is_constructor,
+                    destination,
+                    count - 1,
+                )?;
+
             let outer =
                 self.exact_method_environment(receiver_class, receiver_environment, entry.scope)?;
             let name = name_atom(chunk, site);
@@ -303,9 +422,13 @@ impl VirtualMachine<'_> {
                     entry,
                     arguments: CachedMethodArguments::Proven,
                     trivial_constructor_parameters: None,
-                    fast_path: CachedMethodFastPath::None,
+                    fast_path,
                 },
             );
+
+            if self.call_direct_method_fast_path(fast_path, destination, window_start) {
+                return Ok(());
+            }
 
             return self.push_direct_method_frame(
                 entry,
@@ -332,16 +455,23 @@ impl VirtualMachine<'_> {
             );
         }
 
-        let entry = self.exact_bytecode_method_frame_entry_for(
-            site,
-            chunk,
-            method,
-            receiver_class,
-            is_constructor,
-            destination,
-        );
+        let CachedExactMethodFrame { entry, fast_path } = self
+            .exact_bytecode_method_frame_entry_for(
+                site,
+                chunk,
+                method,
+                receiver_class,
+                is_constructor,
+                destination,
+                count - 1,
+            )?;
+
         let type_environment =
             self.exact_method_environment(receiver_class, receiver_environment, entry.scope)?;
+        if self.call_direct_method_fast_path(fast_path, destination, window_start) {
+            return Ok(());
+        }
+
         self.push_direct_method_frame(
             entry,
             destination,
@@ -351,39 +481,70 @@ impl VirtualMachine<'_> {
         )
     }
 
+    #[inline(always)]
+    fn cached_exact_method_frame(
+        &self,
+        site: usize,
+        receiver_class: ClassId,
+    ) -> Option<&CachedExactMethodFrame> {
+        let cache_pointer = self.current_frame().cache;
+        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
+        let cache_cell = unsafe { cache_pointer.as_ref() };
+        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
+        let cache = unsafe { &*cache_cell.exact_methods() };
+        cache
+            .get(site)
+            .and_then(Option::as_ref)
+            .filter(|cached| cached.entry.called == receiver_class)
+    }
+
+    #[inline(always)]
+    fn cached_exact_method_fast_path(
+        &self,
+        site: usize,
+        receiver_class: ClassId,
+    ) -> CachedMethodFastPath {
+        self.cached_exact_method_frame(site, receiver_class)
+            .map_or(CachedMethodFastPath::None, |cached| cached.fast_path)
+    }
+
     /// Returns the compact frame metadata for an exact direct method site,
     /// resolving and copying it out of the engine's wider tables once.
     #[inline(always)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the resolved call shape includes the argument count for cached return arguments"
+    )]
     fn exact_bytecode_method_frame_entry_for(
-        &self,
+        &mut self,
         site: usize,
         chunk: &Chunk,
         method: MethodEntry,
         receiver_class: ClassId,
         is_constructor: bool,
         destination: u16,
-    ) -> ExactMethodEntry {
-        let cache_pointer = self.current_frame().cache;
-        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
-        let cache_cell = unsafe { cache_pointer.as_ref() };
-        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
-        let cache = unsafe { &*cache_cell.exact_methods() };
-        if !cache.is_empty()
-            // SAFETY: the surrounding invariant keeps this index in bounds.
-            && let Some(entry) = unsafe { *cache.get_unchecked(site) }
-            && entry.called == receiver_class
-        {
-            return entry;
+        argument_count: usize,
+    ) -> Result<CachedExactMethodFrame, VirtualMachineControl> {
+        if let Some(entry) = self.cached_exact_method_frame(site, receiver_class) {
+            return Ok(*entry);
         }
 
-        let entry = self.exact_method_frame_entry(
+        let mut entry = self.exact_method_frame_entry(
             chunk,
             method,
             receiver_class,
             is_constructor,
             destination,
         );
+        entry.function = self.ensure_function_entry_finalized(entry.function)?;
+        let entry = CachedExactMethodFrame {
+            fast_path: Self::cached_method_fast_path(&entry, argument_count),
+            entry,
+        };
 
+        let cache_pointer = self.current_frame().cache;
+        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
+        let cache_cell = unsafe { cache_pointer.as_ref() };
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let cache = unsafe { &mut *cache_cell.exact_methods() };
         if cache.is_empty() {
@@ -395,7 +556,7 @@ impl VirtualMachine<'_> {
             *cache.get_unchecked_mut(site) = Some(entry);
         }
 
-        entry
+        Ok(entry)
     }
 
     #[expect(
@@ -549,7 +710,10 @@ impl VirtualMachine<'_> {
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let chunk = unsafe { entry.function.chunk.as_ref() };
         let mut code = chunk.code.as_slice();
-        if matches!(code.last(), Some(Instruction::ReturnNull)) {
+        if matches!(
+            code.last(),
+            Some(Instruction::ReturnNull | Instruction::ReturnNullUnchecked)
+        ) {
             code = &code[..code.len() - 1];
         }
 
@@ -618,6 +782,47 @@ impl VirtualMachine<'_> {
         let target = self.current_frame().base as usize + usize::from(destination);
         self.stack[target] = value;
         Ok(())
+    }
+
+    #[inline(always)]
+    fn cached_method_property(receiver: &InstanceObject, slot: u16) -> Value {
+        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
+        unsafe { receiver.read_slot_unchecked(usize::from(slot)) }
+    }
+
+    #[inline(always)]
+    fn call_direct_method_fast_path(
+        &mut self,
+        fast_path: CachedMethodFastPath,
+        destination: u16,
+        window_start: usize,
+    ) -> bool {
+        let value = match fast_path {
+            CachedMethodFastPath::None => return false,
+            CachedMethodFastPath::ReturnReceiver => Value::object(
+                self.stack[window_start]
+                    .as_object()
+                    .expect("a direct method call has a proven object receiver")
+                    .clone(),
+            ),
+            CachedMethodFastPath::ReturnArgument(position) => {
+                self.stack[window_start + 1 + usize::from(position)].clone()
+            }
+            CachedMethodFastPath::ReturnProperty(slot) => {
+                let receiver = self.stack[window_start]
+                    .as_object()
+                    .expect("a direct method call has a proven object receiver");
+                let value = Self::cached_method_property(receiver, slot);
+                if value.is_uninitialized() {
+                    return false;
+                }
+                value
+            }
+        };
+
+        let target = self.current_frame().base as usize + usize::from(destination);
+        self.stack[target] = value;
+        true
     }
 
     #[inline(always)]

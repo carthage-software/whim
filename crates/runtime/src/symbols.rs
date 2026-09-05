@@ -97,6 +97,12 @@ pub(crate) struct ExactMethodEntry {
     pub(crate) is_constructor: bool,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct CachedExactMethodFrame {
+    pub(crate) entry: ExactMethodEntry,
+    pub(crate) fast_path: CachedMethodFastPath,
+}
+
 pub(crate) struct CachedBoundCallable {
     pub(crate) target: CallTarget,
     pub(crate) argument_environment: TypeEnvironmentId,
@@ -512,7 +518,7 @@ pub(crate) struct InlineCache {
     property_slots: UnsafeCell<Vec<CachedPropertySlot>>,
     exact_functions: UnsafeCell<Vec<Option<ExactFunctionEntry>>>,
     exact_built_in_functions: UnsafeCell<Vec<Option<ExactBuiltInFunctionEntry>>>,
-    exact_methods: UnsafeCell<Vec<Option<ExactMethodEntry>>>,
+    exact_methods: UnsafeCell<Vec<Option<CachedExactMethodFrame>>>,
     bound_callables: UnsafeCell<Vec<Option<CachedBoundCallable>>>,
     instantiation_environments: UnsafeCell<Vec<InstantiationWays>>,
     newtype_constructors: UnsafeCell<Vec<NewtypeConstructorWays>>,
@@ -553,7 +559,7 @@ impl InlineCache {
         exact_functions: Option<ExactFunctionEntry>,
         exact_built_in_functions: Option<ExactBuiltInFunctionEntry>,
         /// The once-resolved exact-method targets.
-        exact_methods: Option<ExactMethodEntry>,
+        exact_methods: Option<CachedExactMethodFrame>,
         bound_callables: Option<CachedBoundCallable>,
         instantiation_environments: InstantiationWays,
         newtype_constructors: NewtypeConstructorWays,
