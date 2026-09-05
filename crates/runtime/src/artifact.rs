@@ -4,10 +4,12 @@
 
 use std::error::Error;
 use std::fmt;
+use std::io::ErrorKind as IoErrorKind;
 use std::rc::Rc;
 use std::str::from_utf8;
 use std::str::from_utf8_unchecked;
 
+use bincode::ErrorKind as DecodeErrorKind;
 use bincode::serialize;
 use whim_span::Position;
 use whim_syn::arena::Arena;
@@ -453,8 +455,12 @@ fn decode_parts<'source>(
         return Err(ArtifactError::new("artifact contains trailing bytes"));
     }
 
-    let unit = compiled_unit(bytecode, heap)
-        .map_err(|error| ArtifactError::new(format!("artifact bytecode is invalid: {error}")))?;
+    let unit = compiled_unit(bytecode, heap).map_err(|error| match error.as_ref() {
+        DecodeErrorKind::Io(error) if error.kind() == IoErrorKind::UnexpectedEof => {
+            ArtifactError::new("artifact bytecode is invalid: io error: unexpected end of file")
+        }
+        _ => ArtifactError::new(format!("artifact bytecode is invalid: {error}")),
+    })?;
     Ok(DecodedParts {
         unit,
         source,

@@ -36,8 +36,9 @@ impl<'de> DeserializeSeeded<'de, Heap> for Atom {
         heap: &Heap,
         deserializer: D,
     ) -> Result<Self, D::Error> {
-        let (bytes, immortal): (Vec<u8>, bool) = serde::Deserialize::deserialize(deserializer)?;
-        let atom = heap.intern(&bytes);
+        // Artifact decoding borrows its input; interning retains independent heap storage.
+        let (bytes, immortal): (&[u8], bool) = serde::Deserialize::deserialize(deserializer)?;
+        let atom = heap.intern(bytes);
         if immortal {
             atom.make_immortal();
         }
@@ -160,5 +161,114 @@ impl Atom {
     #[must_use]
     pub(crate) const fn as_handle(&self) -> &ManagedRef<ByteStringObject> {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bincode::ErrorKind;
+    use bincode::Options;
+    use serde_seeded::de::Seed;
+
+    use super::Atom;
+    use crate::value::heap::Heap;
+    use crate::value::heap::metadata::TeardownMode;
+    use crate::value::heap::metadata::TypeTag;
+
+    fn decode(bytes: &[u8], heap: &Heap) -> bincode::Result<Atom> {
+        bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .reject_trailing_bytes()
+            .deserialize_seed(Seed::<Heap, Atom>::new(heap), bytes)
+    }
+
+    #[test]
+    fn artifact_atoms_preserve_their_encoding_identity_and_immortality() {
+        for bytes in [b"".as_slice(), b"repeated\\atom\0\xff"] {
+            for immortal in [false, true] {
+                let mut encoded = bincode::DefaultOptions::new()
+                    .with_fixint_encoding()
+                    .serialize(&(bytes, immortal))
+                    .expect("the existing atom representation serializes");
+                let heap = Heap::new();
+                let first = decode(&encoded, &heap).expect("the atom decodes");
+                let second = decode(&encoded, &heap).expect("the repeated atom decodes");
+                assert_eq!(first, second, "repeated atoms keep interned identity");
+
+                let round_trip = bincode::DefaultOptions::new()
+                    .with_fixint_encoding()
+                    .serialize(&first)
+                    .expect("the decoded atom serializes");
+                assert_eq!(round_trip, encoded, "the immortal flag is preserved");
+
+                encoded.fill(0);
+                drop(encoded);
+                assert_eq!(first.as_bytes(), bytes, "input storage is not retained");
+
+                if immortal {
+                    let allocation = first.0.raw_box();
+                    drop(second);
+                    drop(first);
+                    heap.unintern(allocation);
+                    // SAFETY: the isolated immortal atom is live in this heap,
+                    // and both handles plus its interner entry are now gone.
+                    // Immortality left its initial reference count unchanged.
+                    unsafe {
+                        assert_eq!(allocation.as_ref().header_ref().decrement(), 0);
+                        heap.teardown_in_mode(
+                            allocation.cast(),
+                            TypeTag::ByteString,
+                            TeardownMode::Full,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn malformed_artifact_atoms_keep_the_existing_decode_errors() {
+        let encoded = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .serialize(&(b"artifact atom".as_slice(), false))
+            .expect("the atom representation serializes");
+        let mut malformed: Vec<Vec<u8>> = (0..encoded.len())
+            .map(|length| encoded[..length].to_vec())
+            .collect();
+        let mut invalid_flag = encoded.clone();
+        *invalid_flag
+            .last_mut()
+            .expect("the encoded tuple ends with a flag") = 2;
+        malformed.push(invalid_flag);
+        let mut trailing = encoded;
+        trailing.push(0);
+        malformed.push(trailing);
+        malformed.push(u64::MAX.to_le_bytes().to_vec());
+
+        let heap = Heap::new();
+        for bytes in malformed {
+            let previous = bincode::DefaultOptions::new()
+                .with_fixint_encoding()
+                .reject_trailing_bytes()
+                .deserialize::<(Vec<u8>, bool)>(&bytes)
+                .expect_err("the original atom decoder rejects malformed input");
+            let current = decode(&bytes, &heap)
+                .expect_err("the borrowed atom decoder rejects malformed input");
+            match (*current, *previous) {
+                (ErrorKind::Io(current), ErrorKind::Io(previous)) => {
+                    assert_eq!(current.kind(), previous.kind());
+                }
+                (
+                    ErrorKind::InvalidBoolEncoding(current),
+                    ErrorKind::InvalidBoolEncoding(previous),
+                ) => assert_eq!(current, previous),
+                (ErrorKind::Custom(current), ErrorKind::Custom(previous)) => {
+                    assert_eq!(current, previous);
+                }
+                (current, previous) => {
+                    panic!("unexpected atom decode errors: {current:?}, previously {previous:?}");
+                }
+            }
+        }
     }
 }

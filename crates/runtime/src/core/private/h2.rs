@@ -99,7 +99,7 @@ impl H2FrameDecoder {
                     Value::int(i64::from(frame.kind)),
                     Value::int(i64::from(frame.flags)),
                     Value::int(i64::from(frame.stream)),
-                    context.string(&frame.payload),
+                    context.owned_string(frame.payload),
                 ])
             })
             .collect::<Vec<_>>();
@@ -155,7 +155,7 @@ pub(crate) fn encode_frame(
     encoded.push(flags);
     encoded.extend_from_slice(&stream.to_be_bytes());
     encoded.extend_from_slice(payload);
-    Ok(context.string(&encoded))
+    Ok(context.owned_string(encoded))
 }
 
 fn frame_size(context: &mut Context<'_, '_, '_>, value: i64) -> Result<u32, Throw> {

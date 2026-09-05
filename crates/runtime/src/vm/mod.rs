@@ -564,11 +564,12 @@ pub(crate) enum Fault {
 impl<'engine> VirtualMachine<'engine> {
     pub(crate) fn new(engine: &'engine mut Engine) -> VirtualMachine<'engine> {
         let heap = Rc::clone(&engine.heap);
-        let frame_capacity = engine.configuration.call_depth_limit.max(1);
         VirtualMachine {
             engine,
             heap,
-            frames: Vec::with_capacity(frame_capacity),
+            // Linking also uses a VM for type checks, without executing a frame.
+            // Execution grows this buffer on demand and reuses it between calls.
+            frames: Vec::new(),
             stack: Vec::new(),
             stack_initialized_len: 0,
             pending_unwinds: Vec::new(),
@@ -792,12 +793,39 @@ impl<'engine> VirtualMachine<'engine> {
         }
     }
 
-    /// Pushes after the caller proved the configured call-depth capacity.
+    /// Combines the storage bound and the current configured depth limit into
+    /// one call-entry guard, including when a suspended VM resumes after the
+    /// host reconfigured its engine.
+    #[inline(always)]
+    fn call_frame_limit(&self) -> usize {
+        self.frames
+            .capacity()
+            .min(self.engine.configuration.call_depth_limit)
+    }
+
+    /// Reserves the next call frame, or reports the existing hard depth limit.
+    #[cold]
+    #[inline(never)]
+    fn grow_call_frames(&mut self) -> Result<(), VirtualMachineControl> {
+        let length = self.frames.len();
+        let limit = self.engine.configuration.call_depth_limit;
+        if length >= limit {
+            return Err(self.call_depth_exceeded());
+        }
+        if length == self.frames.capacity() {
+            let capacity = self.frames.capacity().saturating_mul(2).max(4).min(limit);
+            self.frames.reserve_exact(capacity - length);
+        }
+        Ok(())
+    }
+
+    /// Pushes after the caller checked the combined storage and depth limit.
     #[inline(always)]
     unsafe fn push_frame_unchecked(&mut self, frame: Frame) {
         let length = self.frames.len();
         debug_assert!(length < self.frames.capacity());
-        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
+        // SAFETY: the call-entry guard reserved storage before any reentrant
+        // helpers ran. They may grow storage but cannot shrink its capacity.
         unsafe {
             self.frames.as_mut_ptr().add(length).write(frame);
             self.frames.set_len(length + 1);

@@ -1,5 +1,7 @@
 //! Value construction and engine operations used by Rust-backed core code.
 
+use std::borrow::Cow;
+
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
@@ -16,6 +18,31 @@ impl Context<'_, '_, '_> {
     #[inline(always)]
     pub(crate) fn string(&self, bytes: &[u8]) -> Value {
         Value::from_string_bytes(self.vm.heap(), bytes)
+    }
+
+    /// Adopts an owned buffer while keeping short strings inline.
+    #[must_use]
+    #[inline(always)]
+    pub(crate) fn owned_string(&self, bytes: Vec<u8>) -> Value {
+        Value::from_string_vec(self.vm.heap(), bytes)
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub(crate) fn string_cow(&self, bytes: Cow<'_, [u8]>) -> Value {
+        match bytes {
+            Cow::Borrowed(bytes) => self.string(bytes),
+            Cow::Owned(bytes) => self.owned_string(bytes),
+        }
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub(crate) fn text_cow(&self, text: Cow<'_, str>) -> Value {
+        match text {
+            Cow::Borrowed(text) => self.string(text.as_bytes()),
+            Cow::Owned(text) => self.owned_string(text.into_bytes()),
+        }
     }
 
     pub(crate) fn vec(&self, elements: impl IntoIterator<Item = Value>) -> Value {

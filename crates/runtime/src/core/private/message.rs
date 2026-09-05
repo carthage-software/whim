@@ -45,7 +45,7 @@ pub(crate) fn parse_headers(context: &Context<'_, '_, '_>, arguments: Arguments<
 
         let name = context.string(&bytes[field_start..value_start - 1]);
         let value = unfold(&bytes[value_start..value_end]);
-        let value = context.string(&value);
+        let value = context.string_cow(value);
         pairs.push(context.tuple([name, value]));
         expected_start = value_end;
     }

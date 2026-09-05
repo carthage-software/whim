@@ -22,7 +22,7 @@ use crate::value::Value;
 fn escape_text(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let text = arguments.bytes(0);
     let escaped = escape_text_bytes(text);
-    context.string(escaped.as_ref())
+    context.string_cow(escaped)
 }
 
 #[whim_function(
@@ -34,7 +34,7 @@ fn escape_text(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value
 fn escape_attribute(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let text = arguments.bytes(0);
     let escaped = escape_attribute_bytes(text);
-    context.string(escaped.as_ref())
+    context.string_cow(escaped)
 }
 
 #[whim_function(
@@ -46,7 +46,7 @@ fn escape_attribute(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> 
 fn decode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let html = arguments.bytes(0);
     let decoded = unescape_bytes_in(html, HtmlContext::General);
-    context.string(decoded.as_ref())
+    context.string_cow(decoded)
 }
 
 #[whim_function(
@@ -58,7 +58,7 @@ fn decode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
 fn decode_attribute(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let html = arguments.bytes(0);
     let decoded = unescape_bytes_in(html, HtmlContext::Attribute);
-    context.string(decoded.as_ref())
+    context.string_cow(decoded)
 }
 
 #[whim_function(

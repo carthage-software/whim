@@ -429,7 +429,82 @@ impl VirtualMachine<'_> {
         Ok(arguments)
     }
 
-    pub(in crate::vm) fn build_named_arguments(
+    /// Dispatches a `CallWithNames` site: the source window carries positional
+    /// values followed by named values in descriptor order.
+    pub(in crate::vm) fn call_with_names_site(
+        &mut self,
+        callee: &Value,
+        site: usize,
+        descriptor: &CallDescriptor,
+        window_start: usize,
+        destination: u16,
+        discard_result: bool,
+    ) -> Result<(), VirtualMachineControl> {
+        let shape = self.resolve_callee_shape(callee)?;
+        let count = usize::from(descriptor.positional) + descriptor.named.len();
+        if let CallTarget::User(function) = shape.target
+            && shape
+                .holder
+                .as_ref()
+                .is_none_or(|holder| holder.presets().is_empty())
+        {
+            // Validate the names before consuming any source arguments. The
+            // mapping also identifies optional gaps that need fresh sentinels.
+            let mapping = self.named_argument_mapping(site, shape.target, descriptor)?;
+            let argument_start = self.stack.len();
+            let argc = mapping.final_count;
+            self.resize_frame_stack(argument_start + argc);
+            self.stack[argument_start..].fill_with(Value::uninitialized);
+            for position in 0..usize::from(descriptor.positional) {
+                self.stack
+                    .swap(argument_start + position, window_start + position);
+            }
+            for (offset, position) in mapping.positions.iter().copied().enumerate() {
+                self.stack.swap(
+                    argument_start + position,
+                    window_start + usize::from(descriptor.positional) + offset,
+                );
+            }
+
+            let environment = self.callee_type_environment(&shape);
+            // Binding precedes frame setup in the owned-argument path, so a
+            // binding error must release the arguments before returning.
+            if environment.is_err() {
+                self.truncate_stack(argument_start);
+            }
+            let outcome = environment.and_then(|(type_environment, type_arguments_bound)| {
+                let captures = shape
+                    .holder
+                    .as_ref()
+                    .map_or(&[][..], |holder| holder.captures());
+                self.push_user_frame(
+                    function,
+                    destination,
+                    shape.this.clone(),
+                    captures,
+                    argument_start,
+                    argc,
+                    shape.method,
+                    shape.holder.as_ref().and_then(|holder| holder.scope()),
+                    Some(argument_start as u32),
+                    type_environment,
+                    type_arguments_bound,
+                    false,
+                    discard_result,
+                    false,
+                )
+            });
+            self.clear_argument_window(window_start, count);
+            return outcome;
+        }
+
+        let arguments = self.build_named_arguments(site, &shape, descriptor, window_start)?;
+        let outcome = self.dispatch_shape_in_place(shape, arguments, destination, discard_result);
+        self.clear_argument_window(window_start, count);
+        outcome
+    }
+
+    fn build_named_arguments(
         &mut self,
         site: usize,
         shape: &CalleeShape,

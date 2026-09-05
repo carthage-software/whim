@@ -38,6 +38,29 @@ fn artifacts_load_in_order_and_execute_their_top_level_code() {
 }
 
 #[test]
+fn artifact_atoms_outlive_the_encoded_input() {
+    let mut declarations = compile(
+        "function artifact_owned_string(): string { return \"retained\\x00artifact\\xffbytes\"; }",
+        "/artifact/owned-atoms.whim",
+    );
+    let entry = compile(
+        "assert!(artifact_owned_string() == \"retained\\x00artifact\\xffbytes\");",
+        "/artifact/owned-atoms-entry.whim",
+    );
+
+    let mut engine = Engine::new(EngineConfiguration::default());
+    engine
+        .load_artifact(&declarations)
+        .expect("the declaration artifact loads");
+    declarations.fill(0);
+    drop(declarations);
+
+    engine
+        .load_artifact(&entry)
+        .expect("decoded names and string literals retain independent storage");
+}
+
+#[test]
 fn artifact_loading_rejects_trailing_bytes() {
     let mut artifact = compile("", "/artifact/empty.whim");
     artifact.push(0);
@@ -47,6 +70,31 @@ fn artifact_loading_rejects_trailing_bytes() {
         .load_artifact(&artifact)
         .expect_err("trailing bytes are rejected");
     assert!(error.to_string().contains("trailing bytes"));
+}
+
+#[test]
+fn artifact_loading_reports_truncated_atom_payloads() {
+    let mut artifact = compile("", "/artifact/truncated-atom.whim");
+    let bytecode_length = u64::from_le_bytes(
+        artifact[20..28]
+            .try_into()
+            .expect("the header contains the bytecode length"),
+    );
+    let bytecode_start = artifact.len()
+        - usize::try_from(bytecode_length).expect("the bytecode length fits in memory");
+    // The first bytecode field is the unit path: keep its length and one byte.
+    artifact.truncate(bytecode_start + 9);
+    artifact[20..28].copy_from_slice(&9_u64.to_le_bytes());
+
+    let mut engine = Engine::new(EngineConfiguration::default());
+    let error = engine
+        .load_artifact(&artifact)
+        .expect_err("a truncated atom must be rejected");
+    assert!(
+        error
+            .to_string()
+            .contains("artifact bytecode is invalid: io error: unexpected end of file")
+    );
 }
 
 #[test]

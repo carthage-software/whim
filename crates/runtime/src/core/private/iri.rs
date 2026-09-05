@@ -42,7 +42,7 @@ pub(crate) fn to_uri(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) ->
         return Value::null();
     };
 
-    context.string(mapped.as_bytes())
+    context.owned_string(mapped.into_bytes())
 }
 
 pub(crate) fn encode_reference(input: &str) -> Option<String> {
@@ -95,7 +95,7 @@ pub(crate) fn from_uri(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) 
         input.to_string()
     };
 
-    context.string(mapped.as_bytes())
+    context.owned_string(mapped.into_bytes())
 }
 
 fn encoded_authority(iri: &AuthorityComponents<'_>, encoded: &AuthorityComponents<'_>) -> String {

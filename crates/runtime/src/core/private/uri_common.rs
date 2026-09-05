@@ -115,7 +115,7 @@ macro_rules! uri_reference_builtins {
                 return Value::null();
             };
 
-            context.string(normalized.to_string().as_bytes())
+            context.owned_string(normalized.to_string().into_bytes())
         }
 
         #[whim_macros::whim_function($resolve)]
@@ -140,7 +140,7 @@ macro_rules! uri_reference_builtins {
                 return Value::null();
             };
 
-            context.string(reference.resolve_against(base).to_string().as_bytes())
+            context.owned_string(reference.resolve_against(base).to_string().into_bytes())
         }
     };
 }

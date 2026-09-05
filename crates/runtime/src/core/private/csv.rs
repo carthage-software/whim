@@ -404,7 +404,7 @@ impl CsvWriter {
                 break;
             }
         }
-        context.string(&output)
+        context.owned_string(output)
     }
 }
 

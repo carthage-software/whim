@@ -34,7 +34,8 @@ pub(in crate::value) fn collect(heap: &Heap) -> usize {
     let mut roots = heap.take_roots();
     mark_roots(&mut roots);
     scan_roots(&roots);
-    let whites = collect_roots(roots);
+    let whites = collect_roots(&roots);
+    heap.recycle_roots(roots);
     let whites = retain_finalizable_subgraphs(heap, whites);
     let freed = whites.len();
     free_whites(heap, &whites);
@@ -116,11 +117,12 @@ fn retain_finalizable_subgraphs(heap: &Heap, whites: Vec<ErasedBox>) -> Vec<Eras
 /// Keeps the roots that are still cycle candidates and grays their
 /// subgraphs; every other root leaves the buffer.
 fn mark_roots(roots: &mut Roots) {
+    let mut stack = Vec::new();
     roots.retain(|&root| {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let root_header = unsafe { header(root) };
         if root_header.color() == Color::Purple && root_header.reference_count() > 0 {
-            mark_gray(root);
+            mark_gray(root, &mut stack);
             true
         } else {
             root_header.set_buffered(false);
@@ -131,8 +133,9 @@ fn mark_roots(roots: &mut Roots) {
 
 /// Paints a subgraph gray, trial-decrementing the target of every edge
 /// traversed, so counts reflect only external references.
-fn mark_gray(start: ErasedBox) {
-    let mut stack = vec![start];
+fn mark_gray(start: ErasedBox, stack: &mut Vec<ErasedBox>) {
+    debug_assert!(stack.is_empty());
+    stack.push(start);
     while let Some(node) = stack.pop() {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let node_header = unsafe { header(node) };
@@ -153,13 +156,16 @@ fn mark_gray(start: ErasedBox) {
 }
 
 fn scan_roots(roots: &[ErasedBox]) {
+    let mut stack = Vec::new();
+    let mut black_stack = Vec::new();
     for &root in roots {
-        scan(root);
+        scan(root, &mut stack, &mut black_stack);
     }
 }
 
-fn scan(start: ErasedBox) {
-    let mut stack = vec![start];
+fn scan(start: ErasedBox, stack: &mut Vec<ErasedBox>, black_stack: &mut Vec<ErasedBox>) {
+    debug_assert!(stack.is_empty());
+    stack.push(start);
     while let Some(node) = stack.pop() {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let node_header = unsafe { header(node) };
@@ -168,7 +174,7 @@ fn scan(start: ErasedBox) {
         }
 
         if node_header.reference_count() > 0 {
-            scan_black(node);
+            scan_black(node, black_stack);
         } else {
             node_header.set_color(Color::White);
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
@@ -179,8 +185,9 @@ fn scan(start: ErasedBox) {
     }
 }
 
-fn scan_black(start: ErasedBox) {
-    let mut stack = vec![start];
+fn scan_black(start: ErasedBox, stack: &mut Vec<ErasedBox>) {
+    debug_assert!(stack.is_empty());
+    stack.push(start);
     while let Some(node) = stack.pop() {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let node_header = unsafe { header(node) };
@@ -202,10 +209,10 @@ fn scan_black(start: ErasedBox) {
     }
 }
 
-fn collect_roots(roots: Roots) -> Vec<ErasedBox> {
+fn collect_roots(roots: &[ErasedBox]) -> Vec<ErasedBox> {
     let mut whites = Vec::new();
     let mut stack = Vec::new();
-    for root in roots {
+    for &root in roots {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe { header(root) }.set_buffered(false);
         stack.push(root);

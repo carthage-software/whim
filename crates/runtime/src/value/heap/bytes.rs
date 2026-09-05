@@ -58,7 +58,7 @@ impl HeapBytes {
         }
     }
 
-    pub(in crate::value) fn from_vec(bytes: Vec<u8>) -> Self {
+    pub(in crate::value) fn from_vec(mut bytes: Vec<u8>) -> Self {
         if bytes.len() <= Self::INLINE_CAPACITY {
             let mut inline = [0; Self::INLINE_CAPACITY];
             inline[..bytes.len()].copy_from_slice(&bytes);
@@ -66,6 +66,12 @@ impl HeapBytes {
                 len: bytes.len() as u8,
                 bytes: inline,
             };
+        }
+
+        // Shrinking transforms can leave a large input-sized reserve behind.
+        // Keep ordinary growth capacity, but bound retained unused storage.
+        if bytes.capacity() > bytes.len().saturating_mul(2) {
+            bytes.shrink_to_fit();
         }
 
         let mut bytes = ManuallyDrop::new(bytes);
@@ -230,6 +236,34 @@ impl HeapBytes {
             unsafe {
                 deallocate_bytes(pointer, capacity);
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::HeapBytes;
+
+    #[test]
+    fn owned_buffers_retain_normal_growth_capacity_and_release_excess_slack() {
+        for capacity in [64, 128, 65_536] {
+            let mut bytes = Vec::with_capacity(capacity);
+            bytes.extend_from_slice(&[0xff; 64]);
+            let pointer = bytes.as_ptr();
+            let stored = HeapBytes::from_vec(bytes);
+            assert_eq!(stored.as_slice(), &[0xff; 64]);
+            let HeapBytes::Allocated {
+                capacity: retained, ..
+            } = &stored
+            else {
+                panic!("the long result must retain an allocated buffer");
+            };
+            assert!(*retained <= 128);
+            if capacity <= 128 {
+                assert_eq!(stored.as_slice().as_ptr(), pointer);
+                assert_eq!(*retained, capacity);
+            }
+            stored.release();
         }
     }
 }

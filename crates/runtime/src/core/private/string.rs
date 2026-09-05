@@ -11,9 +11,11 @@ use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
+use crate::unreachable_invariant;
 use crate::unwrap_option_invariant;
 use crate::unwrap_result_invariant;
 use crate::value::Value;
+use crate::value::ValueView;
 use crate::value::string::ByteStringObject;
 
 #[whim_function("Whim\\_Private\\string_to_bytes(string $value): vec<0..=255>")]
@@ -47,7 +49,7 @@ pub(crate) fn string_from_bytes<'call>(
         bytes.push(byte);
     }
 
-    context.string(&bytes)
+    context.owned_string(bytes)
 }
 
 #[whim_function(
@@ -237,7 +239,17 @@ pub(crate) fn string_join<'call>(
 ) -> Value {
     let values = arguments.vec(0);
     let separator = arguments.bytes(1);
-    let mut result: Vec<u8> = Vec::new();
+    let capacity = join_capacity(
+        values.iter().map(|value| match value.transparent() {
+            ValueView::String(string) => string.len(),
+            ValueView::ShortString(string) => string.as_bytes().len(),
+            // SAFETY: the argument's structural type check validated every element.
+            _ => unsafe { unreachable_invariant("a validated string vector contains strings") },
+        }),
+        separator.len(),
+    );
+    // An unrepresentable total keeps the incremental allocation failure path.
+    let mut result = Vec::with_capacity(capacity.unwrap_or(0));
     let mut first = true;
     for value in values.iter() {
         // SAFETY: the surrounding invariant proves this option contains a value.
@@ -255,7 +267,14 @@ pub(crate) fn string_join<'call>(
         first = false;
     }
 
-    context.string(&result)
+    context.owned_string(result)
+}
+
+fn join_capacity(mut lengths: impl Iterator<Item = usize>, separator: usize) -> Option<usize> {
+    let first = lengths.next().unwrap_or(0);
+    lengths.try_fold(first, |total, length| {
+        total.checked_add(separator)?.checked_add(length)
+    })
 }
 
 #[whim_function(
@@ -297,7 +316,7 @@ pub(crate) fn string_replace<'call>(
     }
 
     result.extend_from_slice(&haystack[start..]);
-    context.string(&result)
+    context.owned_string(result)
 }
 
 #[whim_function("Whim\\_Private\\string_ord(string[1] $character): 0..=255")]
@@ -387,7 +406,7 @@ pub(crate) fn string_pad<'call>(
     result.extend(pad.iter().cycle().take(left));
     result.extend_from_slice(bytes);
     result.extend(pad.iter().cycle().take(right));
-    context.string(&result)
+    context.owned_string(result)
 }
 
 #[whim_function("Whim\\_Private\\string_lowercase(string $string): string")]
@@ -401,7 +420,7 @@ pub(crate) fn string_lowercase<'call>(
         return Value::string(string);
     }
 
-    context.string(&bytes.to_ascii_lowercase())
+    context.owned_string(bytes.to_ascii_lowercase())
 }
 
 #[whim_function("Whim\\_Private\\string_uppercase(string $string): string")]
@@ -415,7 +434,7 @@ pub(crate) fn string_uppercase<'call>(
         return Value::string(string);
     }
 
-    context.string(&bytes.to_ascii_uppercase())
+    context.owned_string(bytes.to_ascii_uppercase())
 }
 
 #[whim_function(
@@ -533,4 +552,25 @@ fn search_result(result: Option<usize>, offset: usize) -> Value {
     };
 
     Value::int(string_position(position + offset))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::join_capacity;
+
+    #[test]
+    fn join_capacity_checks_payload_and_separator_overflow() {
+        assert_eq!(join_capacity([].into_iter(), usize::MAX), Some(0));
+        assert_eq!(
+            join_capacity([usize::MAX].into_iter(), usize::MAX),
+            Some(usize::MAX)
+        );
+        assert_eq!(join_capacity([2, 0, 3].into_iter(), 1), Some(7));
+        assert_eq!(
+            join_capacity([0, 0].into_iter(), usize::MAX),
+            Some(usize::MAX)
+        );
+        assert_eq!(join_capacity([1, 0].into_iter(), usize::MAX), None);
+        assert_eq!(join_capacity([usize::MAX, 1].into_iter(), 0), None);
+    }
 }

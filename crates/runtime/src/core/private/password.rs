@@ -47,7 +47,7 @@ fn argon2_hash(
     };
 
     let rendered = hash.to_string();
-    context.string(rendered.as_bytes())
+    context.owned_string(rendered.into_bytes())
 }
 
 fn argon2_hash_parameters(hash: &str, variant: &str) -> Option<(u32, u32, u32)> {
@@ -94,7 +94,7 @@ fn password_hash_bcrypt(context: &Context<'_, '_, '_>, arguments: Arguments<'_>)
     };
 
     let rendered = parts.format_for_version(bcrypt::Version::TwoB);
-    context.string(rendered.as_bytes())
+    context.owned_string(rendered.into_bytes())
 }
 
 #[whim_function(

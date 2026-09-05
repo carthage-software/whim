@@ -48,6 +48,9 @@ pub(crate) mod tuple;
 pub(crate) mod vec;
 pub(crate) mod weak;
 
+#[cfg(test)]
+mod tests;
+
 const NO_NEWTYPE: u32 = u32::MAX;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

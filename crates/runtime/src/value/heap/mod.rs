@@ -182,6 +182,8 @@ const TEARDOWN_DEPTH_LIMIT: u32 = 32;
 const DEFAULT_CYCLE_THRESHOLD: usize = 10_001;
 const CYCLE_THRESHOLD_STEP: usize = 10_000;
 const CYCLE_THRESHOLD_TRIGGER: usize = 100;
+/// Keep at most 8 KiB of root slots after a burst on 64-bit targets.
+const ROOT_BUFFER_RETAIN_LIMIT: usize = 1_024;
 /// Number of pooled fixed-slot object layouts.
 const OBJECT_POOL_CLASSES: usize = 16;
 const OBJECT_POOL_BYTE_LIMIT: usize = 16 * 1024 * 1024;
@@ -429,6 +431,18 @@ impl Heap {
     pub(in crate::value) fn take_roots(&self) -> Roots {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         mem::take(unsafe { &mut *self.roots.get() })
+    }
+
+    /// Reuses the collector's emptied root storage after it clears buffered flags.
+    pub(in crate::value) fn recycle_roots(&self, mut roots: Roots) {
+        debug_assert!(self.is_collecting());
+        roots.clear();
+        trim_empty_roots(&mut roots);
+        // SAFETY: collection excludes buffering new roots, and the collector no
+        // longer borrows either root vector when returning this empty storage.
+        let buffer = unsafe { &mut *self.roots.get() };
+        debug_assert!(buffer.is_empty());
+        *buffer = roots;
     }
 
     pub(in crate::value) const fn is_collecting(&self) -> bool {
@@ -705,7 +719,7 @@ impl Heap {
 
         header.set_buffered(false);
         if roots.is_empty() {
-            *roots = Vec::new();
+            trim_empty_roots(roots);
         }
     }
 
@@ -961,6 +975,13 @@ impl Heap {
     }
 }
 
+fn trim_empty_roots(roots: &mut Roots) {
+    debug_assert!(roots.is_empty());
+    if roots.capacity() > ROOT_BUFFER_RETAIN_LIMIT {
+        *roots = Vec::new();
+    }
+}
+
 /// # Safety
 ///
 /// `box_pointer` must reference a live box whose header tag matches its
@@ -1053,6 +1074,15 @@ impl Drop for Heap {
 mod tests {
     use super::DEFAULT_CYCLE_THRESHOLD;
     use super::Heap;
+    use super::ROOT_BUFFER_RETAIN_LIMIT;
+    use crate::value::Value;
+    use crate::value::vec::VecObject;
+
+    fn root_buffer_state(heap: &Heap) -> (usize, usize) {
+        // SAFETY: these single-threaded tests inspect the buffer between heap operations.
+        let roots = unsafe { &*heap.roots.get() };
+        (roots.len(), roots.capacity())
+    }
 
     #[test]
     fn cycle_threshold_can_return_to_default() {
@@ -1062,5 +1092,60 @@ mod tests {
 
         heap.configure_cycle_threshold(None);
         assert_eq!(heap.cycle_threshold.get(), DEFAULT_CYCLE_THRESHOLD);
+    }
+
+    #[test]
+    fn root_storage_survives_empty_states_and_updates_swapped_slots() {
+        let heap = Heap::new();
+        let first = VecObject::with_elements(&heap, [Value::int(1)]);
+        let second = VecObject::with_elements(&heap, [Value::int(2)]);
+        drop(first.clone());
+        drop(second.clone());
+        let (length, capacity) = root_buffer_state(&heap);
+        assert_eq!(length, 2);
+        assert!(capacity > 0);
+
+        drop(first);
+        assert_eq!(root_buffer_state(&heap), (1, capacity));
+        assert_eq!(second.header().root_index(), 0);
+        drop(second);
+        assert_eq!(root_buffer_state(&heap), (0, capacity));
+
+        let next = VecObject::with_elements(&heap, [Value::int(3)]);
+        drop(next.clone());
+        assert_eq!(root_buffer_state(&heap), (1, capacity));
+        assert_eq!(heap.collect_cycles(), 0);
+        assert_eq!(root_buffer_state(&heap), (0, capacity));
+        assert_eq!(next.get(0).and_then(Value::as_int), Some(3));
+        drop(next.clone());
+        drop(next);
+        assert_eq!(root_buffer_state(&heap), (0, capacity));
+    }
+
+    #[test]
+    fn root_storage_releases_large_bursts_after_destruction_or_collection() {
+        let heap = Heap::new();
+        heap.configure_cycle_threshold(Some(usize::MAX));
+        for collect in [false, true] {
+            let values: Vec<_> = (0..=ROOT_BUFFER_RETAIN_LIMIT)
+                .map(|_| {
+                    let value = VecObject::with_elements(&heap, [Value::int(1)]);
+                    drop(value.clone());
+                    value
+                })
+                .collect();
+            assert!(root_buffer_state(&heap).1 > ROOT_BUFFER_RETAIN_LIMIT);
+            if collect {
+                assert_eq!(heap.collect_cycles(), 0);
+                assert_eq!(root_buffer_state(&heap), (0, 0));
+                assert!(
+                    values
+                        .iter()
+                        .all(|value| value.get(0).and_then(Value::as_int) == Some(1))
+                );
+            }
+            drop(values);
+            assert_eq!(root_buffer_state(&heap), (0, 0));
+        }
     }
 }

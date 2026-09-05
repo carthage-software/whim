@@ -109,7 +109,7 @@ impl HpackEncoder {
         let encoded = encode_headers(&mut state.borrow_mut(), headers.iter())
             .map_err(|error| hpack_error(context, error))?;
 
-        Ok(context.string(&encoded))
+        Ok(context.owned_string(encoded))
     }
 }
 
@@ -269,8 +269,8 @@ impl HpackDecoder {
             .into_iter()
             .map(|(name, value, flags)| {
                 context.tuple([
-                    context.string(&name),
-                    context.string(&value),
+                    context.owned_string(name),
+                    context.owned_string(value),
                     Value::bool(flags & Decoder::NEVER_INDEXED != 0),
                 ])
             })

@@ -40,9 +40,7 @@ impl VecObject {
         heap: &Heap,
         elements: impl IntoIterator<Item = Value>,
     ) -> ManagedRef<Self> {
-        let elements = elements.into_iter();
-        let mut storage = Vec::with_capacity(elements.size_hint().0);
-        storage.extend(elements);
+        let storage = elements.into_iter().collect();
         ManagedRef::new_in(
             heap,
             Self {
@@ -217,9 +215,11 @@ impl Trace for VecObject {
 #[cfg(test)]
 mod tests {
     use crate::value::Value;
+    use crate::value::ValueView;
     use crate::value::array::ArrayTypeCheck;
     use crate::value::array::ArrayTypeCheckCache;
     use crate::value::array::ArrayTypeCheckId;
+    use crate::value::heap::Heap;
     use crate::value::heap::metadata::CowClone;
     use crate::value::vec::VecObject;
 
@@ -232,6 +232,33 @@ mod tests {
 
     const fn id(value: u32) -> ArrayTypeCheckId {
         ArrayTypeCheckId::new(value)
+    }
+
+    #[test]
+    fn owned_elements_reuse_storage_and_preserve_cow_lifetimes() {
+        let heap = Heap::new();
+        let child = Value::from_string_bytes(&heap, b"owned vector child with heap storage");
+        let mut elements = Vec::with_capacity(16);
+        elements.push(child.clone());
+        elements.push(Value::int(7));
+        let pointer = elements.as_ptr();
+        let vector = VecObject::with_elements(&heap, elements);
+        assert_eq!(vector.as_slice().as_ptr(), pointer);
+
+        let mut copy = vector.clone();
+        drop(copy.make_mut().set(0, Value::int(42)));
+        assert_eq!(copy.get(0).and_then(Value::as_int), Some(42));
+        assert_eq!(
+            vector.get(0).and_then(Value::as_string_bytes),
+            child.as_string_bytes()
+        );
+        drop(copy);
+        drop(vector);
+
+        let ValueView::String(string) = child.transparent() else {
+            panic!("the long child string must use heap storage");
+        };
+        assert!(string.is_unique());
     }
 
     #[test]

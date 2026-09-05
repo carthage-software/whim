@@ -108,8 +108,8 @@ impl VirtualMachine<'_> {
         let frameless = self.engine.tables.functions[function.0 as usize]
             .frameless_literal
             .is_some();
-        if !frameless && self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if !frameless && self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
         self.engine.optimize_callable_once(function)?;
         let (chunk, cache, unit) = {
@@ -156,7 +156,7 @@ impl VirtualMachine<'_> {
             reference_register_mask &= !1;
         }
 
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,
@@ -206,8 +206,8 @@ impl VirtualMachine<'_> {
         discard_result: bool,
     ) -> Result<(), VirtualMachineControl> {
         let frameless = entry.function.frameless;
-        if !frameless && self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if !frameless && self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
 
         let function = self.ensure_function_entry_finalized(entry.function)?;
@@ -266,7 +266,7 @@ impl VirtualMachine<'_> {
             }
         }
         self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,
@@ -303,8 +303,8 @@ impl VirtualMachine<'_> {
         discard_result: bool,
     ) -> Result<(), VirtualMachineControl> {
         let frameless = entry.function.frameless;
-        if !frameless && self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if !frameless && self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
 
         let function = self.ensure_function_entry_finalized(entry.function)?;
@@ -356,7 +356,7 @@ impl VirtualMachine<'_> {
                 live_parameter_mask(&self.stack, base, 0, argc, reference_parameter_mask);
         }
         self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,
@@ -392,8 +392,8 @@ impl VirtualMachine<'_> {
         type_environment: TypeEnvironmentId,
     ) -> Result<(), VirtualMachineControl> {
         let frameless = entry.function.frameless;
-        if !frameless && self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if !frameless && self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
 
         let function = self.ensure_function_entry_finalized(entry.function)?;
@@ -478,7 +478,7 @@ impl VirtualMachine<'_> {
                 live_parameter_mask(&self.stack, base, 1, argc, reference_parameter_mask);
         }
         self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,
@@ -513,8 +513,8 @@ impl VirtualMachine<'_> {
     ) -> Result<(), VirtualMachineControl> {
         let function = entry.function;
         let frameless = entry.frameless;
-        if !frameless && self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if !frameless && self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
 
         if cfg!(debug_assertions) {
@@ -569,7 +569,7 @@ impl VirtualMachine<'_> {
                 live_parameter_mask(&self.stack, base, 0, argc, reference_parameter_mask);
         }
         self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,
@@ -607,8 +607,8 @@ impl VirtualMachine<'_> {
         let frameless = self.engine.tables.functions[function.0 as usize]
             .frameless_literal
             .is_some();
-        if !frameless && self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if !frameless && self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
 
         if cfg!(debug_assertions) {
@@ -672,7 +672,7 @@ impl VirtualMachine<'_> {
                 live_parameter_mask(&self.stack, base, 0, argc, reference_parameter_mask);
         }
         self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,
@@ -752,8 +752,8 @@ impl VirtualMachine<'_> {
         return_register: u16,
         literal: &Literal,
     ) -> Result<(), VirtualMachineControl> {
-        if self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
 
         let function = entry.function;
@@ -808,7 +808,7 @@ impl VirtualMachine<'_> {
             }
         }
         self.snapshot_trace_arguments(base, chunk, 1, &mut reference_register_mask);
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,
@@ -850,8 +850,8 @@ impl VirtualMachine<'_> {
         window_start: usize,
         argc: usize,
     ) -> Result<(), VirtualMachineControl> {
-        if self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
 
         let (chunk, cache, unit, function, type_environment, declared) = {
@@ -914,7 +914,7 @@ impl VirtualMachine<'_> {
             }
         }
         self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
-        // SAFETY: call setup keeps the chunk and reserved stack window live.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,

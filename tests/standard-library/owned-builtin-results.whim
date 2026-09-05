@@ -1,0 +1,49 @@
+use Whim\Encoding\Base64;
+use Whim\Encoding\Hex;
+use Whim\Str;
+
+foreach (vec[0, 7, 8, 23, 24, 64] as $length) {
+  $input = Str\slice(Str\repeat("aZ\x00\xff", 16), 0, $length);
+  $expectedUpper = Str\slice(Str\repeat("AZ\x00\xff", 16), 0, $length);
+  $expectedLower = Str\slice(Str\repeat("az\x00\xff", 16), 0, $length);
+  assert!(Str\uppercase($input) == $expectedUpper);
+  assert!(Str\lowercase($input) == $expectedLower);
+  assert!(Str\from_bytes(Str\to_bytes($input)) == $input);
+  assert!(Base64\decode(Base64\encode($input)) == $input);
+  assert!(Hex\decode(Hex\encode($input)) == $input);
+
+  $joined = Str\join("\x00", vec[$input, '', $input]);
+  $expected = $input . "\x00\x00" . $input;
+  assert!($joined == $expected);
+  $alias = $joined;
+  $joined .= 'tail';
+  assert!($alias == $expected);
+  assert!($joined == $expected . 'tail');
+  assert!(Str\replace($input, 'a', 'A') == $expectedUpper);
+  assert!(
+    Str\pad_right($input, $length + 3, "\x00") == $input . "\x00\x00\x00",
+  );
+}
+
+$parts = Str\split('first long heap string,second long heap string', ',');
+$originalParts = $parts;
+$parts[0] = 'changed';
+$parts[] = 'appended';
+assert!($parts == vec['changed', 'second long heap string', 'appended']);
+assert!(
+  $originalParts == vec['first long heap string', 'second long heap string'],
+);
+
+$parts = vec[];
+assert!(
+  Str\join(',', $originalParts)
+  == 'first long heap string,second long heap string',
+);
+
+$needle = Str\repeat('a', 1024);
+$compressed = Str\replace(Str\repeat($needle, 64), $needle, 'z');
+assert!($compressed == Str\repeat('z', 64));
+$compressedAlias = $compressed;
+$compressed .= 'tail';
+assert!($compressedAlias == Str\repeat('z', 64));
+assert!($compressed == Str\repeat('z', 64) . 'tail');

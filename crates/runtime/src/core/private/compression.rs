@@ -554,5 +554,5 @@ fn finish_state<T>(
 }
 
 fn stream_result(context: &Context<'_, '_, '_>, result: io::Result<Vec<u8>>) -> Value {
-    result.map_or_else(|_| Value::null(), |bytes| context.string(&bytes))
+    result.map_or_else(|_| Value::null(), |bytes| context.owned_string(bytes))
 }

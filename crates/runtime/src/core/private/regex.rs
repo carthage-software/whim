@@ -181,7 +181,7 @@ impl Regex {
         let replaced = state
             .expression
             .replacen(subject, limit, NoExpand(replacement));
-        Ok(context.string(&replaced))
+        Ok(context.string_cow(replaced))
     }
 
     #[whim_method("split(string $subject): vec<string>")]
@@ -212,7 +212,7 @@ pub(crate) fn escape(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) ->
     let literal = arguments.bytes(0);
     if let Ok(literal) = from_utf8(literal) {
         let escaped = regex::escape(literal);
-        return context.string(escaped.as_bytes());
+        return context.owned_string(escaped.into_bytes());
     }
 
     let mut escaped = Vec::with_capacity(literal.len() * 4);
@@ -222,5 +222,5 @@ pub(crate) fn escape(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) ->
         escaped.push(HEX[usize::from(byte & 0x0f)]);
     }
 
-    context.string(&escaped)
+    context.owned_string(escaped)
 }

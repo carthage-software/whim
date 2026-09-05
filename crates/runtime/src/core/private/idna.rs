@@ -22,7 +22,7 @@ pub(crate) fn to_ascii(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) 
         return Value::null();
     };
 
-    context.string(domain.as_bytes())
+    context.text_cow(domain)
 }
 
 #[whim_function("Whim\\_Private\\idna_to_unicode(string $domain): null|string")]
@@ -46,5 +46,5 @@ pub(crate) fn to_unicode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>
         return Value::null();
     }
 
-    context.string(domain.as_bytes())
+    context.text_cow(domain)
 }

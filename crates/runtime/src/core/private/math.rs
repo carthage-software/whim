@@ -232,7 +232,7 @@ fn base_convert<'call>(
     };
     let output = number.to_str_radix(to_base);
 
-    Ok(context.string(output.as_bytes()))
+    Ok(context.owned_string(output.into_bytes()))
 }
 
 macro_rules! with_constant_base {

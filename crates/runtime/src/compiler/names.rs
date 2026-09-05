@@ -1,5 +1,7 @@
 //! Name resolution: namespaces and `use` imports to fully qualified atoms.
 
+use std::rc::Rc;
+
 use hashbrown::HashMap;
 use hashbrown::HashSet;
 
@@ -17,6 +19,11 @@ use crate::value::heap::Heap;
 
 #[derive(Default, Clone)]
 pub(in crate::compiler) struct Resolver {
+    state: Rc<ResolverState>,
+}
+
+#[derive(Default, Clone)]
+struct ResolverState {
     /// The current namespace, without a trailing separator; empty at the
     /// global level.
     namespace: String,
@@ -26,8 +33,10 @@ pub(in crate::compiler) struct Resolver {
 impl Resolver {
     pub(in crate::compiler) fn for_namespace(namespace: &str) -> Self {
         Self {
-            namespace: namespace.to_string(),
-            aliases: HashMap::new(),
+            state: Rc::new(ResolverState {
+                namespace: namespace.to_string(),
+                aliases: HashMap::new(),
+            }),
         }
     }
 
@@ -54,7 +63,7 @@ impl Resolver {
     }
 
     pub(in crate::compiler) fn has_alias(&self, name: &str) -> bool {
-        self.aliases.contains_key(name)
+        self.state.aliases.contains_key(name)
     }
 
     fn collect_item(
@@ -75,7 +84,7 @@ impl Resolver {
             |alias| alias.identifier.value.to_string(),
         );
 
-        if self.aliases.contains_key(&alias) {
+        if self.state.aliases.contains_key(&alias) {
             return Err(CompileError::new(
                 CompileErrorKind::DuplicateImportAlias,
                 format!("`{alias}` is already imported in this namespace"),
@@ -91,7 +100,10 @@ impl Resolver {
             ));
         }
 
-        self.aliases.insert(alias, qualified);
+        // Earlier statements retain their resolver snapshot when an import changes.
+        Rc::make_mut(&mut self.state)
+            .aliases
+            .insert(alias, qualified);
 
         Ok(())
     }
@@ -104,6 +116,7 @@ impl Resolver {
         match identifier {
             Identifier::FullyQualified(name) => strip_leading_separator(name.value).to_string(),
             Identifier::Local(name) => self
+                .state
                 .aliases
                 .get(name.value)
                 .map_or_else(|| self.qualify(name.value), Clone::clone),
@@ -112,7 +125,7 @@ impl Resolver {
                     // SAFETY: the parser marks only names with a separator as qualified.
                     unsafe { unreachable_invariant("a qualified identifier contains a separator") }
                 };
-                self.aliases.get(first).map_or_else(
+                self.state.aliases.get(first).map_or_else(
                     || self.qualify(name.value),
                     |imported| format!("{imported}\\{rest}"),
                 )
@@ -121,10 +134,10 @@ impl Resolver {
     }
 
     pub(in crate::compiler) fn qualify(&self, name: &str) -> String {
-        if self.namespace.is_empty() {
+        if self.state.namespace.is_empty() {
             name.to_string()
         } else {
-            format!("{}\\{name}", self.namespace)
+            format!("{}\\{name}", self.state.namespace)
         }
     }
 }

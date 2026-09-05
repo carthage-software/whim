@@ -11,7 +11,6 @@ use crate::vm::call::BuiltInCallable;
 use crate::vm::call::BuiltInId;
 use crate::vm::call::CacheEntry;
 use crate::vm::call::CachedCallEnvironment;
-use crate::vm::call::CallDescriptor;
 use crate::vm::call::CallTarget;
 use crate::vm::call::Chunk;
 use crate::vm::call::FunctionSpec;
@@ -685,24 +684,5 @@ impl VirtualMachine<'_> {
             false,
             true,
         )
-    }
-
-    /// Dispatches a `CallWithNames` site: the window carries the positional
-    /// values then the named values in descriptor order.
-    pub(in crate::vm) fn call_with_names_site(
-        &mut self,
-        callee: &Value,
-        site: usize,
-        descriptor: &CallDescriptor,
-        window_start: usize,
-        destination: u16,
-        discard_result: bool,
-    ) -> Result<(), VirtualMachineControl> {
-        let shape = self.resolve_callee_shape(callee)?;
-        let arguments = self.build_named_arguments(site, &shape, descriptor, window_start)?;
-        let count = usize::from(descriptor.positional) + descriptor.named.len();
-        let outcome = self.dispatch_shape_in_place(shape, arguments, destination, discard_result);
-        self.clear_argument_window(window_start, count);
-        outcome
     }
 }

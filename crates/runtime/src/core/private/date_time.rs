@@ -639,7 +639,9 @@ fn format_zoned(kind: &FormatterKind, zoned: &Zoned) -> Option<String> {
 }
 
 fn optional_string(context: &Context<'_, '_, '_>, value: Option<String>) -> Value {
-    value.map_or_else(Value::null, |value| context.string(value.as_bytes()))
+    value.map_or_else(Value::null, |value| {
+        context.owned_string(value.into_bytes())
+    })
 }
 
 fn timestamp_value(context: &Context<'_, '_, '_>, timestamp: Timestamp) -> Value {

@@ -86,7 +86,7 @@ pub(crate) fn index_fields(context: &Context<'_, '_, '_>, arguments: Arguments<'
         }
 
         let normalized = if name_bytes.iter().any(u8::is_ascii_uppercase) {
-            context.string(&name_bytes.to_ascii_lowercase())
+            context.owned_string(name_bytes.to_ascii_lowercase())
         } else {
             name.clone()
         };
@@ -126,7 +126,7 @@ pub(crate) fn parse_request_head(context: &Context<'_, '_, '_>, arguments: Argum
         .host
         .map_or_else(Value::null, |host| context.string(host));
     let upgrade = parsed.upgrade.map_or_else(Value::null, |upgrade| {
-        context.string(&upgrade.to_ascii_lowercase())
+        context.owned_string(upgrade.to_ascii_lowercase())
     });
 
     context.tuple([
@@ -183,7 +183,7 @@ fn materialize_indexed_fields(
             .push(context.tuple([name.clone(), value.clone()]));
 
         let normalized = if name_bytes.iter().any(u8::is_ascii_uppercase) {
-            context.string(&name_bytes.to_ascii_lowercase())
+            context.owned_string(name_bytes.to_ascii_lowercase())
         } else {
             name
         };

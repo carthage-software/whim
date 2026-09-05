@@ -36,6 +36,13 @@ rejects(
 
 rejects(
   $work,
+  'duplicate-import-after-statement',
+  'use App\Model\User;' . "\n" . 'null;' . "\n" . 'use App\Other\User;' . "\n",
+  'is already imported in this namespace',
+);
+
+rejects(
+  $work,
   'import-collides-with-a-declaration',
   'use App\Model\User;' . "\n\n" . 'class User {}' . "\n",
   'collides with an import of the same name',
@@ -74,3 +81,29 @@ namespace Helpers {
 assert!(Helpers\double(21) == 42);
 assert!(uppercase('after') == 'AFTER');
 assert!(new Some::<int>(1) is Some<int>);
+
+namespace ResolverSnapshotOriginal {
+  function value(): int {
+    return 11;
+  }
+}
+
+namespace ResolverSnapshotReplacement {
+  function value(): int {
+    return 22;
+  }
+}
+
+assert!(ResolverSnapshotOriginal\value() == 11);
+
+use ResolverSnapshotReplacement as ResolverSnapshotOriginal;
+
+assert!(ResolverSnapshotOriginal\value() == 22);
+
+namespace ResolverSnapshotInner {
+  use \ResolverSnapshotOriginal as ResolverSnapshotOriginal;
+
+  assert!(ResolverSnapshotOriginal\value() == 11);
+}
+
+assert!(ResolverSnapshotOriginal\value() == 22);

@@ -56,7 +56,7 @@ pub(crate) fn case_fold(context: &Context<'_, '_, '_>, arguments: Arguments<'_>)
 
     let mut folded = String::with_capacity(value.len());
     folded.extend(value.chars().default_case_fold());
-    context.string(folded.as_bytes())
+    context.owned_string(folded.into_bytes())
 }
 
 #[whim_function(

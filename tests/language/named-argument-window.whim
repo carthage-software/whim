@@ -1,0 +1,204 @@
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\TypeError;
+
+$combine = function(int $first, int $middle = 20, int $last = 30): int {
+  return $first * 100 + $middle * 10 + $last;
+};
+
+// Reuse the same stack storage after supplying and omitting middle parameters.
+for ($iteration = 0; $iteration < 20; $iteration++) {
+  assert!(
+    $combine(
+      last: 3,
+      first: 1,
+    )
+    == 303,
+  );
+
+  assert!(
+    $combine(
+      last: 3,
+      middle: 2,
+      first: 1,
+    )
+    == 123,
+  );
+
+  assert!($combine(1, last: 3) == 303);
+}
+
+function invoke_reordered(fn(int, int): int $callable): int {
+  return $callable(
+    last: 2,
+    first: 1,
+  );
+}
+
+$forward = function(int $first, int $last): int {
+  return $first * 10 + $last;
+};
+
+$reverse = function(int $last, int $first): int {
+  return $first * 100 + $last;
+};
+
+assert!(invoke_reordered($forward) == 12);
+assert!(invoke_reordered($reverse) == 102);
+assert!(invoke_reordered($forward) == 12);
+
+$captured = vec[7, 8];
+$withCapture = function(
+  vec<int> $values,
+  int $extra = 9,
+) use ($captured): vec<int> {
+  $values[] = $captured[0];
+  $values[] = $extra;
+  return $values;
+};
+
+$original = vec[1, 2];
+assert!(
+  $withCapture(
+    extra: 3,
+    values: $original,
+  ) == vec[1, 2, 7, 3],
+);
+
+assert!($withCapture(values: $original) == vec[1, 2, 7, 9]);
+assert!($original == vec[1, 2]);
+assert!($captured == vec[7, 8]);
+
+$generic = function<T>(T $first, T $last): T {
+  return $first;
+};
+
+assert!(
+  $generic::<string>(
+    last: 'last',
+    first: 'first',
+  )
+  == 'first',
+);
+
+assert!(
+  $generic::<int>(
+    last: 2,
+    first: 1,
+  )
+  == 1,
+);
+
+class NamedWindowReceiver {
+  public function __construct(private string $prefix) {}
+
+  public function combine(string $first, string $last = '!'): string {
+    return $this->prefix . $first . $last;
+  }
+
+  public static function statically(string $first, string $last = '!'): string {
+    return $first . $last;
+  }
+}
+
+$receiver = new NamedWindowReceiver(prefix: 'prefix:');
+assert!(
+  $receiver->combine(
+    last: '?',
+    first: 'value',
+  )
+  == 'prefix:value?',
+);
+
+assert!($receiver->combine(first: 'value') == 'prefix:value!');
+assert!(
+  NamedWindowReceiver::statically(
+    last: '?',
+    first: 'value',
+  )
+  == 'value?',
+);
+
+class NamedWindowLifetime {
+  public static vec<string> $events = vec[];
+
+  public function __construct(public string $name) {
+    self::$events[] = 'create:' . $name;
+  }
+
+  public function __destruct(): void {
+    self::$events[] = 'drop:' . $this->name;
+  }
+}
+
+$consume = function(
+  NamedWindowLifetime $first,
+  NamedWindowLifetime $last,
+): string {
+  return $first->name . $last->name;
+};
+
+assert!(
+  $consume(
+    last: new NamedWindowLifetime('last'),
+    first: new NamedWindowLifetime('first'),
+  )
+  == 'firstlast',
+);
+
+assert!(
+  NamedWindowLifetime::$events == vec[
+    'create:last',
+    'create:first',
+    'drop:first',
+    'drop:last',
+  ],
+);
+
+$caught = false;
+try {
+  $combine(
+    last: 2,
+    first: 'wrong',
+  );
+} catch (TypeError $_) {
+  $caught = true;
+}
+
+assert!($caught);
+
+$throwing = function(string $message, int $code = 0): never {
+  throw new RuntimeException($message, $code);
+};
+
+$caught = false;
+try {
+  $throwing(
+    code: 123,
+    message: 'named failure',
+  );
+} catch (RuntimeException $error) {
+  $caught = $error->getMessage() == 'named failure' && $error->getCode() == 123;
+}
+
+assert!($caught);
+assert!(
+  $combine(
+    last: 3,
+    first: 1,
+  )
+  == 303,
+);
+
+$caught = false;
+try {
+  $combine(
+    first: 1,
+    absent: 2,
+  );
+} catch (ArgumentCountError $_) {
+  $caught = true;
+}
+
+assert!($caught);
+assert!($combine(1, last: 3) == 303);

@@ -54,8 +54,8 @@ impl VirtualMachine<'_> {
         let frameless = self.engine.tables.functions[function.0 as usize]
             .frameless_literal
             .is_some();
-        if !frameless && self.frames.len() >= self.engine.configuration.call_depth_limit {
-            return Err(self.call_depth_exceeded());
+        if !frameless && self.frames.len() >= self.call_frame_limit() {
+            self.grow_call_frames()?;
         }
         self.engine.optimize_callable_once(function)?;
         let (
@@ -273,7 +273,7 @@ impl VirtualMachine<'_> {
             }
         }
         self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
-        // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
+        // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
                 chunk,

@@ -396,7 +396,7 @@ fn hash_digest(
 
     state.update(bytes);
     let digest = state.finish();
-    Ok(context.string(&digest))
+    Ok(context.owned_string(digest))
 }
 
 #[whim_function(
@@ -412,7 +412,7 @@ fn hash_hmac(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Res
 
     state.update(message);
     let digest = state.finish();
-    Ok(context.string(&digest))
+    Ok(context.owned_string(digest))
 }
 
 #[whim_function(
@@ -517,7 +517,7 @@ fn finish_hash_state(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) ->
     };
 
     let digest = state.finish();
-    context.string(&digest)
+    context.owned_string(digest)
 }
 
 #[whim_function(
