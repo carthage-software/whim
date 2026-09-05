@@ -1,6 +1,10 @@
 //! Lowering for recursive `match` patterns and array destructuring.
 
+#[cfg(test)]
+mod tests;
+
 use std::collections::HashSet;
+use std::mem::discriminant;
 use std::ptr;
 
 use whim_span::HasSpan;
@@ -31,6 +35,7 @@ use crate::bytecode::chunk::descriptors::descriptor_is_trivial;
 use crate::bytecode::chunk::descriptors::string_switch_buckets;
 use crate::bytecode::instruction::operands::AsMode;
 use crate::bytecode::instruction::operands::ShortJumpOffset;
+use crate::bytecode::instruction::operands::SwitchTableIndex;
 use crate::compiler::emit::BodyCompiler;
 use crate::compiler::emit::CompileError;
 use crate::compiler::emit::CompileErrorKind;
@@ -77,6 +82,73 @@ struct SwitchLayout<'a> {
     positions: &'a [u32],
     switch: u32,
     default: u32,
+}
+
+struct MatchKeyGroup {
+    start: usize,
+    end: usize,
+    dispatch: MatchDispatch,
+}
+
+enum MatchJump {
+    Instruction(u32),
+    Switch { group: usize, arm: usize },
+}
+
+struct MatchChainSwitch {
+    table: SwitchTableIndex,
+    dispatch: MatchDispatch,
+    position: u32,
+    default: u32,
+    arms: Vec<usize>,
+    targets: Vec<u32>,
+}
+
+fn key_dispatch(keys: &[MatchKey]) -> Option<MatchDispatch> {
+    if keys.is_empty() {
+        return None;
+    }
+
+    if keys.iter().all(|key| matches!(key, MatchKey::String(_))) {
+        return Some(MatchDispatch::String);
+    }
+
+    if keys.iter().all(|key| matches!(key, MatchKey::Float(_))) {
+        return Some(MatchDispatch::Float);
+    }
+
+    if !keys.iter().all(|key| matches!(key, MatchKey::Int(_))) {
+        return None;
+    }
+
+    let mut values = keys
+        .iter()
+        .filter_map(|key| match key {
+            MatchKey::Int(value) => Some(*value),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    values.sort_unstable();
+    values.dedup();
+    let (&minimum, &maximum) = (values.first()?, values.last()?);
+    let span_width = i128::from(maximum) - i128::from(minimum) + 1;
+
+    (values.len() >= 8 && span_width <= 3 * values.len() as i128)
+        .then_some(MatchDispatch::Int(minimum))
+}
+
+const fn switch_instruction(
+    dispatch: MatchDispatch,
+    subject: Register,
+    table: SwitchTableIndex,
+) -> Instruction {
+    match dispatch {
+        MatchDispatch::Int(_) => Instruction::SwitchInt { subject, table },
+        MatchDispatch::String => Instruction::SwitchString { subject, table },
+        MatchDispatch::Float => Instruction::SwitchFloat { subject, table },
+        MatchDispatch::Pattern => Instruction::SwitchPattern { subject, table },
+    }
 }
 
 fn collect_integer_ranges(
@@ -398,11 +470,30 @@ impl BodyCompiler<'_, '_> {
         if let Some(result) = self.try_key_match(scope, matching, &keys, foldable)? {
             return Ok(result);
         }
+
+        let groups = self.match_key_groups(matching);
+        if let [group] = groups.as_slice()
+            && group.start == 0
+            && group.end + 1 == matching.arms.len()
+            && matches!(group.dispatch, MatchDispatch::String)
+            && keys.len() <= 4
+            && matches!(
+                self.lower_match_pattern(scope, matching.arms.as_slice()[group.end].pattern)?,
+                TypeDescriptor::String
+            )
+        {
+            return self.match_with_switch(scope, matching, MatchDispatch::Pattern);
+        }
+
+        if !groups.is_empty() {
+            return self.match_chain(scope, matching, &groups);
+        }
+
         if let Some(result) = self.try_trivial_match(scope, matching)? {
             return Ok(result);
         }
 
-        self.match_chain(scope, matching)
+        self.match_chain(scope, matching, &[])
     }
 
     fn try_tuple_match(
@@ -465,46 +556,56 @@ impl BodyCompiler<'_, '_> {
         if !foldable || keys.is_empty() {
             return Ok(None);
         }
-        if keys.iter().all(|key| matches!(key, MatchKey::String(_))) {
-            return self
-                .match_with_switch(scope, matching, MatchDispatch::String)
-                .map(Some);
-        }
+
         if keys.iter().all(|key| matches!(key, MatchKey::Bool(_))) {
             return self.match_with_bool_switch(scope, matching).map(Some);
         }
-        if keys.iter().all(|key| matches!(key, MatchKey::Float(_))) {
-            return self
-                .match_with_switch(scope, matching, MatchDispatch::Float)
-                .map(Some);
-        }
-        if !keys.iter().all(|key| matches!(key, MatchKey::Int(_))) {
+
+        let Some(dispatch) = key_dispatch(keys) else {
             return Ok(None);
+        };
+
+        self.match_with_switch(scope, matching, dispatch).map(Some)
+    }
+
+    fn match_key_groups(&self, matching: &Match<'_>) -> Vec<MatchKeyGroup> {
+        let mut groups = Vec::new();
+        let mut start = 0;
+        while start < matching.arms.len() {
+            let mut keys = Vec::new();
+            let mut end = start;
+            while let Some(arm) = matching.arms.as_slice().get(end) {
+                let mut arm_keys = Vec::new();
+                if pattern_needs_split_bindings(arm.pattern)
+                    || !collect_match_keys(self.heap, arm.pattern, &mut arm_keys)
+                    || arm_keys.is_empty()
+                {
+                    break;
+                }
+
+                let kind = discriminant(keys.first().unwrap_or(&arm_keys[0]));
+                if arm_keys.iter().any(|key| discriminant(key) != kind) {
+                    break;
+                }
+
+                keys.extend(arm_keys);
+                end += 1;
+            }
+
+            if keys.len() >= 2
+                && let Some(dispatch) = key_dispatch(&keys)
+            {
+                groups.push(MatchKeyGroup {
+                    start,
+                    end,
+                    dispatch,
+                });
+            }
+
+            start = end.max(start + 1);
         }
 
-        let mut values = keys
-            .iter()
-            .filter_map(|key| match key {
-                MatchKey::Int(value) => Some(*value),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        let Some(minimum) = values.iter().copied().min() else {
-            // SAFETY: the surrounding invariant makes this path unreachable.
-            unsafe { unreachable_invariant("integer match keys are non-empty") }
-        };
-        let Some(maximum) = values.iter().copied().max() else {
-            // SAFETY: the surrounding invariant makes this path unreachable.
-            unsafe { unreachable_invariant("integer match keys are non-empty") }
-        };
-        let span_width = i128::from(maximum) - i128::from(minimum) + 1;
-        values.sort_unstable();
-        values.dedup();
-        if values.len() < 8 || span_width > 3 * values.len() as i128 {
-            return Ok(None);
-        }
-        self.match_with_switch(scope, matching, MatchDispatch::Int(minimum))
-            .map(Some)
+        groups
     }
 
     fn try_trivial_match(
@@ -538,6 +639,7 @@ impl BodyCompiler<'_, '_> {
         &mut self,
         scope: &Scope<'_>,
         matching: &Match<'_>,
+        groups: &[MatchKeyGroup],
     ) -> Result<Register, CompileError> {
         let result = self.allocate(matching.span())?;
         let subject = self.allocate(matching.span())?;
@@ -545,9 +647,53 @@ impl BodyCompiler<'_, '_> {
         self.move_into(subject, evaluated, matching.expression.span());
         let comparison = self.allocate(matching.span())?;
         let mut jumps = Vec::new();
+        let mut switches = Vec::new();
         let mut default_arm = None;
 
-        for (index, arm) in matching.arms.iter().enumerate() {
+        let mut index = 0;
+        let mut group_index = 0;
+        while let Some(arm) = matching.arms.as_slice().get(index) {
+            if let Some(group) = groups.get(group_index).filter(|group| group.start == index) {
+                let table = self
+                    .chunk
+                    .add_switch_table(SwitchTable::Int {
+                        base: 0,
+                        targets: Vec::new(),
+                        default: 0,
+                    })
+                    .map_err(|full| side_table_limit(full, arm.pattern.span()))?;
+
+                let position = self.chunk.emit(
+                    switch_instruction(group.dispatch, subject, table),
+                    arm.pattern.span(),
+                );
+
+                for (target, arm_index) in (group.start..group.end).enumerate() {
+                    let arm = &matching.arms.as_slice()[arm_index];
+                    jumps.push((
+                        MatchJump::Switch {
+                            group: group_index,
+                            arm: target,
+                        },
+                        arm,
+                        arm.pattern,
+                    ));
+                }
+
+                switches.push(MatchChainSwitch {
+                    table,
+                    dispatch: group.dispatch,
+                    position,
+                    default: self.code_position(),
+                    arms: (group.start..group.end).collect(),
+                    targets: vec![0; group.end - group.start],
+                });
+
+                index = group.end;
+                group_index += 1;
+                continue;
+            }
+
             check_pattern(arm.pattern)?;
             if self.pattern_is_irrefutable(scope, arm.pattern)? {
                 if index + 1 != matching.arms.len() {
@@ -558,80 +704,129 @@ impl BodyCompiler<'_, '_> {
                     ));
                 }
                 default_arm = Some(arm);
+                index += 1;
                 continue;
             }
-            let mut alternatives = Vec::new();
-            if pattern_needs_split_bindings(arm.pattern) {
-                pattern_alternatives(arm.pattern, &mut alternatives);
-            } else {
-                alternatives.push(arm.pattern);
-            }
-            for pattern in alternatives {
-                let descriptor = self.lower_match_pattern(scope, pattern)?;
-                let mut keys = Vec::new();
-                if collect_match_keys(self.heap, pattern, &mut keys) {
-                    for key in keys {
-                        let mark = self.registers.mark();
-                        let value = self.load_match_key(&key, pattern.span())?;
-                        self.chunk.emit(
-                            Instruction::Equal {
-                                destination: comparison,
-                                left: subject,
-                                right: value,
-                            },
-                            pattern.span(),
-                        );
-                        jumps.push((
-                            self.chunk.emit(
-                                Instruction::JumpIfTrue {
-                                    condition: comparison,
-                                    offset: JumpOffset::new(0),
-                                },
-                                pattern.span(),
-                            ),
-                            arm,
-                            pattern,
-                        ));
-                        self.registers.release_to(mark);
-                    }
-                } else {
-                    let descriptor = self.add_type_descriptor(descriptor, pattern.span())?;
+
+            self.emit_match_chain_tests(scope, subject, comparison, arm, &mut jumps)?;
+            index += 1;
+        }
+
+        self.emit_match_chain_arms(
+            scope,
+            matching.span(),
+            subject,
+            result,
+            &jumps,
+            default_arm,
+            &mut switches,
+        )?;
+
+        for switch in switches {
+            let built = self.build_match_switch_table(
+                scope,
+                matching,
+                switch.dispatch,
+                SwitchLayout {
+                    arms: &switch.arms,
+                    positions: &switch.targets,
+                    switch: switch.position,
+                    default: switch.default,
+                },
+            )?;
+
+            self.chunk.switch_tables[usize::from(switch.table.index())] = built;
+        }
+
+        Ok(result)
+    }
+
+    fn emit_match_chain_tests<'arm, 'arena>(
+        &mut self,
+        scope: &Scope<'_>,
+        subject: Register,
+        comparison: Register,
+        arm: &'arm MatchArm<'arena>,
+        jumps: &mut Vec<(MatchJump, &'arm MatchArm<'arena>, &'arena Pattern<'arena>)>,
+    ) -> Result<(), CompileError> {
+        let mut alternatives = Vec::new();
+        if pattern_needs_split_bindings(arm.pattern) {
+            pattern_alternatives(arm.pattern, &mut alternatives);
+        } else {
+            alternatives.push(arm.pattern);
+        }
+
+        for pattern in alternatives {
+            let descriptor = self.lower_match_pattern(scope, pattern)?;
+            let mut keys = Vec::new();
+            if collect_match_keys(self.heap, pattern, &mut keys) {
+                for key in keys {
+                    let mark = self.registers.mark();
+                    let value = self.load_match_key(&key, pattern.span())?;
                     self.chunk.emit(
-                        Instruction::Is {
+                        Instruction::Equal {
                             destination: comparison,
-                            source: subject,
-                            descriptor,
+                            left: subject,
+                            right: value,
                         },
                         pattern.span(),
                     );
+
                     jumps.push((
-                        self.chunk.emit(
+                        MatchJump::Instruction(self.chunk.emit(
                             Instruction::JumpIfTrue {
                                 condition: comparison,
                                 offset: JumpOffset::new(0),
                             },
                             pattern.span(),
-                        ),
+                        )),
                         arm,
                         pattern,
                     ));
+
+                    self.registers.release_to(mark);
                 }
+            } else {
+                let descriptor = self.add_type_descriptor(descriptor, pattern.span())?;
+                self.chunk.emit(
+                    Instruction::Is {
+                        destination: comparison,
+                        source: subject,
+                        descriptor,
+                    },
+                    pattern.span(),
+                );
+
+                jumps.push((
+                    MatchJump::Instruction(self.chunk.emit(
+                        Instruction::JumpIfTrue {
+                            condition: comparison,
+                            offset: JumpOffset::new(0),
+                        },
+                        pattern.span(),
+                    )),
+                    arm,
+                    pattern,
+                ));
             }
         }
 
-        self.emit_match_chain_arms(scope, matching.span(), subject, result, &jumps, default_arm)?;
-
-        Ok(result)
+        Ok(())
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "arm emission patches both conditional jumps and grouped switch targets"
+    )]
     fn emit_match_chain_arms(
         &mut self,
         scope: &Scope<'_>,
         span: Span,
         subject: Register,
         result: Register,
-        jumps: &[(u32, &MatchArm<'_>, &Pattern<'_>)],
+        jumps: &[(MatchJump, &MatchArm<'_>, &Pattern<'_>)],
         default_arm: Option<&MatchArm<'_>>,
+        switches: &mut [MatchChainSwitch],
     ) -> Result<(), CompileError> {
         let mut exits = Vec::new();
         if let Some(arm) = default_arm {
@@ -652,9 +847,13 @@ impl BodyCompiler<'_, '_> {
                 if ptr::eq(ptr::from_ref(*candidate), arm_pointer)
                     && ptr::eq(ptr::from_ref(*candidate_pattern), pattern_pointer)
                 {
-                    self.chunk.patch_jump(*jump, target);
+                    match jump {
+                        MatchJump::Instruction(jump) => self.chunk.patch_jump(*jump, target),
+                        MatchJump::Switch { group, arm } => switches[*group].targets[*arm] = target,
+                    }
                 }
             }
+
             self.emit_match_arm_pattern(scope, subject, result, arm, pattern, &mut exits)?;
         }
 
@@ -1255,12 +1454,7 @@ impl BodyCompiler<'_, '_> {
                 default: 0,
             })
             .map_err(|full| side_table_limit(full, matching.span()))?;
-        let instruction = match dispatch {
-            MatchDispatch::Int(_) => Instruction::SwitchInt { subject, table },
-            MatchDispatch::String => Instruction::SwitchString { subject, table },
-            MatchDispatch::Float => Instruction::SwitchFloat { subject, table },
-            MatchDispatch::Pattern => Instruction::SwitchPattern { subject, table },
-        };
+        let instruction = switch_instruction(dispatch, subject, table);
         let switch_position = self.chunk.emit(instruction, matching.expression.span());
         let default_position = self.code_position();
         let mut exits = Vec::new();

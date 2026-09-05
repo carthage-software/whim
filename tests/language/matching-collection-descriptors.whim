@@ -1,0 +1,81 @@
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Symbol;
+
+function matches_scalar_vector(mixed $value): bool {
+  return match ($value) {
+    vec<int|string> => true,
+    $_ => false,
+  };
+}
+
+function matches_nested_dictionary<T>(mixed $value): bool {
+  return match ($value) {
+    dict<int|string, vec<(T, T)>> => true,
+    $_ => false,
+  };
+}
+
+assert!(matches_scalar_vector(vec[1, 'two', 3]));
+assert!(!matches_scalar_vector(vec[1, 'two', false]));
+assert!(!matches_scalar_vector((1, 'two', 3)));
+assert!(matches_scalar_vector(vec[]));
+
+assert!(matches_nested_dictionary::<int>(dict[1 => vec[(2, 3)]]));
+assert!(matches_nested_dictionary::<string>(dict['pair' => vec[('a', 'b')]]));
+assert!(!matches_nested_dictionary::<int>(dict['pair' => vec[(2, 'three')]]));
+assert!(!matches_nested_dictionary::<int>(dict[true => vec[(2, 3)]]));
+assert!(matches_nested_dictionary::<int>(dict[]));
+
+newtype PatternDescriptorId = int;
+
+$ids = dict['pair' => vec[(PatternDescriptorId(2), PatternDescriptorId(3))]];
+assert!(matches_nested_dictionary::<PatternDescriptorId>($ids));
+assert!(matches_nested_dictionary::<int>($ids));
+assert!(
+  !matches_nested_dictionary::<PatternDescriptorId>(dict[
+    'pair' => vec[(2, 3)],
+  ]),
+);
+
+$values = vec[1, 'two'];
+assert!(matches_scalar_vector($values));
+$values[] = false;
+assert!(!matches_scalar_vector($values));
+
+$work = Filesystem\canonicalize(
+  Filesystem\create_temporary_directory(null, 'whim-pattern-descriptors-'),
+);
+
+File\write(
+  $work . '/element.whim',
+  'type LatePatternElement = int; function pattern_element_loaded(): void {}',
+);
+
+$loader = new Autoload\Autoloader()->withSymbolFile(
+  'LatePatternElement',
+  $work . '/element.whim',
+);
+
+Autoload\register($loader);
+
+$matchesLate = function(
+  mixed $value,
+): bool {
+  return match ($value) {
+    vec<vec<LatePatternElement>> => true,
+    $_ => false,
+  };
+};
+
+assert!($matchesLate(vec[]));
+assert!($matchesLate(vec[vec[]]));
+assert!(!Symbol\exists('LatePatternElement', false));
+assert!(!$matchesLate(vec[vec['wrong']]));
+assert!(Symbol\exists('pattern_element_loaded', false));
+assert!($matchesLate(vec[vec[1, 2], vec[3]]));
+assert!(!$matchesLate(vec[vec[1, 2], vec[false]]));
+
+Autoload\unregister($loader);
+Filesystem\delete_directory($work, true);

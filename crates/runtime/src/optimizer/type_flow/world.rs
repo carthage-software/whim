@@ -17,6 +17,7 @@ use crate::bytecode::unit::CompiledNewtype;
 use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::unit::ConstantInitializer;
+use crate::bytecode::unit::is_external;
 use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::type_flow::BOOL;
 use crate::optimizer::type_flow::CALLABLE;
@@ -166,12 +167,14 @@ impl WorldIndex {
             &unit.classes,
             |entry| &entry.name,
         );
-        insert_positions(
-            &mut self.constants_by_name,
-            position,
-            &unit.constants,
-            |entry| &entry.name,
-        );
+        for (constant_position, constant) in unit.constants.iter().enumerate() {
+            if !is_external(&constant.attributes) {
+                self.constants_by_name
+                    .entry(constant.name.clone())
+                    .or_insert((position, constant_position));
+            }
+        }
+
         insert_positions(
             &mut self.type_aliases_by_name,
             position,
@@ -269,12 +272,15 @@ impl<'a> IndexedUnit<'a> {
     }
 
     pub(in crate::optimizer) fn constant_by_name(&self, name: &Atom) -> Option<&CompiledConstant> {
-        self.declaration_by_name(
-            name,
-            &self.constants_by_name,
-            &self.world.index().constants_by_name,
-            |unit| &unit.constants,
-        )
+        if let Some(position) = self.constants_by_name.get(name.as_bytes()) {
+            let constant = &self.unit.constants[*position];
+            if !is_external(&constant.attributes) {
+                return Some(constant);
+            }
+        }
+
+        let (unit, position) = *self.world.index().constants_by_name.get(name)?;
+        Some(&self.world.units.get(unit).constants[position])
     }
 
     pub(in crate::optimizer) fn newtype_by_name(&self, name: &Atom) -> Option<&CompiledNewtype> {

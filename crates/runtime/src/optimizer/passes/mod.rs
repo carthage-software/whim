@@ -179,6 +179,7 @@ pub(super) mod specialize_arrays;
 pub(super) mod specialize_comparison;
 pub(super) mod specialize_counter_loop;
 pub(super) mod specialize_lowered;
+pub(super) mod specialize_matches;
 pub(super) mod specialize_property_get;
 
 pub(in crate::optimizer) fn optimize_function(

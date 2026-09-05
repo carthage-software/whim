@@ -19,10 +19,21 @@ use crate::value::atom::Atom;
 use crate::value::ops::compare_int_float;
 
 #[derive(PartialEq, Eq, Hash)]
-enum ConstantDictionaryKey {
+pub(super) enum ConstantDictionaryKey {
     Bool(bool),
     Int(i64),
     String(Atom),
+}
+
+impl ConstantDictionaryKey {
+    pub(super) fn from_value(value: ConstantValue) -> Option<Self> {
+        match value {
+            ConstantValue::Bool(value) => Some(Self::Bool(value)),
+            ConstantValue::Int(value) => Some(Self::Int(value)),
+            ConstantValue::String(value) => Some(Self::String(value)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -573,13 +584,10 @@ impl TypeFlow<'_> {
                 let mut keys = HashSet::with_capacity(usize::from(pair_count.value()));
                 for pair in 0..u16::from(pair_count.value()) {
                     let register = Register::new(first_pair.index() + pair * 2);
-                    let key =
-                        match self.constant_value_fact(self.fact(index, register), depth + 1)? {
-                            ConstantValue::Bool(value) => ConstantDictionaryKey::Bool(value),
-                            ConstantValue::Int(value) => ConstantDictionaryKey::Int(value),
-                            ConstantValue::String(value) => ConstantDictionaryKey::String(value),
-                            _ => return None,
-                        };
+                    let key = ConstantDictionaryKey::from_value(
+                        self.constant_value_fact(self.fact(index, register), depth + 1)?,
+                    )?;
+
                     keys.insert(key);
                 }
 

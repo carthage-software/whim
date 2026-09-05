@@ -44,9 +44,15 @@ mod constants;
 mod descriptors;
 mod proofs;
 mod resolve;
+mod shapes;
 mod string_lengths;
 mod transfer;
 mod world;
+
+#[cfg(test)]
+mod producer_proof_tests;
+#[cfg(test)]
+mod return_proof_tests;
 
 pub(in crate::optimizer) use descriptors::descriptor_options_equal;
 pub(crate) use descriptors::descriptor_proves;

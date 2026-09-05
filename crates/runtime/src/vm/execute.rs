@@ -6425,3 +6425,99 @@ impl VirtualMachine<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod string_switch_tests {
+    use super::SwitchTable;
+    use super::Value;
+    use super::switch_string_target;
+    use crate::bytecode::chunk::descriptors::string_switch_buckets;
+    use crate::value::heap::Heap;
+    use crate::value::newtype::NewtypeValueId;
+    use crate::value::string::ByteStringObject;
+    use crate::value::string::short::ShortString;
+
+    #[test]
+    fn string_switches_keep_first_duplicate_and_strict_subject_type() {
+        let heap = Heap::new();
+        for count in [2, 4, 5, 16] {
+            let arms = (0..count)
+                .map(|index| (heap.intern(b"same"), index + 10))
+                .collect::<Vec<_>>();
+            let table = SwitchTable::String {
+                buckets: string_switch_buckets(&arms),
+                arms,
+                default: -1,
+            };
+
+            let subject = Value::string(heap.intern(b"same").to_handle());
+            assert_eq!(switch_string_target(&table, &subject), 10);
+            assert_eq!(
+                switch_string_target(&table, &Value::newtype(subject, NewtypeValueId(0))),
+                10,
+            );
+            assert_eq!(switch_string_target(&table, &Value::int(10)), -1);
+            assert_eq!(
+                switch_string_target(&table, &Value::string(heap.intern(b"missing").to_handle())),
+                -1,
+            );
+        }
+    }
+
+    #[test]
+    fn string_switches_compare_bytes_across_representations_and_table_sizes() {
+        const LONG: &[u8] =
+            b"shared-prefix-with-a-string-long-enough-to-have-a-rope-representation";
+        let heap = Heap::new();
+        let cases = [
+            (b"".as_slice(), 10),
+            ("héllo".as_bytes(), 20),
+            (b"x\0y", 30),
+            (LONG, 40),
+        ];
+
+        for count in [4, 5, 16] {
+            let mut arms = cases
+                .into_iter()
+                .map(|(bytes, target)| (heap.intern(bytes), target))
+                .collect::<Vec<_>>();
+            for index in arms.len()..count {
+                arms.push((heap.intern(format!("extra-{index}").as_bytes()), -2));
+            }
+
+            let table = SwitchTable::String {
+                buckets: string_switch_buckets(&arms),
+                arms,
+                default: -1,
+            };
+
+            for (bytes, expected) in cases {
+                let subject = Value::string(ByteStringObject::from_bytes(&heap, bytes));
+                assert_eq!(switch_string_target(&table, &subject), expected);
+                if let Some(short) = ShortString::from_bytes(bytes) {
+                    assert_eq!(
+                        switch_string_target(&table, &Value::short_string(short)),
+                        expected,
+                    );
+                }
+            }
+
+            let left = ByteStringObject::from_bytes(&heap, &LONG[..24]);
+            let right = ByteStringObject::from_bytes(&heap, &LONG[24..]);
+            let rope = Value::string(ByteStringObject::concat(&heap, &left, &right));
+            assert_eq!(switch_string_target(&table, &rope), 40);
+            let padded =
+                ByteStringObject::from_vec(&heap, [b"before".as_slice(), LONG, b"after"].concat());
+            let slice = Value::string(ByteStringObject::slice(&heap, &padded, 6, LONG.len()));
+            assert_eq!(switch_string_target(&table, &slice), 40);
+            if count > 4 {
+                let last = Value::string(
+                    heap.intern(format!("extra-{}", count - 1).as_bytes())
+                        .to_handle(),
+                );
+
+                assert_eq!(switch_string_target(&table, &last), -2);
+            }
+        }
+    }
+}

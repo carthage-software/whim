@@ -539,14 +539,21 @@ fn transfer(
             destination,
             left,
             right,
-        }
-        | Instruction::Power {
+        } => (
+            destination,
+            same_numeric_kind(facts.get(left), facts.get(right)),
+        ),
+        Instruction::Power {
             destination,
             left,
             right,
         } => (
             destination,
-            same_numeric_kind(facts.get(left), facts.get(right)),
+            if facts.get(left) == KnownKind::Float || facts.get(right) == KnownKind::Float {
+                KnownKind::Float
+            } else {
+                KnownKind::Unknown
+            },
         ),
         Instruction::Negate { destination, .. }
         | Instruction::UnaryPlus { destination, .. }

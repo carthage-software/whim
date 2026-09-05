@@ -128,15 +128,23 @@ pub(in crate::optimizer) fn transfer(
             destination,
             left,
             right,
-        }
-        | Instruction::Power {
-            destination,
-            left,
-            right,
         } => write(
             destination,
             with_origin(numeric_result(read(left), read(right)), origin),
         ),
+        Instruction::Power {
+            destination,
+            left,
+            right,
+        } => {
+            let exponent = read(right);
+            let mut fact = numeric_result(read(left), exponent);
+            if fact.mask == INT && !exponent.non_negative {
+                fact = Fact::known(NUMERIC);
+            }
+
+            write(destination, with_origin(fact, origin));
+        }
         Instruction::FloatAdd { destination, .. }
         | Instruction::FloatSubtract { destination, .. }
         | Instruction::FloatMultiply { destination, .. }

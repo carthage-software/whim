@@ -227,6 +227,7 @@ impl Default for OptimizationConfiguration {
 pub(crate) struct OptimizationStatistics {
     /// The number of operations replaced by a compile-time constant.
     pub constants_folded: usize,
+    terminal_assertion_constants: usize,
     /// The number of repeated pure expressions replaced by an existing value.
     pub common_subexpressions_eliminated: usize,
     /// The number of dispatchable instructions removed from all chunks.
@@ -259,7 +260,7 @@ pub(crate) struct OptimizationStatistics {
 
 impl OptimizationStatistics {
     fn specialized_total(&self) -> usize {
-        self.constants_folded
+        (self.constants_folded - self.terminal_assertion_constants)
             + self.operations_specialized
             + self.array_operations_specialized
             + self.property_gets_specialized
@@ -326,6 +327,8 @@ fn plan_specialization_round(
     let analysis = analysis::Analysis::of(&indexed, configuration, allocator);
     let mut plan = RewritePlan::for_analysis(&analysis);
 
+    passes::specialize_matches::optimize_unit(&analysis, &mut plan, configuration, statistics);
+
     let comparison_removed = specialize_comparison::remove_boolean_literal_branches_unit(
         &analysis,
         &mut plan,
@@ -357,6 +360,7 @@ fn plan_specialization_round(
     let constants_removed =
         passes::const_fold::remove_unit(&analysis, &mut plan, configuration, statistics);
     if constants_removed {
+        passes::dead_store::optimize_unit(&analysis, &mut plan, configuration, statistics);
         return SpecializationRound::ConstantsRemoved(plan);
     }
 
@@ -565,6 +569,7 @@ pub(crate) fn optimize_unit_with_world(
     passes::specialize_lowered::optimize_unit(unit, configuration, &mut statistics);
     specialize_operations_against_one_analysis(unit, world, heap, configuration, &mut statistics);
     optimize_declarations(unit, heap, configuration, &mut statistics);
+    passes::duplicate_returns::optimize_unit(unit, configuration);
     passes::layout_cold_blocks::optimize_unit(unit, configuration, &mut statistics);
     passes::scalar_replace_objects::optimize_unit(unit, configuration, &mut statistics);
     specialize_against_one_analysis(unit, world, heap, configuration, &mut statistics);
@@ -590,6 +595,8 @@ pub(crate) fn optimize_unit_with_world(
             &mut statistics,
         );
     }
+
+    passes::specialize_matches::canonicalize_unit(unit, configuration, &mut statistics);
     passes::fuse_exact_call_window::optimize_unit(unit, configuration, &mut statistics);
     passes::move_coalescing::optimize_unit(unit, configuration, &mut statistics);
     passes::fuse_index_add_assign::optimize_unit(unit, configuration, &mut statistics);

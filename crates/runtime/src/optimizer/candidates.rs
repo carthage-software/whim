@@ -178,6 +178,9 @@ fn instruction_candidates(
                 | Instruction::NumericLoop { .. }
                 | Instruction::StringIndexGet { .. }
                 | Instruction::StringJumpUnless { .. }
+                | Instruction::Is { .. }
+                | Instruction::SwitchPattern { .. }
+                | Instruction::IntRangeJumpUnless { .. }
         )
     {
         candidates.insert(CandidateSet::COMPARISON);

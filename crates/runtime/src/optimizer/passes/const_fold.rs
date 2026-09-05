@@ -13,7 +13,9 @@ use crate::optimizer::candidates::CandidateSet;
 use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::LivenessQueries;
+use crate::optimizer::liveness::LivenessScratch;
 use crate::optimizer::liveness::register_is_dead_after;
+use crate::optimizer::liveness::register_is_dead_after_removals_with_scratch;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::dead_store::PreviousValueSafety;
 use crate::optimizer::passes::dead_store::scalar_write_is_unobservable;
@@ -21,6 +23,9 @@ use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::value::heap::Heap;
+
+#[cfg(test)]
+mod tests;
 
 pub(in crate::optimizer) fn optimize_unit(
     analysis: &Analysis<'_>,
@@ -32,6 +37,7 @@ pub(in crate::optimizer) fn optimize_unit(
         return;
     }
 
+    let mut liveness = LivenessScratch::default();
     for analyzed in analysis.chunks() {
         if !analyzed.candidates.contains(CandidateSet::CONSTANT) {
             continue;
@@ -52,9 +58,35 @@ pub(in crate::optimizer) fn optimize_unit(
 
             if analyzed.write(plan, index, replacement) {
                 statistics.constants_folded += 1;
+                if matches!(replacement, Instruction::LoadTrue { .. })
+                    && feeds_terminal_assertion(analyzed.chunk, index, destination, &mut liveness)
+                {
+                    statistics.terminal_assertion_constants += 1;
+                }
             }
         }
     }
+}
+
+fn feeds_terminal_assertion(
+    chunk: &Chunk,
+    index: usize,
+    destination: Register,
+    liveness: &mut LivenessScratch,
+) -> bool {
+    destination.index() >= chunk.local_register_count
+        && !chunk.trace_argument_registers.contains(&destination)
+        && matches!(
+            chunk.code.get(index + 1),
+            Some(Instruction::Assert { first_value, .. }) if *first_value == destination
+        )
+        && register_is_dead_after_removals_with_scratch(
+            chunk,
+            destination,
+            index + 2,
+            &[],
+            liveness,
+        )
 }
 
 pub(in crate::optimizer) fn remove_unit(

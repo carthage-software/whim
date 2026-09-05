@@ -1,0 +1,140 @@
+use Whim\Autoload;
+use Whim\Symbol\SymbolKind;
+use Whim\Unwind\Error;
+use Whim\Unwind\UnhandledMatchError;
+
+function typed_string_fallback(mixed $value): int {
+  return match ($value) {
+    'foo' => 1,
+    'bar' => 2,
+    string => 3,
+  };
+}
+
+assert!(typed_string_fallback('foo') == 1);
+assert!(typed_string_fallback('bar') == 2);
+assert!(typed_string_fallback('other') == 3);
+assert!(typed_string_fallback("\x00\xff") == 3);
+$unhandled = false;
+try {
+  typed_string_fallback(1);
+} catch (UnhandledMatchError $_) {
+  $unhandled = true;
+}
+
+assert!($unhandled);
+
+function grouped_literals(mixed $value): int {
+  return match ($value) {
+    -4 => 1,
+    -3 => 2,
+    -2 => 3,
+    -1 => 4,
+    0 => 5,
+    1 => 6,
+    2 => 7,
+    3 => 8,
+    -0.0 => 9,
+    0.0 => 10,
+    1.0 => 11,
+    'a' => 12,
+    'b' => 13,
+    'a' => 14,
+    string[1..=3] => 15,
+    'long' => 16,
+    'other' => 17,
+    $_ => 18,
+  };
+}
+
+assert!(grouped_literals(-4) == 1);
+assert!(grouped_literals(0) == 5);
+assert!(grouped_literals(3) == 8);
+assert!(grouped_literals(-0.0) == 9);
+assert!(grouped_literals(0.0) == 9);
+assert!(grouped_literals(1.0) == 11);
+assert!(grouped_literals('a') == 12);
+assert!(grouped_literals('b') == 13);
+assert!(grouped_literals('x') == 15);
+assert!(grouped_literals('long') == 16);
+assert!(grouped_literals('other') == 17);
+assert!(grouped_literals(4) == 18);
+assert!(grouped_literals(null) == 18);
+assert!(grouped_literals(true) == 18);
+
+function grouped_bindings(mixed $value): string {
+  return match ($value) {
+    $bound @ 'alpha' => $bound,
+    $bound @ 'beta' => $bound,
+    ($word @ 'yes') | ($word @ 'no') => $word,
+    vec[$first @ string, $second @ string] => $first . $second,
+    dict['a' => $first @ string, 'b' => $second @ string] | dict['x' => $first @ string, 'y' => $second @ string] => $first
+    . $second,
+    'tail' => 'tail',
+    'end' => 'end',
+    $_ => 'other',
+  };
+}
+
+assert!(grouped_bindings('alpha') == 'alpha');
+assert!(grouped_bindings('beta') == 'beta');
+assert!(grouped_bindings('yes') == 'yes');
+assert!(grouped_bindings('no') == 'no');
+assert!(grouped_bindings(vec['a', 'b']) == 'ab');
+assert!(grouped_bindings(dict['a' => 'a', 'b' => 'b']) == 'ab');
+assert!(grouped_bindings(dict['x' => 'x', 'y' => 'y']) == 'xy');
+assert!(grouped_bindings('tail') == 'tail');
+assert!(grouped_bindings('end') == 'end');
+
+final class MatchSubjectRecorder {
+  public int $calls = 0;
+  public function evaluate(string $value): string {
+    $this->calls++;
+    return $value;
+  }
+}
+
+$recorder = new MatchSubjectRecorder();
+assert!(
+  (
+    match ($recorder->evaluate('bar')) {
+      'foo' => 1,
+      'bar' => 2,
+      string => 3,
+    }
+  )
+  == 2,
+);
+
+assert!($recorder->calls == 1);
+
+function grouped_before_missing_type(mixed $value): int {
+  return match ($value) {
+    'first' => 1,
+    'second' => 2,
+    MissingLiteralGroupType => 3,
+    'third' => 4,
+    'fourth' => 5,
+    $_ => 6,
+  };
+}
+
+$loader = new Autoload\Autoloader()->withFallback(
+  function(SymbolKind $_, string $name): bool {
+    throw new Error($name);
+  },
+);
+
+Autoload\register($loader);
+assert!(grouped_before_missing_type('first') == 1);
+assert!(grouped_before_missing_type('second') == 2);
+$caught = null;
+try {
+  grouped_before_missing_type('third');
+} catch (Error $error) {
+  $caught = $error;
+}
+
+assert!($caught is Error);
+assert!($caught->getMessage() == 'MissingLiteralGroupType');
+Autoload\unregister($loader);

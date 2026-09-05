@@ -1,12 +1,18 @@
 //! Conflict-safe instruction replacement and removal for one analysis round.
 
+#[cfg(test)]
+mod tests;
+
 use hashbrown::HashMap;
 
+use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::LiteralKey;
+use crate::bytecode::chunk::descriptors::SwitchTable;
 use crate::bytecode::chunk::descriptors::literal_key;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::ConstantIndex;
+use crate::bytecode::instruction::operands::SwitchTableIndex;
 use crate::bytecode::rewrite::compact;
 use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::analysis::Analysis;
@@ -20,6 +26,7 @@ struct ChunkRewrite {
     replacements: Vec<Option<Instruction>>,
     removals: Vec<bool>,
     constants: Vec<Literal>,
+    switch_tables: Vec<SwitchTable>,
     constant_index: Option<HashMap<LiteralKey, ConstantIndex>>,
 }
 
@@ -153,6 +160,13 @@ impl RewritePlan {
             }
 
             let chunk = chunk_mut(unit, rewrite.location);
+            let added_switch_tables = !rewrite.switch_tables.is_empty();
+            for table in rewrite.switch_tables {
+                chunk
+                    .add_switch_table(table)
+                    .expect("a reserved switch table fits its chunk");
+            }
+
             for literal in rewrite.constants {
                 if chunk.push_constant(literal).is_err() {
                     // SAFETY: constant indexes are reserved before a rewrite is planned.
@@ -173,9 +187,77 @@ impl RewritePlan {
             if removals.iter().any(|removed| *removed) {
                 compact(chunk, &removals);
             }
+            if added_switch_tables {
+                compact_switch_tables(chunk);
+            }
         }
 
         result
+    }
+
+    pub(in crate::optimizer) fn add_switch_table(
+        &mut self,
+        analyzed: &AnalyzedChunk<'_>,
+        table: SwitchTable,
+    ) -> Option<SwitchTableIndex> {
+        let rewrite = &mut self.chunks[analyzed.position];
+        let position = analyzed
+            .chunk
+            .switch_tables
+            .len()
+            .checked_add(rewrite.switch_tables.len())?;
+        let index = SwitchTableIndex::new(u16::try_from(position).ok()?);
+        rewrite.switch_tables.push(table);
+        Some(index)
+    }
+}
+
+fn compact_switch_tables(chunk: &mut Chunk) {
+    let mut mapping = vec![None; chunk.switch_tables.len()];
+    for instruction in &mut chunk.code {
+        if let Some(table) = switch_table_index(instruction) {
+            mapping[usize::from(table.index())] = Some(*table);
+        }
+    }
+
+    if mapping.iter().all(Option::is_some) {
+        return;
+    }
+
+    let mut old = 0;
+    let mut next = 0;
+    chunk.switch_tables.retain(|_| {
+        let mapped = &mut mapping[old];
+        old += 1;
+        if mapped.is_none() {
+            return false;
+        }
+
+        *mapped = Some(SwitchTableIndex::new(
+            u16::try_from(next).expect("retained switch tables fit their original index space"),
+        ));
+
+        next += 1;
+        true
+    });
+
+    for instruction in &mut chunk.code {
+        if let Some(table) = switch_table_index(instruction) {
+            *table = mapping[usize::from(table.index())]
+                .expect("every referenced switch table was retained");
+        }
+    }
+}
+
+const fn switch_table_index(instruction: &mut Instruction) -> Option<&mut SwitchTableIndex> {
+    match instruction {
+        Instruction::SwitchInt { table, .. }
+        | Instruction::SwitchString { table, .. }
+        | Instruction::SwitchBool { table, .. }
+        | Instruction::SwitchFloat { table, .. }
+        | Instruction::SwitchPattern { table, .. }
+        | Instruction::SwitchTuplePattern { table, .. } => Some(table),
+        _ => None,
     }
 }
 
@@ -186,6 +268,7 @@ impl ChunkRewrite {
             replacements: Vec::new(),
             removals: Vec::new(),
             constants: Vec::new(),
+            switch_tables: Vec::new(),
             constant_index: None,
         }
     }

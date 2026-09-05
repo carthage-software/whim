@@ -1,6 +1,7 @@
 //! Runtime descriptor checks: subtyping, value conformance, and
 //! callable compatibility.
 
+use std::borrow::Cow;
 use std::rc::Rc;
 
 use crate::bytecode::chunk::descriptors::ShapeKey;
@@ -2035,11 +2036,19 @@ impl VirtualMachine<'_> {
         )
     }
 
-    fn resolved_element_descriptor(
+    fn resolved_element_descriptor<'descriptor>(
         &mut self,
-        descriptor: &TypeDescriptor,
+        descriptor: &'descriptor TypeDescriptor,
         environment: TypeEnvironmentId,
-    ) -> Result<Option<(TypeDescriptor, TypeEnvironmentId)>, VirtualMachineControl> {
+    ) -> Result<Option<(Cow<'descriptor, TypeDescriptor>, TypeEnvironmentId)>, VirtualMachineControl>
+    {
+        if !matches!(
+            descriptor,
+            TypeDescriptor::Parameter(_) | TypeDescriptor::Named { .. }
+        ) {
+            return Ok(Some((Cow::Borrowed(descriptor), environment)));
+        }
+
         let mut current = descriptor.clone();
         let mut environment = environment;
         let mut hops = 0;
@@ -2067,11 +2076,11 @@ impl VirtualMachine<'_> {
 
                     if entry.kind != SymbolKind::TypeAlias {
                         return Ok(Some((
-                            TypeDescriptor::Named {
+                            Cow::Owned(TypeDescriptor::Named {
                                 name,
                                 arguments,
                                 recursive,
-                            },
+                            }),
                             environment,
                         )));
                     }
@@ -2090,7 +2099,7 @@ impl VirtualMachine<'_> {
 
                     aliased
                 }
-                other => return Ok(Some((other, environment))),
+                other => return Ok(Some((Cow::Owned(other), environment))),
             };
         }
     }

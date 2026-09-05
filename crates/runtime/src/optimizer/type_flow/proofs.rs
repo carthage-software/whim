@@ -317,6 +317,41 @@ impl TypeFlow<'_> {
         self.descriptor_proves(&actual, &expected, 0)
     }
 
+    pub(in crate::optimizer) fn disproves(
+        &self,
+        index: usize,
+        register: Register,
+        expected: &TypeDescriptor,
+    ) -> bool {
+        if index >= self.chunk.code.len()
+            || !self.reachable[index]
+            || usize::from(register.index()) >= usize::from(self.chunk.register_count)
+        {
+            return false;
+        }
+
+        let fact = self.fact(index, register);
+        if fact.mask != 0
+            && fact.mask != ALL
+            && (descriptor_mask(expected).is_some_and(|excluded| fact.mask & excluded == 0)
+                || self.literal_disjoint(fact, expected))
+        {
+            return true;
+        }
+
+        let Some(actual) = self.register_type_at(index, register, 0) else {
+            return false;
+        };
+
+        if descriptors_disjoint(&actual, expected, 0) {
+            return true;
+        }
+
+        let actual = self.expand_aliases_owned(actual);
+        let expected = self.expanded_aliases(expected);
+        descriptors_disjoint(&actual, &expected, 0)
+    }
+
     fn argument_proves(&self, index: usize, register: Register, expected: &TypeDescriptor) -> bool {
         self.proves(index, register, expected)
             || self.proves_constructed_array(index, register, expected)
@@ -785,7 +820,7 @@ impl TypeFlow<'_> {
                         && self.array_proves(fact, Some(value), false, depth + 1)
                 }),
                 DICTIONARY => self.dictionary_proves(fact, arguments.as_ref(), depth + 1),
-                TUPLE => arguments.as_ref().is_none_or(|(_, value)| {
+                TUPLE => arguments.as_ref().is_none_or(|(key, value)| {
                     let Some(index) = instruction_index(fact.origin) else {
                         return false;
                     };
@@ -797,6 +832,20 @@ impl TypeFlow<'_> {
                     else {
                         return false;
                     };
+
+                    if element_count.value() != 0
+                        && !self.descriptor_proves(
+                            &TypeDescriptor::integer_range(
+                                Some(0),
+                                Some(i64::from(element_count.value()) - 1),
+                            ),
+                            key,
+                            depth + 1,
+                        )
+                    {
+                        return false;
+                    }
+
                     (0..usize::from(element_count.value())).all(|position| {
                         let register = usize::from(first_element.index()) + position;
                         register < usize::from(self.chunk.register_count)
@@ -812,8 +861,16 @@ impl TypeFlow<'_> {
             TypeDescriptor::Vector(element) => {
                 fact.mask == VECTOR && self.array_proves(fact, element.as_deref(), false, depth)
             }
+            TypeDescriptor::VectorShape { elements, rest } => {
+                fact.mask == VECTOR
+                    && self.sequence_shape_proves(fact, elements, rest.as_deref(), depth)
+            }
             TypeDescriptor::Dictionary(arguments) => {
                 fact.mask == DICTIONARY && self.dictionary_proves(fact, arguments.as_ref(), depth)
+            }
+            TypeDescriptor::DictionaryShape { entries, rest } => {
+                fact.mask == DICTIONARY
+                    && self.dictionary_shape_proves(fact, entries, rest.as_ref(), depth)
             }
             TypeDescriptor::Callable(None) => fact.mask & !CALLABLE == 0,
             TypeDescriptor::Callable(Some(expected)) => {
@@ -839,6 +896,9 @@ impl TypeFlow<'_> {
             TypeDescriptor::Tuple(members) => {
                 fact.mask == TUPLE && self.tuple_proves(fact, members, depth)
             }
+            TypeDescriptor::TupleRest { elements, rest } => {
+                fact.mask == TUPLE && self.sequence_shape_proves(fact, elements, Some(rest), depth)
+            }
             TypeDescriptor::TupleAny => fact.mask & !TUPLE == 0,
             TypeDescriptor::Union(members) => fact_bits(fact).all(|part| {
                 members
@@ -855,10 +915,7 @@ impl TypeFlow<'_> {
             TypeDescriptor::Never
             | TypeDescriptor::Member { .. }
             | TypeDescriptor::Parameter(_)
-            | TypeDescriptor::VectorShape { .. }
-            | TypeDescriptor::DictionaryShape { .. }
-            | TypeDescriptor::Classname(_)
-            | TypeDescriptor::TupleRest { .. } => false,
+            | TypeDescriptor::Classname(_) => false,
             TypeDescriptor::Wildcard | TypeDescriptor::Mixed => true,
         }
     }

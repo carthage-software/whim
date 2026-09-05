@@ -90,6 +90,18 @@ pub(in crate::optimizer::passes) fn optimize_chunk_with_context(
     remove_stores(chunk, &remove, statistics);
 }
 
+pub(in crate::optimizer::passes) fn optimize_chunk_without_flow(
+    chunk: &mut Chunk,
+    configuration: OptimizationConfiguration,
+    statistics: &mut OptimizationStatistics,
+) {
+    if !configuration.dead_store || chunk.code.len() < 2 {
+        return;
+    }
+    let remove = removable_stores_with_flow(chunk, None, chunk.local_register_count);
+    remove_stores(chunk, &remove, statistics);
+}
+
 fn removable_stores<'a>(
     chunk: &'a Chunk,
     parameters: &'a [CompiledParameter],

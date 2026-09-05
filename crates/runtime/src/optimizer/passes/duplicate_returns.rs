@@ -17,7 +17,12 @@ pub(in crate::optimizer) fn optimize_unit(
 }
 
 fn optimize_and_prune(chunk: &mut Chunk) {
-    if optimize_chunk(chunk) {
+    if optimize_chunk(chunk)
+        || chunk
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::ThrowUnhandledMatch { .. }))
+    {
         prune_unreachable::optimize_chunk(chunk);
     }
 }
