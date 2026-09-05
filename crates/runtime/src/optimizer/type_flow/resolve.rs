@@ -764,14 +764,6 @@ impl<'a> TypeFlow<'a> {
         }
     }
 
-    pub(in crate::optimizer::type_flow) fn exact_class(
-        &self,
-        fact: Fact,
-        depth: usize,
-    ) -> Option<&'a CompiledClassLike> {
-        Some(self.exact_class_specialization(fact, depth)?.class)
-    }
-
     pub(in crate::optimizer::type_flow) fn exact_class_specialization(
         &self,
         fact: Fact,
@@ -795,14 +787,14 @@ impl<'a> TypeFlow<'a> {
                     arguments: type_arguments.map(<[TypeDescriptor]>::to_vec),
                 });
             }
-            if let Some((first_argument, _)) = method_call_site(self.chunk.code[index])
-                && self
-                    .resolved_method_at(index, depth + 1)
-                    .and_then(|method| method.function.return_type.as_ref())
+            if let Some((receiver, method)) = self.resolved_method_receiver_at(index, depth + 1)
+                && method
+                    .function
+                    .return_type
+                    .as_ref()
                     .is_some_and(|descriptor| matches!(descriptor, TypeDescriptor::StaticClass))
             {
-                return self
-                    .exact_class_specialization(self.fact(index, first_argument), depth + 1);
+                return Some(receiver);
             }
         }
         let descriptor = self.origin_type_matching_mask(fact, depth + 1)?;
@@ -839,18 +831,29 @@ impl<'a> TypeFlow<'a> {
         index: usize,
         depth: usize,
     ) -> Option<&'a CompiledMethod> {
+        self.resolved_method_receiver_at(index, depth)
+            .map(|(_, method)| method)
+    }
+
+    fn resolved_method_receiver_at(
+        &self,
+        index: usize,
+        depth: usize,
+    ) -> Option<(ExactClass<'a>, &'a CompiledMethod)> {
         if depth > MAX_TYPE_DEPTH {
             return None;
         }
         let (first_argument, cache) = method_call_site(*self.chunk.code.get(index)?)?;
-        let class = self.exact_class(self.fact(index, first_argument), depth + 1)?;
+        let receiver =
+            self.exact_class_specialization(self.fact(index, first_argument), depth + 1)?;
         let name = self.member_name(cache)?;
-        class.methods.iter().find(|method| {
+        let method = receiver.class.methods.iter().find(|method| {
             !method.is_static
                 && !method.is_abstract
                 && method.function.type_parameters.is_empty()
                 && same_atom(&method.name, name)
-        })
+        })?;
+        Some((receiver, method))
     }
 
     pub(in crate::optimizer) fn method_return_type_at(
