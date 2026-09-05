@@ -4,8 +4,10 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::OnceCell;
 use std::cell::RefCell;
+use std::collections::BinaryHeap;
 
 use std::cmp::Ordering;
+use std::cmp::Reverse;
 use std::ptr;
 
 use crate::bytecode::chunk::Chunk;
@@ -608,7 +610,7 @@ impl<'a> TypeFlow<'a> {
             return;
         }
 
-        let mut work = Vec::new();
+        let mut work = BinaryHeap::new();
         let mut queued = vec![false; self.blocks.len()];
         let mut scratch = vec![Fact::UNKNOWN; register_count];
         let mut exceptional = vec![Fact::UNKNOWN; register_count];
@@ -616,7 +618,7 @@ impl<'a> TypeFlow<'a> {
         let mut refinements = Vec::new();
         self.seed_block(0, &entry, &mut work, &mut queued);
 
-        while let Some(block_index) = work.pop() {
+        while let Some(Reverse(block_index)) = work.pop() {
             queued[block_index] = false;
             let block = self.blocks[block_index];
             scratch.copy_from_slice(self.block_state(block_index));
@@ -672,7 +674,7 @@ impl<'a> TypeFlow<'a> {
                 }
 
                 if changed && !queued[successor_block] {
-                    work.push(successor_block);
+                    work.push(Reverse(successor_block));
                     queued[successor_block] = true;
                 }
             }
@@ -1081,7 +1083,7 @@ impl<'a> TypeFlow<'a> {
         &mut self,
         block: usize,
         state: &[Fact],
-        work: &mut Vec<usize>,
+        work: &mut BinaryHeap<Reverse<usize>>,
         queued: &mut [bool],
     ) {
         if self.block_reachable[block] {
@@ -1090,7 +1092,7 @@ impl<'a> TypeFlow<'a> {
 
         self.block_reachable[block] = true;
         self.block_state_mut(block).copy_from_slice(state);
-        work.push(block);
+        work.push(Reverse(block));
         queued[block] = true;
     }
 
@@ -1125,7 +1127,7 @@ impl<'a> TypeFlow<'a> {
         index: usize,
         state: &[Fact],
         exceptional: &mut [Fact],
-        work: &mut Vec<usize>,
+        work: &mut BinaryHeap<Reverse<usize>>,
         queued: &mut [bool],
     ) {
         let instruction = self.chunk.code[index];
@@ -1157,7 +1159,7 @@ impl<'a> TypeFlow<'a> {
             let block = self.block_at(entry.handler as usize);
             let changed = self.merge_into_block(block, exceptional);
             if changed && !queued[block] {
-                work.push(block);
+                work.push(Reverse(block));
                 queued[block] = true;
             }
         }
