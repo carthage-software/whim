@@ -7,7 +7,6 @@ use crate::bytecode::unit::ConstantInitializer;
 use crate::limits::MAX_TYPE_DEPTH;
 use crate::linker::SlotPlacement;
 use crate::linker::slot_placement;
-use crate::optimizer::cfg::dominates;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::type_flow::Atom;
 use crate::optimizer::type_flow::CAPTURE_ORIGIN;
@@ -142,7 +141,9 @@ impl<'a> TypeFlow<'a> {
                     destination,
                     source,
                 } if destination == register => {
-                    return dominates(self.chunk, previous, index).then_some((previous, source));
+                    return self
+                        .dominates(previous, index)
+                        .then_some((previous, source));
                 }
                 _ if effect_on(self.chunk, instruction, register).writes() => return None,
                 _ => {}
@@ -170,7 +171,8 @@ impl<'a> TypeFlow<'a> {
             } = instruction
                 && candidate == iterator
             {
-                return dominates(self.chunk, previous, index)
+                return self
+                    .dominates(previous, index)
                     .then(|| self.register_type_at(previous, subject, depth + 1))?;
             }
             if effect_on(self.chunk, instruction, iterator).writes() {

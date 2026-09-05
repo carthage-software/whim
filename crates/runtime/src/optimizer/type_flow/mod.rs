@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::cell::Cell;
+use std::cell::OnceCell;
 use std::cell::RefCell;
 
 use std::cmp::Ordering;
@@ -26,6 +27,7 @@ use crate::bytecode::unit::CompiledMethod;
 use crate::bytecode::unit::CompiledParameter;
 use crate::bytecode::unit::CompiledProperty;
 use crate::bytecode::unit::CompiledTypeParameter;
+use crate::optimizer::cfg::Dominators;
 use crate::optimizer::cfg::branches_or_terminates;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::effect::effect_on;
@@ -235,6 +237,7 @@ pub(in crate::optimizer) struct TypeFlow<'a> {
     array_keys: Vec<u16>,
     settled: Cell<bool>,
     constants: RefCell<Vec<MemoizedConstant>>,
+    dominators: OnceCell<Dominators>,
 }
 
 #[derive(Clone, Copy)]
@@ -264,6 +267,16 @@ struct ExactClass<'a> {
 }
 
 impl<'a> TypeFlow<'a> {
+    fn dominates(&self, candidate: usize, target: usize) -> bool {
+        debug_assert!(candidate < target && target < self.chunk.code.len());
+        if self.linear || candidate == 0 {
+            return true;
+        }
+
+        let dominators = self.dominators.get_or_init(|| Dominators::new(self.chunk));
+        !dominators.is_reachable(target) || dominators.dominates(candidate, target)
+    }
+
     fn expanded_aliases<'descriptor>(
         &self,
         descriptor: &'descriptor TypeDescriptor,
@@ -464,6 +477,7 @@ impl<'a> TypeFlow<'a> {
             } else {
                 Vec::new()
             }),
+            dominators: OnceCell::new(),
         };
 
         if !declined {

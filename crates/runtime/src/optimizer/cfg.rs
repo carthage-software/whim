@@ -180,36 +180,6 @@ pub(in crate::optimizer) fn branches_or_terminates(instruction: Instruction) -> 
     )
 }
 
-/// Whether every path from the chunk entry to `target` passes `candidate`.
-pub(in crate::optimizer) fn dominates(chunk: &Chunk, candidate: usize, target: usize) -> bool {
-    if candidate == 0 {
-        return true;
-    }
-
-    let mut visited = vec![false; chunk.code.len()];
-    let mut pending = vec![0usize];
-    visited[candidate] = true;
-    while let Some(index) = pending.pop() {
-        if index == target {
-            return false;
-        }
-        if visited[index] {
-            continue;
-        }
-        visited[index] = true;
-
-        let mut edges = Vec::new();
-        successors(chunk, index, &mut edges);
-        for edge in edges {
-            if edge < chunk.code.len() && !visited[edge] {
-                pending.push(edge);
-            }
-        }
-    }
-
-    true
-}
-
 pub(in crate::optimizer) struct Dominators {
     block_of: Vec<usize>,
     immediate: Vec<Option<usize>>,
@@ -317,6 +287,10 @@ impl Dominators {
             block_of,
             immediate,
         }
+    }
+
+    pub(in crate::optimizer) fn is_reachable(&self, instruction: usize) -> bool {
+        self.immediate[self.block_of[instruction]].is_some()
     }
 
     pub(in crate::optimizer) fn dominates(&self, candidate: usize, target: usize) -> bool {

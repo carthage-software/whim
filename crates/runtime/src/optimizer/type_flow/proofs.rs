@@ -2,7 +2,6 @@
 //! analysis.
 
 use crate::limits::MAX_TYPE_DEPTH;
-use crate::optimizer::cfg::dominates;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::ALWAYS_REFERENCE_COUNTED;
@@ -580,7 +579,7 @@ impl TypeFlow<'_> {
         fresh: impl Fn(Instruction) -> bool,
     ) -> Option<(usize, bool)> {
         for candidate in (0..index).rev() {
-            if !dominates(self.chunk, candidate, index) {
+            if !self.dominates(candidate, index) {
                 continue;
             }
             let instruction = self.chunk.code[candidate];
