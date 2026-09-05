@@ -804,19 +804,26 @@ impl<'engine> VirtualMachine<'engine> {
     }
 
     /// Reserves the next call frame, or reports the existing hard depth limit.
-    #[cold]
-    #[inline(never)]
+    #[inline(always)]
     fn grow_call_frames(&mut self) -> Result<(), VirtualMachineControl> {
         let length = self.frames.len();
         let limit = self.engine.configuration.call_depth_limit;
         if length >= limit {
             return Err(self.call_depth_exceeded());
         }
-        if length == self.frames.capacity() {
-            let capacity = self.frames.capacity().saturating_mul(2).max(4).min(limit);
-            self.frames.reserve_exact(capacity - length);
-        }
+
+        Self::grow_frame_storage(&mut self.frames, limit);
         Ok(())
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn grow_frame_storage(frames: &mut Vec<Frame>, limit: usize) {
+        let length = frames.len();
+        if length == frames.capacity() {
+            let capacity = frames.capacity().saturating_mul(2).max(4).min(limit);
+            frames.reserve_exact(capacity - length);
+        }
     }
 
     /// Pushes after the caller checked the combined storage and depth limit.

@@ -71,3 +71,72 @@ assert!($caught);
         }
     }
 }
+
+#[test]
+fn function_value_growth_preserves_arguments_and_recovers_from_overflow() {
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            call_depth_limit: 37,
+            ..EngineConfiguration::default()
+        });
+
+        let source = r"
+class FrameGrowthArgument {
+    public static int $drops = 0;
+    public function __construct(public int $value) {}
+    public function __destruct(): void { self::$drops++; }
+}
+
+#[Whim\Marker\NeverInline]
+function descend(
+    int $remaining,
+    fn(FrameGrowthArgument, vec<int>, int): vec<int> $callable,
+    FrameGrowthArgument $argument,
+    vec<int> $values,
+): vec<int> {
+    if ($remaining == 0) {
+        return $callable($argument, $values, 3);
+    }
+
+    return descend($remaining - 1, $callable, $argument, $values);
+}
+
+#[Whim\Marker\NeverInline]
+function attempt_overflow(
+    fn(FrameGrowthArgument, vec<int>, int): vec<int> $callable,
+    vec<int> $values,
+): bool {
+    try {
+        descend(34, $callable, new FrameGrowthArgument(2), $values);
+    } catch (Whim\Unwind\StackOverflowError $error) {
+        return true;
+    }
+
+    return false;
+}
+
+$callable = function(FrameGrowthArgument $argument, vec<int> $values, int $last): vec<int> {
+    $values[] = $argument->value;
+    $values[] = $last;
+    return $values;
+};
+$original = vec[1];
+
+for ($depth = 0; $depth < 33; $depth++) {
+    assert!(descend($depth, $callable, new FrameGrowthArgument(2), $original) == vec[1, 2, 3]);
+    assert!($original == vec[1]);
+    assert!(FrameGrowthArgument::$drops == $depth + 1);
+}
+
+assert!(attempt_overflow($callable, $original));
+assert!(FrameGrowthArgument::$drops == 34);
+assert!($original == vec[1]);
+assert!(descend(0, $callable, new FrameGrowthArgument(2), $original) == vec[1, 2, 3]);
+assert!(FrameGrowthArgument::$drops == 35);
+assert!($original == vec[1]);
+";
+        let result = engine.run_source(source, Path::new("/function-value-frame-growth.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+    }
+}
