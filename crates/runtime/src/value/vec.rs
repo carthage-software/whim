@@ -187,6 +187,17 @@ impl CowClone for VecObject {
 }
 
 impl Trace for VecObject {
+    #[inline]
+    fn allocate_box(heap: &Heap) -> NonNull<HeapBox<Self>> {
+        heap.allocate_vec_box()
+    }
+
+    #[inline]
+    unsafe fn deallocate_box(heap: &Heap, allocation: NonNull<HeapBox<Self>>) {
+        // SAFETY: the caller has destroyed this vector's payload and released its child edges.
+        unsafe { heap.recycle_vec_box(allocation) };
+    }
+
     fn type_tag() -> TypeTag {
         TypeTag::Vec
     }
@@ -194,7 +205,7 @@ impl Trace for VecObject {
     fn enqueue_children(
         &mut self,
         _allocation: NonNull<HeapBox<()>>,
-        queue: &mut DropQueue,
+        queue: &DropQueue,
         mode: TeardownMode,
     ) {
         let elements = mem::take(&mut self.elements);

@@ -1,0 +1,34 @@
+use Whim\Unwind\RuntimeException;
+
+newtype SnapshotId = int;
+
+class SnapshotPayload {
+  public function __construct(public string $name) {}
+}
+
+$capture = function(
+  SnapshotId $id,
+  vec<int> $values,
+  SnapshotPayload $payload,
+): never {
+  $id = SnapshotId(99);
+  $values = vec[99];
+  $payload = new SnapshotPayload('replacement');
+  throw new RuntimeException('original arguments');
+};
+
+$caught = null;
+try {
+  $capture(SnapshotId(7), vec[1, 2], new SnapshotPayload('original'));
+} catch (RuntimeException $error) {
+  $caught = $error;
+}
+
+assert!($caught is RuntimeException);
+$arguments = $caught->getTrace()[0]->arguments;
+assert!(length!($arguments) == 3);
+assert!($arguments[0] is SnapshotId);
+assert!($arguments[0] == 7);
+assert!($arguments[1] == vec[1, 2]);
+assert!($arguments[2] is SnapshotPayload);
+assert!($arguments[2]->name == 'original');

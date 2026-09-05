@@ -622,6 +622,67 @@ $reentrantWidget = new ReentrantWidget();
 assert!($reentrantWidget->speak() == 'helped + partner');
 Autoload\unregister($reentrantLoader);
 
+$parameterGrowthSource = 'type ReentrantParameterInteger = int;' . "\n";
+for ($i = 0; $i < 4096; $i++) {
+  $parameterGrowthSource .=
+    'function reentrant_parameter_padding_' . "{$i}" . '(): void {}' . "\n";
+}
+
+File\write($work . '/reentrant-parameters.whim', $parameterGrowthSource);
+$parameterGrowthLoader = new Autoload\Autoloader()->withSymbolFile(
+  'ReentrantParameterInteger',
+  $work . '/reentrant-parameters.whim',
+);
+
+Autoload\register($parameterGrowthLoader);
+$checkReentrantParameters = function(
+  ReentrantParameterInteger $first,
+  string $label,
+  int $last,
+): int {
+  return $first + length!($label) + $last;
+};
+
+assert!(!Symbol\exists('ReentrantParameterInteger', false));
+$parameterGrowthError = null;
+try {
+  $checkReentrantParameters(
+    last: 'wrong',
+    label: 'loaded',
+    first: 7,
+  );
+} catch (TypeError $error) {
+  $parameterGrowthError = $error;
+}
+
+assert!($parameterGrowthError is TypeError);
+assert!(
+  Whim\Str\contains(
+    $parameterGrowthError->getMessage(),
+    'argument $last passed to',
+  ),
+);
+
+assert!(
+  Whim\Str\contains(
+    $parameterGrowthError->getMessage(),
+    'must be of type int, string given',
+  ),
+);
+
+assert!(Symbol\exists('ReentrantParameterInteger', false));
+assert!(Symbol\exists('reentrant_parameter_padding_4095', false));
+assert!(
+  $checkReentrantParameters(
+    last: 5,
+    first: 7,
+    label: 'loaded',
+  )
+  == 18,
+);
+
+Autoload\unregister($parameterGrowthLoader);
+
 File\write(
   $work . '/published-loaded.whim',
   'final class PublishedLoaded { public function value(): int { return 1; } }'

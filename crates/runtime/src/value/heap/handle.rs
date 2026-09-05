@@ -10,7 +10,6 @@ use crate::unwrap_option_invariant;
 use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::heap::Heap;
-use crate::value::heap::allocate_box;
 use crate::value::heap::metadata::CowClone;
 use crate::value::heap::metadata::Header;
 use crate::value::heap::metadata::HeapBox;
@@ -27,7 +26,7 @@ pub(crate) struct ManagedRef<T: Trace>(NonNull<HeapBox<T>>, PhantomData<HeapBox<
 impl<T: Trace> ManagedRef<T> {
     #[must_use]
     pub(crate) fn new_in(heap: &Heap, payload: T) -> Self {
-        let boxed = allocate_box::<T>();
+        let boxed = T::allocate_box(heap);
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         unsafe {
             boxed.as_ptr().write(HeapBox {

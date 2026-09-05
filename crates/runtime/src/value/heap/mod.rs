@@ -10,6 +10,7 @@ use std::cell::RefCell;
 use std::cell::UnsafeCell;
 use std::io;
 use std::mem;
+use std::mem::MaybeUninit;
 use std::process;
 use std::ptr;
 use std::ptr::NonNull;
@@ -209,6 +210,8 @@ type FinalizableObjects = HashMap<NonNull<HeapBox<InstanceObject>>, u64, Default
 
 type Interner = HashTable<AtomBox>;
 
+type FreeVecBox = Box<MaybeUninit<HeapBox<VecObject>>>;
+
 pub(crate) struct Heap {
     hash_state: HashState,
     byte_strings: RefCell<[Option<ManagedRef<ByteStringObject>>; 256]>,
@@ -222,7 +225,7 @@ pub(crate) struct Heap {
     pending_collection: Cell<bool>,
     weak_registry: RefCell<WeakRegistry>,
     has_weak_dependents: Cell<bool>,
-    drop_queue: UnsafeCell<DropQueue>,
+    drop_queue: DropQueue,
     /// Live finalizable objects and their allocation order.
     finalizable_objects: UnsafeCell<FinalizableObjects>,
     finalizable_sequence: Cell<u64>,
@@ -232,6 +235,7 @@ pub(crate) struct Heap {
     object_pool_bytes: Cell<usize>,
     draining: Cell<bool>,
     teardown_depth: Cell<u32>,
+    vec_box_cache: Cell<Option<FreeVecBox>>,
 }
 
 impl Heap {
@@ -248,7 +252,7 @@ impl Heap {
             pending_collection: Cell::new(false),
             weak_registry: RefCell::new(HashMap::new()),
             has_weak_dependents: Cell::new(false),
-            drop_queue: UnsafeCell::new(DropQueue::new()),
+            drop_queue: DropQueue::new(),
             finalizable_objects: UnsafeCell::new(HashMap::new()),
             finalizable_sequence: Cell::new(0),
             pending_finalizers: UnsafeCell::new(Vec::new()),
@@ -256,6 +260,7 @@ impl Heap {
             object_pool_bytes: Cell::new(0),
             draining: Cell::new(false),
             teardown_depth: Cell::new(0),
+            vec_box_cache: Cell::new(None),
         })
     }
 
@@ -453,6 +458,31 @@ impl Heap {
         self.collecting.set(collecting);
     }
 
+    pub(in crate::value) fn allocate_vec_box(&self) -> NonNull<HeapBox<VecObject>> {
+        if let Some(allocation) = self.vec_box_cache.take() {
+            // SAFETY: Box supplies a non-null allocation with exactly this size and alignment.
+            return unsafe { NonNull::new_unchecked(Box::into_raw(allocation).cast()) };
+        }
+
+        allocate_box::<VecObject>()
+    }
+
+    /// # Safety
+    ///
+    /// The allocation must belong to this heap and its payload must be fully destroyed.
+    pub(in crate::value) unsafe fn recycle_vec_box(&self, allocation: NonNull<HeapBox<VecObject>>) {
+        // SAFETY: the global allocation has the matching layout. MaybeUninit owns only its
+        // storage and cannot drop the former header, values, or element buffer again.
+        let allocation = unsafe {
+            Box::from_raw(
+                allocation
+                    .cast::<MaybeUninit<HeapBox<VecObject>>>()
+                    .as_ptr(),
+            )
+        };
+        drop(self.vec_box_cache.replace(Some(allocation)));
+    }
+
     pub(in crate::value) fn allocate_tuple_box(&self, len: usize) -> NonNull<HeapBox<TupleObject>> {
         let layout = tuple_layout(len);
         // SAFETY: this layout matches the allocation.
@@ -531,7 +561,7 @@ impl Heap {
 
         if header.decrement() == 0 {
             self.release_last_reference(box_pointer, header);
-        } else if header.type_tag().is_collectable() && !header.is_buffered() {
+        } else {
             self.maybe_buffer_root(box_pointer, header);
         }
     }
@@ -644,13 +674,20 @@ impl Heap {
     }
 
     /// Buffers a possible cycle root and collects at the threshold.
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "the root buffer is bounded by the header's index field"
-    )]
+    #[inline]
     fn maybe_buffer_root(&self, box_pointer: NonNull<HeapBox<()>>, header: &Header) {
         if !header.type_tag().is_collectable() || header.is_buffered() {
             return;
+        }
+
+        if header.type_tag() == TypeTag::Vec {
+            // SAFETY: the tag identifies this live payload, which is only read here.
+            let vector = unsafe { &box_pointer.cast::<HeapBox<VecObject>>().as_ref().payload };
+            match vector.as_slice() {
+                [] => return,
+                [value] if value.collectable_box().is_none() => return,
+                _ => {}
+            }
         }
 
         if matches!(
@@ -674,6 +711,15 @@ impl Heap {
             return;
         }
 
+        self.buffer_root(box_pointer, header);
+    }
+
+    #[inline(never)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the root buffer is bounded by the header's index field"
+    )]
+    fn buffer_root(&self, box_pointer: NonNull<HeapBox<()>>, header: &Header) {
         let should_collect = {
             // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
             let roots = unsafe { &mut *self.roots.get() };
@@ -724,9 +770,14 @@ impl Heap {
     }
 
     fn drain_from(&self, first: Erased) {
+        if self.draining.replace(true) {
+            self.drop_queue.push(first);
+            return;
+        }
+
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
-        unsafe { &mut *self.drop_queue.get() }.pending.push(first);
-        self.drain_pending();
+        unsafe { self.teardown_in_mode(first.box_pointer, first.tag, TeardownMode::Full) };
+        self.finish_drain();
     }
 
     /// Drains teardown and runs a collection deferred during it.
@@ -735,9 +786,14 @@ impl Heap {
             return;
         }
 
+        self.finish_drain();
+    }
+
+    #[inline]
+    fn finish_drain(&self) {
+        debug_assert!(self.draining.get());
         loop {
-            // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
-            let entry = unsafe { &mut *self.drop_queue.get() }.pending.pop();
+            let entry = self.drop_queue.pop();
             let Some(entry) = entry else { break };
             // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
             unsafe { self.teardown_in_mode(entry.box_pointer, entry.tag, TeardownMode::Full) };
@@ -872,9 +928,7 @@ impl Heap {
                         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
                         unsafe { dependent.cast::<HeapBox<WeakMapObject>>().as_ref() }.state_ref();
                     if let Some(value) = map.remove_entry_by_address(address) {
-                        // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
-                        unsafe { &mut *self.drop_queue.get() }
-                            .release_value(value, TeardownMode::Full);
+                        self.drop_queue.release_value(value, TeardownMode::Full);
                     }
                 }
                 // SAFETY: the surrounding invariant makes this path unreachable.
@@ -912,8 +966,7 @@ impl Heap {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         let payload = unsafe { &mut (*typed.as_ptr()).payload };
         let (released_bytes, deferred_built_in) = {
-            // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
-            let queue = unsafe { &mut *self.drop_queue.get() };
+            let queue = &self.drop_queue;
             payload.enqueue_children(box_pointer, queue, mode);
             (queue.take_released_bytes(), queue.take_deferred_built_in())
         };
@@ -927,7 +980,7 @@ impl Heap {
         // SAFETY: the source and target ranges are valid.
         unsafe { ptr::drop_in_place(payload) };
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
-        unsafe { deallocate_box(typed) };
+        unsafe { T::deallocate_box(self, typed) };
     }
 
     /// # Safety
@@ -938,8 +991,7 @@ impl Heap {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         let boxed = unsafe { &mut *typed.as_ptr() };
         let len = boxed.header.tuple_length();
-        // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
-        let queue = unsafe { &mut *self.drop_queue.get() };
+        let queue = &self.drop_queue;
         boxed.payload.enqueue_children(box_pointer, queue, mode);
         // SAFETY: this layout matches the allocation.
         unsafe { dealloc(typed.cast::<u8>().as_ptr(), tuple_layout(len)) };
@@ -956,8 +1008,7 @@ impl Heap {
         let built_in = payload.built_in_state_head();
         let layout = object_layout_from_state_chain(slot_count, built_in);
         let (released_bytes, deferred_built_in) = {
-            // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
-            let queue = unsafe { &mut *self.drop_queue.get() };
+            let queue = &self.drop_queue;
             payload.enqueue_children(box_pointer, queue, mode);
             (queue.take_released_bytes(), queue.take_deferred_built_in())
         };
@@ -1067,21 +1118,128 @@ impl Drop for Heap {
             }
         }
         self.object_pool_bytes.set(0);
+        drop(self.vec_box_cache.take());
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
+
+    use super::Color;
     use super::DEFAULT_CYCLE_THRESHOLD;
+    use super::FreeVecBox;
     use super::Heap;
+    use super::HeapBox;
     use super::ROOT_BUFFER_RETAIN_LIMIT;
+    use super::TeardownMode;
+    use super::TypeTag;
     use crate::value::Value;
+    use crate::value::array::ArrayTypeCheck;
+    use crate::value::array::ArrayTypeCheckId;
+    use crate::value::object::ClassId;
+    use crate::value::object::InstanceObject;
     use crate::value::vec::VecObject;
 
     fn root_buffer_state(heap: &Heap) -> (usize, usize) {
         // SAFETY: these single-threaded tests inspect the buffer between heap operations.
         let roots = unsafe { &*heap.roots.get() };
         (roots.len(), roots.capacity())
+    }
+
+    fn cached_vec_box_address(heap: &Heap) -> Option<usize> {
+        // SAFETY: these single-threaded tests inspect the cache between heap operations.
+        let allocation = unsafe { &*heap.vec_box_cache.as_ptr() };
+        allocation
+            .as_ref()
+            .map(|allocation| allocation.as_ref().as_ptr().addr())
+    }
+
+    #[test]
+    fn reused_vector_boxes_receive_fresh_headers_and_type_caches() {
+        let heap = Heap::new();
+        let blocker = VecObject::with_elements(&heap, [Value::int(1), Value::int(2)]);
+        drop(blocker.clone());
+        let previous = VecObject::with_elements(&heap, [Value::int(3), Value::int(4)]);
+        let check_id = ArrayTypeCheckId::new(41);
+        previous.mark_type_checked(check_id);
+        drop(previous.clone());
+        assert_eq!(previous.header().root_index(), 1);
+        assert_eq!(previous.header().color(), Color::Purple);
+        let address = previous.raw_box().addr().get();
+        let owner = previous.header().heap_ptr();
+        drop(previous);
+        assert_eq!(cached_vec_box_address(&heap), Some(address));
+
+        let fresh = VecObject::with_elements(&heap, [Value::int(99)]);
+        assert_eq!(fresh.raw_box().addr().get(), address);
+        assert_eq!(cached_vec_box_address(&heap), None);
+        assert_eq!(fresh.header().heap_ptr(), owner);
+        assert_eq!(fresh.header().type_tag(), TypeTag::Vec);
+        assert_eq!(fresh.header().reference_count(), 1);
+        assert_eq!(fresh.header().color(), Color::Black);
+        assert_eq!(fresh.header().root_index(), 0);
+        assert!(!fresh.header().is_buffered());
+        assert!(!fresh.header().is_immortal());
+        assert!(!fresh.header().is_interned());
+        assert_eq!(fresh.type_check(check_id), ArrayTypeCheck::Unknown);
+        assert_eq!(fresh.get(0).and_then(Value::as_int), Some(99));
+        assert_eq!(root_buffer_state(&heap).0, 1);
+        assert!(blocker.header().is_buffered());
+        assert_eq!(blocker.header().root_index(), 0);
+    }
+
+    #[test]
+    fn vector_box_cache_keeps_one_dead_box_and_never_reuses_live_storage() {
+        assert_eq!(size_of::<Option<FreeVecBox>>(), size_of::<usize>());
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(size_of::<HeapBox<VecObject>>(), 56);
+
+        let heap = Heap::new();
+        let first = VecObject::new(&heap);
+        let second = VecObject::new(&heap);
+        let first_address = first.raw_box().addr().get();
+        let second_address = second.raw_box().addr().get();
+        assert_ne!(first_address, second_address);
+        drop(first);
+        assert_eq!(cached_vec_box_address(&heap), Some(first_address));
+
+        let third = VecObject::new(&heap);
+        assert_eq!(third.raw_box().addr().get(), first_address);
+        assert_ne!(third.raw_box(), second.raw_box());
+        assert_eq!(cached_vec_box_address(&heap), None);
+        drop(second);
+        assert_eq!(cached_vec_box_address(&heap), Some(second_address));
+        drop(third);
+        assert_eq!(cached_vec_box_address(&heap), Some(first_address));
+
+        let last = VecObject::new(&heap);
+        assert_eq!(last.raw_box().addr().get(), first_address);
+        drop(last);
+        let weak = Rc::downgrade(&heap);
+        drop(heap);
+        assert!(weak.upgrade().is_none());
+    }
+
+    #[test]
+    fn cycle_collected_vector_storage_can_be_reused_without_its_old_edges() {
+        let heap = Heap::new();
+        let object = InstanceObject::new(&heap, ClassId(0), 1);
+        let vector = VecObject::with_elements(&heap, [Value::object(object.clone())]);
+        let address = vector.raw_box().addr().get();
+        drop(object.write_slot(0, Value::vec(vector.clone())));
+        drop(vector);
+        drop(object);
+        assert_eq!(heap.collect_cycles(), 2);
+        assert_eq!(cached_vec_box_address(&heap), Some(address));
+
+        let fresh = VecObject::new(&heap);
+        assert_eq!(fresh.raw_box().addr().get(), address);
+        assert!(fresh.is_empty());
+        assert!(!fresh.header().is_buffered());
+        assert_eq!(fresh.header().color(), Color::Black);
+        assert_eq!(fresh.header().reference_count(), 1);
+        assert_eq!(heap.collect_cycles(), 0);
     }
 
     #[test]
@@ -1095,10 +1253,109 @@ mod tests {
     }
 
     #[test]
+    fn nested_vectors_release_owned_heap_strings_without_overlapping_queue_borrows() {
+        let heap = Heap::new();
+        for depth in [1, 64] {
+            let mut value = Value::from_string_bytes(&heap, b"a byte string with external storage");
+            for _ in 0..depth {
+                value = Value::vec(VecObject::with_elements(&heap, [value]));
+            }
+            drop(value);
+            assert!(heap.drop_queue.pop().is_none());
+            assert!(!heap.draining.get());
+            assert_eq!(root_buffer_state(&heap), (0, 0));
+        }
+    }
+
+    #[test]
+    fn idle_leaf_destruction_does_not_allocate_a_pending_queue() {
+        let heap = Heap::new();
+        drop(Value::from_string_bytes(
+            &heap,
+            b"a byte string with external storage",
+        ));
+        drop(VecObject::with_elements(&heap, [Value::int(42)]));
+        assert_eq!(heap.drop_queue.capacity(), 0);
+        assert!(heap.drop_queue.pop().is_none());
+        assert!(!heap.draining.get());
+        assert!(!heap.pending_collection.get());
+    }
+
+    #[test]
+    fn direct_destruction_keeps_reentrant_descendants_before_older_pending_entries() {
+        for queue_older_entry in [false, true] {
+            let heap = Heap::new();
+            let older_address = queue_older_entry.then(|| {
+                let older = VecObject::new(&heap);
+                let address = older.raw_box().addr().get();
+                heap.drop_queue.release_child(older, TeardownMode::Full);
+                heap.draining.set(true);
+                heap.drain_pending();
+                assert!(heap.draining.get());
+                assert_eq!(cached_vec_box_address(&heap), None);
+                heap.draining.set(false);
+                address
+            });
+            let first = VecObject::new(&heap);
+            let first_address = first.raw_box().addr().get();
+            let last = VecObject::new(&heap);
+            let root = VecObject::with_elements(&heap, [Value::vec(first), Value::vec(last)]);
+            drop(root);
+
+            // Each dead box replaces the cache. The root is destroyed first,
+            // then its children in LIFO order, then any older pending entry.
+            assert_eq!(
+                cached_vec_box_address(&heap),
+                Some(older_address.unwrap_or(first_address))
+            );
+            assert!(heap.drop_queue.pop().is_none());
+            assert!(!heap.draining.get());
+            assert!(!heap.pending_collection.get());
+        }
+    }
+
+    #[test]
+    fn direct_destruction_services_collection_after_the_active_drain() {
+        let heap = Heap::new();
+        heap.configure_cycle_threshold(Some(1));
+        let candidate = VecObject::with_elements(&heap, [Value::int(1), Value::int(2)]);
+        let root = VecObject::with_elements(&heap, [Value::vec(candidate.clone())]);
+        drop(root);
+        assert_eq!(candidate.header().reference_count(), 1);
+        assert_eq!(candidate.get(0).and_then(Value::as_int), Some(1));
+        assert_eq!(candidate.get(1).and_then(Value::as_int), Some(2));
+        assert_eq!(candidate.header().color(), Color::Black);
+        assert!(!candidate.header().is_buffered());
+        assert_eq!(root_buffer_state(&heap).0, 0);
+        assert!(heap.drop_queue.pop().is_none());
+        assert!(!heap.draining.get());
+        assert!(!heap.collecting.get());
+        assert!(!heap.pending_collection.get());
+    }
+
+    #[test]
+    fn cycle_member_teardown_can_directly_destroy_a_heap_string_child() {
+        let heap = Heap::new();
+        let root = InstanceObject::new(&heap, ClassId(0), 2);
+        drop(root.write_slot(0, Value::object(root.clone())));
+        drop(root.write_slot(
+            1,
+            Value::from_string_bytes(&heap, b"a byte string with external storage"),
+        ));
+        drop(root);
+        assert_eq!(heap.collect_cycles(), 1);
+        assert_eq!(root_buffer_state(&heap).0, 0);
+        assert!(heap.drop_queue.pop().is_none());
+        assert!(!heap.draining.get());
+        assert!(!heap.collecting.get());
+        assert!(!heap.pending_collection.get());
+    }
+
+    #[test]
     fn root_storage_survives_empty_states_and_updates_swapped_slots() {
         let heap = Heap::new();
-        let first = VecObject::with_elements(&heap, [Value::int(1)]);
-        let second = VecObject::with_elements(&heap, [Value::int(2)]);
+        let first = VecObject::with_elements(&heap, [Value::int(1), Value::int(1)]);
+        let second = VecObject::with_elements(&heap, [Value::int(2), Value::int(2)]);
         drop(first.clone());
         drop(second.clone());
         let (length, capacity) = root_buffer_state(&heap);
@@ -1111,7 +1368,7 @@ mod tests {
         drop(second);
         assert_eq!(root_buffer_state(&heap), (0, capacity));
 
-        let next = VecObject::with_elements(&heap, [Value::int(3)]);
+        let next = VecObject::with_elements(&heap, [Value::int(3), Value::int(3)]);
         drop(next.clone());
         assert_eq!(root_buffer_state(&heap), (1, capacity));
         assert_eq!(heap.collect_cycles(), 0);
@@ -1123,13 +1380,104 @@ mod tests {
     }
 
     #[test]
+    fn empty_and_singleton_leaf_vectors_do_not_enter_the_root_buffer() {
+        let heap = Heap::new();
+        for elements in [
+            vec![],
+            vec![Value::null()],
+            vec![Value::bool(true)],
+            vec![Value::int(42)],
+            vec![Value::float(1.5)],
+            vec![Value::from_string_bytes(&heap, b"short")],
+            vec![Value::from_string_bytes(
+                &heap,
+                b"a byte string with external storage",
+            )],
+        ] {
+            let vector = VecObject::with_elements(&heap, elements);
+            drop(vector.clone());
+            assert!(!vector.header().is_buffered());
+            assert_eq!(vector.header().reference_count(), 1);
+            assert_eq!(root_buffer_state(&heap), (0, 0));
+            assert_eq!(heap.collect_cycles(), 0);
+        }
+    }
+
+    #[test]
+    fn larger_vectors_and_singleton_collectable_values_remain_cycle_candidates() {
+        let heap = Heap::new();
+        let larger = VecObject::with_elements(&heap, [Value::int(1), Value::int(2)]);
+        drop(larger.clone());
+        assert!(larger.header().is_buffered());
+        assert_eq!(root_buffer_state(&heap).0, 1);
+        drop(larger);
+        assert_eq!(root_buffer_state(&heap).0, 0);
+
+        let child = VecObject::new(&heap);
+        let parent = VecObject::with_elements(&heap, [Value::vec(child.clone())]);
+        drop(parent.clone());
+        assert!(parent.header().is_buffered());
+        assert_eq!(root_buffer_state(&heap).0, 1);
+        assert_eq!(heap.collect_cycles(), 0);
+        drop(parent);
+        assert_eq!(child.header().reference_count(), 1);
+        assert!(child.is_empty());
+        assert_eq!(root_buffer_state(&heap).0, 0);
+    }
+
+    #[test]
+    fn previously_skipped_vectors_collect_cycles_after_unique_or_cow_mutation() {
+        for shared in [false, true] {
+            let heap = Heap::new();
+            let mut vector = VecObject::with_elements(&heap, [Value::int(42)]);
+            drop(vector.clone());
+            assert_eq!(root_buffer_state(&heap), (0, 0));
+
+            let original = shared.then(|| vector.clone());
+            let object = InstanceObject::new(&heap, ClassId(0), 1);
+            drop(vector.make_mut().set(0, Value::object(object.clone())));
+            if let Some(original) = &original {
+                assert!(!original.ptr_eq(&vector));
+                assert_eq!(original.get(0).and_then(Value::as_int), Some(42));
+            }
+
+            drop(object.write_slot(0, Value::vec(vector.clone())));
+            drop(vector);
+            drop(object);
+            assert_eq!(heap.collect_cycles(), 2);
+            assert_eq!(root_buffer_state(&heap).0, 0);
+            if let Some(original) = &original {
+                assert_eq!(original.get(0).and_then(Value::as_int), Some(42));
+                assert_eq!(original.header().reference_count(), 1);
+                assert!(!original.header().is_buffered());
+            }
+        }
+    }
+
+    #[test]
+    fn an_unbuffered_leaf_is_reclaimed_with_its_cyclic_owner() {
+        let heap = Heap::new();
+        let leaf = VecObject::with_elements(&heap, [Value::int(42)]);
+        drop(leaf.clone());
+        assert!(!leaf.header().is_buffered());
+        assert_eq!(root_buffer_state(&heap), (0, 0));
+
+        let object = InstanceObject::new(&heap, ClassId(0), 2);
+        drop(object.write_slot(0, Value::object(object.clone())));
+        drop(object.write_slot(1, Value::vec(leaf)));
+        drop(object);
+        assert_eq!(heap.collect_cycles(), 2);
+        assert_eq!(root_buffer_state(&heap).0, 0);
+    }
+
+    #[test]
     fn root_storage_releases_large_bursts_after_destruction_or_collection() {
         let heap = Heap::new();
         heap.configure_cycle_threshold(Some(usize::MAX));
         for collect in [false, true] {
             let values: Vec<_> = (0..=ROOT_BUFFER_RETAIN_LIMIT)
                 .map(|_| {
-                    let value = VecObject::with_elements(&heap, [Value::int(1)]);
+                    let value = VecObject::with_elements(&heap, [Value::int(1), Value::int(1)]);
                     drop(value.clone());
                     value
                 })

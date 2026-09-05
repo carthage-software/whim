@@ -38,7 +38,7 @@ impl ReflectionState {
         ))
     }
 
-    pub(crate) fn enqueue_children(&mut self, queue: &mut DropQueue, mode: TeardownMode) {
+    pub(crate) fn enqueue_children(&mut self, queue: &DropQueue, mode: TeardownMode) {
         for value in self.values.get_mut().drain(..) {
             queue.release_value(value, mode);
         }

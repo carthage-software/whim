@@ -54,6 +54,53 @@ enum Repr {
     },
 }
 
+pub(crate) struct FlatStringSlices<'source> {
+    base: &'source ManagedRef<ByteStringObject>,
+    bytes: &'source [u8],
+}
+
+impl<'source> FlatStringSlices<'source> {
+    #[must_use]
+    pub(crate) fn new(base: &'source ManagedRef<ByteStringObject>) -> Self {
+        Self {
+            base,
+            bytes: ByteStringObject::handle_bytes(base),
+        }
+    }
+
+    #[must_use]
+    pub(crate) const fn bytes(&self) -> &'source [u8] {
+        self.bytes
+    }
+
+    #[must_use]
+    pub(crate) fn slice(
+        &self,
+        heap: &Heap,
+        offset: usize,
+        len: usize,
+    ) -> ManagedRef<ByteStringObject> {
+        debug_assert!(
+            offset
+                .checked_add(len)
+                .is_some_and(|end| end <= self.bytes.len()),
+            "whim-runtime: a slice must lie within its base: {offset} + {len} > {}",
+            self.bytes.len()
+        );
+        ManagedRef::new_in(
+            heap,
+            ByteStringObject {
+                hash: Cell::new(0),
+                repr: UnsafeCell::new(Repr::Slice {
+                    base: self.base.clone(),
+                    offset,
+                    len,
+                }),
+            },
+        )
+    }
+}
+
 impl ByteStringObject {
     const fn flat(bytes: HeapBytes) -> Self {
         Self {
@@ -65,6 +112,17 @@ impl ByteStringObject {
     #[must_use]
     pub(crate) fn from_bytes(heap: &Heap, bytes: &[u8]) -> ManagedRef<Self> {
         ManagedRef::new_in(heap, Self::flat(HeapBytes::from_slice(bytes)))
+    }
+
+    #[must_use]
+    pub(in crate::value) fn from_hashed_bytes(
+        heap: &Heap,
+        bytes: &[u8],
+        hash: u64,
+    ) -> ManagedRef<Self> {
+        let string = Self::flat(HeapBytes::from_slice(bytes));
+        string.hash.set(hash);
+        ManagedRef::new_in(heap, string)
     }
 
     #[must_use]
@@ -486,7 +544,7 @@ impl Trace for ByteStringObject {
     fn enqueue_children(
         &mut self,
         _allocation: NonNull<HeapBox<()>>,
-        queue: &mut DropQueue,
+        queue: &DropQueue,
         mode: TeardownMode,
     ) {
         match mem::replace(self.repr.get_mut(), Repr::Flat(HeapBytes::empty())) {
@@ -504,10 +562,102 @@ impl Trace for ByteStringObject {
 mod tests {
     use crate::value::heap::Heap;
     use crate::value::string::ByteStringObject;
+    use crate::value::string::FlatStringSlices;
+    use crate::value::string::Repr;
     use crate::value::string::hash_bytes;
     use crate::value::string::short::ShortString;
 
     const CONTENT: &[u8] = b"0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn precomputed_hashes_match_each_heap_and_keep_the_uncached_fallback() {
+        let heaps = [Heap::new(), Heap::new()];
+        for bytes in [
+            b"".as_slice(),
+            b"a",
+            b"seven77",
+            b"eight888",
+            b"binary\0\xff",
+            b"an externally stored string with more than twenty-three bytes",
+            &[0xff; 256],
+        ] {
+            for heap in &heaps {
+                let expected = hash_bytes(heap.hash_state(), bytes);
+                let string = ByteStringObject::from_hashed_bytes(heap, bytes, expected);
+                assert_eq!(string.hash.get(), expected);
+                assert_eq!(string.hash64(heap.hash_state()), expected);
+                assert_eq!(ByteStringObject::handle_bytes(&string), bytes);
+
+                string.hash.set(0);
+                assert_eq!(string.hash64(heap.hash_state()), expected);
+                assert_eq!(string.hash.get(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn prepared_slices_flatten_sources_and_retain_their_backing() {
+        for representation in 0..3 {
+            let heap = Heap::new();
+            let string = match representation {
+                0 => ByteStringObject::from_bytes(&heap, CONTENT),
+                1 => ByteStringObject::concat(
+                    &heap,
+                    &ByteStringObject::from_bytes(&heap, &CONTENT[..19]),
+                    &ByteStringObject::from_bytes(&heap, &CONTENT[19..]),
+                ),
+                _ => {
+                    let mut padded = b"prefix".to_vec();
+                    padded.extend_from_slice(CONTENT);
+                    padded.extend_from_slice(b"suffix");
+                    let base = ByteStringObject::from_vec(&heap, padded);
+                    ByteStringObject::slice(&heap, &base, 6, CONTENT.len())
+                }
+            };
+            assert_eq!(string.is_flat(), representation == 0);
+            assert!(string.is_unique());
+
+            let parts = {
+                let source = FlatStringSlices::new(&string);
+                assert_eq!(source.bytes(), CONTENT);
+                assert!(string.is_flat());
+                assert!(
+                    string.is_unique(),
+                    "preparing slices only borrows the source"
+                );
+                let parts = [
+                    source.slice(&heap, 0, 8),
+                    source.slice(&heap, CONTENT.len() - 8, 8),
+                    source.slice(&heap, CONTENT.len(), 0),
+                ];
+                for part in &parts {
+                    // SAFETY: this live string is only inspected while its source is retained.
+                    let Repr::Slice { base, .. } = (unsafe { &*part.repr.get() }) else {
+                        panic!("prepared slices must keep the existing slice representation");
+                    };
+                    assert!(base.ptr_eq(&string));
+                }
+                parts
+            };
+            assert!(string.has_other_strong_references());
+            drop(string);
+            assert_eq!(ByteStringObject::handle_bytes(&parts[0]), &CONTENT[..8]);
+            assert_eq!(
+                ByteStringObject::handle_bytes(&parts[1]),
+                &CONTENT[CONTENT.len() - 8..]
+            );
+            assert_eq!(ByteStringObject::handle_bytes(&parts[2]), b"");
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "a slice must lie within its base")]
+    fn prepared_slices_keep_the_existing_bounds_assertion() {
+        let heap = Heap::new();
+        let string = ByteStringObject::from_bytes(&heap, CONTENT);
+        drop(FlatStringSlices::new(&string).slice(&heap, usize::MAX, 1));
+    }
 
     #[test]
     fn hashes_equal_bytes_across_representations() {

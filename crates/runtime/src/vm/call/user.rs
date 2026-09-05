@@ -1,5 +1,7 @@
 //! Entering user frames and the re-entrant built-in invocation paths.
 
+use std::ptr;
+
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::vm::call::Atom;
 use crate::vm::call::BuiltInCallable;
@@ -55,7 +57,13 @@ impl VirtualMachine<'_> {
             .frameless_literal
             .is_some();
         if !frameless && self.frames.len() >= self.call_frame_limit() {
-            self.grow_call_frames()?;
+            let length = self.frames.len();
+            let limit = self.engine.configuration.call_depth_limit;
+            if length >= limit {
+                return Err(self.call_depth_exceeded());
+            }
+
+            Self::grow_user_frame_storage(&mut self.frames, limit);
         }
         self.engine.optimize_callable_once(function)?;
         let (
@@ -130,57 +138,57 @@ impl VirtualMachine<'_> {
             .map(|context| context.called)
             .or_else(|| this.as_ref().map(|instance| instance.class()));
         let checked_parameters = if arguments_proven { 0 } else { argc };
-        for position in 0..checked_parameters {
-            let descriptor = {
-                let parameter =
-                    &self.engine.tables.functions[function.0 as usize].parameters()[position];
-                let Some(descriptor) = parameter.declared_type.as_ref() else {
-                    continue;
+        if checked_parameters != 0 {
+            let parameters = self.engine.tables.functions[function.0 as usize].parameters;
+            // SAFETY: the function's retained unit owns this immutable slice across
+            // reentrant type checks, even when the runtime function table grows.
+            let parameters = unsafe { parameters.as_ref() };
+            for (position, parameter) in parameters[..checked_parameters].iter().enumerate() {
+                let descriptor = {
+                    let Some(descriptor) = parameter.declared_type.as_ref() else {
+                        continue;
+                    };
+                    let value = &self.stack[window_start + position];
+                    if value.is_uninitialized()
+                        || check_trivial_descriptor(descriptor, value) == Some(true)
+                    {
+                        continue;
+                    }
+                    NonNull::from(descriptor)
                 };
-                let value = &self.stack[window_start + position];
-                if value.is_uninitialized()
-                    || check_trivial_descriptor(descriptor, value) == Some(true)
-                {
-                    continue;
+                // SAFETY: parameter storage belongs to the function's retained
+                // unit and never moves, even when the check below loads another
+                // unit re-entrantly.
+                let descriptor = unsafe { descriptor.as_ref() };
+                let value = self.stack[window_start + position].clone();
+                let valid = match check_trivial_descriptor(descriptor, &value) {
+                    Some(valid) => valid,
+                    None => self.check_descriptor_with_array_id(
+                        descriptor,
+                        &value,
+                        called,
+                        type_environment,
+                        None,
+                        0,
+                    )?,
+                };
+                if !valid {
+                    let concrete = self.substitute_descriptor(descriptor, type_environment, 0);
+                    let expected = self.render_descriptor(&concrete);
+                    let found = self.value_type_name(&value);
+                    let function_name = String::from_utf8_lossy(
+                        self.engine.tables.functions[function.0 as usize]
+                            .name
+                            .as_bytes(),
+                    );
+                    let parameter_name = String::from_utf8_lossy(parameter.name.as_bytes());
+                    return Err(self.throw_well_known(
+                        self.engine.tables.well_known.type_error,
+                        format!(
+                            "argument ${parameter_name} passed to {function_name} must be of type {expected}, {found} given"
+                        ),
+                    ));
                 }
-                NonNull::from(descriptor)
-            };
-            // SAFETY: parameter storage belongs to the function's retained
-            // unit and never moves, even when the check below loads another
-            // unit re-entrantly.
-            let descriptor = unsafe { descriptor.as_ref() };
-            let value = self.stack[window_start + position].clone();
-            let valid = match check_trivial_descriptor(descriptor, &value) {
-                Some(valid) => valid,
-                None => self.check_descriptor_with_array_id(
-                    descriptor,
-                    &value,
-                    called,
-                    type_environment,
-                    None,
-                    0,
-                )?,
-            };
-            if !valid {
-                let concrete = self.substitute_descriptor(descriptor, type_environment, 0);
-                let expected = self.render_descriptor(&concrete);
-                let found = self.value_type_name(&value);
-                let function_name = String::from_utf8_lossy(
-                    self.engine.tables.functions[function.0 as usize]
-                        .name
-                        .as_bytes(),
-                );
-                let parameter_name = String::from_utf8_lossy(
-                    self.engine.tables.functions[function.0 as usize].parameters()[position]
-                        .name
-                        .as_bytes(),
-                );
-                return Err(self.throw_well_known(
-                    self.engine.tables.well_known.type_error,
-                    format!(
-                        "argument ${parameter_name} passed to {function_name} must be of type {expected}, {found} given"
-                    ),
-                ));
             }
         }
         if frameless {
@@ -220,9 +228,28 @@ impl VirtualMachine<'_> {
             (false, 0, 0)
         };
         self.reset_omitted_parameters(base, this_offset, argc, declared);
-        for position in 0..argc.min(declared) {
-            self.stack
-                .swap(base + this_offset + position, window_start + position);
+        if argc != 0 {
+            assert!(
+                this_offset + argc <= register_count,
+                "checked arguments must fit within the callee frame"
+            );
+            debug_assert!(window_start + argc <= base);
+            // SAFETY: callers provide a verified or staged source window before base.
+            // The fit check bounds the destination in the initialized frame extension;
+            // the two windows are disjoint and the stack has finished resizing.
+            unsafe {
+                let source = self.stack.as_mut_ptr().add(window_start);
+                let destination = self.stack.as_mut_ptr().add(base + this_offset);
+                if argc == 1 {
+                    ptr::swap_nonoverlapping(destination, source, 1);
+                } else if argc == 2 {
+                    ptr::swap_nonoverlapping(destination, source, 2);
+                } else if argc == 3 {
+                    ptr::swap_nonoverlapping(destination, source, 3);
+                } else {
+                    ptr::swap_nonoverlapping(destination, source, argc);
+                }
+            }
         }
         let limit = base + register_count;
         for (position, capture) in captures[capture_skip..].iter().enumerate() {
@@ -272,7 +299,7 @@ impl VirtualMachine<'_> {
                 }
             }
         }
-        self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<true>(base, chunk, argc, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
@@ -301,6 +328,16 @@ impl VirtualMachine<'_> {
             });
         }
         Ok(())
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn grow_user_frame_storage(frames: &mut Vec<Frame>, limit: usize) {
+        let length = frames.len();
+        if length == frames.capacity() {
+            let capacity = frames.capacity().saturating_mul(2).max(4).min(limit);
+            frames.reserve_exact(capacity - length);
+        }
     }
 
     #[expect(

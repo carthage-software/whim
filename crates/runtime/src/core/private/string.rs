@@ -17,6 +17,8 @@ use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::ValueView;
 use crate::value::string::ByteStringObject;
+use crate::value::string::FlatStringSlices;
+use crate::value::string::short::ShortString;
 
 #[whim_function("Whim\\_Private\\string_to_bytes(string $value): vec<0..=255>")]
 pub(crate) fn string_to_bytes<'call>(
@@ -200,7 +202,8 @@ pub(crate) fn string_split<'call>(
     let string = arguments.string(0);
     let delimiter = arguments.bytes(1);
     let limit = arguments.int(2);
-    let haystack = ByteStringObject::handle_bytes(&string);
+    let source = FlatStringSlices::new(&string);
+    let haystack = source.bytes();
     if delimiter.is_empty() {
         let whole = Value::string(string.clone());
         return context.vec([whole]);
@@ -214,22 +217,35 @@ pub(crate) fn string_split<'call>(
             break;
         }
 
-        parts.push(Value::string(ByteStringObject::slice(
-            context.vm.heap(),
-            &string,
-            start,
-            position - start,
-        )));
+        parts.push(split_part(context, &source, start, position));
         start = position + delimiter.len();
     }
 
-    parts.push(Value::string(ByteStringObject::slice(
-        context.vm.heap(),
-        &string,
-        start,
-        haystack.len() - start,
-    )));
+    parts.push(split_part(context, &source, start, haystack.len()));
     context.vec(parts)
+}
+
+#[expect(
+    clippy::inline_always,
+    reason = "each split part avoids a wrapper call and an indirect Value return"
+)]
+#[inline(always)]
+fn split_part(
+    context: &Context<'_, '_, '_>,
+    source: &FlatStringSlices<'_>,
+    start: usize,
+    end: usize,
+) -> Value {
+    if end - start <= ShortString::CAPACITY {
+        Value::short_string(split_short_part(&source.bytes()[start..end]))
+    } else {
+        Value::string(source.slice(context.vm.heap(), start, end - start))
+    }
+}
+
+#[inline(never)]
+fn split_short_part(bytes: &[u8]) -> ShortString {
+    ShortString::from_bytes(bytes).expect("a short split part fits inline storage")
 }
 
 #[whim_function("Whim\\_Private\\string_join(vec<string> $values, string $separator): string")]
@@ -434,7 +450,7 @@ pub(crate) fn string_uppercase<'call>(
         return Value::string(string);
     }
 
-    context.owned_string(bytes.to_ascii_uppercase())
+    context.owned_string(bytes.iter().map(u8::to_ascii_uppercase).collect())
 }
 
 #[whim_function(

@@ -8,6 +8,38 @@ assert!(Str\split('abc', 'x') == vec['abc']);
 assert!(Str\split('a,b,c,d', ',', 2) == vec['a', 'b,c,d']);
 assert!(Str\split('abc', '') == vec['a', 'b', 'c']);
 
+assert!(Str\split('', ',') == vec['']);
+assert!(
+  Str\split(',a,1234567,12345678,', ',')
+  == vec['', 'a', '1234567', '12345678', ''],
+);
+assert!(Str\split('1234567', ',') == vec['1234567']);
+assert!(Str\split('12345678', ',') == vec['12345678']);
+assert!(Str\split('a,b,c', ',', 100) == vec['a', 'b', 'c']);
+assert!(Str\split('a,1234567', ',', 2) == vec['a', '1234567']);
+assert!(Str\split('a,12345678', ',', 2) == vec['a', '12345678']);
+assert!(Str\split('a,12345678', ',', 1) == vec['a,12345678']);
+assert!(
+  Str\split('--a----12345678--', '--')
+  == vec['', 'a', '', '12345678', ''],
+);
+assert!(Str\split('aaaaa', 'aa') == vec['', '', 'a']);
+assert!(
+  Str\split("\x00\xff12345,\x00\xff123456", ',')
+  == vec["\x00\xff12345", "\x00\xff123456"],
+);
+assert!(Str\split("a\x00b\x00", "\x00") == vec['a', 'b', '']);
+assert!(Whim\_Private\string_split('a,b,', ',', 0) == vec['a', 'b', '']);
+assert!(Whim\_Private\string_split('abc', '', 0) == vec['abc']);
+assert!(Whim\_Private\string_split('abc', '', 2) == vec['abc']);
+
+$split_expected = vec['', 'a', '1234567', '12345678', ''];
+$split_source = Str\join(',', $split_expected);
+$split_parts = Str\split($split_source, ',');
+$split_source = 'replaced source';
+assert!($split_parts == $split_expected);
+assert!(Str\join('|', $split_parts) == '|a|1234567|12345678|');
+
 assert!(Str\join('|', vec['a', 'b', 'c']) == 'a|b|c');
 assert!(Str\join('-', vec[]) == '');
 assert!(Str\join(', ', dict['x' => 'one', 'y' => 'two']) == 'one, two');
@@ -19,6 +51,27 @@ assert!(Str\replace_ci('Alpha ALPHA alpha', 'alpha', 'x') == 'x x x');
 
 assert!(Str\lowercase('MiXeD 123!') == 'mixed 123!');
 assert!(Str\uppercase('MiXeD 123!') == 'MIXED 123!');
+assert!(Str\uppercase('') == '');
+assert!(Str\uppercase("ALREADY UPPER\x00\xff") == "ALREADY UPPER\x00\xff");
+foreach (vec[1, 7, 8, 23, 24, 31, 32, 33, 63, 64, 65, 255, 256, 257] as $length) {
+  $input = Str\repeat('a', $length - 1) . 'z';
+  assert!(Str\uppercase($input) == Str\repeat('A', $length - 1) . 'Z');
+  assert!(
+    Str\uppercase(Str\repeat("aZ\x00\xff", $length))
+    == Str\repeat("AZ\x00\xff", $length),
+  );
+}
+$all_bytes = '';
+$uppercase_bytes = '';
+for ($byte = 0; $byte < 256; $byte += 1) {
+  $all_bytes .= Str\chr($byte);
+  $upper_byte = $byte;
+  if ($byte >= 97 && $byte <= 122) {
+    $upper_byte -= 32;
+  }
+  $uppercase_bytes .= Str\chr($upper_byte);
+}
+assert!(Str\uppercase($all_bytes) == $uppercase_bytes);
 assert!(Str\capitalize('hello') == 'Hello');
 assert!(Str\capitalize_words('hello world') == 'Hello World');
 assert!(Str\capitalize_words('one-two_three', '-_') == 'One-Two_Three');

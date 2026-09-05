@@ -167,7 +167,7 @@ impl Trace for FunctionObject {
     fn enqueue_children(
         &mut self,
         _allocation: NonNull<HeapBox<()>>,
-        queue: &mut DropQueue,
+        queue: &DropQueue,
         mode: TeardownMode,
     ) {
         if let Some(this) = self.this.take() {

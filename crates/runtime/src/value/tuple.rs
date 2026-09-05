@@ -168,7 +168,7 @@ impl Trace for TupleObject {
     fn enqueue_children(
         &mut self,
         allocation: NonNull<HeapBox<()>>,
-        queue: &mut DropQueue,
+        queue: &DropQueue,
         mode: TeardownMode,
     ) {
         let boxed = allocation.cast::<HeapBox<Self>>();

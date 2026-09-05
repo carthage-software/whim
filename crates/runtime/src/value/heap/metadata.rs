@@ -8,6 +8,7 @@ use crate::unreachable_invariant;
 use crate::value::heap::BUFFERED_BIT;
 use crate::value::heap::COLOR_MASK;
 use crate::value::heap::COLOR_SHIFT;
+use crate::value::heap::Heap;
 use crate::value::heap::IMMORTAL_BIT;
 use crate::value::heap::INTERNED_BIT;
 use crate::value::heap::ROOT_INDEX_MASK;
@@ -16,6 +17,8 @@ use crate::value::heap::ROOT_INDEX_SHIFT;
 use crate::value::heap::TUPLE_LENGTH_MASK;
 use crate::value::heap::TUPLE_LENGTH_SHIFT;
 use crate::value::heap::TYPE_TAG_MASK;
+use crate::value::heap::allocate_box;
+use crate::value::heap::deallocate_box;
 use crate::value::heap::queue::DropQueue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -286,12 +289,35 @@ impl<'visit> TraceVisitor<'visit> {
 }
 
 pub(crate) trait Trace {
+    /// Allocates storage whose header and payload will both be initialized by the handle.
+    #[inline]
+    fn allocate_box(_heap: &Heap) -> NonNull<HeapBox<Self>>
+    where
+        Self: Sized,
+    {
+        allocate_box::<Self>()
+    }
+
+    /// Releases storage after its payload is destroyed and its child edges are released.
+    ///
+    /// # Safety
+    ///
+    /// `allocation` must be fully torn down storage returned by this type's allocation hook.
+    #[inline]
+    unsafe fn deallocate_box(_heap: &Heap, allocation: NonNull<HeapBox<Self>>)
+    where
+        Self: Sized,
+    {
+        // SAFETY: the caller has destroyed the payload and retained its matching allocation.
+        unsafe { deallocate_box(allocation) };
+    }
+
     fn type_tag() -> TypeTag;
 
     fn enqueue_children(
         &mut self,
         allocation: NonNull<HeapBox<()>>,
-        queue: &mut DropQueue,
+        queue: &DropQueue,
         mode: TeardownMode,
     );
 

@@ -1,5 +1,7 @@
 //! Iterative teardown for nested heap values.
 
+use std::cell::Cell;
+use std::cell::UnsafeCell;
 use std::mem;
 use std::ptr::NonNull;
 
@@ -18,53 +20,70 @@ pub(in crate::value::heap) struct Erased {
     pub(in crate::value::heap) tag: TypeTag,
 }
 
+/// Child teardown can re-enter this queue; mutable borrows stay inside push/pop.
 pub(crate) struct DropQueue {
-    pub(in crate::value::heap) pending: Vec<Erased>,
-    /// One string buffer deferred until the queue borrow ends.
-    released_bytes: Option<HeapBytes>,
-    /// One built-in state drop deferred until the queue borrow ends.
-    deferred_built_in: Option<DeferredBuiltInDrop>,
+    pending: UnsafeCell<Vec<Erased>>,
+    /// One string buffer deferred until child enumeration finishes.
+    released_bytes: Cell<Option<HeapBytes>>,
+    /// One built-in state drop deferred until child enumeration finishes.
+    deferred_built_in: Cell<Option<DeferredBuiltInDrop>>,
 }
 
 impl DropQueue {
     pub(in crate::value::heap) const fn new() -> Self {
         Self {
-            pending: Vec::new(),
-            released_bytes: None,
-            deferred_built_in: None,
+            pending: UnsafeCell::new(Vec::new()),
+            released_bytes: Cell::new(None),
+            deferred_built_in: Cell::new(None),
         }
     }
 
-    /// Defers built-in state destruction until the queue borrow ends.
+    pub(in crate::value::heap) fn push(&self, entry: Erased) {
+        // SAFETY: this single-threaded borrow ends before any child teardown can re-enter.
+        unsafe { &mut *self.pending.get() }.push(entry);
+    }
+
+    pub(in crate::value::heap) fn pop(&self) -> Option<Erased> {
+        // SAFETY: this single-threaded borrow ends before any child teardown can re-enter.
+        unsafe { &mut *self.pending.get() }.pop()
+    }
+
+    #[cfg(test)]
+    pub(in crate::value::heap) fn capacity(&self) -> usize {
+        // SAFETY: tests inspect this single-threaded queue between pending-buffer operations.
+        unsafe { &*self.pending.get() }.capacity()
+    }
+
+    /// Defers built-in state destruction until child enumeration finishes.
     pub(in crate::value) fn defer_built_in_drop(
-        &mut self,
+        &self,
         data: NonNull<()>,
         drop_data: unsafe fn(NonNull<()>),
     ) {
         debug_assert!(
-            self.deferred_built_in.is_none(),
+            self.deferred_built_in.get().is_none(),
             "an object defers one built-in state chain drop per teardown"
         );
-        self.deferred_built_in = Some((data, drop_data));
+        self.deferred_built_in.set(Some((data, drop_data)));
     }
 
-    pub(in crate::value::heap) fn take_deferred_built_in(&mut self) -> Option<DeferredBuiltInDrop> {
+    pub(in crate::value::heap) fn take_deferred_built_in(&self) -> Option<DeferredBuiltInDrop> {
         self.deferred_built_in.take()
     }
 
-    pub(in crate::value) fn release_bytes(&mut self, bytes: HeapBytes) {
+    pub(in crate::value) fn release_bytes(&self, bytes: HeapBytes) {
+        let previous = self.released_bytes.replace(Some(bytes));
         debug_assert!(
-            self.released_bytes.is_none(),
+            previous.is_none(),
             "a payload defers at most one flat buffer per teardown"
         );
-        self.released_bytes = Some(bytes);
     }
 
-    pub(in crate::value::heap) const fn take_released_bytes(&mut self) -> Option<HeapBytes> {
+    pub(in crate::value::heap) fn take_released_bytes(&self) -> Option<HeapBytes> {
         self.released_bytes.take()
     }
 
-    fn release<T: Trace>(&mut self, child: ManagedRef<T>) {
+    fn release<T: Trace>(&self, child: ManagedRef<T>) {
         let erased = child.erased();
         if child.header().is_immortal() {
             mem::forget(child);
@@ -76,12 +95,12 @@ impl DropQueue {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         let heap = unsafe { heap_ptr.as_ref() };
         if let Some(entry) = heap.release_reference(erased) {
-            self.pending.push(entry);
+            self.push(entry);
         }
     }
 
     /// Releases a child unless cycle collection already decremented it.
-    pub(crate) fn release_child<T: Trace>(&mut self, child: ManagedRef<T>, mode: TeardownMode) {
+    pub(crate) fn release_child<T: Trace>(&self, child: ManagedRef<T>, mode: TeardownMode) {
         if mode == TeardownMode::CycleMember && T::type_tag().is_collectable() {
             mem::forget(child);
         } else {
@@ -90,11 +109,10 @@ impl DropQueue {
     }
 
     #[expect(
-        clippy::needless_pass_by_ref_mut,
         clippy::unused_self,
         reason = "all value teardown stays behind the queue interface"
     )]
-    pub(crate) fn release_value(&mut self, value: Value, mode: TeardownMode) {
+    pub(crate) fn release_value(&self, value: Value, mode: TeardownMode) {
         if mode == TeardownMode::CycleMember && value.collectable_box().is_some() {
             mem::forget(value);
         } else {
@@ -103,7 +121,7 @@ impl DropQueue {
     }
 
     /// Releases an object value while avoiding needless cycle work.
-    pub(crate) fn release_object_value(&mut self, value: Value, mode: TeardownMode) {
+    pub(crate) fn release_object_value(&self, value: Value, mode: TeardownMode) {
         if !value.is_object() {
             self.release_value(value, mode);
             return;
@@ -126,7 +144,7 @@ impl DropQueue {
         let remaining = header.decrement();
         mem::forget(object);
         if remaining == 0 {
-            self.pending.push(Erased {
+            self.push(Erased {
                 box_pointer,
                 tag: TypeTag::Object,
             });

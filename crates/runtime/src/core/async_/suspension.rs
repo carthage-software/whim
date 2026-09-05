@@ -51,7 +51,7 @@ impl Suspension {
 
 // SAFETY: only a stored outcome may own a value, and teardown takes it once.
 unsafe impl BuiltInChildren for Suspension {
-    fn enqueue_built_in_children(&mut self, queue: &mut DropQueue, mode: TeardownMode) {
+    fn enqueue_built_in_children(&mut self, queue: &DropQueue, mode: TeardownMode) {
         if let Some(Outcome::Resume(value) | Outcome::Throw(value)) = self.outcome.get_mut().take()
         {
             queue.release_value(value, mode);

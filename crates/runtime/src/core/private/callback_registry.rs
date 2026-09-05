@@ -119,7 +119,7 @@ default_built_in_state!(CallbackRegistry);
 
 // SAFETY: callbacks are the sole owned values and teardown takes each once.
 unsafe impl BuiltInChildren for CallbackRegistry {
-    fn enqueue_built_in_children(&mut self, queue: &mut DropQueue, mode: TeardownMode) {
+    fn enqueue_built_in_children(&mut self, queue: &DropQueue, mode: TeardownMode) {
         for slot in &mut self.registry.get_mut().slots {
             if let Some(callback) = slot.callback.take() {
                 queue.release_value(callback, mode);

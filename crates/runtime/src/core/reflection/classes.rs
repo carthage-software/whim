@@ -60,7 +60,7 @@ macro_rules! reflection_class_methods {
         unsafe impl BuiltInChildren for $rust_name {
             fn enqueue_built_in_children(
                 &mut self,
-                queue: &mut DropQueue,
+                queue: &DropQueue,
                 mode: TeardownMode,
             ) {
                 self.0.enqueue_children(queue, mode);
@@ -570,7 +570,7 @@ impl AttributeReflection {
 
 // SAFETY: the wrapper delegates its complete child set to its sole state.
 unsafe impl BuiltInChildren for AttributeReflection {
-    fn enqueue_built_in_children(&mut self, queue: &mut DropQueue, mode: TeardownMode) {
+    fn enqueue_built_in_children(&mut self, queue: &DropQueue, mode: TeardownMode) {
         self.0.enqueue_children(queue, mode);
     }
 

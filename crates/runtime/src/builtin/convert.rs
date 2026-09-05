@@ -11,7 +11,7 @@ use crate::value::Value;
 /// Visit every owned collectable box once and no other box. Release that same
 /// set once, clear its fields, and never allocate or call the engine.
 pub(crate) unsafe trait BuiltInChildren {
-    fn enqueue_built_in_children(&mut self, queue: &mut DropQueue, mode: TeardownMode);
+    fn enqueue_built_in_children(&mut self, queue: &DropQueue, mode: TeardownMode);
 
     /// Visits the state's collectable boxes.
     fn visit_built_in_children(&self, visitor: &mut TraceVisitor<'_>);

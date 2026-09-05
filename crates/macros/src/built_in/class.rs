@@ -231,7 +231,7 @@ fn emit(
                     #[doc(hidden)]
                     unsafe fn #enqueue_fn(
                         __whim_data: ::core::ptr::NonNull<()>,
-                        __whim_queue: &mut crate::value::heap::queue::DropQueue,
+                        __whim_queue: &crate::value::heap::queue::DropQueue,
                         __whim_mode: crate::value::heap::metadata::TeardownMode,
                     ) {
                         let __whim_state = unsafe { &mut *__whim_data.cast::<#representation>().as_ptr() };

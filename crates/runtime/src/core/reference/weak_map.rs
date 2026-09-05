@@ -28,7 +28,7 @@ default_built_in_state!(WeakMap);
 
 // SAFETY: `map` is the sole owned child and teardown clears it.
 unsafe impl BuiltInChildren for WeakMap {
-    fn enqueue_built_in_children(&mut self, queue: &mut DropQueue, mode: TeardownMode) {
+    fn enqueue_built_in_children(&mut self, queue: &DropQueue, mode: TeardownMode) {
         if let Some(map) = self.map.get_mut().take() {
             queue.release_child(map, mode);
         }

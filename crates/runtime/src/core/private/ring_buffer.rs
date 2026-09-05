@@ -27,7 +27,7 @@ default_built_in_state!(RingBuffer);
 
 // SAFETY: the deque owns every stored value and teardown drains it once.
 unsafe impl BuiltInChildren for RingBuffer {
-    fn enqueue_built_in_children(&mut self, queue: &mut DropQueue, mode: TeardownMode) {
+    fn enqueue_built_in_children(&mut self, queue: &DropQueue, mode: TeardownMode) {
         for value in self.values.get_mut().drain(..) {
             queue.release_value(value, mode);
         }

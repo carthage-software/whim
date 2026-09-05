@@ -63,7 +63,7 @@ impl Trace for WeakReference {
     fn enqueue_children(
         &mut self,
         _allocation: NonNull<HeapBox<()>>,
-        _queue: &mut DropQueue,
+        _queue: &DropQueue,
         _mode: TeardownMode,
     ) {
     }
@@ -156,7 +156,7 @@ impl Trace for WeakMapObject {
     fn enqueue_children(
         &mut self,
         _allocation: NonNull<HeapBox<()>>,
-        queue: &mut DropQueue,
+        queue: &DropQueue,
         mode: TeardownMode,
     ) {
         let entries = mem::take(self.entries.get_mut());

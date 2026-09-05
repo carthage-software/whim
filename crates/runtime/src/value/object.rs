@@ -34,7 +34,7 @@ pub(crate) struct BuiltInHooks {
     /// Drops the inline state after its children have been released.
     pub(crate) drop_in_place: unsafe fn(NonNull<()>),
     /// Releases values held by the inline state.
-    pub(crate) enqueue_children: Option<unsafe fn(NonNull<()>, &mut DropQueue, TeardownMode)>,
+    pub(crate) enqueue_children: Option<unsafe fn(NonNull<()>, &DropQueue, TeardownMode)>,
     /// Visits collectable boxes held by the inline state.
     pub(crate) visit_children: Option<BuiltInVisitChildren>,
 }
@@ -514,7 +514,7 @@ impl Trace for InstanceObject {
     fn enqueue_children(
         &mut self,
         _allocation: NonNull<HeapBox<()>>,
-        queue: &mut DropQueue,
+        queue: &DropQueue,
         mode: TeardownMode,
     ) {
         for index in 0..self.slot_count() {

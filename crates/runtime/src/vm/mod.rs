@@ -756,7 +756,7 @@ impl<'engine> VirtualMachine<'engine> {
     /// be overwritten. Trace-only slots are ordinary frame locals, so their
     /// ownership participates in the same narrow-frame teardown mask.
     #[inline(always)]
-    fn snapshot_trace_arguments(
+    fn snapshot_trace_arguments<const INLINE_SCALARS: bool>(
         &mut self,
         base: usize,
         chunk: NonNull<Chunk>,
@@ -776,7 +776,11 @@ impl<'engine> VirtualMachine<'engine> {
             }
 
             let source = base + usize::from(chunk.parameter_register_start) + position;
-            let value = self.stack[source].clone();
+            let value = if INLINE_SCALARS {
+                self.stack[source].clone_inline_scalar()
+            } else {
+                self.stack[source].clone()
+            };
             if chunk.register_count <= REFERENCE_REGISTER_LIMIT && value.is_reference_counted() {
                 *reference_register_mask |= 1u64 << target.index();
             }
@@ -804,7 +808,8 @@ impl<'engine> VirtualMachine<'engine> {
     }
 
     /// Reserves the next call frame, or reports the existing hard depth limit.
-    #[inline(always)]
+    #[cold]
+    #[inline(never)]
     fn grow_call_frames(&mut self) -> Result<(), VirtualMachineControl> {
         let length = self.frames.len();
         let limit = self.engine.configuration.call_depth_limit;
@@ -812,18 +817,12 @@ impl<'engine> VirtualMachine<'engine> {
             return Err(self.call_depth_exceeded());
         }
 
-        Self::grow_frame_storage(&mut self.frames, limit);
-        Ok(())
-    }
-
-    #[cold]
-    #[inline(never)]
-    fn grow_frame_storage(frames: &mut Vec<Frame>, limit: usize) {
-        let length = frames.len();
-        if length == frames.capacity() {
-            let capacity = frames.capacity().saturating_mul(2).max(4).min(limit);
-            frames.reserve_exact(capacity - length);
+        if length == self.frames.capacity() {
+            let capacity = self.frames.capacity().saturating_mul(2).max(4).min(limit);
+            self.frames.reserve_exact(capacity - length);
         }
+
+        Ok(())
     }
 
     /// Pushes after the caller checked the combined storage and depth limit.

@@ -265,7 +265,7 @@ impl VirtualMachine<'_> {
                     live_parameter_mask(&self.stack, base, 1, argc, reference_parameter_mask);
             }
         }
-        self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<false>(base, chunk, argc, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
@@ -355,7 +355,7 @@ impl VirtualMachine<'_> {
             reference_register_mask |=
                 live_parameter_mask(&self.stack, base, 0, argc, reference_parameter_mask);
         }
-        self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<false>(base, chunk, argc, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
@@ -477,7 +477,7 @@ impl VirtualMachine<'_> {
             reference_register_mask |=
                 live_parameter_mask(&self.stack, base, 1, argc, reference_parameter_mask);
         }
-        self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<false>(base, chunk, argc, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
@@ -568,7 +568,7 @@ impl VirtualMachine<'_> {
             reference_register_mask |=
                 live_parameter_mask(&self.stack, base, 0, argc, reference_parameter_mask);
         }
-        self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<false>(base, chunk, argc, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
@@ -660,6 +660,10 @@ impl VirtualMachine<'_> {
             let source = self.stack.as_mut_ptr().add(window_start);
             if argc == 1 {
                 ptr::swap_nonoverlapping(destination, source, 1);
+            } else if argc == 2 {
+                ptr::swap_nonoverlapping(destination, source, 2);
+            } else if argc == 3 {
+                ptr::swap_nonoverlapping(destination, source, 3);
             } else {
                 ptr::swap_nonoverlapping(destination, source, argc);
             }
@@ -671,7 +675,7 @@ impl VirtualMachine<'_> {
             reference_register_mask |=
                 live_parameter_mask(&self.stack, base, 0, argc, reference_parameter_mask);
         }
-        self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<true>(base, chunk, argc, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
@@ -807,7 +811,7 @@ impl VirtualMachine<'_> {
                 reference_register_mask |= 1;
             }
         }
-        self.snapshot_trace_arguments(base, chunk, 1, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<false>(base, chunk, 1, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {
@@ -913,7 +917,7 @@ impl VirtualMachine<'_> {
                     live_parameter_mask(&self.stack, base, 0, argc, reference_parameter_mask);
             }
         }
-        self.snapshot_trace_arguments(base, chunk, argc, &mut reference_register_mask);
+        self.snapshot_trace_arguments::<false>(base, chunk, argc, &mut reference_register_mask);
         // SAFETY: the call-entry guard reserved a frame within the depth limit.
         unsafe {
             self.push_frame_unchecked(Frame {

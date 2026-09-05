@@ -69,6 +69,34 @@ assert!($withCapture(values: $original) == vec[1, 2, 7, 9]);
 assert!($original == vec[1, 2]);
 assert!($captured == vec[7, 8]);
 
+$wideCapture = function(
+  vec<int> $values,
+  int $second = 2,
+  int $third = 3,
+  int $fourth = 4,
+) use ($captured): vec<int> {
+  $values[] = $captured[0];
+  $values[] = $second;
+  $values[] = $third;
+  $values[] = $fourth;
+  return $values;
+};
+
+for ($iteration = 0; $iteration < 20; $iteration++) {
+  assert!(
+    $wideCapture(
+      fourth: 10,
+      values: $original,
+      third: 9,
+      second: 8,
+    ) == vec[1, 2, 7, 8, 9, 10],
+  );
+  assert!($wideCapture(values: $original) == vec[1, 2, 7, 2, 3, 4]);
+}
+
+assert!($original == vec[1, 2]);
+assert!($captured == vec[7, 8]);
+
 $generic = function<T>(T $first, T $last): T {
   return $first;
 };
@@ -151,6 +179,33 @@ assert!(
     'create:last',
     'create:first',
     'drop:first',
+    'drop:last',
+  ],
+);
+
+NamedWindowLifetime::$events = vec[];
+$consumeThree = function(
+  NamedWindowLifetime $first,
+  NamedWindowLifetime $middle,
+  NamedWindowLifetime $last,
+): string {
+  return $first->name . $middle->name . $last->name;
+};
+
+assert!(
+  $consumeThree(
+    last: new NamedWindowLifetime('last'),
+    middle: new NamedWindowLifetime('middle'),
+    first: new NamedWindowLifetime('first'),
+  ) == 'firstmiddlelast',
+);
+assert!(
+  NamedWindowLifetime::$events == vec[
+    'create:last',
+    'create:middle',
+    'create:first',
+    'drop:first',
+    'drop:middle',
     'drop:last',
   ],
 );

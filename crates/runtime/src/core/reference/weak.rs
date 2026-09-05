@@ -27,7 +27,7 @@ default_built_in_state!(Weak);
 
 // SAFETY: `reference` is the sole owned child and teardown clears it.
 unsafe impl BuiltInChildren for Weak {
-    fn enqueue_built_in_children(&mut self, queue: &mut DropQueue, mode: TeardownMode) {
+    fn enqueue_built_in_children(&mut self, queue: &DropQueue, mode: TeardownMode) {
         if let Some(reference) = self.reference.get_mut().take() {
             queue.release_child(reference, mode);
         }

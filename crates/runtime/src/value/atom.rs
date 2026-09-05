@@ -101,8 +101,7 @@ impl Heap {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             return Atom(unsafe { ManagedRef::retain_raw(pointer) });
         }
-        let string = ByteStringObject::from_bytes(self, bytes);
-        string.hash64(state);
+        let string = ByteStringObject::from_hashed_bytes(self, bytes, hash);
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe { string.raw_box().as_ref() }
             .header_ref()
@@ -112,7 +111,7 @@ impl Heap {
             .borrow_mut()
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             .insert_unique(hash, pointer, |&pointer| unsafe {
-                hash_bytes(state, box_bytes(pointer))
+                pointer.as_ref().state_ref().hash64(state)
             });
         Atom(string)
     }
@@ -120,8 +119,7 @@ impl Heap {
     /// Removes a dying string before its bytes are freed.
     pub(crate) fn unintern(&self, pointer: AtomBox) {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
-        let bytes = unsafe { box_bytes(pointer) };
-        let hash = hash_bytes(self.hash_state(), bytes);
+        let hash = unsafe { pointer.as_ref().state_ref() }.hash64(self.hash_state());
         let mut interner = self.interner().borrow_mut();
         if let Ok(entry) = interner.find_entry(hash, |&candidate| candidate == pointer) {
             entry.remove();
@@ -180,6 +178,45 @@ mod tests {
             .with_fixint_encoding()
             .reject_trailing_bytes()
             .deserialize_seed(Seed::<Heap, Atom>::new(heap), bytes)
+    }
+
+    #[test]
+    fn cached_atom_hashes_preserve_identity_through_growth_and_removal() {
+        let heap = Heap::new();
+        let names: Vec<_> = (0..128)
+            .map(|index| {
+                let mut name = format!("an_externally_stored_atom_name_{index}").into_bytes();
+                name.extend_from_slice(b"\0\xff");
+                name
+            })
+            .collect();
+        let mut atoms: Vec<_> = names.iter().map(|name| Some(heap.intern(name))).collect();
+        assert_eq!(heap.interner().borrow().len(), names.len());
+
+        for (name, atom) in names.iter().zip(&atoms) {
+            assert_eq!(
+                &heap.intern(name),
+                atom.as_ref()
+                    .expect("every original atom is still retained"),
+            );
+        }
+
+        for index in (0..atoms.len()).step_by(2) {
+            drop(atoms[index].take());
+        }
+        assert_eq!(heap.interner().borrow().len(), names.len() / 2);
+
+        for (index, name) in names.iter().enumerate() {
+            let atom = heap.intern(name);
+            assert_eq!(atom.as_bytes(), name.as_slice());
+            assert_eq!(heap.intern(name), atom);
+            if let Some(retained) = &atoms[index] {
+                assert_eq!(&atom, retained);
+            }
+        }
+        assert_eq!(heap.interner().borrow().len(), names.len() / 2);
+        drop(atoms);
+        assert!(heap.interner().borrow().is_empty());
     }
 
     #[test]
