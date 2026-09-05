@@ -20,8 +20,7 @@ Install **Whim Language Support** (`whim-lang`) from Zed's Extensions page:
 
 The extension's source is available in the [Whim Zed repository](https://github.com/carthage-software/whim-zed).
 
-Zed turns language-server semantic tokens off by default. Add this to Zed's
-settings for full highlighting:
+If you use version 0.1.0, add this to Zed's settings for full highlighting:
 
 ```json
 {
@@ -33,7 +32,8 @@ settings for full highlighting:
 }
 ```
 
-The bundled Tree-sitter grammar still highlights Whim keywords without this setting.
+Later versions use the full Tree-sitter Whim grammar and do not need this
+setting.
 
 ## Helix
 
@@ -62,16 +62,18 @@ args = ["language-server"]
 
 [[grammar]]
 name = "whim"
-source = { git = "https://github.com/carthage-software/tree-sitter-whim", rev = "7582557f1d87d7af4957b98b351ad0a1c42bd7cd" }
+source = { git = "https://github.com/carthage-software/tree-sitter-whim", rev = "99e550efd095bf0b0f782e096b0ed6136bebaf47" }
 ```
 
 `use-grammars` keeps the grammar commands limited to Whim. If the file already sets it, add `"whim"` to its existing list instead.
 
-Install the keyword-highlighting query:
+Install the full highlighting query from Tree-sitter Whim:
 
 ```console
 mkdir -p ~/.config/helix/runtime/queries/whim
-printf '%s\n' '(keyword) @keyword' > ~/.config/helix/runtime/queries/whim/highlights.scm
+curl --fail --location \
+  https://raw.githubusercontent.com/carthage-software/tree-sitter-whim/99e550efd095bf0b0f782e096b0ed6136bebaf47/queries/highlights.scm \
+  --output ~/.config/helix/runtime/queries/whim/highlights.scm
 ```
 
 Fetch and build the grammar, then check the setup:
