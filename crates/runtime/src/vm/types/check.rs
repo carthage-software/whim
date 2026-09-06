@@ -1,9 +1,12 @@
 //! Runtime descriptor checks: subtyping, value conformance, and
 //! callable compatibility.
+//!
+//! TODO(azjezz): This module is getting large, consider splitting it.
 
 use std::borrow::Cow;
 use std::rc::Rc;
 
+use crate::bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
 use crate::bytecode::chunk::descriptors::string_length_matches;
@@ -75,6 +78,21 @@ fn key_value(key: Key) -> Value {
         Key::Bool(key) => Value::bool(key),
         Key::String(key) => Value::string(key),
         Key::ShortString(key) => Value::short_string(key),
+    }
+}
+
+fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
+    match (left, right) {
+        (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
+        (ShapeKey::String(left), ShapeKey::String(right)) => left.as_bytes() == right.as_bytes(),
+        _ => false,
+    }
+}
+
+fn shape_key_descriptor(key: &ShapeKey) -> TypeDescriptor {
+    match key {
+        ShapeKey::Int(key) => TypeDescriptor::IntLiteral(*key),
+        ShapeKey::String(key) => TypeDescriptor::StringLiteral(key.clone()),
     }
 }
 
@@ -1354,6 +1372,23 @@ impl VirtualMachine<'_> {
             }
             (TypeDescriptor::Dictionary(_), TypeDescriptor::Dictionary(None)) => true,
             (
+                TypeDescriptor::DictionaryShape {
+                    entries: actual_entries,
+                    rest: actual_rest,
+                },
+                TypeDescriptor::DictionaryShape {
+                    entries: expected_entries,
+                    rest: expected_rest,
+                },
+            ) => self.dictionary_shape_is_subtype(
+                actual_entries,
+                actual_rest.as_ref(),
+                expected_entries,
+                expected_rest.as_ref(),
+                environment,
+                depth + 1,
+            )?,
+            (
                 TypeDescriptor::DictionaryShape { entries, rest },
                 TypeDescriptor::Dictionary(Some((expected_key, expected_value))),
             ) => {
@@ -1476,6 +1511,90 @@ impl VirtualMachine<'_> {
             }
             _ => false,
         })
+    }
+
+    fn dictionary_shape_is_subtype(
+        &mut self,
+        actual_entries: &[(ShapeKey, TypeDescriptor)],
+        actual_rest: Option<&DictionaryTypeDescriptor>,
+        expected_entries: &[(ShapeKey, TypeDescriptor)],
+        expected_rest: Option<&DictionaryTypeDescriptor>,
+        environment: TypeEnvironmentId,
+        depth: u32,
+    ) -> Result<bool, VirtualMachineControl> {
+        for (expected_key, expected_value) in expected_entries {
+            let Some((_, actual_value)) = actual_entries
+                .iter()
+                .find(|(actual_key, _)| shape_keys_same(actual_key, expected_key))
+            else {
+                return Ok(false);
+            };
+
+            if !self.descriptor_is_subtype(actual_value, expected_value, environment, depth + 1)? {
+                return Ok(false);
+            }
+        }
+
+        for (actual_key, actual_value) in actual_entries {
+            if expected_entries
+                .iter()
+                .any(|(expected_key, _)| shape_keys_same(actual_key, expected_key))
+            {
+                continue;
+            }
+
+            let Some((expected_key, expected_value)) = expected_rest else {
+                return Ok(false);
+            };
+
+            let actual_key = shape_key_descriptor(actual_key);
+            if !self.descriptor_is_subtype(&actual_key, expected_key, environment, depth + 1)?
+                || !self.descriptor_is_subtype(
+                    actual_value,
+                    expected_value,
+                    environment,
+                    depth + 1,
+                )?
+            {
+                return Ok(false);
+            }
+        }
+
+        let Some((actual_key, actual_value)) = actual_rest else {
+            return Ok(true);
+        };
+
+        let excluded_keys = match actual_entries {
+            [] => TypeDescriptor::Never,
+            [(key, _)] => shape_key_descriptor(key),
+            entries => TypeDescriptor::Union(
+                entries
+                    .iter()
+                    .map(|(key, _)| shape_key_descriptor(key))
+                    .collect(),
+            ),
+        };
+
+        let allowed_keys = match expected_rest {
+            Some((expected_key, _)) => {
+                TypeDescriptor::Union(vec![expected_key.as_ref().clone(), excluded_keys.clone()])
+            }
+            None => excluded_keys.clone(),
+        };
+
+        if !self.descriptor_is_subtype(actual_key, &allowed_keys, environment, depth + 1)? {
+            return Ok(false);
+        }
+
+        if self.descriptor_is_subtype(actual_key, &excluded_keys, environment, depth + 1)? {
+            return Ok(true);
+        }
+
+        let Some((_, expected_value)) = expected_rest else {
+            return Ok(false);
+        };
+
+        self.descriptor_is_subtype(actual_value, expected_value, environment, depth + 1)
     }
 
     fn union_is_definitely_total(members: &[TypeDescriptor]) -> bool {

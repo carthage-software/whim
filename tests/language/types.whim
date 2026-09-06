@@ -1,5 +1,7 @@
 use Whim\Unwind\TypeError;
 
+require_once!('_diagnostics.whim');
+
 assert!(5 is int);
 assert!(!(5 is float));
 assert!(5.0 is float);
@@ -83,20 +85,58 @@ interface Qux extends Baz {
 }
 
 interface Quux extends Qux {
-  public function getValues(): dict['foo' => int, 'bar' => 'hello', 'baz' => bool, ...<string|int|bool, mixed>];
+  public function getValues(
+  ): dict['foo' => int, 'bar' => 'hello', 'baz' => bool, ...<string
+  | int
+  | bool, mixed>];
 }
 
 interface Corge extends Quux {
-  public function getValues(): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int|bool, string>];
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int|bool, string>];
 }
 
 class MyClass implements Corge {
-  public function getValues(): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int|bool, string>] {
-    return dict[
-      'foo' => 42,
-      'bar' => 'hello',
-      'baz' => true,
-      1 => 'one',
-    ];
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => true, ...<int|bool, string>] {
+    return dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'];
   }
 }
+
+class LiteralRestKey implements Corge {
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<1, string>] {
+    return dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'];
+  }
+}
+
+class NarrowRestKey implements Corge {
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int, string>] {
+    return dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'];
+  }
+}
+
+class LiteralRestValue implements Corge {
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int|bool, 'one'>] {
+    return dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'];
+  }
+}
+
+class RequiredRestEntry implements Corge {
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, 1 => 'one', ...<int
+  | bool, string>] {
+    return dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'];
+  }
+}
+
+class ClosedShape implements Corge {
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'] {
+    return dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'];
+  }
+}
+
+raises('_types/dict-shape-rest-widening.whim', 'return type is not covariant');

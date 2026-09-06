@@ -1,0 +1,13 @@
+namespace DictShapeRestWidening;
+
+interface Expected {
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int|bool, string>];
+}
+
+class Invalid implements Expected {
+  public function getValues(
+  ): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, 1 => 'one', ...] {
+    return dict['foo' => 42, 'bar' => 'hello', 'baz' => true, 1 => 'one'];
+  }
+}
