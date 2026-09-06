@@ -389,6 +389,11 @@ the same value, as does `&`. Tuple, vec, dict, and object patterns may nest.
 Tuple, vec, and dict patterns may end with `...` to accept, check, or bind the
 rest. Object patterns use a bare `...` to permit additional public properties.
 
+A pattern after a collection's `...` cannot contain bindings, except for a
+whole-remainder capture written as `$rest` or `$rest @ pattern`, where the
+pattern on the right contains no bindings. The compiler enforces this rule
+recursively; parentheses preserve the same meaning.
+
 See [Match and Destructuring](../language/patterns.md).
 
 ## Types

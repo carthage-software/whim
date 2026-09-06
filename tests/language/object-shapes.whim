@@ -349,7 +349,11 @@ raises(
 );
 
 raises('_object-shapes/duplicate-binding.whim', 'more than once');
-raises('_object-shapes/rest-property-binding.whim', 'cannot bind properties');
+raises(
+  '_object-shapes/rest-property-binding.whim',
+  'rest element patterns cannot contain bindings',
+);
+
 raises('_object-shapes/invalid-override.whim', 'return type is not covariant');
 
 #[NeverInline]

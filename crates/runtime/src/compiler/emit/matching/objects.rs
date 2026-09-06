@@ -20,22 +20,9 @@ use super::pattern_has_bindings;
 use super::tuple_index;
 
 pub(super) fn contains_object_pattern(pattern: &Pattern<'_>) -> bool {
-    any_object_pattern(pattern, |_| true)
-}
-
-pub(super) fn contains_object_binding(pattern: &Pattern<'_>) -> bool {
-    any_object_pattern(pattern, |object| {
-        object.entries.iter().any(|entry| match entry {
-            ObjectPatternEntry::Property { pattern, .. } => pattern_has_bindings(pattern),
-            ObjectPatternEntry::Shorthand(_) => true,
-        })
-    })
-}
-
-fn any_object_pattern(pattern: &Pattern<'_>, predicate: fn(&ObjectPattern<'_>) -> bool) -> bool {
-    let nested = |pattern| any_object_pattern(pattern, predicate);
+    let nested = contains_object_pattern;
     match pattern {
-        Pattern::Object(pattern) => predicate(pattern),
+        Pattern::Object(_) => true,
         Pattern::Parenthesized(pattern) => nested(pattern.pattern),
         Pattern::As(pattern) => nested(pattern.left) || nested(pattern.right),
         Pattern::Intersection(pattern) => nested(pattern.left) || nested(pattern.right),

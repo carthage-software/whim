@@ -3,6 +3,7 @@ use std::rc::Rc;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
 
+use super::CompileErrorKind;
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::SwitchTable;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -229,4 +230,55 @@ fn sparse_integer_groups_keep_the_existing_table_size_limit() {
             .iter()
             .any(|instruction| matches!(instruction, Instruction::SwitchString { .. }))
     );
+}
+
+#[test]
+fn rest_patterns_reject_bindings_inside_repeated_element_patterns() {
+    for pattern in [
+        "#{ $value }",
+        "#{ value: $value @ int }",
+        "($first, $second)",
+        "($_,)",
+        "vec[$value]",
+        "dict['value' => $value]",
+        "vec[...$inner]",
+        "#{ value: vec[...$inner] }",
+        "$rest @ #{ $value }",
+        "$rest @ vec[...$inner]",
+        "$rest @ ($value @ int)",
+        "$rest @ (dict['value' => $value] | dict['other' => $value])",
+        "($rest @ int) | ($rest @ string)",
+        "$rest & int",
+        "int @ $rest",
+        "($rest @ int) @ $other",
+    ] {
+        for (prefix, suffix) in [("vec[", "]"), ("(", ")"), ("dict[", "]")] {
+            let source = format!(
+                "function choose(mixed $subject): bool {{ return match ($subject) {{ {prefix}...{pattern}{suffix} => true, $_ => false }}; }}"
+            );
+            let arena = LocalArena::new();
+            let program = parse(&arena, &source).expect("the rest pattern parses");
+            let heap = Heap::new();
+            for optimize in [false, true] {
+                let error = compile_with_configuration(
+                    program,
+                    "/project/rest-bindings.whim",
+                    &heap,
+                    CompileConfiguration {
+                        optimization: OptimizationConfiguration {
+                            enabled: optimize,
+                            ..OptimizationConfiguration::default()
+                        },
+                        ..CompileConfiguration::default()
+                    },
+                )
+                .expect_err("a rest element pattern cannot introduce bindings");
+                assert_eq!(
+                    error.kind,
+                    CompileErrorKind::InvalidRestPatternBinding,
+                    "{source}"
+                );
+            }
+        }
+    }
 }

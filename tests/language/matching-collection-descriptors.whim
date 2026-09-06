@@ -28,6 +28,85 @@ assert!(!matches_nested_dictionary::<int>(dict['pair' => vec[(2, 'three')]]));
 assert!(!matches_nested_dictionary::<int>(dict[true => vec[(2, 3)]]));
 assert!(matches_nested_dictionary::<int>(dict[]));
 
+function capture_vector_rest(mixed $value): mixed {
+  return match ($value) {
+    vec[$head, ...$rest @ int | string] => ($head, $rest),
+    $_ => null,
+  };
+}
+
+function capture_positional_rest(mixed $value): mixed {
+  return match ($value) {
+    ($head, ...(($rest) @ (int | string))) => ($head, $rest),
+    $_ => null,
+  };
+}
+
+function capture_dictionary_rest(mixed $value): mixed {
+  return match ($value) {
+    dict['head' => $head, ...$rest @ int | string] => ($head, $rest),
+    $_ => null,
+  };
+}
+
+assert!(capture_vector_rest(vec[true, 1, 'two']) == (true, vec[1, 'two']));
+assert!(capture_vector_rest(vec[true]) == (true, vec[]));
+assert!(capture_vector_rest(vec[true, false]) == null);
+assert!(capture_positional_rest((true, 1, 'two')) == (true, vec[1, 'two']));
+assert!(capture_positional_rest((true,)) == (true, vec[]));
+assert!(capture_positional_rest((true, false)) == null);
+assert!(
+  capture_dictionary_rest(dict['head' => true, 7 => 1, 'other' => 'two']) == (
+    true,
+    dict[7 => 1, 'other' => 'two'],
+  ),
+);
+
+assert!(capture_dictionary_rest(dict['head' => true]) == (true, dict[]));
+assert!(
+  capture_dictionary_rest(dict['head' => true, 'other' => false]) == null,
+);
+
+assert!(
+  match (vec[1, 'two']) {
+    vec[...($rest)] => $rest,
+  } == vec[1, 'two'],
+);
+
+assert!(
+  match ((1, 'two')) {
+    (...$rest) => $rest,
+  } == vec[1, 'two'],
+);
+
+assert!(
+  match (dict[7 => 1]) {
+    dict[...$rest] => $rest,
+  } == dict[7 => 1],
+);
+
+$rows = vec[(1, 'one'), (2, 'two')];
+assert!(
+  match ($rows) {
+    vec[...$rest @ (int, string)] => $rest,
+  }
+  == $rows,
+);
+
+assert!(
+  match (vec[vec[1, 2], vec[]]) {
+    vec[...vec[...int]] => true,
+    $_ => false,
+  },
+);
+
+assert!(
+  match (vec[dict['value' => 1]]) {
+    vec[...dict['value' => int]] => true,
+    $_ => false,
+  },
+);
+
 newtype PatternDescriptorId = int;
 
 $ids = dict['pair' => vec[(PatternDescriptorId(2), PatternDescriptorId(3))]];

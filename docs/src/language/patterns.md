@@ -191,6 +191,34 @@ $value = dict['foo' => 2, 'bar' => 'yes', 'baz' => 1.5];
 assert!(extract($value) == (2, 'yes'));
 ```
 
+## Rest patterns and captures
+
+In tuple, vec, and dict patterns, `...` permits a remainder. A pattern after
+`...` checks every remaining value and must not introduce bindings inside its
+elements, entries, properties, alternatives, or nested rests.
+
+Two forms can bind the whole remainder: `...$rest` and
+`...$rest @ pattern`. In the second form, `pattern` checks each remaining value
+and must contain no bindings. The capture goes on the left of `@`.
+Parentheses do not change these rules.
+
+```whim
+$result = match (vec[1, 'two', 'three']) {
+  vec[$first @ int, ...$strings @ string] => ($first, $strings),
+  $_ => null,
+};
+assert!($result == (1, vec['two', 'three']));
+```
+
+Tuple and vec rests bind a vec. Dict rests bind a dict that preserves the
+remaining keys and their order. An empty remainder passes its element checks
+and binds an empty collection. If an element fails, the entire arm fails.
+
+`...#{ value: int }` and `...$rest @ #{ value: int }` are valid.
+`...#{ $value }`, `...($x, $y)`, `...vec[...$inner]`, and
+`...$rest @ #{ $value }` are compile errors. Rest captures do not collect
+individual fields into new collections.
+
 ## Pattern intersections
 
 `left & right` requires both patterns to match the same value. It binds more
@@ -216,10 +244,10 @@ shorthand for `#{ value: $value }`; this shorthand is available only in
 patterns. Write `#{ value: $other }` to bind a different name. Add `...` to allow
 additional public properties.
 
-Inside a collection rest, an object pattern checks each remaining element.
-Bind the entire remainder with `...$rest @ #{ value: int }`. Property bindings
-such as `...#{ $value }` are rejected because a rest may contain any number of
-objects.
+Inside a collection rest, object patterns follow the
+[rest binding rules](#rest-patterns-and-captures):
+`...$rest @ #{ value: int }` captures the whole remainder, while
+`...#{ $value }` is a compile error.
 
 ```whim
 use Whim\Result\Ok;

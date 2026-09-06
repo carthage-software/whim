@@ -2481,14 +2481,25 @@ fn check_rest_pattern_bindings<'arena>(
     pattern: &Pattern<'arena>,
     bindings: &mut HashSet<&'arena str>,
 ) -> Result<(), CompileError> {
-    if objects::contains_object_binding(pattern) {
+    if pattern_has_bindings(pattern) && !is_rest_capture(pattern) {
         return Err(CompileError::new(
             CompileErrorKind::InvalidRestPatternBinding,
-            "an object pattern inside a collection rest cannot bind properties; bind the whole remainder instead",
+            "rest element patterns cannot contain bindings; use `$rest` or `$rest @ pattern` to bind the whole remainder",
             pattern.span(),
         ));
     }
     check_pattern_bindings(pattern, bindings)
+}
+
+fn is_rest_capture(pattern: &Pattern<'_>) -> bool {
+    match pattern {
+        Pattern::Variable(_) => true,
+        Pattern::Parenthesized(pattern) => is_rest_capture(pattern.pattern),
+        Pattern::As(pattern) if !pattern_has_bindings(pattern.right) => {
+            is_rest_capture(pattern.left)
+        }
+        _ => false,
+    }
 }
 
 fn check_object_pattern_bindings<'arena>(
