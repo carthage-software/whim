@@ -155,7 +155,7 @@ pub struct DictShapeTypeEntry<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct DictShapeRest<'arena> {
     pub ellipsis: Span,
-    pub type_arguments: DictTypeArguments<'arena>,
+    pub type_arguments: Option<DictTypeArguments<'arena>>,
     pub trailing_comma: Option<Span>,
 }
 
@@ -616,10 +616,13 @@ impl HasSpan for DictShapeTypeEntry<'_> {
 
 impl HasSpan for DictShapeRest<'_> {
     fn span(&self) -> Span {
-        self.ellipsis.join(
-            self.trailing_comma
-                .unwrap_or(self.type_arguments.greater_than),
-        )
+        match self.trailing_comma {
+            Some(trailing_comma) => self.ellipsis.join(trailing_comma),
+            None => match &self.type_arguments {
+                Some(type_arguments) => self.ellipsis.join(type_arguments.span()),
+                None => self.ellipsis,
+            },
+        }
     }
 }
 

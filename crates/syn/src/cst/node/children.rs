@@ -1252,7 +1252,9 @@ impl Node<'_, '_> {
                 f(Node::Type(node.value));
             }
             Node::DictShapeRest(node) => {
-                f(Node::DictTypeArguments(&node.type_arguments));
+                if let Some(type_args) = &node.type_arguments {
+                    f(Node::DictTypeArguments(type_args));
+                }
             }
             Node::DictTypeArguments(node) => {
                 f(Node::Type(node.key));

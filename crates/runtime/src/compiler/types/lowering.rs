@@ -228,9 +228,11 @@ fn validate_checked_builtin_arity(source: &Type<'_>) -> Result<(), CompileError>
                 for entry in shape.entries {
                     pending.push(entry.value);
                 }
-                if let Some(rest) = &shape.rest {
-                    pending.push(rest.type_arguments.key);
-                    pending.push(rest.type_arguments.value);
+
+                if let Some(type_args) = shape.rest.as_ref().and_then(|r| r.type_arguments.as_ref())
+                {
+                    pending.push(type_args.key);
+                    pending.push(type_args.value);
                 }
             }
             Type::Tuple(tuple) => {
@@ -483,9 +485,11 @@ fn validate_return_only_positions(
                 for entry in shape.entries {
                     pending.push((entry.value, false, "dict shape value"));
                 }
-                if let Some(rest) = &shape.rest {
-                    pending.push((rest.type_arguments.key, false, "dict shape rest key"));
-                    pending.push((rest.type_arguments.value, false, "dict shape rest value"));
+
+                if let Some(type_args) = shape.rest.as_ref().and_then(|r| r.type_arguments.as_ref())
+                {
+                    pending.push((type_args.key, false, "dict shape rest key"));
+                    pending.push((type_args.value, false, "dict shape rest value"));
                 }
             }
             Type::Classname(classname) => {
@@ -968,18 +972,20 @@ fn lower_dict_shape_type(
         .rest
         .as_ref()
         .map(|rest| {
-            Ok((
-                Box::new(lower_type_inner(
-                    scope,
-                    rest.type_arguments.key,
-                    defer_named_arity,
-                )?),
-                Box::new(lower_type_inner(
-                    scope,
-                    rest.type_arguments.value,
-                    defer_named_arity,
-                )?),
-            ))
+            Ok(match rest.type_arguments.as_ref() {
+                Some(type_args) => (
+                    Box::new(lower_type_inner(scope, type_args.key, defer_named_arity)?),
+                    Box::new(lower_type_inner(scope, type_args.value, defer_named_arity)?),
+                ),
+                None => (
+                    Box::new(TypeDescriptor::Union(vec![
+                        TypeDescriptor::String,
+                        TypeDescriptor::Int,
+                        TypeDescriptor::Bool,
+                    ])),
+                    Box::new(TypeDescriptor::Mixed),
+                ),
+            })
         })
         .transpose()?;
 

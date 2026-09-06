@@ -6,7 +6,6 @@ use std::vec::Vec;
 use whim_span::HasSpan;
 use whim_syn::arena::Arena;
 use whim_syn::arena::Vec as ArenaVec;
-
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::class::Class;
 use whim_syn::cst::class::ClassLikeConstant;
@@ -420,9 +419,14 @@ where
             Type::DictShape(shape) => {
                 let mut entries = f.inline_token_sequence(&shape.entries);
                 if let Some(rest) = &shape.rest {
-                    let key = rest.type_arguments.key.format(f);
-                    let value = rest.type_arguments.value.format(f);
-                    let rest = f.concat([f.text("...<"), key, f.text(", "), value, f.text(">")]);
+                    let rest = if let Some(type_args) = &rest.type_arguments {
+                        let key = type_args.key.format(f);
+                        let value = type_args.value.format(f);
+                        f.concat([f.text("...<"), key, f.text(", "), value, f.text(">")])
+                    } else {
+                        f.text("...")
+                    };
+
                     entries = if shape.entries.is_empty() {
                         rest
                     } else {

@@ -65,3 +65,38 @@ class Robot implements Named {}
 
 assert!(new Person() is Named&Aged);
 assert!(!(new Robot() is Named&Aged));
+
+interface Foo {
+  public function getValues(): array<mixed, mixed>;
+}
+
+interface Bar extends Foo {
+  public function getValues(): array<string|int|bool, mixed>;
+}
+
+interface Baz extends Bar {
+  public function getValues(): dict<string|int|bool, mixed>;
+}
+
+interface Qux extends Baz {
+  public function getValues(): dict['foo' => int, 'bar' => string, ...];
+}
+
+interface Quux extends Qux {
+  public function getValues(): dict['foo' => int, 'bar' => 'hello', 'baz' => bool, ...<string|int|bool, mixed>];
+}
+
+interface Corge extends Quux {
+  public function getValues(): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int|bool, string>];
+}
+
+class MyClass implements Corge {
+  public function getValues(): dict['foo' => 42, 'bar' => 'hello', 'baz' => bool, ...<int|bool, string>] {
+    return dict[
+      'foo' => 42,
+      'bar' => 'hello',
+      'baz' => true,
+      1 => 'one',
+    ];
+  }
+}

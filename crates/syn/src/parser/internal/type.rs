@@ -617,22 +617,24 @@ where
             while !self.is_at(TokenKind::RightBracket)? {
                 if self.is_at(TokenKind::DotDotDot)? {
                     let ellipsis = self.consume()?.compute_span();
-                    let less_than = self.expect_span(TokenKind::LessThan)?;
-                    let key = self.parse_type()?;
-                    let comma = self.expect_span(TokenKind::Comma)?;
-                    let value = self.parse_type()?;
-                    let greater_than = self.expect_type_list_close()?;
-                    let trailing_comma = self.eat_optional(TokenKind::Comma)?;
-                    rest = Some(DictShapeRest {
-                        ellipsis,
-                        type_arguments: DictTypeArguments {
-                            less_than,
-                            key,
-                            comma,
-                            value,
-                            greater_than,
-                        },
-                        trailing_comma,
+                    rest = Some(if self.is_at(TokenKind::LessThan)? {
+                        DictShapeRest {
+                            ellipsis,
+                            type_arguments: Some(DictTypeArguments {
+                                less_than: self.expect_span(TokenKind::LessThan)?,
+                                key: self.parse_type()?,
+                                comma: self.expect_span(TokenKind::Comma)?,
+                                value: self.parse_type()?,
+                                greater_than: self.expect_type_list_close()?,
+                            }),
+                            trailing_comma: self.eat_optional(TokenKind::Comma)?,
+                        }
+                    } else {
+                        DictShapeRest {
+                            ellipsis,
+                            type_arguments: None,
+                            trailing_comma: self.eat_optional(TokenKind::Comma)?,
+                        }
                     });
                     break;
                 }

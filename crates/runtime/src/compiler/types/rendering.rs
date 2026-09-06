@@ -758,12 +758,17 @@ fn render_dict_shape_type(
             ))
         })
         .collect::<Result<Vec<_>, CompileError>>()?;
+
     if let Some(rest) = &shape.rest {
-        entries.push(format!(
-            "...<{}, {}>",
-            render_child(state, rest.type_arguments.key, expanding_aliases)?,
-            render_child(state, rest.type_arguments.value, expanding_aliases)?,
-        ));
+        if let Some(type_args) = &rest.type_arguments {
+            entries.push(format!(
+                "...<{}, {}>",
+                render_child(state, type_args.key, expanding_aliases)?,
+                render_child(state, type_args.value, expanding_aliases)?,
+            ));
+        } else {
+            entries.push("...<string|int|bool, mixed>".to_string());
+        }
     }
 
     Ok(format!("dict[{}]", entries.join(", ")))

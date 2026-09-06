@@ -77,6 +77,7 @@ Without a rest entry, the dict must have only the listed keys. A rest entry
 allows other keys and gives them a key and value type:
 
 ```whim
+type Named = dict['name' => string, ...];
 type ScoredUser = dict['id' => int, 'name' => string, ...<string, int|float>];
 
 $user = dict['id' => 1, 'name' => 'Ada', 'score' => 9.5];
