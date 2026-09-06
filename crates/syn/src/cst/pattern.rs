@@ -4,8 +4,10 @@ use whim_span::Span;
 use crate::cst::atom::Keyword;
 use crate::cst::atom::LiteralInteger;
 use crate::cst::atom::LiteralString;
+use crate::cst::atom::LocalIdentifier;
 use crate::cst::atom::Variable;
 use crate::cst::sequence::TokenSeparatedSequence;
+use crate::cst::r#type::ObjectShapeRest;
 use crate::cst::r#type::Type;
 
 impl HasSpan for Pattern<'_> {
@@ -14,6 +16,8 @@ impl HasSpan for Pattern<'_> {
             Self::Variable(variable) => variable.span,
             Self::Parenthesized(pattern) => pattern.span(),
             Self::As(pattern) => pattern.span(),
+            Self::Intersection(pattern) => pattern.span(),
+            Self::Object(pattern) => pattern.span(),
             Self::Union(pattern) => pattern.left.span().join(pattern.right.span()),
             Self::Vec(pattern) => pattern.vec.span().join(pattern.right_bracket),
             Self::Dict(pattern) => pattern.dict.span().join(pattern.right_bracket),
@@ -88,6 +92,8 @@ pub enum Pattern<'arena> {
     Variable(Variable<'arena>),
     Parenthesized(ParenthesizedPattern<'arena>),
     As(AsPattern<'arena>),
+    Intersection(IntersectionPattern<'arena>),
+    Object(ObjectPattern<'arena>),
     Union(UnionPattern<'arena>),
     Vec(VecPattern<'arena>),
     Dict(DictPattern<'arena>),
@@ -162,4 +168,60 @@ pub struct TuplePattern<'arena> {
 pub struct TrailingPattern<'arena> {
     pub ellipsis: Span,
     pub pattern: Option<&'arena Pattern<'arena>>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct IntersectionPattern<'arena> {
+    pub left: &'arena Pattern<'arena>,
+    pub ampersand: Span,
+    pub right: &'arena Pattern<'arena>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ObjectPattern<'arena> {
+    pub hash_left_brace: Span,
+    pub entries: TokenSeparatedSequence<'arena, ObjectPatternEntry<'arena>>,
+    pub rest: Option<ObjectShapeRest>,
+    pub right_brace: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum ObjectPatternEntry<'arena> {
+    Property {
+        name: LocalIdentifier<'arena>,
+        colon: Span,
+        pattern: &'arena Pattern<'arena>,
+    },
+    Shorthand(Variable<'arena>),
+}
+
+impl ObjectPatternEntry<'_> {
+    #[must_use]
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Property { name, .. } => name.value,
+            Self::Shorthand(variable) => &variable.name[1..],
+        }
+    }
+}
+
+impl HasSpan for IntersectionPattern<'_> {
+    fn span(&self) -> Span {
+        self.left.span().join(self.right.span())
+    }
+}
+
+impl HasSpan for ObjectPattern<'_> {
+    fn span(&self) -> Span {
+        self.hash_left_brace.join(self.right_brace)
+    }
+}
+
+impl HasSpan for ObjectPatternEntry<'_> {
+    fn span(&self) -> Span {
+        match self {
+            Self::Property { name, pattern, .. } => name.span().join(pattern.span()),
+            Self::Shorthand(variable) => variable.span(),
+        }
+    }
 }

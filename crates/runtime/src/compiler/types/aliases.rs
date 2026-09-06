@@ -21,15 +21,20 @@ struct AliasReferences<'context, 'arena> {
     binders: &'context [String],
     out: &'context mut Vec<AliasEdge>,
     union_depth: usize,
-    array_depth: usize,
+    structure_depth: usize,
 }
 
 impl<'ast, 'arena> Visitor<'ast, 'arena> for AliasReferences<'_, '_> {
     fn enter(&mut self, node: Node<'ast, 'arena>) -> Flow {
         match node {
             Node::UnionType(_) => self.union_depth += 1,
-            Node::VecType(_) | Node::DictType(_) | Node::TupleType(_) => {
-                self.array_depth += 1;
+            Node::VecType(_)
+            | Node::DictType(_)
+            | Node::TupleType(_)
+            | Node::VecShapeType(_)
+            | Node::DictShapeType(_)
+            | Node::ObjectShapeType(_) => {
+                self.structure_depth += 1;
             }
             _ => {}
         }
@@ -46,7 +51,7 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for AliasReferences<'_, '_> {
                 let edge = AliasEdge {
                     target: resolved,
                     through_union: self.union_depth > 0,
-                    through_array: self.array_depth > 0,
+                    through_structure: self.structure_depth > 0,
                 };
                 if !self.out.contains(&edge) {
                     self.out.push(edge);
@@ -60,8 +65,13 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for AliasReferences<'_, '_> {
     fn leave(&mut self, node: Node<'ast, 'arena>) {
         match node {
             Node::UnionType(_) => self.union_depth -= 1,
-            Node::VecType(_) | Node::DictType(_) | Node::TupleType(_) => {
-                self.array_depth -= 1;
+            Node::VecType(_)
+            | Node::DictType(_)
+            | Node::TupleType(_)
+            | Node::VecShapeType(_)
+            | Node::DictShapeType(_)
+            | Node::ObjectShapeType(_) => {
+                self.structure_depth -= 1;
             }
             _ => {}
         }
@@ -83,7 +93,7 @@ pub(in crate::compiler) fn collect_alias_references(
             binders,
             out,
             union_depth: 0,
-            array_depth: 0,
+            structure_depth: 0,
         },
     );
 }
@@ -109,7 +119,7 @@ enum Visit {
 #[derive(Clone, Copy)]
 enum RequiredEdge {
     WithoutUnion,
-    WithoutArray,
+    WithoutStructure,
 }
 
 struct Frame<'graph> {
@@ -119,7 +129,7 @@ struct Frame<'graph> {
 
 pub(in crate::compiler) fn find_alias_cycle(aliases: &AliasGraph) -> Option<AliasCycle> {
     let path = find_filtered_cycle(aliases, RequiredEdge::WithoutUnion)
-        .or_else(|| find_filtered_cycle(aliases, RequiredEdge::WithoutArray))?;
+        .or_else(|| find_filtered_cycle(aliases, RequiredEdge::WithoutStructure))?;
     let mut names = path[..path.len() - 1].to_vec();
     let latest = names
         .iter()
@@ -202,6 +212,6 @@ fn find_filtered_cycle(aliases: &AliasGraph, required: RequiredEdge) -> Option<V
 const fn edge_is_allowed(edge: &AliasEdge, required: RequiredEdge) -> bool {
     match required {
         RequiredEdge::WithoutUnion => !edge.through_union,
-        RequiredEdge::WithoutArray => !edge.through_array,
+        RequiredEdge::WithoutStructure => !edge.through_structure,
     }
 }

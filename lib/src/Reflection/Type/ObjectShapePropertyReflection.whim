@@ -1,0 +1,14 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+#[Stub]
+final class ObjectShapePropertyReflection {
+  private function __construct() {}
+
+  #[MustUse]
+  public function getName(): string {}
+
+  #[MustUse]
+  public function getType(): TypeReflection {}
+}

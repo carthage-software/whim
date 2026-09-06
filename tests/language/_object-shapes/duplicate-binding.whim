@@ -1,0 +1,3 @@
+$_ = match (null) {
+  #{ first: $value, second: $value } => null,
+};

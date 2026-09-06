@@ -30,6 +30,7 @@ use crate::cst::operation::AssignmentTarget;
 use crate::cst::operation::DestructureTarget;
 use crate::cst::operation::TypeOperator;
 use crate::cst::pattern::DictPatternKey;
+use crate::cst::pattern::ObjectPatternEntry;
 use crate::cst::pattern::Pattern;
 use crate::cst::statement::Statement;
 use crate::cst::r#type::IntegerRangeBound;
@@ -547,6 +548,8 @@ impl Node<'_, '_> {
                 Pattern::Variable(variable) => f(Node::Variable(variable)),
                 Pattern::Parenthesized(pattern) => f(Node::ParenthesizedPattern(pattern)),
                 Pattern::As(pattern) => f(Node::AsPattern(pattern)),
+                Pattern::Intersection(pattern) => f(Node::IntersectionPattern(pattern)),
+                Pattern::Object(pattern) => f(Node::ObjectPattern(pattern)),
                 Pattern::Union(pattern) => f(Node::UnionPattern(pattern)),
                 Pattern::Vec(pattern) => f(Node::VecPattern(pattern)),
                 Pattern::Dict(pattern) => f(Node::DictPattern(pattern)),
@@ -554,6 +557,38 @@ impl Node<'_, '_> {
                 Pattern::Type(r#type) => f(Node::Type(r#type)),
             },
             Node::ParenthesizedPattern(node) => f(Node::Pattern(node.pattern)),
+            Node::IntersectionPattern(node) => {
+                f(Node::Pattern(node.left));
+                f(Node::Pattern(node.right));
+            }
+            Node::ObjectPattern(node) => {
+                for entry in &node.entries {
+                    f(Node::ObjectPatternEntry(entry));
+                }
+                if let Some(rest) = &node.rest {
+                    f(Node::ObjectShapeRest(rest));
+                }
+            }
+            Node::ObjectPatternEntry(node) => match node {
+                ObjectPatternEntry::Property { name, pattern, .. } => {
+                    f(Node::LocalIdentifier(name));
+                    f(Node::Pattern(pattern));
+                }
+                ObjectPatternEntry::Shorthand(variable) => f(Node::Variable(variable)),
+            },
+            Node::ObjectShapeType(node) => {
+                for entry in &node.entries {
+                    f(Node::ObjectShapeTypeEntry(entry));
+                }
+                if let Some(rest) = &node.rest {
+                    f(Node::ObjectShapeRest(rest));
+                }
+            }
+            Node::ObjectShapeTypeEntry(node) => {
+                f(Node::LocalIdentifier(&node.name));
+                f(Node::Type(node.value));
+            }
+            Node::ObjectShapeRest(_) => {}
             Node::AsPattern(node) => {
                 f(Node::Pattern(node.left));
                 f(Node::Pattern(node.right));
@@ -1090,6 +1125,7 @@ impl Node<'_, '_> {
                 Type::VecShape(inner) => f(Node::VecShapeType(inner)),
                 Type::Dict(inner) => f(Node::DictType(inner)),
                 Type::DictShape(inner) => f(Node::DictShapeType(inner)),
+                Type::ObjectShape(inner) => f(Node::ObjectShapeType(inner)),
                 Type::Classname(inner) => f(Node::ClassnameType(inner)),
                 Type::Tuple(inner) => f(Node::TupleType(inner)),
                 Type::String(inner)

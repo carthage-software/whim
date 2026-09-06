@@ -18,6 +18,7 @@ use crate::vm::CachedPropertyGuard;
 use crate::vm::CachedPropertySlot;
 use crate::vm::Chunk;
 use crate::vm::ClassId;
+use crate::vm::IcDescriptor;
 use crate::vm::InlineCache;
 use crate::vm::InstanceObject;
 use crate::vm::ManagedRef;
@@ -214,7 +215,11 @@ impl VirtualMachine<'_> {
     ) -> Result<u32, VirtualMachineControl> {
         let name = name_atom(chunk, site);
         let class = &self.engine.tables.classes[receiver_class.0 as usize];
-        let scope = self.current_frame().class_scope.get();
+        let scope = if matches!(chunk.ic_descriptors[site], IcDescriptor::PublicProperty(_)) {
+            None
+        } else {
+            self.current_frame().class_scope.get()
+        };
         let Some(slot) = scope
             .and_then(|scope| class.private_slots.get(&(scope, name.clone())).copied())
             .or_else(|| class.slot_names.get(name).copied())
@@ -232,7 +237,7 @@ impl VirtualMachine<'_> {
             &self.engine.tables.classes,
             info.visibility,
             info.declaring_class,
-            self.current_frame().class_scope.get(),
+            scope,
         ) {
             let info = &self.engine.tables.classes[receiver_class.0 as usize].slots[slot as usize];
             let class_name = String::from_utf8_lossy(

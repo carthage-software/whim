@@ -137,3 +137,5 @@ fn every_case_directory_is_registered() {
         );
     }
 }
+
+case!(object_shapes);

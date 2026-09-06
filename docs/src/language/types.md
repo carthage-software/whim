@@ -57,6 +57,10 @@ The [collections chapter](collections.md) covers their syntax and update rules.
 `object` accepts any class instance. A class or interface name accepts objects
 of that class or its subtypes.
 
+An [object shape](structural-types.md#object-shapes), such as
+`#{ name: string, ... }`, checks public instance properties and their current
+values. Omit `...` to require exactly the listed public properties.
+
 `fn(A, B): R` accepts a callable with two parameters and result `R`:
 
 ```whim

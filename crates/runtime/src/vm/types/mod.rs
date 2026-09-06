@@ -40,52 +40,76 @@ use crate::vm::is_instance_of;
 use crate::vm::ops;
 use crate::vm::unreachable_invariant;
 
-fn array_type_check_cacheable(descriptor: &TypeDescriptor) -> bool {
-    match descriptor {
-        TypeDescriptor::Wildcard
-        | TypeDescriptor::Mixed
-        | TypeDescriptor::Null
-        | TypeDescriptor::Bool
-        | TypeDescriptor::Int
-        | TypeDescriptor::Float
-        | TypeDescriptor::String
-        | TypeDescriptor::StringLength { .. }
-        | TypeDescriptor::Object
-        | TypeDescriptor::TrueLiteral
-        | TypeDescriptor::FalseLiteral
-        | TypeDescriptor::IntLiteral(_)
-        | TypeDescriptor::IntRange { .. }
-        | TypeDescriptor::FloatLiteral(_)
-        | TypeDescriptor::Array(None)
-        | TypeDescriptor::Vector(None)
-        | TypeDescriptor::Dictionary(None)
-        | TypeDescriptor::TupleAny => true,
-        TypeDescriptor::Array(Some((key, value)))
-        | TypeDescriptor::Dictionary(Some((key, value))) => {
-            array_type_check_cacheable(key) && array_type_check_cacheable(value)
+impl VirtualMachine<'_> {
+    fn array_type_check_cacheable(&self, descriptor: &TypeDescriptor, depth: u32) -> bool {
+        if depth > MAX_TYPE_DEPTH_U32 {
+            return false;
         }
-        TypeDescriptor::Vector(Some(element)) | TypeDescriptor::Negated(element) => {
-            array_type_check_cacheable(element)
+        let cacheable = |child: &TypeDescriptor| self.array_type_check_cacheable(child, depth + 1);
+        match descriptor {
+            TypeDescriptor::Wildcard
+            | TypeDescriptor::Mixed
+            | TypeDescriptor::Null
+            | TypeDescriptor::Bool
+            | TypeDescriptor::Int
+            | TypeDescriptor::Float
+            | TypeDescriptor::String
+            | TypeDescriptor::StringLength { .. }
+            | TypeDescriptor::Object
+            | TypeDescriptor::TrueLiteral
+            | TypeDescriptor::FalseLiteral
+            | TypeDescriptor::IntLiteral(_)
+            | TypeDescriptor::IntRange { .. }
+            | TypeDescriptor::FloatLiteral(_)
+            | TypeDescriptor::Array(None)
+            | TypeDescriptor::Vector(None)
+            | TypeDescriptor::Dictionary(None)
+            | TypeDescriptor::TupleAny => true,
+            TypeDescriptor::Array(Some((key, value)))
+            | TypeDescriptor::Dictionary(Some((key, value))) => cacheable(key) && cacheable(value),
+            TypeDescriptor::Vector(Some(element)) | TypeDescriptor::Negated(element) => {
+                cacheable(element)
+            }
+            TypeDescriptor::Tuple(members)
+            | TypeDescriptor::Union(members)
+            | TypeDescriptor::Intersection(members) => members.iter().all(cacheable),
+            TypeDescriptor::TupleRest { elements, rest } => {
+                elements.iter().all(cacheable) && cacheable(rest)
+            }
+            TypeDescriptor::Named {
+                name, arguments, ..
+            } => {
+                let Some(symbol) = self.engine.tables.symbols.get(name) else {
+                    return false;
+                };
+                if symbol.kind == SymbolKind::TypeAlias
+                    && !cacheable(
+                        &self.engine.tables.type_aliases[symbol.index as usize].descriptor,
+                    )
+                {
+                    return false;
+                }
+                if symbol.kind == SymbolKind::Newtype
+                    && !cacheable(&self.engine.tables.newtypes[symbol.index as usize].backing)
+                {
+                    return false;
+                }
+                arguments
+                    .as_ref()
+                    .is_none_or(|arguments| arguments.iter().all(cacheable))
+            }
+            TypeDescriptor::Void
+            | TypeDescriptor::Never
+            | TypeDescriptor::StringLiteral(_)
+            | TypeDescriptor::Member { .. }
+            | TypeDescriptor::Parameter(_)
+            | TypeDescriptor::StaticClass
+            | TypeDescriptor::Callable(_)
+            | TypeDescriptor::Classname(_)
+            | TypeDescriptor::VectorShape { .. }
+            | TypeDescriptor::DictionaryShape { .. }
+            | TypeDescriptor::ObjectShape { .. } => false,
         }
-        TypeDescriptor::Tuple(members)
-        | TypeDescriptor::Union(members)
-        | TypeDescriptor::Intersection(members) => members.iter().all(array_type_check_cacheable),
-        TypeDescriptor::TupleRest { elements, rest } => {
-            elements.iter().all(array_type_check_cacheable) && array_type_check_cacheable(rest)
-        }
-        TypeDescriptor::Named { arguments, .. } => arguments
-            .as_ref()
-            .is_none_or(|arguments| arguments.iter().all(array_type_check_cacheable)),
-        TypeDescriptor::Void
-        | TypeDescriptor::Never
-        | TypeDescriptor::StringLiteral(_)
-        | TypeDescriptor::Member { .. }
-        | TypeDescriptor::Parameter(_)
-        | TypeDescriptor::StaticClass
-        | TypeDescriptor::Callable(_)
-        | TypeDescriptor::Classname(_)
-        | TypeDescriptor::VectorShape { .. }
-        | TypeDescriptor::DictionaryShape { .. } => false,
     }
 }
 
@@ -104,7 +128,7 @@ impl VirtualMachine<'_> {
         &mut self,
         descriptor: &TypeDescriptor,
     ) -> Option<ArrayTypeCheckId> {
-        if !array_type_check_cacheable(descriptor) {
+        if !self.array_type_check_cacheable(descriptor, 0) {
             return None;
         }
 

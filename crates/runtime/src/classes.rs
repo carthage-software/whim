@@ -417,6 +417,7 @@ fn descriptor_is_acyclic(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::VectorShape { .. }
         | TypeDescriptor::Dictionary(_)
         | TypeDescriptor::DictionaryShape { .. }
+        | TypeDescriptor::ObjectShape { .. }
         | TypeDescriptor::Callable(_)
         | TypeDescriptor::Tuple(_)
         | TypeDescriptor::TupleRest { .. }

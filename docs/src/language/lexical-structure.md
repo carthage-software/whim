@@ -60,7 +60,9 @@ function answer(): int {
 ```
 
 A doc comment belongs to the declaration that follows it. `#` does not start a
-comment. The sequence `#[` starts an attribute.
+comment. The tokens `#[` and `#{` start an attribute list and an object shape,
+respectively. Each is a single token: whitespace or comments cannot separate
+the `#` from the bracket or brace.
 
 ## Shebang line
 
@@ -71,7 +73,7 @@ A file may start with a Unix shebang:
 ```
 
 The shebang must start at byte zero. Whim treats `#` anywhere else as an error
-unless it begins an attribute.
+unless it begins `#[` or `#{`.
 
 ## Number literals
 

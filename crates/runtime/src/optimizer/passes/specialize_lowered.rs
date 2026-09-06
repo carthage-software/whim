@@ -354,6 +354,7 @@ fn return_kind_satisfies(
         | TypeDescriptor::VectorShape { .. }
         | TypeDescriptor::Dictionary(Some(_))
         | TypeDescriptor::DictionaryShape { .. }
+        | TypeDescriptor::ObjectShape { .. }
         | TypeDescriptor::Callable(Some(_))
         | TypeDescriptor::Classname(_)
         | TypeDescriptor::Tuple(_)
@@ -652,7 +653,9 @@ fn descriptor_kind(descriptor: &TypeDescriptor) -> KnownKind {
         | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Classname(_) => KnownKind::String,
-        TypeDescriptor::Object | TypeDescriptor::StaticClass => KnownKind::Object,
+        TypeDescriptor::Object
+        | TypeDescriptor::StaticClass
+        | TypeDescriptor::ObjectShape { .. } => KnownKind::Object,
         TypeDescriptor::Vector(_) | TypeDescriptor::VectorShape { .. } => KnownKind::Vec,
         TypeDescriptor::Dictionary(_) | TypeDescriptor::DictionaryShape { .. } => KnownKind::Dict,
         TypeDescriptor::Tuple(_) | TypeDescriptor::TupleRest { .. } | TypeDescriptor::TupleAny => {

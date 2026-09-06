@@ -132,3 +132,13 @@ bindings, bound object, called class, captured values, and bound arguments.
 value that has no newtype. `getBackingValue()` returns the value inside that
 newtype. Pass the result to `reflect_newtype_value()` to inspect a nested
 newtype.
+
+## Object shape types
+
+`reflect_type::<#{ value: int, ... }>()` returns an
+`ObjectShapeTypeReflection` with kind `TypeKind::ObjectShape`. `isOpen()` reports
+whether extra public instance properties are allowed. `getProperties()` returns
+`ObjectShapePropertyReflection` values in source order; each has `getName()` and
+`getType()` methods. The usual `accepts()`, `isSubtypeOf()`, `resolve()`, and type
+identity operations apply to object shapes. `accepts()` checks current property
+values on every call.

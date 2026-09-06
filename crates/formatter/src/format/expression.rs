@@ -46,6 +46,7 @@ use whim_syn::cst::operation::UnaryPrefix;
 use whim_syn::cst::operation::UnaryPrefixOperator;
 use whim_syn::cst::pattern::DictPatternEntry;
 use whim_syn::cst::pattern::DictPatternKey;
+use whim_syn::cst::pattern::ObjectPatternEntry;
 use whim_syn::cst::pattern::Pattern;
 use whim_syn::cst::pattern::TrailingPattern;
 use whim_syn::cst::sequence::TokenSeparatedSequence;
@@ -634,6 +635,16 @@ where
                 let right = right.format(f);
                 f.concat([left, f.text(" @ "), right])
             }
+            Pattern::Intersection(pattern) => {
+                let left = pattern.left.format(f);
+                let right = pattern.right.format(f);
+                f.concat([left, f.text(" & "), right])
+            }
+            Pattern::Object(pattern) => f.object_shape(
+                pattern.entries.as_slice(),
+                pattern.rest.as_ref(),
+                pattern.right_brace.start.offset,
+            ),
             Pattern::Union(pattern) => {
                 let left = pattern.left.format(f);
                 let right = pattern.right.format(f);
@@ -670,6 +681,24 @@ where
     }
 }
 
+impl<'arena, A> Format<'arena, A> for ObjectPatternEntry<'arena>
+where
+    A: Arena,
+{
+    fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
+        wrap!(f, self, {
+            match self {
+                Self::Property { name, pattern, .. } => {
+                    let name = f.text(name.value);
+                    let pattern = pattern.format(f);
+                    f.concat([name, f.text(": "), pattern])
+                }
+                Self::Shorthand(variable) => variable.format(f),
+            }
+        })
+    }
+}
+
 fn pattern_type_is_wildcard(r#type: &Type<'_>) -> bool {
     matches!(
         r#type.unparenthesized(),
@@ -687,6 +716,13 @@ fn pattern_binds(pattern: &Pattern<'_>) -> bool {
         Pattern::Parenthesized(pattern) => pattern_binds(pattern.pattern),
         Pattern::As(pattern) => pattern_binds(pattern.left) || pattern_binds(pattern.right),
         Pattern::Union(pattern) => pattern_binds(pattern.left) || pattern_binds(pattern.right),
+        Pattern::Intersection(pattern) => {
+            pattern_binds(pattern.left) || pattern_binds(pattern.right)
+        }
+        Pattern::Object(pattern) => pattern.entries.iter().any(|entry| match entry {
+            ObjectPatternEntry::Property { pattern, .. } => pattern_binds(pattern),
+            ObjectPatternEntry::Shorthand(_) => true,
+        }),
         Pattern::Vec(pattern) => {
             pattern.elements.iter().any(pattern_binds)
                 || pattern

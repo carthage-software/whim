@@ -229,6 +229,7 @@ pub(crate) fn call_descriptor(descriptor: &CallDescriptor) -> String {
 pub(crate) fn ic_descriptor(descriptor: &IcDescriptor) -> String {
     match descriptor {
         IcDescriptor::Member { name, .. } => name.to_string_lossy().into_owned(),
+        IcDescriptor::PublicProperty(name) => format!("public {}", name.to_string_lossy()),
         IcDescriptor::ClassMember { class, member, .. } => {
             format!("{}::{}", class.to_string_lossy(), member.to_string_lossy())
         }

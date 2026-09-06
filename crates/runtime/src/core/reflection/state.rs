@@ -58,13 +58,7 @@ pub(crate) fn dispatch(
     arguments: Arguments<'_>,
     operation: Operation,
 ) -> Result<Value, Throw> {
-    let receiver = context.receiver();
-    let Some(state) = classes::state(&receiver) else {
-        return Err(context.type_error("the reflection object has no built-in state"));
-    };
-    let Some((data, values)) = state.snapshot() else {
-        return Err(context.type_error("the reflection object is not initialized"));
-    };
+    let (data, values) = receiver_snapshot(context)?;
     match data {
         ReflectionData::SourceLocation(location) => {
             metadata::source_location_dispatch(context, operation, &location)
@@ -132,6 +126,9 @@ pub(crate) fn dispatch(
             r#type,
             optional,
         } => types::function_parameter_dispatch(context, operation, position, &r#type, optional),
+        ReflectionData::ObjectShapeProperty { name, r#type } => {
+            types::shape_property_dispatch(context, operation, &name, &r#type)
+        }
         ReflectionData::DictShapeEntry { key, r#type } => {
             types::shape_entry_dispatch(context, operation, &key, &r#type)
         }
@@ -158,4 +155,15 @@ pub(crate) fn dispatch(
             values::newtype_value_dispatch(context, operation, identifier, &values)
         }
     }
+}
+
+fn receiver_snapshot(
+    context: &mut Context<'_, '_, '_>,
+) -> Result<(ReflectionData, Vec<Value>), Throw> {
+    let receiver = context.receiver();
+    let state = classes::state(&receiver)
+        .ok_or_else(|| context.type_error("the reflection object has no built-in state"))?;
+    state
+        .snapshot()
+        .ok_or_else(|| context.type_error("the reflection object is not initialized"))
 }

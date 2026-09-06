@@ -366,3 +366,33 @@ fn artifacts_retain_embedded_file_bytes() {
         .load_artifact(&artifact)
         .expect("the artifact runs without its source asset");
 }
+
+#[test]
+fn artifacts_preserve_object_shapes_and_public_property_patterns() {
+    let artifact = compile(
+        r"
+        type Shape<T> = #{ value: T, ... };
+        class Base {
+            private string $value = 'private';
+            public function extract(): mixed { return match ($this) { #{ $value } => $value }; }
+        }
+        class Child extends Base { public int $value = 42; }
+        function identity(Shape<int> $value): Shape<int> { return $value; }
+        $value = new Child();
+        assert!($value is #{ value: int });
+        assert!(!($value is #{}));
+        assert!(identity($value) == $value);
+        assert!($value->extract() == 42);
+        ",
+        "/artifact/object-shapes.whim",
+    );
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        engine
+            .load_artifact(&artifact)
+            .expect("object shapes survive serialization");
+    }
+}

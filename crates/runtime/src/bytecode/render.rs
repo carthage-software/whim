@@ -104,6 +104,20 @@ where
                 format!("dict<{}, {}>", render(key), render(value))
             }
             TypeDescriptor::Dictionary(None) => "dict".to_string(),
+            TypeDescriptor::ObjectShape { entries, open } => {
+                let mut parts = entries
+                    .iter()
+                    .map(|(name, value)| format!("{}: {}", name.to_string_lossy(), render(value)))
+                    .collect::<Vec<_>>();
+                if *open {
+                    parts.push("...".to_string());
+                }
+                if parts.is_empty() {
+                    "#{}".to_string()
+                } else {
+                    format!("#{{ {} }}", parts.join(", "))
+                }
+            }
             TypeDescriptor::DictionaryShape { entries, rest } => {
                 let mut parts = entries
                     .iter()

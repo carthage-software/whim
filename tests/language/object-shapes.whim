@@ -1,0 +1,646 @@
+use Whim\Marker\NeverInline;
+use Whim\Result\Ok;
+use Whim\Result\Err;
+use Whim\Unwind\TypeError;
+
+require_once!('_diagnostics.whim');
+
+type HasValue<T> = #{ value: T, ... };
+type IntValue = #{ value: int };
+
+class EmptyShape {}
+
+class HiddenShape {
+  private int $privateValue = 1;
+  protected int $protectedValue = 2;
+  public static int $staticValue = 3;
+}
+
+class ShapeBase {
+  public string $name = 'base';
+  private int $secret = 4;
+}
+
+class ShapeChild extends ShapeBase {
+  public int $value = 7;
+}
+
+class ShapeValue {
+  public mixed $value;
+  public function __construct(mixed $value) {
+    $this->value = $value;
+  }
+}
+
+class ShapeUninitialized {
+  public mixed $value;
+  public string $extra;
+}
+
+class ShapeReadonly {
+  public readonly mixed $value;
+  public function __construct(mixed $value) {
+    $this->value = $value;
+  }
+}
+
+$empty = new EmptyShape();
+$hidden = new HiddenShape();
+$child = new ShapeChild();
+$value = new ShapeValue(7);
+$pending = new ShapeUninitialized();
+assert!($empty is #{});
+assert!($hidden is #{});
+assert!($hidden is #{ ... });
+assert!(!($hidden is #{ privateValue: int, ... }));
+assert!(!($hidden is #{ protectedValue: int, ... }));
+assert!(!($hidden is #{ staticValue: int, ... }));
+assert!($child is #{ name: 'base', value: 7 });
+assert!($child is #{ value: int, name: string });
+assert!($child is #{ value: int, ... });
+assert!(!($child is #{ value: int }));
+assert!(!($child is #{}));
+assert!($child is ShapeBase&#{ name: string, ... });
+assert!(!($child is ShapeValue&#{ value: int, ... }));
+assert!($value is #{ value: int });
+assert!($value is HasValue<int>);
+assert!(!($value is #{ Value: int }));
+assert!(!($value is #{ missing: null, ... }));
+assert!(!($pending is #{ value: mixed, ... }));
+assert!(!($pending is #{}));
+$pending->value = null;
+assert!($pending is #{ value: null, ... });
+assert!(!($pending is #{ value: null }));
+assert!(!($pending is #{ value: mixed, extra: mixed }));
+$pending->extra = 'ready';
+assert!($pending is #{ value: null, extra: string });
+assert!(new ShapeReadonly(5) is IntValue);
+foreach (vec[
+  null,
+  false,
+  1,
+  1.0,
+  '',
+  vec[],
+  dict[],
+  (1, 2),
+  fn() => 1,
+] as $scalar) {
+  assert!(!($scalar is #{ ... }));
+  assert!(!($scalar is #{}));
+}
+
+assert!($value as IntValue == $value);
+assert!($value ?as #{ value: string } == null);
+assert!($value is !#{ value: string });
+assert!($value is #{ value: int }|null);
+
+#[NeverInline]
+function acceptsShape(IntValue $value): int {
+  return $value->value as int;
+}
+
+#[NeverInline]
+function acceptsShapeVector(vec<IntValue> $values): int {
+  return length!($values);
+}
+
+#[NeverInline]
+function acceptsShapeDict(dict<string, IntValue> $values): int {
+  return length!($values);
+}
+
+#[NeverInline]
+function acceptsShapeTuple((IntValue, int) $values): int {
+  return $values[1];
+}
+
+#[NeverInline]
+function mutatingReturn(IntValue $value): IntValue {
+  $value->value = 'changed';
+  return $value;
+}
+
+#[NeverInline]
+function mutatingVectorReturn(vec<IntValue> $values): vec<IntValue> {
+  $values[0]->value = 'changed';
+  return $values;
+}
+
+#[NeverInline]
+function repeatedCheck(mixed $value): bool {
+  assert!($value is IntValue);
+  $value->value = 'changed';
+  return $value is IntValue;
+}
+
+$values = vec[$value];
+$dictionary = dict['a' => $value];
+$tuple = ($value, 2);
+for ($i = 0; $i < 5; $i++) {
+  $value->value = 7;
+  assert!(acceptsShape($value) == 7);
+  assert!(acceptsShapeVector($values) == 1);
+  assert!(acceptsShapeDict($dictionary) == 1);
+  assert!(acceptsShapeTuple($tuple) == 2);
+  assert!($values is vec<IntValue>);
+  assert!($dictionary is dict<string, IntValue>);
+  assert!($tuple is (IntValue, int));
+  $value->value = 'changed';
+  assert!(!($value is IntValue));
+  assert!(!($values is vec<IntValue>));
+  assert!(!($dictionary is dict<string, IntValue>));
+  assert!(!($tuple is (IntValue, int)));
+  foreach (vec[
+    fn() => acceptsShape($value),
+    fn() => acceptsShapeVector($values),
+    fn() => acceptsShapeDict($dictionary),
+    fn() => acceptsShapeTuple($tuple),
+  ] as $call) {
+    $caught = false;
+    try {
+      $_ = $call();
+    } catch (TypeError $_) {
+      $caught = true;
+    }
+
+    assert!($caught);
+  }
+}
+
+foreach (vec[
+  fn() => mutatingReturn(new ShapeValue(1)),
+  fn() => mutatingVectorReturn(vec[new ShapeValue(1)]),
+] as $call) {
+  $caught = false;
+  try {
+    $_ = $call();
+  } catch (TypeError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+assert!(!repeatedCheck(new ShapeValue(1)));
+
+#[NeverInline]
+function extractShape(mixed $input): mixed {
+  return match ($input) {
+    ShapeChild & #{ name: 'base', value: $number @ 1..=10 } => $number,
+    #{ value: #{ $value } } => $value,
+    #{ value: vec[#{ value: $number }, ...] } => $number,
+    #{ value: dict['item' => #{ $value }, ...] } => $value,
+    #{ value: (#{ $value }, true) } => $value,
+    #{ value: 'left' | 'right' } => 'direction',
+    #{ value: $number @ int } & #{ value: 10.., ... } => $number,
+    #{ value: $text @ string } | #{ name: $text @ string, ... } => $text,
+    #{} => 'empty',
+    $_ => null,
+  };
+}
+
+assert!(extractShape($child) == 7);
+assert!(extractShape(new ShapeValue(new ShapeValue('nested'))) == 'nested');
+assert!(extractShape(new ShapeValue(vec[new ShapeValue(12), false])) == 12);
+assert!(
+  extractShape(
+    new ShapeValue(dict['item' => new ShapeValue(13), 'extra' => true]),
+  )
+  == 13,
+);
+
+assert!(extractShape(new ShapeValue((new ShapeValue(14), true))) == 14);
+assert!(extractShape(new ShapeValue('left')) == 'direction');
+assert!(extractShape(new ShapeValue(15)) == 15);
+assert!(extractShape(new ShapeValue('text')) == 'text');
+assert!(extractShape($empty) == 'empty');
+assert!(extractShape($hidden) == 'empty');
+assert!(extractShape(7) == null);
+assert!(extractShape(new ShapeUninitialized()) == null);
+
+$value = 'outer';
+$result = match (new ShapeValue('text')) {
+  #{ value: $value @ int } => $value,
+  $_ => $value,
+};
+
+assert!($result == 'outer');
+assert!($value == 'outer');
+assert!(
+  match (new ShapeValue(8)) {
+    #{ $value } => $value,
+  }
+  == 8,
+);
+
+assert!(
+  match (vec[new ShapeValue(8), 1, 2]) {
+    vec[#{ $value }, ...$rest] => ($value, $rest),
+  } == (8, vec[1, 2]),
+);
+
+assert!(
+  match (dict['item' => new ShapeValue(8), 'extra' => 2]) {
+    dict['item' => #{ $value }, ...$rest] => ($value, $rest),
+  } == (8, dict['extra' => 2]),
+);
+
+$restValue = new ShapeValue(8);
+assert!(
+  match (vec[$restValue]) {
+    vec[...$rest @ #{ value: int }] => $rest,
+  } == vec[$restValue],
+);
+
+assert!(
+  match (($restValue,)) {
+    (...$rest @ #{ value: int }) => $rest,
+  } == vec[$restValue],
+);
+
+assert!(
+  match (dict['item' => $restValue]) {
+    dict[...$rest @ #{ value: int }] => $rest,
+  } == dict['item' => $restValue],
+);
+
+assert!(
+  match (vec[$restValue, false]) {
+    vec[...#{ value: int }] => false,
+    $_ => true,
+  },
+);
+
+assert!(
+  match (vec[]) {
+    vec[...#{ value: int }] => true,
+    $_ => false,
+  },
+);
+
+interface ShapeProvider {
+  public function get(): #{ value: int, ... };
+}
+
+interface NarrowShapeProvider extends ShapeProvider {
+  public function get(): #{ name: string, value: 1..=10 };
+}
+
+class ConcreteShapeProvider implements NarrowShapeProvider {
+  public function get(): #{ value: 7, name: 'base' } {
+    return new ShapeChild();
+  }
+}
+
+assert!(new ConcreteShapeProvider()->get() is #{ value: 7, name: 'base' });
+
+function boundedShape<T: #{ value: int, ... }>(T $value): T {
+  return $value;
+}
+
+assert!(boundedShape::<IntValue>(new ShapeValue(1)) is IntValue);
+
+function reflectedShape<T>(): string {
+  $type = Whim\Reflection\reflect_type::<#{ value: T }>();
+  assert!($type->isResolved());
+  return $type->toString();
+}
+
+assert!(reflectedShape::<int>() == '#{ value: int }');
+assert!(
+  reflectedShape::<dict['item' => string]>()
+  == '#{ value: dict[\'item\' => string] }',
+);
+
+class GenericShapeHolder<T> {
+  public #{ value: T } $item;
+}
+
+assert!(
+  'GenericShapeHolder<#{ value: int }>' is classname<GenericShapeHolder<
+      #{ value: int },
+    >>,
+);
+
+assert!(
+  !(
+    'GenericShapeHolder<#{ value: string }>' is classname<GenericShapeHolder<
+        #{ value: int },
+      >>
+  ),
+);
+
+$genericHolder = new GenericShapeHolder::<int>();
+$genericHolder->item = new ShapeValue(1);
+$caught = false;
+try {
+  $genericHolder->item = new ShapeValue('wrong');
+} catch (TypeError $_) {
+  $caught = true;
+}
+
+assert!($caught);
+
+raises('_object-shapes/duplicate-type.whim', 'cannot repeat a property name');
+raises(
+  '_object-shapes/duplicate-pattern.whim',
+  'cannot repeat a property name',
+);
+
+raises('_object-shapes/duplicate-binding.whim', 'more than once');
+raises('_object-shapes/rest-property-binding.whim', 'cannot bind properties');
+raises('_object-shapes/invalid-override.whim', 'return type is not covariant');
+
+#[NeverInline]
+function unwrapShape(mixed $result): string {
+  return match ($result) {
+    Ok<string> & #{ value: '' } => 'empty',
+    Ok<string> & #{ $value } => $value,
+    Err<int> & #{ error: $code @ 400..=499 } => 'client error: ' . $code,
+    Err<int> & #{ $error } => 'error: ' . $error,
+    $_ => 'other',
+  };
+}
+
+assert!(unwrapShape(new Ok::<string>('')) == 'empty');
+assert!(unwrapShape(new Ok::<string>('hello')) == 'hello');
+assert!(unwrapShape(new Err::<int>(404)) == 'client error: 404');
+assert!(unwrapShape(new Err::<int>(500)) == 'error: 500');
+assert!(unwrapShape(new Ok::<int>(5)) == 'other');
+
+$closure = fn(
+  mixed $subject,
+) => (
+  match ($subject) {
+    #{ $value } => fn() => $value,
+    $_ => fn() => null,
+  }
+);
+
+assert!($closure(new ShapeValue(9))() == 9);
+$value = 'outer';
+assert!($closure(new ShapeValue(9))() == 9);
+assert!($value == 'outer');
+
+$closed = Whim\Reflection\reflect_type::<#{ value: int }>();
+$open = Whim\Reflection\reflect_type::<#{ value: int, ... }>();
+$any = Whim\Reflection\reflect_type::<#{ ... }>();
+$object = Whim\Reflection\reflect_type::<object>();
+$emptyType = Whim\Reflection\reflect_type::<#{}>();
+$extra = Whim\Reflection\reflect_type::<#{ value: 7, name: 'base' }>();
+assert!($closed is Whim\Reflection\Type\ObjectShapeTypeReflection);
+assert!($closed->getKind() == Whim\Reflection\Type\TypeKind::ObjectShape);
+assert!(!$closed->isOpen());
+assert!($open->isOpen());
+assert!($closed->toString() == '#{ value: int }');
+assert!($any->toString() == '#{ ... }');
+assert!($emptyType->toString() == '#{}');
+assert!($closed->isResolved());
+assert!(length!($closed->getProperties()) == 1);
+assert!(
+  $closed->getProperties()[0] is Whim\Reflection\Type\ObjectShapePropertyReflection,
+);
+
+assert!($closed->getProperties()[0]->getName() == 'value');
+assert!($closed->getProperties()[0]->getType()->toString() == 'int');
+assert!($closed->isSubtypeOf($open));
+assert!(!$open->isSubtypeOf($closed));
+assert!($extra->isSubtypeOf($open));
+assert!(!$extra->isSubtypeOf($closed));
+assert!($closed->isSubtypeOf($object));
+assert!($any->isSubtypeOf($object));
+assert!($object->isSubtypeOf($any));
+assert!(!$object->isSubtypeOf($emptyType));
+assert!($emptyType->isSubtypeOf($any));
+assert!(!$emptyType->isSubtypeOf($open));
+assert!(
+  $extra->isSubtypeOf(
+    Whim\Reflection\reflect_type::<#{ name: string, value: int }>(),
+  ),
+);
+
+assert!(
+  Whim\Reflection\reflect_type::<#{ name: 'base', value: 7 }>()->isSubtypeOf(
+    $extra,
+  ),
+);
+
+assert!(
+  !$open->isSubtypeOf(
+    Whim\Reflection\reflect_type::<#{ value: string, ... }>(),
+  ),
+);
+
+assert!(
+  Whim\Reflection\reflect_type::<
+    fn(#{ value: int, ... }): #{ value: int },
+  >()->isSubtypeOf(
+    Whim\Reflection\reflect_type::<fn(#{ value: 7 }): #{ value: int, ... }>(),
+  ),
+);
+
+$value = new ShapeValue(1);
+assert!($closed->accepts($value));
+$value->value = 'changed';
+assert!(!$closed->accepts($value));
+assert!(
+  $closed->equals(
+    Whim\Reflection\reflect_type_id($closed->getId())
+      as Whim\Reflection\Type\TypeReflection,
+  ),
+);
+
+assert!(Whim\Reflection\reflect_type::<ShapeChild>()->isSubtypeOf($any));
+
+newtype ShapeTag = #{ value: int };
+$tagged = ShapeTag(new ShapeValue(3));
+assert!($tagged is #{ value: int });
+assert!(
+  match ($tagged) {
+    #{ $value } => $value,
+  }
+  == 3,
+);
+
+$probe = new ShapeValue(new ShapeChild());
+$fixture = beside('_object-shapes/late-alias.whim');
+$loader = new Whim\Autoload\Autoloader()->withFallback(
+  function(
+    Whim\Symbol\SymbolKind $kind,
+    string $name,
+  ) use ($probe, $fixture): bool {
+    if ($name != 'LateObjectShapeAlias') {
+      return false;
+    }
+
+    $probe->value = 'mutated by loader';
+    require!($fixture);
+    return true;
+  },
+);
+
+Whim\Autoload\register($loader);
+$snapshot = match ($probe) {
+  #{ value: $captured @ LateObjectShapeAlias } => $captured,
+  $_ => null,
+};
+
+Whim\Autoload\unregister($loader);
+assert!($snapshot is ShapeChild);
+assert!($probe->value == 'mutated by loader');
+
+class ShapePrivateBase {
+  private string $value = 'private';
+  public function extract(): mixed {
+    return match ($this) {
+      #{ $value } => $value,
+      $_ => null,
+    };
+  }
+
+  public function checkPrivate(): bool {
+    return $this is #{ value: string, ... };
+  }
+}
+
+class ShapePublicChild extends ShapePrivateBase {
+  public int $value = 42;
+}
+
+assert!(!new ShapePrivateBase()->checkPrivate());
+assert!(new ShapePrivateBase()->extract() == null);
+assert!(new ShapePublicChild()->extract() == 42);
+
+#[NeverInline]
+function acceptTaggedShape(ShapeTag $tag): void {}
+
+#[NeverInline]
+function mutateTaggedShape(ShapeTag $tag): ShapeTag {
+  $tag->value = 'changed';
+  return $tag;
+}
+
+$inner = new ShapeValue(1);
+$tag = ShapeTag($inner);
+$tags = vec[$tag];
+for ($i = 0; $i < 3; $i++) {
+  $inner->value = 1;
+  assert!($tags is vec<ShapeTag>);
+  acceptTaggedShape($tag);
+  $inner->value = 'changed';
+  assert!(!($tags is vec<ShapeTag>));
+  $caught = false;
+  try {
+    acceptTaggedShape($tag);
+  } catch (TypeError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+$caught = false;
+try {
+  $_ = mutateTaggedShape(ShapeTag(new ShapeValue(1)));
+} catch (TypeError $_) {
+  $caught = true;
+}
+
+assert!($caught);
+
+class ShapeHolder {
+  public IntValue $value;
+}
+
+$holder = new ShapeHolder();
+$held = new ShapeValue(1);
+for ($i = 0; $i < 3; $i++) {
+  $held->value = 1;
+  $holder->value = $held;
+  $held->value = 'changed';
+  $caught = false;
+  try {
+    $holder->value = $held;
+  } catch (TypeError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+final class ShapeGetter<T> {
+  public function __construct(private T $value) {}
+
+  #[NeverInline]
+  public function get(): T {
+    return $this->value;
+  }
+}
+
+$getter = new ShapeGetter::<IntValue>(new ShapeValue(1));
+$held = $getter->get();
+for ($i = 0; $i < 3; $i++) {
+  $held->value = 1;
+  assert!($getter->get() is IntValue);
+  $held->value = 'changed';
+  $caught = false;
+  try {
+    $_ = $getter->get();
+  } catch (TypeError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+type ObjectNode = #{ value: int, next: null|ObjectNode };
+class ShapeLink {
+  public mixed $value = 1;
+  public mixed $next = null;
+}
+
+$head = new ShapeLink();
+$head->next = new ShapeLink();
+assert!($head is ObjectNode);
+$head->next->value = 'wrong';
+assert!(!($head is ObjectNode));
+
+#[NeverInline]
+function mutateGenericShape<T>(T $value): T {
+  $value->value = 'changed';
+  return $value;
+}
+
+$caught = false;
+try {
+  $_ = mutateGenericShape::<IntValue>(new ShapeValue(1));
+} catch (TypeError $_) {
+  $caught = true;
+}
+
+assert!($caught);
+
+#[NeverInline]
+function mutateLateShape(
+  LateMutableObjectShape $value,
+): LateMutableObjectShape {
+  $value->value = 'changed';
+  return $value;
+}
+
+$loader = new Whim\Autoload\Autoloader()->withSymbolFile(
+  'LateMutableObjectShape',
+  beside('_object-shapes/late-mutable-alias.whim'),
+);
+
+Whim\Autoload\register($loader);
+$caught = false;
+try {
+  $_ = mutateLateShape(new ShapeValue(1));
+} catch (TypeError $_) {
+  $caught = true;
+}
+
+Whim\Autoload\unregister($loader);
+assert!($caught);

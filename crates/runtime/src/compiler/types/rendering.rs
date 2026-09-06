@@ -17,6 +17,7 @@ use whim_syn::cst::r#type::IntegerRangeType;
 use whim_syn::cst::r#type::IntersectionType;
 use whim_syn::cst::r#type::NamedType;
 use whim_syn::cst::r#type::NegativeLiteralType;
+use whim_syn::cst::r#type::ObjectShapeType;
 use whim_syn::cst::r#type::SelfType;
 use whim_syn::cst::r#type::StringLength;
 use whim_syn::cst::r#type::TupleType;
@@ -423,6 +424,7 @@ fn render_type_with_state(
         Type::Vec(vector) => render_vec_type(state, vector, expanding_aliases)?,
         Type::Dict(dictionary) => render_dict_type(state, dictionary, expanding_aliases)?,
         Type::VecShape(shape) => render_vec_shape_type(state, shape, expanding_aliases)?,
+        Type::ObjectShape(shape) => render_object_shape_type(state, shape, expanding_aliases)?,
         Type::DictShape(shape) => render_dict_shape_type(state, shape, expanding_aliases)?,
         Type::Classname(classname) => {
             format!(
@@ -740,6 +742,32 @@ fn render_vec_shape_type(
     }
 
     Ok(format!("vec[{}]", parts.join(", ")))
+}
+
+fn render_object_shape_type(
+    state: RenderState<'_, '_, '_>,
+    shape: &ObjectShapeType<'_>,
+    expanding_aliases: &mut Vec<String>,
+) -> Result<String, CompileError> {
+    let mut parts = shape
+        .entries
+        .iter()
+        .map(|entry| {
+            Ok(format!(
+                "{}: {}",
+                entry.name.value,
+                render_child(state, entry.value, expanding_aliases)?
+            ))
+        })
+        .collect::<Result<Vec<_>, CompileError>>()?;
+    if shape.rest.is_some() {
+        parts.push("...".to_string());
+    }
+    Ok(if parts.is_empty() {
+        "#{}".to_string()
+    } else {
+        format!("#{{ {} }}", parts.join(", "))
+    })
 }
 
 fn render_dict_shape_type(

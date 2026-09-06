@@ -1,5 +1,6 @@
 //! Descriptor-level subtyping, equality, and substitution helpers.
 
+use crate::bytecode::aliases::TypeAliasLookup;
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::string_length_matches;
 use crate::limits::MAX_TYPE_DEPTH;
@@ -61,7 +62,9 @@ pub(in crate::optimizer) fn descriptor_mask(descriptor: &TypeDescriptor) -> Opti
         | TypeDescriptor::StringLength { .. }
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Classname(_) => Some(STRING),
-        TypeDescriptor::Object | TypeDescriptor::StaticClass => Some(OBJECT),
+        TypeDescriptor::Object
+        | TypeDescriptor::StaticClass
+        | TypeDescriptor::ObjectShape { .. } => Some(OBJECT),
         TypeDescriptor::Named { .. }
         | TypeDescriptor::Member { .. }
         | TypeDescriptor::Parameter(_) => None,
@@ -102,6 +105,10 @@ pub(in crate::optimizer::type_flow) fn exact_descriptor_mask(
         TypeDescriptor::Float => Some(FLOAT),
         TypeDescriptor::String => Some(STRING),
         TypeDescriptor::Object => Some(OBJECT),
+        TypeDescriptor::ObjectShape {
+            entries,
+            open: true,
+        } if entries.is_empty() => Some(OBJECT),
         TypeDescriptor::Array(None) => Some(VECTOR | DICTIONARY | TUPLE),
         TypeDescriptor::Vector(None) => Some(VECTOR),
         TypeDescriptor::Dictionary(None) => Some(DICTIONARY),
@@ -131,6 +138,7 @@ pub(in crate::optimizer::type_flow) fn descriptor_may_release_observably(
         | TypeDescriptor::Member { .. }
         | TypeDescriptor::Parameter(_)
         | TypeDescriptor::StaticClass
+        | TypeDescriptor::ObjectShape { .. }
         | TypeDescriptor::Array(None)
         | TypeDescriptor::Vector(None)
         | TypeDescriptor::Dictionary(None)
@@ -183,6 +191,67 @@ pub(in crate::optimizer::type_flow) fn descriptor_may_release_observably(
     }
 }
 
+fn checks_mutable_properties(
+    descriptor: &TypeDescriptor,
+    unit: Option<&IndexedUnit<'_>>,
+    depth: usize,
+) -> bool {
+    if depth > MAX_TYPE_DEPTH {
+        return true;
+    }
+    let sensitive = |child| checks_mutable_properties(child, unit, depth + 1);
+    match descriptor {
+        TypeDescriptor::ObjectShape { entries, .. } => !entries.is_empty(),
+        TypeDescriptor::Parameter(_) => true,
+        TypeDescriptor::Named {
+            name, arguments, ..
+        } => {
+            let Some(unit) = unit else {
+                return true;
+            };
+            if let Some(alias) = unit.find_alias(name) {
+                return sensitive(&substitute_parameters(
+                    &alias.descriptor,
+                    &alias.type_parameters,
+                    arguments.as_deref(),
+                    depth + 1,
+                ));
+            }
+            if let Some(newtype) = unit.newtype_by_name(name) {
+                return sensitive(&substitute_parameters(
+                    &newtype.backing,
+                    &newtype.type_parameters,
+                    arguments.as_deref(),
+                    depth + 1,
+                ));
+            }
+            unit.class_by_name(name).is_none()
+                && unit.function_by_name(name).is_none()
+                && unit.built_in_function_by_name(name).is_none()
+                && unit.constant_by_name(name).is_none()
+        }
+        TypeDescriptor::Array(Some((key, value)))
+        | TypeDescriptor::Dictionary(Some((key, value))) => sensitive(key) || sensitive(value),
+        TypeDescriptor::Vector(Some(value)) | TypeDescriptor::Negated(value) => sensitive(value),
+        TypeDescriptor::VectorShape { elements, rest } => {
+            elements.iter().any(sensitive) || rest.as_deref().is_some_and(sensitive)
+        }
+        TypeDescriptor::DictionaryShape { entries, rest } => {
+            entries.iter().any(|(_, value)| sensitive(value))
+                || rest
+                    .as_ref()
+                    .is_some_and(|(key, value)| sensitive(key) || sensitive(value))
+        }
+        TypeDescriptor::Tuple(elements)
+        | TypeDescriptor::Union(elements)
+        | TypeDescriptor::Intersection(elements) => elements.iter().any(sensitive),
+        TypeDescriptor::TupleRest { elements, rest } => {
+            elements.iter().any(sensitive) || sensitive(rest)
+        }
+        _ => false,
+    }
+}
+
 pub(crate) fn descriptor_proves(
     actual: &TypeDescriptor,
     expected: &TypeDescriptor,
@@ -194,7 +263,12 @@ pub(crate) fn descriptor_proves(
     {
         return depth <= MAX_TYPE_DEPTH;
     }
-    if descriptors_equal(actual, expected, depth + 1) || matches!(actual, TypeDescriptor::Never) {
+    if matches!(actual, TypeDescriptor::Never) {
+        return true;
+    }
+    if descriptors_equal(actual, expected, depth + 1)
+        && !checks_mutable_properties(expected, unit, depth + 1)
+    {
         return true;
     }
     if string_lengths_prove(actual, expected, depth + 1) {

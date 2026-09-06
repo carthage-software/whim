@@ -8,6 +8,7 @@ use whim_syn::cst::function::ShortClosure;
 use whim_syn::cst::function::ShortClosureBody;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::operation::UnaryPrefixOperator;
+use whim_syn::cst::pattern::ObjectPatternEntry;
 use whim_syn::cst::pattern::Pattern;
 use whim_syn::cst::walker::Flow;
 use whim_syn::cst::walker::Visitor;
@@ -82,7 +83,8 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for AssignedNames<'_, 'arena> {
 
                 Flow::Skip
             }
-            Node::Pattern(Pattern::Variable(variable)) => {
+            Node::Pattern(Pattern::Variable(variable))
+            | Node::ObjectPatternEntry(ObjectPatternEntry::Shorthand(variable)) => {
                 self.names.insert(variable.name);
                 Flow::Skip
             }
@@ -194,7 +196,8 @@ fn collect_scoped_bindings(node: Node<'_, '_>, bindings: &mut Vec<(String, Span)
     impl<'ast, 'arena> Visitor<'ast, 'arena> for ScopedBindings<'_> {
         fn enter(&mut self, node: Node<'ast, 'arena>) -> Flow {
             match node {
-                Node::Pattern(Pattern::Variable(variable)) => {
+                Node::Pattern(Pattern::Variable(variable))
+                | Node::ObjectPatternEntry(ObjectPatternEntry::Shorthand(variable)) => {
                     self.bindings
                         .push((variable.name.to_string(), variable.span));
                     Flow::Skip
@@ -271,7 +274,8 @@ fn collect_local_names<'arena>(node: Node<'_, 'arena>, names: &mut Names<'arena>
 
                     Flow::Descend
                 }
-                Node::Pattern(Pattern::Variable(variable)) => {
+                Node::Pattern(Pattern::Variable(variable))
+                | Node::ObjectPatternEntry(ObjectPatternEntry::Shorthand(variable)) => {
                     self.names.insert(variable.name);
                     Flow::Skip
                 }
@@ -376,6 +380,7 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for ReferencedNames<'_, 'arena> {
                 Flow::Skip
             }
             Node::Pattern(Pattern::Variable(_))
+            | Node::ObjectPatternEntry(ObjectPatternEntry::Shorthand(_))
             | Node::BindingTarget(_)
             | Node::Function(_)
             | Node::Class(_)

@@ -1,0 +1,18 @@
+type Empty=#{};
+type Open=#{...};
+type Nested<T> = #{first:T,child:#{name:string,...},...};
+function unwrap(mixed $x): #{value:int,...} {return match($x){Ok<int>&#{$value}=>new Item($value),#{value:$other@int,...}=>new Item($other),};}
+type Comments=#{
+// property
+name:string,
+// rest
+...,
+};
+type OnlyComment=#{
+// inside
+};
+$x=match($y){#{
+// binding
+$name,
+...,
+}=>$name,};

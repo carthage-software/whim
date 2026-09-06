@@ -2344,7 +2344,9 @@ fn exact_call_results_only_request_reference_teardown_when_needed() {
             continue;
         };
         let name = match &unit.main.ic_descriptors[cache.index() as usize] {
-            IcDescriptor::Member { name, .. } => name.as_bytes(),
+            IcDescriptor::Member { name, .. } | IcDescriptor::PublicProperty(name) => {
+                name.as_bytes()
+            }
             IcDescriptor::ClassMember { .. } => unreachable!(),
         };
         let owns_reference = unit.main.reference_register_mask & (1u64 << destination.index()) != 0;

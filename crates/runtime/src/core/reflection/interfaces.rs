@@ -181,6 +181,7 @@ reflection_interface! {
         "Whim\\Reflection\\Type\\VecShapeTypeReflection",
         "Whim\\Reflection\\Type\\DictTypeReflection",
         "Whim\\Reflection\\Type\\DictShapeTypeReflection",
+        "Whim\\Reflection\\Type\\ObjectShapeTypeReflection",
         "Whim\\Reflection\\Type\\ClassnameTypeReflection",
         "Whim\\Reflection\\Type\\TupleTypeReflection",
         "Whim\\Reflection\\Type\\WildcardTypeReflection"

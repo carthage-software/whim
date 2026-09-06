@@ -34,6 +34,7 @@ use whim_syn::cst::expression::Expression;
 use whim_syn::cst::sequence::TokenSeparatedSequence;
 use whim_syn::cst::trivia::Trivia;
 use whim_syn::cst::trivia::TriviaKind;
+use whim_syn::cst::r#type::ObjectShapeRest;
 use whim_syn::cst::r#type::TupleType;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeArgumentList;
@@ -295,6 +296,58 @@ where
         contents.push(self.text(close));
 
         Document::Group(Group::new(contents).with_break_mode(break_mode))
+    }
+
+    fn object_shape<T>(
+        &mut self,
+        nodes: &[T],
+        rest: Option<&ObjectShapeRest>,
+        close_offset: u32,
+    ) -> Document<'arena, A>
+    where
+        T: Format<'arena, A>,
+    {
+        let mut inner = self.vec();
+        for (index, node) in nodes.iter().enumerate() {
+            if index != 0 {
+                inner.push(self.text(","));
+                inner.push(self.line());
+            }
+
+            inner.push(node.format(self));
+        }
+
+        if let Some(rest) = rest {
+            if !nodes.is_empty() {
+                inner.push(self.text(","));
+                inner.push(self.line());
+            }
+
+            inner.push(wrap!(self, rest, { self.text("...") }));
+        }
+
+        let comments = self.take_interior_comments(close_offset, &mut inner);
+        if inner.is_empty() {
+            return self.text("#{}");
+        }
+
+        let mut indented = self.vec();
+        indented.push(self.line());
+        indented.push(Document::Array(inner));
+        let mut contents = self.vec();
+        contents.push(self.text("#{"));
+        contents.push(self.indent_if_break(indented));
+        if !nodes.is_empty() || rest.is_some() {
+            contents.push(self.ifbreak(self.text(","), self.empty()));
+        }
+
+        contents.push(self.line());
+        contents.push(self.text("}"));
+        Document::Group(Group::new(contents).with_break_mode(if comments {
+            BreakMode::Force
+        } else {
+            BreakMode::Auto
+        }))
     }
 
     fn signature_parameters<T>(&mut self, nodes: &[T], close_offset: u32) -> Document<'arena, A>

@@ -354,13 +354,16 @@ match-arm       := pattern "=>" expression
 
 pattern         := union-pattern
 union-pattern   := as-pattern ("|" as-pattern)*
-as-pattern      := primary-pattern ("@" union-pattern)?
+as-pattern      := intersection-pattern ("@" union-pattern)?
+intersection-pattern
+                := primary-pattern ("&" primary-pattern)*
 primary-pattern := variable
-                 | type
+                 | prefix-type
                  | "(" pattern ")"
                  | tuple-pattern
                  | vec-pattern
                  | dict-pattern
+                 | object-pattern
 
 tuple-pattern   := "(" pattern ("," pattern)*
                    ("," trailing-pattern)? ","? ")"
@@ -371,13 +374,20 @@ dict-pattern    := "dict" "[" (dict-pattern-entry
                    ("," trailing-pattern)? ","? "]"
 dict-pattern-entry
                 := (string-literal | signed-integer-literal) "=>" pattern
+object-pattern  := "#{" object-pattern-items? "}"
+object-pattern-items
+                := object-pattern-entry ("," object-pattern-entry)*
+                   ("," "...")? ","? | "..." ","?
+object-pattern-entry
+                := identifier ":" pattern | variable
 trailing-pattern
                 := "..." pattern?
 ```
 
 Variables bind. Types and literals check. `@` requires both patterns to match
-the same value. Tuple, vec, and dict patterns may nest. Their final item may
-use `...` to accept, check, or bind the rest.
+the same value, as does `&`. Tuple, vec, dict, and object patterns may nest.
+Tuple, vec, and dict patterns may end with `...` to accept, check, or bind the
+rest. Object patterns use a bare `...` to permit additional public properties.
 
 See [Match and Destructuring](../language/patterns.md).
 
@@ -392,7 +402,8 @@ prefix-type     := "!" prefix-type
                  | "=" prefix-type
                  | primary-type
 
-primary-type    := built-in-type
+primary-type    := object-shape-type
+                 | built-in-type
                  | named-type
                  | literal-type
                  | range-type
@@ -443,7 +454,14 @@ dict-shape-items
                    ("," dict-shape-rest)? ","?
 dict-shape-entry
                 := (string-literal | integer-literal) "=>" type
-dict-shape-rest := "..." "<" type "," type ">"
+dict-shape-rest := "..." ("<" type "," type ">")?
+object-shape-type
+                := "#{" object-shape-items? "}"
+object-shape-items
+                := object-shape-entry ("," object-shape-entry)*
+                   ("," "...")? ","? | "..." ","?
+object-shape-entry
+                := identifier ":" type
 
 callable-parameters
                 := callable-parameter ("," callable-parameter)* ","?

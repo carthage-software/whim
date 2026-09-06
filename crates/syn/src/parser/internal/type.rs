@@ -24,6 +24,9 @@ use crate::cst::r#type::MemberType;
 use crate::cst::r#type::NamedType;
 use crate::cst::r#type::NegatedType;
 use crate::cst::r#type::NegativeLiteralType;
+use crate::cst::r#type::ObjectShapeRest;
+use crate::cst::r#type::ObjectShapeType;
+use crate::cst::r#type::ObjectShapeTypeEntry;
 use crate::cst::r#type::ParenthesizedType;
 use crate::cst::r#type::SelfType;
 use crate::cst::r#type::StringLength;
@@ -88,7 +91,7 @@ where
     }
 
     /// Parses unary negation without recursive descent through a long prefix.
-    fn parse_negated_type(&mut self) -> Result<&'arena Type<'arena>, ParseError> {
+    pub(crate) fn parse_negated_type(&mut self) -> Result<&'arena Type<'arena>, ParseError> {
         let mut prefixes = Vec::new_in(self.arena);
         while self.is_at(TokenKind::Bang)? {
             self.enter()?;
@@ -109,6 +112,42 @@ where
         Ok(r#type)
     }
 
+    fn parse_object_shape_type(&mut self) -> Result<Type<'arena>, ParseError> {
+        let hash_left_brace = self.expect_span(TokenKind::HashLeftBrace)?;
+        let mut entries = Vec::new_in(self.arena);
+        let mut commas = Vec::new_in(self.arena);
+        let mut rest = None;
+        while !self.is_at(TokenKind::RightBrace)? {
+            if self.is_at(TokenKind::DotDotDot)? {
+                rest = Some(self.parse_object_shape_rest()?);
+                break;
+            }
+            let name = self.parse_member_name()?;
+            let colon = self.expect_span(TokenKind::Colon)?;
+            let value = self.parse_type()?;
+            entries.push(ObjectShapeTypeEntry { name, colon, value });
+            if self.is_at(TokenKind::Comma)? {
+                commas.push(self.consume()?);
+            } else {
+                break;
+            }
+        }
+        let right_brace = self.expect_span(TokenKind::RightBrace)?;
+        Ok(Type::ObjectShape(ObjectShapeType {
+            hash_left_brace,
+            entries: TokenSeparatedSequence::new(entries, commas),
+            rest,
+            right_brace,
+        }))
+    }
+
+    pub(crate) fn parse_object_shape_rest(&mut self) -> Result<ObjectShapeRest, ParseError> {
+        Ok(ObjectShapeRest {
+            ellipsis: self.expect_span(TokenKind::DotDotDot)?,
+            trailing_comma: self.eat_optional(TokenKind::Comma)?,
+        })
+    }
+
     fn parse_type_atom(&mut self) -> Result<&'arena Type<'arena>, ParseError> {
         let Some(token) = self.peek()? else {
             return Err(self.unexpected(Expected::Description("a type")));
@@ -120,6 +159,7 @@ where
             TokenKind::Array => Type::Array(self.parse_array_type()?),
             TokenKind::Vec => self.parse_vec_or_shape_type()?,
             TokenKind::Dict => self.parse_dict_or_shape_type()?,
+            TokenKind::HashLeftBrace => self.parse_object_shape_type()?,
             TokenKind::Classname => Type::Classname(self.parse_classname_type()?),
             TokenKind::Self_ => Type::Self_(self.parse_self_type()?),
             TokenKind::Parent => Type::Parent(self.expect_keyword(TokenKind::Parent)?),

@@ -51,7 +51,7 @@ impl VirtualMachine<'_> {
         let name = match &chunk.ic_descriptors[slot] {
             IcDescriptor::Member { name, .. } => name.clone(),
             // SAFETY: the surrounding invariant makes this path unreachable.
-            IcDescriptor::ClassMember { .. } => unsafe {
+            IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => unsafe {
                 unreachable_invariant("a ConstantGet site resolves a member descriptor")
             },
         };

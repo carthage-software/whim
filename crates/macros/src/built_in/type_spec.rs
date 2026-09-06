@@ -72,7 +72,7 @@ pub(super) fn type_spec(
             quote!(#path::Wildcard)
         }
         Type::Named(named) => named_spec(named, parameters, &path)?,
-        Type::VecShape(_) | Type::DictShape(_) => {
+        Type::VecShape(_) | Type::DictShape(_) | Type::ObjectShape(_) => {
             return Err(unsupported(
                 subject,
                 "shape types are not supported in built-in signatures",
@@ -336,6 +336,22 @@ pub(super) fn render(subject: &Type<'_>) -> String {
             }
             None => "dict".to_owned(),
         },
+        Type::ObjectShape(shape) => {
+            let mut entries = shape
+                .entries
+                .iter()
+                .map(|entry| format!("{}: {}", entry.name.value, render(entry.value)))
+                .collect::<Vec<_>>();
+            if shape.rest.is_some() {
+                entries.push("...".to_string());
+            }
+
+            if entries.is_empty() {
+                "#{}".to_string()
+            } else {
+                format!("#{{ {} }}", entries.join(", "))
+            }
+        }
         Type::Tuple(tuple) => {
             let elements = tuple.elements.iter().map(render).collect::<Vec<_>>();
             let elements = if let Some(rest) = &tuple.trailing_type {

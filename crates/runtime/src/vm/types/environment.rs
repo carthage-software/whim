@@ -279,6 +279,9 @@ impl VirtualMachine<'_> {
                     pending.extend(elements);
                     pending.extend(rest.map(|rest| *rest));
                 }
+                TypeDescriptor::ObjectShape { entries, .. } => {
+                    pending.extend(entries.into_iter().map(|(_, value)| value))
+                }
                 TypeDescriptor::DictionaryShape { entries, rest } => {
                     pending.extend(entries.into_iter().map(|(_, value)| value));
                     if let Some((key, value)) = rest {
@@ -464,7 +467,8 @@ impl VirtualMachine<'_> {
                     .map(|member| self.substitute_descriptor(member, environment, depth + 1))
                     .collect(),
             ),
-            other => other.clone(),
+            other => other
+                .map_children(|child| self.substitute_descriptor(child, environment, depth + 1)),
         }
     }
 
@@ -632,6 +636,14 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
             rest.is_some().hash(state);
             if let Some(rest) = rest {
                 hash_descriptor(rest, state);
+            }
+        }
+        TypeDescriptor::ObjectShape { entries, open } => {
+            entries.len().hash(state);
+            open.hash(state);
+            for (name, value) in entries {
+                name.hash(state);
+                hash_descriptor(value, state);
             }
         }
         TypeDescriptor::DictionaryShape { entries, rest } => {
@@ -825,6 +837,25 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
                     }
                     _ => false,
                 }
+        }
+        (
+            TypeDescriptor::ObjectShape {
+                entries: left,
+                open: left_open,
+            },
+            TypeDescriptor::ObjectShape {
+                entries: right,
+                open: right_open,
+            },
+        ) => {
+            left_open == right_open
+                && left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|((left_name, left), (right_name, right))| {
+                        left_name == right_name && descriptor_same(left, right)
+                    })
         }
         (TypeDescriptor::Callable(left), TypeDescriptor::Callable(right)) => match (left, right) {
             (None, None) => true,

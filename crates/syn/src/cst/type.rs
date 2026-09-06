@@ -30,6 +30,7 @@ pub enum Type<'arena> {
     VecShape(VecShapeType<'arena>),
     Dict(DictType<'arena>),
     DictShape(DictShapeType<'arena>),
+    ObjectShape(ObjectShapeType<'arena>),
     Classname(ClassnameType<'arena>),
     Tuple(TupleType<'arena>),
     String(Keyword<'arena>),
@@ -381,6 +382,7 @@ impl HasSpan for Type<'_> {
             Type::VecShape(shape) => shape.span(),
             Type::Dict(dict) => dict.span(),
             Type::DictShape(shape) => shape.span(),
+            Type::ObjectShape(shape) => shape.span(),
             Type::Classname(classname) => classname.span(),
             Type::Tuple(tuple) => tuple.span(),
             Type::String(keyword)
@@ -748,5 +750,45 @@ mod tests {
             source.len() as u32 - 1,
             "the span ends at the last `int`, before the semicolon"
         );
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ObjectShapeType<'arena> {
+    pub hash_left_brace: Span,
+    pub entries: TokenSeparatedSequence<'arena, ObjectShapeTypeEntry<'arena>>,
+    pub rest: Option<ObjectShapeRest>,
+    pub right_brace: Span,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ObjectShapeTypeEntry<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub colon: Span,
+    pub value: &'arena Type<'arena>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ObjectShapeRest {
+    pub ellipsis: Span,
+    pub trailing_comma: Option<Span>,
+}
+
+impl HasSpan for ObjectShapeType<'_> {
+    fn span(&self) -> Span {
+        self.hash_left_brace.join(self.right_brace)
+    }
+}
+
+impl HasSpan for ObjectShapeTypeEntry<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.value.span())
+    }
+}
+
+impl HasSpan for ObjectShapeRest {
+    fn span(&self) -> Span {
+        self.trailing_comma
+            .map_or(self.ellipsis, |comma| self.ellipsis.join(comma))
     }
 }

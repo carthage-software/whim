@@ -124,6 +124,11 @@ impl Engine {
                     elements.iter().chain(rest.iter().map(Box::as_ref)),
                     path,
                 )?,
+            TypeDescriptor::ObjectShape { entries, .. } => self
+                .validate_descriptor_type_argument_bounds_all(
+                    entries.iter().map(|(_, value)| value),
+                    path,
+                )?,
             TypeDescriptor::DictionaryShape { entries, rest } => self
                 .validate_descriptor_type_argument_bounds_all(
                     entries.iter().map(|(_, value)| value).chain(
@@ -504,6 +509,9 @@ impl Engine {
                     self.names_are_linked(key) && self.names_are_linked(value)
                 })
             }
+            TypeDescriptor::ObjectShape { entries, .. } => entries
+                .iter()
+                .all(|(_, value)| self.names_are_linked(value)),
             TypeDescriptor::DictionaryShape { entries, rest } => {
                 entries
                     .iter()
@@ -643,6 +651,9 @@ fn contains_late_type(descriptor: &TypeDescriptor) -> bool {
         TypeDescriptor::Dictionary(arguments) => arguments
             .as_ref()
             .is_some_and(|(key, value)| contains_late_type(key) || contains_late_type(value)),
+        TypeDescriptor::ObjectShape { entries, .. } => {
+            entries.iter().any(|(_, value)| contains_late_type(value))
+        }
         TypeDescriptor::DictionaryShape { entries, rest } => {
             entries.iter().any(|(_, value)| contains_late_type(value))
                 || rest.as_ref().is_some_and(|(key, value)| {

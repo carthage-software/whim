@@ -71,6 +71,11 @@ pub(crate) fn dispatch(
         Operation::KeyType => array_type(context, reflected, ArrayPart::Key),
         Operation::ValueType => array_type(context, reflected, ArrayPart::Value),
         Operation::RestType => rest_type(context, reflected),
+        Operation::Properties => object_shape_properties(context, reflected),
+        Operation::IsOpen => Ok(Value::bool(matches!(
+            &reflected.descriptor,
+            TypeDescriptor::ObjectShape { open: true, .. }
+        ))),
         Operation::Entries => shape_entries(context, reflected),
         Operation::RestKeyType => array_type(context, reflected, ArrayPart::RestKey),
         Operation::RestValueType => array_type(context, reflected, ArrayPart::RestValue),
@@ -93,6 +98,21 @@ pub(crate) fn function_parameter_dispatch(
         _ => {
             Err(context
                 .type_error("the operation is not valid for this reflected function parameter"))
+        }
+    }
+}
+
+pub(crate) fn shape_property_dispatch(
+    context: &mut Context<'_, '_, '_>,
+    operation: Operation,
+    name: &Atom,
+    reflected: &ReflectedType,
+) -> Result<Value, Throw> {
+    match operation {
+        Operation::Name => Ok(context.string(name.as_bytes())),
+        Operation::Type => objects::r#type(context, reflected.clone()),
+        _ => {
+            Err(context.type_error("the operation is not valid for this reflected shape property"))
         }
     }
 }
@@ -203,6 +223,7 @@ fn type_kind(
         TypeDescriptor::VectorShape { .. } => "VecShape",
         TypeDescriptor::Dictionary(_) => "Dict",
         TypeDescriptor::DictionaryShape { .. } => "DictShape",
+        TypeDescriptor::ObjectShape { .. } => "ObjectShape",
         TypeDescriptor::Classname(_) => "Classname",
         TypeDescriptor::Tuple(_) | TypeDescriptor::TupleRest { .. } | TypeDescriptor::TupleAny => {
             "Tuple"
@@ -636,6 +657,27 @@ fn rest_type(context: &mut Context<'_, '_, '_>, reflected: &ReflectedType) -> Re
     reflect_child(context, rest, reflected)
 }
 
+fn object_shape_properties(
+    context: &mut Context<'_, '_, '_>,
+    reflected: &ReflectedType,
+) -> Result<Value, Throw> {
+    let TypeDescriptor::ObjectShape { entries, .. } = &reflected.descriptor else {
+        return Err(context.type_error("the reflected type is not an object shape"));
+    };
+    let mut values = Vec::with_capacity(entries.len());
+    for (name, descriptor) in entries {
+        values.push(objects::build(
+            context,
+            ReflectionData::ObjectShapeProperty {
+                name: name.clone(),
+                r#type: child_type(descriptor, reflected),
+            },
+            Vec::new(),
+        )?);
+    }
+    Ok(context.vec(values))
+}
+
 fn shape_entries(
     context: &mut Context<'_, '_, '_>,
     reflected: &ReflectedType,
@@ -963,6 +1005,9 @@ pub(crate) fn is_resolved(descriptor: &TypeDescriptor) -> bool {
         TypeDescriptor::Vector(value) => value.as_deref().is_none_or(is_resolved),
         TypeDescriptor::VectorShape { elements, rest } => {
             elements.iter().all(is_resolved) && rest.as_deref().is_none_or(is_resolved)
+        }
+        TypeDescriptor::ObjectShape { entries, .. } => {
+            entries.iter().all(|(_, value)| is_resolved(value))
         }
         TypeDescriptor::DictionaryShape { entries, rest } => {
             entries.iter().all(|(_, value)| is_resolved(value))

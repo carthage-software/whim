@@ -541,6 +541,7 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::VectorShape { .. }
             | TypeDescriptor::Dictionary(_)
             | TypeDescriptor::DictionaryShape { .. }
+            | TypeDescriptor::ObjectShape { .. }
             | TypeDescriptor::Callable(_)
             | TypeDescriptor::Classname(_)
             | TypeDescriptor::Tuple(_)
@@ -687,6 +688,15 @@ impl VirtualMachine<'_> {
             );
         }
 
+        if matches!(&expected, TypeDescriptor::ObjectShape { entries, open: true } if entries.is_empty())
+        {
+            return self.descriptor_is_subtype(
+                &actual,
+                &TypeDescriptor::Object,
+                environment,
+                depth + 1,
+            );
+        }
         if descriptor_same(&actual, &expected) {
             return Ok(true);
         }
@@ -1412,6 +1422,31 @@ impl VirtualMachine<'_> {
                 compatible
             }
             (TypeDescriptor::DictionaryShape { .. }, TypeDescriptor::Dictionary(None)) => true,
+            (TypeDescriptor::ObjectShape { .. }, TypeDescriptor::Object) => true,
+            (
+                TypeDescriptor::ObjectShape {
+                    entries: actual,
+                    open: actual_open,
+                },
+                TypeDescriptor::ObjectShape {
+                    entries: expected,
+                    open: expected_open,
+                },
+            ) => {
+                if !expected_open && (*actual_open || actual.len() != expected.len()) {
+                    return Ok(false);
+                }
+                for (name, expected) in expected {
+                    let Some((_, actual)) = actual.iter().find(|(candidate, _)| candidate == name)
+                    else {
+                        return Ok(false);
+                    };
+                    if !self.descriptor_is_subtype(actual, expected, environment, depth + 1)? {
+                        return Ok(false);
+                    }
+                }
+                true
+            }
             (TypeDescriptor::Tuple(actual), TypeDescriptor::Tuple(expected))
                 if actual.len() == expected.len() =>
             {
@@ -1891,7 +1926,7 @@ impl VirtualMachine<'_> {
             TypeDescriptor::Tuple(_)
             | TypeDescriptor::TupleRest { .. }
             | TypeDescriptor::TupleAny => Some(8),
-            TypeDescriptor::Object => Some(9),
+            TypeDescriptor::Object | TypeDescriptor::ObjectShape { .. } => Some(9),
             TypeDescriptor::Member { class, member, .. } => {
                 let entry = self.resolve_checked_name(class.clone())?;
                 entry
@@ -2970,6 +3005,49 @@ impl VirtualMachine<'_> {
                     environment,
                     array_id,
                 )?,
+                None => false,
+            },
+            TypeDescriptor::ObjectShape { entries, open } => match value.as_object() {
+                Some(object) => {
+                    let class = &self.engine.tables.classes[object.class().0 as usize];
+                    if !open
+                        && class
+                            .slots
+                            .iter()
+                            .filter(|property| property.visibility == Visibility::Public)
+                            .count()
+                            != entries.len()
+                    {
+                        return Ok(false);
+                    }
+                    for (name, descriptor) in entries {
+                        let class = &self.engine.tables.classes[object.class().0 as usize];
+                        let Some(slot) = class.slot_names.get(name).copied().filter(|slot| {
+                            class.slots[*slot as usize].visibility == Visibility::Public
+                        }) else {
+                            return Ok(false);
+                        };
+                        if matches!(descriptor, TypeDescriptor::Wildcard) {
+                            if object.slot_is_uninitialized(slot as usize) {
+                                return Ok(false);
+                            }
+                            continue;
+                        }
+                        let property = object.read_slot(slot as usize);
+                        if property.is_uninitialized()
+                            || !self.check_descriptor(
+                                descriptor,
+                                &property,
+                                called,
+                                environment,
+                                depth + 1,
+                            )?
+                        {
+                            return Ok(false);
+                        }
+                    }
+                    true
+                }
                 None => false,
             },
             TypeDescriptor::DictionaryShape { entries, rest } => match value.as_dict() {

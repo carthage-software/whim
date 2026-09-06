@@ -420,6 +420,7 @@ fn remap_cache(
 ) -> Option<IcSlot> {
     let descriptor = snapshot.ic_descriptors.get(usize::from(cache.index()))?;
     let cloned = match descriptor {
+        IcDescriptor::PublicProperty(name) => IcDescriptor::PublicProperty(name.clone()),
         IcDescriptor::Member {
             name,
             type_arguments,

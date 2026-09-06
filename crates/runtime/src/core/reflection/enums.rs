@@ -122,6 +122,8 @@ pub(crate) enum TypeKind {
     Dict,
     #[whim_case("DictShape")]
     DictShape,
+    #[whim_case("ObjectShape")]
+    ObjectShape,
     #[whim_case("Classname")]
     Classname,
     #[whim_case("Tuple")]

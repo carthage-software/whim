@@ -174,6 +174,9 @@ use crate::cst::pattern::AsPattern;
 use crate::cst::pattern::DictPattern;
 use crate::cst::pattern::DictPatternEntry;
 use crate::cst::pattern::DictPatternKey;
+use crate::cst::pattern::IntersectionPattern;
+use crate::cst::pattern::ObjectPattern;
+use crate::cst::pattern::ObjectPatternEntry;
 use crate::cst::pattern::ParenthesizedPattern;
 use crate::cst::pattern::Pattern;
 use crate::cst::pattern::TrailingPattern;
@@ -206,6 +209,9 @@ use crate::cst::r#type::NamedType;
 use crate::cst::r#type::NegatedType;
 use crate::cst::r#type::NegativeLiteralType;
 use crate::cst::r#type::Newtype;
+use crate::cst::r#type::ObjectShapeRest;
+use crate::cst::r#type::ObjectShapeType;
+use crate::cst::r#type::ObjectShapeTypeEntry;
 use crate::cst::r#type::ParenthesizedType;
 use crate::cst::r#type::SelfType;
 use crate::cst::r#type::StringLength;
@@ -329,6 +335,12 @@ define_nodes! {
     MatchArm(MatchArm<'arena>),
     Pattern(Pattern<'arena>),
     ParenthesizedPattern(ParenthesizedPattern<'arena>),
+    IntersectionPattern(IntersectionPattern<'arena>),
+    ObjectPattern(ObjectPattern<'arena>),
+    ObjectPatternEntry(ObjectPatternEntry<'arena>),
+    ObjectShapeType(ObjectShapeType<'arena>),
+    ObjectShapeTypeEntry(ObjectShapeTypeEntry<'arena>),
+    ObjectShapeRest(ObjectShapeRest),
     AsPattern(AsPattern<'arena>),
     UnionPattern(UnionPattern<'arena>),
     VecPattern(VecPattern<'arena>),

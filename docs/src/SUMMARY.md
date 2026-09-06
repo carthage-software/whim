@@ -54,7 +54,7 @@
 
 - [Runtime Type Checks](semantics/type-system.md)
 - [Unions, Intersections, and Ranges](language/type-composition.md)
-- [Collection and Callable Types](language/structural-types.md)
+- [Structural Types](language/structural-types.md)
 - [Generics](language/generics.md)
 - [Symbols as Types](language/symbol-types.md)
 - [Aliases and Newtypes](core-library/functions-and-constants.md)

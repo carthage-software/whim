@@ -49,6 +49,8 @@ pub(crate) enum CompileErrorKind {
     InconsistentPatternBindings,
     DuplicatePatternBinding,
     DuplicateDictionaryKey,
+    DuplicateObjectProperty,
+    InvalidRestPatternBinding,
     DuplicateImportAlias,
     GenericEnum,
     TypeArgumentArityMismatch,

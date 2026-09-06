@@ -146,6 +146,10 @@ pub(crate) enum ReflectionData {
         r#type: ReflectedType,
         optional: bool,
     },
+    ObjectShapeProperty {
+        name: Atom,
+        r#type: ReflectedType,
+    },
     DictShapeEntry {
         key: ShapeKey,
         r#type: ReflectedType,

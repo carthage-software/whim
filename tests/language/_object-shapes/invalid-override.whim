@@ -1,0 +1,11 @@
+namespace ObjectShapeInvalidOverride;
+
+interface Base {
+  public function get(): #{ value: int };
+}
+
+class Child implements Base {
+  public function get(): #{ value: int, ... } {
+    throw new Whim\Unwind\Exception();
+  }
+}

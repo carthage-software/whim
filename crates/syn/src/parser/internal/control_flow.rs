@@ -29,6 +29,9 @@ use crate::cst::pattern::AsPattern;
 use crate::cst::pattern::DictPattern;
 use crate::cst::pattern::DictPatternEntry;
 use crate::cst::pattern::DictPatternKey;
+use crate::cst::pattern::IntersectionPattern;
+use crate::cst::pattern::ObjectPattern;
+use crate::cst::pattern::ObjectPatternEntry;
 use crate::cst::pattern::ParenthesizedPattern;
 use crate::cst::pattern::Pattern;
 use crate::cst::pattern::TrailingPattern;
@@ -36,6 +39,8 @@ use crate::cst::pattern::TuplePattern;
 use crate::cst::pattern::UnionPattern;
 use crate::cst::pattern::VecPattern;
 use crate::cst::sequence::TokenSeparatedSequence;
+use crate::cst::r#type::IntersectionType;
+use crate::cst::r#type::Type;
 use crate::error::Expected;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -102,13 +107,70 @@ where
     }
 
     fn parse_as_pattern(&mut self) -> Result<&'arena Pattern<'arena>, ParseError> {
-        let left = self.parse_primary_pattern()?;
+        let left = self.parse_intersection_pattern()?;
         let Some(at) = self.eat_optional(TokenKind::At)? else {
             return Ok(left);
         };
         let right = self.parse_union_pattern()?;
 
         Ok(self.arena.alloc(Pattern::As(AsPattern { left, at, right })))
+    }
+
+    fn parse_intersection_pattern(&mut self) -> Result<&'arena Pattern<'arena>, ParseError> {
+        let mut left = self.parse_primary_pattern()?;
+        while self.is_at(TokenKind::Ampersand)? {
+            let ampersand = self.expect_span(TokenKind::Ampersand)?;
+            let right = self.parse_primary_pattern()?;
+            left = self.arena.alloc(match (left, right) {
+                (Pattern::Type(left), Pattern::Type(right)) => {
+                    Pattern::Type(Type::Intersection(IntersectionType {
+                        left: self.arena.alloc(left.clone()),
+                        ampersand,
+                        right: self.arena.alloc(right.clone()),
+                    }))
+                }
+                (left, right) => Pattern::Intersection(IntersectionPattern {
+                    left,
+                    ampersand,
+                    right,
+                }),
+            });
+        }
+        Ok(left)
+    }
+
+    fn parse_object_pattern(&mut self) -> Result<&'arena Pattern<'arena>, ParseError> {
+        let hash_left_brace = self.expect_span(TokenKind::HashLeftBrace)?;
+        let mut entries = Vec::new_in(self.arena);
+        let mut commas = Vec::new_in(self.arena);
+        let mut rest = None;
+        while !self.is_at(TokenKind::RightBrace)? {
+            if self.is_at(TokenKind::DotDotDot)? {
+                rest = Some(self.parse_object_shape_rest()?);
+                break;
+            }
+            entries.push(if self.is_at(TokenKind::Variable)? {
+                ObjectPatternEntry::Shorthand(self.parse_variable()?)
+            } else {
+                ObjectPatternEntry::Property {
+                    name: self.parse_member_name()?,
+                    colon: self.expect_span(TokenKind::Colon)?,
+                    pattern: self.parse_match_pattern()?,
+                }
+            });
+            if self.is_at(TokenKind::Comma)? {
+                commas.push(self.consume()?);
+            } else {
+                break;
+            }
+        }
+        let right_brace = self.expect_span(TokenKind::RightBrace)?;
+        Ok(self.arena.alloc(Pattern::Object(ObjectPattern {
+            hash_left_brace,
+            entries: TokenSeparatedSequence::new(entries, commas),
+            rest,
+            right_brace,
+        })))
     }
 
     fn parse_primary_pattern(&mut self) -> Result<&'arena Pattern<'arena>, ParseError> {
@@ -137,7 +199,10 @@ where
             return self.parse_dict_pattern();
         }
 
-        let r#type = self.parse_intersection_type()?;
+        if self.is_at(TokenKind::HashLeftBrace)? {
+            return self.parse_object_pattern();
+        }
+        let r#type = self.parse_negated_type()?;
         Ok(self.arena.alloc(Pattern::Type(r#type.clone())))
     }
 

@@ -35,13 +35,15 @@ use crate::vm::call::guard_allows;
 use crate::vm::class_member_atoms;
 use crate::vm::name_atom;
 use crate::vm::site_type_arguments;
+use crate::vm::types::descriptor_same;
 use crate::vm::unreachable_invariant;
 use crate::vm::visibility_allows;
 use crate::vm::visibility_name;
 
 fn returned_register(instruction: Instruction) -> Option<u16> {
     match instruction {
-        Instruction::ReturnUnchecked { source }
+        Instruction::Return { source }
+        | Instruction::ReturnUnchecked { source }
         | Instruction::ReturnReferenceUnchecked { source }
         | Instruction::ReturnScalarUnchecked { source } => Some(source.index()),
         _ => None,
@@ -538,7 +540,7 @@ impl VirtualMachine<'_> {
         );
         entry.function = self.ensure_function_entry_finalized(entry.function)?;
         let entry = CachedExactMethodFrame {
-            fast_path: Self::cached_method_fast_path(&entry, argument_count),
+            fast_path: self.cached_method_fast_path(&entry, argument_count),
             entry,
         };
 
@@ -700,6 +702,7 @@ impl VirtualMachine<'_> {
     }
 
     fn cached_method_fast_path(
+        &self,
         entry: &ExactMethodEntry,
         argument_count: usize,
     ) -> CachedMethodFastPath {
@@ -720,6 +723,20 @@ impl VirtualMachine<'_> {
         if let [instruction] = code
             && let Some(source) = returned_register(*instruction)
         {
+            if matches!(instruction, Instruction::Return { .. }) {
+                let function = &self.engine.tables.functions[entry.function.function.0 as usize];
+                if source > 0
+                    && usize::from(source) <= argument_count
+                    && let Some(actual) = function.parameters()[usize::from(source) - 1]
+                        .declared_type
+                        .as_ref()
+                    && let Some(expected) = function.return_type.as_deref()
+                    && descriptor_same(actual, expected)
+                {
+                    return CachedMethodFastPath::ReturnStableArgument(source as u8 - 1);
+                }
+                return CachedMethodFastPath::None;
+            }
             if source == 0 {
                 return CachedMethodFastPath::ReturnReceiver;
             }
@@ -740,6 +757,20 @@ impl VirtualMachine<'_> {
             && object.index() == 0
             && returned_register(*returned) == Some(destination.index())
         {
+            if matches!(returned, Instruction::Return { .. }) {
+                let function = &self.engine.tables.functions[entry.function.function.0 as usize];
+                let property = &self.engine.tables.classes[entry.called.0 as usize].slots
+                    [usize::from(slot.index())];
+                if function.type_parameters().is_empty()
+                    && property.declaring_class == entry.scope
+                    && let Some(actual) = property.declared_type.as_ref()
+                    && let Some(expected) = function.return_type.as_deref()
+                    && descriptor_same(actual, expected)
+                {
+                    return CachedMethodFastPath::ReturnStableProperty(slot.index());
+                }
+                return CachedMethodFastPath::None;
+            }
             return CachedMethodFastPath::ReturnProperty(slot.index());
         }
 
@@ -758,7 +789,15 @@ impl VirtualMachine<'_> {
         let value = match fast_path {
             CachedMethodFastPath::None => return Err(receiver),
             CachedMethodFastPath::ReturnReceiver => Value::object(receiver),
-            CachedMethodFastPath::ReturnArgument(position) => {
+            CachedMethodFastPath::ReturnArgument(position)
+            | CachedMethodFastPath::ReturnStableArgument(position) => {
+                if matches!(fast_path, CachedMethodFastPath::ReturnStableArgument(_))
+                    && !Self::method_return_is_stable(
+                        &self.stack[argument_start + usize::from(position)],
+                    )
+                {
+                    return Err(receiver);
+                }
                 let value = mem::replace(
                     &mut self.stack[argument_start + usize::from(position)],
                     Value::uninitialized(),
@@ -766,10 +805,14 @@ impl VirtualMachine<'_> {
                 drop(receiver);
                 value
             }
-            CachedMethodFastPath::ReturnProperty(slot) => {
+            CachedMethodFastPath::ReturnProperty(slot)
+            | CachedMethodFastPath::ReturnStableProperty(slot) => {
                 // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
                 let value = unsafe { receiver.read_slot_unchecked(usize::from(slot)) };
-                if value.is_uninitialized() {
+                if value.is_uninitialized()
+                    || (matches!(fast_path, CachedMethodFastPath::ReturnStableProperty(_))
+                        && !Self::method_return_is_stable(&value))
+                {
                     drop(value);
                     return Err(receiver);
                 }
@@ -791,6 +834,11 @@ impl VirtualMachine<'_> {
     }
 
     #[inline(always)]
+    fn method_return_is_stable(value: &Value) -> bool {
+        !value.is_object() && !value.is_vec() && !value.is_dict() && !value.is_tuple()
+    }
+
+    #[inline(always)]
     fn call_direct_method_fast_path(
         &mut self,
         fast_path: CachedMethodFastPath,
@@ -805,15 +853,27 @@ impl VirtualMachine<'_> {
                     .expect("a direct method call has a proven object receiver")
                     .clone(),
             ),
-            CachedMethodFastPath::ReturnArgument(position) => {
+            CachedMethodFastPath::ReturnArgument(position)
+            | CachedMethodFastPath::ReturnStableArgument(position) => {
+                if matches!(fast_path, CachedMethodFastPath::ReturnStableArgument(_))
+                    && !Self::method_return_is_stable(
+                        &self.stack[window_start + 1 + usize::from(position)],
+                    )
+                {
+                    return false;
+                }
                 self.stack[window_start + 1 + usize::from(position)].clone()
             }
-            CachedMethodFastPath::ReturnProperty(slot) => {
+            CachedMethodFastPath::ReturnProperty(slot)
+            | CachedMethodFastPath::ReturnStableProperty(slot) => {
                 let receiver = self.stack[window_start]
                     .as_object()
                     .expect("a direct method call has a proven object receiver");
                 let value = Self::cached_method_property(receiver, slot);
-                if value.is_uninitialized() {
+                if value.is_uninitialized()
+                    || (matches!(fast_path, CachedMethodFastPath::ReturnStableProperty(_))
+                        && !Self::method_return_is_stable(&value))
+                {
                     return false;
                 }
                 value
@@ -1221,7 +1281,7 @@ impl VirtualMachine<'_> {
                             &exact_entry,
                             argument_count,
                         ),
-                        fast_path: Self::cached_method_fast_path(&exact_entry, argument_count),
+                        fast_path: self.cached_method_fast_path(&exact_entry, argument_count),
                     };
                     cached.arguments = if arguments_proven || argument_count == 0 {
                         CachedMethodArguments::Proven

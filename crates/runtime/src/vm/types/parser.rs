@@ -82,6 +82,40 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
 
     fn parse_atom(&mut self) -> Option<TypeDescriptor> {
         self.skip_space();
+        if self.bytes.get(self.position..self.position + 2) == Some(b"#{") {
+            self.position += 2;
+            let mut entries = Vec::new();
+            let mut open = false;
+            while !self.consume(b'}') {
+                if self.consume_ellipsis() {
+                    open = true;
+                    self.consume(b',');
+                    self.expect(b'}')?;
+                    break;
+                }
+                let name = self.take_token()?;
+                if !name
+                    .first()
+                    .is_some_and(|byte| byte.is_ascii_alphabetic() || *byte == b'_' || *byte >= 128)
+                    || !name
+                        .iter()
+                        .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'_' || *byte >= 128)
+                {
+                    return None;
+                }
+                let name = self.heap.intern(name);
+                if entries.iter().any(|(existing, _)| existing == &name) {
+                    return None;
+                }
+                self.expect(b':')?;
+                entries.push((name, self.parse_union()?));
+                if !self.consume(b',') {
+                    self.expect(b'}')?;
+                    break;
+                }
+            }
+            return Some(TypeDescriptor::ObjectShape { entries, open });
+        }
         if self.consume(b'(') {
             if self.consume(b')') {
                 return Some(TypeDescriptor::Tuple(Vec::new()));
@@ -415,6 +449,8 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                         | b')'
                         | b'['
                         | b']'
+                        | b'{'
+                        | b'}'
                         | b':'
                         | b'|'
                         | b'&'

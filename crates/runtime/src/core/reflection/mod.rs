@@ -73,6 +73,7 @@ pub(crate) enum Operation {
     EndLine,
     EndOffset,
     Entries,
+    IsOpen,
     Enum,
     EnumCase,
     Equals,

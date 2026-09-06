@@ -500,3 +500,41 @@ fn type_composition_uses_union_intersection_and_negation_precedence() {
     ));
     assert!(matches!(aliased_type(&arena, "!(A | B)"), Type::Negated(_)));
 }
+
+#[test]
+fn object_shapes_are_types_with_exact_and_open_layouts() {
+    let arena = LocalArena::new();
+    let Type::ObjectShape(closed) =
+        aliased_type(&arena, "#{ value: string, child: #{ id: int, ... }, }")
+    else {
+        panic!("expected object shape");
+    };
+    assert_eq!(closed.entries.len(), 2);
+    assert_eq!(closed.entries.as_slice()[0].name.value, "value");
+    assert!(closed.rest.is_none());
+    let Type::ObjectShape(child) = closed.entries.as_slice()[1].value else {
+        panic!("expected nested shape");
+    };
+    assert!(child.rest.is_some());
+    assert!(
+        matches!(aliased_type(&arena, "#{}"), Type::ObjectShape(shape) if shape.entries.is_empty() && shape.rest.is_none())
+    );
+    assert!(
+        matches!(aliased_type(&arena, "#{ ..., }"), Type::ObjectShape(shape) if shape.entries.is_empty() && shape.rest.is_some())
+    );
+    assert!(matches!(
+        aliased_type(&arena, "Foo<int> & #{ value: int, ... }"),
+        Type::Intersection(_)
+    ));
+    for source in [
+        "type T = #{ $value };",
+        "type T = #{ value int };",
+        "type T = #{ ..., value: int };",
+        "type T = #{ ...<string, int> };",
+        "type T = # {};",
+        "type T = #{ value: };",
+        "type T = #{ value: int;",
+    ] {
+        let _ = error(source);
+    }
+}

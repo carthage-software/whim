@@ -62,7 +62,7 @@ impl VirtualMachine<'_> {
                 type_arguments,
             } => (name.clone(), type_arguments.clone()),
             // SAFETY: the surrounding invariant makes this path unreachable.
-            IcDescriptor::ClassMember { .. } => unsafe {
+            IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => unsafe {
                 unreachable_invariant("a NewStatic site resolves a class name")
             },
         };
@@ -106,7 +106,7 @@ impl VirtualMachine<'_> {
         let type_arguments = match &chunk.ic_descriptors[site] {
             IcDescriptor::Member { type_arguments, .. } => type_arguments.as_deref(),
             // SAFETY: the surrounding invariant makes this path unreachable.
-            IcDescriptor::ClassMember { .. } => unsafe {
+            IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => unsafe {
                 unreachable_invariant("a NewStatic site resolves a class name")
             },
         };

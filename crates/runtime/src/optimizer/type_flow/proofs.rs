@@ -867,6 +867,9 @@ impl TypeFlow<'_> {
             TypeDescriptor::Dictionary(arguments) => {
                 fact.mask == DICTIONARY && self.dictionary_proves(fact, arguments.as_ref(), depth)
             }
+            TypeDescriptor::ObjectShape { entries, open } => {
+                *open && entries.is_empty() && fact.mask & !OBJECT == 0
+            }
             TypeDescriptor::DictionaryShape { entries, rest } => {
                 fact.mask == DICTIONARY
                     && self.dictionary_shape_proves(fact, entries, rest.as_ref(), depth)
@@ -1195,6 +1198,9 @@ impl TypeFlow<'_> {
         if depth > MAX_TYPE_DEPTH {
             return false;
         }
+        let Some(actual) = self.class_like(actual_name) else {
+            return false;
+        };
         if same_atom(actual_name, expected_name) {
             return match (actual_arguments, expected_arguments) {
                 (None, None) => true,
@@ -1204,9 +1210,6 @@ impl TypeFlow<'_> {
                 _ => false,
             };
         }
-        let Some(actual) = self.class_like(actual_name) else {
-            return false;
-        };
         actual.parent.iter().chain(&actual.interfaces).any(|base| {
             let arguments = base.type_arguments.as_ref().map(|arguments| {
                 arguments

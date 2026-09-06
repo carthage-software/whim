@@ -33,6 +33,7 @@ interface TypeReflection extends
   VecShapeTypeReflection,
   DictTypeReflection,
   DictShapeTypeReflection,
+  ObjectShapeTypeReflection,
   ClassnameTypeReflection,
   TupleTypeReflection,
   WildcardTypeReflection {

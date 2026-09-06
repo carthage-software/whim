@@ -18,6 +18,7 @@ use whim_syn::cst::r#type::MemberType;
 use whim_syn::cst::r#type::NamedType;
 use whim_syn::cst::r#type::NegatedType;
 use whim_syn::cst::r#type::NegativeLiteralType;
+use whim_syn::cst::r#type::ObjectShapeType;
 use whim_syn::cst::r#type::SelfType;
 use whim_syn::cst::r#type::StringLength;
 use whim_syn::cst::r#type::StringLengthType;
@@ -224,6 +225,9 @@ fn validate_checked_builtin_arity(source: &Type<'_>) -> Result<(), CompileError>
                 }
             }
             Type::Classname(classname) => pending.push(classname.inner),
+            Type::ObjectShape(shape) => {
+                pending.extend(shape.entries.iter().map(|entry| entry.value));
+            }
             Type::DictShape(shape) => {
                 for entry in shape.entries {
                     pending.push(entry.value);
@@ -480,6 +484,14 @@ fn validate_return_only_positions(
                         "dict value",
                     ));
                 }
+            }
+            Type::ObjectShape(shape) => {
+                pending.extend(
+                    shape
+                        .entries
+                        .iter()
+                        .map(|entry| (entry.value, false, "object shape property")),
+                );
             }
             Type::DictShape(shape) => {
                 for entry in shape.entries {
@@ -934,6 +946,32 @@ fn lower_dict_type(
     ))))
 }
 
+fn lower_object_shape_type(
+    scope: &TypeScope<'_>,
+    shape: &ObjectShapeType<'_>,
+    defer_named_arity: bool,
+) -> Result<TypeDescriptor, CompileError> {
+    let mut entries = Vec::with_capacity(shape.entries.len());
+    for entry in &shape.entries {
+        let name = scope.heap.intern(entry.name.value.as_bytes());
+        if entries.iter().any(|(existing, _)| existing == &name) {
+            return Err(CompileError::new(
+                CompileErrorKind::DuplicateObjectProperty,
+                "an object shape cannot repeat a property name",
+                entry.name.span(),
+            ));
+        }
+        entries.push((
+            name,
+            lower_type_inner(scope, entry.value, defer_named_arity)?,
+        ));
+    }
+    Ok(TypeDescriptor::ObjectShape {
+        entries,
+        open: shape.rest.is_some(),
+    })
+}
+
 fn lower_dict_shape_type(
     scope: &TypeScope<'_>,
     shape: &DictShapeType<'_>,
@@ -1144,6 +1182,7 @@ fn lower_type_inner(
         Type::VecShape(shape) => lower_vec_shape_type(scope, shape, defer_named_arity),
         Type::Dict(dictionary) => lower_dict_type(scope, dictionary, defer_named_arity),
         Type::DictShape(shape) => lower_dict_shape_type(scope, shape, defer_named_arity),
+        Type::ObjectShape(shape) => lower_object_shape_type(scope, shape, defer_named_arity),
         Type::Tuple(tuple) => lower_tuple_type(scope, tuple, defer_named_arity),
         Type::Union(_) => lower_union_type(scope, source, defer_named_arity),
         Type::Intersection(_) => lower_intersection_type(scope, source, defer_named_arity),
@@ -1157,6 +1196,7 @@ fn descriptor_may_be_class_like(descriptor: &TypeDescriptor) -> bool {
         TypeDescriptor::Wildcard
         | TypeDescriptor::Mixed
         | TypeDescriptor::Object
+        | TypeDescriptor::ObjectShape { .. }
         | TypeDescriptor::Named { .. }
         | TypeDescriptor::Member { .. }
         | TypeDescriptor::Parameter(_)
@@ -1212,6 +1252,9 @@ fn descriptor_has_parameter(descriptor: &TypeDescriptor) -> bool {
                     .as_ref()
                     .is_some_and(|rest| descriptor_has_parameter(rest))
         }
+        TypeDescriptor::ObjectShape { entries, .. } => entries
+            .iter()
+            .any(|(_, value)| descriptor_has_parameter(value)),
         TypeDescriptor::DictionaryShape { entries, rest } => {
             entries
                 .iter()

@@ -97,6 +97,7 @@ define_token_kinds! {
     DotDot => "`..`";
     DotDotEqual => "`..=`";
     DotDotDot => "`...`";
+    HashLeftBrace => "`#{`";
     HashLeftBracket => "`#[`";
     NamespaceSeparator => "`\\`";
     Dollar => "`$`";

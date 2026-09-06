@@ -9,6 +9,7 @@ use whim_syn::cst::operation::BinaryOperator;
 use whim_syn::cst::operation::DestructureTarget;
 use whim_syn::cst::operation::TypeOperator;
 use whim_syn::cst::pattern::Pattern;
+use whim_syn::cst::r#type::Type;
 use whim_syn::error::Expected;
 use whim_syn::error::ParseError;
 use whim_syn::token::kind::TokenKind;
@@ -917,5 +918,31 @@ fn construct_names_are_not_reserved() {
             TokenKind::Identifier,
             _
         )
+    ));
+}
+
+#[test]
+fn object_patterns_support_shorthand_and_intersections() {
+    let arena = LocalArena::new();
+    let Expression::Match(matching) = expression(
+        &arena,
+        "match ($result) { Ok<string> & #{ $value } => $value, Err<int> & #{ error: $error @ 400..=499, ... } => $error, #{ nested: vec[#{ $id }], ... } => $id };",
+    ) else {
+        panic!("expected match");
+    };
+    let Pattern::Intersection(first) = matching.arms.as_slice()[0].pattern else {
+        panic!("expected intersection");
+    };
+    assert!(matches!(first.left, Pattern::Type(Type::Named(_))));
+    assert!(
+        matches!(first.right, Pattern::Object(shape) if shape.entries.len() == 1 && shape.entries.as_slice()[0].name() == "value")
+    );
+    let Pattern::Intersection(second) = matching.arms.as_slice()[1].pattern else {
+        panic!("expected intersection");
+    };
+    assert!(matches!(second.right, Pattern::Object(shape) if shape.rest.is_some()));
+    assert!(matches!(
+        matching.arms.as_slice()[2].pattern,
+        Pattern::Object(_)
     ));
 }

@@ -1,0 +1,47 @@
+namespace Whim\Reflection\Type;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Type\TypeId;
+#[Stub]
+final class ObjectShapeTypeReflection implements TypeReflection {
+  private function __construct() {}
+
+  #[MustUse]
+  public function getKind(): TypeKind {}
+
+  #[MustUse]
+  public function isResolved(): bool {}
+
+  #[MustUse]
+  #[TrackCaller]
+  public function getId(): TypeId {}
+
+  #[MustUse]
+  public function toString(): string {}
+
+  #[MustUse]
+  public function resolve(
+    null|TypeEnvironmentReflection $environment = null,
+    null|ClassTypeReflection $calledType = null,
+  ): TypeReflection {}
+
+  #[MustUse]
+  #[TrackCaller]
+  public function accepts(mixed $value): bool {}
+
+  #[MustUse]
+  public function equals(TypeReflection $other): bool {}
+
+  #[MustUse]
+  #[TrackCaller]
+  public function isSubtypeOf(TypeReflection $other): bool {}
+
+  #[MustUse]
+  public function getProperties(): vec<ObjectShapePropertyReflection> {}
+
+  #[MustUse]
+  public function isOpen(): bool {}
+}

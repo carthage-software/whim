@@ -358,14 +358,14 @@ fn is_cold_call(chunk: &Chunk, instruction: Instruction, callables: &ColdCallabl
 fn descriptor_member(chunk: &Chunk, cache: IcSlot) -> Option<&Atom> {
     match &chunk.ic_descriptors[usize::from(cache.index())] {
         IcDescriptor::Member { name, .. } => Some(name),
-        IcDescriptor::ClassMember { .. } => None,
+        IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => None,
     }
 }
 
 fn descriptor_class_member(chunk: &Chunk, cache: IcSlot) -> Option<(&Atom, &Atom)> {
     match &chunk.ic_descriptors[usize::from(cache.index())] {
         IcDescriptor::ClassMember { class, member, .. } => Some((class, member)),
-        IcDescriptor::Member { .. } => None,
+        IcDescriptor::Member { .. } | IcDescriptor::PublicProperty(_) => None,
     }
 }
 

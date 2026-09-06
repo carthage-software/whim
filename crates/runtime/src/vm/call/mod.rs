@@ -141,6 +141,9 @@ pub(in crate::vm) fn argument_guard(
         },
         TypeDescriptor::FloatLiteral(expected) => ArgumentGuard::ExactFloat(expected.to_bits()),
         TypeDescriptor::Named { .. } | TypeDescriptor::StaticClass => {
+            if value.newtype_id().is_some() {
+                return None;
+            }
             let value = value.as_object()?;
             ArgumentGuard::ExactObject {
                 class: value.class(),
@@ -167,6 +170,7 @@ pub(in crate::vm) fn argument_guard(
         | TypeDescriptor::VectorShape { .. }
         | TypeDescriptor::Dictionary(_)
         | TypeDescriptor::DictionaryShape { .. }
+        | TypeDescriptor::ObjectShape { .. }
         | TypeDescriptor::Callable(None)
         | TypeDescriptor::Classname(_)
         | TypeDescriptor::Tuple(_)

@@ -146,6 +146,12 @@ pub(crate) enum TypeDescriptor {
     Intersection(Vec<TypeDescriptor>),
     /// The complement of a runtime-checkable type relative to `mixed`.
     Negated(Box<TypeDescriptor>),
+    ObjectShape {
+        #[seeded(with(crate::bytecode::decode::pairs))]
+        entries: Vec<(Atom, TypeDescriptor)>,
+        #[seeded(with(serde_seeded::unseeded))]
+        open: bool,
+    },
 }
 
 impl TypeDescriptor {
@@ -262,6 +268,13 @@ impl TypeDescriptor {
                     .as_ref()
                     .map(|(key, value)| (Box::new(map(key)), Box::new(map(value)))),
             ),
+            Self::ObjectShape { entries, open } => Self::ObjectShape {
+                entries: entries
+                    .iter()
+                    .map(|(name, value)| (name.clone(), map(value)))
+                    .collect(),
+                open: *open,
+            },
             Self::DictionaryShape { entries, rest } => Self::DictionaryShape {
                 entries: entries
                     .iter()
@@ -332,6 +345,7 @@ impl TypeDescriptor {
             | Self::VectorShape { .. }
             | Self::Dictionary(_)
             | Self::DictionaryShape { .. }
+            | Self::ObjectShape { .. }
             | Self::Callable(_)
             | Self::Classname(_)
             | Self::Tuple(_)
@@ -401,6 +415,7 @@ pub(crate) fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::StaticClass
         | TypeDescriptor::Callable(Some(_))
         | TypeDescriptor::Classname(_) => false,
+        TypeDescriptor::ObjectShape { entries, open } => *open && entries.is_empty(),
     }
 }
 
@@ -563,6 +578,10 @@ pub(crate) fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Valu
             .as_string_bytes()
             .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
         TypeDescriptor::Object => value.is_object(),
+        TypeDescriptor::ObjectShape {
+            entries,
+            open: true,
+        } if entries.is_empty() => value.is_object(),
         TypeDescriptor::TrueLiteral => value.as_bool() == Some(true),
         TypeDescriptor::FalseLiteral => value.as_bool() == Some(false),
         TypeDescriptor::IntLiteral(expected) => value.as_int() == Some(*expected),
@@ -842,6 +861,7 @@ pub(crate) enum IcDescriptor {
         /// class-member cache, and for a call that writes none.
         type_arguments: Option<Vec<TypeDescriptor>>,
     },
+    PublicProperty(Atom),
 }
 
 /// Type facts established once before an integer-controlled numeric loop.

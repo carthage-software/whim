@@ -735,7 +735,8 @@ fn literal_satisfies_in<'a>(
         | TypeDescriptor::TupleRest { .. }
         | TypeDescriptor::TupleAny
         | TypeDescriptor::VectorShape { .. }
-        | TypeDescriptor::DictionaryShape { .. } => false,
+        | TypeDescriptor::DictionaryShape { .. }
+        | TypeDescriptor::ObjectShape { .. } => false,
         TypeDescriptor::Member { .. } | TypeDescriptor::Intersection(_) => return None,
         TypeDescriptor::TrueLiteral => matches!(literal, BytecodeLiteral::Bool(true)),
         TypeDescriptor::FalseLiteral => matches!(literal, BytecodeLiteral::Bool(false)),

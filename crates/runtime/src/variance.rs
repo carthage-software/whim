@@ -58,6 +58,9 @@ pub(crate) fn incompatible_parameter<'parameter>(
                     pending.push((rest, position));
                 }
             }
+            TypeDescriptor::ObjectShape { entries, .. } => {
+                pending.extend(entries.iter().map(|(_, value)| (value, position)));
+            }
             TypeDescriptor::DictionaryShape { entries, rest } => {
                 pending.extend(entries.iter().map(|(_, value)| (value, position)));
                 if let Some((key, value)) = rest {

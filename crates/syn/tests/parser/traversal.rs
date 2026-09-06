@@ -281,3 +281,32 @@ fn walks_into_every_construct_node() {
         "a variadic construct argument is a node"
     );
 }
+
+#[test]
+fn object_shapes_visit_properties_rest_and_nested_bindings() {
+    let ks = kinds(
+        "type T<X> = #{ value: X, ... }; $_ = match (null) { T<int> & #{ child: #{ $value }, ... } => $value };",
+    );
+    for kind in [
+        NodeKind::ObjectShapeType,
+        NodeKind::ObjectShapeTypeEntry,
+        NodeKind::ObjectShapeRest,
+        NodeKind::ObjectPattern,
+        NodeKind::ObjectPatternEntry,
+        NodeKind::IntersectionPattern,
+    ] {
+        assert!(ks.contains(&kind), "missing {kind:?}");
+    }
+    assert_eq!(
+        ks.iter()
+            .filter(|kind| **kind == NodeKind::ObjectShapeRest)
+            .count(),
+        2
+    );
+    assert_eq!(
+        ks.iter()
+            .filter(|kind| **kind == NodeKind::ObjectPatternEntry)
+            .count(),
+        2
+    );
+}

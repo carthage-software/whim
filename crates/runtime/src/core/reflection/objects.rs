@@ -153,6 +153,9 @@ fn class_name(
         ReflectionData::FunctionTypeParameter { .. } => {
             "Whim\\Reflection\\Type\\FunctionTypeParameterReflection"
         }
+        ReflectionData::ObjectShapeProperty { .. } => {
+            "Whim\\Reflection\\Type\\ObjectShapePropertyReflection"
+        }
         ReflectionData::DictShapeEntry { .. } => "Whim\\Reflection\\Type\\DictShapeEntryReflection",
     })
 }
@@ -196,6 +199,7 @@ fn type_class_name(context: &Context<'_, '_, '_>, descriptor: &TypeDescriptor) -
         TypeDescriptor::Vector(_) => "Whim\\Reflection\\Type\\VecTypeReflection",
         TypeDescriptor::VectorShape { .. } => "Whim\\Reflection\\Type\\VecShapeTypeReflection",
         TypeDescriptor::Dictionary(_) => "Whim\\Reflection\\Type\\DictTypeReflection",
+        TypeDescriptor::ObjectShape { .. } => "Whim\\Reflection\\Type\\ObjectShapeTypeReflection",
         TypeDescriptor::DictionaryShape { .. } => "Whim\\Reflection\\Type\\DictShapeTypeReflection",
         TypeDescriptor::Callable(_) => "Whim\\Reflection\\Type\\FunctionTypeReflection",
         TypeDescriptor::Classname(_) => "Whim\\Reflection\\Type\\ClassnameTypeReflection",

@@ -240,6 +240,7 @@ fn summarize(descriptor: &TypeDescriptor, depth: usize) -> Option<Summary> {
         | TypeDescriptor::VectorShape { .. }
         | TypeDescriptor::Dictionary(_)
         | TypeDescriptor::DictionaryShape { .. }
+        | TypeDescriptor::ObjectShape { .. }
         | TypeDescriptor::Callable(_)
         | TypeDescriptor::Tuple(_)
         | TypeDescriptor::TupleRest { .. }

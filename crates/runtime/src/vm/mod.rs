@@ -489,7 +489,7 @@ fn find_double_colon(bytes: &[u8]) -> Option<usize> {
 /// The member name atom of an inline-cache site.
 fn name_atom(chunk: &Chunk, site: usize) -> &Atom {
     match &chunk.ic_descriptors[site] {
-        IcDescriptor::Member { name, .. } => name,
+        IcDescriptor::Member { name, .. } | IcDescriptor::PublicProperty(name) => name,
         // SAFETY: the surrounding invariant makes this path unreachable.
         IcDescriptor::ClassMember { .. } => unsafe {
             unreachable_invariant("the site resolves a member descriptor")
@@ -499,6 +499,7 @@ fn name_atom(chunk: &Chunk, site: usize) -> &Atom {
 
 fn site_type_arguments(chunk: &Chunk, site: usize) -> Option<&[TypeDescriptor]> {
     match &chunk.ic_descriptors[site] {
+        IcDescriptor::PublicProperty(_) => None,
         IcDescriptor::Member { type_arguments, .. }
         | IcDescriptor::ClassMember { type_arguments, .. } => type_arguments.as_deref(),
     }
@@ -509,7 +510,7 @@ fn class_member_atoms(chunk: &Chunk, site: usize) -> (&Atom, &Atom) {
     match &chunk.ic_descriptors[site] {
         IcDescriptor::ClassMember { class, member, .. } => (class, member),
         // SAFETY: the surrounding invariant makes this path unreachable.
-        IcDescriptor::Member { .. } => unsafe {
+        IcDescriptor::Member { .. } | IcDescriptor::PublicProperty(_) => unsafe {
             unreachable_invariant("the site resolves a class-member descriptor")
         },
     }

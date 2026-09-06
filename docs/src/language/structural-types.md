@@ -1,6 +1,6 @@
-# Collection and Callable Types
+# Structural Types
 
-Whim can describe the parts of arrays and callables at runtime.
+Whim can describe the parts of arrays, objects, and callables at runtime.
 
 ## Homogeneous vecs
 
@@ -83,6 +83,70 @@ type ScoredUser = dict['id' => int, 'name' => string, ...<string, int|float>];
 $user = dict['id' => 1, 'name' => 'Ada', 'score' => 9.5];
 assert!($user is ScoredUser);
 ```
+
+## Object shapes
+
+`#{ name: string }` accepts an object with exactly one public instance property,
+`name`, whose current value is a string. Add a final `...` to allow other public
+instance properties:
+
+```whim
+type NamedObject = #{ name: string, ... };
+type WithValue<T> = #{ value: T, ... };
+
+class Person {
+  public string $name = 'Ada';
+  public int $age = 36;
+}
+
+$person = new Person();
+assert!($person is NamedObject);
+assert!($person is #{ age: int, name: string });
+assert!(!($person is #{ name: string }));
+```
+
+Property names are case-sensitive identifiers, without `$`. Required properties
+must exist, be public instance properties, be initialized, and have values that
+match their corresponding types. Inherited public properties count. Private,
+protected, and static properties do not participate, even when the check runs
+inside their declaring class. An uninitialized required property rejects a
+check; it does not throw an uninitialized-property error. An extra public
+property still counts toward exactness when it is uninitialized.
+
+`#{}` accepts objects with no public instance properties. `#{ ... }` accepts
+any object, just like `object`. Neither form accepts an array or another
+non-object value. Object shapes have a bare `...` rest marker; unlike dict
+shapes, they do not have a typed rest entry. Property names cannot repeat.
+Trailing commas are allowed.
+
+Shapes check current values, independently of a property's declared type. A
+`mixed` property holding an integer can satisfy an `int` entry. A successful
+check does not change the property's declared type, visibility, or readonly
+rules. Mutating the object can make a later check fail, including when the
+object is held inside a vec, dict, or tuple.
+
+Combine a nominal type with a shape using an intersection:
+
+```whim
+use Whim\Result\Ok;
+
+$value = new Ok::<string>('hello');
+assert!($value is Ok<string> & #{ value: string & !'' });
+```
+
+Shapes work in aliases, generic arguments and bounds, callable signatures,
+parameter and return types, property types, `is`, `as`, and `?as`. Their
+subtyping rules compare required names independently of source order and allow
+narrower property value types. An open expected shape allows extra properties;
+a closed expected shape requires the same public property set and a closed
+actual shape. Every object shape is a subtype of `object`. A class name alone
+does not promise that its properties are initialized with the required current
+values; use a shape or an intersection to express that requirement.
+
+The opening `#{` is one token. Whitespace or a comment cannot separate `#` from
+`{`. Object shapes are types and patterns, not object construction expressions.
+See [Match and Destructuring](patterns.md#object-patterns) for extracting their
+properties in a match arm.
 
 ## Tuple types
 

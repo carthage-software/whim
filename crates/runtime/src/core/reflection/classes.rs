@@ -823,6 +823,22 @@ reflection_class! {
 }
 
 reflection_class! {
+    ObjectShapeTypeReflection = "Whim\\Reflection\\Type\\ObjectShapeTypeReflection"
+    implements ["Whim\\Reflection\\Type\\TypeReflection"]
+    with [type_reflection] {
+        get_properties: "getProperties(): vec<Whim\\Reflection\\Type\\ObjectShapePropertyReflection>" => Properties;
+        is_open: "isOpen(): bool" => IsOpen;
+    }
+}
+
+reflection_class! {
+    ObjectShapePropertyReflection = "Whim\\Reflection\\Type\\ObjectShapePropertyReflection" {
+        get_name: "getName(): string" => Name;
+        get_type: "getType(): Whim\\Reflection\\Type\\TypeReflection" => Type;
+    }
+}
+
+reflection_class! {
     DictShapeTypeReflection = "Whim\\Reflection\\Type\\DictShapeTypeReflection"
     implements ["Whim\\Reflection\\Type\\TypeReflection"]
     with [type_reflection] {
@@ -918,6 +934,8 @@ pub(crate) fn state(value: &Value) -> Option<&ReflectionState> {
         VecTypeReflection,
         VecShapeTypeReflection,
         DictTypeReflection,
+        ObjectShapeTypeReflection,
+        ObjectShapePropertyReflection,
         DictShapeTypeReflection,
         DictShapeEntryReflection,
         ClassnameTypeReflection,

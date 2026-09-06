@@ -492,6 +492,8 @@ whim_core! {
         reflection::VecShapeTypeReflection,
         reflection::DictTypeReflection,
         reflection::DictShapeTypeReflection,
+        reflection::ObjectShapeTypeReflection,
+        reflection::ObjectShapePropertyReflection,
         reflection::DictShapeEntryReflection,
         reflection::ClassnameTypeReflection,
         reflection::TupleTypeReflection,

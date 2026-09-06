@@ -441,6 +441,8 @@ pub(crate) enum CachedMethodFastPath {
     ReturnReceiver,
     ReturnArgument(u8),
     ReturnProperty(u16),
+    ReturnStableArgument(u8),
+    ReturnStableProperty(u16),
 }
 
 /// A small polymorphic cache for late-bound instance method sites.

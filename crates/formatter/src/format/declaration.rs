@@ -35,6 +35,7 @@ use whim_syn::cst::r#type::IntegerRangeType;
 use whim_syn::cst::r#type::NamedType;
 use whim_syn::cst::r#type::NegativeLiteralType;
 use whim_syn::cst::r#type::Newtype;
+use whim_syn::cst::r#type::ObjectShapeTypeEntry;
 use whim_syn::cst::r#type::StringLength;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeAlias;
@@ -416,6 +417,11 @@ where
                 };
                 f.concat([f.text("dict"), arguments])
             }
+            Type::ObjectShape(shape) => f.object_shape(
+                shape.entries.as_slice(),
+                shape.rest.as_ref(),
+                shape.right_brace.start.offset,
+            ),
             Type::DictShape(shape) => {
                 let mut entries = f.inline_token_sequence(&shape.entries);
                 if let Some(rest) = &shape.rest {
@@ -468,6 +474,19 @@ where
                 }
             }
         }
+    }
+}
+
+impl<'arena, A> Format<'arena, A> for ObjectShapeTypeEntry<'arena>
+where
+    A: Arena,
+{
+    fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
+        wrap!(f, self, {
+            let name = f.text(self.name.value);
+            let value = self.value.format(f);
+            f.concat([name, f.text(": "), value])
+        })
     }
 }
 

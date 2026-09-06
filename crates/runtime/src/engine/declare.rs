@@ -887,6 +887,7 @@ pub(crate) fn prelink_exact_function_sites(
                 type_arguments,
             } => (name, type_arguments.is_some()),
             IcDescriptor::ClassMember { class, .. } => return Err(class.clone()),
+            IcDescriptor::PublicProperty(name) => return Err(name.clone()),
         };
 
         let Some(symbol) = symbols.get(name) else {
