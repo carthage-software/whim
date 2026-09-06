@@ -1,5 +1,7 @@
 //! Each node's direct children, in source order.
 
+use whim_span::HasSpan;
+
 use crate::cst::access::Access;
 use crate::cst::access::ClassReference;
 use crate::cst::array::DictEntry;
@@ -26,6 +28,7 @@ use crate::cst::function::ShortClosureBody;
 use crate::cst::node::Node;
 use crate::cst::operation::AssignmentTarget;
 use crate::cst::operation::DestructureTarget;
+use crate::cst::operation::TypeOperator;
 use crate::cst::pattern::DictPatternKey;
 use crate::cst::pattern::Pattern;
 use crate::cst::statement::Statement;
@@ -43,8 +46,20 @@ impl Node<'_, '_> {
     {
         match self {
             Node::Program(node) => {
-                for statement in node.statements {
-                    f(Node::Statement(statement));
+                let mut trivia = 0;
+                let mut statements = 0;
+                while trivia < node.trivia.len() || statements < node.statements.len() {
+                    if statements == node.statements.len()
+                        || (trivia < node.trivia.len()
+                            && node.trivia[trivia].span.start.offset
+                                <= node.statements[statements].span().start.offset)
+                    {
+                        f(Node::Trivia(&node.trivia[trivia]));
+                        trivia += 1;
+                    } else {
+                        f(Node::Statement(&node.statements[statements]));
+                        statements += 1;
+                    }
                 }
             }
             Node::Statement(node) => match node {
@@ -64,14 +79,7 @@ impl Node<'_, '_> {
                 Statement::For(inner) => f(Node::For(inner)),
                 Statement::Foreach(inner) => f(Node::Foreach(inner)),
                 Statement::Try(inner) => f(Node::Try(inner)),
-                Statement::Using(inner) => {
-                    f(Node::Keyword(&inner.using));
-                    for binding in &inner.bindings {
-                        f(Node::BindingTarget(&binding.target));
-                        f(Node::Expression(binding.value));
-                    }
-                    f(Node::Block(&inner.body));
-                }
+                Statement::Using(inner) => f(Node::Using(inner)),
                 Statement::FinalLocal(inner) => f(Node::FinalLocal(inner)),
                 Statement::Expression(inner) => f(Node::ExpressionStatement(inner)),
                 Statement::Noop(_) => {}
@@ -80,6 +88,17 @@ impl Node<'_, '_> {
             Node::FinalLocal(node) => {
                 f(Node::Keyword(&node.r#final));
                 f(Node::Variable(&node.variable));
+                f(Node::Expression(node.value));
+            }
+            Node::Using(node) => {
+                f(Node::Keyword(&node.using));
+                for binding in &node.bindings {
+                    f(Node::UsingBinding(binding));
+                }
+                f(Node::Block(&node.body));
+            }
+            Node::UsingBinding(node) => {
+                f(Node::BindingTarget(&node.target));
                 f(Node::Expression(node.value));
             }
             Node::Block(node) => {
@@ -497,10 +516,13 @@ impl Node<'_, '_> {
                     f(Node::Variable(variable));
                 }
                 if let Some(guard) = &node.guard {
-                    f(Node::Keyword(&guard.r#if));
-                    f(Node::Expression(guard.condition));
+                    f(Node::TryCatchGuard(guard));
                 }
                 f(Node::Block(&node.block));
+            }
+            Node::TryCatchGuard(node) => {
+                f(Node::Keyword(&node.r#if));
+                f(Node::Expression(node.condition));
             }
             Node::TryElseClause(node) => {
                 f(Node::Keyword(&node.r#else));
@@ -523,79 +545,91 @@ impl Node<'_, '_> {
             }
             Node::Pattern(node) => match node {
                 Pattern::Variable(variable) => f(Node::Variable(variable)),
-                Pattern::Parenthesized(pattern) => {
-                    f(Node::Pattern(pattern.pattern));
-                }
-                Pattern::As(pattern) => {
-                    f(Node::Pattern(pattern.left));
-                    f(Node::Pattern(pattern.right));
-                }
-                Pattern::Union(pattern) => {
-                    f(Node::Pattern(pattern.left));
-                    f(Node::Pattern(pattern.right));
-                }
-                Pattern::Vec(pattern) => {
-                    for element in &pattern.elements {
-                        f(Node::Pattern(element));
-                    }
-                    if let Some(trailing) = &pattern.trailing
-                        && let Some(pattern) = trailing.pattern
-                    {
-                        f(Node::Pattern(pattern));
-                    }
-                }
-                Pattern::Dict(pattern) => {
-                    for entry in &pattern.entries {
-                        f(Node::DictPatternKey(&entry.key));
-                        f(Node::Pattern(entry.pattern));
-                    }
-                    if let Some(trailing) = &pattern.trailing
-                        && let Some(pattern) = trailing.pattern
-                    {
-                        f(Node::Pattern(pattern));
-                    }
-                }
-                Pattern::Tuple(pattern) => {
-                    for element in &pattern.elements {
-                        f(Node::Pattern(element));
-                    }
-                    if let Some(trailing) = &pattern.trailing
-                        && let Some(pattern) = trailing.pattern
-                    {
-                        f(Node::Pattern(pattern));
-                    }
-                }
+                Pattern::Parenthesized(pattern) => f(Node::ParenthesizedPattern(pattern)),
+                Pattern::As(pattern) => f(Node::AsPattern(pattern)),
+                Pattern::Union(pattern) => f(Node::UnionPattern(pattern)),
+                Pattern::Vec(pattern) => f(Node::VecPattern(pattern)),
+                Pattern::Dict(pattern) => f(Node::DictPattern(pattern)),
+                Pattern::Tuple(pattern) => f(Node::TuplePattern(pattern)),
                 Pattern::Type(r#type) => f(Node::Type(r#type)),
             },
+            Node::ParenthesizedPattern(node) => f(Node::Pattern(node.pattern)),
+            Node::AsPattern(node) => {
+                f(Node::Pattern(node.left));
+                f(Node::Pattern(node.right));
+            }
+            Node::UnionPattern(node) => {
+                f(Node::Pattern(node.left));
+                f(Node::Pattern(node.right));
+            }
+            Node::VecPattern(node) => {
+                f(Node::Keyword(&node.vec));
+                for element in &node.elements {
+                    f(Node::Pattern(element));
+                }
+                if let Some(trailing) = &node.trailing {
+                    f(Node::TrailingPattern(trailing));
+                }
+            }
+            Node::DictPattern(node) => {
+                f(Node::Keyword(&node.dict));
+                for entry in &node.entries {
+                    f(Node::DictPatternEntry(entry));
+                }
+                if let Some(trailing) = &node.trailing {
+                    f(Node::TrailingPattern(trailing));
+                }
+            }
+            Node::DictPatternEntry(node) => {
+                f(Node::DictPatternKey(&node.key));
+                f(Node::Pattern(node.pattern));
+            }
             Node::DictPatternKey(node) => match node {
                 DictPatternKey::String(literal) => f(Node::LiteralString(literal)),
                 DictPatternKey::Integer { literal, .. } => f(Node::LiteralInteger(literal)),
             },
+            Node::TuplePattern(node) => {
+                for element in &node.elements {
+                    f(Node::Pattern(element));
+                }
+                if let Some(trailing) = &node.trailing {
+                    f(Node::TrailingPattern(trailing));
+                }
+            }
+            Node::TrailingPattern(node) => {
+                if let Some(pattern) = node.pattern {
+                    f(Node::Pattern(pattern));
+                }
+            }
             Node::BindingTarget(node) => match node {
-                BindingTarget::Variable(variable) => {
-                    f(Node::Variable(variable));
-                }
-                BindingTarget::Tuple(tuple) => {
-                    for target in &tuple.targets {
-                        match target {
-                            ElementBindingTarget::Target(target) => {
-                                f(Node::BindingTarget(target));
-                            }
-                            ElementBindingTarget::Rest(rest) => {
-                                if let Some(target) = &rest.target {
-                                    f(Node::BindingTarget(target));
-                                }
-                            }
-                        }
-                    }
-                }
-                BindingTarget::Dict(dict) => {
-                    for entry in &dict.entries {
-                        f(Node::Expression(entry.key));
-                        f(Node::BindingTarget(&entry.target));
-                    }
-                }
+                BindingTarget::Variable(variable) => f(Node::Variable(variable)),
+                BindingTarget::Tuple(tuple) => f(Node::TupleBindingTarget(tuple)),
+                BindingTarget::Dict(dict) => f(Node::DictBindingTarget(dict)),
             },
+            Node::TupleBindingTarget(node) => {
+                for target in &node.targets {
+                    f(Node::ElementBindingTarget(target));
+                }
+            }
+            Node::DictBindingTarget(node) => {
+                f(Node::Keyword(&node.dict));
+                for entry in &node.entries {
+                    f(Node::EntryBindingTarget(entry));
+                }
+            }
+            Node::EntryBindingTarget(node) => {
+                f(Node::Expression(node.key));
+                f(Node::BindingTarget(&node.target));
+            }
+            Node::ElementBindingTarget(node) => match node {
+                ElementBindingTarget::Target(target) => f(Node::BindingTarget(target)),
+                ElementBindingTarget::Rest(rest) => f(Node::TrailingBindingTarget(rest)),
+            },
+            Node::TrailingBindingTarget(node) => {
+                if let Some(target) = &node.target {
+                    f(Node::BindingTarget(target));
+                }
+            }
             Node::Expression(node) => match node {
                 Expression::Binary(inner) => f(Node::Binary(inner)),
                 Expression::UnaryPrefix(inner) => f(Node::UnaryPrefix(inner)),
@@ -1053,27 +1087,9 @@ impl Node<'_, '_> {
                 Type::Function(inner) => f(Node::FunctionType(inner)),
                 Type::Array(inner) => f(Node::ArrayType(inner)),
                 Type::Vec(inner) => f(Node::VecType(inner)),
-                Type::VecShape(inner) => {
-                    for element in &inner.elements {
-                        f(Node::Type(element));
-                    }
-                    if let Some(trailing) = &inner.trailing_type
-                        && let Some(r#type) = trailing.r#type
-                    {
-                        f(Node::Type(r#type));
-                    }
-                }
+                Type::VecShape(inner) => f(Node::VecShapeType(inner)),
                 Type::Dict(inner) => f(Node::DictType(inner)),
-                Type::DictShape(inner) => {
-                    for entry in &inner.entries {
-                        f(Node::Literal(&entry.key));
-                        f(Node::Type(entry.value));
-                    }
-                    if let Some(rest) = &inner.rest {
-                        f(Node::Type(rest.type_arguments.key));
-                        f(Node::Type(rest.type_arguments.value));
-                    }
-                }
+                Type::DictShape(inner) => f(Node::DictShapeType(inner)),
                 Type::Classname(inner) => f(Node::ClassnameType(inner)),
                 Type::Tuple(inner) => f(Node::TupleType(inner)),
                 Type::String(inner)
@@ -1086,15 +1102,7 @@ impl Node<'_, '_> {
                 | Type::Object(inner)
                 | Type::Parent(inner)
                 | Type::Static(inner) => f(Node::Keyword(inner)),
-                Type::Self_(inner) => {
-                    f(Node::Keyword(&inner.self_));
-                    if let Some(member) = &inner.member {
-                        f(Node::LocalIdentifier(&member.name));
-                        if let Some(type_arguments) = &member.type_arguments {
-                            f(Node::TypeArgumentList(type_arguments));
-                        }
-                    }
-                }
+                Type::Self_(inner) => f(Node::SelfType(inner)),
             },
             Node::NamedType(node) => {
                 f(Node::Identifier(&node.identifier));
@@ -1102,10 +1110,19 @@ impl Node<'_, '_> {
                     f(Node::TypeArgumentList(type_arguments));
                 }
                 if let Some(member) = &node.member {
-                    f(Node::LocalIdentifier(&member.name));
-                    if let Some(type_arguments) = &member.type_arguments {
-                        f(Node::TypeArgumentList(type_arguments));
-                    }
+                    f(Node::MemberType(member));
+                }
+            }
+            Node::MemberType(node) => {
+                f(Node::LocalIdentifier(&node.name));
+                if let Some(type_arguments) = &node.type_arguments {
+                    f(Node::TypeArgumentList(type_arguments));
+                }
+            }
+            Node::SelfType(node) => {
+                f(Node::Keyword(&node.self_));
+                if let Some(member) = &node.member {
+                    f(Node::MemberType(member));
                 }
             }
             Node::TypeArgumentList(node) => {
@@ -1206,11 +1223,40 @@ impl Node<'_, '_> {
                     f(Node::TypeArgumentList(arguments));
                 }
             }
+            Node::VecShapeType(node) => {
+                f(Node::Keyword(&node.vec));
+                for element in &node.elements {
+                    f(Node::Type(element));
+                }
+                if let Some(trailing) = &node.trailing_type {
+                    f(Node::TrailingType(trailing));
+                }
+            }
             Node::DictType(node) => {
                 f(Node::Keyword(&node.dict));
                 if let Some(arguments) = &node.type_arguments {
                     f(Node::TypeArgumentList(arguments));
                 }
+            }
+            Node::DictShapeType(node) => {
+                f(Node::Keyword(&node.dict));
+                for entry in &node.entries {
+                    f(Node::DictShapeTypeEntry(entry));
+                }
+                if let Some(rest) = &node.rest {
+                    f(Node::DictShapeRest(rest));
+                }
+            }
+            Node::DictShapeTypeEntry(node) => {
+                f(Node::Literal(&node.key));
+                f(Node::Type(node.value));
+            }
+            Node::DictShapeRest(node) => {
+                f(Node::DictTypeArguments(&node.type_arguments));
+            }
+            Node::DictTypeArguments(node) => {
+                f(Node::Type(node.key));
+                f(Node::Type(node.value));
             }
             Node::ClassnameType(node) => {
                 f(Node::Keyword(&node.classname));
@@ -1220,9 +1266,12 @@ impl Node<'_, '_> {
                 for element in &node.elements {
                     f(Node::Type(element));
                 }
-                if let Some(trailing) = &node.trailing_type
-                    && let Some(r#type) = trailing.r#type
-                {
+                if let Some(trailing) = &node.trailing_type {
+                    f(Node::TrailingType(trailing));
+                }
+            }
+            Node::TrailingType(node) => {
+                if let Some(r#type) = node.r#type {
                     f(Node::Type(r#type));
                 }
             }
@@ -1239,11 +1288,17 @@ impl Node<'_, '_> {
                     f(Node::Keyword(inner));
                 }
             },
+            Node::TypeOperator(node) => match node {
+                TypeOperator::Check(keyword)
+                | TypeOperator::Assert(keyword)
+                | TypeOperator::AssertOrNull(_, keyword) => f(Node::Keyword(keyword)),
+            },
+            Node::Modifier(node) => f(Node::Keyword(node.keyword())),
             Node::Keyword(_)
+            | Node::Trivia(_)
             | Node::BinaryOperator(_)
             | Node::UnaryPrefixOperator(_)
             | Node::UnaryPostfixOperator(_)
-            | Node::TypeOperator(_)
             | Node::AssignmentOperator(_)
             | Node::PlaceholderArgument(_)
             | Node::VariadicPlaceholderArgument(_)
@@ -1255,8 +1310,7 @@ impl Node<'_, '_> {
             | Node::LiteralString(_)
             | Node::InterpolatedStringLiteral(_)
             | Node::LiteralInteger(_)
-            | Node::LiteralFloat(_)
-            | Node::Modifier(_) => {}
+            | Node::LiteralFloat(_) => {}
         }
     }
 

@@ -134,8 +134,13 @@ fn children_matches_visit_children() {
     let program = parse(&arena, "$a = 1 + 2;").expect("parse");
     let root = Node::Program(program);
     let children = root.children();
-    assert_eq!(children.len(), 1);
+    assert_eq!(children.len(), 5);
     assert_eq!(children[0].kind(), NodeKind::Statement);
+    assert!(
+        children[1..]
+            .iter()
+            .all(|child| child.kind() == NodeKind::Trivia)
+    );
 }
 
 #[test]

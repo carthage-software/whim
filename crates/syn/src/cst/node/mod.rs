@@ -38,6 +38,11 @@ use crate::cst::atom::Modifier;
 use crate::cst::atom::QualifiedIdentifier;
 use crate::cst::atom::Variable;
 use crate::cst::binding::BindingTarget;
+use crate::cst::binding::DictBindingTarget;
+use crate::cst::binding::ElementBindingTarget;
+use crate::cst::binding::EntryBindingTarget;
+use crate::cst::binding::TrailingBindingTarget;
+use crate::cst::binding::TupleBindingTarget;
 use crate::cst::call::Argument;
 use crate::cst::call::ArgumentList;
 use crate::cst::call::Call;
@@ -112,6 +117,7 @@ use crate::cst::control_flow::Match;
 use crate::cst::control_flow::MatchArm;
 use crate::cst::control_flow::Try;
 use crate::cst::control_flow::TryCatchClause;
+use crate::cst::control_flow::TryCatchGuard;
 use crate::cst::control_flow::TryElseClause;
 use crate::cst::control_flow::TryFinallyClause;
 use crate::cst::control_flow::While;
@@ -164,15 +170,30 @@ use crate::cst::operation::UnaryPostfix;
 use crate::cst::operation::UnaryPostfixOperator;
 use crate::cst::operation::UnaryPrefix;
 use crate::cst::operation::UnaryPrefixOperator;
+use crate::cst::pattern::AsPattern;
+use crate::cst::pattern::DictPattern;
+use crate::cst::pattern::DictPatternEntry;
 use crate::cst::pattern::DictPatternKey;
+use crate::cst::pattern::ParenthesizedPattern;
 use crate::cst::pattern::Pattern;
+use crate::cst::pattern::TrailingPattern;
+use crate::cst::pattern::TuplePattern;
+use crate::cst::pattern::UnionPattern;
+use crate::cst::pattern::VecPattern;
 use crate::cst::statement::Block;
 use crate::cst::statement::ExpressionStatement;
 use crate::cst::statement::FinalLocal;
 use crate::cst::statement::Statement;
+use crate::cst::statement::Using;
+use crate::cst::statement::UsingBinding;
+use crate::cst::trivia::Trivia;
 use crate::cst::r#type::ArrayType;
 use crate::cst::r#type::ClassnameType;
+use crate::cst::r#type::DictShapeRest;
+use crate::cst::r#type::DictShapeType;
+use crate::cst::r#type::DictShapeTypeEntry;
 use crate::cst::r#type::DictType;
+use crate::cst::r#type::DictTypeArguments;
 use crate::cst::r#type::FunctionType;
 use crate::cst::r#type::FunctionTypeParameter;
 use crate::cst::r#type::FunctionTypeSignature;
@@ -180,13 +201,16 @@ use crate::cst::r#type::IntegerRangeBound;
 use crate::cst::r#type::IntegerRangeOperator;
 use crate::cst::r#type::IntegerRangeType;
 use crate::cst::r#type::IntersectionType;
+use crate::cst::r#type::MemberType;
 use crate::cst::r#type::NamedType;
 use crate::cst::r#type::NegatedType;
 use crate::cst::r#type::NegativeLiteralType;
 use crate::cst::r#type::Newtype;
 use crate::cst::r#type::ParenthesizedType;
+use crate::cst::r#type::SelfType;
 use crate::cst::r#type::StringLength;
 use crate::cst::r#type::StringLengthType;
+use crate::cst::r#type::TrailingType;
 use crate::cst::r#type::TupleType;
 use crate::cst::r#type::Type;
 use crate::cst::r#type::TypeAlias;
@@ -198,6 +222,7 @@ use crate::cst::r#type::TypeParameterDefault;
 use crate::cst::r#type::TypeParameterList;
 use crate::cst::r#type::TypeVariance;
 use crate::cst::r#type::UnionType;
+use crate::cst::r#type::VecShapeType;
 use crate::cst::r#type::VecType;
 
 macro_rules! define_nodes {
@@ -236,9 +261,12 @@ macro_rules! define_nodes {
 
 define_nodes! {
     Program(Program<'arena>),
+    Trivia(Trivia<'arena>),
     Statement(Statement<'arena>),
     ExpressionStatement(ExpressionStatement<'arena>),
     FinalLocal(FinalLocal<'arena>),
+    Using(Using<'arena>),
+    UsingBinding(UsingBinding<'arena>),
     Block(Block<'arena>),
     Return(Return<'arena>),
     Namespace(Namespace<'arena>),
@@ -294,13 +322,27 @@ define_nodes! {
     Continue(Continue<'arena>),
     Try(Try<'arena>),
     TryCatchClause(TryCatchClause<'arena>),
+    TryCatchGuard(TryCatchGuard<'arena>),
     TryElseClause(TryElseClause<'arena>),
     TryFinallyClause(TryFinallyClause<'arena>),
     Match(Match<'arena>),
     MatchArm(MatchArm<'arena>),
     Pattern(Pattern<'arena>),
+    ParenthesizedPattern(ParenthesizedPattern<'arena>),
+    AsPattern(AsPattern<'arena>),
+    UnionPattern(UnionPattern<'arena>),
+    VecPattern(VecPattern<'arena>),
+    DictPattern(DictPattern<'arena>),
+    DictPatternEntry(DictPatternEntry<'arena>),
     DictPatternKey(DictPatternKey<'arena>),
+    TuplePattern(TuplePattern<'arena>),
+    TrailingPattern(TrailingPattern<'arena>),
     BindingTarget(BindingTarget<'arena>),
+    TupleBindingTarget(TupleBindingTarget<'arena>),
+    DictBindingTarget(DictBindingTarget<'arena>),
+    EntryBindingTarget(EntryBindingTarget<'arena>),
+    ElementBindingTarget(ElementBindingTarget<'arena>),
+    TrailingBindingTarget(TrailingBindingTarget<'arena>),
     Expression(Expression<'arena>),
     Parenthesized(Parenthesized<'arena>),
     InterpolatedString(InterpolatedString<'arena>),
@@ -394,6 +436,8 @@ define_nodes! {
     StaticMethodPartialApplication(StaticMethodPartialApplication<'arena>),
     Type(Type<'arena>),
     NamedType(NamedType<'arena>),
+    MemberType(MemberType<'arena>),
+    SelfType(SelfType<'arena>),
     TypeArgumentList(TypeArgumentList<'arena>),
     TypeArgument(TypeArgument<'arena>),
     TypeParameterList(TypeParameterList<'arena>),
@@ -416,9 +460,15 @@ define_nodes! {
     FunctionTypeParameter(FunctionTypeParameter<'arena>),
     ArrayType(ArrayType<'arena>),
     VecType(VecType<'arena>),
+    VecShapeType(VecShapeType<'arena>),
     DictType(DictType<'arena>),
+    DictShapeType(DictShapeType<'arena>),
+    DictShapeTypeEntry(DictShapeTypeEntry<'arena>),
+    DictShapeRest(DictShapeRest<'arena>),
+    DictTypeArguments(DictTypeArguments<'arena>),
     ClassnameType(ClassnameType<'arena>),
     TupleType(TupleType<'arena>),
+    TrailingType(TrailingType<'arena>),
     Keyword(Keyword<'arena>),
     Identifier(Identifier<'arena>),
     LocalIdentifier(LocalIdentifier<'arena>),

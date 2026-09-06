@@ -479,8 +479,8 @@ impl HasSpan for NamedType<'_> {
 impl HasSpan for MemberType<'_> {
     fn span(&self) -> Span {
         self.type_arguments.as_ref().map_or_else(
-            || self.name.span(),
-            |arguments| self.name.span().join(arguments.span()),
+            || self.double_colon.join(self.name.span()),
+            |arguments| self.double_colon.join(arguments.span()),
         )
     }
 }
@@ -616,7 +616,16 @@ impl HasSpan for DictShapeTypeEntry<'_> {
 
 impl HasSpan for DictShapeRest<'_> {
     fn span(&self) -> Span {
-        self.ellipsis.join(self.type_arguments.greater_than)
+        self.ellipsis.join(
+            self.trailing_comma
+                .unwrap_or(self.type_arguments.greater_than),
+        )
+    }
+}
+
+impl HasSpan for DictTypeArguments<'_> {
+    fn span(&self) -> Span {
+        self.less_than.join(self.greater_than)
     }
 }
 

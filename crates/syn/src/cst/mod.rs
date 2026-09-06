@@ -21,7 +21,6 @@ pub mod r#type;
 pub mod walker;
 
 use whim_span::HasSpan;
-use whim_span::Position;
 use whim_span::Span;
 
 use crate::cst::statement::Statement;
@@ -31,21 +30,13 @@ use crate::cst::trivia::Trivia;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct Program<'arena> {
     pub source_text: &'arena str,
+    pub span: Span,
     pub trivia: &'arena [Trivia<'arena>],
     pub statements: &'arena [Statement<'arena>],
 }
 
 impl HasSpan for Program<'_> {
     fn span(&self) -> Span {
-        let start = self
-            .statements
-            .first()
-            .map_or_else(Position::zero, |statement| statement.span().start);
-        let end = self
-            .statements
-            .last()
-            .map_or_else(Position::zero, |statement| statement.span().end);
-
-        Span::new(start, end)
+        self.span
     }
 }

@@ -90,9 +90,11 @@ where
             statements.push(self.parse_statement()?);
         }
 
+        let span = self.stream.input_span();
         let trivia = self.stream.take_trivia();
         let program = self.arena.alloc(Program {
             source_text: self.source,
+            span,
             trivia,
             statements: statements.leak(),
         });

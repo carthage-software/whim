@@ -29,6 +29,7 @@ where
     lexer: Lexer<'input, 'arena, A>,
     buffer: RingBuffer<Token<'input>, LOOKAHEAD>,
     trivia: Vec<'arena, Trivia<'arena>, A>,
+    start: Position,
     position: Position,
 }
 
@@ -44,8 +45,15 @@ where
             lexer,
             buffer: RingBuffer::new(),
             trivia: Vec::new_in(arena),
+            start: position,
             position,
         }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(super) const fn input_span(&self) -> Span {
+        Span::new(self.start, self.lexer.current_position())
     }
 
     /// The end position of the most recently consumed significant token, or
