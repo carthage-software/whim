@@ -123,6 +123,7 @@ where
                     .iter()
                     .map(|(key, value)| {
                         let key = match key {
+                            ShapeKey::Bool(key) => key.to_string(),
                             ShapeKey::Int(key) => key.to_string(),
                             ShapeKey::String(key) => {
                                 format!("'{}'", key.to_string_lossy())

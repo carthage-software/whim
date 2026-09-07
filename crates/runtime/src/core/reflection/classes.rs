@@ -850,7 +850,7 @@ reflection_class! {
 
 reflection_class! {
     DictShapeEntryReflection = "Whim\\Reflection\\Type\\DictShapeEntryReflection" {
-        get_key: "getKey(): int|string" => Key;
+        get_key: "getKey(): bool|int|string" => Key;
         get_type: "getType(): Whim\\Reflection\\Type\\TypeReflection" => Type;
     }
 }

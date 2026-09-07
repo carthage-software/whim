@@ -57,6 +57,96 @@ assert!(5 is 5);
 assert!(!(6 is 5));
 assert!(true is true);
 
+type BooleanShape<T> = dict[true => T, false => string];
+
+function matches_boolean_shape<T>(mixed $value): bool {
+  return $value is BooleanShape<T>;
+}
+
+$booleanShape = dict[true => 7, false => 'no'];
+assert!(matches_boolean_shape::<int>($booleanShape));
+assert!(!matches_boolean_shape::<string>($booleanShape));
+assert!(!matches_boolean_shape::<int>(dict[1 => 7, 0 => 'no']));
+assert!(!matches_boolean_shape::<int>(dict[true => 7]));
+assert!(!matches_boolean_shape::<int>(dict[true => 7, false => 'no', 1 => 8]));
+assert!($booleanShape as BooleanShape<int> == $booleanShape);
+assert!(dict[1 => 7, 0 => 'no'] ?as BooleanShape<int> == null);
+assert!(
+  dict[
+    true => 1,
+    1 => 'int',
+    '1' => false,
+  ] is dict[true => int, 1 => string, '1' => bool],
+);
+
+assert!(
+  dict[
+    false => 1,
+    0 => 'int',
+    '0' => true,
+  ] is dict[false => int, 0 => string, '0' => bool],
+);
+
+assert!(
+  dict[true => 7, false => 'no'] is dict[true => int, ...<false, string>],
+);
+
+assert!(!(dict[true => 7, 0 => 'no'] is dict[true => int, ...<false, string>]));
+assert!(dict[true => 7, 1 => 'one'] is dict[true => int, ...<int, string>]);
+assert!(
+  !(dict[true => 7, false => 'no'] is dict[true => int, ...<int, string>]),
+);
+
+assert!(dict[true => 7, false => 'no', 1 => null] is dict[true => int, ...]);
+assert!(
+  Whim\Type\id::<dict[true => int]>() != Whim\Type\id::<dict[false => int]>(),
+);
+
+assert!(
+  Whim\Type\id::<dict[true => int]>() != Whim\Type\id::<dict[1 => int]>(),
+);
+
+function boolean_shape_bound<T: dict<bool, int>>(T $value): T {
+  return $value;
+}
+
+assert!(
+  boolean_shape_bound::<dict[true => int, false => int]>(dict[
+    true => 1,
+    false => 2,
+  ]) == dict[true => 1, false => 2],
+);
+
+interface BooleanShapeSource {
+  public function read(): array<true, int>;
+}
+
+class BooleanShapeImplementation implements BooleanShapeSource {
+  public function read(): dict[true => 1] {
+    return dict[true => 1];
+  }
+}
+
+assert!(new BooleanShapeImplementation()->read() == dict[true => 1]);
+
+class BooleanShapeHolder {
+  public BooleanShape<int> $value = dict[true => 1, false => 'no'];
+}
+
+$booleanHolder = new BooleanShapeHolder();
+$caughtBooleanWrite = false;
+try {
+  $booleanHolder->value[true] = 'wrong';
+} catch (TypeError $error) {
+  $caughtBooleanWrite = true;
+}
+
+assert!($caughtBooleanWrite);
+assert!($booleanHolder->value == dict[true => 1, false => 'no']);
+$booleanShape[true] = 'changed';
+assert!(!matches_boolean_shape::<int>($booleanShape));
+assert!(matches_boolean_shape::<string>($booleanShape));
+
 interface Named {}
 
 interface Aged {}

@@ -982,6 +982,8 @@ fn lower_dict_shape_type(
         .iter()
         .map(|entry| {
             let key = match entry.key {
+                Literal::True(_) => ShapeKey::Bool(true),
+                Literal::False(_) => ShapeKey::Bool(false),
                 Literal::String(string) => ShapeKey::String(scope.heap.intern(string.value)),
                 Literal::Integer(integer) => {
                     ShapeKey::Int(i64::try_from(integer.value).map_err(|_| {
@@ -995,7 +997,7 @@ fn lower_dict_shape_type(
                 _ => {
                     return Err(CompileError::new(
                         CompileErrorKind::TypeNotRuntimeCheckable,
-                        "dictionary shape keys must be strings or integers",
+                        "dictionary shape keys must be strings, integers, or booleans",
                         entry.key.span(),
                     ));
                 }

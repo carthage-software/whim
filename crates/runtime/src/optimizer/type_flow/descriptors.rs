@@ -361,6 +361,8 @@ pub(crate) fn descriptor_proves(
         ) => {
             return entries.iter().all(|(key, value)| {
                 let key = match key {
+                    ShapeKey::Bool(true) => TypeDescriptor::TrueLiteral,
+                    ShapeKey::Bool(false) => TypeDescriptor::FalseLiteral,
                     ShapeKey::Int(_) => TypeDescriptor::Int,
                     ShapeKey::String(_) => TypeDescriptor::String,
                 };

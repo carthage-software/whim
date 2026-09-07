@@ -125,6 +125,7 @@ pub(crate) fn shape_entry_dispatch(
 ) -> Result<Value, Throw> {
     match operation {
         Operation::Key => Ok(match key {
+            ShapeKey::Bool(key) => Value::bool(*key),
             ShapeKey::Int(key) => Value::int(*key),
             ShapeKey::String(key) => Value::string(key.to_handle()),
         }),

@@ -320,10 +320,15 @@ where
                 let token = self.consume()?;
                 if !matches!(
                     token.kind,
-                    TokenKind::LiteralInteger | TokenKind::LiteralString
+                    TokenKind::LiteralInteger
+                        | TokenKind::LiteralString
+                        | TokenKind::True
+                        | TokenKind::False
                 ) {
                     return Err(ParseError::UnexpectedToken(
-                        Expected::Description("a string or integer dictionary pattern key"),
+                        Expected::Description(
+                            "a string, integer, or boolean dictionary pattern key",
+                        ),
                         token.kind,
                         token.compute_span(),
                     ));
@@ -334,7 +339,9 @@ where
                         literal,
                     },
                     Literal::String(literal) => DictPatternKey::String(literal),
-                    _ => unreachable!("the token kind permits only integer and string literals"),
+                    Literal::True(keyword) => DictPatternKey::True(keyword),
+                    Literal::False(keyword) => DictPatternKey::False(keyword),
+                    _ => unreachable!("the token kind permits only dictionary key literals"),
                 }
             };
             let double_arrow = self.expect_span(TokenKind::EqualGreaterThan)?;

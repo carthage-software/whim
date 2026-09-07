@@ -650,6 +650,10 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
             entries.len().hash(state);
             for (key, value) in entries {
                 match key {
+                    ShapeKey::Bool(key) => {
+                        2u8.hash(state);
+                        key.hash(state);
+                    }
                     ShapeKey::Int(key) => {
                         0u8.hash(state);
                         key.hash(state);
@@ -901,6 +905,7 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
 
 fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
     match (left, right) {
+        (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
         (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
         (ShapeKey::String(left), ShapeKey::String(right)) => left == right,
         _ => false,

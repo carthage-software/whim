@@ -83,6 +83,7 @@ fn key_value(key: Key) -> Value {
 
 fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
     match (left, right) {
+        (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
         (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
         (ShapeKey::String(left), ShapeKey::String(right)) => left.as_bytes() == right.as_bytes(),
         _ => false,
@@ -91,6 +92,8 @@ fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
 
 fn shape_key_descriptor(key: &ShapeKey) -> TypeDescriptor {
     match key {
+        ShapeKey::Bool(true) => TypeDescriptor::TrueLiteral,
+        ShapeKey::Bool(false) => TypeDescriptor::FalseLiteral,
         ShapeKey::Int(key) => TypeDescriptor::IntLiteral(*key),
         ShapeKey::String(key) => TypeDescriptor::StringLiteral(key.clone()),
     }
@@ -1229,6 +1232,8 @@ impl VirtualMachine<'_> {
                 let mut compatible = true;
                 for (key, value) in entries {
                     let key = match key {
+                        ShapeKey::Bool(true) => TypeDescriptor::TrueLiteral,
+                        ShapeKey::Bool(false) => TypeDescriptor::FalseLiteral,
                         ShapeKey::Int(_) => TypeDescriptor::Int,
                         ShapeKey::String(_) => TypeDescriptor::String,
                     };
@@ -3058,6 +3063,7 @@ impl VirtualMachine<'_> {
                     }
                     for (key, descriptor) in entries {
                         let key = match key {
+                            ShapeKey::Bool(key) => Key::Bool(*key),
                             ShapeKey::Int(key) => Key::Int(*key),
                             ShapeKey::String(key) => Key::String(key.to_handle()),
                         };
@@ -3072,6 +3078,9 @@ impl VirtualMachine<'_> {
                     if let Some((key_type, value_type)) = rest {
                         for (key, value) in dictionary.iter() {
                             if entries.iter().any(|(shape_key, _)| match (shape_key, key) {
+                                (ShapeKey::Bool(expected), KeyRef::Bool(actual)) => {
+                                    *expected == actual
+                                }
                                 (ShapeKey::Int(expected), KeyRef::Int(actual)) => {
                                     *expected == actual
                                 }

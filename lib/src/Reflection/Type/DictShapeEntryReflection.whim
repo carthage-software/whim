@@ -10,7 +10,7 @@ final class DictShapeEntryReflection {
 
   /** Returns the exact required key. */
   #[MustUse]
-  public function getKey(): int|string {}
+  public function getKey(): bool|int|string {}
 
   /** Returns the value type required at that key. */
   #[MustUse]

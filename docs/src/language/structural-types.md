@@ -66,11 +66,22 @@ check, use `dict<_, _>` or `array<_, _>`.
 
 A dict shape lists required keys and their value types.
 
+Keys may be string, integer, or boolean literals. As in dict values, `true`,
+`1`, and `'1'` are distinct keys, as are `false`, `0`, and `'0'`.
+
 ```whim
 type UserRow = dict['id' => int, 'name' => string];
 
 $user = dict['id' => 1, 'name' => 'Ada'];
 assert!($user is UserRow);
+```
+
+```whim
+type Partition<T> = dict[true => vec<T>, false => vec<T>];
+
+$partition = dict[true => vec[1, 3], false => vec[2, 4]];
+assert!($partition is Partition<int>);
+assert!(!(dict[1 => vec[1, 3], 0 => vec[2, 4]] is Partition<int>));
 ```
 
 Without a rest entry, the dict must have only the listed keys. A rest entry

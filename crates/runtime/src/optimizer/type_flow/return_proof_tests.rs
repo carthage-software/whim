@@ -123,6 +123,12 @@ function invalid_copy_mutation(): dict['a' => 1] {
 function invalid_duplicate_shape(): dict['a' => 1, 'a' => 1] { return dict['a' => 1]; }
 #[NeverInline]
 function invalid_bool_key(): dict[1 => 1] { return dict[true => 1]; }
+#[NeverInline]
+function boolean_shape(): dict[true => 1, false => 2, 1 => 3, '1' => 4] {
+    return dict[true => 1, false => 2, 1 => 3, '1' => 4];
+}
+#[NeverInline]
+function invalid_boolean_shape(): dict[true => 1] { return dict[1 => 1]; }
 newtype Key = string;
 #[NeverInline]
 function invalid_rest_newtype(): dict['a' => 1, ...<Key, int>] {
@@ -142,6 +148,7 @@ const PROVEN: &[&str] = &[
     "duplicate_key",
     "bool_rest",
     "distinct_keys",
+    "boolean_shape",
     "vector_tail",
     "tuple_tail",
     "tuple_array",
@@ -170,6 +177,7 @@ const CHECKED: &[&str] = &[
     "invalid_copy_mutation",
     "invalid_duplicate_shape",
     "invalid_bool_key",
+    "invalid_boolean_shape",
     "invalid_rest_newtype",
     "unknown_key",
     "callback_result",

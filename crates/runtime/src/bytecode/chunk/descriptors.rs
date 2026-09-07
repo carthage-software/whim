@@ -55,6 +55,7 @@ pub(crate) type DictionaryTypeDescriptor = (Box<TypeDescriptor>, Box<TypeDescrip
 pub(crate) enum ShapeKey {
     Int(#[seeded(with(serde_seeded::unseeded))] i64),
     String(Atom),
+    Bool(#[seeded(with(serde_seeded::unseeded))] bool),
 }
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
@@ -453,6 +454,7 @@ fn check_vector_shape(
 
 fn shape_key_matches(expected: &ShapeKey, actual: KeyRef<'_>) -> bool {
     match (expected, actual) {
+        (ShapeKey::Bool(expected), KeyRef::Bool(actual)) => *expected == actual,
         (ShapeKey::Int(expected), KeyRef::Int(actual)) => *expected == actual,
         (ShapeKey::String(expected), KeyRef::String(actual)) => {
             expected.as_bytes() == ByteStringObject::handle_bytes(actual)
@@ -477,6 +479,7 @@ fn check_dictionary_shape(
     }
     for (key, descriptor) in entries {
         let value = match key {
+            ShapeKey::Bool(key) => dictionary.get_ref(KeyRef::Bool(*key)),
             ShapeKey::Int(key) => dictionary.get_int(*key),
             ShapeKey::String(key) => dictionary.get_string(key.as_handle()),
         };

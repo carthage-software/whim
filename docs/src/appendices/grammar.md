@@ -373,7 +373,8 @@ dict-pattern    := "dict" "[" (dict-pattern-entry
                    ("," dict-pattern-entry)*)?
                    ("," trailing-pattern)? ","? "]"
 dict-pattern-entry
-                := (string-literal | signed-integer-literal) "=>" pattern
+                := (string-literal | signed-integer-literal | "true" | "false")
+                   "=>" pattern
 object-pattern  := "#{" object-pattern-items? "}"
 object-pattern-items
                 := object-pattern-entry ("," object-pattern-entry)*
@@ -458,7 +459,7 @@ dict-shape-items
                 := dict-shape-entry ("," dict-shape-entry)*
                    ("," dict-shape-rest)? ","?
 dict-shape-entry
-                := (string-literal | integer-literal) "=>" type
+                := (string-literal | integer-literal | "true" | "false") "=>" type
 dict-shape-rest := "..." ("<" type "," type ">")?
 object-shape-type
                 := "#{" object-shape-items? "}"

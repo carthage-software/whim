@@ -621,6 +621,9 @@ impl Node<'_, '_> {
             }
             Node::DictPatternKey(node) => match node {
                 DictPatternKey::String(literal) => f(Node::LiteralString(literal)),
+                DictPatternKey::True(keyword) | DictPatternKey::False(keyword) => {
+                    f(Node::Keyword(keyword))
+                }
                 DictPatternKey::Integer { literal, .. } => f(Node::LiteralInteger(literal)),
             },
             Node::TuplePattern(node) => {

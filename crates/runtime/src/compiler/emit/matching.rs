@@ -235,6 +235,7 @@ fn collect_bool_tuple_indices(
 
 fn same_shape_key(left: &ShapeKey, right: &ShapeKey) -> bool {
     match (left, right) {
+        (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
         (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
         (ShapeKey::String(left), ShapeKey::String(right)) => left.as_bytes() == right.as_bytes(),
         _ => false,
@@ -1875,23 +1876,10 @@ impl BodyCompiler<'_, '_> {
                     .entries
                     .iter()
                     .map(|entry| {
-                        let key = match &entry.key {
-                            DictPatternKey::String(string) => {
-                                ShapeKey::String(self.heap.intern(string.value))
-                            }
-                            DictPatternKey::Integer { minus, literal } => ShapeKey::Int(
-                                dict_pattern_integer(minus.is_some(), literal).ok_or_else(
-                                    || {
-                                        CompileError::new(
-                                            CompileErrorKind::IntegerLiteralOutOfRange,
-                                            "dictionary pattern key does not fit in an integer",
-                                            entry.key.span(),
-                                        )
-                                    },
-                                )?,
-                            ),
-                        };
-                        Ok((key, self.lower_match_pattern(scope, entry.pattern)?))
+                        Ok((
+                            self.lower_dict_pattern_key(&entry.key)?,
+                            self.lower_match_pattern(scope, entry.pattern)?,
+                        ))
                     })
                     .collect::<Result<Vec<_>, CompileError>>()?;
                 let rest = pattern
@@ -2388,8 +2376,35 @@ impl BodyCompiler<'_, '_> {
         Ok(())
     }
 
+    fn lower_dict_pattern_key(&self, key: &DictPatternKey<'_>) -> Result<ShapeKey, CompileError> {
+        Ok(match key {
+            DictPatternKey::True(_) => ShapeKey::Bool(true),
+            DictPatternKey::False(_) => ShapeKey::Bool(false),
+            DictPatternKey::String(string) => ShapeKey::String(self.heap.intern(string.value)),
+            DictPatternKey::Integer { minus, literal } => ShapeKey::Int(
+                dict_pattern_integer(minus.is_some(), literal).ok_or_else(|| {
+                    CompileError::new(
+                        CompileErrorKind::IntegerLiteralOutOfRange,
+                        "dictionary pattern key does not fit in an integer",
+                        key.span(),
+                    )
+                })?,
+            ),
+        })
+    }
+
     fn pattern_dict_key(&mut self, key: &DictPatternKey<'_>) -> Result<Register, CompileError> {
         match key {
+            DictPatternKey::True(_) | DictPatternKey::False(_) => {
+                let destination = self.allocate(key.span())?;
+                let instruction = if matches!(key, DictPatternKey::True(_)) {
+                    Instruction::LoadTrue { destination }
+                } else {
+                    Instruction::LoadFalse { destination }
+                };
+                self.chunk.emit(instruction, key.span());
+                Ok(destination)
+            }
             DictPatternKey::String(string) => {
                 let destination = self.allocate(string.span)?;
                 let constant = self.string_constant(string.value, string.span)?;
@@ -2786,6 +2801,8 @@ fn same_sequence_binding_layout(
 
 fn same_dict_pattern_key(left: &DictPatternKey<'_>, right: &DictPatternKey<'_>) -> bool {
     match (left, right) {
+        (DictPatternKey::True(_), DictPatternKey::True(_))
+        | (DictPatternKey::False(_), DictPatternKey::False(_)) => true,
         (
             DictPatternKey::Integer {
                 minus: left_minus,

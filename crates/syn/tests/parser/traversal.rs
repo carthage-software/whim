@@ -83,12 +83,14 @@ fn string_length_parts_are_nodes() {
 
 #[test]
 fn descends_into_dictionary_pattern_keys() {
-    let ks = kinds("$x = match ($v) { dict[-0x10 => $_, 'name' => $_] => 1, $_ => 0 };");
+    let ks = kinds(
+        "$x = match ($v) { dict[-0x10 => $_, 'name' => $_, true => $_, false => $_] => 1, $_ => 0 };",
+    );
     assert_eq!(
         ks.iter()
             .filter(|kind| **kind == NodeKind::DictPatternKey)
             .count(),
-        2
+        4
     );
     assert!(ks.contains(&NodeKind::LiteralInteger));
     assert!(ks.contains(&NodeKind::LiteralString));

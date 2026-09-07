@@ -32,6 +32,7 @@ use crate::core::private::syscall::StandardStream;
 use crate::engine::Engine;
 use crate::unwrap_option_invariant;
 use crate::value::ValueView;
+use crate::value::dict::keys::KeyRef;
 use crate::value::heap::metadata::HeapBox;
 use crate::vm::AsMode;
 use crate::vm::ByteStringObject;
@@ -274,6 +275,7 @@ fn switch_pattern_target(table: &SwitchTable, subject: &Value) -> i32 {
             let mut values = [None; 8];
             for (position, key) in keys.iter().enumerate() {
                 values[position] = match key {
+                    ShapeKey::Bool(key) => dictionary.get_ref(KeyRef::Bool(*key)),
                     ShapeKey::Int(key) => dictionary.get_int(*key),
                     ShapeKey::String(key) => dictionary.get_string(key.as_handle()),
                 };

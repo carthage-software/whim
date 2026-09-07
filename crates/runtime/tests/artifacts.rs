@@ -396,3 +396,42 @@ fn artifacts_preserve_object_shapes_and_public_property_patterns() {
             .expect("object shapes survive serialization");
     }
 }
+
+#[test]
+fn artifacts_preserve_boolean_dictionary_shape_keys() {
+    let artifact = compile(
+        r"
+        type Partition<T> = dict[true => T, false => T];
+        function swap<T>(Partition<T> $value): Partition<T> {
+            return match ($value) {
+                dict[true => $yes, false => $no] => dict[true => $no, false => $yes],
+            };
+        }
+        function classify(mixed $value): int {
+            return match ($value) {
+                dict[true => 1, false => string] => 1,
+                dict[true => 2, false => string] => 2,
+                dict[true => int, false => string] => 3,
+                $_ => 0,
+            };
+        }
+        assert!(swap::<int>(dict[true => 1, false => 2]) == dict[true => 2, false => 1]);
+        assert!(!(dict[1 => 1, 0 => 2] is Partition<int>));
+        assert!(classify(dict[true => 1, false => 'no']) == 1);
+        assert!(classify(dict[true => 2, false => 'no']) == 2);
+        assert!(classify(dict[true => 3, false => 'no']) == 3);
+        assert!(classify(dict[true => 1, false => 2]) == 0);
+        assert!(classify(dict[1 => 1, 0 => 'no']) == 0);
+        ",
+        "/artifact/boolean-shape-keys.whim",
+    );
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        engine
+            .load_artifact(&artifact)
+            .expect("boolean shape keys survive serialization");
+    }
+}

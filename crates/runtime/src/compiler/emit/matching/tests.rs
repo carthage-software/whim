@@ -282,3 +282,23 @@ fn rest_patterns_reject_bindings_inside_repeated_element_patterns() {
         }
     }
 }
+
+#[test]
+fn dictionary_patterns_reject_duplicate_boolean_keys() {
+    for key in ["true", "false"] {
+        let source = format!(
+            "$value = match ($subject) {{ dict[{key} => int, {key} => string] => 1, $_ => 0 }};"
+        );
+        let arena = LocalArena::new();
+        let program = parse(&arena, &source).expect("boolean dictionary pattern keys parse");
+        let heap = Heap::new();
+        let error = compile_with_configuration(
+            program,
+            "/project/duplicate-boolean-key.whim",
+            &heap,
+            CompileConfiguration::default(),
+        )
+        .expect_err("duplicate boolean keys are rejected");
+        assert_eq!(error.kind, CompileErrorKind::DuplicateDictionaryKey);
+    }
+}

@@ -160,8 +160,9 @@ assert!($first == 1);
 
 ## Dict patterns
 
-A dict pattern uses literal keys. Without `...`, it requires the exact key set.
-With `...`, it permits unlisted keys:
+A dict pattern uses string, integer, or boolean literal keys. `true`, `1`, and
+`'1'` are distinct keys, as are `false`, `0`, and `'0'`. Without `...`, the
+pattern requires the exact key set. With `...`, it permits unlisted keys:
 
 ```whim
 $name = match (dict['id' => 7, 'name' => 'Ada']) {

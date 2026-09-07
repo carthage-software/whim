@@ -4,6 +4,10 @@ type MaybeMailer = null|Mailer;
 type Handler = fn(int, =string): void;
 type Any = fn;
 type Constrained = Repository<User>&Countable;
+type Partition<T> = dict[true => vec<T>, false => vec<T>];
+$parts = match ($partition) {
+  dict[true => $yes, false => $no] => ($yes, $no),
+};
 
 function build(): void {
   $v = vec[1, 2, 3];

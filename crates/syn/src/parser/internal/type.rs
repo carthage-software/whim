@@ -682,10 +682,13 @@ where
                 let token = self.consume()?;
                 if !matches!(
                     token.kind,
-                    TokenKind::LiteralString | TokenKind::LiteralInteger
+                    TokenKind::LiteralString
+                        | TokenKind::LiteralInteger
+                        | TokenKind::True
+                        | TokenKind::False
                 ) {
                     return Err(ParseError::UnexpectedToken(
-                        Expected::Description("a string or integer dictionary shape key"),
+                        Expected::Description("a string, integer, or boolean dictionary shape key"),
                         token.kind,
                         token.compute_span(),
                     ));

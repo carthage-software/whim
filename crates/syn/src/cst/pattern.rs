@@ -67,6 +67,7 @@ impl HasSpan for DictPatternKey<'_> {
     fn span(&self) -> Span {
         match self {
             Self::String(literal) => literal.span,
+            Self::True(keyword) | Self::False(keyword) => keyword.span,
             Self::Integer { minus, literal } => {
                 minus.map_or(literal.span, |minus| minus.join(literal.span))
             }
@@ -150,6 +151,8 @@ pub struct DictPatternEntry<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum DictPatternKey<'arena> {
     String(LiteralString<'arena>),
+    True(Keyword<'arena>),
+    False(Keyword<'arena>),
     Integer {
         minus: Option<Span>,
         literal: LiteralInteger<'arena>,

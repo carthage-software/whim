@@ -38,7 +38,7 @@ use crate::value::heap::Heap;
 use crate::vm::VirtualMachineControl;
 
 const MAGIC: &[u8; 8] = b"WHIM\0\0\0\0";
-const FORMAT_VERSION: u32 = 7;
+const FORMAT_VERSION: u32 = 8;
 
 mod merge;
 

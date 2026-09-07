@@ -685,6 +685,18 @@ assert!($dictShape->getEntries()[0]->getType()->toString() == 'int');
 assert!($dictShape->getRestKeyType()?->toString() == 'string');
 assert!($dictShape->getRestValueType()?->toString() == 'float');
 
+$booleanShape = Reflection\reflect_type::<
+  dict[true => int, false => string, 1 => bool],
+>();
+
+assert!($booleanShape->getEntries()[0]->getKey() == true);
+assert!($booleanShape->getEntries()[1]->getKey() == false);
+assert!($booleanShape->getEntries()[2]->getKey() == 1);
+assert!($booleanShape->getEntries()[0]->getType()->toString() == 'int');
+assert!(
+  $booleanShape->toString() == 'dict[true => int, false => string, 1 => bool]',
+);
+
 $classnameType = Reflection\reflect_type::<classname<Box<int>>>();
 assert!($classnameType is Reflection\Type\ClassnameTypeReflection);
 assert!(

@@ -95,6 +95,7 @@ impl TypeFlow<'_> {
         }
         for (key, expected) in entries {
             let key = match key {
+                ShapeKey::Bool(value) => ConstantDictionaryKey::Bool(*value),
                 ShapeKey::Int(value) => ConstantDictionaryKey::Int(*value),
                 ShapeKey::String(value) => ConstantDictionaryKey::String(value.clone()),
             };

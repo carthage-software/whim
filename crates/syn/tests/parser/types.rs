@@ -1,4 +1,5 @@
 use whim_syn::arena::LocalArena;
+use whim_syn::cst::atom::Literal;
 
 use whim_syn::cst::call::Call;
 use whim_syn::cst::expression::Expression;
@@ -16,6 +17,20 @@ use crate::aliased_type;
 use crate::error;
 use crate::expression;
 use crate::statement;
+
+#[test]
+fn dictionary_shapes_accept_boolean_keys() {
+    let arena = LocalArena::new();
+    let Type::DictShape(shape) =
+        aliased_type(&arena, "dict[true => int, false => string, 1 => bool]")
+    else {
+        panic!("expected a dict shape");
+    };
+    let entries = shape.entries.as_slice();
+    assert!(matches!(entries[0].key, Literal::True(_)));
+    assert!(matches!(entries[1].key, Literal::False(_)));
+    assert!(matches!(entries[2].key, Literal::Integer(_)));
+}
 
 #[test]
 fn function_type() {

@@ -803,6 +803,7 @@ where
     fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
         match self {
             Self::String(literal) => f.format_string_literal(literal),
+            Self::True(keyword) | Self::False(keyword) => f.text(keyword.value),
             Self::Integer { minus, literal } => {
                 let literal = f.text(literal.raw);
                 if minus.is_some() {
