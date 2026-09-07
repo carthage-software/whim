@@ -87,7 +87,8 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             slot.index(),
             short_jump(index, ShortJumpOffset::new(i16::from(offset.offset())))
         ),
-        instructions!(IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceStringKey | StringIndexCoalesce; { destination, container, index: subscript, offset }) => {
+        instructions!(IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceStringKey | StringIndexCoalesce; { destination, container, index: subscript, offset }) =>
+        {
             format!(
                 " {}, {}, {} {}",
                 register(destination),
