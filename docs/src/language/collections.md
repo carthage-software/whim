@@ -95,15 +95,18 @@ keys. A dict keeps its keys.
 
 ## Reading entries
 
-An index must exist. Reading a missing vec position, tuple position, or dict key
-throws `OutOfBoundsError`. `??` does not hide that error:
+An ordinary indexed read requires an existing index. Reading a missing vec
+position, tuple position, or dict key throws `OutOfBoundsError`. Use `??` to
+provide a fallback for a missing or null entry:
 
 ```whim
 $values = dict['ready' => true];
 assert!(!contains_key!($values, 'missing'));
+assert!(($values['missing'] ?? false) == false);
 ```
 
-Check with `contains_key!` before the read. `contains!` checks values:
+`contains_key!` checks existence, including entries whose value is null.
+`contains!` checks values:
 
 ```whim
 $values = vec[10, 20];

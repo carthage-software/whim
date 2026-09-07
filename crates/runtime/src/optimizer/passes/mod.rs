@@ -124,6 +124,7 @@ pub(in crate::optimizer::passes) fn specialize_chunk_instructions(
 
 pub(super) mod const_fold;
 mod copy_propagation;
+pub(super) mod fuse_coalescing;
 mod fuse_comparison;
 pub(super) mod fuse_concatenation;
 mod fuse_counter_loop;

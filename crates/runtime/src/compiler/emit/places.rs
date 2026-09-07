@@ -182,7 +182,11 @@ impl BodyCompiler<'_, '_> {
                 };
                 let mut place = self.prepare_place(scope, &assignment.target)?;
                 self.materialize_place(&mut place, assignment.span())?;
-                let current = self.read_place(&place, assignment.span())?;
+                let current = if matches!(kind, ShortCircuit::Coalesce) {
+                    self.read_place_or_null(&place, assignment.span())?
+                } else {
+                    self.read_place(&place, assignment.span())?
+                };
                 let result = self.allocate(assignment.span())?;
                 self.move_into(result, current, assignment.span());
                 let skip = self
@@ -586,6 +590,44 @@ impl BodyCompiler<'_, '_> {
                 span,
             )),
         }
+    }
+
+    fn read_place_or_null(
+        &mut self,
+        place: &Place<'_>,
+        span: Span,
+    ) -> Result<Register, CompileError> {
+        let before = self.chunk.code.len();
+        let destination = self.read_place(place, span)?;
+        if self.chunk.code.len() != before
+            && let Some(instruction) = self.chunk.code.last_mut()
+        {
+            *instruction = match *instruction {
+                Instruction::IndexGet {
+                    destination,
+                    container,
+                    index,
+                } => Instruction::IndexGetOrNull {
+                    destination,
+                    container,
+                    index,
+                },
+                Instruction::PropertyGet {
+                    destination,
+                    object,
+                    cache,
+                } => Instruction::PropertyGetOrNull {
+                    destination,
+                    object,
+                    cache,
+                },
+                Instruction::StaticPropertyGet { destination, cache } => {
+                    Instruction::StaticPropertyGetOrNull { destination, cache }
+                }
+                instruction => instruction,
+            };
+        }
+        Ok(destination)
     }
 
     pub(in crate::compiler::emit) fn write_place(

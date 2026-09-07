@@ -68,15 +68,7 @@ $lookup['name'] = 'grace';
 assert!($lookup['name'] == 'grace');
 $lookup['new'] = 'inserted';
 assert!($lookup['new'] == 'inserted');
-$assertion_value_27 = fn(): string => $lookup['absent'] ?? 'default';
-$assertion_error_27 = null;
-try {
-  $assertion_value_27();
-} catch (OutOfBoundsError $assertion_caught_27) {
-  $assertion_error_27 = $assertion_caught_27;
-}
-
-assert!($assertion_error_27 is OutOfBoundsError);
+assert!(($lookup['absent'] ?? 'default') == 'default');
 
 $pair = ('x', 'y');
 assert!($pair[0] == 'x');

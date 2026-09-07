@@ -4,6 +4,7 @@ use std::cmp::Reverse;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::optimizer::OptimizationConfiguration;
+use crate::optimizer::passes::fuse_coalescing::normalize_chunk;
 use crate::optimizer::passes::inline_leaf_calls::Atom;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::Chunk;
@@ -15,7 +16,6 @@ use crate::optimizer::passes::inline_leaf_calls::Heap;
 use crate::optimizer::passes::inline_leaf_calls::IcDescriptor;
 use crate::optimizer::passes::inline_leaf_calls::InlineCandidates;
 use crate::optimizer::passes::inline_leaf_calls::Instruction;
-
 use crate::optimizer::passes::inline_leaf_calls::Location;
 use crate::optimizer::passes::inline_leaf_calls::OptimizationStatistics;
 use crate::optimizer::passes::inline_leaf_calls::REGISTER_LIMIT;
@@ -171,7 +171,8 @@ pub(in crate::optimizer) fn splice_generic_sites(
             continue;
         };
 
-        let snapshot = function.chunk.clone();
+        let mut snapshot = function.chunk.clone();
+        normalize_chunk(&mut snapshot);
         let Some(terminal) = unchecked_terminal(&snapshot) else {
             continue;
         };
@@ -403,7 +404,8 @@ pub(in crate::optimizer) fn inline_generic_statics(
         }
 
         let callee = &unit.classes[site.class].methods[site.method].function;
-        let snapshot = callee.chunk.clone();
+        let mut snapshot = callee.chunk.clone();
+        normalize_chunk(&mut snapshot);
         let type_parameters = callee.type_parameters.clone();
         let Ok(parameters) = u16::try_from(callee.parameters.len()) else {
             continue;

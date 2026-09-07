@@ -73,6 +73,8 @@ pub(in crate::optimizer) fn operands(kind: InstructionKind) -> Option<&'static [
                 | LoadInt
                 | NewStatic
                 | NewTyped
+                | StaticPropertyGetOrNull
+                | StaticPropertyCoalesce
                 | StaticPropertyGet
                 | ConstantGet
                 | ClassConstantGet
@@ -110,7 +112,13 @@ pub(in crate::optimizer) fn operands(kind: InstructionKind) -> Option<&'static [
                 | Rethrow
         ) => Some(&[]),
         instruction_kinds!(
-            Move | Negate
+            Coalesce
+                | PropertyCoalesce
+                | PropertyCoalesceUnchecked
+                | PropertyGetOrNull
+                | PropertyGetOrNullUnchecked
+                | Move
+                | Negate
                 | UnaryPlus
                 | BitwiseNot
                 | Not
@@ -166,6 +174,16 @@ pub(in crate::optimizer) fn operands(kind: InstructionKind) -> Option<&'static [
                 | GreaterThan
                 | GreaterThanOrEqual
                 | Compare
+                | IndexGetOrNull
+                | VecIndexGetOrNull
+                | DictIndexGetIntKeyOrNull
+                | DictIndexGetStringKeyOrNull
+                | StringIndexGetOrNull
+                | IndexCoalesce
+                | VecIndexCoalesce
+                | DictIndexCoalesceIntKey
+                | DictIndexCoalesceStringKey
+                | StringIndexCoalesce
                 | IndexGet
                 | StringIndexGet
                 | Remove

@@ -8,6 +8,7 @@ use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::optimizer::cfg::branches_or_terminates;
 use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::register_is_dead_after;
+use crate::optimizer::passes::fuse_coalescing::normalized_chunk;
 use crate::optimizer::passes::inline_leaf_calls::CALLEE_INSTRUCTION_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::Chunk;
@@ -155,6 +156,11 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::Length { .. }
             | Instruction::IndexGet { .. }
             | Instruction::StringIndexGet { .. }
+            | Instruction::IndexGetOrNull { .. }
+            | Instruction::VecIndexGetOrNull { .. }
+            | Instruction::DictIndexGetIntKeyOrNull { .. }
+            | Instruction::DictIndexGetStringKeyOrNull { .. }
+            | Instruction::StringIndexGetOrNull { .. }
     )
 }
 
@@ -335,10 +341,10 @@ fn inline_into_chunk_from(
             {
                 continue;
             }
-            let Some(terminal) = unchecked_terminal(&callee_function.chunk) else {
+            let snapshot = normalized_chunk(&callee_function.chunk);
+            let Some(terminal) = unchecked_terminal(&snapshot) else {
                 continue;
             };
-            let snapshot = callee_function.chunk.clone();
             if let Some(replacement) = build_jumping_replacement_capped(
                 chunk,
                 &snapshot,
@@ -879,6 +885,31 @@ pub(super) fn remap_instruction(
             destination,
             container,
             index,
+        }
+        | Instruction::IndexGetOrNull {
+            destination,
+            container,
+            index,
+        }
+        | Instruction::VecIndexGetOrNull {
+            destination,
+            container,
+            index,
+        }
+        | Instruction::DictIndexGetIntKeyOrNull {
+            destination,
+            container,
+            index,
+        }
+        | Instruction::DictIndexGetStringKeyOrNull {
+            destination,
+            container,
+            index,
+        }
+        | Instruction::StringIndexGetOrNull {
+            destination,
+            container,
+            index,
         } => {
             *destination = remap(*destination);
             *container = remap(*container);
@@ -943,6 +974,16 @@ pub(super) fn remap_instruction(
             ..
         }
         | Instruction::PropertyGetUnchecked {
+            destination,
+            object,
+            ..
+        }
+        | Instruction::PropertyGetOrNull {
+            destination,
+            object,
+            ..
+        }
+        | Instruction::PropertyGetOrNullUnchecked {
             destination,
             object,
             ..

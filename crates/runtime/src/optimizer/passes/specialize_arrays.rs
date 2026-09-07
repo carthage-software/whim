@@ -210,6 +210,46 @@ pub(super) fn specialize_with(
     value_mode: impl Fn(Register, Register) -> ArrayValueMode,
 ) -> Option<Instruction> {
     match instruction {
+        Instruction::IndexGetOrNull {
+            destination,
+            container,
+            index,
+        } if is_string(container) && is_int(index) => Some(Instruction::StringIndexGetOrNull {
+            destination,
+            container,
+            index,
+        }),
+        Instruction::IndexGetOrNull {
+            destination,
+            container,
+            index,
+        } if is_vector(container) && is_int(index) => Some(Instruction::VecIndexGetOrNull {
+            destination,
+            container,
+            index,
+        }),
+        Instruction::IndexGetOrNull {
+            destination,
+            container,
+            index,
+        } if is_dictionary(container) && is_int(index) => {
+            Some(Instruction::DictIndexGetIntKeyOrNull {
+                destination,
+                container,
+                index,
+            })
+        }
+        Instruction::IndexGetOrNull {
+            destination,
+            container,
+            index,
+        } if is_dictionary(container) && is_string(index) => {
+            Some(Instruction::DictIndexGetStringKeyOrNull {
+                destination,
+                container,
+                index,
+            })
+        }
         Instruction::Length {
             destination,
             source,

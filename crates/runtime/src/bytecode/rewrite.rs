@@ -8,6 +8,7 @@ use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::SwitchTable;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::JumpOffset;
+use crate::bytecode::instruction::operands::NearJumpOffset;
 use crate::bytecode::instruction::operands::ShortJumpOffset;
 use crate::unwrap_result_invariant;
 
@@ -21,6 +22,10 @@ pub(crate) fn control_flow_targets(chunk: &Chunk) -> HashSet<usize> {
 }
 
 /// Visits instructions reached by a non-fallthrough edge.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the branch target table stays exhaustive in one match"
+)]
 pub(crate) fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(usize)) {
     for (index, instruction) in chunk.code.iter().enumerate() {
         match instruction {
@@ -34,7 +39,18 @@ pub(crate) fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(
             | Instruction::FloatSquaresSumBranch { offset, .. } => {
                 visit(relative_target(index, offset.offset()));
             }
-            Instruction::JumpUnless { offset, .. }
+            Instruction::IndexCoalesce { offset, .. }
+            | Instruction::VecIndexCoalesce { offset, .. }
+            | Instruction::DictIndexCoalesceIntKey { offset, .. }
+            | Instruction::DictIndexCoalesceStringKey { offset, .. }
+            | Instruction::StringIndexCoalesce { offset, .. }
+            | Instruction::PropertyCoalesce { offset, .. }
+            | Instruction::PropertyCoalesceUnchecked { offset, .. } => {
+                visit(relative_target(index, i32::from(offset.offset())));
+            }
+            Instruction::Coalesce { offset, .. }
+            | Instruction::StaticPropertyCoalesce { offset, .. }
+            | Instruction::JumpUnless { offset, .. }
             | Instruction::IntJumpUnless { offset, .. }
             | Instruction::StringJumpUnless { offset, .. }
             | Instruction::StringByteJumpUnlessEqual { offset, .. }
@@ -178,7 +194,22 @@ pub(crate) fn rebase_targets(
                 *offset = ShortJumpOffset::new(relative);
             }
         }
-        Instruction::JumpUnless { offset, .. }
+        Instruction::IndexCoalesce { offset, .. }
+        | Instruction::VecIndexCoalesce { offset, .. }
+        | Instruction::DictIndexCoalesceIntKey { offset, .. }
+        | Instruction::DictIndexCoalesceStringKey { offset, .. }
+        | Instruction::StringIndexCoalesce { offset, .. }
+        | Instruction::PropertyCoalesce { offset, .. }
+        | Instruction::PropertyCoalesceUnchecked { offset, .. } => {
+            let target = relative_target(old_index, i32::from(offset.offset()));
+            *offset = NearJumpOffset::new(
+                i8::try_from(new_offset(new_index, old_to_new[target]))
+                    .expect("a compacted coalescing branch fits its original offset"),
+            );
+        }
+        Instruction::Coalesce { offset, .. }
+        | Instruction::StaticPropertyCoalesce { offset, .. }
+        | Instruction::JumpUnless { offset, .. }
         | Instruction::IntJumpUnless { offset, .. }
         | Instruction::StringJumpUnless { offset, .. }
         | Instruction::StringByteJumpUnlessEqual { offset, .. }

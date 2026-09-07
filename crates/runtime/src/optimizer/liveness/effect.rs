@@ -37,7 +37,7 @@ pub(in crate::optimizer) fn effect_on(
 
     match instruction {
         instructions!(
-            Move | Negate | UnaryPlus | BitwiseNot | IntBitwiseNot | Not | Length | StringLength
+            Coalesce | Move | Negate | UnaryPlus | BitwiseNot | IntBitwiseNot | Not | Length | StringLength
                 | CloneObject | AddImmediate | SubtractImmediate | IntMultiplyImmediate
                 | IntModuloImmediate | FloatMultiplyConstant | ConcatenateRightConstant
                 | ConcatenateLeftConstant | Is | AsCheck | AsOrNull;
@@ -79,6 +79,8 @@ pub(in crate::optimizer) fn effect_on(
         | Instruction::LoadInt { destination, .. }
         | Instruction::NewStatic { destination, .. }
         | Instruction::NewTyped { destination, .. }
+        | Instruction::StaticPropertyGetOrNull { destination, .. }
+        | Instruction::StaticPropertyCoalesce { destination, .. }
         | Instruction::StaticPropertyGet { destination, .. }
         | Instruction::ConstantGet { destination, .. }
         | Instruction::ClassConstantGet { destination, .. }
@@ -247,7 +249,7 @@ pub(in crate::optimizer) fn effect_on(
             writes(destination),
         ),
         instructions!(
-            IndexGet | VecIndexGet | DictIndexGetIntKey | DictIndexGetStringKey | StringIndexGet
+            IndexGetOrNull | VecIndexGetOrNull | DictIndexGetIntKeyOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceStringKey | StringIndexCoalesce | IndexGet | VecIndexGet | DictIndexGetIntKey | DictIndexGetStringKey | StringIndexGet
                 | StringByteEqual | StringByteNotEqual | StringByteLessThan
                 | StringByteLessThanOrEqual | StringByteGreaterThan | StringByteGreaterThanOrEqual;
             { destination, container, index, .. }
@@ -399,7 +401,7 @@ pub(in crate::optimizer) fn effect_on(
             destination,
             class_name,
         } => read_then_write(reads(class_name), writes(destination)),
-        instructions!(PropertyGet | PropertyGetUnchecked; {
+        instructions!(PropertyGetOrNull | PropertyGetOrNullUnchecked | PropertyCoalesce | PropertyCoalesceUnchecked | PropertyGet | PropertyGetUnchecked; {
             destination,
             object,
             ..

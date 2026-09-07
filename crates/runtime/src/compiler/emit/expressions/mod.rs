@@ -53,6 +53,7 @@ use crate::compiler::emit::tuple_window_gate;
 use crate::unreachable_invariant;
 use crate::unwrap_result_invariant;
 
+mod coalescing;
 pub(in crate::compiler::emit) mod operators;
 
 fn literal_check_descriptor(descriptor: &TypeDescriptor) -> bool {

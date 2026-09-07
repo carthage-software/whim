@@ -42,12 +42,19 @@ These forms may skip work:
 
 - `false && $right` skips `$right`;
 - `true || $right` skips `$right`;
-- a non-null left side of `??` skips the right side;
+- a present, initialized, non-null left side of `??` skips the right side;
 - a null receiver for `?->` skips the member access and call arguments;
 - `match` evaluates only the chosen arm result;
 - a destructuring default runs only for a missing position.
 
 `0`, `false`, and `''` are not null, so `??` keeps them.
+
+Property and index paths on the left of `??` stop at the first missing,
+uninitialized, or null step and select the fallback. Later keys are skipped.
+Receivers and evaluated keys run once. Invalid types, visibility violations,
+undefined locals, and exceptions from calls still throw. See
+[coalescing](../language/expressions.md#coalescing) for examples and the
+boundary between probing an access path and evaluating a computation.
 
 ## Pipeline
 

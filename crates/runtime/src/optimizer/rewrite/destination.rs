@@ -54,7 +54,15 @@ pub(in crate::optimizer) fn with_destination(
             value_mode,
             ..
         } if *value_mode != ArrayValueMode::Generic => destination,
-        Instruction::Move { destination, .. }
+        Instruction::IndexGetOrNull { destination, .. }
+        | Instruction::VecIndexGetOrNull { destination, .. }
+        | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+        | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
+        | Instruction::StringIndexGetOrNull { destination, .. }
+        | Instruction::PropertyGetOrNull { destination, .. }
+        | Instruction::PropertyGetOrNullUnchecked { destination, .. }
+        | Instruction::StaticPropertyGetOrNull { destination, .. }
+        | Instruction::Move { destination, .. }
         | Instruction::LoadConstant { destination, .. }
         | Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }

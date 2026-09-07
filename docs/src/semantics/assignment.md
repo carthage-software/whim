@@ -56,6 +56,12 @@ assert!($values[0] == 11);
 
 `&&=`, `||=`, and `??=` short-circuit like their non-assignment forms.
 
+`??=` probes the final property or index and assigns only if it is missing,
+uninitialized, or null. Every intermediate parent must already exist and have
+the appropriate type; missing parents throw before the right side runs. No
+intermediate containers are created. The write obeys the same type,
+visibility, readonly, and bounds checks as ordinary assignment.
+
 ## Tuple and vec destructuring
 
 A tuple target accepts a tuple or vec:

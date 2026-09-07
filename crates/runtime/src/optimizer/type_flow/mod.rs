@@ -4,10 +4,9 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::OnceCell;
 use std::cell::RefCell;
-use std::collections::BinaryHeap;
-
 use std::cmp::Ordering;
 use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 use std::ptr;
 
 use crate::bytecode::chunk::Chunk;
@@ -325,6 +324,17 @@ impl<'a> TypeFlow<'a> {
 
     pub(in crate::optimizer) fn chunk(&self) -> &'a Chunk {
         self.chunk
+    }
+
+    pub(in crate::optimizer) fn nullness(&self, index: usize, register: Register) -> Option<bool> {
+        let mask = self.fact(index, register).mask;
+        if mask == NULL {
+            Some(true)
+        } else if mask != 0 && mask & NULL == 0 {
+            Some(false)
+        } else {
+            None
+        }
     }
 
     pub(in crate::optimizer) fn capture_types(&self) -> &[Option<TypeDescriptor>] {

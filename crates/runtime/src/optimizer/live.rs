@@ -7,6 +7,7 @@ use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::successors;
+use crate::optimizer::passes::fuse_coalescing;
 use crate::optimizer::passes::inline_leaf_calls::leaf::inline_live_tail;
 use crate::optimizer::passes::optimize_isolated_live_tail;
 use crate::optimizer::passes::specialize_arithmetic;
@@ -46,6 +47,7 @@ pub(crate) fn refine(refinement: Refinement<'_>) -> Option<Chunk> {
     }
 
     let mut tail = chunk.clone_tail(floor);
+    fuse_coalescing::normalize_chunk(&mut tail);
     let indexed = IndexedUnit::with_world(unit, world);
     let replacements = {
         let flow = TypeFlow::analyze_live_with_unit(&tail, registers, &indexed, heap);
@@ -110,7 +112,12 @@ pub(crate) fn refine(refinement: Refinement<'_>) -> Option<Chunk> {
         );
     }
 
-    (changed || inlined).then(|| chunk.with_replaced_tail(floor, tail))
+    if changed || inlined {
+        fuse_coalescing::optimize_chunk(&mut tail, &mut statistics);
+        Some(chunk.with_replaced_tail(floor, tail))
+    } else {
+        None
+    }
 }
 
 fn tail_is_isolated(chunk: &Chunk, floor: usize) -> bool {

@@ -42,7 +42,24 @@ pub(crate) fn mask_with_classification(
                 Literal::String(_)
             )
             .then_some(destination),
-            Instruction::Move { destination, .. }
+            Instruction::IndexGetOrNull { destination, .. }
+            | Instruction::VecIndexGetOrNull { destination, .. }
+            | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+            | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
+            | Instruction::StringIndexGetOrNull { destination, .. }
+            | Instruction::PropertyGetOrNull { destination, .. }
+            | Instruction::PropertyGetOrNullUnchecked { destination, .. }
+            | Instruction::StaticPropertyGetOrNull { destination, .. }
+            | Instruction::IndexCoalesce { destination, .. }
+            | Instruction::VecIndexCoalesce { destination, .. }
+            | Instruction::DictIndexCoalesceIntKey { destination, .. }
+            | Instruction::DictIndexCoalesceStringKey { destination, .. }
+            | Instruction::StringIndexCoalesce { destination, .. }
+            | Instruction::PropertyCoalesce { destination, .. }
+            | Instruction::PropertyCoalesceUnchecked { destination, .. }
+            | Instruction::StaticPropertyCoalesce { destination, .. }
+            | Instruction::Coalesce { destination, .. }
+            | Instruction::Move { destination, .. }
             | Instruction::AsCheck { destination, .. }
             | Instruction::AsOrNull { destination, .. }
             | Instruction::Concatenate { destination, .. }

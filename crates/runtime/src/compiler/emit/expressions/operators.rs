@@ -366,12 +366,19 @@ impl BodyCompiler<'_, '_> {
         scope: &Scope<'_>,
         binary: &Binary<'_>,
     ) -> Result<Register, CompileError> {
+        if matches!(binary.operator, BinaryOperator::NullCoalesce(_)) {
+            return self.coalesce(scope, binary);
+        }
         let mut spine = Vec::new();
         let mut link = binary;
         loop {
             spine.push(link);
             match link.lhs {
-                Expression::Binary(inner) => link = inner,
+                Expression::Binary(inner)
+                    if !matches!(inner.operator, BinaryOperator::NullCoalesce(_)) =>
+                {
+                    link = inner;
+                }
                 _ => break,
             }
         }

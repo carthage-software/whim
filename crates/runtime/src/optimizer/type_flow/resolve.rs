@@ -188,6 +188,18 @@ impl<'a> TypeFlow<'a> {
         index: usize,
     ) -> Option<(Register, Fact)> {
         let origin = index as u32 + 1;
+        if let Instruction::IndexGetOrNull { destination, .. }
+        | Instruction::VecIndexGetOrNull { destination, .. }
+        | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+        | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
+        | Instruction::StringIndexGetOrNull { destination, .. }
+        | Instruction::PropertyGetOrNull { destination, .. }
+        | Instruction::PropertyGetOrNullUnchecked { destination, .. }
+        | Instruction::StaticPropertyGetOrNull { destination, .. } = self.chunk.code[index]
+        {
+            let descriptor = self.origin_type(origin, 0)?;
+            return Some((destination, self.descriptor_fact(&descriptor, origin)));
+        }
         let (destination, descriptor) = match self.chunk.code.get(index)? {
             Instruction::AsCheck {
                 destination,
@@ -561,6 +573,84 @@ impl<'a> TypeFlow<'a> {
                 Some(literal_type(literal))
             }
             Instruction::ClassConstantGet { cache, .. } => self.class_constant_type(cache),
+            Instruction::IndexGetOrNull {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::VecIndexGetOrNull {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::DictIndexGetIntKeyOrNull {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::DictIndexGetStringKeyOrNull {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::StringIndexGetOrNull {
+                container,
+                index: key,
+                ..
+            } => {
+                let container = self.register_type_at(index, container, depth + 1)?;
+                let value = match container {
+                    TypeDescriptor::Array(Some((_, value)))
+                    | TypeDescriptor::Dictionary(Some((_, value)))
+                    | TypeDescriptor::Vector(Some(value)) => *value,
+                    TypeDescriptor::String => TypeDescriptor::String,
+                    _ => {
+                        let ConstantValue::Int(key) =
+                            self.constant_value_fact(self.fact(index, key), depth + 1)?
+                        else {
+                            return None;
+                        };
+
+                        Self::indexed_descriptor(&container, key)?.clone()
+                    }
+                };
+
+                Some(TypeDescriptor::Union(vec![value, TypeDescriptor::Null]))
+            }
+            Instruction::PropertyGetOrNull { object, cache, .. } => {
+                let resolved =
+                    self.property_class_specialization(self.fact(index, object), depth + 1)?;
+                let property = self
+                    .instance_slot_of(resolved.class, self.member_name(cache)?)?
+                    .property;
+                let value = substitute_parameters(
+                    property.declared_type.as_ref()?,
+                    &resolved.class.type_parameters,
+                    resolved.arguments.as_deref(),
+                    depth + 1,
+                );
+
+                Some(TypeDescriptor::Union(vec![value, TypeDescriptor::Null]))
+            }
+            Instruction::StaticPropertyGetOrNull { cache, .. } => {
+                let value = self.static_property_type(cache, depth + 1)?;
+                Some(TypeDescriptor::Union(vec![value, TypeDescriptor::Null]))
+            }
+            Instruction::PropertyGetOrNullUnchecked { object, slot, .. } => {
+                let resolved =
+                    self.property_class_specialization(self.fact(index, object), depth + 1)?;
+                let (_, property) = *self
+                    .flattened_layout(resolved.class)?
+                    .get(usize::from(slot.index()))?;
+                let value = substitute_parameters(
+                    property.declared_type.as_ref()?,
+                    &resolved.class.type_parameters,
+                    resolved.arguments.as_deref(),
+                    depth + 1,
+                );
+
+                Some(TypeDescriptor::Union(vec![value, TypeDescriptor::Null]))
+            }
             Instruction::IndexGet {
                 container,
                 index: key,
@@ -572,6 +662,7 @@ impl<'a> TypeFlow<'a> {
                 else {
                     return None;
                 };
+
                 Self::indexed_descriptor(&container, key).cloned()
             }
             Instruction::ElementGet {
@@ -734,6 +825,36 @@ impl<'a> TypeFlow<'a> {
             }
             _ => None,
         }
+    }
+
+    fn static_property_type(&self, cache: IcSlot, depth: usize) -> Option<TypeDescriptor> {
+        let IcDescriptor::ClassMember {
+            class,
+            member,
+            type_arguments: None,
+        } = self.chunk.ic_descriptors.get(usize::from(cache.index()))?
+        else {
+            return None;
+        };
+
+        let mut class = self.class(class)?;
+        for _ in depth..MAX_TYPE_DEPTH {
+            if !class.type_parameters.is_empty() {
+                return None;
+            }
+
+            if let Some(property) = class
+                .properties
+                .iter()
+                .find(|property| property.is_static && same_atom(&property.name, member))
+            {
+                return property.declared_type.clone();
+            }
+
+            class = self.class(&class.parent.as_ref()?.name)?;
+        }
+
+        None
     }
 
     fn newtype_call_type(&self, index: usize) -> Option<TypeDescriptor> {

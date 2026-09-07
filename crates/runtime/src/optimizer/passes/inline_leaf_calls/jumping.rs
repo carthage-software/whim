@@ -79,6 +79,7 @@ pub(super) fn self_inline_function(
             || matches!(
                 instruction,
                 Instruction::PropertyGet { .. }
+                    | Instruction::PropertyGetOrNull { .. }
                     | Instruction::CheckDefined { .. }
                     | Instruction::ReturnScalarUnchecked { .. }
                     | Instruction::ReturnReferenceUnchecked { .. }

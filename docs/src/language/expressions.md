@@ -117,8 +117,9 @@ generic types, aliases, newtypes, collection shapes, and symbol types.
 
 ## Coalescing
 
-`$left ?? $right` returns the left value unless it is null. It evaluates the
-right side only for null:
+`$left ?? $right` returns the left value when it is present, initialized, and
+non-null. Otherwise it evaluates and returns the right side. False, zero, and
+empty strings are present values:
 
 ```whim
 assert!((0 ?? 10) == 0);
@@ -126,8 +127,46 @@ assert!((false ?? true) == false);
 assert!((null ?? 10) == 10);
 ```
 
-The left expression still runs. A missing dict key or bad property access
-throws before `??` can inspect a value.
+On the left of `??`, property and index accesses probe the whole access path.
+A missing property, uninitialized property, missing index, or null at any step
+selects the fallback. This includes static properties and indexes into vecs,
+dicts, tuples, and strings. Parentheses around an access preserve this behavior.
+
+```whim
+$settings = dict[];
+assert!(($settings['display']['theme'] ?? 'light') == 'light');
+$settings['display'] = dict['theme' => 'dark'];
+assert!(($settings['display']['theme'] ?? 'light') == 'dark');
+```
+
+Receivers and keys are evaluated at most once, from left to right. Once a step
+selects the fallback, subsequent keys are skipped. The right side is evaluated
+only when needed. Invalid receiver or key types and visibility errors still
+throw. An undefined local variable still throws `UndefinedVariableError`.
+
+Calls and other computations execute normally, including their arguments.
+For example, `transform($values['key']) ?? $default` performs an ordinary read
+of `$values['key']` before calling `transform`. Exceptions from a receiver,
+key expression, or call propagate.
+
+`??=` probes the final assignment target and writes the right side only when
+that target is missing, uninitialized, or null. It returns the retained or
+assigned value. A declared property can be initialized, and an existing dict
+can receive a new key:
+
+```whim
+$settings = dict[];
+assert!(($settings['theme'] ??= 'light') == 'light');
+assert!(($settings['theme'] ??= 'dark') == 'light');
+```
+
+Every intermediate value must already exist, be initialized, and have the
+appropriate type. `??=` never creates intermediate containers. For example,
+`$settings['display']['theme'] ??= 'light'` requires an existing, non-null
+`$settings['display']`. A missing parent throws before the right side runs.
+All normal assignment checks apply, including property types, visibility,
+readonly restrictions, and collection bounds. Missing vec positions are not
+created by `??=`.
 
 ## Pipeline
 

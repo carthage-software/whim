@@ -137,6 +137,7 @@ fn instruction_candidates(
         && matches!(
             instruction,
             Instruction::Length { .. }
+                | Instruction::IndexGetOrNull { .. }
                 | Instruction::IndexGet { .. }
                 | Instruction::IndexSet { .. }
                 | Instruction::IndexAddAssign { .. }
@@ -225,7 +226,8 @@ fn instruction_candidates(
     if (configuration.elide_property_checks || configuration.specialize_property_get)
         && matches!(
             instruction,
-            Instruction::PropertyGet { .. }
+            Instruction::PropertyGetOrNull { .. }
+                | Instruction::PropertyGet { .. }
                 | Instruction::PropertySet { .. }
                 | Instruction::PropertyInitRaw { .. }
                 | Instruction::PropertyIndexSet { .. }
@@ -242,6 +244,8 @@ fn instruction_candidates(
         && matches!(
             instruction,
             Instruction::CheckDestructure { .. }
+                | Instruction::JumpIfNull { .. }
+                | Instruction::JumpIfNotNull { .. }
                 | Instruction::Return { .. }
                 | Instruction::ReturnNull
         )

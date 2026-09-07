@@ -30,13 +30,18 @@ pub(in crate::optimizer) fn optimize_unit(
                 continue;
             }
 
-            let Instruction::PropertyGet {
-                destination,
-                object,
-                cache,
-            } = instruction
-            else {
-                continue;
+            let (destination, object, cache, optional) = match instruction {
+                Instruction::PropertyGet {
+                    destination,
+                    object,
+                    cache,
+                } => (destination, object, cache, false),
+                Instruction::PropertyGetOrNull {
+                    destination,
+                    object,
+                    cache,
+                } => (destination, object, cache, true),
+                _ => continue,
             };
 
             let Some(resolved) = analyzed.flow.resolved_property(index, object, cache) else {
@@ -52,11 +57,19 @@ pub(in crate::optimizer) fn optimize_unit(
             if analyzed.write(
                 plan,
                 index,
-                Instruction::PropertyGetUnchecked {
-                    destination,
-                    object,
-                    slot: PropertySlot::new(resolved.slot),
-                    value_mode: PropertyReadMode::Clone,
+                if optional {
+                    Instruction::PropertyGetOrNullUnchecked {
+                        destination,
+                        object,
+                        slot: PropertySlot::new(resolved.slot),
+                    }
+                } else {
+                    Instruction::PropertyGetUnchecked {
+                        destination,
+                        object,
+                        slot: PropertySlot::new(resolved.slot),
+                        value_mode: PropertyReadMode::Clone,
+                    }
                 },
             ) {
                 statistics.property_gets_specialized += 1;

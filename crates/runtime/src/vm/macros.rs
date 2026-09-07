@@ -8,6 +8,13 @@ macro_rules! read_register {
     };
 }
 
+macro_rules! borrow_register {
+    ($registers:expr, $register:expr) => {
+        // SAFETY: verified bytecode keeps the register in the active frame.
+        unsafe { &*$registers.add($register.index() as usize) }
+    };
+}
+
 /// Evaluates the value before writing it, so it may read the register it replaces.
 macro_rules! write_register {
     ($registers:expr, $register:expr, $value:expr) => {{

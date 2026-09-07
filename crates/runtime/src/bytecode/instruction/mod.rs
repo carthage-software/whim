@@ -28,6 +28,7 @@ use crate::bytecode::instruction::operands::ImmediateInt;
 use crate::bytecode::instruction::operands::IndexAddMode;
 use crate::bytecode::instruction::operands::IntStepLoopDescriptorIndex;
 use crate::bytecode::instruction::operands::JumpOffset;
+use crate::bytecode::instruction::operands::NearJumpOffset;
 use crate::bytecode::instruction::operands::PreparedIntLoopDescriptorIndex;
 use crate::bytecode::instruction::operands::PresetDescriptorIndex;
 use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
@@ -405,6 +406,23 @@ macro_rules! instruction_set {
             ConcatenateRightConstant { destination: Register, source: Register, constant: ConstantIndex, } = 199,
             /// `destination = constants[constant] . source`; the constant is a string.
             ConcatenateLeftConstant { destination: Register, source: Register, constant: ConstantIndex, } = 200,
+            IndexGetOrNull { destination: Register, container: Register, index: Register, } = 201,
+            VecIndexGetOrNull { destination: Register, container: Register, index: Register, } = 202,
+            DictIndexGetIntKeyOrNull { destination: Register, container: Register, index: Register, } = 203,
+            DictIndexGetStringKeyOrNull { destination: Register, container: Register, index: Register, } = 204,
+            StringIndexGetOrNull { destination: Register, container: Register, index: Register, } = 205,
+            PropertyGetOrNull { destination: Register, object: Register, cache: IcSlot, } = 206,
+            PropertyGetOrNullUnchecked { destination: Register, object: Register, slot: PropertySlot, } = 207,
+            StaticPropertyGetOrNull { destination: Register, cache: IcSlot, } = 208,
+            Coalesce { destination: Register, source: Register, offset: ShortJumpOffset, } = 209,
+            IndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 210,
+            VecIndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 211,
+            DictIndexCoalesceIntKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 212,
+            DictIndexCoalesceStringKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 213,
+            StringIndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 214,
+            PropertyCoalesce { destination: Register, object: Register, cache: IcSlot, offset: NearJumpOffset, } = 215,
+            PropertyCoalesceUnchecked { destination: Register, object: Register, slot: PropertySlot, offset: NearJumpOffset, } = 216,
+            StaticPropertyCoalesce { destination: Register, cache: IcSlot, offset: ShortJumpOffset, } = 217,
         }
     };
 }
@@ -538,6 +556,11 @@ macro_rules! visit_instruction_operand {
     };
     ($visit:ident, $variant:ident, $field:ident, ShortJumpOffset, $value:expr) => {
         $visit(InstructionOperand::RelativeTarget($value))?;
+    };
+    ($visit:ident, $variant:ident, $field:ident, NearJumpOffset, $value:expr) => {
+        $visit(InstructionOperand::Jump(JumpOffset::new(i32::from(
+            $value.offset(),
+        ))))?;
     };
     ($visit:ident, $variant:ident, $field:ident, SwitchTableIndex, $value:expr) => {
         $visit(InstructionOperand::SwitchTable($value))?;

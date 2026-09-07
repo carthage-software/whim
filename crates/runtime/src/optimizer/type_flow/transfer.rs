@@ -342,6 +342,29 @@ pub(in crate::optimizer) fn transfer(
                     | NULL,
             ),
         ),
+        Instruction::Coalesce {
+            destination,
+            source,
+            ..
+        } => write(destination, read(source)),
+        Instruction::IndexGetOrNull { destination, .. }
+        | Instruction::VecIndexGetOrNull { destination, .. }
+        | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+        | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
+        | Instruction::StringIndexGetOrNull { destination, .. }
+        | Instruction::PropertyGetOrNull { destination, .. }
+        | Instruction::PropertyGetOrNullUnchecked { destination, .. }
+        | Instruction::StaticPropertyGetOrNull { destination, .. }
+        | Instruction::IndexCoalesce { destination, .. }
+        | Instruction::VecIndexCoalesce { destination, .. }
+        | Instruction::DictIndexCoalesceIntKey { destination, .. }
+        | Instruction::DictIndexCoalesceStringKey { destination, .. }
+        | Instruction::StringIndexCoalesce { destination, .. }
+        | Instruction::PropertyCoalesce { destination, .. }
+        | Instruction::PropertyCoalesceUnchecked { destination, .. }
+        | Instruction::StaticPropertyCoalesce { destination, .. } => {
+            write(destination, Fact::UNKNOWN)
+        }
         Instruction::IndexGet {
             destination,
             container,

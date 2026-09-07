@@ -105,6 +105,117 @@ fn dict_key_ref(value: &Value) -> Result<KeyRef<'_>, ArrayFault> {
 }
 
 #[inline(always)]
+pub(in crate::vm) fn index_get_or_null(
+    heap: &Heap,
+    container: &Value,
+    index: &Value,
+) -> Result<Value, ArrayFault> {
+    let found = match container.transparent() {
+        ValueView::Vec(values) => values
+            .get(probe_position(index)?)
+            .map(Value::clone_inline_scalar),
+        ValueView::Tuple(values) => values
+            .get(probe_position(index)?)
+            .map(Value::clone_inline_scalar),
+        ValueView::Dict(values) => values
+            .get_ref(dict_key_ref(index)?)
+            .map(Value::clone_inline_scalar),
+        ValueView::String(_) | ValueView::ShortString(_) => {
+            return string_index_get_or_null(heap, container, index);
+        }
+        _ => return Err(bad_container(container)),
+    };
+    Ok(found.unwrap_or_else(Value::null))
+}
+
+#[inline(always)]
+fn probe_position(index: &Value) -> Result<usize, ArrayFault> {
+    match index.transparent() {
+        ValueView::Int(position) => Ok(usize::try_from(*position).unwrap_or(usize::MAX)),
+        _ => Err(ArrayFault::type_error(format!(
+            "an index must be int, {} given",
+            index.kind_name()
+        ))),
+    }
+}
+
+#[inline(always)]
+fn proven_probe_position(index: &Value) -> usize {
+    // SAFETY: type flow proves the integer index of a specialized vec read.
+    usize::try_from(unsafe { index.as_int_unchecked() }).unwrap_or(usize::MAX)
+}
+
+#[inline(always)]
+pub(in crate::vm) fn vec_index_get_or_null(
+    _: &Heap,
+    container: &Value,
+    index: &Value,
+) -> Result<Value, ArrayFault> {
+    let Some(values) = container.as_vec() else {
+        // SAFETY: type flow proves the container type for this specialized read.
+        unsafe { unreachable_invariant("a specialized probe has its proven container") }
+    };
+    Ok(values
+        .get(proven_probe_position(index))
+        .map(Value::clone_inline_scalar)
+        .unwrap_or_else(Value::null))
+}
+
+#[inline(always)]
+pub(in crate::vm) fn dict_index_get_int_key_or_null(
+    _: &Heap,
+    container: &Value,
+    index: &Value,
+) -> Result<Value, ArrayFault> {
+    let Some(values) = container.as_dict() else {
+        // SAFETY: type flow proves the container type for this specialized read.
+        unsafe { unreachable_invariant("a specialized probe has its proven container") }
+    };
+    // SAFETY: type flow proves the integer key.
+    let key = unsafe { index.as_int_unchecked() };
+    Ok(values
+        .get_int(key)
+        .map(Value::clone_inline_scalar)
+        .unwrap_or_else(Value::null))
+}
+
+#[inline(always)]
+pub(in crate::vm) fn dict_index_get_string_key_or_null(
+    _: &Heap,
+    container: &Value,
+    index: &Value,
+) -> Result<Value, ArrayFault> {
+    let Some(values) = container.as_dict() else {
+        // SAFETY: type flow proves the container type for this specialized read.
+        unsafe { unreachable_invariant("a specialized probe has its proven container") }
+    };
+    let found = match index.transparent() {
+        ValueView::String(key) => values.get_string(key),
+        ValueView::ShortString(key) => values.get_short_string(*key),
+        // SAFETY: type flow proves the string key.
+        _ => unsafe { unreachable_invariant("a specialized string probe has a string key") },
+    };
+    Ok(found
+        .map(Value::clone_inline_scalar)
+        .unwrap_or_else(Value::null))
+}
+
+#[inline(always)]
+pub(in crate::vm) fn string_index_get_or_null(
+    heap: &Heap,
+    container: &Value,
+    index: &Value,
+) -> Result<Value, ArrayFault> {
+    let Some(bytes) = container.as_string_bytes() else {
+        return Err(bad_container(container));
+    };
+    Ok(bytes
+        .get(probe_position(index)?)
+        .map(|byte| Value::string(heap.byte_string(*byte)))
+        .unwrap_or_else(Value::null))
+}
+
+#[inline(always)]
 fn vec_position(index: &Value, length: usize) -> Result<usize, ArrayFault> {
     match index.transparent() {
         ValueView::Int(position) => int_position(*position, length),

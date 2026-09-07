@@ -1,0 +1,310 @@
+use Whim\Marker\NeverInline;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\ReadonlyError;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedVariableError;
+use Whim\Unwind\UninitializedPropertyError;
+use Whim\Unwind\VisibilityError;
+
+final class Probe {
+  public static int $calls = 0;
+  public static int $cached;
+  public static int|null $nullable = null;
+  private static int $hidden = 1;
+  public int $number;
+  public mixed $value = null;
+  public readonly int $locked;
+  private int $secret = 1;
+
+  public function __construct() {
+    $this->locked ??= 9;
+  }
+
+  public function secret(): int {
+    return $this->secret ?? 0;
+  }
+}
+
+function tick(): int {
+  Probe::$calls++;
+  return 0;
+}
+
+function raises<T>(fn(): mixed $operation): void {
+  $caught = null;
+  try {
+    $operation();
+  } catch (Throwable $error) {
+    $caught = $error;
+  }
+
+  assert!($caught != null);
+  assert!($caught is T);
+}
+
+#[NeverInline]
+function property(Probe $probe): int {
+  return $probe->number ?? 42;
+}
+
+#[NeverInline]
+function indexed(dict<string, int> $values, string $key): int {
+  return $values[$key] ?? 42;
+}
+
+#[NeverInline]
+function missing(mixed $value): mixed {
+  return $value->absent ?? 42;
+}
+
+#[NeverInline]
+function local(mixed $value): mixed {
+  return $value ?? 'fallback';
+}
+
+assert!(local(null) == 'fallback');
+assert!(local(false) == false);
+assert!(local(0) == 0);
+assert!(local('') == '');
+
+$probe = new Probe();
+assert!(property($probe) == 42);
+assert!(($probe->number ??= 7) == 7);
+assert!(property($probe) == 7);
+assert!(($probe->number ??= tick()) == 7);
+assert!(($probe->locked ??= tick()) == 9);
+assert!($probe->secret() == 1);
+assert!(($probe->value ??= false) == false);
+assert!(($probe->value ?? 1) == false);
+assert!(($probe->absent ?? 42) == 42);
+assert!(($probe->absent[tick()]->another ?? 42) == 42);
+assert!(Probe::$calls == 0);
+
+foreach (vec[0, false, ''] as $present) {
+  assert!(($present ?? tick()) == $present);
+}
+
+assert!((null ?? 3) == 3);
+assert!((null ?? null ?? 3) == 3);
+assert!((null ?? 2) + 3 == 5);
+assert!((1 + 2 ?? 3) == 3);
+
+$null = null;
+assert!(($null->value[tick()] ?? 7) == 7);
+assert!(($null[tick()] ?? 7) == 7);
+assert!(Probe::$calls == 0);
+$values = dict[true => 1, false => 2, 1 => 3, '1' => 4, 'null' => null];
+assert!(($values[true] ?? 0) == 1);
+assert!(($values[false] ?? 0) == 2);
+assert!(($values[1] ?? 0) == 3);
+assert!(($values['1'] ?? 0) == 4);
+assert!(($values['missing'] ?? 7) == 7);
+assert!(($values['null'] ?? 7) == 7);
+assert!(($values['missing'][tick()] ?? 7) == 7);
+assert!(($values['null'][tick()] ?? 7) == 7);
+assert!(Probe::$calls == 0);
+assert!(indexed(dict['key' => 5], 'key') == 5);
+assert!(indexed(dict[], 'missing') == 42);
+
+$vector = vec[null, 3];
+assert!(($vector[0] ??= 7) == 7);
+assert!(($vector[1] ?? tick()) == 3);
+assert!(($vector[-1] ?? 7) == 7);
+assert!(($vector[2] ?? 7) == 7);
+assert!(((1, 2)[2] ?? 7) == 7);
+assert!(('ab'[1] ?? 'z') == 'b');
+assert!(('ab'[2] ?? 'z') == 'z');
+assert!(('ab'[-1] ?? 'z') == 'z');
+
+$nested = dict['outer' => dict[]];
+assert!(($nested['outer']['key'] ??= 42) == 42);
+assert!($nested['outer']['key'] == 42);
+$copy = $nested;
+$nested['outer']['other'] ??= 7;
+assert!(!contains_key!($copy['outer'], 'other'));
+$nested['outer'][tick()] ??= 1;
+assert!(Probe::$calls == 1);
+$nested['outer'][tick()] ??= tick();
+assert!(Probe::$calls == 2);
+
+assert!((Probe::$cached ?? 42) == 42);
+assert!((Probe::$cached ??= 7) == 7);
+assert!((Probe::$cached ??= tick()) == 7);
+assert!((Probe::$nullable ??= 8) == 8);
+assert!((Probe::$absent ?? 42) == 42);
+assert!(Probe::$calls == 2);
+
+raises::<VisibilityError>(function() use ($probe): mixed {
+  return $probe->secret ?? 0;
+});
+
+raises::<VisibilityError>(function(): mixed {
+  return Probe::$hidden ?? 0;
+});
+
+raises::<UndefinedVariableError>(function(): mixed {
+  return $undefined ?? 0;
+});
+
+raises::<UndefinedVariableError>(function(): mixed {
+  return $undefined ??= 0;
+});
+
+raises::<TypeError>(function(): mixed {
+  return dict[][vec[]] ?? 0;
+});
+
+raises::<TypeError>(function(): mixed {
+  return vec[]['key'] ?? 0;
+});
+
+raises::<TypeError>(function(): mixed {
+  return 7[0] ?? 0;
+});
+
+raises::<TypeError>(function(): mixed {
+  return missing(7);
+});
+
+raises::<TypeError>(function(): mixed {
+  return new Probe()->number ??= 'invalid';
+});
+
+raises::<TypeError>(function() use ($probe): mixed {
+  return $probe->absent ??= tick();
+});
+
+assert!(Probe::$calls == 3);
+raises::<TypeError>(function(): mixed {
+  return Probe::$absent ??= tick();
+});
+
+assert!(Probe::$calls == 4);
+raises::<VisibilityError>(function() use ($probe): mixed {
+  return $probe->secret ??= tick();
+});
+
+assert!(Probe::$calls == 4);
+raises::<UninitializedPropertyError>(function(): mixed {
+  return new Probe()->number[0] ??= tick();
+});
+
+raises::<OutOfBoundsError>(function(): mixed {
+  $values = dict[];
+  return $values['missing'][0] ??= tick();
+});
+
+raises::<TypeError>(function(): mixed {
+  $values = dict['null' => null];
+  return $values['null'][0] ??= tick();
+});
+
+raises::<TypeError>(function(): mixed {
+  $value = null;
+  return $value->number ??= tick();
+});
+
+assert!(Probe::$calls == 4);
+raises::<OutOfBoundsError>(function(): mixed {
+  $values = vec[];
+  return $values[0] ??= tick();
+});
+
+assert!(Probe::$calls == 5);
+
+final class UnwrittenReadonly {
+  public readonly int $value;
+}
+
+raises::<ReadonlyError>(function(): mixed {
+  $value = new UnwrittenReadonly();
+  return $value->value ??= 1;
+});
+
+function identity(mixed $value): mixed {
+  return $value;
+}
+
+function broken_key(): int {
+  return vec[][0];
+}
+
+raises::<OutOfBoundsError>(function(): mixed {
+  return identity(dict[]['missing']) ?? 0;
+});
+
+raises::<OutOfBoundsError>(function(): mixed {
+  return dict[][broken_key()] ?? 0;
+});
+
+raises::<OutOfBoundsError>(function(): mixed {
+  return broken_key() ?? 0;
+});
+
+assert!((identity(null)->number[broken_key()] ?? 42) == 42);
+assert!((identity(new Probe())->number ?? 42) == 42);
+assert!((identity(new Probe())?->number ?? 42) == 42);
+assert!(((identity(dict[])['missing']) ?? 42) == 42);
+
+raises::<UndefinedVariableError>(function(): mixed {
+  $values = dict[];
+  $_ = $values['missing'][$skipped = 0] ?? 7;
+  return $skipped;
+});
+
+raises::<UndefinedVariableError>(function(): mixed {
+  $values = dict[];
+  return $values['missing'][$skipped = 0] ?? $skipped;
+});
+
+raises::<UndefinedVariableError>(function(): mixed {
+  $_ = 1 ?? ($skipped = 0);
+  return $skipped;
+});
+
+final class DifferentProbe {
+  public string $absent = 'present';
+}
+
+foreach (vec[
+  $probe,
+  new DifferentProbe(),
+  $probe,
+  new DifferentProbe(),
+] as $value) {
+  if ($value is Probe) {
+    assert!(missing($value) == 42);
+  } else {
+    assert!(missing($value) == 'present');
+  }
+}
+
+class StaticProbe {
+  public static function read(): mixed {
+    return static::$value ?? 'missing';
+  }
+}
+
+final class StaticPresent extends StaticProbe {
+  public static int $value = 42;
+}
+
+assert!(StaticProbe::read() == 'missing');
+assert!(StaticPresent::read() == 42);
+assert!(StaticProbe::read() == 'missing');
+assert!(StaticPresent::read() == 42);
+
+$changing = vec[5];
+assert!(($changing[($changing = vec[0])[0]] ?? 42) == 5);
+assert!($changing == vec[0]);
+
+newtype ProbeNumber = int;
+newtype ProbeNumbers = vec<ProbeNumber>;
+
+$tagged = ProbeNumber(42);
+assert!((vec[$tagged][0] ?? 0) is ProbeNumber);
+assert!((dict['key' => $tagged]['key'] ?? 0) is ProbeNumber);
+assert!((ProbeNumbers(vec[$tagged])[0] ?? 0) is ProbeNumber);
+$probe->value = $tagged;
+assert!(($probe->value ?? 0) is ProbeNumber);

@@ -80,9 +80,14 @@ use crate::vm::array_length;
 use crate::vm::arrays::array_contains;
 use crate::vm::arrays::array_contains_key;
 use crate::vm::arrays::array_length_hint;
+use crate::vm::arrays::dict_index_get_int_key_or_null;
+use crate::vm::arrays::dict_index_get_string_key_or_null;
 use crate::vm::arrays::dict_index_set;
+use crate::vm::arrays::index_get_or_null;
 use crate::vm::arrays::int_position;
 use crate::vm::arrays::reserve_array_hint;
+use crate::vm::arrays::string_index_get_or_null;
+use crate::vm::arrays::vec_index_get_or_null;
 use crate::vm::bitwise_and;
 use crate::vm::bitwise_or;
 use crate::vm::bitwise_xor;
@@ -1175,6 +1180,358 @@ impl VirtualMachine<'_> {
                     string_byte_jump {
                         StringByteJumpUnlessEqual => !=;
                         StringByteJumpUnlessNotEqual => ==;
+                    }
+                    Instruction::IndexGetOrNull {
+                        destination,
+                        container,
+                        index,
+                    } => {
+                        let outcome = index_get_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::VecIndexGetOrNull {
+                        destination,
+                        container,
+                        index,
+                    } => {
+                        let outcome = vec_index_get_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::DictIndexGetIntKeyOrNull {
+                        destination,
+                        container,
+                        index,
+                    } => {
+                        let outcome = dict_index_get_int_key_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::DictIndexGetStringKeyOrNull {
+                        destination,
+                        container,
+                        index,
+                    } => {
+                        let outcome = dict_index_get_string_key_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::StringIndexGetOrNull {
+                        destination,
+                        container,
+                        index,
+                    } => {
+                        let outcome = string_index_get_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::IndexCoalesce {
+                        destination,
+                        container,
+                        index,
+                        offset,
+                    } => {
+                        let outcome = index_get_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::VecIndexCoalesce {
+                        destination,
+                        container,
+                        index,
+                        offset,
+                    } => {
+                        let outcome = vec_index_get_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::DictIndexCoalesceIntKey {
+                        destination,
+                        container,
+                        index,
+                        offset,
+                    } => {
+                        let outcome = dict_index_get_int_key_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::DictIndexCoalesceStringKey {
+                        destination,
+                        container,
+                        index,
+                        offset,
+                    } => {
+                        let outcome = dict_index_get_string_key_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::StringIndexCoalesce {
+                        destination,
+                        container,
+                        index,
+                        offset,
+                    } => {
+                        let outcome = string_index_get_or_null(
+                            &self.heap,
+                            borrow_register!(registers, container),
+                            borrow_register!(registers, index),
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::PropertyGetOrNull {
+                        destination,
+                        object,
+                        cache,
+                    } => {
+                        let outcome = self.property_get_or_null(
+                            cache.index() as usize,
+                            chunk,
+                            borrow_register!(registers, object),
+                            ip,
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(control) => {
+                                fail!(self, ip, floor, 'dispatch, control);
+                            }
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::PropertyCoalesce {
+                        destination,
+                        object,
+                        cache,
+                        offset,
+                    } => {
+                        let outcome = self.property_get_or_null(
+                            cache.index() as usize,
+                            chunk,
+                            borrow_register!(registers, object),
+                            ip,
+                        );
+                        let value = match outcome {
+                            Ok(value) => value,
+                            Err(control) => {
+                                fail!(self, ip, floor, 'dispatch, control);
+                            }
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::PropertyGetOrNullUnchecked {
+                        destination,
+                        object,
+                        slot,
+                    } => {
+                        // SAFETY: type flow proves the receiver class and its property slot.
+                        let receiver = unsafe { object_register(registers, object) };
+                        // SAFETY: the resolved slot belongs to the proven receiver class.
+                        let value = if let Some(integer) =
+                            unsafe { receiver.read_int_slot_unchecked(usize::from(slot.index())) }
+                        {
+                            Value::int(integer)
+                        } else {
+                            // SAFETY: the resolved slot belongs to the proven receiver class.
+                            let value = unsafe { receiver.read_slot_unchecked(usize::from(slot.index())) };
+                            if value.is_uninitialized() {
+                                Value::null()
+                            } else {
+                                value
+                            }
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::PropertyCoalesceUnchecked {
+                        destination,
+                        object,
+                        slot,
+                        offset,
+                    } => {
+                        // SAFETY: type flow proves the receiver class and its property slot.
+                        let receiver = unsafe { object_register(registers, object) };
+                        // SAFETY: the resolved slot belongs to the proven receiver class.
+                        let value = if let Some(integer) =
+                            unsafe { receiver.read_int_slot_unchecked(usize::from(slot.index())) }
+                        {
+                            Value::int(integer)
+                        } else {
+                            // SAFETY: the resolved slot belongs to the proven receiver class.
+                            let value = unsafe { receiver.read_slot_unchecked(usize::from(slot.index())) };
+                            if value.is_uninitialized() {
+                                Value::null()
+                            } else {
+                                value
+                            }
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::StaticPropertyGetOrNull { destination, cache } => {
+                        let value = if let Some(value) = self.cached_static_get_or_null(cache.index() as usize)
+                        {
+                            value
+                        } else {
+                            self.sync_ip(ip);
+                            let value = match self.static_get_or_null(cache.index() as usize, chunk) {
+                                Ok(value) => value,
+                                Err(control) => {
+                                    fail!(self, ip, floor, 'dispatch, control);
+                                }
+                            };
+                            reload_frame!(self, chunk, code, ip, registers);
+                            value
+                        };
+
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::StaticPropertyCoalesce {
+                        destination,
+                        cache,
+                        offset,
+                    } => {
+                        let value = if let Some(value) = self.cached_static_get_or_null(cache.index() as usize)
+                        {
+                            value
+                        } else {
+                            self.sync_ip(ip);
+                            let value = match self.static_get_or_null(cache.index() as usize, chunk) {
+                                Ok(value) => value,
+                                Err(control) => {
+                                    fail!(self, ip, floor, 'dispatch, control);
+                                }
+                            };
+                            reload_frame!(self, chunk, code, ip, registers);
+                            value
+                        };
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
+                    }
+                    Instruction::Coalesce {
+                        destination,
+                        source,
+                        offset,
+                    } => {
+                        let value = read_register!(registers, source);
+                        if !value.is_null() {
+                            ip = jump_target(ip, i32::from(offset.offset()));
+                        }
+                        write_register!(registers, destination, value);
                     }
                     Instruction::Move {
                         destination,

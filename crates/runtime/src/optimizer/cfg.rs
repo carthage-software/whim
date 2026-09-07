@@ -17,7 +17,9 @@ pub(in crate::optimizer) fn successors(chunk: &Chunk, index: usize, successors: 
         Instruction::IncrementJump { offset, .. } => {
             successors.push(relative_target(index, i32::from(offset.offset())));
         }
-        Instruction::CounterLoop { offset, .. }
+        Instruction::Coalesce { offset, .. }
+        | Instruction::StaticPropertyCoalesce { offset, .. }
+        | Instruction::CounterLoop { offset, .. }
         | Instruction::IntCounterLoop { offset, .. }
         | Instruction::IntStepLoop { offset, .. }
         | Instruction::NumericLoop { offset, .. }
@@ -32,6 +34,16 @@ pub(in crate::optimizer) fn successors(chunk: &Chunk, index: usize, successors: 
         | Instruction::JumpUnlessConstant { offset, .. }
         | Instruction::IntRangeJumpIf { offset, .. }
         | Instruction::IntRangeJumpUnless { offset, .. } => {
+            successors.push(index + 1);
+            successors.push(relative_target(index, i32::from(offset.offset())));
+        }
+        Instruction::IndexCoalesce { offset, .. }
+        | Instruction::VecIndexCoalesce { offset, .. }
+        | Instruction::DictIndexCoalesceIntKey { offset, .. }
+        | Instruction::DictIndexCoalesceStringKey { offset, .. }
+        | Instruction::StringIndexCoalesce { offset, .. }
+        | Instruction::PropertyCoalesce { offset, .. }
+        | Instruction::PropertyCoalesceUnchecked { offset, .. } => {
             successors.push(index + 1);
             successors.push(relative_target(index, i32::from(offset.offset())));
         }
@@ -136,6 +148,15 @@ pub(in crate::optimizer) fn branches_or_terminates(instruction: Instruction) -> 
             | Instruction::JumpIfTrue { .. }
             | Instruction::JumpIfNull { .. }
             | Instruction::JumpIfNotNull { .. }
+            | Instruction::IndexCoalesce { .. }
+            | Instruction::VecIndexCoalesce { .. }
+            | Instruction::DictIndexCoalesceIntKey { .. }
+            | Instruction::DictIndexCoalesceStringKey { .. }
+            | Instruction::StringIndexCoalesce { .. }
+            | Instruction::PropertyCoalesce { .. }
+            | Instruction::PropertyCoalesceUnchecked { .. }
+            | Instruction::StaticPropertyCoalesce { .. }
+            | Instruction::Coalesce { .. }
             | Instruction::JumpUnless { .. }
             | Instruction::IntJumpUnless { .. }
             | Instruction::StringJumpUnless { .. }
@@ -350,6 +371,15 @@ pub(in crate::optimizer) fn is_block_boundary(instruction: Instruction) -> bool 
             | Instruction::JumpIfTrue { .. }
             | Instruction::JumpIfNull { .. }
             | Instruction::JumpIfNotNull { .. }
+            | Instruction::IndexCoalesce { .. }
+            | Instruction::VecIndexCoalesce { .. }
+            | Instruction::DictIndexCoalesceIntKey { .. }
+            | Instruction::DictIndexCoalesceStringKey { .. }
+            | Instruction::StringIndexCoalesce { .. }
+            | Instruction::PropertyCoalesce { .. }
+            | Instruction::PropertyCoalesceUnchecked { .. }
+            | Instruction::StaticPropertyCoalesce { .. }
+            | Instruction::Coalesce { .. }
             | Instruction::SwitchInt { .. }
             | Instruction::SwitchString { .. }
             | Instruction::SwitchBool { .. }

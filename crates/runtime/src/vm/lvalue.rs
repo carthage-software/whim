@@ -110,6 +110,12 @@ impl VirtualMachine<'_> {
         site: usize,
         receiver_class: ClassId,
     ) -> Option<u32> {
+        self.cached_property_slot_or_missing(site, receiver_class)
+            .filter(|slot| *slot != u32::MAX)
+    }
+
+    #[inline(always)]
+    fn cached_property_slot_or_missing(&self, site: usize, receiver_class: ClassId) -> Option<u32> {
         let cache_pointer = self.current_frame().cache;
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let cache_cell = unsafe { cache_pointer.as_ref() };
@@ -134,7 +140,49 @@ impl VirtualMachine<'_> {
             return Ok(slot);
         }
 
-        self.resolve_property_slot(site, chunk, receiver_class)
+        self.resolve_property_slot::<false>(site, chunk, receiver_class)
+    }
+
+    #[inline(always)]
+    pub(in crate::vm) fn property_get_or_null(
+        &mut self,
+        site: usize,
+        chunk: &Chunk,
+        receiver: &Value,
+        ip: usize,
+    ) -> Result<Value, VirtualMachineControl> {
+        let Some(instance) = receiver.as_object() else {
+            self.sync_ip(ip);
+            return Err(self.throw_well_known(
+                self.engine.tables.well_known.type_error,
+                format!("cannot access a property on {}", receiver.kind_name()),
+            ));
+        };
+
+        let slot = match self.cached_property_slot_or_missing(site, instance.class()) {
+            Some(slot) => slot,
+            None => {
+                self.sync_ip(ip);
+                self.resolve_property_slot::<true>(site, chunk, instance.class())?
+            }
+        };
+
+        if slot == u32::MAX {
+            return Ok(Value::null());
+        }
+
+        // SAFETY: resolution or a matching class cache proves the property slot.
+        if let Some(integer) = unsafe { instance.read_int_slot_unchecked(slot as usize) } {
+            return Ok(Value::int(integer));
+        }
+
+        // SAFETY: resolution or a matching class cache proves the property slot.
+        let value = unsafe { instance.read_slot_unchecked(slot as usize) };
+        Ok(if value.is_uninitialized() {
+            Value::null()
+        } else {
+            value
+        })
     }
 
     /// Resolves the slot a raw property initialization writes, caching it by
@@ -207,7 +255,7 @@ impl VirtualMachine<'_> {
     /// Resolves and fills a property cache miss.
     #[cold]
     #[inline(never)]
-    fn resolve_property_slot(
+    fn resolve_property_slot<const OPTIONAL: bool>(
         &mut self,
         site: usize,
         chunk: &Chunk,
@@ -224,6 +272,18 @@ impl VirtualMachine<'_> {
             .and_then(|scope| class.private_slots.get(&(scope, name.clone())).copied())
             .or_else(|| class.slot_names.get(name).copied())
         else {
+            if OPTIONAL {
+                let cache_pointer = self.current_frame().cache;
+                // SAFETY: the active frame owns its inline cache.
+                let cache = unsafe { &mut *cache_pointer.as_ref().property_slots() };
+                if cache.is_empty() {
+                    cache.resize(chunk.ic_descriptors.len(), CachedPropertySlot::EMPTY);
+                }
+
+                cache[site] = CachedPropertySlot::new(receiver_class, u32::MAX);
+                return Ok(u32::MAX);
+            }
+
             let class_name = class.name.to_string();
             let member = name.to_string_lossy().into_owned();
             return Err(self.throw_well_known(
@@ -746,6 +806,67 @@ impl VirtualMachine<'_> {
         site: usize,
         chunk: &Chunk,
     ) -> Result<(ClassId, u32), VirtualMachineControl> {
+        self.static_slot_for_mode::<false>(site, chunk)
+    }
+
+    pub(in crate::vm) fn static_get_or_null(
+        &mut self,
+        site: usize,
+        chunk: &Chunk,
+    ) -> Result<Value, VirtualMachineControl> {
+        let (class, slot) = self.static_slot_for_mode::<true>(site, chunk)?;
+        if slot == u32::MAX {
+            return Ok(Value::null());
+        }
+
+        let value = self.engine.tables.classes[class.0 as usize]
+            .statics
+            .borrow()[slot as usize]
+            .clone();
+
+        Ok(if value.is_uninitialized() {
+            Value::null()
+        } else {
+            value
+        })
+    }
+
+    #[inline(always)]
+    pub(in crate::vm) fn cached_static_get_or_null(&self, site: usize) -> Option<Value> {
+        let cache_pointer = self.current_frame().cache;
+        // SAFETY: the active frame owns the cache and its entries.
+        let cache = unsafe { &*cache_pointer.as_ref().entries() };
+        let CacheEntry::StaticSlot { class, slot } = cache.get(site)? else {
+            return None;
+        };
+
+        if *slot == u32::MAX {
+            return Some(Value::null());
+        }
+
+        let statics = self.engine.tables.classes[class.0 as usize]
+            .statics
+            .borrow();
+
+        let value = &statics[*slot as usize];
+        if value.newtype_id().is_none()
+            && let Some(integer) = value.as_int()
+        {
+            return Some(Value::int(integer));
+        }
+
+        Some(if value.is_uninitialized() {
+            Value::null()
+        } else {
+            value.clone_inline_scalar()
+        })
+    }
+
+    fn static_slot_for_mode<const OPTIONAL: bool>(
+        &mut self,
+        site: usize,
+        chunk: &Chunk,
+    ) -> Result<(ClassId, u32), VirtualMachineControl> {
         let cache_pointer = self.current_frame().cache;
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let cache_cell = unsafe { cache_pointer.as_ref() };
@@ -755,7 +876,9 @@ impl VirtualMachine<'_> {
             cache.resize(chunk.ic_descriptors.len(), CacheEntry::Empty);
         }
 
-        if let CacheEntry::StaticSlot { class, slot } = &cache[site] {
+        if let CacheEntry::StaticSlot { class, slot } = &cache[site]
+            && (OPTIONAL || *slot != u32::MAX)
+        {
             return Ok((*class, *slot));
         }
 
@@ -764,6 +887,19 @@ impl VirtualMachine<'_> {
         let mut current = Some(named_class);
         let found = loop {
             let Some(class) = current else {
+                if OPTIONAL {
+                    if *class_atom != self.engine.tables.static_atom {
+                        // SAFETY: the active frame owns its inline cache.
+                        let cache = unsafe { &mut *cache_cell.entries() };
+                        cache[site] = CacheEntry::StaticSlot {
+                            class: named_class,
+                            slot: u32::MAX,
+                        };
+                    }
+
+                    return Ok((named_class, u32::MAX));
+                }
+
                 let member_text = member.to_string_lossy().into_owned();
                 let class_text = String::from_utf8_lossy(
                     self.engine.tables.classes[named_class.0 as usize]
@@ -771,6 +907,7 @@ impl VirtualMachine<'_> {
                         .as_bytes(),
                 )
                 .into_owned();
+
                 return Err(self.throw_well_known(
                     self.engine.tables.well_known.type_error,
                     format!("the static property {class_text}::${member_text} is not declared"),

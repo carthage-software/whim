@@ -10,6 +10,8 @@ use crate::bytecode::rewrite::compact;
 use crate::bytecode::unit::CompiledMethod;
 use crate::bytecode::unit::must_use_note;
 use crate::optimizer::OptimizationConfiguration;
+use crate::optimizer::passes::fuse_coalescing::normalize_chunk;
+use crate::optimizer::passes::fuse_coalescing::normalized_chunk;
 use crate::optimizer::passes::inline_leaf_calls::Atom;
 use crate::optimizer::passes::inline_leaf_calls::CALLEE_INSTRUCTION_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::Chunk;
@@ -215,7 +217,8 @@ pub(super) fn inline_direct_methods(
         let callee = unit.classes[site.class].methods[site.method]
             .function
             .clone();
-        let snapshot = callee.chunk.clone();
+        let mut snapshot = callee.chunk.clone();
+        normalize_chunk(&mut snapshot);
         let declared = callee.parameters.len();
         let Ok(parameters) = u16::try_from(declared + 1) else {
             continue;
@@ -337,6 +340,8 @@ pub(super) fn method_body_inlinable(chunk: &Chunk, parameters: u16, force: bool)
         return false;
     }
 
+    let chunk = normalized_chunk(chunk);
+    let chunk = chunk.as_ref();
     let Some(terminal) = unchecked_terminal(chunk) else {
         return false;
     };
@@ -346,6 +351,7 @@ pub(super) fn method_body_inlinable(chunk: &Chunk, parameters: u16, force: bool)
             || matches!(
                 instruction,
                 Instruction::PropertyGetUnchecked { .. }
+                    | Instruction::PropertyGetOrNullUnchecked { .. }
                     | Instruction::PropertySetUnchecked { .. }
                     | Instruction::ReturnScalarUnchecked { .. }
                     | Instruction::ReturnReferenceUnchecked { .. }
@@ -381,6 +387,8 @@ pub(super) fn generic_body_inlinable(chunk: &Chunk, parameters: u16, force: bool
         return false;
     }
 
+    let chunk = normalized_chunk(chunk);
+    let chunk = chunk.as_ref();
     let Some(terminal) = unchecked_terminal(chunk) else {
         return false;
     };
@@ -390,6 +398,7 @@ pub(super) fn generic_body_inlinable(chunk: &Chunk, parameters: u16, force: bool
             || matches!(
                 instruction,
                 Instruction::PropertyGetUnchecked { .. }
+                    | Instruction::PropertyGetOrNullUnchecked { .. }
                     | Instruction::PropertySetUnchecked { .. }
                     | Instruction::NewStatic { .. }
                     | Instruction::ReturnScalarUnchecked { .. }

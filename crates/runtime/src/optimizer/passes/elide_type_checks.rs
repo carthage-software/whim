@@ -30,6 +30,25 @@ pub(in crate::optimizer) fn optimize_unit(
                 continue;
             }
 
+            let null_branch = match instruction {
+                Instruction::JumpIfNull { subject, offset } => Some((subject, offset, true)),
+                Instruction::JumpIfNotNull { subject, offset } => Some((subject, offset, false)),
+                _ => None,
+            };
+            if let Some((subject, offset, branch_on_null)) = null_branch
+                && let Some(is_null) = analyzed.flow.nullness(index, subject)
+            {
+                let changed = if is_null == branch_on_null {
+                    analyzed.write(plan, index, Instruction::Jump { offset })
+                } else {
+                    plan.remove(analyzed, index)
+                };
+                if changed {
+                    statistics.type_checks_elided += 1;
+                }
+                continue;
+            }
+
             if let Instruction::CheckDestructure {
                 subject,
                 required,

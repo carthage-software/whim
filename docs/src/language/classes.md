@@ -126,6 +126,9 @@ class Job {
 A property without a default starts uninitialized. Reading it throws
 `Whim\Unwind\UninitializedPropertyError`.
 
+The [coalescing operators](expressions.md#coalescing) can read a fallback for
+an uninitialized property or initialize it with `??=`.
+
 ```whim,norun
 class Job {
   public string $state;

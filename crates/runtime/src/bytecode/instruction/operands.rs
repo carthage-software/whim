@@ -79,6 +79,11 @@ integer_operand!(
     ShortJumpOffset(i16) => offset
 );
 
+integer_operand!(
+    /// A signed 8-bit relative jump used by packed superinstructions.
+    NearJumpOffset(i8) => offset
+);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub(crate) enum Comparison {

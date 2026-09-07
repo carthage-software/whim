@@ -16,6 +16,7 @@ use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
 use crate::bytecode::instruction::operands::PropertyReadMode;
 use crate::bytecode::instruction::operands::PropertyRemoveMode;
+use crate::bytecode::instruction::operands::ShortJumpOffset;
 
 macro_rules! instructions {
     ($($name:ident)|+ ; $fields:tt) => {
@@ -32,6 +33,69 @@ macro_rules! instructions {
 )]
 pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) -> String {
     match instruction {
+        Instruction::PropertyGetOrNullUnchecked {
+            destination,
+            object,
+            slot,
+        } => format!(
+            " {}, {}, slot[{}]",
+            register(destination),
+            register(object),
+            slot.index()
+        ),
+        Instruction::Coalesce {
+            destination,
+            source,
+            offset,
+        } => format!(
+            " {}, {} {}",
+            register(destination),
+            register(source),
+            short_jump(index, offset)
+        ),
+        Instruction::StaticPropertyCoalesce {
+            destination,
+            cache,
+            offset,
+        } => format!(
+            " {}, {} {}",
+            register(destination),
+            cache_reference(chunk, cache),
+            short_jump(index, offset)
+        ),
+        Instruction::PropertyCoalesce {
+            destination,
+            object,
+            cache,
+            offset,
+        } => format!(
+            " {}, {}, {} {}",
+            register(destination),
+            register(object),
+            cache_reference(chunk, cache),
+            short_jump(index, ShortJumpOffset::new(i16::from(offset.offset())))
+        ),
+        Instruction::PropertyCoalesceUnchecked {
+            destination,
+            object,
+            slot,
+            offset,
+        } => format!(
+            " {}, {}, slot[{}] {}",
+            register(destination),
+            register(object),
+            slot.index(),
+            short_jump(index, ShortJumpOffset::new(i16::from(offset.offset())))
+        ),
+        instructions!(IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceStringKey | StringIndexCoalesce; { destination, container, index: subscript, offset }) => {
+            format!(
+                " {}, {}, {} {}",
+                register(destination),
+                register(container),
+                register(subscript),
+                short_jump(index, ShortJumpOffset::new(i16::from(offset.offset())))
+            )
+        }
         instructions!(
             Move | MoveOwned | Negate | UnaryPlus | BitwiseNot | IntBitwiseNot | Not | Length
                 | StringLength | CloneObject;
@@ -350,7 +414,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(destination),
             window(first_pair, 2 * u32::from(pair_count.value()))
         ),
-        instructions!(IndexGet | StringIndexGet; {
+        instructions!(IndexGetOrNull | VecIndexGetOrNull | DictIndexGetIntKeyOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexGet | StringIndexGet; {
             destination,
             container,
             index: subscript,
@@ -510,11 +574,11 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(destination),
             descriptor_reference(chunk, descriptor)
         ),
-        Instruction::PropertyGet {
+        instructions!(PropertyGet | PropertyGetOrNull; {
             destination,
             object,
             cache,
-        } => format!(
+        }) => format!(
             " {}, {}, {}",
             register(destination),
             register(object),
@@ -694,7 +758,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             slot.index()
         ),
         instructions!(
-            NewStatic | StaticPropertyGet | ConstantGet | ClassConstantGet;
+            NewStatic | StaticPropertyGetOrNull | StaticPropertyGet | ConstantGet | ClassConstantGet;
             { destination, cache }
         ) => format!(
             " {}, {}",

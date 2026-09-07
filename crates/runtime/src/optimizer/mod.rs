@@ -69,6 +69,8 @@ pub(crate) struct OptimizationConfiguration {
     pub elide_property_checks: bool,
     /// Fuse a comparison whose only consumer is a conditional jump.
     pub fuse_comparison: bool,
+    /// Fuse a coalescing operation with its adjacent load and store.
+    pub fuse_coalescing: bool,
     /// Fuse a one-literal exact function call with its adjacent literal load.
     pub fuse_call_constant: bool,
     /// Fuse string constants into concatenation.
@@ -182,6 +184,7 @@ impl Default for OptimizationConfiguration {
             elide_discarded_checks: true,
             elide_property_checks: true,
             fuse_comparison: true,
+            fuse_coalescing: true,
             fuse_call_constant: true,
             fuse_concatenation: true,
             fuse_float_constants: true,
@@ -559,6 +562,7 @@ pub(crate) fn optimize_unit_with_world(
     configuration: OptimizationConfiguration,
 ) -> OptimizationStatistics {
     let mut statistics = OptimizationStatistics::default();
+    passes::fuse_coalescing::normalize_unit(unit, configuration);
     let has_destructor = passes::finalizer_boundaries::has_destructor(unit);
 
     analysis::annotate_capture_types(unit, world, heap);
@@ -618,6 +622,7 @@ pub(crate) fn optimize_unit_with_world(
     passes::refine_reference_registers::optimize_unit(unit, configuration);
     passes::fuse_property_initialization::optimize_unit(unit, configuration, &mut statistics);
     passes::scalar_replace_objects::optimize_unit(unit, configuration, &mut statistics);
+    passes::fuse_coalescing::optimize_unit(unit, configuration, &mut statistics);
     statistics
 }
 
