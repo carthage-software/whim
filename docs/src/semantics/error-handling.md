@@ -171,8 +171,10 @@ when the return later fails its declared type.
 `exit!` ends normal execution. It does not run enclosing catch, `else`, or
 `finally` clauses. Whim still runs shutdown destructors.
 
-`panic!('message')` does the same, but first writes the message and current
-stack trace to standard error. It always exits with status 255. It is for a
+`panic!($message)` evaluates its message expression, then writes the string
+and current stack trace to standard error and exits with status 255. A
+non-string result throws a catchable `TypeError` before the panic occurs.
+Errors during message evaluation also propagate normally. Panic is for a
 broken invariant, not an error a caller can handle.
 
 ## Uncaught throwables

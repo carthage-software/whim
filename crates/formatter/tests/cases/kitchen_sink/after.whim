@@ -52,5 +52,9 @@ function main(): int {
     $double($value),
   );
 
+  if (!$p) {
+    panic!('missing point: ' . describe($result));
+  }
+
   return 0;
 }

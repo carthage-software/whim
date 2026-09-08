@@ -2,3 +2,4 @@ $result = compute($alpha, $beta, $gamma, $delta, $epsilon);
 $items = vec['one', 'two', 'three', 'four', 'five', 'six'];
 $config = dict['host' => 'localhost', 'port' => 8080, 'secure' => true];
 $result = match($value) { $_ => sequence!($value=compute($alpha),record($value),$value,), };
+panic! ( describe($alpha,$beta,$gamma,$delta), );

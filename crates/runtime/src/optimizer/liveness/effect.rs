@@ -166,6 +166,7 @@ pub(in crate::optimizer) fn effect_on(
         | Instruction::ReturnReferenceUnchecked { source }
         | Instruction::ReturnScalarUnchecked { source }
         | Instruction::Throw { source }
+        | Instruction::Panic { message: source }
         | Instruction::CheckDiscardedResult { source }
         | Instruction::CheckSoleReference { source, .. } => {
             if reads(source) {
@@ -549,7 +550,6 @@ pub(in crate::optimizer) fn effect_on(
                 Effect::None
             }
         }
-        Instruction::Panic { .. } => Effect::None,
         Instruction::Require {
             destination, path, ..
         } => read_then_write(reads(path), writes(destination)),

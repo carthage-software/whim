@@ -36,5 +36,6 @@ function main() : int {
     foreach  (vec[ 1 , 2 , 3 ]  as $i => $v)  { $sum += $v ; }
     $double = fn ( int $n ) : int => $n * 2 ;
     $result = sequence! ( $value=1 ,sequence!($value+=2,$value,),$double($value), );
+    if(!$p){panic! ( 'missing point: '.describe($result), );}
     return 0 ;
 }

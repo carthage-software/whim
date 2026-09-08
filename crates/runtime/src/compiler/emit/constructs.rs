@@ -158,7 +158,7 @@ impl BodyCompiler<'_, '_> {
                 self.null_result(exit.span())
             }
             Construct::Panic(panic) => {
-                let message = self.string_constant(panic.message.value, panic.span())?;
+                let message = self.expression(scope, panic.message)?;
                 self.chunk
                     .emit(Instruction::Panic { message }, panic.span());
                 self.null_result(panic.span())

@@ -96,7 +96,7 @@ where
                 None => f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset),
             },
             Construct::Panic(c) => {
-                format_literal_construct(f, c.name.value, &c.message, c.right_parenthesis)
+                f.format_construct(c.name.value, &[c.message], c.right_parenthesis.start.offset)
             }
             Construct::Write(c) => f.format_variadic_construct(
                 c.name.value,

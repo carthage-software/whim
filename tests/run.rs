@@ -125,7 +125,7 @@ fn panic_exits_255_with_a_redacted_trace_and_bypasses_handlers() {
                     string $label,\n\
                     #[Whim\\Marker\\SensitiveParameter] string $secret,\n\
                   ): never {\n\
-                    panic!('an impossible state was reached');\n\
+                    panic!(sequence!(write_line!('evaluated'), \"an impossible state was reached: {$label}\"));\n\
                   }\n\
                   #[Whim\\Marker\\TraceBoundary]\n\
                   function hidden(): never {\n\
@@ -141,9 +141,9 @@ fn panic_exits_255_with_a_redacted_trace_and_bypasses_handlers() {
     let output = run_program("panic.whim", source, &[]);
     let errors = stderr_of(&output);
 
-    assert_eq!(stdout_of(&output), "");
+    assert_eq!(stdout_of(&output), "evaluated\n");
     assert_eq!(code_of(&output), 255);
-    assert!(errors.starts_with("panic: an impossible state was reached\n"));
+    assert!(errors.starts_with("panic: an impossible state was reached: public-marker\n"));
     assert!(errors.contains("Stack backtrace:"));
     assert!(errors.contains("visible called with"));
     assert!(errors.contains("public-marker"));
@@ -162,7 +162,9 @@ fn panic_exits_255_with_a_redacted_trace_and_bypasses_handlers() {
     let _ = fs::remove_file(path);
 
     assert_eq!(code_of(&full), 255);
+    assert_eq!(stdout_of(&full), "evaluated\n");
     let errors = stderr_of(&full);
+    assert!(errors.starts_with("panic: an impossible state was reached: public-marker\n"));
     assert!(errors.contains("  hidden"));
     assert!(!errors.contains("secret-marker"));
 }

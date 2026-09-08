@@ -239,6 +239,46 @@ assert!(
   == 'assertion failed: false' . "\n" . '  message: with message',
 );
 
+function panicWithMessage(mixed $message): never {
+  panic!($message);
+}
+
+foreach (vec[
+  null,
+  false,
+  42,
+  1.5,
+  vec[],
+  dict[],
+  (1,),
+  new Bucket(),
+] as $message) {
+  $panicError = null;
+  $panicEvaluations = 0;
+  try {
+    panicWithMessage(sequence!($panicEvaluations += 1, $message));
+  } catch (TypeError $error) {
+    $panicError = $error;
+  } finally {
+    $panicEvaluations += 10;
+  }
+
+  assert!($panicError is TypeError);
+  assert!($panicEvaluations == 11);
+}
+
+$panicError = null;
+try {
+  panic!(123);
+} catch (TypeError $error) {
+  $panicError = $error;
+}
+
+assert!($panicError is TypeError);
+assert!(
+  $panicError->getMessage() == 'a panic! message must be string, int given',
+);
+
 $assertion_value_28 = function(): void {
   assert!(false);
 };

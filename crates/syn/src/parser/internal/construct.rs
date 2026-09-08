@@ -364,11 +364,7 @@ where
 
     fn parse_panic_construct(&mut self) -> Result<PanicConstruct<'arena>, ParseError> {
         let (name, bang, left_parenthesis) = self.open_construct()?;
-        let token = self.expect(TokenKind::LiteralString)?;
-        let Literal::String(message) = self.literal_of(token)? else {
-            // SAFETY: the surrounding invariant makes this path unreachable.
-            unsafe { unreachable_invariant("a string token parses as a string literal") }
-        };
+        let message = self.parse_expression_ref()?;
         let (trailing_comma, right_parenthesis) = self.close_construct()?;
 
         Ok(PanicConstruct {

@@ -70,9 +70,10 @@ WHIM_FULL_TRACE=true whim tests/example.whim
 
 Parameters marked `SensitiveParameter` remain hidden in either trace mode.
 
-`panic!('message')` prints the same kind of stack trace, then exits with status
-255. It takes a literal string and cannot be caught. Use it to mark a state that
-must never occur.
+`panic!($message)` evaluates an expression that must produce a string, prints
+the same kind of stack trace, then exits with status 255. The panic cannot be
+caught; a non-string message throws a catchable `TypeError` instead. Use panic
+to mark a state that must never occur.
 
 ## Bytecode
 

@@ -947,7 +947,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             text.index(),
         ),
         Instruction::Exit { code } => format!(" code {}", register(code)),
-        Instruction::Panic { message } => format!(" message #{}", message.index()),
+        Instruction::Panic { message } => format!(" message {}", register(message)),
         Instruction::Require {
             once,
             destination,

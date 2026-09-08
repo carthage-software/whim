@@ -3408,17 +3408,24 @@ impl VirtualMachine<'_> {
                     }
                     Instruction::Panic { message } => {
                         self.sync_ip(ip);
-                        let message = match &chunk.constants[usize::from(message.index())] {
-                            Literal::String(message) => message.clone(),
-                            // SAFETY: the surrounding invariant makes this path unreachable.
-                            _ => unsafe {
-                                unreachable_invariant(
-                                    "a verified panic instruction names a string constant",
+                        let value = read_register!(registers, message);
+                        let Some(message) = value.as_string_bytes() else {
+                            fail!(
+                                self,
+                                ip,
+                                floor,
+                                'dispatch,
+                                self.throw_well_known(
+                                    self.engine.tables.well_known.type_error,
+                                    format!(
+                                        "a panic! message must be string, {} given",
+                                        value.kind_name()
+                                    ),
                                 )
-                            },
+                            );
                         };
                         let trace = self.capture_trace();
-                        self.engine.write_panic(message.as_bytes(), &trace);
+                        self.engine.write_panic(message, &trace);
 
                         return Err(VirtualMachineControl::Exit(255));
                     }

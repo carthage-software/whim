@@ -19,7 +19,7 @@ This table lists every construct.
 | `exit!($status)` | `never` | exits with the low eight bits of an int |
 | `file!()` | `string` | returns the current source file |
 | `length!($value)` | `int` | counts string bytes or array items |
-| `panic!('message')` | `never` | prints a trace and exits with status 255 |
+| `panic!($message)` | `never` | requires a string, prints a trace, and exits with status 255 |
 | `remove!($array, $key)` | value | removes and returns one entry |
 | `swap_remove!($vec, $index)` | value | removes a vec item without keeping order |
 | `remove_first!($vec)` | value | removes and returns the first item |
@@ -103,10 +103,11 @@ The view stops after 64 collection items and 32 nested levels.
 `exit!` stops the process. It does not throw. A `catch` cannot intercept it,
 and pending `finally` blocks do not run.
 
-`panic!` has the same control flow. It takes one literal string, prints the
-message and current stack trace to standard error, and uses status 255. Trace
-boundaries and sensitive parameter markers apply. Both forms run shutdown
-destructors.
+`panic!` evaluates one expression that must produce a string, then prints the
+message and current stack trace to standard error and exits with status 255.
+A non-string result throws a catchable `TypeError` instead. Errors during
+message evaluation propagate normally. Trace boundaries and sensitive
+parameter markers apply. Both exit forms run shutdown destructors.
 
 ## Source paths
 

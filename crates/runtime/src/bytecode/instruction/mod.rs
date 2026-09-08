@@ -397,9 +397,7 @@ macro_rules! instruction_set {
             IntRangeJumpIf { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 194,
             IntRangeJumpUnless { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 195,
             BoolPatternBranch { subject: Register, false_offset: ShortJumpOffset, default_offset: ShortJumpOffset, } = 196,
-            /// Stops the process with status 255 after printing the string constant
-            /// at `message` and the current stack trace.
-            Panic { message: ConstantIndex, } = 197,
+            Panic { message: Register, } = 197,
             /// `destination = swap_remove!(container, index)`; does not preserve order.
             SwapRemove { destination: Register, container: Register, index: Register, } = 198,
             /// `destination = source . constants[constant]`; the constant is a string.

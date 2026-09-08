@@ -232,6 +232,7 @@ pub(in crate::optimizer) fn operands(kind: InstructionKind) -> Option<&'static [
                 | CheckSoleReference
                 | CheckDiscardedResult
                 | Exit
+                | Panic
         ) => Some(&[R1]),
         instruction_kinds!(
             JumpUnless | IntJumpUnless | StringJumpUnless | NumericLoop | IntNumericLoop | Assert

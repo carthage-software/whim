@@ -28,3 +28,12 @@ $result = match ($value) {
     $value,
   ),
 };
+
+panic!(
+  describe(
+    $alpha,
+    $beta,
+    $gamma,
+    $delta,
+  ),
+);

@@ -811,7 +811,7 @@ impl Node<'_, '_> {
             }
             Node::PanicConstruct(node) => {
                 f(Node::LocalIdentifier(&node.name));
-                f(Node::LiteralString(&node.message));
+                f(Node::Expression(node.message));
             }
             Node::WriteConstruct(node) => {
                 f(Node::LocalIdentifier(&node.name));

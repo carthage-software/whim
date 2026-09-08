@@ -62,8 +62,7 @@ pub(in crate::bytecode::verify) fn verify_instruction(
     instruction.try_visit_operands(|operand| verify_operand(chunk, at, operand))?;
 
     match instruction {
-        Instruction::Panic { message }
-        | Instruction::ConcatenateRightConstant {
+        Instruction::ConcatenateRightConstant {
             constant: message, ..
         }
         | Instruction::ConcatenateLeftConstant {

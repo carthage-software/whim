@@ -77,6 +77,7 @@ fn instruction(register_bound: u16, constant_bound: u16) -> impl Strategy<Value 
             .prop_map(|(condition, offset)| Instruction::JumpIfTrue { condition, offset }),
         forward.prop_map(|offset| Instruction::Jump { offset }),
         reg().prop_map(|source| Instruction::Throw { source }),
+        reg().prop_map(|message| Instruction::Panic { message }),
         reg().prop_map(|source| Instruction::Return { source }),
         Just(Instruction::ReturnNull),
     ]
@@ -210,24 +211,6 @@ proptest! {
             execute(chunk);
         }
     }
-}
-
-#[test]
-fn panic_requires_a_string_constant() {
-    let mut chunk = Chunk::new();
-    chunk.constants.push(Literal::Int(1));
-    chunk.code.push(Instruction::Panic {
-        message: ConstantIndex::new(0),
-    });
-    chunk.spans.push(Span::zero());
-
-    assert_eq!(
-        verify(&chunk),
-        Err(VerifyError::ConstantKindInvalid {
-            instruction: 0,
-            constant: 0,
-        })
-    );
 }
 
 #[test]

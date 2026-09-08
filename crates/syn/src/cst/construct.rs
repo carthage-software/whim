@@ -184,7 +184,7 @@ pub struct PanicConstruct<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub bang: Span,
     pub left_parenthesis: Span,
-    pub message: LiteralString<'arena>,
+    pub message: &'arena Expression<'arena>,
     pub trailing_comma: Option<Span>,
     pub right_parenthesis: Span,
 }

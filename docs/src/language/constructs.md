@@ -134,14 +134,19 @@ another strong reference keeps a resource alive.
 and uses its low eight bits. Exit is not an exception: `catch` cannot catch it,
 and `finally` does not run after it.
 
-`panic!('message')` reports a broken invariant. It takes one literal string,
-writes `panic: message` and the current stack trace to standard error, and ends
-the process with status 255. It is not an exception. `catch` cannot catch it,
-and `finally` does not run after it. Shutdown destructors still run.
+`panic!($message)` reports a broken invariant. It evaluates one expression,
+which must produce a string, writes `panic: message` and the current stack
+trace to standard error, and ends the process with status 255. It is not an
+exception. `catch` cannot catch it, and `finally` does not run after it.
+Shutdown destructors still run.
+
+A non-string message throws `TypeError` before the panic occurs. Errors
+thrown while evaluating the message also propagate normally. These errors
+can be caught and run pending `finally` blocks.
 
 ```whim,ignore
 if (!contains_key!($states, $name)) {
-  panic!('the state table is incomplete');
+  panic!("the state table has no entry for {$name}");
 }
 ```
 

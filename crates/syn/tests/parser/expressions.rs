@@ -747,12 +747,11 @@ fn language_constructs() {
     assert!(exit.code.is_none());
 
     let Expression::Construct(Construct::Panic(panic)) =
-        expression(&arena, "panic!(\"impossible\",);")
+        expression(&arena, "panic!('failure: ' . describe($value),);")
     else {
         panic!("expected a panic construct");
     };
-    assert_eq!(panic.message.raw, "\"impossible\"");
-    assert_eq!(panic.message.value, b"impossible");
+    assert!(matches!(panic.message, Expression::Binary(_)));
     assert!(panic.trailing_comma.is_some());
 
     let Expression::Construct(Construct::WriteLine(write)) =
@@ -832,12 +831,7 @@ fn constructs_fail_fast_in_the_parser() {
         error("drop!($object->property);"),
         ParseError::UnexpectedToken(..)
     ));
-    for invalid in [
-        "panic!();",
-        "panic!($message);",
-        "panic!('one', 'two');",
-        "panic!(\"{$message}\");",
-    ] {
+    for invalid in ["panic!();", "panic!('one', 'two');"] {
         assert!(matches!(error(invalid), ParseError::UnexpectedToken(..)));
     }
 }
