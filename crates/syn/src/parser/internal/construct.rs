@@ -30,6 +30,7 @@ use crate::cst::construct::RemoveFirstConstruct;
 use crate::cst::construct::RemoveLastConstruct;
 use crate::cst::construct::RequireConstruct;
 use crate::cst::construct::RequireOnceConstruct;
+use crate::cst::construct::SequenceConstruct;
 use crate::cst::construct::SwapRemoveConstruct;
 use crate::cst::construct::WriteConstruct;
 use crate::cst::construct::WriteErrorConstruct;
@@ -73,6 +74,7 @@ where
             }
             "debug" => Construct::Debug(self.parse_debug_construct()?),
             "discard" => Construct::Discard(self.parse_discard_construct()?),
+            "sequence" => Construct::Sequence(self.parse_sequence_construct()?),
             "drop" => Construct::Drop(self.parse_drop_construct()?),
             "file" => Construct::File(self.parse_file_construct()?),
             "directory" => Construct::Directory(self.parse_directory_construct()?),
@@ -496,6 +498,34 @@ where
             left_parenthesis,
             value,
             trailing_comma,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_sequence_construct(&mut self) -> Result<SequenceConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let mut arguments = Vec::new_in(self.arena);
+        let mut commas = Vec::new_in(self.arena);
+
+        arguments.push(ConstructArgument {
+            value: self.parse_expression_ref()?,
+        });
+        while self.is_at(TokenKind::Comma)? {
+            commas.push(self.consume()?);
+            if self.is_at(TokenKind::RightParenthesis)? {
+                break;
+            }
+            arguments.push(ConstructArgument {
+                value: self.parse_expression_ref()?,
+            });
+        }
+
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+        Ok(SequenceConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            arguments: TokenSeparatedSequence::new(arguments, commas),
             right_parenthesis,
         })
     }

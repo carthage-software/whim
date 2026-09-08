@@ -256,7 +256,7 @@ enum G { case A; }";
 #[test]
 fn walks_into_every_construct_node() {
     let ks = kinds(
-        "$a = remove!($v, clone!($o, k: 1)); $b = swap_remove!($v, 0); assert!($c, 'm'); debug!($x); discard!(work()); embed!('data.txt'); panic!('stop');",
+        "$a = remove!($v, clone!($o, k: 1)); $b = swap_remove!($v, 0); assert!($c, 'm'); debug!($x); discard!(work()); sequence!($x = 1, $x); embed!('data.txt'); panic!('stop');",
     );
     assert!(
         ks.contains(&NodeKind::Construct),
@@ -276,6 +276,7 @@ fn walks_into_every_construct_node() {
     );
     assert!(ks.contains(&NodeKind::DebugConstruct));
     assert!(ks.contains(&NodeKind::DiscardConstruct));
+    assert!(ks.contains(&NodeKind::SequenceConstruct));
     assert!(ks.contains(&NodeKind::EmbedConstruct));
     assert!(ks.contains(&NodeKind::PanicConstruct));
     assert!(

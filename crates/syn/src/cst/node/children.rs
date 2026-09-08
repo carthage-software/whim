@@ -738,6 +738,7 @@ impl Node<'_, '_> {
                 Construct::WriteErrorLine(inner) => f(Node::WriteErrorLineConstruct(inner)),
                 Construct::Debug(inner) => f(Node::DebugConstruct(inner)),
                 Construct::Discard(inner) => f(Node::DiscardConstruct(inner)),
+                Construct::Sequence(inner) => f(Node::SequenceConstruct(inner)),
                 Construct::Drop(inner) => f(Node::DropConstruct(inner)),
                 Construct::File(inner) => f(Node::FileConstruct(inner)),
                 Construct::Directory(inner) => f(Node::DirectoryConstruct(inner)),
@@ -845,6 +846,12 @@ impl Node<'_, '_> {
             Node::DiscardConstruct(node) => {
                 f(Node::LocalIdentifier(&node.name));
                 f(Node::Expression(node.value));
+            }
+            Node::SequenceConstruct(node) => {
+                f(Node::LocalIdentifier(&node.name));
+                for argument in node.arguments {
+                    f(Node::ConstructArgument(argument));
+                }
             }
             Node::DropConstruct(node) => {
                 f(Node::LocalIdentifier(&node.name));

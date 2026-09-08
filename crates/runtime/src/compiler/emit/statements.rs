@@ -245,7 +245,9 @@ impl<'arena> BodyCompiler<'_, 'arena> {
                         .emit(Instruction::ReturnNull, return_expression.span());
                 } else {
                     self.clear_temporaries_except(None, return_expression.span());
+                    let saved_floor = self.registers.pin_temporaries();
                     let holes = self.emit_finally_copies(scope, &finally_frames)?;
+                    self.registers.unpin_temporaries(saved_floor);
                     self.chunk
                         .emit(Instruction::ReturnNull, return_expression.span());
                     self.finish_finally_holes(holes, self.code_position());

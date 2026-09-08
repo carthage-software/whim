@@ -36,6 +36,67 @@ assert!(READY == 'value');
 assert!(Holder::LABEL == 'value');
 
 assert!(length!('hello') == 5);
+
+assert!(sequence!(42) == 42);
+assert!(sequence!(true) is true);
+assert!(sequence!(null) is null);
+$sequence_events = vec[];
+$sequence_result = sequence!(
+  $sequence_events[] = 'first',
+  $sequence_local = 4,
+  sequence!($sequence_events[] = 'second', $sequence_local *= 3),
+  $sequence_events[] = 'last',
+  $sequence_local + 1,
+);
+
+assert!($sequence_events == vec['first', 'second', 'last']);
+assert!(($sequence_result, $sequence_local) == (13, 12));
+assert!(
+  (5 * 7)
+  + sequence!($sequence_values = vec[10, 20], remove_last!($sequence_values))
+  == 55,
+);
+
+assert!($sequence_values == vec[10]);
+$sequence_number = 1;
+assert!(
+  vec[
+    sequence!($sequence_number),
+    sequence!($sequence_number = 2, $sequence_number),
+    sequence!(sequence!($sequence_number = 3, $sequence_number)),
+  ] == vec[1, 2, 3],
+);
+
+$sequence_offset = 7;
+$sequence_closure = fn(
+  int $value,
+): int => sequence!($value += $sequence_offset, $value * 2);
+
+assert!(
+  $sequence_closure(sequence!($sequence_argument = 3, $sequence_argument))
+  == 20,
+);
+
+$sequence_stage = 0;
+assert!((false && sequence!($sequence_stage = 99, true)) == false);
+assert!((1 ?? sequence!($sequence_stage = 99, 2)) == 1);
+$sequence_match = match ('chosen') {
+  'other' => sequence!($sequence_stage = 99, 'other'),
+  $_ => sequence!($sequence_stage += 1, 'chosen'),
+};
+
+assert!(($sequence_match, $sequence_stage) == ('chosen', 1));
+try {
+  sequence!(
+    $sequence_stage = 2,
+    throw new TypeError('sequence'),
+    $sequence_stage = 99,
+  );
+} catch (TypeError $_) {
+}
+
+assert!($sequence_stage == 2);
+
 assert!(vec[1, 2, 3][1] + dict['a' => 2]['a'] + (1,)[0] == 5);
 assert!((7 * 6) - (8 / 2) == 38.0);
 assert!((1 << 5) | 3 == 35);

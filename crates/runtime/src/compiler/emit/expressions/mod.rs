@@ -27,6 +27,7 @@ use crate::compiler::emit::ChainStep;
 use crate::compiler::emit::CompileError;
 use crate::compiler::emit::CompileErrorKind;
 use crate::compiler::emit::ConstantIndex;
+use crate::compiler::emit::Construct;
 use crate::compiler::emit::Count;
 use crate::compiler::emit::DictEntry;
 use crate::compiler::emit::Expression;
@@ -141,6 +142,10 @@ impl BodyCompiler<'_, '_> {
             Expression::UnaryPostfix(unary) => self.unary_postfix_discarded(scope, unary),
             Expression::Assignment(assignment) => self.assignment_discarded(scope, assignment),
             Expression::Return(r#return) => self.emit_return(scope, r#return),
+            Expression::Construct(Construct::Sequence(sequence)) => {
+                let last = self.sequence_prefix(scope, sequence)?;
+                self.expression_discarded(scope, last)
+            }
             _ => {
                 self.expression(scope, expression)?;
                 Ok(())

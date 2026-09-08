@@ -126,6 +126,11 @@ where
             Construct::Discard(c) => {
                 f.format_construct(c.name.value, &[c.value], c.right_parenthesis.start.offset)
             }
+            Construct::Sequence(c) => f.format_variadic_construct(
+                c.name.value,
+                &c.arguments,
+                c.right_parenthesis.start.offset,
+            ),
             Construct::Drop(c) => {
                 let mut parts = f.vec();
                 parts.push(f.text(c.name.value));

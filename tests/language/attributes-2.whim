@@ -365,6 +365,25 @@ assert!($assertion_error_20 is DiscardedResultError);
 assert!($used_answer == 42);
 assert!(MustUseValues::$calls == 7);
 
+assert!(sequence!(discard!(must_use_answer()), must_use_answer()) == 42);
+discard!(sequence!(0, sequence!(must_use_answer())));
+foreach (vec[
+  fn(): mixed => sequence!(must_use_answer(), null),
+  fn(): mixed => discard!(sequence!(must_use_answer(), null)),
+  function(): void {
+    sequence!(0, sequence!(must_use_answer()));
+  },
+] as $sequence_attempt) {
+  $sequence_error = null;
+  try {
+    $sequence_result = $sequence_attempt();
+  } catch (DiscardedResultError $error) {
+    $sequence_error = $error;
+  }
+
+  assert!($sequence_error is DiscardedResultError);
+}
+
 function boundary_fail(): never {
   throw new Exception('failed');
 }

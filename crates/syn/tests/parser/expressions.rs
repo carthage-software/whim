@@ -775,6 +775,22 @@ fn language_constructs() {
         panic!("expected a discard construct");
     };
     assert!(matches!(discard.value, Expression::Call(_)));
+
+    let Expression::Construct(Construct::Sequence(sequence)) =
+        expression(&arena, "sequence!($value = 1, $value + 2,);")
+    else {
+        panic!("expected a sequence construct");
+    };
+    assert_eq!(sequence.arguments.len(), 2);
+    assert!(sequence.arguments.get_trailing_token().is_some());
+    assert!(matches!(
+        sequence.arguments.nodes[0].value,
+        Expression::Assignment(_)
+    ));
+    assert!(matches!(
+        sequence.arguments.nodes[1].value,
+        Expression::Binary(_)
+    ));
 }
 
 #[test]

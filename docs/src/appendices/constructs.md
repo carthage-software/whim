@@ -26,6 +26,7 @@ This table lists every construct.
 | `remove_last!($vec)` | value | removes and returns the last item |
 | `require!($path)` | `null` | loads and runs a source file |
 | `require_once!($path)` | `null` | loads a resolved path at most once |
+| `sequence!($first, ..., $last)` | last expression's type | evaluates one or more expressions in order and produces the last value |
 | `write!(...)` | `void` | writes to standard output |
 | `write_line!(...)` | `void` | writes to standard output, then ends the line |
 | `write_error!(...)` | `void` | writes to standard error |

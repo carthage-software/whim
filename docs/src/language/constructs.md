@@ -58,6 +58,53 @@ Use `debug!` while working, then remove it from normal output paths.
 `discard!($value)` evaluates and ignores a value. It is the explicit way to
 ignore a result marked `#[MustUse]`.
 
+## Sequencing expressions
+
+`sequence!($first, ..., $last)` evaluates each expression once, from left to
+right, and produces the last expression's value and type. It requires at least
+one expression and allows a trailing comma:
+
+```whim
+$result = sequence!(
+  $value = 10,
+  $value *= 2,
+  $value + 1,
+);
+
+assert!($result == 21);
+assert!($value == 20);
+```
+
+Each earlier expression behaves like an expression statement, including
+`#[MustUse]` checks. Use `discard!` on an individual expression to deliberately
+ignore a required result. If the whole sequence is an expression statement,
+the last expression also follows the usual discard rules.
+
+A sequence shares the surrounding variable scope and control flow. `return`
+exits the enclosing callable, `break` and `continue` target the enclosing
+loops, and an exception skips the remaining expressions. Normal cleanup rules
+still apply. The compiler emits the expressions directly without a function
+call or closure.
+
+Use it in a match arm that needs several expressions:
+
+```whim
+$input = '  hello  ';
+$value = match ($input) {
+  '' => 'empty',
+  $_ => sequence!(
+    $trimmed = Whim\Str\trim($input),
+    assert!(length!($trimmed) > 0),
+    $trimmed,
+  ),
+};
+
+assert!($value == 'hello');
+```
+
+Only the selected arm evaluates its sequence. The arguments are expressions;
+statements such as `if`, `foreach`, and `try` still belong in statement bodies.
+
 ## Object cloning
 
 `clone!` copies an object and may replace named properties during the copy:

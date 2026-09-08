@@ -46,5 +46,11 @@ function main(): int {
   }
 
   $double = fn(int $n): int => $n * 2;
+  $result = sequence!(
+    $value = 1,
+    sequence!($value += 2, $value),
+    $double($value),
+  );
+
   return 0;
 }

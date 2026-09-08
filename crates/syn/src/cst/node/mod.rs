@@ -99,6 +99,7 @@ use crate::cst::construct::RemoveFirstConstruct;
 use crate::cst::construct::RemoveLastConstruct;
 use crate::cst::construct::RequireConstruct;
 use crate::cst::construct::RequireOnceConstruct;
+use crate::cst::construct::SequenceConstruct;
 use crate::cst::construct::SwapRemoveConstruct;
 use crate::cst::construct::WriteConstruct;
 use crate::cst::construct::WriteErrorConstruct;
@@ -384,6 +385,7 @@ define_nodes! {
     WriteErrorLineConstruct(WriteErrorLineConstruct<'arena>),
     DebugConstruct(DebugConstruct<'arena>),
     DiscardConstruct(DiscardConstruct<'arena>),
+    SequenceConstruct(SequenceConstruct<'arena>),
     DropConstruct(DropConstruct<'arena>),
     FileConstruct(FileConstruct<'arena>),
     DirectoryConstruct(DirectoryConstruct<'arena>),

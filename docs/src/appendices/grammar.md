@@ -323,6 +323,18 @@ call-argument   := (parameter-name ":")? (expression | "?" | "...")
 `...` must be the sole or final placeholder. Ordinary calls do not accept
 placeholders.
 
+The `sequence!` construct accepts one or more expressions, with an optional
+trailing comma:
+
+```text
+sequence-expression
+                := "sequence" "!" "(" expression ("," expression)* ","? ")"
+```
+
+It is a `construct-expression`. See
+[Language Constructs](../language/constructs.md#sequencing-expressions) for
+evaluation and discard rules.
+
 Collection literals use these forms:
 
 ```text

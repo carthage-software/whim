@@ -389,6 +389,7 @@ const fn is_construct(kind: NodeKind) -> bool {
             | NodeKind::WriteErrorLineConstruct
             | NodeKind::DebugConstruct
             | NodeKind::DiscardConstruct
+            | NodeKind::SequenceConstruct
             | NodeKind::DropConstruct
             | NodeKind::FileConstruct
             | NodeKind::DirectoryConstruct

@@ -5,6 +5,7 @@ use whim_syn::cst::construct::CloneConstruct;
 use whim_syn::cst::construct::DropConstruct;
 use whim_syn::cst::construct::EmbedConstruct;
 use whim_syn::cst::construct::RemoveConstruct;
+use whim_syn::cst::construct::SequenceConstruct;
 use whim_syn::cst::construct::SwapRemoveConstruct;
 
 use crate::bytecode::instruction::operands::PropertyRemoveMode;
@@ -201,6 +202,7 @@ impl BodyCompiler<'_, '_> {
                 self.expression(scope, discard.value)?;
                 self.null_result(discard.span())
             }
+            Construct::Sequence(sequence) => self.sequence_construct(scope, sequence),
             Construct::Drop(drop) => self.drop_construct(drop),
             Construct::Require(require) => {
                 self.require_construct(scope, require.value, require.span(), false)
@@ -212,6 +214,34 @@ impl BodyCompiler<'_, '_> {
             Construct::Directory(directory) => self.directory_construct(directory.span()),
             Construct::Embed(embed) => self.embed_construct(scope, embed),
         }
+    }
+
+    fn sequence_construct(
+        &mut self,
+        scope: &Scope<'_>,
+        sequence: &SequenceConstruct<'_>,
+    ) -> Result<Register, CompileError> {
+        let last = self.sequence_prefix(scope, sequence)?;
+        self.expression(scope, last)
+    }
+
+    pub(in crate::compiler::emit) fn sequence_prefix<'arena>(
+        &mut self,
+        scope: &Scope<'_>,
+        sequence: &SequenceConstruct<'arena>,
+    ) -> Result<&'arena Expression<'arena>, CompileError> {
+        let Some((last, prefix)) = sequence.arguments.as_slice().split_last() else {
+            // SAFETY: the parser requires at least one sequence argument.
+            unsafe { unreachable_invariant("a sequence has at least one argument") }
+        };
+
+        for argument in prefix {
+            let mark = self.registers.mark();
+            self.expression_discarded(scope, argument.value)?;
+            self.registers.release_to(mark);
+        }
+
+        Ok(last.value)
     }
 
     fn unary_construct(

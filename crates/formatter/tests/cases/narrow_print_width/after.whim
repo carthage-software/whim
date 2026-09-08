@@ -20,3 +20,11 @@ $config = dict[
   'port' => 8080,
   'secure' => true,
 ];
+
+$result = match ($value) {
+  $_ => sequence!(
+    $value = compute($alpha),
+    record($value),
+    $value,
+  ),
+};

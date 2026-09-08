@@ -28,6 +28,7 @@ pub enum Construct<'arena> {
     WriteErrorLine(WriteErrorLineConstruct<'arena>),
     Debug(DebugConstruct<'arena>),
     Discard(DiscardConstruct<'arena>),
+    Sequence(SequenceConstruct<'arena>),
     Drop(DropConstruct<'arena>),
     File(FileConstruct<'arena>),
     Directory(DirectoryConstruct<'arena>),
@@ -244,6 +245,15 @@ pub struct DiscardConstruct<'arena> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct SequenceConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub arguments: TokenSeparatedSequence<'arena, ConstructArgument<'arena>>,
+    pub right_parenthesis: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct DropConstruct<'arena> {
     pub name: LocalIdentifier<'arena>,
     pub bang: Span,
@@ -305,6 +315,7 @@ impl HasSpan for Construct<'_> {
             Construct::WriteErrorLine(construct) => construct.span(),
             Construct::Debug(construct) => construct.span(),
             Construct::Discard(construct) => construct.span(),
+            Construct::Sequence(construct) => construct.span(),
             Construct::Drop(construct) => construct.span(),
             Construct::File(construct) => construct.span(),
             Construct::Directory(construct) => construct.span(),
@@ -422,6 +433,12 @@ impl HasSpan for DebugConstruct<'_> {
 }
 
 impl HasSpan for DiscardConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for SequenceConstruct<'_> {
     fn span(&self) -> Span {
         self.name.span().join(self.right_parenthesis)
     }
