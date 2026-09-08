@@ -111,7 +111,7 @@ jobs:
             shasum -a 256 "${archive}" > "${archive}.sha256"
           )
           echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: ${{ steps.package.outputs.archive }}
       - uses: actions/upload-artifact@v7
@@ -142,7 +142,7 @@ jobs:
           set -euo pipefail
           cd release
           sha256sum -- *.tar.gz > SHA256SUMS
-      - uses: actions/attest-build-provenance@v3
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: release/SHA256SUMS
       - uses: softprops/action-gh-release@v3
