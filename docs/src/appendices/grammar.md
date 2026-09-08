@@ -375,6 +375,10 @@ primary-pattern := variable
                  | vec-pattern
                  | dict-pattern
                  | object-pattern
+                 | named-object-pattern
+
+named-object-pattern
+                := qualified-name ("<" type-list ">")? object-pattern
 
 tuple-pattern   := "(" pattern ("," pattern)*
                    ("," trailing-pattern)? ","? ")"
@@ -420,6 +424,7 @@ prefix-type     := "!" prefix-type
                  | primary-type
 
 primary-type    := object-shape-type
+                 | named-shape-type
                  | built-in-type
                  | named-type
                  | literal-type
@@ -438,6 +443,7 @@ named-type      := qualified-name ("<" type-list ">")?
                  | "self" ("::" identifier ("<" type-list ">")?)?
                  | "parent"
                  | "static"
+named-shape-type := qualified-name ("<" type-list ">")? object-shape-type
 vec-type        := "vec" ("<" type ">")? | "vec" "[" shape-items? "]"
 dict-type       := "dict" ("<" type "," type ">")?
                  | "dict" "[" dict-shape-items? "]"

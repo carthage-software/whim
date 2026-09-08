@@ -289,9 +289,11 @@ fn walks_into_every_construct_node() {
 #[test]
 fn object_shapes_visit_properties_rest_and_nested_bindings() {
     let ks = kinds(
-        "type T<X> = #{ value: X, ... }; $_ = match (null) { T<int> & #{ child: #{ $value }, ... } => $value };",
+        "type T<X> = Box<X> #{ value: X, ... }; $_ = match (null) { T<int> #{ child: #{ $value }, ... } & object => $value };",
     );
     for kind in [
+        NodeKind::NamedShapeType,
+        NodeKind::NamedObjectPattern,
         NodeKind::ObjectShapeType,
         NodeKind::ObjectShapeTypeEntry,
         NodeKind::ObjectShapeRest,

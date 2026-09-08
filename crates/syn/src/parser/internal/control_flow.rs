@@ -30,6 +30,7 @@ use crate::cst::pattern::DictPattern;
 use crate::cst::pattern::DictPatternEntry;
 use crate::cst::pattern::DictPatternKey;
 use crate::cst::pattern::IntersectionPattern;
+use crate::cst::pattern::NamedObjectPattern;
 use crate::cst::pattern::ObjectPattern;
 use crate::cst::pattern::ObjectPatternEntry;
 use crate::cst::pattern::ParenthesizedPattern;
@@ -139,7 +140,7 @@ where
         Ok(left)
     }
 
-    fn parse_object_pattern(&mut self) -> Result<&'arena Pattern<'arena>, ParseError> {
+    fn parse_object_pattern(&mut self) -> Result<ObjectPattern<'arena>, ParseError> {
         let hash_left_brace = self.expect_span(TokenKind::HashLeftBrace)?;
         let mut entries = Vec::new_in(self.arena);
         let mut commas = Vec::new_in(self.arena);
@@ -165,12 +166,12 @@ where
             }
         }
         let right_brace = self.expect_span(TokenKind::RightBrace)?;
-        Ok(self.arena.alloc(Pattern::Object(ObjectPattern {
+        Ok(ObjectPattern {
             hash_left_brace,
             entries: TokenSeparatedSequence::new(entries, commas),
             rest,
             right_brace,
-        })))
+        })
     }
 
     fn parse_primary_pattern(&mut self) -> Result<&'arena Pattern<'arena>, ParseError> {
@@ -200,7 +201,27 @@ where
         }
 
         if self.is_at(TokenKind::HashLeftBrace)? {
-            return self.parse_object_pattern();
+            let object = self.parse_object_pattern()?;
+            return Ok(self.arena.alloc(Pattern::Object(object)));
+        }
+        if matches!(
+            self.peek_kind()?,
+            Some(
+                TokenKind::Identifier
+                    | TokenKind::QualifiedIdentifier
+                    | TokenKind::FullyQualifiedIdentifier
+            )
+        ) {
+            let named = self.parse_named_type()?;
+            return if named.member.is_none() && self.is_at(TokenKind::HashLeftBrace)? {
+                let object = self.parse_object_pattern()?;
+                Ok(self.arena.alloc(Pattern::NamedObject(NamedObjectPattern {
+                    name: named,
+                    object,
+                })))
+            } else {
+                Ok(self.arena.alloc(Pattern::Type(Type::Named(named))))
+            };
         }
         let r#type = self.parse_negated_type()?;
         Ok(self.arena.alloc(Pattern::Type(r#type.clone())))

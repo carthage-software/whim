@@ -213,6 +213,12 @@ fn validate_checked_builtin_arity(source: &Type<'_>) -> Result<(), CompileError>
                     pending.extend(arguments.arguments.iter().map(|argument| argument.r#type));
                 }
             }
+            Type::NamedShape(named) => {
+                if let Some(arguments) = &named.type_arguments {
+                    pending.extend(arguments.arguments.iter().map(|argument| argument.r#type));
+                }
+                pending.extend(named.shape.entries.iter().map(|entry| entry.value));
+            }
             Type::Function(function) => {
                 if let Some(signature) = &function.signature {
                     pending.push(signature.return_type);
@@ -356,12 +362,18 @@ struct WildcardFinder<'found> {
 
 impl<'ast, 'arena> Visitor<'ast, 'arena> for WildcardFinder<'_> {
     fn enter(&mut self, node: Node<'ast, 'arena>) -> Flow {
-        if self.found.is_none()
-            && let Node::Type(source) = node
-            && is_wildcard(source)
-        {
-            *self.found = Some(source.span());
-            return Flow::Skip;
+        if self.found.is_none() {
+            let span = match node {
+                Node::Type(source) if is_wildcard(source) => Some(source.span()),
+                Node::NamedShapeType(named) if is_wildcard(&Type::Named(named.named_type())) => {
+                    Some(named.identifier.span())
+                }
+                _ => None,
+            };
+            if span.is_some() {
+                *self.found = span;
+                return Flow::Skip;
+            }
         }
 
         Flow::Descend
@@ -422,6 +434,20 @@ fn validate_return_only_positions(
                         pending.push((argument.r#type, false, "type argument"));
                     }
                 }
+            }
+            Type::NamedShape(named) => {
+                if let Some(arguments) = &named.type_arguments {
+                    for argument in arguments.arguments {
+                        pending.push((argument.r#type, false, "type argument"));
+                    }
+                }
+                pending.extend(
+                    named
+                        .shape
+                        .entries
+                        .iter()
+                        .map(|entry| (entry.value, false, "object shape property")),
+                );
             }
             Type::Union(union) => {
                 for member in [union.left, union.right] {
@@ -1179,6 +1205,15 @@ fn lower_type_inner(
         Type::Parent(_) => lower_parent_type(scope, source),
         Type::Static(_) => lower_static_type(scope, source.span()),
         Type::Named(named) => lower_named_type(scope, named, defer_named_arity),
+        Type::NamedShape(named) => {
+            let name = Type::Named(named.named_type());
+            let shape = Type::ObjectShape(named.shape);
+            validate_composition(scope, &[&name, &shape], false)?;
+            Ok(TypeDescriptor::intersection(vec![
+                lower_type_inner(scope, &name, defer_named_arity)?,
+                lower_type_inner(scope, &shape, defer_named_arity)?,
+            ]))
+        }
         Type::Array(array) => lower_array_type(scope, array, defer_named_arity),
         Type::Vec(vector) => lower_vec_type(scope, vector, defer_named_arity),
         Type::VecShape(shape) => lower_vec_shape_type(scope, shape, defer_named_arity),

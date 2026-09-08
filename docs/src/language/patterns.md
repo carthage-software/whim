@@ -250,16 +250,20 @@ Inside a collection rest, object patterns follow the
 `...$rest @ #{ value: int }` captures the whole remainder, while
 `...#{ $value }` is a compile error.
 
+A named type can precede an object pattern directly. `Foo #{ $value }` has the
+same matching and binding behavior as `Foo & #{ $value }`. This also works
+with generic names and nested patterns:
+
 ```whim
 use Whim\Result\Ok;
 use Whim\Result\Err;
 
 function describe_result(mixed $result): string {
   return match ($result) {
-    Ok<string> & #{ value: '' } => 'empty',
-    Ok<string> & #{ $value } => $value,
-    Err<int> & #{ error: $code @ 400..=499 } => 'client error: ' . $code,
-    Err<int> & #{ $error } => 'error: ' . $error,
+    Ok<string> #{ value: '' } => 'empty',
+    Ok<string> #{ $value } => $value,
+    Err<int> #{ error: $code @ 400..=499 } => 'client error: ' . $code,
+    Err<int> #{ $error } => 'error: ' . $error,
     $_ => 'other',
   };
 }

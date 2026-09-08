@@ -7,6 +7,7 @@ use crate::cst::atom::LiteralString;
 use crate::cst::atom::LocalIdentifier;
 use crate::cst::atom::Variable;
 use crate::cst::sequence::TokenSeparatedSequence;
+use crate::cst::r#type::NamedType;
 use crate::cst::r#type::ObjectShapeRest;
 use crate::cst::r#type::Type;
 
@@ -18,6 +19,7 @@ impl HasSpan for Pattern<'_> {
             Self::As(pattern) => pattern.span(),
             Self::Intersection(pattern) => pattern.span(),
             Self::Object(pattern) => pattern.span(),
+            Self::NamedObject(pattern) => pattern.span(),
             Self::Union(pattern) => pattern.left.span().join(pattern.right.span()),
             Self::Vec(pattern) => pattern.vec.span().join(pattern.right_bracket),
             Self::Dict(pattern) => pattern.dict.span().join(pattern.right_bracket),
@@ -95,6 +97,7 @@ pub enum Pattern<'arena> {
     As(AsPattern<'arena>),
     Intersection(IntersectionPattern<'arena>),
     Object(ObjectPattern<'arena>),
+    NamedObject(NamedObjectPattern<'arena>),
     Union(UnionPattern<'arena>),
     Vec(VecPattern<'arena>),
     Dict(DictPattern<'arena>),
@@ -189,6 +192,12 @@ pub struct ObjectPattern<'arena> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct NamedObjectPattern<'arena> {
+    pub name: NamedType<'arena>,
+    pub object: ObjectPattern<'arena>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum ObjectPatternEntry<'arena> {
     Property {
         name: LocalIdentifier<'arena>,
@@ -217,6 +226,12 @@ impl HasSpan for IntersectionPattern<'_> {
 impl HasSpan for ObjectPattern<'_> {
     fn span(&self) -> Span {
         self.hash_left_brace.join(self.right_brace)
+    }
+}
+
+impl HasSpan for NamedObjectPattern<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.object.span())
     }
 }
 

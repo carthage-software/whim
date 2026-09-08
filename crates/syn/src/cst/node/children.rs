@@ -549,6 +549,7 @@ impl Node<'_, '_> {
                 Pattern::As(pattern) => f(Node::AsPattern(pattern)),
                 Pattern::Intersection(pattern) => f(Node::IntersectionPattern(pattern)),
                 Pattern::Object(pattern) => f(Node::ObjectPattern(pattern)),
+                Pattern::NamedObject(pattern) => f(Node::NamedObjectPattern(pattern)),
                 Pattern::Union(pattern) => f(Node::UnionPattern(pattern)),
                 Pattern::Vec(pattern) => f(Node::VecPattern(pattern)),
                 Pattern::Dict(pattern) => f(Node::DictPattern(pattern)),
@@ -575,6 +576,10 @@ impl Node<'_, '_> {
                 }
                 ObjectPatternEntry::Shorthand(variable) => f(Node::Variable(variable)),
             },
+            Node::NamedObjectPattern(node) => {
+                f(Node::NamedType(&node.name));
+                f(Node::ObjectPattern(&node.object));
+            }
             Node::ObjectShapeType(node) => {
                 for entry in &node.entries {
                     f(Node::ObjectShapeTypeEntry(entry));
@@ -1120,6 +1125,7 @@ impl Node<'_, '_> {
             }
             Node::Type(node) => match node {
                 Type::Named(inner) => f(Node::NamedType(inner)),
+                Type::NamedShape(inner) => f(Node::NamedShapeType(inner)),
                 Type::Literal(inner) => f(Node::Literal(inner)),
                 Type::NegativeLiteral(inner) => f(Node::NegativeLiteralType(inner)),
                 Type::IntegerRange(inner) => f(Node::IntegerRangeType(inner)),
@@ -1157,6 +1163,14 @@ impl Node<'_, '_> {
                 if let Some(member) = &node.member {
                     f(Node::MemberType(member));
                 }
+            }
+            Node::NamedShapeType(node) => {
+                f(Node::Identifier(&node.identifier));
+                if let Some(type_arguments) = &node.type_arguments {
+                    f(Node::TypeArgumentList(type_arguments));
+                }
+
+                f(Node::ObjectShapeType(&node.shape));
             }
             Node::MemberType(node) => {
                 f(Node::LocalIdentifier(&node.name));

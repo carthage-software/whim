@@ -541,6 +541,22 @@ fn object_shapes_are_types_with_exact_and_open_layouts() {
         aliased_type(&arena, "Foo<int> & #{ value: int, ... }"),
         Type::Intersection(_)
     ));
+    let Type::NamedShape(named) = aliased_type(&arena, "\\Example\\Foo<int> #{ value: int, ... }")
+    else {
+        panic!("expected named object shape");
+    };
+    assert_eq!(named.identifier.value(), "\\Example\\Foo");
+    assert_eq!(named.type_arguments.unwrap().arguments.len(), 1);
+    assert_eq!(named.shape.entries.as_slice()[0].name.value, "value");
+    assert!(named.shape.rest.is_some());
+    assert!(matches!(
+        aliased_type(&arena, "Foo #{} | null"),
+        Type::Union(union) if matches!(union.left, Type::NamedShape(_))
+    ));
+    assert!(matches!(
+        aliased_type(&arena, "!Foo #{ value: int }"),
+        Type::Negated(negated) if matches!(negated.r#type, Type::NamedShape(_))
+    ));
     for source in [
         "type T = #{ $value };",
         "type T = #{ value int };",

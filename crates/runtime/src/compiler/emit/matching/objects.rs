@@ -6,6 +6,7 @@ use whim_syn::cst::pattern::ObjectPatternEntry;
 use whim_syn::cst::pattern::Pattern;
 use whim_syn::cst::pattern::TrailingPattern;
 use whim_syn::cst::sequence::TokenSeparatedSequence;
+use whim_syn::cst::r#type::Type;
 
 use super::BodyCompiler;
 use super::CompileError;
@@ -16,13 +17,14 @@ use super::JumpOffset;
 use super::Register;
 use super::Scope;
 use super::TypeDescriptor;
+use super::lower_pattern_type;
 use super::pattern_has_bindings;
 use super::tuple_index;
 
 pub(super) fn contains_object_pattern(pattern: &Pattern<'_>) -> bool {
     let nested = contains_object_pattern;
     match pattern {
-        Pattern::Object(_) => true,
+        Pattern::Object(_) | Pattern::NamedObject(_) => true,
         Pattern::Parenthesized(pattern) => nested(pattern.pattern),
         Pattern::As(pattern) => nested(pattern.left) || nested(pattern.right),
         Pattern::Intersection(pattern) => nested(pattern.left) || nested(pattern.right),
@@ -181,6 +183,12 @@ impl BodyCompiler<'_, '_> {
                 Ok(())
             }
             Pattern::Object(object) => self.test_and_bind_object(scope, object, value, failures),
+            Pattern::NamedObject(pattern) => {
+                let descriptor =
+                    lower_pattern_type(&self.types(scope), &Type::Named(pattern.name))?;
+                self.test_pattern_descriptor(descriptor, value, pattern.name.span(), failures)?;
+                self.test_and_bind_object(scope, &pattern.object, value, failures)
+            }
             Pattern::Vec(sequence) if contains_object_pattern(pattern) => self
                 .test_and_bind_sequence(
                     scope,

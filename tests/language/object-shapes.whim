@@ -7,6 +7,8 @@ require_once!('_diagnostics.whim');
 
 type HasValue<T> = #{ value: T, ... };
 type IntValue = #{ value: int };
+type NamedValue<T> = ShapeValue #{ value: T };
+type GenericNamedValue<T> = Ok<T> #{ value: T };
 
 class EmptyShape {}
 
@@ -64,6 +66,29 @@ assert!($child is ShapeBase&#{ name: string, ... });
 assert!(!($child is ShapeValue&#{ value: int, ... }));
 assert!($value is #{ value: int });
 assert!($value is HasValue<int>);
+assert!($value is NamedValue<int>);
+assert!($value is ShapeValue #{ value: int });
+assert!($value is \ShapeValue #{ value: int });
+assert!(!($value is ShapeValue #{ value: string }));
+assert!($child is ShapeBase #{ name: string, ... });
+assert!(!($child is ShapeBase #{ name: string }));
+assert!($empty is EmptyShape #{});
+assert!($hidden is HiddenShape #{ ... });
+assert!($value as NamedValue<int> == $value);
+assert!($value ?as ShapeValue #{ value: string } == null);
+assert!($value is !ShapeValue #{ value: string });
+assert!(null is !ShapeValue #{ value: int });
+assert!($value is ShapeValue #{ value: int }|null);
+assert!(new Ok::<int>(7) is GenericNamedValue<int>);
+
+#[NeverInline]
+function preserveNamedValue(
+  ShapeValue #{ value: int } $value,
+): ShapeValue #{ value: int } {
+  return $value;
+}
+
+assert!(preserveNamedValue($value) == $value);
 assert!(!($value is #{ Value: int }));
 assert!(!($value is #{ missing: null, ... }));
 assert!(!($pending is #{ value: mixed, ... }));
@@ -359,9 +384,9 @@ raises('_object-shapes/invalid-override.whim', 'return type is not covariant');
 #[NeverInline]
 function unwrapShape(mixed $result): string {
   return match ($result) {
-    Ok<string> & #{ value: '' } => 'empty',
-    Ok<string> & #{ $value } => $value,
-    Err<int> & #{ error: $code @ 400..=499 } => 'client error: ' . $code,
+    Ok<string> #{ value: '' } => 'empty',
+    Ok<string> #{ $value } => $value,
+    Err<int> #{ error: $code @ 400..=499 } => 'client error: ' . $code,
     Err<int> & #{ $error } => 'error: ' . $error,
     $_ => 'other',
   };
@@ -372,6 +397,33 @@ assert!(unwrapShape(new Ok::<string>('hello')) == 'hello');
 assert!(unwrapShape(new Err::<int>(404)) == 'client error: 404');
 assert!(unwrapShape(new Err::<int>(500)) == 'error: 500');
 assert!(unwrapShape(new Ok::<int>(5)) == 'other');
+
+assert!(
+  match (new Ok::<ShapeValue>(new ShapeValue(9))) {
+    Ok<ShapeValue> #{ value: ShapeValue #{ $value } } => $value,
+  }
+  == 9,
+);
+
+assert!(
+  match (new ShapeValue(9)) {
+    $whole @ ShapeValue #{ $value } => $whole->value == $value,
+  },
+);
+
+assert!(
+  match (vec[new ShapeValue(9)]) {
+    vec[...$rest @ ShapeValue #{ value: int }] => length!($rest),
+  }
+  == 1,
+);
+
+assert!(
+  match (new Err::<int>(9)) {
+    Ok<int> #{ $value } | Err<int> & #{ error: $value } => $value,
+  }
+  == 9,
+);
 
 $closure = fn(
   mixed $subject,
@@ -392,6 +444,19 @@ $open = Whim\Reflection\reflect_type::<#{ value: int, ... }>();
 $any = Whim\Reflection\reflect_type::<#{ ... }>();
 $object = Whim\Reflection\reflect_type::<object>();
 $emptyType = Whim\Reflection\reflect_type::<#{}>();
+$namedType = Whim\Reflection\reflect_type::<ShapeValue #{ value: int }>();
+$intersectionType = Whim\Reflection\reflect_type::<
+  ShapeValue&#{ value: int },
+>();
+
+assert!($namedType->equals($intersectionType));
+assert!($namedType->toString() == $intersectionType->toString());
+assert!(
+  Whim\Reflection\reflect_type::<!ShapeValue #{ value: int }>()->equals(
+    Whim\Reflection\reflect_type::<!(ShapeValue&#{ value: int })>(),
+  ),
+);
+
 $extra = Whim\Reflection\reflect_type::<#{ value: 7, name: 'base' }>();
 assert!($closed is Whim\Reflection\Type\ObjectShapeTypeReflection);
 assert!($closed->getKind() == Whim\Reflection\Type\TypeKind::ObjectShape);

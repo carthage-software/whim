@@ -324,6 +324,15 @@ where
     fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
         match self {
             Type::Named(named) => named.format(f),
+            Type::NamedShape(named) => {
+                let name = named.named_type().format(f);
+                let shape = f.object_shape(
+                    named.shape.entries.as_slice(),
+                    named.shape.rest.as_ref(),
+                    named.shape.right_brace.start.offset,
+                );
+                f.concat([name, f.text(" "), shape])
+            }
             Type::Literal(literal) => literal.format(f),
             Type::NegativeLiteral(literal) => match literal {
                 NegativeLiteralType::Integer { literal, .. } => {

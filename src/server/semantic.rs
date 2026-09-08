@@ -348,6 +348,7 @@ const fn is_type_position(kind: NodeKind) -> bool {
     matches!(
         kind,
         NodeKind::NamedType
+            | NodeKind::NamedShapeType
             | NodeKind::Type
             | NodeKind::TypeArgument
             | NodeKind::TypeParameterBound

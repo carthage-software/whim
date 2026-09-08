@@ -21,6 +21,7 @@ use crate::cst::r#type::IntegerRangeOperator;
 use crate::cst::r#type::IntegerRangeType;
 use crate::cst::r#type::IntersectionType;
 use crate::cst::r#type::MemberType;
+use crate::cst::r#type::NamedShapeType;
 use crate::cst::r#type::NamedType;
 use crate::cst::r#type::NegatedType;
 use crate::cst::r#type::NegativeLiteralType;
@@ -112,7 +113,7 @@ where
         Ok(r#type)
     }
 
-    fn parse_object_shape_type(&mut self) -> Result<Type<'arena>, ParseError> {
+    fn parse_object_shape_type(&mut self) -> Result<ObjectShapeType<'arena>, ParseError> {
         let hash_left_brace = self.expect_span(TokenKind::HashLeftBrace)?;
         let mut entries = Vec::new_in(self.arena);
         let mut commas = Vec::new_in(self.arena);
@@ -133,12 +134,12 @@ where
             }
         }
         let right_brace = self.expect_span(TokenKind::RightBrace)?;
-        Ok(Type::ObjectShape(ObjectShapeType {
+        Ok(ObjectShapeType {
             hash_left_brace,
             entries: TokenSeparatedSequence::new(entries, commas),
             rest,
             right_brace,
-        }))
+        })
     }
 
     pub(crate) fn parse_object_shape_rest(&mut self) -> Result<ObjectShapeRest, ParseError> {
@@ -159,7 +160,7 @@ where
             TokenKind::Array => Type::Array(self.parse_array_type()?),
             TokenKind::Vec => self.parse_vec_or_shape_type()?,
             TokenKind::Dict => self.parse_dict_or_shape_type()?,
-            TokenKind::HashLeftBrace => self.parse_object_shape_type()?,
+            TokenKind::HashLeftBrace => Type::ObjectShape(self.parse_object_shape_type()?),
             TokenKind::Classname => Type::Classname(self.parse_classname_type()?),
             TokenKind::Self_ => Type::Self_(self.parse_self_type()?),
             TokenKind::Parent => Type::Parent(self.expect_keyword(TokenKind::Parent)?),
@@ -190,7 +191,18 @@ where
             }
             TokenKind::Identifier
             | TokenKind::QualifiedIdentifier
-            | TokenKind::FullyQualifiedIdentifier => Type::Named(self.parse_named_type()?),
+            | TokenKind::FullyQualifiedIdentifier => {
+                let named = self.parse_named_type()?;
+                if named.member.is_none() && self.is_at(TokenKind::HashLeftBrace)? {
+                    Type::NamedShape(NamedShapeType {
+                        identifier: named.identifier,
+                        type_arguments: named.type_arguments,
+                        shape: self.parse_object_shape_type()?,
+                    })
+                } else {
+                    Type::Named(named)
+                }
+            }
             _ => {
                 return Err(ParseError::UnexpectedToken(
                     Expected::Description("a type"),

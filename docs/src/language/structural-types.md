@@ -136,14 +136,20 @@ check does not change the property's declared type, visibility, or readonly
 rules. Mutating the object can make a later check fail, including when the
 object is held inside a vec, dict, or tuple.
 
-Combine a nominal type with a shape using an intersection:
+Place a shape after a named type to combine the nominal and structural checks.
+`Name #{ ... }` is shorthand for `Name & #{ ... }`, including generic names:
 
 ```whim
 use Whim\Result\Ok;
 
 $value = new Ok::<string>('hello');
 assert!($value is Ok<string> & #{ value: string & !'' });
+assert!($value is Ok<string> #{ value: string & !'' });
 ```
+
+The name and shape form one type: `!Name #{ value: int }` negates the entire
+combination, like `!(Name & #{ value: int })`. Closed and open property-set
+rules apply equally to both spellings.
 
 Shapes work in aliases, generic arguments and bounds, callable signatures,
 parameter and return types, property types, `is`, `as`, and `?as`. Their

@@ -17,6 +17,7 @@ use crate::cst::sequence::TokenSeparatedSequence;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Type<'arena> {
     Named(NamedType<'arena>),
+    NamedShape(NamedShapeType<'arena>),
     Literal(Literal<'arena>),
     NegativeLiteral(NegativeLiteralType<'arena>),
     IntegerRange(IntegerRangeType<'arena>),
@@ -204,6 +205,25 @@ pub struct NamedType<'arena> {
     pub member: Option<MemberType<'arena>>,
 }
 
+/// A named type with a shape, such as `Option<string> #{ value: !'' }`.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct NamedShapeType<'arena> {
+    pub identifier: Identifier<'arena>,
+    pub type_arguments: Option<TypeArgumentList<'arena>>,
+    pub shape: ObjectShapeType<'arena>,
+}
+
+impl<'arena> NamedShapeType<'arena> {
+    #[must_use]
+    pub fn named_type(&self) -> NamedType<'arena> {
+        NamedType {
+            identifier: self.identifier,
+            type_arguments: self.type_arguments,
+            member: None,
+        }
+    }
+}
+
 /// A member of a named class-like, such as `SeekWhence::Set`.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct MemberType<'arena> {
@@ -368,6 +388,7 @@ impl HasSpan for Type<'_> {
     fn span(&self) -> Span {
         match self {
             Type::Named(named) => named.span(),
+            Type::NamedShape(named_shape) => named_shape.span(),
             Type::Literal(literal) => literal.span(),
             Type::NegativeLiteral(literal) => literal.span(),
             Type::IntegerRange(range) => range.span(),
@@ -475,6 +496,12 @@ impl HasSpan for NamedType<'_> {
         self.member
             .as_ref()
             .map_or(span, |member| span.join(member.span()))
+    }
+}
+
+impl HasSpan for NamedShapeType<'_> {
+    fn span(&self) -> Span {
+        self.identifier.span().join(self.shape.span())
     }
 }
 

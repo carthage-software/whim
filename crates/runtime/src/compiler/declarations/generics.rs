@@ -270,14 +270,18 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for UnboundDefaultReference<'_> {
         if self.found.is_some() {
             return Flow::Skip;
         }
-        if let Node::NamedType(named) = node
-            && let Identifier::Local(local) = &named.identifier
+        let named = match node {
+            Node::NamedType(named) => Some((&named.identifier, named.span())),
+            Node::NamedShapeType(named) => Some((&named.identifier, named.span())),
+            _ => None,
+        };
+        if let Some((Identifier::Local(local), span)) = named
             && self
                 .unavailable
                 .iter()
                 .any(|parameter| parameter == local.value)
         {
-            self.found = Some((local.value.to_string(), named.span()));
+            self.found = Some((local.value.to_string(), span));
             return Flow::Skip;
         }
 

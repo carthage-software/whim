@@ -389,17 +389,12 @@ fn render_type_with_state(
         Type::Void(_) => "void".to_string(),
         Type::Never(_) => "never".to_string(),
         Type::Negated(negated) => {
-            format!(
-                "!{}",
-                render_type_subst(
-                    scope,
-                    negated.r#type,
-                    substitution,
-                    depth,
-                    expanding_aliases,
-                    alias_rendering,
-                )?
-            )
+            let inner = render_child(state, negated.r#type, expanding_aliases)?;
+            if matches!(negated.r#type, Type::NamedShape(_)) {
+                format!("!({inner})")
+            } else {
+                format!("!{inner}")
+            }
         }
         Type::Self_(self_type) => render_self_type(state, source, self_type, expanding_aliases)?,
         Type::Parent(_) => scope.parent_name(source)?,
@@ -420,6 +415,16 @@ fn render_type_with_state(
         },
         Type::IntegerRange(range) => render_integer_range(range),
         Type::Named(named) => render_named_type(state, source, named, expanding_aliases)?,
+        Type::NamedShape(named) => {
+            let name = Type::Named(named.named_type());
+            let shape = Type::ObjectShape(named.shape);
+            validate_composition(scope, &[&name, &shape], false)?;
+            format!(
+                "{}&{}",
+                render_child(state, &name, expanding_aliases)?,
+                render_child(state, &shape, expanding_aliases)?,
+            )
+        }
         Type::Array(array) => render_array_type(state, array, expanding_aliases)?,
         Type::Vec(vector) => render_vec_type(state, vector, expanding_aliases)?,
         Type::Dict(dictionary) => render_dict_type(state, dictionary, expanding_aliases)?,

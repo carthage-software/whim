@@ -1,7 +1,10 @@
 type Empty=#{};
 type Open=#{...};
 type Nested<T> = #{first:T,child:#{name:string,...},...};
+type Named<T>=\Example\Box<T>#{value:T,child:Child#{name:string,...},...};
+type Combined=Item#{value:string}|!Item#{value:int};
 function unwrap(mixed $x): #{value:int,...} {return match($x){Ok<int>&#{$value}=>new Item($value),#{value:$other@int,...}=>new Item($other),};}
+function unwrapNamed(mixed $x):Item#{value:int}{return match($x){Ok<int>#{$value}=>new Item($value),$whole@Item#{value:$other@int}=>$whole,};}
 type Comments=#{
 // property
 name:string,

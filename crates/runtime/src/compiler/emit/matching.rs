@@ -22,6 +22,7 @@ use whim_syn::cst::pattern::AsPattern;
 use whim_syn::cst::pattern::DictPattern;
 use whim_syn::cst::pattern::DictPatternKey;
 use whim_syn::cst::pattern::IntersectionPattern;
+use whim_syn::cst::pattern::NamedObjectPattern;
 use whim_syn::cst::pattern::ObjectPattern;
 use whim_syn::cst::pattern::ObjectPatternEntry;
 use whim_syn::cst::pattern::Pattern;
@@ -300,6 +301,7 @@ fn collect_match_keys(heap: &Heap, pattern: &Pattern<'_>, keys: &mut Vec<MatchKe
         }
         Pattern::Intersection(_)
         | Pattern::Object(_)
+        | Pattern::NamedObject(_)
         | Pattern::As(_)
         | Pattern::Variable(_)
         | Pattern::Vec(_)
@@ -360,6 +362,7 @@ fn pattern_only_binds(pattern: &Pattern<'_>) -> bool {
             pattern_only_binds(pattern.left) && pattern_only_binds(pattern.right)
         }
         Pattern::Object(_)
+        | Pattern::NamedObject(_)
         | Pattern::Union(_)
         | Pattern::Vec(_)
         | Pattern::Dict(_)
@@ -1803,9 +1806,11 @@ impl BodyCompiler<'_, '_> {
                 let descriptor = lower_pattern_type(&self.types(scope), r#type)?;
                 Ok(descriptor_is_top(&descriptor, 0))
             }
-            Pattern::Object(_) | Pattern::Vec(_) | Pattern::Dict(_) | Pattern::Tuple(_) => {
-                Ok(false)
-            }
+            Pattern::Object(_)
+            | Pattern::NamedObject(_)
+            | Pattern::Vec(_)
+            | Pattern::Dict(_)
+            | Pattern::Tuple(_) => Ok(false),
         }
     }
 
@@ -1841,6 +1846,10 @@ impl BodyCompiler<'_, '_> {
     ) -> Result<TypeDescriptor, CompileError> {
         match pattern {
             Pattern::Object(pattern) => self.lower_object_pattern(scope, pattern),
+            Pattern::NamedObject(pattern) => Ok(TypeDescriptor::Intersection(vec![
+                lower_pattern_type(&self.types(scope), &Type::Named(pattern.name))?,
+                self.lower_object_pattern(scope, &pattern.object)?,
+            ])),
             Pattern::Variable(_) => Ok(TypeDescriptor::Wildcard),
             Pattern::Parenthesized(pattern) => self.lower_match_pattern(scope, pattern.pattern),
             Pattern::Intersection(IntersectionPattern { left, right, .. })
@@ -1936,7 +1945,10 @@ impl BodyCompiler<'_, '_> {
 
     fn push_nested_pattern_bindings(&mut self, pattern: &Pattern<'_>) -> Result<(), CompileError> {
         match pattern {
-            Pattern::Object(pattern) => {
+            Pattern::Object(pattern)
+            | Pattern::NamedObject(NamedObjectPattern {
+                object: pattern, ..
+            }) => {
                 for entry in &pattern.entries {
                     match entry {
                         ObjectPatternEntry::Property { pattern, .. } => {
@@ -2001,7 +2013,10 @@ impl BodyCompiler<'_, '_> {
         value: Register,
     ) -> Result<(), CompileError> {
         match pattern {
-            Pattern::Object(pattern) => self.bind_object_pattern(scope, pattern, value),
+            Pattern::Object(pattern)
+            | Pattern::NamedObject(NamedObjectPattern {
+                object: pattern, ..
+            }) => self.bind_object_pattern(scope, pattern, value),
             Pattern::Variable(variable) => self.bind_pattern_variable(variable, value),
             Pattern::Intersection(pattern) => {
                 self.bind_pattern(scope, pattern.left, value)?;
@@ -2547,7 +2562,10 @@ fn check_pattern_bindings<'arena>(
     bindings: &mut HashSet<&'arena str>,
 ) -> Result<(), CompileError> {
     match pattern {
-        Pattern::Object(pattern) => check_object_pattern_bindings(pattern, bindings),
+        Pattern::Object(pattern)
+        | Pattern::NamedObject(NamedObjectPattern {
+            object: pattern, ..
+        }) => check_object_pattern_bindings(pattern, bindings),
         Pattern::Variable(variable) => collect_pattern_binding(variable, bindings),
         Pattern::Type(_) => Ok(()),
         Pattern::Parenthesized(pattern) => check_pattern_bindings(pattern.pattern, bindings),
@@ -2658,7 +2676,10 @@ fn collect_pattern_binding<'arena>(
 
 fn pattern_has_bindings(pattern: &Pattern<'_>) -> bool {
     match pattern {
-        Pattern::Object(pattern) => pattern.entries.iter().any(|entry| match entry {
+        Pattern::Object(pattern)
+        | Pattern::NamedObject(NamedObjectPattern {
+            object: pattern, ..
+        }) => pattern.entries.iter().any(|entry| match entry {
             ObjectPatternEntry::Property { pattern, .. } => pattern_has_bindings(pattern),
             ObjectPatternEntry::Shorthand(_) => true,
         }),
@@ -2710,30 +2731,17 @@ fn same_binding_layout(left: &Pattern<'_>, right: &Pattern<'_>) -> bool {
             same_binding_layout(left.left, right.left)
                 && same_binding_layout(left.right, right.right)
         }
-        (Pattern::Object(left), Pattern::Object(right)) => {
-            left.entries.len() == right.entries.len()
-                && left
-                    .entries
-                    .iter()
-                    .zip(right.entries.iter())
-                    .all(|(left, right)| match (left, right) {
-                        (
-                            ObjectPatternEntry::Property { pattern: left, .. },
-                            ObjectPatternEntry::Property { pattern: right, .. },
-                        ) => same_binding_layout(left, right),
-                        (
-                            ObjectPatternEntry::Shorthand(left),
-                            ObjectPatternEntry::Shorthand(right),
-                        ) => left.name == right.name,
-                        (
-                            ObjectPatternEntry::Property { pattern: left, .. },
-                            ObjectPatternEntry::Shorthand(right),
-                        ) => same_binding_layout(left, &Pattern::Variable(*right)),
-                        (
-                            ObjectPatternEntry::Shorthand(left),
-                            ObjectPatternEntry::Property { pattern: right, .. },
-                        ) => same_binding_layout(&Pattern::Variable(*left), right),
-                    })
+        (Pattern::Object(left), Pattern::Object(right)) => same_object_binding_layout(left, right),
+        (Pattern::NamedObject(left), Pattern::NamedObject(right)) => {
+            same_object_binding_layout(&left.object, &right.object)
+        }
+        (Pattern::NamedObject(left), Pattern::Intersection(right)) => {
+            !pattern_has_bindings(right.left)
+                && same_object_pattern_binding_layout(&left.object, right.right)
+        }
+        (Pattern::Intersection(left), Pattern::NamedObject(right)) => {
+            !pattern_has_bindings(left.left)
+                && same_object_pattern_binding_layout(&right.object, left.right)
         }
         (Pattern::Intersection(left), Pattern::Intersection(right)) => {
             same_binding_layout(left.left, right.left)
@@ -2761,6 +2769,47 @@ fn same_binding_layout(left: &Pattern<'_>, right: &Pattern<'_>) -> bool {
                 && same_trailing_binding_layout(left.trailing.as_ref(), right.trailing.as_ref())
         }
         _ => !pattern_has_bindings(left) && !pattern_has_bindings(right),
+    }
+}
+
+fn same_object_binding_layout(left: &ObjectPattern<'_>, right: &ObjectPattern<'_>) -> bool {
+    left.entries.len() == right.entries.len()
+        && left
+            .entries
+            .iter()
+            .zip(right.entries.iter())
+            .all(|(left, right)| match (left, right) {
+                (
+                    ObjectPatternEntry::Property { pattern: left, .. },
+                    ObjectPatternEntry::Property { pattern: right, .. },
+                ) => same_binding_layout(left, right),
+                (ObjectPatternEntry::Shorthand(left), ObjectPatternEntry::Shorthand(right)) => {
+                    left.name == right.name
+                }
+                (
+                    ObjectPatternEntry::Property { pattern: left, .. },
+                    ObjectPatternEntry::Shorthand(right),
+                ) => same_binding_layout(left, &Pattern::Variable(*right)),
+                (
+                    ObjectPatternEntry::Shorthand(left),
+                    ObjectPatternEntry::Property { pattern: right, .. },
+                ) => same_binding_layout(&Pattern::Variable(*left), right),
+            })
+}
+
+fn same_object_pattern_binding_layout(object: &ObjectPattern<'_>, pattern: &Pattern<'_>) -> bool {
+    match pattern {
+        Pattern::Parenthesized(pattern) => {
+            same_object_pattern_binding_layout(object, pattern.pattern)
+        }
+        Pattern::Object(pattern) => same_object_binding_layout(object, pattern),
+        _ => {
+            !pattern_has_bindings(pattern)
+                && object.entries.iter().all(|entry| match entry {
+                    ObjectPatternEntry::Property { pattern, .. } => !pattern_has_bindings(pattern),
+                    ObjectPatternEntry::Shorthand(_) => false,
+                })
+        }
     }
 }
 

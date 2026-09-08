@@ -176,6 +176,7 @@ use crate::cst::pattern::DictPattern;
 use crate::cst::pattern::DictPatternEntry;
 use crate::cst::pattern::DictPatternKey;
 use crate::cst::pattern::IntersectionPattern;
+use crate::cst::pattern::NamedObjectPattern;
 use crate::cst::pattern::ObjectPattern;
 use crate::cst::pattern::ObjectPatternEntry;
 use crate::cst::pattern::ParenthesizedPattern;
@@ -206,6 +207,7 @@ use crate::cst::r#type::IntegerRangeOperator;
 use crate::cst::r#type::IntegerRangeType;
 use crate::cst::r#type::IntersectionType;
 use crate::cst::r#type::MemberType;
+use crate::cst::r#type::NamedShapeType;
 use crate::cst::r#type::NamedType;
 use crate::cst::r#type::NegatedType;
 use crate::cst::r#type::NegativeLiteralType;
@@ -338,6 +340,7 @@ define_nodes! {
     ParenthesizedPattern(ParenthesizedPattern<'arena>),
     IntersectionPattern(IntersectionPattern<'arena>),
     ObjectPattern(ObjectPattern<'arena>),
+    NamedObjectPattern(NamedObjectPattern<'arena>),
     ObjectPatternEntry(ObjectPatternEntry<'arena>),
     ObjectShapeType(ObjectShapeType<'arena>),
     ObjectShapeTypeEntry(ObjectShapeTypeEntry<'arena>),
@@ -450,6 +453,7 @@ define_nodes! {
     StaticMethodPartialApplication(StaticMethodPartialApplication<'arena>),
     Type(Type<'arena>),
     NamedType(NamedType<'arena>),
+    NamedShapeType(NamedShapeType<'arena>),
     MemberType(MemberType<'arena>),
     SelfType(SelfType<'arena>),
     TypeArgumentList(TypeArgumentList<'arena>),

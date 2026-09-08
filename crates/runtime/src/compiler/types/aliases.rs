@@ -39,10 +39,15 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for AliasReferences<'_, '_> {
             _ => {}
         }
 
-        if let Node::NamedType(named) = node
-            && !is_binder_name(&named.identifier, self.binders)
+        let identifier = match node {
+            Node::NamedType(named) => Some(&named.identifier),
+            Node::NamedShapeType(named) => Some(&named.identifier),
+            _ => None,
+        };
+        if let Some(identifier) = identifier
+            && !is_binder_name(identifier, self.binders)
         {
-            let resolved = self.resolver.resolve_text(&named.identifier);
+            let resolved = self.resolver.resolve_text(identifier);
             if self
                 .generics
                 .get(&resolved)

@@ -46,6 +46,7 @@ use whim_syn::cst::operation::UnaryPrefix;
 use whim_syn::cst::operation::UnaryPrefixOperator;
 use whim_syn::cst::pattern::DictPatternEntry;
 use whim_syn::cst::pattern::DictPatternKey;
+use whim_syn::cst::pattern::NamedObjectPattern;
 use whim_syn::cst::pattern::ObjectPatternEntry;
 use whim_syn::cst::pattern::Pattern;
 use whim_syn::cst::pattern::TrailingPattern;
@@ -640,6 +641,15 @@ where
                 let right = pattern.right.format(f);
                 f.concat([left, f.text(" & "), right])
             }
+            Pattern::NamedObject(pattern) => {
+                let name = pattern.name.format(f);
+                let object = f.object_shape(
+                    pattern.object.entries.as_slice(),
+                    pattern.object.rest.as_ref(),
+                    pattern.object.right_brace.start.offset,
+                );
+                f.concat([name, f.text(" "), object])
+            }
             Pattern::Object(pattern) => f.object_shape(
                 pattern.entries.as_slice(),
                 pattern.rest.as_ref(),
@@ -719,7 +729,10 @@ fn pattern_binds(pattern: &Pattern<'_>) -> bool {
         Pattern::Intersection(pattern) => {
             pattern_binds(pattern.left) || pattern_binds(pattern.right)
         }
-        Pattern::Object(pattern) => pattern.entries.iter().any(|entry| match entry {
+        Pattern::Object(pattern)
+        | Pattern::NamedObject(NamedObjectPattern {
+            object: pattern, ..
+        }) => pattern.entries.iter().any(|entry| match entry {
             ObjectPatternEntry::Property { pattern, .. } => pattern_binds(pattern),
             ObjectPatternEntry::Shorthand(_) => true,
         }),
