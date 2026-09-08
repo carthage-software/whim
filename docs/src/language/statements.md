@@ -2,6 +2,10 @@
 
 Statements run actions and choose control flow.
 
+Blocks group statements as the bodies of declarations and control-flow
+constructs, such as functions, `if`, loops, `try`, and `using`. Standalone
+`{ ... }` and `{}` blocks are syntax errors, including inside another body.
+
 ## Expression statements
 
 Any expression may form a statement when followed by `;`:

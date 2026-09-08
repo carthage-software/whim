@@ -35,6 +35,7 @@ pub enum ParseError {
     UnexpectedEndOfFile(Expected, Position),
     InvalidAssignmentTarget(Span),
     InvalidBindTarget(Span),
+    StandaloneBlock(Span),
     /// `_` is reserved for wildcard type and pattern positions and cannot be
     /// used as the name of a declaration or member.
     ReservedIdentifier(Span),
@@ -52,6 +53,7 @@ impl ParseError {
             | Self::InvalidStringLiteral(_, span)
             | Self::InvalidAssignmentTarget(span)
             | Self::InvalidBindTarget(span)
+            | Self::StandaloneBlock(span)
             | Self::ReservedIdentifier(span)
             | Self::RecursionLimitExceeded(span)
             | Self::StructuralDepthExceeded(span) => span.start,
@@ -76,6 +78,7 @@ impl HasSpan for ParseError {
             | Self::InvalidStringLiteral(_, span)
             | Self::InvalidAssignmentTarget(span)
             | Self::InvalidBindTarget(span)
+            | Self::StandaloneBlock(span)
             | Self::ReservedIdentifier(span)
             | Self::RecursionLimitExceeded(span)
             | Self::StructuralDepthExceeded(span) => *span,
@@ -104,6 +107,7 @@ impl fmt::Display for ParseError {
                 f,
                 "a bind target must be a variable or a nested tuple or dictionary binding pattern"
             ),
+            Self::StandaloneBlock(_) => write!(f, "standalone blocks are not allowed"),
             Self::ReservedIdentifier(_) => {
                 write!(f, "`_` is reserved and cannot be used as an identifier")
             }

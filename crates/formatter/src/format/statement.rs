@@ -71,7 +71,6 @@ where
             Statement::Constant(node) => node.format(f),
             Statement::TypeAlias(node) => node.format(f),
             Statement::Newtype(node) => node.format(f),
-            Statement::Block(node) => node.format(f),
             Statement::If(node) => node.format(f),
             Statement::While(node) => node.format(f),
             Statement::DoWhile(node) => node.format(f),

@@ -204,8 +204,7 @@ See [Aliases and Newtypes](../core-library/functions-and-constants.md).
 ## Statements
 
 ```text
-statement       := block
-                 | ";"
+statement       := ";"
                  | expression ";"
                  | if-statement
                  | while-statement

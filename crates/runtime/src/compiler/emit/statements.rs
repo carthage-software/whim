@@ -122,7 +122,6 @@ impl<'arena> BodyCompiler<'_, 'arena> {
                 self.registers.release_temporaries();
                 Ok(())
             }
-            Statement::Block(block) => self.statements_inner(scope, block.statements),
             Statement::Noop(_) => Ok(()),
             Statement::If(if_statement) => self.if_statement(scope, if_statement),
             Statement::While(loop_statement) => self.while_statement(scope, loop_statement),

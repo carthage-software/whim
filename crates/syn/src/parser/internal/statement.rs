@@ -41,7 +41,11 @@ where
 
         let statement = match kind {
             TokenKind::Semicolon => Statement::Noop(self.expect_span(TokenKind::Semicolon)?),
-            TokenKind::LeftBrace => Statement::Block(self.parse_block()?),
+            TokenKind::LeftBrace => {
+                return Err(ParseError::StandaloneBlock(
+                    self.expect_span(TokenKind::LeftBrace)?,
+                ));
+            }
             TokenKind::HashLeftBracket => return self.parse_attributed_statement(),
             TokenKind::Namespace if self.at_namespace_declaration()? => {
                 Statement::Namespace(self.parse_namespace()?)

@@ -73,7 +73,6 @@ impl Node<'_, '_> {
                 Statement::Constant(inner) => f(Node::Constant(inner)),
                 Statement::TypeAlias(inner) => f(Node::TypeAlias(inner)),
                 Statement::Newtype(inner) => f(Node::Newtype(inner)),
-                Statement::Block(inner) => f(Node::Block(inner)),
                 Statement::If(inner) => f(Node::If(inner)),
                 Statement::While(inner) => f(Node::While(inner)),
                 Statement::DoWhile(inner) => f(Node::DoWhile(inner)),
