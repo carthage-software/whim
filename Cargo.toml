@@ -76,7 +76,7 @@ file-format = { version = "0.29.0", features = ["reader-txt", "reader-xml"] }
 flate2 = "1.1.9"
 foldhash = "0.2"
 fs2 = "0.4.3"
-getrandom = "0.3.4"
+getrandom = "0.4.3"
 globset = "0.4.16"
 hashbrown = "0.17.1"
 hmac = "0.13.0"
