@@ -221,6 +221,8 @@ whim_core! {
         async_::task::forget_unhandled,
         private::process::getmypid,
         private::random::random_bytes,
+        private::random::random_int,
+        private::random::random_string,
         private::regex::escape,
         private::string::string_to_bytes,
         private::string::string_from_bytes,

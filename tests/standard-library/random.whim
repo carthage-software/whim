@@ -11,6 +11,20 @@ for ($index = 0; $index < length!($text); $index++) {
   assert!(contains!(vec['a', 'b'], $text[$index]));
 }
 
+foreach (vec[
+  'ab',
+  'abc',
+  "\0\xffa",
+  Whim\Str\repeat('x', 256) . 'y',
+] as $alphabet) {
+  assert!(Whim\SecureRandom\string(0, $alphabet) == '');
+  $text = Whim\SecureRandom\string(1025, $alphabet);
+  assert!(length!($text) == 1025);
+  for ($index = 0; $index < length!($text); $index++) {
+    assert!(Whim\Str\contains($alphabet, $text[$index]));
+  }
+}
+
 $assertion_value_4 = Whim\SecureRandom\int(10, 20);
 assert!($assertion_value_4 >= 10);
 assert!($assertion_value_4 <= 20);

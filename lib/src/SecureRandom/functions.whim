@@ -5,6 +5,7 @@ use Whim\Marker\TrackCaller;
 use Whim\Math;
 use Whim\Refine\NonNegativeInt;
 use Whim\_Private\random_bytes;
+use Whim\_Private\random_string;
 
 /**
  * Generates cryptographically secure random bytes.
@@ -35,12 +36,11 @@ function string(
     $alphabet
     ?? '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  $result = '';
-  $index = 0;
-  while ($index < $length) {
-    $position = _Private\SECURE_SEQUENCE->nextIn(0, length!($alphabet) - 1);
-    $result .= $alphabet[$position];
-    $index++;
+  $result = random_string($length, $alphabet);
+  if ($result is null) {
+    throw new InsufficientEntropyException(
+      'the operating system did not provide random bytes',
+    );
   }
 
   return $result;

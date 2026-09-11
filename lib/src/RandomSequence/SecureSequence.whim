@@ -18,14 +18,11 @@ final class SecureSequence implements Default, Sequence {
   /** Return the next value in the sequence. */
   #[TrackCaller]
   public function next(): int {
-    $bytes = _Private\string_to_bytes(SecureRandom\bytes(8));
-    $value = 0;
-    $index = 0;
-    while ($index < 8) {
-      $value = ($value << 8) | $bytes[$index];
-      $index++;
-    }
-
-    return $value;
+    return (
+      _Private\random_int()
+      ?? throw new SecureRandom\InsufficientEntropyException(
+        'the operating system did not provide random bytes',
+      )
+    );
   }
 }
