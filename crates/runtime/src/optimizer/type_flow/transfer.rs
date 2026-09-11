@@ -410,7 +410,8 @@ pub(in crate::optimizer) fn transfer(
         Instruction::ElementGet { destination, .. }
         | Instruction::PropertyGet { destination, .. }
         | Instruction::PropertyGetUnchecked { destination, .. }
-        | Instruction::CallMethodDirect { destination, .. } => {
+        | Instruction::CallMethodDirect { destination, .. }
+        | Instruction::CallNamedDirect { destination, .. } => {
             write(destination, Fact::with_origin(ALL, origin))
         }
         Instruction::Remove {
@@ -600,11 +601,19 @@ pub(in crate::optimizer) fn transfer(
             };
             write(value_destination, Fact::with_origin(mask, origin));
         }
-        Instruction::IncrementJump { target, .. } => {
-            write(target, unary_numeric_result(read(target)))
+        Instruction::IncrementJump {
+            target, immediate, ..
+        } => {
+            let current = read(target);
+            let mut next = unary_numeric_result(current);
+            next.non_negative = current.non_negative && immediate.value() >= 0;
+            write(target, next);
         }
         Instruction::CounterLoop { counter, .. } => {
-            write(counter, unary_numeric_result(read(counter)))
+            let current = read(counter);
+            let mut next = unary_numeric_result(current);
+            next.non_negative = current.non_negative;
+            write(counter, next);
         }
         Instruction::IntCounterLoop { counter, .. } => {
             let current = read(counter);

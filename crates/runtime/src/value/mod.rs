@@ -508,6 +508,12 @@ impl Value {
     }
 
     #[must_use]
+    #[inline(always)]
+    pub(crate) const fn kind_bit(&self) -> u16 {
+        1 << self.kind as u16
+    }
+
+    #[must_use]
     pub(crate) fn has_other_strong_references(&self) -> bool {
         match self.transparent_view() {
             ValueView::String(value) => value.has_other_strong_references(),

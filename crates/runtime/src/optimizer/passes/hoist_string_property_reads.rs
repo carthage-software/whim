@@ -602,6 +602,7 @@ fn invalidates_property(instruction: Instruction, slot: PropertySlot) -> bool {
             | Instruction::CallValueUnchecked { .. }
             | Instruction::CallNamedUnchecked { .. }
             | Instruction::CallMethodUnchecked { .. }
+            | Instruction::CallNamedDirect { .. }
             | Instruction::CallMethodDirect { .. }
             | Instruction::CallSelfUnchecked { .. }
             | Instruction::CallNamedConstantUnchecked { .. }

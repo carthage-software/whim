@@ -67,7 +67,7 @@ fn exact_call_restores_reference_mask(chunk: &Chunk, register: Register, start: 
             Instruction::CallNamedUnchecked { destination, .. }
                 | Instruction::CallSelfUnchecked { destination, .. }
                 | Instruction::CallMethodUnchecked { destination, .. }
-                | Instruction::CallMethodDirect { destination, .. }
+                | Instruction::CallNamedDirect { destination, .. } | Instruction::CallMethodDirect { destination, .. }
                 if destination == register
         ) {
             return true;

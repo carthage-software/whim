@@ -168,7 +168,8 @@ fn instruction_candidates(
     if configuration.specialize_comparison
         && matches!(
             instruction,
-            Instruction::Equal { .. }
+            Instruction::Not { .. }
+                | Instruction::Equal { .. }
                 | Instruction::NotEqual { .. }
                 | Instruction::LessThan { .. }
                 | Instruction::LessThanOrEqual { .. }

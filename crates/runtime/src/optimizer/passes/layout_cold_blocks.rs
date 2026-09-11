@@ -328,6 +328,7 @@ fn is_cold_call(chunk: &Chunk, instruction: Instruction, callables: &ColdCallabl
     let method = match instruction {
         Instruction::CallMethod { cache, .. }
         | Instruction::CallMethodUnchecked { cache, .. }
+        | Instruction::CallNamedDirect { cache, .. }
         | Instruction::CallMethodDirect { cache, .. }
         | Instruction::CallMethodDiscarded { cache, .. } => Some(cache),
         _ => None,

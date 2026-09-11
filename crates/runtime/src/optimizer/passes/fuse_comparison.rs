@@ -216,7 +216,9 @@ fn fuse_null_comparison(chunk: &mut Chunk, statistics: &mut OptimizationStatisti
     compact_removed_instructions(chunk, &remove, statistics);
 }
 
-fn comparison(instruction: Instruction) -> Option<(Comparison, Register, Register, Register)> {
+pub(super) fn comparison(
+    instruction: Instruction,
+) -> Option<(Comparison, Register, Register, Register)> {
     match instruction {
         Instruction::Equal {
             destination,

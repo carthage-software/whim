@@ -327,6 +327,11 @@ fn pinned_window_registers(chunk: &Chunk) -> HashSet<u16> {
                 first_argument,
                 ..
             }
+            | Instruction::CallNamedDirect {
+                argument_count,
+                first_argument,
+                ..
+            }
             | Instruction::CallMethodDirect {
                 argument_count,
                 first_argument,
@@ -533,6 +538,11 @@ fn normalize_empty_window_starts(chunk: &mut Chunk) {
                 ..
             }
             | Instruction::CallMethodUnchecked {
+                argument_count,
+                first_argument,
+                ..
+            }
+            | Instruction::CallNamedDirect {
                 argument_count,
                 first_argument,
                 ..

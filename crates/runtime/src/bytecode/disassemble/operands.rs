@@ -782,7 +782,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
         ),
         instructions!(
             CallNamed | CallNamedDiscarded | CallNamedUnchecked | CallMethod
-                | CallMethodDiscarded | CallMethodUnchecked | CallMethodDirect | CallStatic
+                | CallMethodDiscarded | CallMethodUnchecked | CallMethodDirect | CallNamedDirect | CallStatic
                 | CallStaticDiscarded;
             {
             argument_count,

@@ -43,6 +43,7 @@ impl VirtualMachine<'_> {
             let cache = match instruction {
                 Instruction::CallNamed { cache, .. }
                 | Instruction::CallNamedDiscarded { cache, .. }
+                | Instruction::CallNamedDirect { cache, .. }
                 | Instruction::CallNamedUnchecked { cache, .. } => cache,
                 _ => continue,
             };

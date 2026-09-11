@@ -3,7 +3,7 @@
 
 use std::rc::Rc;
 
-use crate::bytecode::aliases::expand_aliases;
+use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::limits::MAX_TYPE_DEPTH_U32;
 use crate::vm::types::Atom;
@@ -217,7 +217,7 @@ impl VirtualMachine<'_> {
         let descriptor = if self.engine.tables.type_aliases.is_empty() {
             descriptor.clone()
         } else {
-            expand_aliases(descriptor, &self.engine.tables.type_aliases)
+            expand_aliases(descriptor, self.engine.tables.type_aliases.as_slice())
         };
         Ok(self.substitute_descriptor(&descriptor, environment, 0))
     }

@@ -503,7 +503,7 @@ impl VirtualMachine<'_> {
 
     /// Pushes the narrow frame shape emitted for a whole-unit-proven exact
     /// named-function call.
-    pub(in crate::vm) fn push_exact_function_frame(
+    pub(in crate::vm) fn push_exact_function_frame<const BORROWED: bool>(
         &mut self,
         site: usize,
         entry: ExactFunctionEntry,
@@ -526,6 +526,20 @@ impl VirtualMachine<'_> {
         }
 
         let entry = self.ensure_prelinked_function_site_finalized(site, entry)?;
+        if let Some((string, offset)) = entry.string_byte_at
+            && argc == 2
+            && let Some(bytes) = self.stack[window_start + usize::from(string)].as_string_bytes()
+            && let Some(offset) = self.stack[window_start + usize::from(offset)].as_int()
+            && let Ok(offset) = usize::try_from(offset)
+            && let Some(byte) = bytes.get(offset).copied()
+        {
+            if !BORROWED {
+                self.clear_argument_window(window_start, argc);
+            }
+            let target = self.current_base() + usize::from(return_register);
+            self.stack[target] = Value::int(i64::from(byte));
+            return Ok(());
+        }
         let chunk = entry.chunk;
         let cache = entry.cache;
         let unit = entry.unit;
@@ -536,7 +550,7 @@ impl VirtualMachine<'_> {
                 function,
                 return_register,
                 window_start,
-                argc,
+                if BORROWED { 0 } else { argc },
                 None,
                 None,
                 TypeEnvironmentId::default(),
@@ -555,7 +569,13 @@ impl VirtualMachine<'_> {
         unsafe {
             let destination = self.stack.as_mut_ptr().add(base);
             let source = self.stack.as_mut_ptr().add(window_start);
-            if argc == 1 {
+            if BORROWED {
+                for position in 0..argc {
+                    destination
+                        .add(position)
+                        .write((*source.add(position)).clone());
+                }
+            } else if argc == 1 {
                 ptr::swap_nonoverlapping(destination, source, 1);
             } else {
                 ptr::swap_nonoverlapping(destination, source, argc);
@@ -595,7 +615,7 @@ impl VirtualMachine<'_> {
     /// Pushes a proven generic named call with its already-bound reified
     /// environment while retaining a normal user frame for traces.
     #[inline(always)]
-    pub(in crate::vm) fn push_exact_generic_function_frame(
+    pub(in crate::vm) fn push_exact_generic_function_frame<const BORROWED: bool>(
         &mut self,
         function: FuncId,
         return_register: u16,
@@ -639,7 +659,7 @@ impl VirtualMachine<'_> {
                 function,
                 return_register,
                 window_start,
-                argc,
+                if BORROWED { 0 } else { argc },
                 None,
                 None,
                 type_environment,
@@ -658,7 +678,13 @@ impl VirtualMachine<'_> {
         unsafe {
             let destination = self.stack.as_mut_ptr().add(base);
             let source = self.stack.as_mut_ptr().add(window_start);
-            if argc == 1 {
+            if BORROWED {
+                for position in 0..argc {
+                    destination
+                        .add(position)
+                        .write((*source.add(position)).clone());
+                }
+            } else if argc == 1 {
                 ptr::swap_nonoverlapping(destination, source, 1);
             } else if argc == 2 {
                 ptr::swap_nonoverlapping(destination, source, 2);

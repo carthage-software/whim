@@ -92,6 +92,7 @@ pub(in crate::optimizer) fn operands(kind: InstructionKind) -> Option<&'static [
                 | CallMethodDiscarded
                 | CallMethodUnchecked
                 | CallMethodDirect
+                | CallNamedDirect
                 | CallStatic
                 | CallStaticDiscarded
         ) => Some(&[W2]),
@@ -289,7 +290,7 @@ pub(in crate::optimizer) fn implicit_reads(instruction: Instruction) -> Option<(
         )),
         instructions!(
             CallNamed | CallNamedDiscarded | CallMethod | CallMethodDiscarded
-                | CallMethodUnchecked | CallMethodDirect | CallStatic | CallStaticDiscarded
+                | CallMethodUnchecked | CallMethodDirect | CallNamedDirect | CallStatic | CallStaticDiscarded
                 | CallValue | CallValueDiscarded;
             {
             argument_count,

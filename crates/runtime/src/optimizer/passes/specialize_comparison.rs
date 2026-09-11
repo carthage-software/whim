@@ -48,6 +48,190 @@ pub(in crate::optimizer) fn optimize_unit(
         CandidateSet::COMPARISON,
         specialized_instruction,
     );
+
+    for analyzed in analysis.chunks() {
+        if analyzed.candidates.contains(CandidateSet::COMPARISON) {
+            plan_integer_comparison_ranges(analyzed, plan, statistics);
+            plan_boolean_negations(analyzed, plan, statistics);
+        }
+    }
+}
+
+fn plan_integer_comparison_ranges(
+    analyzed: &AnalyzedChunk<'_>,
+    plan: &mut RewritePlan,
+    statistics: &mut OptimizationStatistics,
+) {
+    let chunk = analyzed.chunk;
+    let targets = control_flow_targets(chunk);
+    for index in 0..chunk.code.len().saturating_sub(2) {
+        let Instruction::JumpIfFalse { condition, offset } = chunk.code[index + 1] else {
+            continue;
+        };
+        let second_index = match chunk.code[index + 2] {
+            Instruction::LoadInt { destination, .. }
+            | Instruction::LoadConstant { destination, .. }
+                if destination == condition
+                    || (register_is_dead_after(chunk, destination, index + 4)
+                        && !analyzed
+                            .flow
+                            .register_may_release_observably(index + 2, destination)) =>
+            {
+                index + 3
+            }
+            _ => index + 2,
+        };
+        if second_index >= chunk.code.len()
+            || relative_target(index + 1, offset.offset()) != second_index + 1
+            || (index + 1..=second_index).any(|index| targets.contains(&index))
+            || !(index..=second_index).all(|index| plan.is_available(analyzed, index))
+        {
+            continue;
+        }
+        let Some((destination, source, lower, first)) =
+            integer_comparison_bound(&analyzed.flow, index, chunk.code[index])
+        else {
+            continue;
+        };
+        let Some((other_destination, other_source, other_lower, second)) =
+            integer_comparison_bound(&analyzed.flow, second_index, chunk.code[second_index])
+        else {
+            continue;
+        };
+        if condition != destination
+            || other_destination != destination
+            || source != other_source
+            || source == destination
+            || lower == other_lower
+            || (second_index == index + 3
+                && overwrites_register(chunk, chunk.code[index + 2], source))
+        {
+            continue;
+        }
+        let (min, max) = if lower {
+            (first, second)
+        } else {
+            (second, first)
+        };
+        let replacement = if min > max {
+            Instruction::LoadFalse { destination }
+        } else {
+            let Some(descriptor) = plan.add_type_descriptor(
+                analyzed,
+                TypeDescriptor::IntRange {
+                    min: Some(min),
+                    max: Some(max),
+                },
+            ) else {
+                continue;
+            };
+            Instruction::Is {
+                destination,
+                source,
+                descriptor,
+            }
+        };
+        if plan.replace(analyzed, index, replacement) {
+            for removed in index + 1..=second_index {
+                plan.remove(analyzed, removed);
+            }
+            statistics.operations_specialized += 1;
+            statistics.instructions_removed += second_index - index;
+        }
+    }
+}
+
+fn plan_boolean_negations(
+    analyzed: &AnalyzedChunk<'_>,
+    plan: &mut RewritePlan,
+    statistics: &mut OptimizationStatistics,
+) {
+    let chunk = analyzed.chunk;
+    let targets = control_flow_targets(chunk);
+    for index in 0..chunk.code.len().saturating_sub(1) {
+        let Instruction::Not {
+            destination,
+            source,
+        } = chunk.code[index]
+        else {
+            continue;
+        };
+        let (condition, offset, positive) = match chunk.code[index + 1] {
+            Instruction::JumpIfFalse { condition, offset } => (condition, offset, true),
+            Instruction::JumpIfTrue { condition, offset } => (condition, offset, false),
+            _ => continue,
+        };
+        if condition != destination
+            || targets.contains(&(index + 1))
+            || !plan.is_available(analyzed, index)
+            || !plan.is_available(analyzed, index + 1)
+            || !analyzed.flow.proves(index, source, &TypeDescriptor::Bool)
+            || analyzed
+                .flow
+                .register_may_release_observably(index, destination)
+            || !register_is_dead_after(chunk, destination, index + 2)
+            || !register_is_dead_after(
+                chunk,
+                destination,
+                relative_target(index + 1, offset.offset()),
+            )
+        {
+            continue;
+        }
+        let Some(offset) = offset.offset().checked_add(1).map(JumpOffset::new) else {
+            continue;
+        };
+        let replacement = if positive {
+            Instruction::JumpIfTrue {
+                condition: source,
+                offset,
+            }
+        } else {
+            Instruction::JumpIfFalse {
+                condition: source,
+                offset,
+            }
+        };
+        if plan.replace(analyzed, index, replacement) {
+            plan.remove(analyzed, index + 1);
+            statistics.instructions_removed += 1;
+        }
+    }
+}
+
+fn integer_comparison_bound(
+    flow: &TypeFlow<'_>,
+    index: usize,
+    instruction: Instruction,
+) -> Option<(Register, Register, bool, i64)> {
+    let (comparison, destination, left, right) = fuse_comparison::comparison(instruction)?;
+    let (source, constant, reversed) =
+        if let Some(ConstantValue::Int(value)) = flow.constant_value(index, right) {
+            (left, value, false)
+        } else if let Some(ConstantValue::Int(value)) = flow.constant_value(index, left) {
+            (right, value, true)
+        } else {
+            return None;
+        };
+    if !flow.proves(index, source, &TypeDescriptor::Int) {
+        return None;
+    }
+    let (lower, bound) = match (comparison, reversed) {
+        (Comparison::GreaterThanOrEqual, false) | (Comparison::LessThanOrEqual, true) => {
+            (true, constant)
+        }
+        (Comparison::GreaterThan, false) | (Comparison::LessThan, true) => {
+            (true, constant.checked_add(1)?)
+        }
+        (Comparison::LessThanOrEqual, false) | (Comparison::GreaterThanOrEqual, true) => {
+            (false, constant)
+        }
+        (Comparison::LessThan, false) | (Comparison::GreaterThan, true) => {
+            (false, constant.checked_sub(1)?)
+        }
+        _ => return None,
+    };
+    Some((destination, source, lower, bound))
 }
 
 pub(in crate::optimizer) fn prepare_unit(

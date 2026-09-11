@@ -3,13 +3,14 @@
 //!
 //! TODO(azjezz): This module is getting large, consider splitting it.
 
-use std::borrow::Cow;
+use std::ops::Deref;
 use std::rc::Rc;
 
 use crate::bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
 use crate::bytecode::chunk::descriptors::string_length_matches;
+use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::Visibility;
 use crate::classes::ClassMemberEntry;
 use crate::classes::MethodBodyKind;
@@ -61,6 +62,24 @@ fn is_complete_callable_binding(function: &FunctionObject, parameter_count: usiz
 enum ExactCallableShape {
     Family,
     Concrete(FunctionTypeDescriptor),
+}
+
+enum ResolvedElementDescriptor<'descriptor> {
+    Borrowed(&'descriptor TypeDescriptor),
+    Owned(TypeDescriptor),
+    Alias(Rc<CompiledTypeAlias>),
+}
+
+impl Deref for ResolvedElementDescriptor<'_> {
+    type Target = TypeDescriptor;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Borrowed(descriptor) => descriptor,
+            Self::Owned(descriptor) => descriptor,
+            Self::Alias(alias) => &alias.descriptor,
+        }
+    }
 }
 
 fn key_ref_value(key: KeyRef<'_>) -> Value {
@@ -1984,18 +2003,15 @@ impl VirtualMachine<'_> {
         if entry.kind != SymbolKind::TypeAlias {
             return Ok(None);
         }
-        let (parameters, aliased) = {
-            let alias = &self.engine.tables.type_aliases[entry.index as usize];
-            (alias.type_parameters.clone(), alias.descriptor.clone())
-        };
+        let alias = Rc::clone(&self.engine.tables.type_aliases[entry.index as usize]);
         let alias_environment = self.bind_type_parameters(
-            &parameters,
+            &alias.type_parameters,
             arguments.as_deref(),
             TypeEnvironmentId::default(),
             name.as_bytes(),
         )?;
         Ok(Some(self.substitute_descriptor(
-            &aliased,
+            &alias.descriptor,
             alias_environment,
             depth + 1,
         )))
@@ -2199,68 +2215,42 @@ impl VirtualMachine<'_> {
         &mut self,
         descriptor: &'descriptor TypeDescriptor,
         environment: TypeEnvironmentId,
-    ) -> Result<Option<(Cow<'descriptor, TypeDescriptor>, TypeEnvironmentId)>, VirtualMachineControl>
-    {
-        if !matches!(
-            descriptor,
-            TypeDescriptor::Parameter(_) | TypeDescriptor::Named { .. }
-        ) {
-            return Ok(Some((Cow::Borrowed(descriptor), environment)));
-        }
-
-        let mut current = descriptor.clone();
+    ) -> Result<
+        Option<(ResolvedElementDescriptor<'descriptor>, TypeEnvironmentId)>,
+        VirtualMachineControl,
+    > {
+        let mut current = ResolvedElementDescriptor::Borrowed(descriptor);
         let mut environment = environment;
-        let mut hops = 0;
-        loop {
-            if hops > MAX_TYPE_DEPTH_U32 {
-                return Ok(None);
-            }
-
-            hops += 1;
-            current = match current {
+        for _ in 0..=MAX_TYPE_DEPTH_U32 {
+            current = match &*current {
                 TypeDescriptor::Parameter(name) => {
-                    match self.type_environment_binding(environment, &name).cloned() {
-                        Some(bound) => bound,
+                    match self.type_environment_binding(environment, name).cloned() {
+                        Some(bound) => ResolvedElementDescriptor::Owned(bound),
                         None => return Ok(None),
                     }
                 }
                 TypeDescriptor::Named {
-                    name,
-                    arguments,
-                    recursive,
+                    name, arguments, ..
                 } => {
                     let Some(entry) = self.resolve_checked_name(name.clone())? else {
                         return Ok(None);
                     };
-
                     if entry.kind != SymbolKind::TypeAlias {
-                        return Ok(Some((
-                            Cow::Owned(TypeDescriptor::Named {
-                                name,
-                                arguments,
-                                recursive,
-                            }),
-                            environment,
-                        )));
+                        return Ok(Some((current, environment)));
                     }
-
-                    let (parameters, aliased) = {
-                        let alias = &self.engine.tables.type_aliases[entry.index as usize];
-                        (alias.type_parameters.clone(), alias.descriptor.clone())
-                    };
-
+                    let alias = Rc::clone(&self.engine.tables.type_aliases[entry.index as usize]);
                     environment = self.bind_type_parameters(
-                        &parameters,
+                        &alias.type_parameters,
                         arguments.as_deref(),
                         environment,
                         name.as_bytes(),
                     )?;
-
-                    aliased
+                    ResolvedElementDescriptor::Alias(alias)
                 }
-                other => return Ok(Some((Cow::Owned(other), environment))),
+                _ => return Ok(Some((current, environment))),
             };
         }
+        Ok(None)
     }
 
     fn check_dictionary_elements(
@@ -2624,8 +2614,8 @@ impl VirtualMachine<'_> {
             TypeDescriptor::Float => value.is_float(),
             TypeDescriptor::String => value.is_string(),
             TypeDescriptor::StringLength { min, max } => value
-                .as_string_bytes()
-                .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
+                .as_string_len()
+                .is_some_and(|length| string_length_matches(length, *min, *max)),
             TypeDescriptor::Object => value.is_object(),
             TypeDescriptor::TrueLiteral => value.as_bool() == Some(true),
             TypeDescriptor::FalseLiteral => value.as_bool() == Some(false),
@@ -2634,9 +2624,12 @@ impl VirtualMachine<'_> {
                 min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
             }),
             TypeDescriptor::FloatLiteral(expected) => value.as_float() == Some(*expected),
-            TypeDescriptor::StringLiteral(expected) => value
-                .as_string_bytes()
-                .is_some_and(|string| string == expected.as_bytes()),
+            TypeDescriptor::StringLiteral(expected) => {
+                value.as_string_len() == Some(expected.as_bytes().len())
+                    && value
+                        .as_string_bytes()
+                        .is_some_and(|string| string == expected.as_bytes())
+            }
             descriptor @ TypeDescriptor::Member {
                 class,
                 class_arguments,
@@ -2731,18 +2724,16 @@ impl VirtualMachine<'_> {
                         }
                     }
                     SymbolKind::TypeAlias => {
-                        let (parameters, aliased) = {
-                            let alias = &self.engine.tables.type_aliases[entry.index as usize];
-                            (alias.type_parameters.clone(), alias.descriptor.clone())
-                        };
+                        let alias =
+                            Rc::clone(&self.engine.tables.type_aliases[entry.index as usize]);
                         let alias_environment = self.bind_type_parameters(
-                            &parameters,
+                            &alias.type_parameters,
                             arguments.as_deref(),
                             environment,
                             name.as_bytes(),
                         )?;
                         self.check_descriptor(
-                            &aliased,
+                            &alias.descriptor,
                             value,
                             called,
                             alias_environment,

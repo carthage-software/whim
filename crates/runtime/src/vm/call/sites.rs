@@ -184,7 +184,7 @@ impl VirtualMachine<'_> {
                             .is_empty());
 
                 let outcome = if exact {
-                    self.push_exact_generic_function_frame(
+                    self.push_exact_generic_function_frame::<false>(
                         function,
                         destination,
                         window_start,
@@ -403,7 +403,7 @@ impl VirtualMachine<'_> {
     /// Pushes the narrow frame for a named function prelinked when its unit
     /// was declared.
     #[inline(always)]
-    pub(in crate::vm) fn call_exact_function_site(
+    pub(in crate::vm) fn call_exact_function_site<const BORROWED: bool>(
         &mut self,
         site: usize,
         destination: u16,
@@ -419,7 +419,9 @@ impl VirtualMachine<'_> {
                     window_start,
                     count,
                 );
-                self.clear_argument_window(window_start, count);
+                if !BORROWED {
+                    self.clear_argument_window(window_start, count);
+                }
                 let value = outcome?;
                 let target = self.current_base() + usize::from(destination);
                 self.stack[target] = value;
@@ -470,7 +472,9 @@ impl VirtualMachine<'_> {
                     true,
                     &[],
                 );
-                self.clear_argument_window(window_start, count);
+                if !BORROWED {
+                    self.clear_argument_window(window_start, count);
+                }
                 let value = outcome?;
                 let target = self.current_base() + usize::from(destination);
                 self.stack[target] = value;
@@ -482,7 +486,9 @@ impl VirtualMachine<'_> {
             } else {
                 self.invoke_proven_built_in_function_from_stack(spec, window_start, count)
             };
-            self.clear_argument_window(window_start, count);
+            if !BORROWED {
+                self.clear_argument_window(window_start, count);
+            }
             let value = outcome?;
             let target = self.current_base() + usize::from(destination);
             self.stack[target] = value;
@@ -509,7 +515,7 @@ impl VirtualMachine<'_> {
                 type_arguments,
                 outer,
             )?;
-            return self.push_exact_generic_function_frame(
+            return self.push_exact_generic_function_frame::<BORROWED>(
                 function,
                 destination,
                 window_start,
@@ -518,7 +524,7 @@ impl VirtualMachine<'_> {
                 false,
             );
         }
-        self.push_exact_function_frame(site, entry, destination, window_start, count)
+        self.push_exact_function_frame::<BORROWED>(site, entry, destination, window_start, count)
     }
 
     #[inline(always)]
@@ -596,7 +602,7 @@ impl VirtualMachine<'_> {
                 && function.scope().is_none()
                 && (type_arguments_bound || type_parameters_empty)
             {
-                return self.push_exact_generic_function_frame(
+                return self.push_exact_generic_function_frame::<false>(
                     id,
                     destination,
                     window_start,
@@ -666,7 +672,7 @@ impl VirtualMachine<'_> {
             _ => None,
         };
         if let Some((function, environment)) = direct {
-            return self.push_exact_generic_function_frame(
+            return self.push_exact_generic_function_frame::<false>(
                 function,
                 destination,
                 window_start,

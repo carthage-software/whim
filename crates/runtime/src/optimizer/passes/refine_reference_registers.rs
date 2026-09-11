@@ -90,7 +90,8 @@ fn result_may_reference(
             .and_then(|property| property.declared_type.as_ref())
             .is_none_or(TypeDescriptor::may_hold_reference),
         Instruction::CallSelfUnchecked { .. } => current.unwrap_or(true),
-        Instruction::CallNamedUnchecked { cache, .. }
+        Instruction::CallNamedDirect { cache, .. }
+        | Instruction::CallNamedUnchecked { cache, .. }
         | Instruction::CallNamedConstantUnchecked { cache, .. } => {
             let Some(IcDescriptor::Member { name, .. }) =
                 chunk.ic_descriptors.get(cache.index() as usize)

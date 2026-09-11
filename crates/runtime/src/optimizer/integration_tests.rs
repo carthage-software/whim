@@ -1,6 +1,11 @@
 mod matching;
 
+use crate::engine::Engine;
+use crate::engine::EngineConfiguration;
+use crate::symbols::ExactFunctionEntry;
+use crate::value::function::FuncId;
 use std::ops::Deref;
+use std::path::Path;
 use std::rc::Rc;
 
 use whim_syn::arena::LocalArena;
@@ -1012,10 +1017,12 @@ fn catch_back_edges_preserve_loop_invariant_local_types() {
     );
     let code = method(&unit, b"Runner::read");
 
-    assert!(
-        code.iter()
-            .any(|instruction| { matches!(instruction, Instruction::CallNamedUnchecked { .. }) })
-    );
+    assert!(code.iter().any(|instruction| {
+        matches!(
+            instruction,
+            Instruction::CallNamedUnchecked { .. } | Instruction::CallNamedDirect { .. }
+        )
+    }));
     assert!(
         method(&unit, b"Runner::modified")
             .iter()
@@ -1053,10 +1060,12 @@ fn null_guards_refine_copied_aliases() {
         .chunk
         .code;
 
-    assert!(
-        code.iter()
-            .any(|instruction| { matches!(instruction, Instruction::CallNamedUnchecked { .. }) })
-    );
+    assert!(code.iter().any(|instruction| {
+        matches!(
+            instruction,
+            Instruction::CallNamedUnchecked { .. } | Instruction::CallNamedDirect { .. }
+        )
+    }));
 }
 
 #[test]
@@ -1716,6 +1725,7 @@ fn named_calls_with_omitted_defaults_elide_parameter_checks() {
         matches!(
             instruction,
             Instruction::CallNamedUnchecked { .. }
+                | Instruction::CallNamedDirect { .. }
                 | Instruction::CallNamedConstantUnchecked { .. }
                 | Instruction::CallSelfUnchecked { .. }
         )
@@ -1927,6 +1937,7 @@ fn string_length_ranges_elide_only_proven_type_checks() {
     assert!(pass_exact.chunk.code.iter().any(|instruction| matches!(
         instruction,
         Instruction::CallNamedUnchecked { .. }
+            | Instruction::CallNamedDirect { .. }
             | Instruction::CallNamedConstantUnchecked { .. }
             | Instruction::CallSelfUnchecked { .. }
     )));
@@ -2013,11 +2024,12 @@ fn foreach_tuple_elements_elide_named_call_parameter_checks() {
     };
 
     assert!(
-        validate
-            .chunk
-            .code
-            .iter()
-            .any(|instruction| { matches!(instruction, Instruction::CallNamedUnchecked { .. }) }),
+        validate.chunk.code.iter().any(|instruction| {
+            matches!(
+                instruction,
+                Instruction::CallNamedUnchecked { .. } | Instruction::CallNamedDirect { .. }
+            )
+        }),
         "{:#?}",
         validate.chunk.code,
     );
@@ -2054,15 +2066,16 @@ fn captured_parameter_types_elide_checks_inside_closures() {
             ..OptimizationConfiguration::default()
         },
     );
-    let Some(closure) =
-        unit.functions.iter().find(|function| {
-            function.name.as_bytes() != b"target"
-                && function.name.as_bytes() != b"capture"
-                && function.chunk.code.iter().any(|instruction| {
-                    matches!(instruction, Instruction::CallNamedUnchecked { .. })
-                })
-        })
-    else {
+    let Some(closure) = unit.functions.iter().find(|function| {
+        function.name.as_bytes() != b"target"
+            && function.name.as_bytes() != b"capture"
+            && function.chunk.code.iter().any(|instruction| {
+                matches!(
+                    instruction,
+                    Instruction::CallNamedUnchecked { .. } | Instruction::CallNamedDirect { .. }
+                )
+            })
+    }) else {
         panic!("the closure call has no parameter check");
     };
 
@@ -2110,11 +2123,12 @@ fn nested_closures_propagate_capture_types_to_the_innermost_body() {
         )
     }));
     assert!(closures.iter().any(|closure| {
-        closure
-            .chunk
-            .code
-            .iter()
-            .any(|instruction| matches!(instruction, Instruction::CallNamedUnchecked { .. }))
+        closure.chunk.code.iter().any(|instruction| {
+            matches!(
+                instruction,
+                Instruction::CallNamedUnchecked { .. } | Instruction::CallNamedDirect { .. }
+            )
+        })
     }));
 }
 
@@ -2337,9 +2351,12 @@ fn exact_call_results_only_request_reference_teardown_when_needed() {
     );
 
     for instruction in &unit.main.code {
-        let Instruction::CallNamedUnchecked {
+        let (Instruction::CallNamedUnchecked {
             destination, cache, ..
-        } = instruction
+        }
+        | Instruction::CallNamedDirect {
+            destination, cache, ..
+        }) = instruction
         else {
             continue;
         };
@@ -2395,6 +2412,7 @@ fn cold_block_layout_is_configurable() {
                 instruction,
                 Instruction::CallNamed { .. }
                     | Instruction::CallNamedUnchecked { .. }
+                    | Instruction::CallNamedDirect { .. }
                     | Instruction::CallNamedDiscarded { .. }
             )
         })
@@ -3086,7 +3104,9 @@ fn integer_range_matches_inline_into_callers() {
     assert!(unit.main.code.iter().all(|instruction| {
         !matches!(
             instruction,
-            Instruction::CallNamed { .. } | Instruction::CallNamedUnchecked { .. }
+            Instruction::CallNamed { .. }
+                | Instruction::CallNamedUnchecked { .. }
+                | Instruction::CallNamedDirect { .. }
         )
     }));
 }
@@ -3392,4 +3412,283 @@ fn lazy_method_optimization_keeps_defaulted_constructor_call() {
                 | Instruction::CallMethodDirect { .. }
         )
     }));
+}
+
+#[test]
+fn bounded_comparisons_preserve_integer_edges() {
+    let source = r"
+#[Whim\Marker\NeverInline]
+function ranges(int $value): vec<bool> {
+    $zero = $value == 0;
+    if (!$zero) { assert!($value != 0); }
+    if (!!$zero) { assert!($value == 0); }
+    return vec[
+        $value >= 48 && $value <= 57,
+        102 >= $value && 97 <= $value,
+        $value > 0 && $value < 4,
+        $value < 0 && $value > 10,
+        $value > 9223372036854775807 && $value < 4,
+        $value < -9223372036854775808 && $value > 0,
+    ];
+}
+foreach (vec[-9223372036854775808, -1, 0, 1, 3, 4, 47, 48, 57, 58, 96, 97, 102, 103, 9223372036854775807] as $value) {
+    assert!(ranges($value) == vec[$value is 48..=57, $value is 97..=102, $value is 1..=3, false, false, false]);
+}
+";
+    let unit = compile(source, OptimizationConfiguration::default());
+    let function = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"ranges")
+        .unwrap();
+    assert!(
+        function
+            .chunk
+            .code
+            .iter()
+            .filter(|instruction| matches!(instruction, Instruction::Is { .. }))
+            .count()
+            >= 3,
+        "{:?}",
+        function.chunk.code
+    );
+    verify_unit(&unit).unwrap();
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..Default::default()
+        });
+        let result = engine.run_source(source, Path::new("/comparison-ranges.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+    }
+}
+
+#[test]
+fn byte_wrappers_keep_bounds_and_error_frames() {
+    let source = r#"
+#[Whim\Marker\NeverInline]
+#[Whim\Marker\TrackCaller]
+function byte_value(string $text, 0.. $offset): 0..=255 {
+    return Whim\_Private\string_byte_at($text, $offset);
+}
+#[Whim\Marker\NeverInline]
+function reversed_byte(0.. $offset, string $text): 0..=255 {
+    return Whim\_Private\string_byte_at($text, $offset);
+}
+#[Whim\Marker\NeverInline]
+function restricted_byte(string $text, 0.. $offset): 0..=127 {
+    return Whim\_Private\string_byte_at($text, $offset);
+}
+for ($round = 0; $round < 4; $round++) {
+    foreach (vec['a', 'a long string', "\0\xff\x80\x7f"] as $text) {
+        for ($offset = 0; $offset < length!($text); $offset++) {
+            $expected = Whim\_Private\string_byte_at($text, $offset);
+            assert!(byte_value($text, $offset) == $expected);
+            assert!(reversed_byte($offset, $text) == $expected);
+        }
+        $caught = false;
+        try { byte_value($text, length!($text)); }
+        catch (Whim\Unwind\OutOfBoundsError $error) {
+            assert!($error->getTrace()[0]->function == 'byte_value');
+            $caught = true;
+        }
+        assert!($caught);
+    }
+    $caught = false;
+    try { restricted_byte("\xff", 0); }
+    catch (Whim\Unwind\TypeError $error) { $caught = true; }
+    assert!($caught);
+}
+"#;
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..Default::default()
+        });
+        let result = engine.run_source(source, Path::new("/byte-wrappers.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+        if optimize {
+            let (position, function) = engine
+                .tables
+                .functions
+                .iter()
+                .enumerate()
+                .find(|(_, function)| function.name.as_bytes() == b"byte_value")
+                .unwrap();
+            assert_eq!(
+                ExactFunctionEntry::from_runtime(FuncId(position as u32), function, true)
+                    .string_byte_at,
+                Some((0, 1))
+            );
+        }
+    }
+}
+
+#[test]
+fn direct_named_calls_preserve_borrowed_arguments() {
+    let source = r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function alter(vec<int> $left, vec<int> $right, int $extra = 9): vec<int> {
+    $left[] = $extra;
+    $right[0] = 7;
+    return $left;
+}
+#[NeverInline]
+function identity<T>(T $value): T { return $value; }
+#[NeverInline]
+function fail(vec<int> $value): never { throw new Whim\Unwind\TypeError('failed'); }
+#[NeverInline]
+function exercise(vec<int> $left, vec<int> $right): void {
+    assert!(alter($left, $right) == vec[1, 9]);
+    assert!($left == vec[1] && $right == vec[1]);
+    assert!(identity::<vec<int>>($left) == $left);
+    $caught = false;
+    try { fail($left); } catch (Whim\Unwind\TypeError $error) { $caught = true; }
+    assert!($caught && $left == vec[1]);
+}
+$value = vec[1];
+exercise($value, $value);
+assert!($value == vec[1]);
+";
+    let unit = compile(source, OptimizationConfiguration::default());
+    assert!(unit.functions.iter().any(|function| {
+        function
+            .chunk
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::CallNamedDirect { .. }))
+    }));
+    verify_unit(&unit).unwrap();
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..Default::default()
+        });
+        let result = engine.run_source(source, Path::new("/direct-named-calls.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+    }
+}
+
+#[test]
+fn collection_tests_use_union_contracts_without_losing_element_checks() {
+    let source = r"
+use Whim\Marker\NeverInline;
+type Tree = null|int|string|vec<Tree>|dict<string, Tree>;
+#[NeverInline]
+function kind(Tree $value): int {
+    if ($value is dict<string, Tree>) { return 1; }
+    if ($value is vec<Tree>) { return 2; }
+    return 3;
+}
+#[NeverInline]
+function integers(vec<int>|vec<string>|null $value): bool {
+    return $value is vec<int>;
+}
+#[NeverInline]
+function changed(vec<int>|null $value): bool {
+    if ($value == null) { return false; }
+    $value[] = 'text';
+    return $value is vec<int>;
+}
+assert!(kind(dict['a' => vec[1, dict['b' => null]]]) == 1);
+assert!(kind(vec[dict['a' => 1]]) == 2);
+assert!(kind(1) == 3 && kind(null) == 3);
+assert!(integers(vec[1]) && !integers(vec['x']) && !integers(null));
+assert!(!changed(vec[1]));
+class Holder { public mixed $value = 1; }
+type MutableTree = vec<MutableTree>|#{ value: int };
+#[NeverInline]
+function mutable_shape(vec<MutableTree>|int $values, Holder $holder): bool {
+    $holder->value = 'changed';
+    return $values is vec<MutableTree>;
+}
+$holder = new Holder();
+assert!(!mutable_shape(vec[$holder], $holder));
+";
+    let unit = compile(source, OptimizationConfiguration::default());
+    let function = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"kind")
+        .unwrap();
+    assert!(
+        function
+            .chunk
+            .code
+            .iter()
+            .filter_map(|instruction| match instruction {
+                Instruction::Is { descriptor, .. } =>
+                    Some(&function.chunk.type_descriptors[descriptor.index() as usize]),
+                _ => None,
+            })
+            .all(|descriptor| matches!(
+                descriptor,
+                TypeDescriptor::Vector(None) | TypeDescriptor::Dictionary(None)
+            ))
+    );
+    verify_unit(&unit).unwrap();
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..Default::default()
+        });
+        let result = engine.run_source(source, Path::new("/collection-tests.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+    }
+}
+
+#[test]
+fn collection_elements_keep_class_and_return_contracts() {
+    let source = r"
+use Whim\Marker\NeverInline;
+final readonly class Entry {
+    public function __construct(public int $value) {}
+    #[NeverInline]
+    public function read(): int { return $this->value; }
+}
+#[NeverInline]
+function total(vec<Entry> $entries): int {
+    $sum = 0;
+    foreach ($entries as $entry) { $sum += $entry->value + $entry->read(); }
+    return $sum;
+}
+#[NeverInline]
+function from_key(dict<string, Entry> $entries, string $key): int {
+    return $entries[$key]->value;
+}
+assert!(total(vec[new Entry(2), new Entry(3)]) == 10);
+assert!(from_key(dict['x' => new Entry(7)], 'x') == 7);
+";
+    let unit = compile(source, OptimizationConfiguration::default());
+    for name in [b"total".as_slice(), b"from_key".as_slice()] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name)
+            .unwrap();
+        assert!(
+            function
+                .chunk
+                .code
+                .iter()
+                .any(|instruction| matches!(instruction, Instruction::PropertyGetUnchecked { .. }))
+        );
+        assert!(
+            !function
+                .chunk
+                .code
+                .iter()
+                .any(|instruction| matches!(instruction, Instruction::PropertyGet { .. }))
+        );
+    }
+    verify_unit(&unit).unwrap();
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..Default::default()
+        });
+        let result = engine.run_source(source, Path::new("/element-contracts.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+    }
 }

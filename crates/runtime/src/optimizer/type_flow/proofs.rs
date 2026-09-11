@@ -1,6 +1,8 @@
 //! Whether tracked facts prove declared types: the query side of the
 //! analysis.
 
+use std::slice;
+
 use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::type_flow::ALL;
@@ -209,6 +211,7 @@ impl TypeFlow<'_> {
     ) -> bool {
         let type_arguments = match self.chunk.code[index] {
             Instruction::CallNamed { cache, .. }
+            | Instruction::CallNamedDirect { cache, .. }
             | Instruction::CallNamedUnchecked { cache, .. } => {
                 let Some((_, type_arguments)) = self.member_descriptor(cache) else {
                     return false;
@@ -314,6 +317,34 @@ impl TypeFlow<'_> {
         let actual = self.expand_aliases_owned(actual);
 
         self.descriptor_proves(&actual, &expected, 0)
+    }
+
+    pub(in crate::optimizer) fn collection_type_test(
+        &self,
+        index: usize,
+        register: Register,
+        expected: &TypeDescriptor,
+    ) -> Option<TypeDescriptor> {
+        let (kind, primitive) = match expected {
+            TypeDescriptor::Vector(Some(_)) => (VECTOR, TypeDescriptor::Vector(None)),
+            TypeDescriptor::Dictionary(Some(_)) => (DICTIONARY, TypeDescriptor::Dictionary(None)),
+            _ => return None,
+        };
+        let actual = self.expand_aliases_owned(self.register_type_at(index, register, 0)?);
+        let expanded = self.expanded_aliases(expected);
+        let members = match &actual {
+            TypeDescriptor::Union(members) => members.as_slice(),
+            _ => slice::from_ref(&actual),
+        };
+        for member in members {
+            if descriptor_mask(member)? & kind != 0
+                && !self.descriptor_proves(member, expected, 0)
+                && !self.descriptor_proves(member, &expanded, 0)
+            {
+                return None;
+            }
+        }
+        Some(primitive)
     }
 
     pub(in crate::optimizer) fn disproves(

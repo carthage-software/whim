@@ -5,7 +5,7 @@ use std::ptr;
 use std::rc::Rc;
 
 use crate::builtin::spec::FunctionSpec;
-use crate::bytecode::aliases::expand_aliases;
+use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
 use crate::bytecode::chunk::descriptors::CallDescriptor;
 use crate::bytecode::chunk::descriptors::PresetDescriptor;
 use crate::bytecode::chunk::descriptors::PresetSlot;
@@ -15,6 +15,7 @@ use crate::bytecode::unit::literal_value;
 use crate::engine::builtins::BuiltInCallable;
 use crate::engine::builtins::built_in_type_parameters;
 use crate::symbols::ArgumentGuardWays;
+use crate::value::ValueKind;
 use crate::value::function::BuiltInId;
 use crate::value::function::PresetArg;
 use crate::vm::ArgumentGuard;
@@ -82,6 +83,7 @@ fn live_parameter_mask(
 pub(in crate::vm) fn guard_allows(guard: &ArgumentGuard, value: &Value) -> bool {
     match guard {
         ArgumentGuard::Any => true,
+        ArgumentGuard::ScalarUnion(mask) => value.kind_bit() & mask != 0,
         ArgumentGuard::Null => value.is_null(),
         ArgumentGuard::Bool => value.is_bool(),
         ArgumentGuard::Int => value.is_int(),
@@ -94,8 +96,8 @@ pub(in crate::vm) fn guard_allows(guard: &ArgumentGuard, value: &Value) -> bool 
             min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
         }),
         ArgumentGuard::StringLength { min, max } => value
-            .as_string_bytes()
-            .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
+            .as_string_len()
+            .is_some_and(|length| string_length_matches(length, *min, *max)),
         ArgumentGuard::ExactFloat(expected) => value
             .as_float()
             .is_some_and(|value| value.to_bits() == *expected),
@@ -114,6 +116,28 @@ pub(in crate::vm) fn guard_allows(guard: &ArgumentGuard, value: &Value) -> bool 
                 && function.presets().is_empty()
         }),
     }
+}
+
+fn scalar_union_mask(descriptor: &TypeDescriptor) -> Option<u16> {
+    Some(match descriptor {
+        TypeDescriptor::Null => 1 << ValueKind::Null as u16,
+        TypeDescriptor::Bool => 1 << ValueKind::Bool as u16,
+        TypeDescriptor::Int => 1 << ValueKind::Int as u16,
+        TypeDescriptor::Float => 1 << ValueKind::Float as u16,
+        TypeDescriptor::String => {
+            (1 << ValueKind::String as u16) | (1 << ValueKind::ShortString as u16)
+        }
+        TypeDescriptor::Union(members) => members
+            .iter()
+            .try_fold(0, |mask, member| Some(mask | scalar_union_mask(member)?))?,
+        TypeDescriptor::Array(_)
+        | TypeDescriptor::Vector(_)
+        | TypeDescriptor::Dictionary(_)
+        | TypeDescriptor::Tuple(_)
+        | TypeDescriptor::TupleRest { .. }
+        | TypeDescriptor::TupleAny => 0,
+        _ => return None,
+    })
 }
 
 pub(in crate::vm) fn argument_guard(
@@ -160,6 +184,10 @@ pub(in crate::vm) fn argument_guard(
                 environment: function.type_environment(),
             }
         }
+        TypeDescriptor::Union(_) => {
+            let guard = ArgumentGuard::ScalarUnion(scalar_union_mask(descriptor)?);
+            return guard_allows(&guard, value).then_some(guard);
+        }
         TypeDescriptor::Void
         | TypeDescriptor::Never
         | TypeDescriptor::StringLiteral(_)
@@ -176,7 +204,6 @@ pub(in crate::vm) fn argument_guard(
         | TypeDescriptor::Tuple(_)
         | TypeDescriptor::TupleRest { .. }
         | TypeDescriptor::TupleAny
-        | TypeDescriptor::Union(_)
         | TypeDescriptor::Intersection(_)
         | TypeDescriptor::Negated(_) => return None,
     })
@@ -240,11 +267,14 @@ impl VirtualMachine<'_> {
                 }
                 CachedParameterGuard::Descriptor {
                     descriptor,
+                    scalar_mask,
                     array_id,
                 } => {
-                    let value =
-                        // SAFETY: the surrounding invariant keeps this index in bounds.
-                        unsafe { self.stack.get_unchecked(window.start + position).clone() };
+                    let value = &self.stack[window.start + position];
+                    if value.kind_bit() & scalar_mask != 0 {
+                        continue;
+                    }
+                    let value = value.clone();
                     if !self.check_descriptor_with_array_id(
                         &descriptor,
                         &value,
@@ -298,11 +328,12 @@ impl VirtualMachine<'_> {
                     Some(descriptor) => {
                         let concrete = expand_aliases(
                             &self.substitute_descriptor(descriptor, environment, 0),
-                            &self.engine.tables.type_aliases,
+                            self.engine.tables.type_aliases.as_slice(),
                         );
                         match argument_guard(&concrete, value) {
                             Some(guard) => CachedParameterGuard::Cheap(guard),
                             None => CachedParameterGuard::Descriptor {
+                                scalar_mask: scalar_union_mask(&concrete).unwrap_or(0),
                                 descriptor: Rc::new(concrete),
                                 array_id: None,
                             },
@@ -317,6 +348,7 @@ impl VirtualMachine<'_> {
             if let CachedParameterGuard::Descriptor {
                 descriptor,
                 array_id,
+                ..
             } = guard
             {
                 *array_id = self.array_type_check_id(descriptor);

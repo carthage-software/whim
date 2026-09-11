@@ -9,9 +9,11 @@ use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::LiteralKey;
 use crate::bytecode::chunk::descriptors::SwitchTable;
+use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::chunk::descriptors::literal_key;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::ConstantIndex;
+use crate::bytecode::instruction::operands::DescriptorIndex;
 use crate::bytecode::instruction::operands::SwitchTableIndex;
 use crate::bytecode::rewrite::compact;
 use crate::bytecode::unit::CompiledUnit;
@@ -26,6 +28,7 @@ struct ChunkRewrite {
     replacements: Vec<Option<Instruction>>,
     removals: Vec<bool>,
     constants: Vec<Literal>,
+    type_descriptors: Vec<TypeDescriptor>,
     switch_tables: Vec<SwitchTable>,
     constant_index: Option<HashMap<LiteralKey, ConstantIndex>>,
 }
@@ -160,6 +163,11 @@ impl RewritePlan {
             }
 
             let chunk = chunk_mut(unit, rewrite.location);
+            for descriptor in rewrite.type_descriptors {
+                chunk
+                    .add_type_descriptor(descriptor)
+                    .expect("a reserved type descriptor fits its chunk");
+            }
             let added_switch_tables = !rewrite.switch_tables.is_empty();
             for table in rewrite.switch_tables {
                 chunk
@@ -193,6 +201,22 @@ impl RewritePlan {
         }
 
         result
+    }
+
+    pub(in crate::optimizer) fn add_type_descriptor(
+        &mut self,
+        analyzed: &AnalyzedChunk<'_>,
+        descriptor: TypeDescriptor,
+    ) -> Option<DescriptorIndex> {
+        let rewrite = &mut self.chunks[analyzed.position];
+        let position = analyzed
+            .chunk
+            .type_descriptors
+            .len()
+            .checked_add(rewrite.type_descriptors.len())?;
+        let index = DescriptorIndex::new(u16::try_from(position).ok()?);
+        rewrite.type_descriptors.push(descriptor);
+        Some(index)
     }
 
     pub(in crate::optimizer) fn add_switch_table(
@@ -268,6 +292,7 @@ impl ChunkRewrite {
             replacements: Vec::new(),
             removals: Vec::new(),
             constants: Vec::new(),
+            type_descriptors: Vec::new(),
             switch_tables: Vec::new(),
             constant_index: None,
         }

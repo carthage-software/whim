@@ -441,7 +441,13 @@ pub(in crate::optimizer) fn effect_on(
             window(first_argument, usize::from(argument_count.value())),
             writes(destination) || window(first_argument, usize::from(argument_count.value())),
         ),
-        Instruction::CallMethodDirect {
+        Instruction::CallNamedDirect {
+            argument_count,
+            destination,
+            first_argument,
+            ..
+        }
+        | Instruction::CallMethodDirect {
             argument_count,
             destination,
             first_argument,

@@ -125,6 +125,90 @@ assert!(!(vec[dict['leaf' => false]] is A));
 
 class InvalidJson {}
 
+#[Whim\Marker\NeverInline]
+function matches_recursive<T>(mixed $value): bool {
+  return $value is T;
+}
+
+$documents = vec[$document];
+assert!(matches_recursive::<vec<Json>>($documents));
+assert!(matches_recursive::<vec<Json>>($documents));
+$originalDocuments = $documents;
+$documents[0]['items'][4]['nested'][0] = new InvalidJson();
+assert!(!matches_recursive::<vec<Json>>($documents));
+assert!(matches_recursive::<vec<Json>>($originalDocuments));
+$documents[0]['items'][4]['nested'][0] = 1;
+assert!(matches_recursive::<vec<Json>>($documents));
+$documents[] = new InvalidJson();
+assert!(!matches_recursive::<vec<Json>>($documents));
+remove_last!($documents);
+assert!(matches_recursive::<vec<Json>>($documents));
+
+assert!(matches_recursive::<dict<string, Json>>($document));
+assert!(matches_recursive::<dict<string, Json>>($document));
+$document['items'][] = new InvalidJson();
+assert!(!matches_recursive::<dict<string, Json>>($document));
+remove_last!($document['items']);
+assert!(matches_recursive::<dict<string, Json>>($document));
+
+$branches = vec[vec[dict['leaf' => 1]]];
+assert!(matches_recursive::<vec<A>>($branches));
+assert!(matches_recursive::<vec<A>>($branches));
+$branches[0][0]['leaf'] = false;
+assert!(!matches_recursive::<vec<A>>($branches));
+
+$rose = vec[vec[1]];
+assert!(matches_recursive::<vec<Rose<int>>>($rose));
+assert!(!matches_recursive::<vec<Rose<string>>>($rose));
+$rose[0][0] = 'one';
+assert!(matches_recursive::<vec<Rose<string>>>($rose));
+assert!(!matches_recursive::<vec<Rose<int>>>($rose));
+
+type MutableTree = vec<MutableTree>|#{ value: int };
+
+class MutableLeaf {
+  public mixed $value = 1;
+}
+
+$leaf = new MutableLeaf();
+$trees = vec[vec[$leaf]];
+assert!(matches_recursive::<vec<MutableTree>>($trees));
+assert!(matches_recursive::<vec<MutableTree>>($trees));
+$leaf->value = 'invalid';
+assert!(!matches_recursive::<vec<MutableTree>>($trees));
+$leaf->value = 2;
+assert!(matches_recursive::<vec<MutableTree>>($trees));
+
+#[Whim\Marker\NeverInline]
+function is_json_dictionary(mixed $value): bool {
+  return $value is dict<string, Json>;
+}
+
+$checkedDictionary = dict['items' => vec[1]];
+assert!(is_json_dictionary($checkedDictionary));
+$copiedDictionary = $checkedDictionary;
+$checkedDictionary['items'] = new MutableLeaf();
+assert!(!is_json_dictionary($checkedDictionary));
+assert!(is_json_dictionary($copiedDictionary));
+remove!($checkedDictionary, 'items');
+assert!(is_json_dictionary($checkedDictionary));
+
+#[Whim\Marker\NeverInline]
+function accept_scalar_or_array(int|string|vec<int> $value): mixed {
+  return $value;
+}
+
+foreach (vec[vec[1], 'text', 42, vec[2], vec[false], false] as $value) {
+  $rejected = false;
+  try {
+    assert!(accept_scalar_or_array($value) == $value);
+  } catch (TypeError $_) {
+    $rejected = true;
+  }
+
+  assert!($rejected == ($value == false || $value == vec[false]));
+}
+
 $asValue = 5;
 $asSame = $asValue as int;
 assert!($asSame == 5);

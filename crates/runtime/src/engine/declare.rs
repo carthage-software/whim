@@ -200,6 +200,7 @@ impl Engine {
             .tables
             .type_aliases
             .iter()
+            .map(Rc::as_ref)
             .chain(unit.type_aliases.iter())
             .cloned()
             .collect();
@@ -462,7 +463,7 @@ impl Engine {
                 continue;
             }
             let index = u32_index(self.tables.type_aliases.len());
-            self.tables.type_aliases.push(alias.clone());
+            self.tables.type_aliases.push(Rc::new(alias.clone()));
             self.tables.symbols.insert(
                 alias.name.clone(),
                 SymbolEntry {
@@ -858,7 +859,13 @@ pub(crate) fn prelink_exact_function_sites(
     let mut built_in_entries = vec![None; chunk.ic_descriptors.len()];
     let mut sites = chunk.code.iter().filter_map(|instruction| {
         let (cache, destination, argument_count) = match instruction {
-            Instruction::CallNamedUnchecked {
+            Instruction::CallNamedDirect {
+                cache,
+                destination,
+                argument_count,
+                ..
+            }
+            | Instruction::CallNamedUnchecked {
                 cache,
                 destination,
                 argument_count,

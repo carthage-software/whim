@@ -577,7 +577,7 @@ pub(crate) fn optimize_unit_with_world(
     passes::layout_cold_blocks::optimize_unit(unit, configuration, &mut statistics);
     passes::scalar_replace_objects::optimize_unit(unit, configuration, &mut statistics);
     specialize_against_one_analysis(unit, world, heap, configuration, &mut statistics);
-    passes::fuse_exact_call_window::optimize_unit(unit, configuration, &mut statistics);
+    passes::fuse_exact_call_window::optimize_unit(unit, configuration, &mut statistics, false);
     passes::cse::optimize_unit(unit, configuration, &mut statistics);
     passes::fuse_return_pair::optimize_unit(unit, configuration, &mut statistics);
     passes::cse::optimize_unit(unit, configuration, &mut statistics);
@@ -601,7 +601,7 @@ pub(crate) fn optimize_unit_with_world(
     }
 
     passes::specialize_matches::canonicalize_unit(unit, configuration, &mut statistics);
-    passes::fuse_exact_call_window::optimize_unit(unit, configuration, &mut statistics);
+    passes::fuse_exact_call_window::optimize_unit(unit, configuration, &mut statistics, true);
     passes::move_coalescing::optimize_unit(unit, configuration, &mut statistics);
     passes::fuse_index_add_assign::optimize_unit(unit, configuration, &mut statistics);
     if !has_destructor {

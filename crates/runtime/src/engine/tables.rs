@@ -1,5 +1,7 @@
 //! The complete symbol world owned by an engine.
 
+use std::rc::Rc;
+
 use hashbrown::HashMap;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -33,7 +35,7 @@ pub(crate) struct RuntimeTables {
     pub(crate) functions: Vec<RuntimeFunction>,
     pub(crate) classes: Vec<RuntimeClass>,
     pub(crate) constants: Vec<ConstantSlot>,
-    pub(crate) type_aliases: Vec<CompiledTypeAlias>,
+    pub(crate) type_aliases: Vec<Rc<CompiledTypeAlias>>,
     pub(crate) newtypes: Vec<CompiledNewtype>,
     pub(crate) newtype_values: Vec<NewtypeValueDescriptor>,
     pub(crate) newtype_value_cache: HashMap<NewtypeValueDescriptor, NewtypeValueId>,

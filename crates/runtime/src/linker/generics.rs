@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 
-use crate::bytecode::aliases::expand_aliases;
+use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledFunction;
@@ -285,7 +285,7 @@ impl Engine {
                 substitute_symbolic(default, &bindings)
             };
 
-            let argument = expand_aliases(&argument, &self.tables.type_aliases);
+            let argument = expand_aliases(&argument, self.tables.type_aliases.as_slice());
             bindings.insert(parameter.name.clone(), argument.clone());
             resolved_arguments.push(argument);
         }
@@ -297,7 +297,7 @@ impl Engine {
             for bound in &parameter.bounds {
                 let bound = expand_aliases(
                     &substitute_symbolic(bound, &bindings),
-                    &self.tables.type_aliases,
+                    self.tables.type_aliases.as_slice(),
                 );
 
                 if contains_late_type(argument) || contains_late_type(&bound) {
@@ -416,13 +416,13 @@ impl Engine {
 
             let default = expand_aliases(
                 &substitute_symbolic(default, &bindings),
-                &self.tables.type_aliases,
+                self.tables.type_aliases.as_slice(),
             );
 
             for bound in &parameter.bounds {
                 let bound = expand_aliases(
                     &substitute_symbolic(bound, &bindings),
-                    &self.tables.type_aliases,
+                    self.tables.type_aliases.as_slice(),
                 );
 
                 if contains_late_type(&default) || contains_late_type(&bound) {

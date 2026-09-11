@@ -113,6 +113,7 @@ pub(crate) fn mask_with_classification(
             | Instruction::DictIndexGetStringKey { destination, .. } => Some(destination),
             classified @ (Instruction::PropertyGetUnchecked { destination, .. }
             | Instruction::CallNamedUnchecked { destination, .. }
+            | Instruction::CallNamedDirect { destination, .. }
             | Instruction::CallNamedConstantUnchecked { destination, .. }
             | Instruction::CallSelfUnchecked { destination, .. }) => {
                 result_may_reference(classified).then_some(destination)

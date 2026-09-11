@@ -209,7 +209,9 @@ fn string_chain_dispatch_preserves_existing_call_inlining() {
     assert!(
         !code.iter().any(|i| matches!(
             i,
-            Instruction::CallNamed { .. } | Instruction::CallNamedUnchecked { .. }
+            Instruction::CallNamed { .. }
+                | Instruction::CallNamedUnchecked { .. }
+                | Instruction::CallNamedDirect { .. }
         )),
         "{code:?}"
     );

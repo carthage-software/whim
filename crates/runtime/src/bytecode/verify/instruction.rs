@@ -401,6 +401,11 @@ pub(in crate::bytecode::verify) fn verify_instruction(
             first_argument,
             ..
         }
+        | Instruction::CallNamedDirect {
+            argument_count,
+            first_argument,
+            ..
+        }
         | Instruction::CallMethodDirect {
             argument_count,
             first_argument,

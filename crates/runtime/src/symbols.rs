@@ -17,8 +17,10 @@ use hashbrown::HashMap;
 use crate::builtin::spec::BuiltInDirectHandler;
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::Chunk;
+use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
+use crate::bytecode::instruction::Instruction;
 use crate::bytecode::unit::CompiledAttribute;
 use crate::bytecode::unit::CompiledParameter;
 use crate::bytecode::unit::CompiledTypeParameter;
@@ -79,6 +81,7 @@ pub(crate) struct ExactFunctionEntry {
     pub(crate) finalized: bool,
     pub(crate) has_type_parameters: bool,
     pub(crate) frameless: bool,
+    pub(crate) string_byte_at: Option<(u8, u8)>,
 }
 
 #[derive(Clone, Copy)]
@@ -197,6 +200,7 @@ pub(crate) struct CachedCallEnvironment {
 #[derive(Clone, Copy)]
 pub(crate) enum ArgumentGuard {
     Any,
+    ScalarUnion(u16),
     Null,
     Bool,
     Int,
@@ -229,6 +233,7 @@ pub(crate) enum CachedParameterGuard {
     Cheap(ArgumentGuard),
     Descriptor {
         descriptor: Rc<TypeDescriptor>,
+        scalar_mask: u16,
         array_id: Option<ArrayTypeCheckId>,
     },
 }
@@ -287,6 +292,7 @@ pub(crate) struct CachedIsCheck {
 
 #[derive(Clone, Copy)]
 pub(crate) struct IsCheckWays {
+    pub(crate) array_id: Option<ArrayTypeCheckId>,
     cacheability: Option<(TypeEnvironmentId, Option<ClassId>, bool)>,
     ways: [Option<CachedIsCheck>; IS_CHECK_WAYS],
 }
@@ -295,6 +301,7 @@ const IS_CHECK_WAYS: usize = 4;
 
 impl IsCheckWays {
     pub(crate) const EMPTY: Self = Self {
+        array_id: None,
         cacheability: None,
         ways: [None; IS_CHECK_WAYS],
     };
@@ -766,6 +773,91 @@ pub(crate) enum CallableOptimization {
 }
 
 impl RuntimeFunction {
+    fn string_byte_at(&self) -> Option<(u8, u8)> {
+        if self.optimization != CallableOptimization::Complete
+            || self.declared_parameters != 2
+            || self.captures_this
+            || !self.type_parameters().is_empty()
+        {
+            return None;
+        }
+        let FunctionLocator::TopLevel(position) = self.locator else {
+            return None;
+        };
+        let chunk = self
+            .optimized_chunk
+            .as_deref()
+            .unwrap_or(&self.unit.unit.functions[position as usize].chunk);
+        let code = chunk
+            .code
+            .strip_suffix(&[Instruction::ReturnNull])
+            .unwrap_or(&chunk.code);
+        let moved = |instruction| match instruction {
+            Instruction::Move {
+                destination,
+                source,
+            }
+            | Instruction::MoveOwned {
+                destination,
+                source,
+            } => Some((destination.index(), source.index())),
+            _ => None,
+        };
+        let (string, offset, destination, cache, returned) = match code {
+            [
+                first,
+                second,
+                Instruction::CallNamedUnchecked {
+                    destination,
+                    first_argument,
+                    argument_count,
+                    cache,
+                },
+                returned,
+            ] => {
+                let (first_target, string) = moved(*first)?;
+                let (second_target, offset) = moved(*second)?;
+                if first_target < 2
+                    || second_target < 2
+                    || first_target != first_argument.index()
+                    || first_target.checked_add(1) != Some(second_target)
+                    || argument_count.value() != 2
+                {
+                    return None;
+                }
+                (string, offset, destination, cache, returned)
+            }
+            [
+                Instruction::CallNamedDirect {
+                    destination,
+                    first_argument,
+                    argument_count,
+                    cache,
+                },
+                returned,
+            ] if first_argument.index() == 0 && argument_count.value() == 2 => {
+                (0, 1, destination, cache, returned)
+            }
+            _ => return None,
+        };
+        if string > 1
+            || offset > 1
+            || string == offset
+            || !matches!(returned, Instruction::ReturnScalarUnchecked { source } | Instruction::ReturnUnchecked { source } if source == destination)
+        {
+            return None;
+        }
+        let IcDescriptor::Member {
+            name,
+            type_arguments: None,
+        } = chunk.ic_descriptors.get(usize::from(cache.index()))?
+        else {
+            return None;
+        };
+        (name.as_bytes() == b"Whim\\_Private\\string_byte_at")
+            .then_some((u8::try_from(string).ok()?, u8::try_from(offset).ok()?))
+    }
+
     #[must_use]
     pub(crate) const fn parameters(&self) -> &[CompiledParameter] {
         // SAFETY: the engine owns this stable slice for the function's lifetime.
@@ -807,6 +899,7 @@ impl ExactFunctionEntry {
             finalized: runtime.optimization == CallableOptimization::Complete,
             has_type_parameters: !runtime.type_parameters().is_empty(),
             frameless: runtime.frameless_literal.is_some(),
+            string_byte_at: runtime.string_byte_at(),
         }
     }
 

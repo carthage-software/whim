@@ -80,7 +80,11 @@ pub(super) fn leaf_callee(function: &CompiledFunction) -> Option<LeafCallee> {
     let force = is_always_inline(&function.attributes);
     for instruction in chunk.code[..terminal].iter().copied() {
         let allowed = straight_line_body_instruction(instruction)
-            || force && matches!(instruction, Instruction::CallNamedUnchecked { .. });
+            || force
+                && matches!(
+                    instruction,
+                    Instruction::CallNamedUnchecked { .. } | Instruction::CallNamedDirect { .. }
+                );
         if !allowed {
             return None;
         }
@@ -649,10 +653,23 @@ pub(super) fn remap_instruction(
             destination,
             first_argument,
             cache,
-            ..
+            argument_count,
+        }
+        | Instruction::CallNamedDirect {
+            destination,
+            first_argument,
+            cache,
+            argument_count,
         } => {
+            let first = remap(*first_argument);
+            if !(0..u16::from(argument_count.value())).all(|offset| {
+                remap(Register::new(first_argument.index() + offset)).index()
+                    == first.index() + offset
+            }) {
+                return None;
+            }
             *destination = remap(*destination);
-            *first_argument = remap(*first_argument);
+            *first_argument = first;
             *cache = chunk
                 .add_ic_descriptor(callee_chunk.ic_descriptors[usize::from(cache.index())].clone())
                 .ok()?;

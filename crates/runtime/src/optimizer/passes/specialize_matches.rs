@@ -50,6 +50,23 @@ pub(in crate::optimizer) fn optimize_unit(
                 } => {
                     let descriptor =
                         &analyzed.chunk.type_descriptors[usize::from(descriptor.index())];
+                    if let Some(primitive) = analyzed
+                        .flow
+                        .collection_type_test(index, source, descriptor)
+                        && let Some(descriptor) = plan.add_type_descriptor(analyzed, primitive)
+                        && analyzed.write(
+                            plan,
+                            index,
+                            Instruction::Is {
+                                destination,
+                                source,
+                                descriptor,
+                            },
+                        )
+                    {
+                        statistics.operations_specialized += 1;
+                        continue;
+                    }
                     if !descriptor_is_trivial(descriptor) {
                         continue;
                     }

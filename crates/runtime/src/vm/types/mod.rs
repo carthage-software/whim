@@ -40,12 +40,26 @@ use crate::vm::is_instance_of;
 use crate::vm::ops;
 use crate::vm::unreachable_invariant;
 
+struct ActiveAliases {
+    indices: [u32; MAX_TYPE_DEPTH_U32 as usize + 1],
+    len: usize,
+}
+
 impl VirtualMachine<'_> {
-    fn array_type_check_cacheable(&self, descriptor: &TypeDescriptor, depth: u32) -> bool {
+    fn array_type_check_cacheable(
+        &self,
+        descriptor: &TypeDescriptor,
+        depth: u32,
+        aliases: &mut ActiveAliases,
+    ) -> bool {
         if depth > MAX_TYPE_DEPTH_U32 {
             return false;
         }
-        let cacheable = |child: &TypeDescriptor| self.array_type_check_cacheable(child, depth + 1);
+
+        let cacheable = |child: &TypeDescriptor, aliases: &mut ActiveAliases| {
+            self.array_type_check_cacheable(child, depth + 1, aliases)
+        };
+
         match descriptor {
             TypeDescriptor::Wildcard
             | TypeDescriptor::Mixed
@@ -66,15 +80,20 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::Dictionary(None)
             | TypeDescriptor::TupleAny => true,
             TypeDescriptor::Array(Some((key, value)))
-            | TypeDescriptor::Dictionary(Some((key, value))) => cacheable(key) && cacheable(value),
+            | TypeDescriptor::Dictionary(Some((key, value))) => {
+                cacheable(key, aliases) && cacheable(value, aliases)
+            }
             TypeDescriptor::Vector(Some(element)) | TypeDescriptor::Negated(element) => {
-                cacheable(element)
+                cacheable(element, aliases)
             }
             TypeDescriptor::Tuple(members)
             | TypeDescriptor::Union(members)
-            | TypeDescriptor::Intersection(members) => members.iter().all(cacheable),
+            | TypeDescriptor::Intersection(members) => {
+                members.iter().all(|member| cacheable(member, aliases))
+            }
             TypeDescriptor::TupleRest { elements, rest } => {
-                elements.iter().all(cacheable) && cacheable(rest)
+                elements.iter().all(|element| cacheable(element, aliases))
+                    && cacheable(rest, aliases)
             }
             TypeDescriptor::Named {
                 name, arguments, ..
@@ -83,20 +102,34 @@ impl VirtualMachine<'_> {
                     return false;
                 };
                 if symbol.kind == SymbolKind::TypeAlias
-                    && !cacheable(
+                    && !aliases.indices[..aliases.len].contains(&symbol.index)
+                {
+                    aliases.indices[aliases.len] = symbol.index;
+                    aliases.len += 1;
+                    let result = cacheable(
                         &self.engine.tables.type_aliases[symbol.index as usize].descriptor,
+                        aliases,
+                    );
+
+                    aliases.len -= 1;
+                    if !result {
+                        return false;
+                    }
+                }
+                if symbol.kind == SymbolKind::Newtype
+                    && !cacheable(
+                        &self.engine.tables.newtypes[symbol.index as usize].backing,
+                        aliases,
                     )
                 {
                     return false;
                 }
-                if symbol.kind == SymbolKind::Newtype
-                    && !cacheable(&self.engine.tables.newtypes[symbol.index as usize].backing)
-                {
-                    return false;
-                }
-                arguments
-                    .as_ref()
-                    .is_none_or(|arguments| arguments.iter().all(cacheable))
+
+                arguments.as_ref().is_none_or(|arguments| {
+                    arguments
+                        .iter()
+                        .all(|argument| cacheable(argument, aliases))
+                })
             }
             TypeDescriptor::Void
             | TypeDescriptor::Never
@@ -128,7 +161,12 @@ impl VirtualMachine<'_> {
         &mut self,
         descriptor: &TypeDescriptor,
     ) -> Option<ArrayTypeCheckId> {
-        if !self.array_type_check_cacheable(descriptor, 0) {
+        let mut aliases = ActiveAliases {
+            indices: [0; MAX_TYPE_DEPTH_U32 as usize + 1],
+            len: 0,
+        };
+
+        if !self.array_type_check_cacheable(descriptor, 0, &mut aliases) {
             return None;
         }
 

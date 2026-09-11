@@ -2748,7 +2748,29 @@ impl VirtualMachine<'_> {
                         self.sync_ip(ip);
                         let window_start = self.current_base() + first_argument.index() as usize;
                         let count = usize::from(argument_count.value());
-                        if let Err(control) = self.call_exact_function_site(
+                        if let Err(control) = self.call_exact_function_site::<false>(
+                            cache.index() as usize,
+                            destination.index(),
+                            window_start,
+                            count,
+                        ) {
+                            self.handle_control(control, floor)?;
+                            continue 'dispatch;
+                        }
+
+                        reload_frame!(self, chunk, code, ip, registers);
+                        continue 'instructions;
+                    }
+                    Instruction::CallNamedDirect {
+                        argument_count,
+                        destination,
+                        first_argument,
+                        cache,
+                    } => {
+                        self.sync_ip(ip);
+                        let window_start = self.current_base() + first_argument.index() as usize;
+                        let count = usize::from(argument_count.value());
+                        if let Err(control) = self.call_exact_function_site::<true>(
                             cache.index() as usize,
                             destination.index(),
                             window_start,
@@ -5078,12 +5100,8 @@ impl VirtualMachine<'_> {
                         // SAFETY: verified bytecode keeps the source in the active frame.
                         let value = unsafe { &*registers.add(source.index() as usize) };
                         // SAFETY: the value's tag proves this projection is valid.
-                        let string = unsafe { value.as_string_bytes().unwrap_unchecked() };
-                        write_register!(
-                            registers,
-                            destination,
-                            Value::int(string.len() as i64)
-                        );
+                        let length = unsafe { value.as_string_len().unwrap_unchecked() };
+                        write_register!(registers, destination, Value::int(length as i64));
                     }
                     Instruction::Remove {
                         destination,
@@ -5287,7 +5305,7 @@ impl VirtualMachine<'_> {
                         };
 
                         let site = descriptor.index() as usize;
-                        let cached_cacheability = {
+                        let (cached_cacheability, cached_array_id) = {
                             // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                             let cache = unsafe {
                                 &mut *self.current_frame().cache.as_ref().is_checks()
@@ -5298,7 +5316,25 @@ impl VirtualMachine<'_> {
                                     IsCheckWays::EMPTY,
                                 );
                             }
-                            cache[site].cacheable(frame_environment, frame_called)
+                            (
+                                if value.is_object() {
+                                    cache[site].cacheable(frame_environment, frame_called)
+                                } else {
+                                    Some(false)
+                                },
+                                cache[site].array_id,
+                            )
+                        };
+                        let array_id = if value.is_vec() || value.is_dict() || value.is_tuple() {
+                            cached_array_id.or_else(|| {
+                                let id = self.array_type_check_id(checked)?;
+                                // SAFETY: this call owns the VM and the site was reserved above.
+                                (unsafe { &mut *self.current_frame().cache.as_ref().is_checks() })[site]
+                                    .array_id = Some(id);
+                                Some(id)
+                            })
+                        } else {
+                            None
                         };
                         let cacheable = match cached_cacheability {
                             Some(cacheable) => cacheable,
@@ -5342,11 +5378,12 @@ impl VirtualMachine<'_> {
                         }
 
                         let value = read_register!(registers, source);
-                        match self.check_descriptor(
+                        match self.check_descriptor_with_array_id(
                             checked,
                             &value,
                             frame_called,
                             frame_environment,
+                            array_id,
                             0,
                         ) {
                             Ok(matches) => {
@@ -6330,16 +6367,7 @@ impl VirtualMachine<'_> {
 
         // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
         let descriptor = unsafe { descriptor.as_ref() };
-        let valid = match descriptor {
-            TypeDescriptor::Void => result.is_null(),
-            TypeDescriptor::Never => false,
-            _ => match check_trivial_descriptor(descriptor, result) {
-                Some(valid) => valid,
-                None => self.check_descriptor(descriptor, result, called, environment, 0)?,
-            },
-        };
-
-        Ok(valid)
+        self.check_descriptor(descriptor, result, called, environment, 0)
     }
 
     /// Builds the return mismatch after dispatch has synchronized the precise

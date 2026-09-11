@@ -17,13 +17,14 @@ pub(in crate::optimizer) fn optimize_unit(
     unit: &mut CompiledUnit,
     configuration: OptimizationConfiguration,
     statistics: &mut OptimizationStatistics,
+    borrow_named: bool,
 ) {
     if !configuration.elide_parameter_checks && !configuration.move_coalescing {
         return;
     }
 
     for_each_mutable_chunk(unit, configuration, |chunk| {
-        optimize_chunk(chunk, configuration, statistics);
+        optimize_chunk(chunk, configuration, statistics, borrow_named);
     });
 }
 
@@ -31,6 +32,7 @@ fn optimize_chunk(
     chunk: &mut Chunk,
     configuration: OptimizationConfiguration,
     statistics: &mut OptimizationStatistics,
+    borrow_named: bool,
 ) {
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
@@ -58,14 +60,20 @@ fn optimize_chunk(
             continue;
         }
 
-        let Instruction::CallMethodUnchecked {
-            argument_count,
-            destination,
-            first_argument,
-            cache,
-        } = chunk.code[index]
-        else {
-            continue;
+        let (argument_count, destination, first_argument, cache, named) = match chunk.code[index] {
+            Instruction::CallMethodUnchecked {
+                argument_count,
+                destination,
+                first_argument,
+                cache,
+            } => (argument_count, destination, first_argument, cache, false),
+            Instruction::CallNamedUnchecked {
+                argument_count,
+                destination,
+                first_argument,
+                cache,
+            } if borrow_named => (argument_count, destination, first_argument, cache, true),
+            _ => continue,
         };
 
         let count = usize::from(argument_count.value());
@@ -88,11 +96,20 @@ fn optimize_chunk(
         }
 
         remove[start..index].fill(true);
-        chunk.code[index] = Instruction::CallMethodDirect {
-            argument_count,
-            destination,
-            first_argument: first_source,
-            cache,
+        chunk.code[index] = if named {
+            Instruction::CallNamedDirect {
+                argument_count,
+                destination,
+                first_argument: first_source,
+                cache,
+            }
+        } else {
+            Instruction::CallMethodDirect {
+                argument_count,
+                destination,
+                first_argument: first_source,
+                cache,
+            }
         };
     }
 
@@ -385,6 +402,7 @@ mod tests {
             &mut chunk,
             OptimizationConfiguration::default(),
             &mut statistics,
+            true,
         );
 
         assert_eq!(statistics.instructions_removed, 2);
@@ -436,6 +454,7 @@ mod tests {
             &mut chunk,
             OptimizationConfiguration::default(),
             &mut statistics,
+            true,
         );
 
         assert_eq!(statistics.instructions_removed, 0);

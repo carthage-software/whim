@@ -845,6 +845,7 @@ impl<'a> TypeFlow<'a> {
                 | Instruction::CallMethodUnchecked { .. }
                 | Instruction::CallMethodDirect { .. }
                 | Instruction::CallNamed { .. }
+                | Instruction::CallNamedDirect { .. }
                 | Instruction::CallNamedUnchecked { .. }
                 | Instruction::CallNamedConstantUnchecked { .. }
                 | Instruction::CallSelfUnchecked { .. } => {

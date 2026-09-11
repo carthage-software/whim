@@ -1,5 +1,7 @@
 //! Structural expansion of compiled type aliases.
 
+use std::rc::Rc;
+
 use hashbrown::HashMap;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -41,6 +43,14 @@ impl TypeAliasLookup for TypeAliasIndex<'_> {
 impl TypeAliasLookup for [CompiledTypeAlias] {
     fn find_alias(&self, name: &Atom) -> Option<&CompiledTypeAlias> {
         self.iter().find(|alias| alias.name == *name)
+    }
+}
+
+impl TypeAliasLookup for [Rc<CompiledTypeAlias>] {
+    fn find_alias(&self, name: &Atom) -> Option<&CompiledTypeAlias> {
+        self.iter()
+            .find(|alias| alias.name == *name)
+            .map(Rc::as_ref)
     }
 }
 

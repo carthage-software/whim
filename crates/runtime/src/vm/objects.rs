@@ -3,7 +3,7 @@
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-use crate::bytecode::aliases::expand_aliases;
+use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
 use crate::bytecode::unit::ClassLikeKind;
 use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::literal_value;
@@ -78,7 +78,8 @@ impl VirtualMachine<'_> {
                     recursive: false,
                 };
                 let concrete = self.substitute_descriptor(&descriptor, outer, 0);
-                let expanded = expand_aliases(&concrete, &self.engine.tables.type_aliases);
+                let expanded =
+                    expand_aliases(&concrete, self.engine.tables.type_aliases.as_slice());
                 return match expanded {
                     TypeDescriptor::Named {
                         name, arguments, ..

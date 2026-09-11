@@ -146,6 +146,7 @@ pub(in crate::optimizer) fn with_destination(
         | Instruction::CallNamedConstantUnchecked { destination, .. }
         | Instruction::CallMethod { destination, .. }
         | Instruction::CallMethodUnchecked { destination, .. }
+        | Instruction::CallNamedDirect { destination, .. }
         | Instruction::CallMethodDirect { destination, .. }
         | Instruction::CallStatic { destination, .. }
         | Instruction::CallWithNames { destination, .. }

@@ -234,7 +234,7 @@ impl<'a> TypeFlow<'a> {
                 slot,
                 ..
             } => {
-                let resolved = self.property_class_specialization(self.fact(index, *object), 0)?;
+                let resolved = self.property_class_specialization(index, *object, 0)?;
                 let (_, property) = *self
                     .flattened_layout(resolved.class)?
                     .get(usize::from(slot.index()))?;
@@ -274,6 +274,7 @@ impl<'a> TypeFlow<'a> {
                 return Some((*destination, self.descriptor_fact(&descriptor, origin)));
             }
             Instruction::CallNamed { destination, .. }
+            | Instruction::CallNamedDirect { destination, .. }
             | Instruction::CallNamedUnchecked { destination, .. }
             | Instruction::CallNamedConstantUnchecked { destination, .. }
             | Instruction::CallSelfUnchecked { destination, .. } => {
@@ -398,16 +399,19 @@ impl<'a> TypeFlow<'a> {
         if index >= self.chunk.code.len() || !self.reachable[index] {
             return None;
         }
-        let class = self
-            .property_class_specialization(self.fact(index, object), 0)?
-            .class;
+        let class = self.property_class_specialization(index, object, 0)?.class;
         let name = self.member_name(cache)?;
         self.instance_slot_of(class, name)
     }
 
-    fn property_class_specialization(&self, fact: Fact, depth: usize) -> Option<ExactClass<'a>> {
-        if fact.origin != THIS_ORIGIN {
-            return self.exact_class_specialization(fact, depth);
+    fn property_class_specialization(
+        &self,
+        index: usize,
+        register: Register,
+        depth: usize,
+    ) -> Option<ExactClass<'a>> {
+        if self.fact(index, register).origin != THIS_ORIGIN {
+            return self.exact_class_at(index, register, depth);
         }
 
         let class = self.class(self.class_name?)?;
@@ -618,8 +622,7 @@ impl<'a> TypeFlow<'a> {
                 Some(TypeDescriptor::Union(vec![value, TypeDescriptor::Null]))
             }
             Instruction::PropertyGetOrNull { object, cache, .. } => {
-                let resolved =
-                    self.property_class_specialization(self.fact(index, object), depth + 1)?;
+                let resolved = self.property_class_specialization(index, object, depth + 1)?;
                 let property = self
                     .instance_slot_of(resolved.class, self.member_name(cache)?)?
                     .property;
@@ -637,8 +640,7 @@ impl<'a> TypeFlow<'a> {
                 Some(TypeDescriptor::Union(vec![value, TypeDescriptor::Null]))
             }
             Instruction::PropertyGetOrNullUnchecked { object, slot, .. } => {
-                let resolved =
-                    self.property_class_specialization(self.fact(index, object), depth + 1)?;
+                let resolved = self.property_class_specialization(index, object, depth + 1)?;
                 let (_, property) = *self
                     .flattened_layout(resolved.class)?
                     .get(usize::from(slot.index()))?;
@@ -655,8 +657,29 @@ impl<'a> TypeFlow<'a> {
                 container,
                 index: key,
                 ..
+            }
+            | Instruction::VecIndexGet {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::DictIndexGetIntKey {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::DictIndexGetStringKey {
+                container,
+                index: key,
+                ..
             } => {
                 let container = self.register_type_at(index, container, depth + 1)?;
+                if let TypeDescriptor::Array(Some((_, element)))
+                | TypeDescriptor::Dictionary(Some((_, element)))
+                | TypeDescriptor::Vector(Some(element)) = container
+                {
+                    return Some(*element);
+                }
                 let ConstantValue::Int(key) =
                     self.constant_value_fact(self.fact(index, key), depth + 1)?
                 else {
@@ -674,8 +697,7 @@ impl<'a> TypeFlow<'a> {
                 Self::indexed_descriptor(&container, i64::from(key.value())).cloned()
             }
             Instruction::PropertyGet { object, cache, .. } => {
-                let resolved =
-                    self.property_class_specialization(self.fact(index, object), depth + 1)?;
+                let resolved = self.property_class_specialization(index, object, depth + 1)?;
                 let name = self.member_name(cache)?;
                 let property = self.instance_slot_of(resolved.class, name)?.property;
                 Some(substitute_parameters(
@@ -686,8 +708,7 @@ impl<'a> TypeFlow<'a> {
                 ))
             }
             Instruction::PropertyGetUnchecked { object, slot, .. } => {
-                let resolved =
-                    self.exact_class_specialization(self.fact(index, object), depth + 1)?;
+                let resolved = self.exact_class_at(index, object, depth + 1)?;
                 // The slot indexes the flattened layout, not the class's own
                 // declarations.
                 let layout = self.flattened_layout(resolved.class)?;
@@ -713,6 +734,7 @@ impl<'a> TypeFlow<'a> {
             | Instruction::CallMethodDirect { .. } => self.method_return_type_at(index, depth + 1),
             Instruction::CallNamed { .. }
             | Instruction::CallNamedDiscarded { .. }
+            | Instruction::CallNamedDirect { .. }
             | Instruction::CallNamedUnchecked { .. }
             | Instruction::CallNamedConstantUnchecked { .. }
             | Instruction::CallSelfUnchecked { .. } => {
@@ -770,8 +792,7 @@ impl<'a> TypeFlow<'a> {
                 .declared_type
                 .as_ref(),
             Instruction::PropertyGetUnchecked { object, slot, .. } => {
-                let resolved =
-                    self.property_class_specialization(self.fact(index, object), depth)?;
+                let resolved = self.property_class_specialization(index, object, depth)?;
                 self.flattened_layout(resolved.class)?
                     .get(usize::from(slot.index()))?
                     .1
@@ -885,6 +906,29 @@ impl<'a> TypeFlow<'a> {
         }
     }
 
+    fn exact_class_at(
+        &self,
+        index: usize,
+        register: Register,
+        depth: usize,
+    ) -> Option<ExactClass<'a>> {
+        if let Some(class) = self.exact_class_specialization(self.fact(index, register), depth + 1)
+        {
+            return Some(class);
+        }
+        let descriptor = self.register_type_at(index, register, depth + 1)?;
+        let TypeDescriptor::Named {
+            name, arguments, ..
+        } = self.expand_aliases_owned(descriptor)
+        else {
+            return None;
+        };
+        Some(ExactClass {
+            class: self.final_class(&name)?,
+            arguments,
+        })
+    }
+
     pub(in crate::optimizer::type_flow) fn exact_class_specialization(
         &self,
         fact: Fact,
@@ -965,8 +1009,7 @@ impl<'a> TypeFlow<'a> {
             return None;
         }
         let (first_argument, cache) = method_call_site(*self.chunk.code.get(index)?)?;
-        let receiver =
-            self.exact_class_specialization(self.fact(index, first_argument), depth + 1)?;
+        let receiver = self.exact_class_at(index, first_argument, depth + 1)?;
         let name = self.member_name(cache)?;
         let method = receiver.class.methods.iter().find(|method| {
             !method.is_static
@@ -1177,6 +1220,7 @@ fn named_call_cache(instruction: Instruction) -> Option<IcSlot> {
     match instruction {
         Instruction::CallNamed { cache, .. }
         | Instruction::CallNamedDiscarded { cache, .. }
+        | Instruction::CallNamedDirect { cache, .. }
         | Instruction::CallNamedUnchecked { cache, .. }
         | Instruction::CallNamedConstantUnchecked { cache, .. } => Some(cache),
         _ => None,

@@ -306,6 +306,7 @@ macro_rules! instruction_set {
             /// Calls an exact instance method directly from a proven caller-register
             /// window, borrowing the receiver for the duration of the frame.
             CallMethodDirect { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 136,
+            CallNamedDirect { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 218,
             VecForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode, } = 137,
             DictForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode, } = 138,
             StringLength { destination: Register, source: Register, } = 139,
