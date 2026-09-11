@@ -23,6 +23,7 @@ $created = $connection->execute(
 
 assert!($created->getAffectedRows() == 0);
 $created->close();
+assert!($created->getColumns() == vec[]);
 
 $insert = $connection->prepare(
   'INSERT INTO items (name, enabled, payload) VALUES ($1, $2, $3)',
@@ -56,6 +57,21 @@ $reordered = $connection->execute(
 
 assert!($reordered->fetch() == vec[1]);
 assert!($reordered->fetch() == null);
+assert!($reordered->getColumns()[0]->name == 'id');
+assert!($selected->getColumns() == $columns);
+
+$unnamedRejected = false;
+try {
+  $connection->execute('SELECT 1 AS ""');
+} catch (Whim\Database\QueryException $error) {
+  assert!(
+    $error->getMessage() == 'the SQLite driver returned an empty column name',
+  );
+
+  $unnamedRejected = true;
+}
+
+assert!($unnamedRejected);
 
 $repeated = $connection->prepare(
   'SELECT id FROM items WHERE name = $2 AND id = $1 AND $1 = id',

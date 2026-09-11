@@ -110,7 +110,7 @@ fn query(
         return Err(Error::message("query metadata is missing"));
     };
     let rows = collect(&result)?;
-    Ok((metadata, rows))
+    Ok((metadata.clone(), rows))
 }
 
 fn memory_configuration() -> Configuration {
@@ -287,4 +287,35 @@ fn queries_cross_result_batches_without_losing_rows() {
     assert!(matches!(rows[0][0], Value::Integer(1)));
     assert!(matches!(rows[64][0], Value::Integer(65)));
     assert!(matches!(rows[129][0], Value::Integer(130)));
+}
+
+#[test]
+fn notifications_drain_while_the_producer_signals() {
+    use std::io::Read;
+
+    let notifier = Arc::new(Notifier::new().unwrap());
+    let writer = Arc::clone(&notifier);
+    let producer = thread::spawn(move || {
+        for _ in 0..10_000 {
+            writer.signal();
+        }
+    });
+    while !producer.is_finished() {
+        notifier.drain();
+    }
+    producer.join().unwrap();
+    notifier.drain();
+    assert_eq!(
+        (&notifier.reader).read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    for _ in 0..513 {
+        notifier.signal();
+    }
+    notifier.drain();
+    notifier.drain();
+    assert_eq!(
+        (&notifier.reader).read(&mut [0; 1]).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
 }

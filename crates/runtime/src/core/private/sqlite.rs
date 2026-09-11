@@ -414,23 +414,37 @@ impl SQLiteResult {
     #[whim_method("__construct(): void", visibility = "private")]
     const fn construct() {}
 
+    #[whim_method("hasNamedColumns(): bool", must_use)]
+    fn has_named_columns(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
+        Ok(Value::bool(result(cx)?.metadata().is_some_and(
+            |metadata| {
+                metadata
+                    .columns
+                    .iter()
+                    .all(|column| !column.name.is_empty())
+            },
+        )))
+    }
+
     #[whim_method("columns(): vec<(string, null|string)>", must_use)]
     fn columns(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
+        let result = result(cx)?;
         // SAFETY: the surrounding invariant proves this option contains a value.
         let metadata = unsafe {
             unwrap_option_invariant(
-                result(cx)?.metadata(),
+                result.metadata(),
                 "the SQLite result metadata is ready before it is exposed",
             )
         };
         let columns = metadata
             .columns
-            .into_iter()
+            .iter()
             .map(|column| {
-                let name = Value::from_string_vec(cx.vm.heap(), column.name);
-                let type_name = column.declared_type.map_or_else(Value::null, |name| {
-                    Value::from_string_vec(cx.vm.heap(), name)
-                });
+                let name = cx.string(&column.name);
+                let type_name = column
+                    .declared_type
+                    .as_ref()
+                    .map_or_else(Value::null, |name| cx.string(name));
                 cx.tuple([name, type_name])
             })
             .collect::<Vec<_>>();
@@ -439,10 +453,11 @@ impl SQLiteResult {
 
     #[whim_method("affectedRows(): null|(0..)", must_use)]
     fn affected_rows(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
+        let result = result(cx)?;
         // SAFETY: the surrounding invariant proves this option contains a value.
         let metadata = unsafe {
             unwrap_option_invariant(
-                result(cx)?.metadata(),
+                result.metadata(),
                 "the SQLite result metadata is ready before it is exposed",
             )
         };

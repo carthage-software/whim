@@ -13,15 +13,18 @@ mod tests;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io;
+use std::io::Read;
+use std::io::Write;
 use std::mem::replace;
 use std::mem::swap;
 use std::os::fd::AsRawFd;
 use std::os::fd::RawFd;
-use std::os::unix::net::UnixDatagram;
+use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::PoisonError;
 use std::sync::Weak;
 use std::sync::atomic::AtomicBool;
@@ -87,16 +90,21 @@ pub struct Configuration {
 }
 
 struct Notifier {
-    reader: UnixDatagram,
-    writer: UnixDatagram,
+    reader: UnixStream,
+    writer: UnixStream,
+    pending: AtomicBool,
 }
 
 impl Notifier {
     fn new() -> io::Result<Self> {
-        let (reader, writer) = UnixDatagram::pair()?;
+        let (reader, writer) = UnixStream::pair()?;
         reader.set_nonblocking(true)?;
         writer.set_nonblocking(true)?;
-        Ok(Self { reader, writer })
+        Ok(Self {
+            reader,
+            writer,
+            pending: AtomicBool::new(false),
+        })
     }
 
     fn descriptor(&self) -> RawFd {
@@ -105,17 +113,24 @@ impl Notifier {
 
     fn signal(&self) {
         loop {
-            match self.writer.send(&[1]) {
+            match (&self.writer).write(&[1]) {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-                Ok(_) | Err(_) => return,
+                Ok(_) | Err(_) => {
+                    self.pending.store(true, Ordering::Release);
+                    return;
+                }
             }
         }
     }
 
     fn drain(&self) {
+        if !self.pending.swap(false, Ordering::AcqRel) {
+            return;
+        }
         let mut bytes = [0_u8; 64];
         loop {
-            match self.reader.recv(&mut bytes) {
+            match (&self.reader).read(&mut bytes) {
+                Ok(0) => return,
                 Ok(_) => {}
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => return,
@@ -227,13 +242,13 @@ impl Drop for Operation {
 }
 
 struct ResultQueue {
-    metadata: Option<Metadata>,
     rows: VecDeque<Row>,
     terminal: Option<Result<(), Error>>,
     closed: bool,
 }
 
 struct ResultShared {
+    metadata: OnceLock<Metadata>,
     queue: Mutex<ResultQueue>,
     space: Condvar,
     connection: Arc<ConnectionShared>,
@@ -244,8 +259,8 @@ struct ResultShared {
 impl ResultShared {
     fn new(connection: Arc<ConnectionShared>, id: u64) -> Arc<Self> {
         Arc::new(Self {
+            metadata: OnceLock::new(),
             queue: Mutex::new(ResultQueue {
-                metadata: None,
                 rows: VecDeque::new(),
                 terminal: None,
                 closed: false,
@@ -258,10 +273,7 @@ impl ResultShared {
     }
 
     fn set_metadata(&self, metadata: Metadata) {
-        self.queue
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .metadata = Some(metadata);
+        assert!(self.metadata.set(metadata).is_ok());
     }
 
     fn push_batch(&self, rows: &mut Vec<Row>) -> bool {
@@ -362,13 +374,8 @@ impl ResultSet {
 
     /// Returns the result metadata once it is available.
     #[must_use]
-    pub fn metadata(&self) -> Option<Metadata> {
-        self.shared
-            .queue
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .metadata
-            .clone()
+    pub fn metadata(&self) -> Option<&Metadata> {
+        self.shared.metadata.get()
     }
 
     /// Takes the next row or terminal result when available.

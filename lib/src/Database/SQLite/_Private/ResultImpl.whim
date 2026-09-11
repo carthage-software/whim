@@ -13,18 +13,26 @@ use Whim\_Private\SQLiteResult;
 
 /** Implements a database result over a SQLite row stream. */
 final class ResultImpl implements Result {
-  private vec<Column> $columns;
+  private null|vec<Column> $columns = null;
 
   /** Creates a result from a ready SQLite stream. */
   public function __construct(private SQLiteResult $result) {
-    $columns = vec[];
-    foreach ($result->columns() as $column) {
-      if ($column[0] == '') {
-        throw new QueryException(
-          'the SQLite driver returned an empty column name',
-        );
-      }
+    if (!$result->hasNamedColumns()) {
+      throw new QueryException(
+        'the SQLite driver returned an empty column name',
+      );
+    }
+  }
 
+  /** Returns column metadata in row order. */
+  #[MustUse]
+  public function getColumns(): vec<Column> {
+    if ($this->columns != null) {
+      return $this->columns;
+    }
+
+    $columns = vec[];
+    foreach ($this->result->columns() as $column) {
       $typeName = $column[1];
       if ($typeName == '') {
         $typeName = null;
@@ -36,13 +44,7 @@ final class ResultImpl implements Result {
       );
     }
 
-    $this->columns = $columns;
-  }
-
-  /** Returns column metadata in row order. */
-  #[MustUse]
-  public function getColumns(): vec<Column> {
-    return $this->columns;
+    return $this->columns = $columns;
   }
 
   /** Returns the affected row count. */

@@ -114,6 +114,11 @@ final class SQLiteConnection {
 final class SQLiteResult {
   private function __construct() {}
 
+  #[MustUse]
+  #[TrackCaller]
+  #[TraceBoundary]
+  public function hasNamedColumns(): bool {}
+
   /** Returns raw column metadata. */
   #[MustUse]
   #[TrackCaller]
