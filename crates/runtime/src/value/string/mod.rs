@@ -319,9 +319,10 @@ impl ByteStringObject {
     }
 
     /// Iterates leaf chunks without flattening or recursion.
-    fn chunks(&self) -> Chunks<'_> {
+    const fn chunks(&self) -> Chunks<'_> {
         Chunks {
-            stack: vec![ptr::from_ref(self)],
+            current: Some(ptr::from_ref(self)),
+            stack: Vec::new(),
             _marker: PhantomData,
         }
     }
@@ -420,6 +421,7 @@ impl ByteStringObject {
 
 /// An iterative walk over a string's leaf chunks.
 struct Chunks<'string> {
+    current: Option<*const ByteStringObject>,
     stack: Vec<*const ByteStringObject>,
     _marker: PhantomData<&'string ByteStringObject>,
 }
@@ -428,7 +430,7 @@ impl<'string> Iterator for Chunks<'string> {
     type Item = &'string [u8];
 
     fn next(&mut self) -> Option<&'string [u8]> {
-        while let Some(node) = self.stack.pop() {
+        while let Some(node) = self.current.take().or_else(|| self.stack.pop()) {
             // SAFETY: the live string owns this payload, and the VM serializes representation access.
             let node = unsafe { &*node };
             // SAFETY: the live string owns this payload, and the VM serializes representation access.
@@ -452,7 +454,7 @@ impl<'string> Iterator for Chunks<'string> {
                     let left: &ByteStringObject = left;
                     let right: &ByteStringObject = right;
                     self.stack.push(ptr::from_ref(right));
-                    self.stack.push(ptr::from_ref(left));
+                    self.current = Some(ptr::from_ref(left));
                 }
             }
         }
@@ -568,6 +570,44 @@ mod tests {
     use crate::value::string::short::ShortString;
 
     const CONTENT: &[u8] = b"0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn length_and_literal_mismatches_keep_rope_storage() {
+        use crate::bytecode::chunk::descriptors::TypeDescriptor;
+        use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
+        use crate::value::Value;
+
+        let heap = Heap::new();
+        let part = ByteStringObject::from_bytes(&heap, &[b'a'; 32]);
+        let rope = ByteStringObject::concat(&heap, &part, &part);
+        let value = Value::string(rope.clone());
+        assert_eq!(value.as_string_len(), Some(64));
+        for (descriptor, expected) in [
+            (
+                TypeDescriptor::StringLength {
+                    min: 64,
+                    max: Some(64),
+                },
+                true,
+            ),
+            (
+                TypeDescriptor::StringLength {
+                    min: 1,
+                    max: Some(63),
+                },
+                false,
+            ),
+            (TypeDescriptor::StringLiteral(heap.intern(b"")), false),
+        ] {
+            assert_eq!(
+                check_trivial_descriptor(&descriptor, &value),
+                Some(expected)
+            );
+            assert!(!rope.is_flat());
+        }
+        let matching = TypeDescriptor::StringLiteral(heap.intern(&[b'a'; 64]));
+        assert_eq!(check_trivial_descriptor(&matching, &value), Some(true));
+    }
 
     #[test]
     fn precomputed_hashes_match_each_heap_and_keep_the_uncached_fallback() {

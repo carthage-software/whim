@@ -103,17 +103,43 @@ impl VirtualMachine<'_> {
             TypeSpec::Float => value.is_float(),
             TypeSpec::String => value.is_string(),
             TypeSpec::StringLength(min, max) => value
-                .as_string_bytes()
-                .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
-            TypeSpec::StringLiteral(expected) => value
-                .as_string_bytes()
-                .is_some_and(|value| value == *expected),
+                .as_string_len()
+                .is_some_and(|length| string_length_matches(length, *min, *max)),
+            TypeSpec::StringLiteral(expected) => {
+                value.as_string_len() == Some(expected.len())
+                    && value
+                        .as_string_bytes()
+                        .is_some_and(|value| value == *expected)
+            }
             TypeSpec::Array => value.is_vec() || value.is_dict() || value.is_tuple(),
             TypeSpec::Vec => value.is_vec(),
             TypeSpec::Dict => value.is_dict(),
             TypeSpec::Tuple => value.is_tuple(),
             TypeSpec::Function => value.is_function(),
             TypeSpec::Object => value.is_object(),
+            TypeSpec::Optional(inner) => {
+                value.is_null() || Self::trivial_built_in_type_spec_accepts(inner, value)?
+            }
+            TypeSpec::Union(members) => {
+                for member in *members {
+                    if !matches!(member, TypeSpec::Void | TypeSpec::Never)
+                        && Self::trivial_built_in_type_spec_accepts(member, value)?
+                    {
+                        return Some(true);
+                    }
+                }
+                false
+            }
+            TypeSpec::VectorOf(_) => {
+                return value
+                    .as_vec()
+                    .map_or(Some(false), |vector| vector.is_empty().then_some(true));
+            }
+            TypeSpec::DictionaryOf(_, _) => {
+                return value.as_dict().map_or(Some(false), |dictionary| {
+                    dictionary.is_empty().then_some(true)
+                });
+            }
             _ => return None,
         })
     }
@@ -707,7 +733,7 @@ impl VirtualMachine<'_> {
             },
         };
         let outcome = (|| -> Result<Value, VirtualMachineControl> {
-            let environment = if type_arguments_bound {
+            let environment = if type_arguments_bound || callable.type_parameters().is_empty() {
                 outer_environment
             } else {
                 let parameters = built_in_type_parameters(&self.heap, callable.type_parameters());
@@ -735,7 +761,7 @@ impl VirtualMachine<'_> {
                     }
                 }
                 BuiltInCallable::Method { body, name } => {
-                    let rendered = name.to_string_lossy().into_owned();
+                    let rendered = name.to_string_lossy();
                     self.validate_built_in_arguments(
                         body.parameters,
                         &rendered,
@@ -744,14 +770,25 @@ impl VirtualMachine<'_> {
                         environment,
                     )?;
 
-                    let mut window = Vec::with_capacity(arguments.len() + 1);
-                    window.push(match this {
+                    let receiver = match this {
                         Some(instance) => Value::object(instance.clone()),
                         None => Value::null(),
-                    });
-
-                    window.extend(arguments.iter().cloned());
-                    self.dispatch_built_in(body.handler, &window, called_class, environment)
+                    };
+                    let mut local = [const { Value::uninitialized() }; 5];
+                    let mut allocated;
+                    let window = if arguments.len() < local.len() {
+                        local[0] = receiver;
+                        for (slot, value) in local[1..].iter_mut().zip(arguments) {
+                            *slot = value.clone();
+                        }
+                        &local[..arguments.len() + 1]
+                    } else {
+                        allocated = Vec::with_capacity(arguments.len() + 1);
+                        allocated.push(receiver);
+                        allocated.extend(arguments.iter().cloned());
+                        &allocated
+                    };
+                    self.dispatch_built_in(body.handler, window, called_class, environment)
                 }
             };
 

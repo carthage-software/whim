@@ -578,8 +578,8 @@ pub(crate) fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Valu
         TypeDescriptor::Float => value.is_float(),
         TypeDescriptor::String => value.is_string(),
         TypeDescriptor::StringLength { min, max } => value
-            .as_string_bytes()
-            .is_some_and(|value| string_length_matches(value.len(), *min, *max)),
+            .as_string_len()
+            .is_some_and(|length| string_length_matches(length, *min, *max)),
         TypeDescriptor::Object => value.is_object(),
         TypeDescriptor::ObjectShape {
             entries,
@@ -592,9 +592,12 @@ pub(crate) fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Valu
             min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
         }),
         TypeDescriptor::FloatLiteral(expected) => value.as_float() == Some(*expected),
-        TypeDescriptor::StringLiteral(expected) => value
-            .as_string_bytes()
-            .is_some_and(|string| string == expected.as_bytes()),
+        TypeDescriptor::StringLiteral(expected) => {
+            value.as_string_len() == Some(expected.as_bytes().len())
+                && value
+                    .as_string_bytes()
+                    .is_some_and(|string| string == expected.as_bytes())
+        }
         TypeDescriptor::Array(None) => value.is_vec() || value.is_dict() || value.is_tuple(),
         TypeDescriptor::Array(Some((key, element)))
             if matches!(key.as_ref(), TypeDescriptor::Wildcard)

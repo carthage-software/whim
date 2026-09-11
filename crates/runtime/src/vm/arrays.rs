@@ -247,7 +247,7 @@ pub(in crate::vm) fn array_length(value: &Value) -> Result<i64, ArrayFault> {
     match value.transparent() {
         ValueView::String(_) | ValueView::ShortString(_) => {
             // SAFETY: the value's tag proves this projection is valid.
-            Ok(unsafe { value.as_string_bytes().unwrap_unchecked().len() as i64 })
+            Ok(unsafe { value.as_string_len().unwrap_unchecked() as i64 })
         }
         ValueView::Vec(vec) => Ok(vec.len() as i64),
         ValueView::Dict(dict) => Ok(dict.len() as i64),

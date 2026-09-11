@@ -61,8 +61,8 @@ pub(crate) enum ValueKind {
     Bool,
     Int,
     Float,
-    String,
     ShortString,
+    String,
     Vec,
     Dict,
     Tuple,
@@ -73,6 +73,7 @@ pub(crate) enum ValueKind {
 
 union ValuePayload {
     raw: u64,
+    boxed: NonNull<HeapBox<()>>,
     boolean: bool,
     integer: i64,
     float: f64,
@@ -150,23 +151,16 @@ impl ValueView<'_> {
 
 impl Clone for Value {
     fn clone(&self) -> Self {
-        let mut value = match self.transparent_view() {
-            ValueView::Uninitialized => Self::uninitialized(),
-            ValueView::Null => Self::null(),
-            ValueView::Bool(value) => Self::bool(*value),
-            ValueView::Int(value) => Self::int(*value),
-            ValueView::Float(value) => Self::float(*value),
-            ValueView::String(value) => Self::string(value.clone()),
-            ValueView::ShortString(value) => Self::short_string(*value),
-            ValueView::Vec(value) => Self::vec(value.clone()),
-            ValueView::Dict(value) => Self::dict(value.clone()),
-            ValueView::Tuple(value) => Self::tuple(value.clone()),
-            ValueView::Function(value) => Self::function(value.clone()),
-            ValueView::Object(value) => Self::object(value.clone()),
-            ValueView::Iter(value) => Self::iterator(value.clone()),
-        };
-        value.newtype = self.newtype;
-        value
+        // SAFETY: a reference tag holds a live heap pointer; retaining it lets the value be copied.
+        unsafe {
+            if self.is_reference_counted() {
+                let header = self.payload.boxed.as_ref().header_ref();
+                if !header.is_immortal() {
+                    header.increment();
+                }
+            }
+            ptr::read(self)
+        }
     }
 }
 
@@ -174,20 +168,13 @@ impl Drop for Value {
     fn drop(&mut self) {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe {
-            match self.kind {
-                ValueKind::String => ManuallyDrop::drop(&mut self.payload.string),
-                ValueKind::Vec => ManuallyDrop::drop(&mut self.payload.vec),
-                ValueKind::Dict => ManuallyDrop::drop(&mut self.payload.dict),
-                ValueKind::Tuple => ManuallyDrop::drop(&mut self.payload.tuple),
-                ValueKind::Function => ManuallyDrop::drop(&mut self.payload.function),
-                ValueKind::Object => ManuallyDrop::drop(&mut self.payload.object),
-                ValueKind::Iter => ManuallyDrop::drop(&mut self.payload.iterator),
-                ValueKind::Uninitialized
-                | ValueKind::Null
-                | ValueKind::Bool
-                | ValueKind::Int
-                | ValueKind::Float
-                | ValueKind::ShortString => {}
+            if self.is_reference_counted() {
+                let boxed = self.payload.boxed;
+                let header = boxed.as_ref().header_ref();
+                if !header.is_immortal() {
+                    let heap = header.heap_ptr().cast::<Heap>().as_ref();
+                    heap.release_erased(boxed);
+                }
             }
         }
     }
@@ -637,6 +624,16 @@ impl Value {
 
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe { self.payload.float }
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub(crate) fn as_string_len(&self) -> Option<usize> {
+        match self.transparent_view() {
+            ValueView::String(value) => Some(value.len()),
+            ValueView::ShortString(value) => Some(value.as_bytes().len()),
+            _ => None,
+        }
     }
 
     #[must_use]

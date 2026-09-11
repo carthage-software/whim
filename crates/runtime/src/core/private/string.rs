@@ -199,29 +199,41 @@ pub(crate) fn string_split<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
-    let string = arguments.string(0);
+    let haystack = arguments.bytes(0);
     let delimiter = arguments.bytes(1);
     let limit = arguments.int(2);
-    let source = FlatStringSlices::new(&string);
-    let haystack = source.bytes();
-    if delimiter.is_empty() {
-        let whole = Value::string(string.clone());
-        return context.vec([whole]);
+    let mut positions = find_bytes_positions(haystack, delimiter).peekable();
+    if delimiter.is_empty() || limit == 1 || positions.peek().is_none() {
+        return context.vec([arguments.local(0).with_newtype(None)]);
     }
 
+    let string = (haystack.len() > ShortString::CAPACITY).then(|| arguments.string(0));
+    let source = string.as_ref().map(FlatStringSlices::new);
     let limit = string_index(limit);
     let mut parts: Vec<Value> = Vec::new();
     let mut start = 0usize;
-    for position in find_bytes_positions(haystack, delimiter) {
+    for position in positions {
         if limit != 0 && parts.len() + 1 == limit {
             break;
         }
 
-        parts.push(split_part(context, &source, start, position));
+        parts.push(split_part(
+            context,
+            source.as_ref(),
+            haystack,
+            start,
+            position,
+        ));
         start = position + delimiter.len();
     }
 
-    parts.push(split_part(context, &source, start, haystack.len()));
+    parts.push(split_part(
+        context,
+        source.as_ref(),
+        haystack,
+        start,
+        haystack.len(),
+    ));
     context.vec(parts)
 }
 
@@ -232,14 +244,20 @@ pub(crate) fn string_split<'call>(
 #[inline(always)]
 fn split_part(
     context: &Context<'_, '_, '_>,
-    source: &FlatStringSlices<'_>,
+    source: Option<&FlatStringSlices<'_>>,
+    bytes: &[u8],
     start: usize,
     end: usize,
 ) -> Value {
     if end - start <= ShortString::CAPACITY {
-        Value::short_string(split_short_part(&source.bytes()[start..end]))
+        let bytes = source.map_or(bytes, FlatStringSlices::bytes);
+        Value::short_string(split_short_part(&bytes[start..end]))
     } else {
-        Value::string(source.slice(context.vm.heap(), start, end - start))
+        Value::string(source.expect("a long split part has a heap string").slice(
+            context.vm.heap(),
+            start,
+            end - start,
+        ))
     }
 }
 
@@ -300,27 +318,32 @@ pub(crate) fn string_replace<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
-    let string = arguments.string(0);
     let needle = arguments.bytes(1);
     let replacement = arguments.bytes(2);
     let ci = arguments.bool(3);
-    let haystack = ByteStringObject::handle_bytes(&string);
+    let haystack = arguments.bytes(0);
     if needle.is_empty() {
-        return Value::string(string);
+        return arguments.local(0).with_newtype(None);
     }
 
-    let mut result = Vec::with_capacity(haystack.len());
+    let mut result = Vec::new();
     let mut start = 0usize;
     if ci {
         let folded_haystack = haystack.to_ascii_lowercase();
         let folded_needle = needle.to_ascii_lowercase();
         for position in find_bytes_positions(&folded_haystack, &folded_needle) {
+            if start == 0 {
+                result.reserve(haystack.len());
+            }
             result.extend_from_slice(&haystack[start..position]);
             result.extend_from_slice(replacement);
             start = position + needle.len();
         }
     } else {
         for position in find_bytes_positions(haystack, needle) {
+            if start == 0 {
+                result.reserve(haystack.len());
+            }
             result.extend_from_slice(&haystack[start..position]);
             result.extend_from_slice(replacement);
             start = position + needle.len();
@@ -328,7 +351,7 @@ pub(crate) fn string_replace<'call>(
     }
 
     if start == 0 {
-        return Value::string(string);
+        return arguments.local(0).with_newtype(None);
     }
 
     result.extend_from_slice(&haystack[start..]);
