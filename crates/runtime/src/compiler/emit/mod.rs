@@ -349,7 +349,6 @@ use crate::compiler::emit::analysis::collect_scoped_bindings_in_expression;
 use crate::compiler::emit::analysis::collect_scoped_bindings_in_statements;
 use crate::compiler::emit::analysis::collect_variables_in_expression;
 use crate::compiler::emit::analysis::collect_variables_in_statements;
-use crate::compiler::emit::analysis::references_this_in_block;
 use crate::compiler::emit::constructs::tuple_index;
 use crate::compiler::emit::expressions::operators::ShortCircuit;
 use crate::compiler::emit::expressions::operators::binary_instruction;

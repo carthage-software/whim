@@ -9,7 +9,7 @@ $boundedPair = Channel\bounded::<int>(2);
 $boundedSender = $boundedPair[0];
 $boundedReceiver = $boundedPair[1];
 assert!($boundedSender->getCapacity() == 2);
-Async\spawn::<int>(function() use ($boundedSender): int {
+Async\spawn::<int>(fn(): int {
   for ($i = 1; $i <= 5; $i = $i + 1) {
     $boundedSender->send($i);
   }
@@ -50,7 +50,7 @@ $tinyPair = Channel\bounded::<int>(1);
 $tinySender = $tinyPair[0];
 $tinyReceiver = $tinyPair[1];
 $tinySender->trySend(7);
-$assertion_value_7 = function() use ($tinySender): void {
+$assertion_value_7 = fn(): void {
   $tinySender->trySend(8);
 };
 
@@ -79,10 +79,7 @@ $preCancelledToken->cancel();
 $cancelledSendPair = Channel\bounded::<int>(1);
 $cancelledSender = $cancelledSendPair[0];
 $cancelledSender->trySend(1);
-$assertion_value_10 = function() use (
-  $cancelledSender,
-  $preCancelledToken,
-): void {
+$assertion_value_10 = fn(): void {
   $cancelledSender->send(2, $preCancelledToken);
 };
 
@@ -98,10 +95,7 @@ assert!($assertion_error_10 is CancelledException);
 assert!($cancelledSender->count() == 1);
 $cancelledReceivePair = Channel\bounded::<int>(1);
 $cancelledReceiver = $cancelledReceivePair[1];
-$assertion_value_12 = function() use (
-  $cancelledReceiver,
-  $preCancelledToken,
-): void {
+$assertion_value_12 = fn(): void {
   $cancelledReceiver->receive($preCancelledToken);
 };
 
@@ -169,7 +163,7 @@ $emptyWriter->close();
 $streamPair = IO\pipe();
 $streamReader = $streamPair[0];
 $streamWriter = $streamPair[1];
-Async\spawn::<int>(function() use ($streamWriter): int {
+Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(10));
   $streamWriter->writeAll('hello ');
   $streamWriter->writeAll('async ');
@@ -185,7 +179,7 @@ $copyPair = IO\pipe();
 $copySource = $copyPair[0];
 $copyDrain = $copyPair[1];
 $copySink = new IO\MemoryHandle();
-Async\spawn::<int>(function() use ($copyDrain): int {
+Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(10));
   $copyDrain->writeAll('copied via reactor');
   $copyDrain->close();

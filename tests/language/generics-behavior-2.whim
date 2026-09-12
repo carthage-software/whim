@@ -56,7 +56,7 @@ File\write(
 );
 
 $narrowedParameter = $work . '/narrowed-parameter.whim';
-$assertion_value_4 = function() use ($narrowedParameter): void {
+$assertion_value_4 = fn(): void {
   require!($narrowedParameter);
 };
 
@@ -84,7 +84,7 @@ File\write(
 );
 
 $widenedReturn = $work . '/widened-return.whim';
-$assertion_value_5 = function() use ($widenedReturn): void {
+$assertion_value_5 = fn(): void {
   require!($widenedReturn);
 };
 
@@ -112,7 +112,7 @@ File\write(
 );
 
 $wrongSpecialization = $work . '/wrong-specialization.whim';
-$assertion_value_6 = function() use ($wrongSpecialization): void {
+$assertion_value_6 = fn(): void {
   require!($wrongSpecialization);
 };
 
@@ -144,7 +144,7 @@ File\write(
 );
 
 $directSpecializations = $work . '/direct-specializations.whim';
-$assertion_value_7 = function() use ($directSpecializations): void {
+$assertion_value_7 = fn(): void {
   require!($directSpecializations);
 };
 
@@ -180,7 +180,7 @@ File\write(
 );
 
 $inheritedSpecializations = $work . '/inherited-specializations.whim';
-$assertion_value_8 = function() use ($inheritedSpecializations): void {
+$assertion_value_8 = fn(): void {
   require!($inheritedSpecializations);
 };
 
@@ -272,7 +272,7 @@ File\write(
 );
 
 $inheritanceBound = $work . '/inheritance-bound.whim';
-$assertion_value_20 = function() use ($inheritanceBound): void {
+$assertion_value_20 = fn(): void {
   require!($inheritanceBound);
 };
 
@@ -310,7 +310,7 @@ $deep[] = (2, dict['two' => 'wrong']);
 assert!(!($deep is Deep<int>));
 assert!(class_name('AliasBox<int>') == 'AliasBox<int>');
 assert!(class_name('IntAliasBox') == 'IntAliasBox');
-$assertion_value_25 = function(): void {
+$assertion_value_25 = fn(): void {
   class_name('StringAliasBox');
 };
 
@@ -323,7 +323,7 @@ try {
 
 assert!($assertion_error_25 is TypeError);
 
-$assertion_value_26 = function(): void {
+$assertion_value_26 = fn(): void {
   class_name('MissingAliasBox');
 };
 
@@ -336,7 +336,7 @@ try {
 
 assert!($assertion_error_26 is TypeError);
 
-$wide = function(mixed $value): int {
+$wide = fn(mixed $value): int {
   return 1;
 };
 
@@ -417,7 +417,7 @@ class ArityPair<A, B> {}
 class ArityBox<T> {}
 
 $arityPair = new ArityPair::<int, string>();
-$assertion_value_46 = function() use ($arityPair): void {
+$assertion_value_46 = fn(): void {
   $_ = $arityPair is ArityPair<_>;
 };
 
@@ -437,7 +437,7 @@ try {
 assert!($assertion_error_46 is TypeError);
 
 $arityBox = new ArityBox::<int>();
-$assertion_value_47 = function() use ($arityBox): void {
+$assertion_value_47 = fn(): void {
   $_ = $arityBox ?as ArityBox<string, string, int>;
 };
 

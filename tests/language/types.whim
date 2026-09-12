@@ -30,7 +30,7 @@ assert!(!($square is Shape));
 assert!(!($square is Missing));
 
 assert!(5 as int == 5);
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   $_ = 'text' as int;
 };
 

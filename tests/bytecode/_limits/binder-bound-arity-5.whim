@@ -1,2 +1,2 @@
 class Box<T> {}
-$f = function<U: Box<int, string>>(): void {};
+$f = fn<U: Box<int, string>>(): void {};

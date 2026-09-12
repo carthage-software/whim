@@ -78,7 +78,7 @@ assert!("\xFF" == "\377");
 assert!("\7\77\377" == "\x07\x3F\xFF");
 assert!("\x" == '\x');
 
-$assertion_value_6 = function(): void {
+$assertion_value_6 = fn(): void {
   require!('_syntax/invalid-float.whim');
 };
 
@@ -102,7 +102,7 @@ foreach (vec[1, 2] as $x) {
 
 assert!($total == 6);
 $caught = null;
-$assertion_callable_8 = function(): void {
+$assertion_callable_8 = fn(): void {
   throw new Error('boom');
 };
 

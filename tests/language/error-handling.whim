@@ -213,7 +213,7 @@ function finally_path(int $which, FinallyLog $log): string {
 $finallyLog = new FinallyLog();
 assert!(finally_path(1, $finallyLog) == 'normal completion');
 assert!(finally_path(2, $finallyLog) == 'after catch');
-$assertion_value_12 = function() use ($finallyLog): void {
+$assertion_value_12 = fn(): void {
   finally_path(3, $finallyLog);
 };
 
@@ -231,7 +231,7 @@ assert!($finallyLog->events == vec['finally', 'finally', 'finally']);
 class ReplacedError extends Error {}
 class ReplacementError extends Error {}
 
-$assertion_value_14 = function(): void {
+$assertion_value_14 = fn(): void {
   try {
     throw new ReplacedError('first', 0);
   } finally {
@@ -276,7 +276,7 @@ function invalid_empty_return(FinallyRunCounts $runs): int {
 }
 
 $counts = new FinallyRunCounts();
-$assertion_value_15 = function() use ($counts): void {
+$assertion_value_15 = fn(): void {
   invalid_return_value($counts);
 };
 
@@ -291,7 +291,7 @@ assert!($assertion_error_15 is TypeError);
 
 assert!($counts->inner == 1);
 assert!($counts->outer == 1);
-$assertion_value_18 = function() use ($counts): void {
+$assertion_value_18 = fn(): void {
   invalid_empty_return($counts);
 };
 

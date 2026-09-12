@@ -151,7 +151,7 @@ File\write(
   . "\n",
 );
 
-$assertion_value_1 = function() use ($redeclaration): void {
+$assertion_value_1 = fn(): void {
   require!($redeclaration);
 };
 
@@ -185,7 +185,7 @@ enum CloneableDirection {
   case South;
 }
 
-$assertion_value_3 = function(): void {
+$assertion_value_3 = fn(): void {
   $copy = clone!(CloneableDirection::North);
 };
 
@@ -290,7 +290,7 @@ enum Level: int {
 $level = Level::High;
 assert!($level->label() == 'high');
 assert!($level is Level);
-$assertion_value_34 = function(): void {
+$assertion_value_34 = fn(): void {
   $_ = new Direction();
 };
 

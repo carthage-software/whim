@@ -1,4 +1,4 @@
-$f = function<
+$f = fn<
   T = Box<
     A0,
     A1,

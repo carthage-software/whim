@@ -63,7 +63,7 @@ rejects(
   . "\n"
   . '#[ClassOnly]'
   . "\n"
-  . 'function (): void {};'
+  . 'fn (): void {};'
   . "\n",
   'does not target functions',
 );
@@ -236,7 +236,7 @@ function frameless_answer(): int {
 }
 
 $frameless_discarded = null;
-$assertion_callable_12 = function(): void {
+$assertion_callable_12 = fn(): void {
   frameless_answer();
 };
 
@@ -276,7 +276,7 @@ function must_use_answer(int $value = 42): int {
 }
 
 $answer_discarded = null;
-$assertion_callable_14 = function(): void {
+$assertion_callable_14 = fn(): void {
   must_use_answer();
 };
 
@@ -294,7 +294,7 @@ assert!(
 );
 
 $must_use_values = new MustUseValues();
-$assertion_value_16 = function() use ($must_use_values): void {
+$assertion_value_16 = fn(): void {
   $must_use_values->instance();
 };
 
@@ -307,7 +307,7 @@ try {
 
 assert!($assertion_error_16 is DiscardedResultError);
 
-$assertion_value_17 = function(): void {
+$assertion_value_17 = fn(): void {
   MustUseValues::staticValue();
 };
 
@@ -321,7 +321,7 @@ try {
 assert!($assertion_error_17 is DiscardedResultError);
 
 $answer_callable = must_use_answer(...);
-$assertion_value_18 = function() use ($answer_callable): void {
+$assertion_value_18 = fn(): void {
   $answer_callable();
 };
 
@@ -334,7 +334,7 @@ try {
 
 assert!($assertion_error_18 is DiscardedResultError);
 
-$assertion_value_19 = function() use ($answer_callable): void {
+$assertion_value_19 = fn(): void {
   $answer_callable(value: 7);
 };
 
@@ -349,7 +349,7 @@ assert!($assertion_error_19 is DiscardedResultError);
 
 $used_answer = must_use_answer();
 discard!(must_use_answer());
-$assertion_value_20 = function(): void {
+$assertion_value_20 = fn(): void {
   Whim\Vec\sort::<int>(vec[3, 1, 2]);
 };
 
@@ -370,7 +370,7 @@ discard!(sequence!(0, sequence!(must_use_answer())));
 foreach (vec[
   fn(): mixed => sequence!(must_use_answer(), null),
   fn(): mixed => discard!(sequence!(must_use_answer(), null)),
-  function(): void {
+  fn(): void {
     sequence!(0, sequence!(must_use_answer()));
   },
 ] as $sequence_attempt) {
@@ -398,7 +398,7 @@ function boundary_entry(): void {
 }
 
 $boundary_error = null;
-$assertion_callable_23 = function(): void {
+$assertion_callable_23 = fn(): void {
   boundary_entry();
 };
 

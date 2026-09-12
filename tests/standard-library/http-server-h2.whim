@@ -477,16 +477,16 @@ $requestClient->sendHeaders(
 $requestExchange = http_server_h2_exchange(
   $requestClient,
   new FunctionHandler(
-    function(
+    fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ) use ($state): Response {
+    ): Response {
       $state->calls++;
       $state->pushCapabilities[] = $context is Push;
       $state->bodies[] = $request->body?->readAll() ?? '';
       $state->trailers[] = $request->trailers?->await()->get('x-checksum');
-      $context->onResponseComplete(function() use ($state): void {
+      $context->onResponseComplete(fn(): void {
         $state->completed++;
       });
 
@@ -541,11 +541,11 @@ discard!(
   http_server_h2_exchange(
     $pushClient,
     new FunctionHandler(
-      function(
+      fn(
         Context $context,
         Request $request,
         CancellationToken $cancellation,
-      ) use ($pushState): Response {
+      ): Response {
         $pushState->pushCapabilities[] = $context is Push;
         return new Response(204);
       },
@@ -576,11 +576,11 @@ discard!(
   http_server_h2_exchange(
     $noPushClient,
     new FunctionHandler(
-      function(
+      fn(
         Context $context,
         Request $request,
         CancellationToken $cancellation,
-      ) use ($noPushState): Response {
+      ): Response {
         $noPushState->pushCapabilities[] = $context is Push;
         return new Response(204);
       },
@@ -647,11 +647,11 @@ $failingState = new HTTPServerH2ParityState();
 $failingExchange = http_server_h2_exchange(
   $failingClient,
   new FunctionHandler(
-    function(
+    fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ) use ($failingState): Response {
+    ): Response {
       $failingState->calls++;
       if ($request->requestTarget == '/fail') {
         return new Response(200, body: new HTTPServerH2FailingBody());
@@ -822,11 +822,11 @@ $pushLimitClient->sendHeaders(
 $pushLimitExchange = http_server_h2_exchange(
   $pushLimitClient,
   new FunctionHandler(
-    function(
+    fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ) use ($pushLimitState): Response {
+    ): Response {
       $pushLimitState->calls++;
       if ($request->requestTarget == '/' && $context is Push) {
         $url = URL::parse('https://example.com/pushed') as URL;

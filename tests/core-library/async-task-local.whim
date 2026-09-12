@@ -23,38 +23,32 @@ assert!($local->get() == null);
 $local->clear();
 
 $local->set('main');
-$first = Async\spawn::<vec<null|string>>(
-  function() use ($local): vec<null|string> {
-    $before = $local->get();
-    $local->set('first');
-    Async\later();
-    $after = $local->get();
-    return vec[$before, $after];
-  },
-);
+$first = Async\spawn::<vec<null|string>>(fn(): vec<null|string> {
+  $before = $local->get();
+  $local->set('first');
+  Async\later();
+  $after = $local->get();
+  return vec[$before, $after];
+});
 
-$second = Async\spawn::<vec<null|string>>(
-  function() use ($local): vec<null|string> {
-    $before = $local->get();
-    $local->set('second');
-    Async\later();
-    $after = $local->get();
-    $local->clear();
-    return vec[$before, $after, $local->get()];
-  },
-);
+$second = Async\spawn::<vec<null|string>>(fn(): vec<null|string> {
+  $before = $local->get();
+  $local->set('second');
+  Async\later();
+  $after = $local->get();
+  $local->clear();
+  return vec[$before, $after, $local->get()];
+});
 
 assert!($first->await() == vec[null, 'first']);
 assert!($second->await() == vec[null, 'second', null]);
 assert!($local->get() == 'main');
 
-$nested = Async\spawn::<vec<null|string>>(
-  function() use ($local): vec<null|string> {
-    $local->set('parent');
-    $child = Async\spawn::<null|string>(fn(): null|string => $local->get());
-    return vec[$local->get(), $child->await(), $local->get()];
-  },
-);
+$nested = Async\spawn::<vec<null|string>>(fn(): vec<null|string> {
+  $local->set('parent');
+  $child = Async\spawn::<null|string>(fn(): null|string => $local->get());
+  return vec[$local->get(), $child->await(), $local->get()];
+});
 
 assert!($nested->await() == vec['parent', null, 'parent']);
 
@@ -69,12 +63,10 @@ assert!($rejectedNull);
 assert!($local->get() == 'main');
 
 $payloadStorage = new TaskLocal::<TaskLocalPayload>();
-$weak = Async\spawn::<Weak<TaskLocalPayload>>(
-  function() use ($payloadStorage): Weak<TaskLocalPayload> {
-    $payload = new TaskLocalPayload();
-    $payloadStorage->set($payload);
-    return new Weak::<TaskLocalPayload>($payload);
-  },
-)->await();
+$weak = Async\spawn::<Weak<TaskLocalPayload>>(fn(): Weak<TaskLocalPayload> {
+  $payload = new TaskLocalPayload();
+  $payloadStorage->set($payload);
+  return new Weak::<TaskLocalPayload>($payload);
+})->await();
 
 assert!($weak->get() == null);

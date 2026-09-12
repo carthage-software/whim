@@ -294,7 +294,7 @@ try {
 
 assert!($assertion_error_59 is TypeError);
 
-$assertion_value_60 = function(): void {
+$assertion_value_60 = fn(): void {
   $parts = new Parser('limit', maximumPartSize: 3)->parse(
     new MemoryHandle("--limit\r\n\r\nfour\r\n--limit--\r\n"),
   );
@@ -311,7 +311,7 @@ try {
 
 assert!($assertion_error_60 is MultiPartException);
 
-$assertion_value_61 = function(): void {
+$assertion_value_61 = fn(): void {
   $parts = new Parser('limit', maximumParts: 1)->parse(
     new MemoryHandle(
       "--limit\r\n\r\none\r\n" . "--limit\r\n\r\ntwo\r\n" . "--limit--\r\n",
@@ -331,7 +331,7 @@ try {
 
 assert!($assertion_error_61 is MultiPartException);
 
-$assertion_value_62 = function(): void {
+$assertion_value_62 = fn(): void {
   $parts = new Parser('missing')->parse(
     new MemoryHandle("--missing\r\n\r\nbody"),
   );
@@ -348,7 +348,7 @@ try {
 
 assert!($assertion_error_62 is MultiPartException);
 
-$assertion_value_63 = function(): void {
+$assertion_value_63 = fn(): void {
   $parts = new Parser('headers', maximumHeaderSize: 8)->parse(
     new MemoryHandle(
       "--headers\r\nX-Header: too-large\r\n\r\nbody\r\n--headers--\r\n",

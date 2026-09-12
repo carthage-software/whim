@@ -6,7 +6,7 @@ class SnapshotPayload {
   public function __construct(public string $name) {}
 }
 
-$capture = function(
+$capture = fn(
   SnapshotId $id,
   vec<int> $values,
   SnapshotPayload $payload,

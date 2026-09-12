@@ -1,11 +1,10 @@
 # Closures
 
-A callable is a closure, short closure, first-class function, bound method, or
-partial call.
+A closure is an anonymous function you can save in a variable or pass as arguments to other functions. You can create the closure in one place and then call the closure elsewhere to evaluate it in a different context. Unlike functions, closures can capture values from the scope in which they’re defined.
 
-## Short closures
+## Bodies
 
-A short closure uses `fn`. This is the preferred closure syntax:
+A closure uses `fn`:
 
 ```whim
 $double = fn(int $value): int {
@@ -15,10 +14,10 @@ $double = fn(int $value): int {
 assert!($double(21) == 42);
 ```
 
-Like a named function, a short closure may have type parameters, typed
+Like a named function, a closure may have type parameters, typed
 parameters, defaults, a return type, attributes, and a block body.
 
-A short closure may also have an expression body:
+A closure may also have an expression body:
 
 ```whim
 $factor = 3;
@@ -31,16 +30,15 @@ A block body may contain any statements. It does not return its last
 expression. Use `return` to return a value. A block body may declare `void`;
 an expression body may not.
 
-A short closure captures each outer variable that its body uses. Capture is by
-value at creation time. Parameters are not captures.
+## Captures
 
-## Explicit captures
-
-A long closure uses `function` and lists outer variables in `use`:
+A closure captures each outer variable that its body uses. Capture is by
+value at creation time. Parameters and locals assigned before use are not
+captures.
 
 ```whim
 $offset = 10;
-$add = function(int $value) use ($offset): int {
+$add = fn(int $value): int {
   return $value + $offset;
 };
 
@@ -54,13 +52,9 @@ local.
 Objects keep identity when copied, so a captured object still sees later
 property changes.
 
-Use a long closure when the explicit capture list helps the reader. Prefer
-`fn` otherwise.
-
 ## `$this`
 
-A closure or short closure made in an instance method may use `$this` without
-listing it in `use`:
+A closure made in an instance method may use `$this`:
 
 ```whim
 final class Counter {

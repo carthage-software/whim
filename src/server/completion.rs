@@ -66,12 +66,12 @@ const SNIPPETS: &[Snippet] = &[
     },
     Snippet {
         label: "closure",
-        detail: "closure with captures",
-        text: "function (${1}) use (\\$${2:captured}): ${3:void} {\n\t$0\n}",
+        detail: "block closure",
+        text: "fn(${1}): ${2:void} {\n\t$0\n}",
     },
     Snippet {
         label: "fn",
-        detail: "short closure",
+        detail: "expression closure",
         text: "fn(${1}): ${2:mixed} => $0",
     },
     Snippet {

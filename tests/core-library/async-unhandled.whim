@@ -7,7 +7,7 @@ use Whim\File;
 use Whim\Filesystem;
 use Whim\Unwind\RuntimeException;
 
-$awaited = Async\spawn::<int>(function(): int {
+$awaited = Async\spawn::<int>(fn(): int {
   throw new RuntimeException('observed by await');
 });
 
@@ -24,13 +24,13 @@ try {
 
 assert!($assertion_error_1 is RuntimeException);
 
-$suppressed = Async\spawn::<int>(function(): int {
+$suppressed = Async\spawn::<int>(fn(): int {
   throw new RuntimeException('suppressed');
 });
 
 $suppressed->ignore();
 
-$late = Async\spawn::<int>(function(): int {
+$late = Async\spawn::<int>(fn(): int {
   throw new RuntimeException('observed late');
 });
 
@@ -53,7 +53,7 @@ Async\drain();
 $unobservedDeferred = new Async\Deferred::<int>();
 $unobservedDeferred->error(new RuntimeException('unobserved'));
 $unhandledError = null;
-$assertion_callable_3 = function(): void {
+$assertion_callable_3 = fn(): void {
   Async\drain();
 };
 
@@ -72,34 +72,30 @@ assert!($unobservedCause->getMessage() == 'unobserved');
 
 $releaseGate = new Async\Deferred::<null>();
 $staleAwaitToken = new Async\SignalCancellationToken();
-$failingSource = Async\spawn::<int>(function() use ($releaseGate): int {
+$failingSource = Async\spawn::<int>(fn(): int {
   $releaseGate->getFuture()->await();
   throw new RuntimeException('source failed');
 });
 
-$cancelledWaiter = Async\spawn::<null>(
-  function() use ($failingSource, $staleAwaitToken): null {
-    try {
-      $failingSource->await($staleAwaitToken);
-    } catch (CancelledException $_) {
-    }
+$cancelledWaiter = Async\spawn::<null>(fn(): null {
+  try {
+    $failingSource->await($staleAwaitToken);
+  } catch (CancelledException $_) {
+  }
 
-    return null;
-  },
-);
+  return null;
+});
 
 $cancelledWaiter->ignore();
-$canceller = Async\spawn::<null>(
-  function() use ($releaseGate, $staleAwaitToken): null {
-    Async\later();
-    $staleAwaitToken->cancel();
-    $releaseGate->complete(null);
-    return null;
-  },
-);
+$canceller = Async\spawn::<null>(fn(): null {
+  Async\later();
+  $staleAwaitToken->cancel();
+  $releaseGate->complete(null);
+  return null;
+});
 
 $canceller->ignore();
-$assertion_value_6 = function(): void {
+$assertion_value_6 = fn(): void {
   Async\drain();
 };
 
@@ -145,7 +141,7 @@ File\write(
   $surfacing,
   'write_line!(\'spawning\');'
   . "\n"
-  . '$unobserved = Whim\Async\spawn::<int>(function (): int {'
+  . '$unobserved = Whim\Async\spawn::<int>(fn (): int {'
   . "\n"
   . '    throw new Whim\Unwind\RuntimeException(\'nobody is watching\');'
   . "\n"

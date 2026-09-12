@@ -30,7 +30,7 @@ assert!(Ordering::Less->then(Ordering::Greater) == Ordering::Less);
 assert!(Ordering::Equal->then(Ordering::Greater) == Ordering::Greater);
 
 $evaluated = false;
-assert!(Ordering::Less->thenWith(function() use ($evaluated): Ordering {
+assert!(Ordering::Less->thenWith(fn(): Ordering {
   $evaluated = true;
   return Ordering::Greater;
 }) == Ordering::Less);

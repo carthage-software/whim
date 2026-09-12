@@ -61,7 +61,7 @@ $proxy = new Client\ProxyConfiguration(
   authorization: 'Basic cHJveHk6c2VjcmV0',
 );
 
-$server = Async\spawn::<string>(function() use ($listener): string {
+$server = Async\spawn::<string>(fn(): string {
   $stream = $listener->accept();
   $reader = new Reader($stream);
   $head = $reader->readUntilBounded("\r\n\r\n", 8192);
@@ -110,7 +110,7 @@ $proxy = new Client\ProxyConfiguration(
   authorization: 'Basic cHJveHk6c2VjcmV0',
 );
 
-$server = Async\spawn::<string>(function() use ($listener): string {
+$server = Async\spawn::<string>(fn(): string {
   $stream = $listener->accept();
   $reader = new Reader($stream);
   $head = $reader->readUntilBounded("\r\n\r\n", 8192);
@@ -155,7 +155,7 @@ $proxy = new Client\ProxyConfiguration(
   authorization: 'Bearer tunnel-token',
 );
 
-$server = Async\spawn::<string>(function() use ($listener): string {
+$server = Async\spawn::<string>(fn(): string {
   $stream = $listener->accept();
   $reader = new Reader($stream);
   $head = $reader->readUntilBounded("\r\n\r\n", 8192);
@@ -276,7 +276,7 @@ $proxy = new Client\ProxyConfiguration(
   URL::from('http://' . $proxyEndpoint->toString()),
 );
 
-$server = Async\spawn::<null>(function() use ($listener): null {
+$server = Async\spawn::<null>(fn(): null {
   $stream = $listener->accept();
   $reader = new Reader($stream);
   discard!($reader->readUntilBounded("\r\n\r\n", 8192));
@@ -289,7 +289,7 @@ $server = Async\spawn::<null>(function() use ($listener): null {
 });
 
 $stream = TCP\connect($proxyEndpoint->address, $proxyEndpoint->port);
-$assertion_value_9 = function() use ($stream, $proxy): void {
+$assertion_value_9 = fn(): void {
   Client\_Private\establish_tunnel(
     $stream,
     Client\Origin::fromURL(URL::from('https://example.com/')),

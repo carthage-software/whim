@@ -1,17 +1,15 @@
-//! Function-like constructs: functions, closures, and short closures.
+//! Function-like constructs: functions and closures.
 
 use crate::arena::Arena;
 
 use crate::cst::declaration::AttributeList;
 use crate::cst::function::Closure;
-use crate::cst::function::ClosureUseClause;
+use crate::cst::function::ClosureBody;
 use crate::cst::function::Function;
 use crate::cst::function::Parameter;
 use crate::cst::function::ParameterDefault;
 use crate::cst::function::ParameterList;
 use crate::cst::function::ReturnType;
-use crate::cst::function::ShortClosure;
-use crate::cst::function::ShortClosureBody;
 use crate::error::Expected;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -59,38 +57,6 @@ where
         &mut self,
         attribute_lists: &'arena [AttributeList<'arena>],
     ) -> Result<Closure<'arena>, ParseError> {
-        let function = self.expect_keyword(TokenKind::Function)?;
-        let type_parameters = self.parse_optional_type_parameter_list()?;
-        let parameter_list = self.parse_parameter_list()?;
-        let use_clause = if self.is_at(TokenKind::Use)? {
-            Some(self.parse_closure_use_clause()?)
-        } else {
-            None
-        };
-        let return_type = self.parse_return_type()?;
-        let body = self.parse_block()?;
-
-        Ok(Closure {
-            attribute_lists,
-            function,
-            type_parameters,
-            parameter_list,
-            use_clause,
-            return_type,
-            body,
-        })
-    }
-
-    pub(crate) fn parse_short_closure(&mut self) -> Result<ShortClosure<'arena>, ParseError> {
-        let attribute_lists = self.empty_slice();
-
-        self.parse_short_closure_with(attribute_lists)
-    }
-
-    pub(crate) fn parse_short_closure_with(
-        &mut self,
-        attribute_lists: &'arena [AttributeList<'arena>],
-    ) -> Result<ShortClosure<'arena>, ParseError> {
         let r#fn = self.expect_keyword(TokenKind::Fn)?;
         let type_parameters = self.parse_optional_type_parameter_list()?;
         let parameter_list = self.parse_parameter_list()?;
@@ -100,40 +66,23 @@ where
                 let arrow = self.expect_span(TokenKind::EqualGreaterThan)?;
                 let expression = self.parse_expression_ref()?;
 
-                ShortClosureBody::Expression { arrow, expression }
+                ClosureBody::Expression { arrow, expression }
             }
-            Some(TokenKind::LeftBrace) => ShortClosureBody::Block(self.parse_block()?),
+            Some(TokenKind::LeftBrace) => ClosureBody::Block(self.parse_block()?),
             _ => {
                 return Err(self.unexpected(Expected::Description(
-                    "`=>` or a block after a short closure signature",
+                    "`=>` or a block after a closure signature",
                 )));
             }
         };
 
-        Ok(ShortClosure {
+        Ok(Closure {
             attribute_lists,
             r#fn,
             type_parameters,
             parameter_list,
             return_type,
             body,
-        })
-    }
-
-    fn parse_closure_use_clause(&mut self) -> Result<ClosureUseClause<'arena>, ParseError> {
-        let r#use = self.expect_keyword(TokenKind::Use)?;
-        let left_parenthesis = self.expect_span(TokenKind::LeftParenthesis)?;
-
-        let variables =
-            self.parse_comma_separated_until(TokenKind::RightParenthesis, Self::parse_variable)?;
-
-        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
-
-        Ok(ClosureUseClause {
-            r#use,
-            left_parenthesis,
-            variables,
-            right_parenthesis,
         })
     }
 

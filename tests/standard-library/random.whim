@@ -67,7 +67,7 @@ $secure = Whim\RandomSequence\SecureSequence::default();
 assert!($secure is Whim\RandomSequence\Sequence);
 assert!($secure->next() is int);
 
-$assertion_value_16 = function(): void {
+$assertion_value_16 = fn(): void {
   Whim\RandomSequence\SecureSequence::default();
 };
 

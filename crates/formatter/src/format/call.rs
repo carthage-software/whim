@@ -1,5 +1,4 @@
-//! Formatting for calls, partial applications, arguments, closures, and short
-//! closures.
+//! Formatting for calls, partial applications, arguments, and closures.
 
 use whim_syn::arena::Arena;
 use whim_syn::cst::call::Argument;
@@ -7,9 +6,8 @@ use whim_syn::cst::call::PartialArgument;
 use whim_syn::cst::call::PartialArgumentList;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::function::Closure;
+use whim_syn::cst::function::ClosureBody;
 use whim_syn::cst::function::ParameterList;
-use whim_syn::cst::function::ShortClosure;
-use whim_syn::cst::function::ShortClosureBody;
 
 use crate::document::BreakMode;
 use crate::document::Document;
@@ -33,7 +31,7 @@ where
         }
     }
 
-    fn format_short_closure_return_value(
+    fn format_closure_return_value(
         &mut self,
         expression: &Expression<'arena>,
     ) -> Document<'arena, A> {
@@ -123,50 +121,6 @@ where
             Some(list) => f.format_type_parameter_list(list),
             None => f.empty(),
         };
-        let parameters = f.format_closure_parameters(&self.parameter_list);
-
-        let mut parts = f.vec();
-        parts.push(attributes);
-        parts.push(f.text("function"));
-        parts.push(type_parameters);
-        parts.push(parameters);
-
-        if let Some(use_clause) = &self.use_clause {
-            let variables = f.delimited(
-                "(",
-                use_clause.variables.as_slice(),
-                ")",
-                use_clause.right_parenthesis.start.offset,
-                false,
-            );
-            parts.push(f.text(" use "));
-            parts.push(variables);
-        }
-
-        if let Some(return_type) = &self.return_type {
-            let r#type = return_type.r#type.format(f);
-            parts.push(f.text(": "));
-            parts.push(r#type);
-        }
-
-        parts.push(f.space());
-        let body = self.body.format(f);
-        parts.push(body);
-
-        Document::Group(Group::new(parts))
-    }
-}
-
-impl<'arena, A> Format<'arena, A> for ShortClosure<'arena>
-where
-    A: Arena,
-{
-    fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
-        let attributes = f.attribute_lists_inline(self.attribute_lists);
-        let type_parameters = match &self.type_parameters {
-            Some(list) => f.format_type_parameter_list(list),
-            None => f.empty(),
-        };
 
         let parameters = f.format_closure_parameters(&self.parameter_list);
         let mut parts = f.vec();
@@ -181,12 +135,12 @@ where
         }
 
         match &self.body {
-            ShortClosureBody::Expression { expression, .. } => {
+            ClosureBody::Expression { expression, .. } => {
                 parts.push(f.text(" => "));
-                let value = f.format_short_closure_return_value(expression);
+                let value = f.format_closure_return_value(expression);
                 parts.push(value);
             }
-            ShortClosureBody::Block(block) => {
+            ClosureBody::Block(block) => {
                 parts.push(f.space());
                 parts.push(block.format(f));
             }

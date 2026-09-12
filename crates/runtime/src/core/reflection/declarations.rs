@@ -432,7 +432,6 @@ pub(crate) fn closure_dispatch(
         return Err(context.type_error("the reflected closure is no longer loaded"));
     };
     match operation {
-        Operation::IsShort => Ok(Value::bool(info.is_short_closure)),
         Operation::Captures => {
             let mut captures = Vec::with_capacity(info.capture_names.len());
             for position in 0..info.capture_names.len() {

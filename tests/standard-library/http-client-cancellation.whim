@@ -10,7 +10,7 @@ use Whim\Time\Duration;
 use Whim\URL\URL;
 
 $h2Server = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
-$h2ServerTask = Async\spawn::<null>(function() use ($h2Server): null {
+$h2ServerTask = Async\spawn::<null>(fn(): null {
   $stream = $h2Server->accept();
   $protocol = new H2\ServerConnection();
   $requests = 0;

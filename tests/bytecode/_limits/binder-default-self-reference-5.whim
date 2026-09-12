@@ -1,1 +1,1 @@
-$f = function<T = T>(): void {};
+$f = fn<T = T>(): void {};

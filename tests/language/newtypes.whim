@@ -27,7 +27,7 @@ assert!(!(Bar(1) is Foo));
 assert!(Foo(1) + Foo(2) == 3);
 assert!(Foo(3) << 1 == 6);
 assert!('x' . Foo(2) == 'x2');
-$assertion_value_12 = function(): void {
+$assertion_value_12 = fn(): void {
   take_foo(1);
 };
 
@@ -63,7 +63,7 @@ newtype Strict<T: int|string> = T;
 $work = Filesystem\create_temporary_directory(null, 'whim-test-');
 File\write($work . '/missing-type-argument.whim', 'Strict(1);' . "\n");
 $missingTypeArgument = $work . '/missing-type-argument.whim';
-$assertion_value_18 = function() use ($missingTypeArgument): void {
+$assertion_value_18 = fn(): void {
   require!($missingTypeArgument);
 };
 
@@ -82,7 +82,7 @@ try {
 
 assert!($assertion_error_18 is TypeError);
 
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   Strict::<float>(1.0);
 };
 
@@ -118,7 +118,7 @@ function invalid(Foo $value = 1): Foo {
   return $value;
 }
 
-$assertion_value_27 = function(): void {
+$assertion_value_27 = fn(): void {
   invalid();
 };
 
@@ -206,7 +206,7 @@ $mutated = Numbers(vec[1]);
 $mutated[] = 'changed';
 assert!(!($mutated is Numbers));
 assert!($mutated ?as Numbers == null);
-$assertion_value_45 = function() use ($mutated): void {
+$assertion_value_45 = fn(): void {
   take_numbers($mutated);
 };
 
@@ -246,7 +246,7 @@ File\write(
 );
 
 $aliasOnlyAttribute = $work . '/alias-only-attribute.whim';
-$assertion_value_48 = function() use ($aliasOnlyAttribute): void {
+$assertion_value_48 = fn(): void {
   require!($aliasOnlyAttribute);
 };
 
@@ -283,7 +283,7 @@ function invalid_generic_newtype_key_dictionary<T: int>(
   return $values;
 }
 
-$assertion_value_49 = function(): dict<NewtypeDictKey, string> {
+$assertion_value_49 = fn(): dict<NewtypeDictKey, string> {
   return invalid_newtype_key_dictionary();
 };
 
@@ -296,7 +296,7 @@ try {
 
 assert!($assertion_error_49 is TypeError);
 
-$assertion_value_50 = function(): dict<NewtypeDictKey, string> {
+$assertion_value_50 = fn(): dict<NewtypeDictKey, string> {
   return invalid_generic_newtype_key_dictionary::<NewtypeDictKey>(
     NewtypeDictKey(1),
   );

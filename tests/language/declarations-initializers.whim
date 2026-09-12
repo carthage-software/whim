@@ -102,11 +102,11 @@ final readonly class ObjectHolds {
 }
 
 const GLOBAL_BOX = new Box(1);
-const DOUBLE = function(int $value): int {
+const DOUBLE = fn(int $value): int {
   return $value * 2;
 };
 
-const SHORT_DOUBLE = fn(int $value): int => $value * 2;
+const EXPRESSION_DOUBLE = fn(int $value): int => $value * 2;
 const MAKE_READER = fn(int $value): fn(): int => fn(): int => $value;
 const MAKE_LOCAL_READER = fn(): fn(): int {
   $value = 42;
@@ -147,7 +147,7 @@ function object_defaults(
 assert!(GLOBAL_BOX->value == 1);
 $double = DOUBLE;
 assert!($double(4) == 8);
-assert!((SHORT_DOUBLE)(4) == 8);
+assert!((EXPRESSION_DOUBLE)(4) == 8);
 assert!((MAKE_READER)(42)() == 42);
 assert!((MAKE_LOCAL_READER)()() == 42);
 assert!(ObjectTarget::CLASS_BOX->value == 3);
@@ -184,7 +184,7 @@ File\write(
   $capturing,
   '$captured = 1;'
   . "\n\n"
-  . 'function invalid((fn(): int) $callback = function () use ($captured): int {'
+  . 'function invalid((fn(): int) $callback = fn (): int {'
   . "\n"
   . '  return $captured;'
   . "\n"
@@ -196,7 +196,7 @@ File\write(
   . "\n",
 );
 
-$assertion_value_27 = function() use ($capturing): void {
+$assertion_value_27 = fn(): void {
   require!($capturing);
 };
 
@@ -214,7 +214,7 @@ File\write(
   $this_,
   'final class Invalid {'
   . "\n"
-  . '  public function run((fn(): self) $callback = function (): self {'
+  . '  public function run((fn(): self) $callback = fn (): self {'
   . "\n"
   . '    return $this;'
   . "\n"
@@ -228,7 +228,7 @@ File\write(
   . "\n",
 );
 
-$assertion_value_28 = function() use ($this_): void {
+$assertion_value_28 = fn(): void {
   require!($this_);
 };
 
@@ -255,7 +255,7 @@ foreach (dict[
   'read-before-assignment' => 'const INVALID = fn(): int { $captured = $captured + 1; return $captured; };',
   'container' => 'const INVALID = vec[fn(): int => $captured];',
 ] as $name => $source) {
-  $path = $work . '/capturing-short-' . $name . '.whim';
+  $path = $work . '/capturing-' . $name . '.whim';
   File\write($path, '$captured = 1;' . $source);
   $error = null;
   try {
@@ -265,9 +265,7 @@ foreach (dict[
   }
 
   assert!($error is CompilerError);
-  assert!(
-    Whim\Str\contains($error->getMessage(), 'a short closure with captures'),
-  );
+  assert!(Whim\Str\contains($error->getMessage(), 'a closure with captures'));
 }
 
 $dynamic = $work . '/dynamic.whim';
@@ -281,7 +279,7 @@ File\write(
   . "\n",
 );
 
-$assertion_value_30 = function() use ($dynamic): void {
+$assertion_value_30 = fn(): void {
   require!($dynamic);
 };
 

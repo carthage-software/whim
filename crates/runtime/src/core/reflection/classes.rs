@@ -487,7 +487,6 @@ reflection_class! {
     ClosureReflection = "Whim\\Reflection\\Callable\\ClosureReflection"
     implements ["Whim\\Reflection\\Callable\\CallableReflection"]
     with [declaration, generic, callable_name, callable] {
-        is_short: "isShort(): bool" => IsShort;
         get_captures: "getCaptures(): vec<Whim\\Reflection\\Callable\\CaptureReflection>" => Captures;
     }
 }

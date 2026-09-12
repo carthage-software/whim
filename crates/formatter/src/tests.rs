@@ -230,14 +230,14 @@ fn a_multiline_closure_argument_does_not_add_an_invisible_indent() {
         concat!(
             "function run(): void {",
             "foreach ($values as $value) {",
-            "Async\\spawn::<null>(function(): null { return null; })->ignore();",
+            "Async\\spawn::<null>(fn(): null { return null; })->ignore();",
             "}",
             "}",
         ),
         concat!(
             "function run(): void {\n",
             "  foreach ($values as $value) {\n",
-            "    Async\\spawn::<null>(function(): null {\n",
+            "    Async\\spawn::<null>(fn(): null {\n",
             "      return null;\n",
             "    })->ignore();\n",
             "  }\n",
@@ -347,7 +347,7 @@ fn match_expression() {
 }
 
 #[test]
-fn closure_and_short_closure() {
+fn closures() {
     assert_formats("$f = fn($x)=>$x*2;\n", "$f = fn($x) => $x * 2;\n");
     assert_formats(
         "$f=fn(int $x):int{$result=$x*2;return $result;};",
@@ -359,24 +359,24 @@ fn closure_and_short_closure() {
         ),
     );
     assert_formats(
-        "$g = function ($x) use ($y): int { return $x + $y; };",
-        "$g = function($x) use ($y): int {\n  return $x + $y;\n};\n",
+        "$g = fn ($x): int { return $x + $y; };",
+        "$g = fn($x): int {\n  return $x + $y;\n};\n",
     );
     assert_formats(
-        "$f = function<T: Countable + Traversable> (): void {};",
-        "$f = function<T: Countable + Traversable>(): void {};\n",
+        "$f = fn<T: Countable + Traversable> (): void {};",
+        "$f = fn<T: Countable + Traversable>(): void {};\n",
     );
     assert_formats(
-        "$f=function():dict<string|int|bool,mixed>{return dict[];};",
+        "$f=fn():dict<string|int|bool,mixed>{return dict[];};",
         concat!(
-            "$f = function(): dict<string|int|bool, mixed> {\n",
+            "$f = fn(): dict<string|int|bool, mixed> {\n",
             "  return dict[];\n",
             "};\n",
         ),
     );
     assert_formats(
-        "$f = function (/* no parameters */): void {};",
-        "$f = function(/* no parameters */): void {};\n",
+        "$f = fn (/* no parameters */): void {};",
+        "$f = fn(/* no parameters */): void {};\n",
     );
 }
 
@@ -643,25 +643,23 @@ fn calls_break_arguments_before_short_member_chains() {
 }
 
 #[test]
-fn calls_hug_short_closures_without_changing_body_indentation() {
+fn calls_hug_closures_without_changing_body_indentation() {
     assert_formats(
-        "$id=$token->register(function () use ($weak):void {$linked=$weak->get();});",
+        "$id=$token->register(fn ():void {$linked=$weak->get();});",
         concat!(
-            "$id = $token->register(function() use ($weak): void {\n",
+            "$id = $token->register(fn(): void {\n",
             "  $linked = $weak->get();\n",
             "});\n",
         ),
     );
     assert_formats(
-        "final class Gate {public function wait():void{$id=$cancellation->register(function () use ($cancellation,$waiter):void {$waiter->active=false;});}}",
+        "final class Gate {public function wait():void{$id=$cancellation->register(fn ():void {$waiter->active=false;});}}",
         concat!(
             "final class Gate {\n",
             "  public function wait(): void {\n",
-            "    $id = $cancellation->register(\n",
-            "      function() use ($cancellation, $waiter): void {\n",
-            "        $waiter->active = false;\n",
-            "      },\n",
-            "    );\n",
+            "    $id = $cancellation->register(fn(): void {\n",
+            "      $waiter->active = false;\n",
+            "    });\n",
             "  }\n",
             "}\n",
         ),
@@ -904,7 +902,7 @@ fn long_call_breaks_arguments() {
 }
 
 #[test]
-fn expression_bodied_short_closure_with_return_type() {
+fn expression_bodied_closure_with_return_type() {
     assert_formats("$f = fn($x): int => $x;\n", "$f = fn($x): int => $x;\n");
     assert_idempotent("$f = fn() => (/* keep */ $x);");
     assert_formats(

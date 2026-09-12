@@ -15,7 +15,7 @@ raises(
 
 raises('_type-system-annotations/parent-without-parent.whim', 'has no parent');
 
-$assertion_value_1 = function(): void {
+$assertion_value_1 = fn(): void {
   require!('_type-system-annotations/literal_mismatch.whim');
 };
 
@@ -28,7 +28,7 @@ try {
 
 assert!($assertion_error_1 is CompilerError);
 
-$assertion_value_2 = function(): void {
+$assertion_value_2 = fn(): void {
   require!('_type-system-annotations/alias_literal_mismatch.whim');
 };
 
@@ -41,7 +41,7 @@ try {
 
 assert!($assertion_error_2 is CompilerError);
 
-$assertion_value_3 = function(): void {
+$assertion_value_3 = fn(): void {
   require!('_type-system-annotations/computed_mismatch.whim');
 };
 
@@ -54,7 +54,7 @@ try {
 
 assert!($assertion_error_3 is LinkerError);
 
-$assertion_value_4 = function(): void {
+$assertion_value_4 = fn(): void {
   require!('_type-system-annotations/float_backing.whim');
 };
 
@@ -67,7 +67,7 @@ try {
 
 assert!($assertion_error_4 is CompilerError);
 
-$assertion_value_5 = function(): void {
+$assertion_value_5 = fn(): void {
   require!('_type-system-annotations/literal_case_mismatch.whim');
 };
 
@@ -80,7 +80,7 @@ try {
 
 assert!($assertion_error_5 is CompilerError);
 
-$assertion_value_6 = function(): void {
+$assertion_value_6 = fn(): void {
   require!('_type-system-annotations/computed_case_mismatch.whim');
 };
 
@@ -93,7 +93,7 @@ try {
 
 assert!($assertion_error_6 is LinkerError);
 
-$assertion_value_7 = function(): void {
+$assertion_value_7 = fn(): void {
   require!('_type-system-annotations/void_gate.whim');
 };
 
@@ -106,7 +106,7 @@ try {
 
 assert!($assertion_error_7 is CompilerError);
 
-$assertion_value_8 = function(): void {
+$assertion_value_8 = fn(): void {
   require!('_type-system-annotations/never_gate.whim');
 };
 
@@ -190,7 +190,7 @@ class Holder {
 }
 
 $holder = new Holder();
-$assertion_value_18 = function() use ($holder): void {
+$assertion_value_18 = fn(): void {
   $holder->slot = 'text';
 };
 
@@ -203,7 +203,7 @@ try {
 
 assert!($assertion_error_18 is TypeError);
 
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   Holder::$shared = vec[1, 'text'];
 };
 
@@ -234,7 +234,7 @@ $dictionaryHolder->put(2, 20);
 $dictionaryHolder->put(1, 11);
 assert!($dictionaryHolder->values == dict[1 => 11, 2 => 20]);
 
-$assertion_value_22 = function() use ($dictionaryHolder): void {
+$assertion_value_22 = fn(): void {
   $dictionaryHolder->put(3, 'wrong');
 };
 
@@ -249,7 +249,7 @@ assert!($assertion_error_22 is TypeError);
 
 assert!($dictionaryHolder->values == dict[1 => 11, 2 => 20]);
 
-$assertion_value_24 = function() use ($dictionaryHolder): void {
+$assertion_value_24 = fn(): void {
   $dictionaryHolder->put('wrong', 30);
 };
 
@@ -276,7 +276,7 @@ $nestedHolder = new NestedDictionaryHolder(dict[1 => dict[1 => 10]]);
 $nestedHolder->put(1, 2, 20);
 assert!($nestedHolder->values == dict[1 => dict[1 => 10, 2 => 20]]);
 
-$assertion_value_27 = function() use ($nestedHolder): void {
+$assertion_value_27 = fn(): void {
   $nestedHolder->put(1, 3, false);
 };
 
@@ -314,7 +314,7 @@ class LiteralCounterBag {
 }
 
 $literalBag = new LiteralCounterBag();
-$assertion_value_31 = function() use ($literalBag): void {
+$assertion_value_31 = fn(): void {
   $literalBag->increment();
 };
 
@@ -338,7 +338,7 @@ readonly class ReadonlyCounterBag {
 }
 
 $readonlyBag = new ReadonlyCounterBag(dict[0 => 1]);
-$assertion_value_33 = function() use ($readonlyBag): void {
+$assertion_value_33 = fn(): void {
   $readonlyBag->increment(1);
 };
 
@@ -353,7 +353,7 @@ assert!($assertion_error_33 is OutOfBoundsError);
 
 assert!($readonlyBag->values == dict[0 => 1]);
 
-$assertion_value_35 = function() use ($readonlyBag): void {
+$assertion_value_35 = fn(): void {
   $readonlyBag->increment(0);
 };
 
@@ -402,7 +402,7 @@ class LiteralProperty {
 }
 
 $literalProperty = new LiteralProperty();
-$assertion_value_39 = function() use ($literalProperty): void {
+$assertion_value_39 = fn(): void {
   $literalProperty->increment();
 };
 
@@ -430,7 +430,7 @@ readonly class FixedProperty {
 }
 
 $fixedProperty = new FixedProperty(3);
-$assertion_value_41 = function() use ($fixedProperty): void {
+$assertion_value_41 = fn(): void {
   $fixedProperty->add('not numeric');
 };
 
@@ -445,7 +445,7 @@ assert!($assertion_error_41 is IncompatibleOperandsError);
 
 assert!($fixedProperty->value == 3);
 
-$assertion_value_43 = function() use ($fixedProperty): void {
+$assertion_value_43 = fn(): void {
   $fixedProperty->increment();
 };
 
@@ -469,7 +469,7 @@ class LateProperty {
 }
 
 $lateProperty = new LateProperty();
-$assertion_value_45 = function() use ($lateProperty): void {
+$assertion_value_45 = fn(): void {
   $lateProperty->increment();
 };
 

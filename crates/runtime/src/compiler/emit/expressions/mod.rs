@@ -111,7 +111,6 @@ impl BodyCompiler<'_, '_> {
             }
             Expression::Instantiation(instantiation) => self.instantiation(scope, instantiation),
             Expression::Closure(closure) => self.closure(scope, closure),
-            Expression::ShortClosure(closure) => self.short_closure(scope, closure),
             Expression::Match(matching) => self.matching(scope, matching),
             Expression::Throw(throw) => self.throw_expression(scope, throw),
             Expression::Break(r#break) => self.break_expression(scope, r#break),

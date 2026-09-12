@@ -24,7 +24,7 @@ use crate::cst::declaration::NamespaceBody;
 use crate::cst::declaration::UseItems;
 use crate::cst::expression::Expression;
 use crate::cst::expression::InterpolatedStringPart;
-use crate::cst::function::ShortClosureBody;
+use crate::cst::function::ClosureBody;
 use crate::cst::node::Node;
 use crate::cst::operation::AssignmentTarget;
 use crate::cst::operation::DestructureTarget;
@@ -367,29 +367,6 @@ impl Node<'_, '_> {
                 for list in node.attribute_lists {
                     f(Node::AttributeList(list));
                 }
-                f(Node::Keyword(&node.function));
-                if let Some(type_parameters) = &node.type_parameters {
-                    f(Node::TypeParameterList(type_parameters));
-                }
-                f(Node::ParameterList(&node.parameter_list));
-                if let Some(use_clause) = &node.use_clause {
-                    f(Node::ClosureUseClause(use_clause));
-                }
-                if let Some(return_type) = &node.return_type {
-                    f(Node::ReturnType(return_type));
-                }
-                f(Node::Block(&node.body));
-            }
-            Node::ClosureUseClause(node) => {
-                f(Node::Keyword(&node.r#use));
-                for variable in node.variables {
-                    f(Node::Variable(variable));
-                }
-            }
-            Node::ShortClosure(node) => {
-                for list in node.attribute_lists {
-                    f(Node::AttributeList(list));
-                }
                 f(Node::Keyword(&node.r#fn));
                 if let Some(type_parameters) = &node.type_parameters {
                     f(Node::TypeParameterList(type_parameters));
@@ -398,13 +375,13 @@ impl Node<'_, '_> {
                 if let Some(return_type) = &node.return_type {
                     f(Node::ReturnType(return_type));
                 }
-                f(Node::ShortClosureBody(&node.body));
+                f(Node::ClosureBody(&node.body));
             }
-            Node::ShortClosureBody(node) => match node {
-                ShortClosureBody::Expression { expression, .. } => {
+            Node::ClosureBody(node) => match node {
+                ClosureBody::Expression { expression, .. } => {
                     f(Node::Expression(expression));
                 }
-                ShortClosureBody::Block(block) => f(Node::Block(block)),
+                ClosureBody::Block(block) => f(Node::Block(block)),
             },
             Node::ParameterList(node) => {
                 for parameter in &node.parameters {
@@ -693,7 +670,6 @@ impl Node<'_, '_> {
                 Expression::Call(inner) => f(Node::Call(inner)),
                 Expression::PartialApplication(inner) => f(Node::PartialApplication(inner)),
                 Expression::Closure(inner) => f(Node::Closure(inner)),
-                Expression::ShortClosure(inner) => f(Node::ShortClosure(inner)),
                 Expression::Match(inner) => f(Node::Match(inner)),
                 Expression::Instantiation(inner) => f(Node::Instantiation(inner)),
                 Expression::Break(inner) => f(Node::Break(inner)),

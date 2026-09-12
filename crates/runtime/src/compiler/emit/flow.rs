@@ -173,7 +173,6 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for FinallyGates {
 
         match node {
             Node::Closure(_)
-            | Node::ShortClosure(_)
             | Node::Function(_)
             | Node::Class(_)
             | Node::Interface(_)

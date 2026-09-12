@@ -63,7 +63,7 @@ assert!($localClose->takeOutput() == "\x88\x05\x03\xe8bye");
 assert!(!$localClose->isClosed());
 
 $defaultClose = WebSocketCodec::server(1024, 1024);
-$closeDefault = function() use ($defaultClose): void {
+$closeDefault = fn(): void {
   $defaultClose->close();
 };
 
@@ -71,7 +71,7 @@ $closeDefault();
 assert!($defaultClose->takeOutput() == "\x88\x00");
 
 $defaultReason = WebSocketCodec::server(1024, 1024);
-$closeDefaultReason = function() use ($defaultReason): void {
+$closeDefaultReason = fn(): void {
   $defaultReason->close(1000);
 };
 

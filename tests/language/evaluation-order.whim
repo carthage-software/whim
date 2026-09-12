@@ -52,7 +52,7 @@ function assignment_receiver(
 
 $deferredWrites = new DeferredPropertyWrites();
 Trace::$events = vec[];
-$assertion_value_7 = function() use ($deferredWrites): void {
+$assertion_value_7 = fn(): void {
   assignment_receiver($deferredWrites)->indexed[tap('I', 0)] = tap('V', 1);
 };
 
@@ -68,7 +68,7 @@ assert!($assertion_error_7 is UninitializedPropertyError);
 assert!(Trace::$events == vec['O', 'I', 'V']);
 
 Trace::$events = vec[];
-$assertion_value_9 = function() use ($deferredWrites): void {
+$assertion_value_9 = fn(): void {
   assignment_receiver($deferredWrites)->appended[] = tap('V', 1);
 };
 
@@ -84,7 +84,7 @@ assert!($assertion_error_9 is UninitializedPropertyError);
 assert!(Trace::$events == vec['O', 'V']);
 
 Trace::$events = vec[];
-$assertion_value_11 = function() use ($deferredWrites): void {
+$assertion_value_11 = fn(): void {
   assignment_receiver($deferredWrites)->nested[tap('I1', 0)][tap(
     'I2',
     0,

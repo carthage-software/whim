@@ -37,7 +37,7 @@ assert!($products == vec[10, 20, 20, 40]);
 
 class Box {}
 
-$assertion_value_5 = function(): void {
+$assertion_value_5 = fn(): void {
   foreach (5 as $x) {
     $_ = $x;
   }
@@ -52,7 +52,7 @@ try {
 
 assert!($assertion_error_5 is TypeError);
 
-$assertion_value_6 = function(): void {
+$assertion_value_6 = fn(): void {
   foreach (new Box() as $x) {
     $_ = $x;
   }

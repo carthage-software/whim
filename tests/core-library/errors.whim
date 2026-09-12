@@ -44,7 +44,7 @@ function trace_outer(): void {
 }
 
 $traced = null;
-$assertion_callable_18 = function(): void {
+$assertion_callable_18 = fn(): void {
   trace_outer();
 };
 

@@ -11,12 +11,12 @@ final class AsyncEventRecorder {
   public vec<string> $events = vec[];
 }
 
-$laterTask = Async\spawn::<string>(function(): string {
+$laterTask = Async\spawn::<string>(fn(): string {
   Async\later();
   return 'a';
 });
 
-$immediateTask = Async\spawn::<string>(function(): string {
+$immediateTask = Async\spawn::<string>(fn(): string {
   return 'b';
 });
 
@@ -24,13 +24,13 @@ assert!($immediateTask->await() == 'b');
 assert!($laterTask->await() == 'a');
 
 $sleepOrder = new AsyncEventRecorder();
-$slowSleeper = Async\spawn::<string>(function() use ($sleepOrder): string {
+$slowSleeper = Async\spawn::<string>(fn(): string {
   Async\sleep(Duration::fromMilliseconds(30));
   $sleepOrder->events[] = 'slow';
   return 'slow';
 });
 
-$fastSleeper = Async\spawn::<string>(function() use ($sleepOrder): string {
+$fastSleeper = Async\spawn::<string>(fn(): string {
   Async\sleep(Duration::fromMilliseconds(5));
   $sleepOrder->events[] = 'fast';
   return 'fast';
@@ -40,7 +40,7 @@ assert!($fastSleeper->await() == 'fast');
 assert!($slowSleeper->await() == 'slow');
 assert!($sleepOrder->events == vec['fast', 'slow']);
 
-$nestedSum = Async\spawn::<int>(function(): int {
+$nestedSum = Async\spawn::<int>(fn(): int {
   $twenty = Async\spawn::<int>(fn(): int => 20);
   $twentyTwo = Async\spawn::<int>(fn(): int => 22);
   return $twenty->await() + $twentyTwo->await();
@@ -58,19 +58,19 @@ $completed->complete(7);
 assert!($completed->getFuture()->await() == 7);
 
 $drainLog = new MemoryHandle();
-Async\spawn::<int>(function() use ($drainLog): int {
+Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(20));
   $drainLog->writeAll('slow ');
   return 0;
 })->ignore();
 
-Async\spawn::<int>(function() use ($drainLog): int {
+Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(5));
   $drainLog->writeAll('quick ');
   return 0;
 })->ignore();
 
-Async\spawn::<int>(function() use ($drainLog): int {
+Async\spawn::<int>(fn(): int {
   $drainLog->writeAll('immediate ');
   return 0;
 })->ignore();
@@ -82,13 +82,13 @@ $drainLog->seek(0);
 assert!($drainLog->readAll() == 'immediate quick slow ');
 
 $demoStart = Instant::now();
-$squareFutures = dict[0 => Async\spawn::<int>(function(): int {
+$squareFutures = dict[0 => Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(20));
   return 1 * 1;
-}), 1 => Async\spawn::<int>(function(): int {
+}), 1 => Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(20));
   return 2 * 2;
-}), 2 => Async\spawn::<int>(function(): int {
+}), 2 => Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(20));
   return 3 * 3;
 })];
@@ -99,7 +99,7 @@ assert!($squares == dict[0 => 1, 1 => 4, 2 => 9]);
 $demoChannel = Channel\bounded::<string>(2);
 $demoSender = $demoChannel[0];
 $demoReceiver = $demoChannel[1];
-Async\spawn::<int>(function() use ($demoSender): int {
+Async\spawn::<int>(fn(): int {
   $demoSender->send('h');
   $demoSender->send('i');
   $demoSender->send('!');
@@ -123,7 +123,7 @@ assert!($demoStart->elapsed()->isPositive());
 $waitGroup = new Async\WaitGroup();
 for ($i = 0; $i < 3; $i = $i + 1) {
   $waitGroup->add();
-  Async\spawn::<int>(function() use ($waitGroup): int {
+  Async\spawn::<int>(fn(): int {
     Async\sleep(Duration::fromMilliseconds(15));
     $waitGroup->done();
     return 0;
@@ -134,7 +134,7 @@ assert!($waitGroup->getCount() == 3);
 $waitGroup->wait();
 assert!($waitGroup->getCount() == 0);
 
-$semaphore = new Async\Semaphore::<int, int>(2, function(int $value): int {
+$semaphore = new Async\Semaphore::<int, int>(2, fn(int $value): int {
   Async\sleep(Duration::fromMilliseconds(20));
   return $value * 10;
 });
@@ -152,14 +152,12 @@ assert!($thirdPermit->await() == 30);
 assert!($fourthPermit->await() == 40);
 
 $sequenceOrder = new AsyncEventRecorder();
-$sequence = new Async\Sequence::<int, int>(
-  function(int $value) use ($sequenceOrder): int {
-    $sequenceOrder->events[] = 'start ' . $value;
-    Async\sleep(Duration::fromMilliseconds(10));
-    $sequenceOrder->events[] = 'end ' . $value;
-    return $value;
-  },
-);
+$sequence = new Async\Sequence::<int, int>(fn(int $value): int {
+  $sequenceOrder->events[] = 'start ' . $value;
+  Async\sleep(Duration::fromMilliseconds(10));
+  $sequenceOrder->events[] = 'end ' . $value;
+  return $value;
+});
 
 $firstInLine = Async\spawn::<int>(fn(): int => $sequence->waitFor(1));
 $secondInLine = Async\spawn::<int>(fn(): int => $sequence->waitFor(2));
@@ -179,19 +177,19 @@ assert!(
 );
 
 $taskGroup = new Async\TaskGroup();
-$taskGroup->defer(function(): void {
+$taskGroup->defer(fn(): void {
   Async\sleep(Duration::fromMilliseconds(5));
 });
 
-$taskGroup->defer(function(): void {
+$taskGroup->defer(fn(): void {
   throw new RuntimeException('deferred failure');
 });
 
-$taskGroup->defer(function(): void {
+$taskGroup->defer(fn(): void {
   Async\sleep(Duration::fromMilliseconds(5));
 });
 
-$assertion_value_27 = function() use ($taskGroup): void {
+$assertion_value_27 = fn(): void {
   $taskGroup->awaitAll();
 };
 
@@ -211,10 +209,7 @@ $cancelledWaitGroup = new Async\WaitGroup();
 $cancelledWaitGroup->add();
 $cancelledToken = new Async\SignalCancellationToken();
 $cancelledToken->cancel();
-$assertion_value_28 = function() use (
-  $cancelledWaitGroup,
-  $cancelledToken,
-): void {
+$assertion_value_28 = fn(): void {
   $cancelledWaitGroup->wait($cancelledToken);
 };
 

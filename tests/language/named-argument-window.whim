@@ -2,7 +2,7 @@ use Whim\Unwind\ArgumentCountError;
 use Whim\Unwind\RuntimeException;
 use Whim\Unwind\TypeError;
 
-$combine = function(int $first, int $middle = 20, int $last = 30): int {
+$combine = fn(int $first, int $middle = 20, int $last = 30): int {
   return $first * 100 + $middle * 10 + $last;
 };
 
@@ -35,11 +35,11 @@ function invoke_reordered(fn(int, int): int $callable): int {
   );
 }
 
-$forward = function(int $first, int $last): int {
+$forward = fn(int $first, int $last): int {
   return $first * 10 + $last;
 };
 
-$reverse = function(int $last, int $first): int {
+$reverse = fn(int $last, int $first): int {
   return $first * 100 + $last;
 };
 
@@ -48,10 +48,7 @@ assert!(invoke_reordered($reverse) == 102);
 assert!(invoke_reordered($forward) == 12);
 
 $captured = vec[7, 8];
-$withCapture = function(
-  vec<int> $values,
-  int $extra = 9,
-) use ($captured): vec<int> {
+$withCapture = fn(vec<int> $values, int $extra = 9): vec<int> {
   $values[] = $captured[0];
   $values[] = $extra;
   return $values;
@@ -69,12 +66,12 @@ assert!($withCapture(values: $original) == vec[1, 2, 7, 9]);
 assert!($original == vec[1, 2]);
 assert!($captured == vec[7, 8]);
 
-$wideCapture = function(
+$wideCapture = fn(
   vec<int> $values,
   int $second = 2,
   int $third = 3,
   int $fourth = 4,
-) use ($captured): vec<int> {
+): vec<int> {
   $values[] = $captured[0];
   $values[] = $second;
   $values[] = $third;
@@ -91,13 +88,14 @@ for ($iteration = 0; $iteration < 20; $iteration++) {
       second: 8,
     ) == vec[1, 2, 7, 8, 9, 10],
   );
+
   assert!($wideCapture(values: $original) == vec[1, 2, 7, 2, 3, 4]);
 }
 
 assert!($original == vec[1, 2]);
 assert!($captured == vec[7, 8]);
 
-$generic = function<T>(T $first, T $last): T {
+$generic = fn<T>(T $first, T $last): T {
   return $first;
 };
 
@@ -159,10 +157,7 @@ class NamedWindowLifetime {
   }
 }
 
-$consume = function(
-  NamedWindowLifetime $first,
-  NamedWindowLifetime $last,
-): string {
+$consume = fn(NamedWindowLifetime $first, NamedWindowLifetime $last): string {
   return $first->name . $last->name;
 };
 
@@ -184,7 +179,7 @@ assert!(
 );
 
 NamedWindowLifetime::$events = vec[];
-$consumeThree = function(
+$consumeThree = fn(
   NamedWindowLifetime $first,
   NamedWindowLifetime $middle,
   NamedWindowLifetime $last,
@@ -197,8 +192,10 @@ assert!(
     last: new NamedWindowLifetime('last'),
     middle: new NamedWindowLifetime('middle'),
     first: new NamedWindowLifetime('first'),
-  ) == 'firstmiddlelast',
+  )
+  == 'firstmiddlelast',
 );
+
 assert!(
   NamedWindowLifetime::$events == vec[
     'create:last',
@@ -222,7 +219,7 @@ try {
 
 assert!($caught);
 
-$throwing = function(string $message, int $code = 0): never {
+$throwing = fn(string $message, int $code = 0): never {
   throw new RuntimeException($message, $code);
 };
 

@@ -278,7 +278,7 @@ assert!($fraction == 2.5);
 --$fraction;
 assert!($fraction == 1.5);
 
-$assertion_value_58 = function(): void {
+$assertion_value_58 = fn(): void {
   $letter = 'a';
   $letter++;
 };
@@ -292,7 +292,7 @@ try {
 
 assert!($assertion_error_58 is IncompatibleOperandsError);
 
-$assertion_value_59 = function(): void {
+$assertion_value_59 = fn(): void {
   $maximum = 9223372036854775807;
   $maximum++;
 };
@@ -306,7 +306,7 @@ try {
 
 assert!($assertion_error_59 is OverflowError);
 
-$assertion_value_60 = function(): void {
+$assertion_value_60 = fn(): void {
   $bottom = -9223372036854775807 - 1;
   $bottom--;
 };

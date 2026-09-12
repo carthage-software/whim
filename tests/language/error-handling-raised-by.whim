@@ -28,7 +28,7 @@ function needs_two(int $a, int $b): int {
   return $a + $b;
 }
 
-$assertion_value_1 = function(): void {
+$assertion_value_1 = fn(): void {
   needs_two(1);
 };
 
@@ -41,7 +41,7 @@ try {
 
 assert!($assertion_error_1 is ArgumentCountError);
 
-$assertion_value_2 = function(): void {
+$assertion_value_2 = fn(): void {
   needs_two(1, 2, 3);
 };
 
@@ -54,7 +54,7 @@ try {
 
 assert!($assertion_error_2 is ArgumentCountError);
 
-$assertion_value_3 = function(): void {
+$assertion_value_3 = fn(): void {
   needs_two(
     a: 1,
     ghost: 2,
@@ -70,7 +70,7 @@ try {
 
 assert!($assertion_error_3 is ArgumentCountError);
 
-$assertion_value_4 = function(): void {
+$assertion_value_4 = fn(): void {
   $x = 1 << 64;
 };
 
@@ -84,7 +84,7 @@ try {
 assert!($assertion_error_4 is ArithmeticError);
 
 $assertion = null;
-$assertion_callable_5 = function(): void {
+$assertion_callable_5 = fn(): void {
   assert!(false, 'invariant broken');
 };
 
@@ -104,7 +104,7 @@ assert!($assertion is AssertionError);
 
 assert!(Whim\Str\contains($assertion->getMessage(), 'invariant broken'));
 
-$assertion_value_7 = function(): void {
+$assertion_value_7 = fn(): void {
   $x = 1 / 0;
 };
 
@@ -117,7 +117,7 @@ try {
 
 assert!($assertion_error_7 is DivisionByZeroError);
 
-$assertion_value_8 = function(): void {
+$assertion_value_8 = fn(): void {
   $x = 1 % 0;
 };
 
@@ -130,7 +130,7 @@ try {
 
 assert!($assertion_error_8 is DivisionByZeroError);
 
-$assertion_value_9 = function(): void {
+$assertion_value_9 = fn(): void {
   $x = 1.0 / 0.0;
 };
 
@@ -143,7 +143,7 @@ try {
 
 assert!($assertion_error_9 is DivisionByZeroError);
 
-$assertion_value_10 = function(): void {
+$assertion_value_10 = fn(): void {
   $x = '5' + 5;
 };
 
@@ -156,7 +156,7 @@ try {
 
 assert!($assertion_error_10 is IncompatibleOperandsError);
 
-$assertion_value_11 = function(): void {
+$assertion_value_11 = fn(): void {
   $x = 'a' . true;
 };
 
@@ -169,7 +169,7 @@ try {
 
 assert!($assertion_error_11 is IncompatibleOperandsError);
 
-$assertion_value_12 = function(): void {
+$assertion_value_12 = fn(): void {
   $x = 1 < 'a';
 };
 
@@ -182,7 +182,7 @@ try {
 
 assert!($assertion_error_12 is IncompatibleOperandsError);
 
-$assertion_value_13 = function(): void {
+$assertion_value_13 = fn(): void {
   $x = vec[1] < vec[2];
 };
 
@@ -198,7 +198,7 @@ assert!($assertion_error_13 is IncompatibleOperandsError);
 abstract class GhostlyShape {}
 interface SpectralContract {}
 
-$assertion_value_14 = function(): void {
+$assertion_value_14 = fn(): void {
   $x = new GhostlyShape();
 };
 
@@ -211,7 +211,7 @@ try {
 
 assert!($assertion_error_14 is InstantiationError);
 
-$assertion_value_15 = function(): void {
+$assertion_value_15 = fn(): void {
   $x = new SpectralContract();
 };
 
@@ -224,7 +224,7 @@ try {
 
 assert!($assertion_error_15 is InstantiationError);
 
-$assertion_value_16 = function(): void {
+$assertion_value_16 = fn(): void {
   $x = vec[1][5];
 };
 
@@ -237,7 +237,7 @@ try {
 
 assert!($assertion_error_16 is OutOfBoundsError);
 
-$assertion_value_17 = function(): void {
+$assertion_value_17 = fn(): void {
   $x = dict['a' => 1]['b'];
 };
 
@@ -250,7 +250,7 @@ try {
 
 assert!($assertion_error_17 is OutOfBoundsError);
 
-$assertion_value_18 = function(): void {
+$assertion_value_18 = fn(): void {
   $x = 'abc'[9];
 };
 
@@ -263,7 +263,7 @@ try {
 
 assert!($assertion_error_18 is OutOfBoundsError);
 
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   $empty = vec[];
   remove_first!($empty);
 };
@@ -277,7 +277,7 @@ try {
 
 assert!($assertion_error_19 is OutOfBoundsError);
 
-$assertion_value_20 = function(): void {
+$assertion_value_20 = fn(): void {
   $x = 9223372036854775807 + 1;
 };
 
@@ -290,7 +290,7 @@ try {
 
 assert!($assertion_error_20 is OverflowError);
 
-$assertion_value_21 = function(): void {
+$assertion_value_21 = fn(): void {
   $x = (-9223372036854775807 - 1) - 1;
 };
 
@@ -308,7 +308,7 @@ class FixedCell {
 }
 
 $fixed = new FixedCell(1);
-$assertion_value_22 = function() use ($fixed): void {
+$assertion_value_22 = fn(): void {
   $fixed->n = 2;
 };
 
@@ -330,7 +330,7 @@ class WrittenTwice {
   }
 }
 
-$assertion_value_23 = function(): void {
+$assertion_value_23 = fn(): void {
   $x = new WrittenTwice();
 };
 
@@ -347,7 +347,7 @@ const TAKEN = 1;
 
 $taken = $work . '/taken.whim';
 File\write($taken, 'function TAKEN(): void {}' . "\n");
-$assertion_value_24 = function() use ($taken): void {
+$assertion_value_24 = fn(): void {
   require!($taken);
 };
 
@@ -361,7 +361,7 @@ try {
 assert!($assertion_error_24 is LinkerError);
 
 $nowhere = $work . '/nowhere.whim';
-$assertion_value_25 = function() use ($nowhere): void {
+$assertion_value_25 = fn(): void {
   require!($nowhere);
 };
 
@@ -385,7 +385,7 @@ function dive(int $n): int {
   return dive($n + 1);
 }
 
-$assertion_value_26 = function(): void {
+$assertion_value_26 = fn(): void {
   dive(0);
 };
 
@@ -398,7 +398,7 @@ try {
 
 assert!($assertion_error_26 is StackOverflowError);
 
-$assertion_value_27 = function(): void {
+$assertion_value_27 = fn(): void {
   if (1) {}
 };
 
@@ -411,7 +411,7 @@ try {
 
 assert!($assertion_error_27 is TypeError);
 
-$assertion_value_28 = function(): void {
+$assertion_value_28 = fn(): void {
   $x = 'a' as int;
 };
 
@@ -424,7 +424,7 @@ try {
 
 assert!($assertion_error_28 is TypeError);
 
-$assertion_value_29 = function(): void {
+$assertion_value_29 = fn(): void {
   $x = dict[][1.5];
 };
 
@@ -437,7 +437,7 @@ try {
 
 assert!($assertion_error_29 is TypeError);
 
-$assertion_value_30 = function(): void {
+$assertion_value_30 = fn(): void {
   $tuple = (1, 2);
   $tuple[0] = 9;
 };
@@ -451,7 +451,7 @@ try {
 
 assert!($assertion_error_30 is TypeError);
 
-$assertion_value_31 = function(): void {
+$assertion_value_31 = fn(): void {
   $letters = 'abc';
   $letters[0] = 'z';
 };
@@ -467,7 +467,7 @@ assert!($assertion_error_31 is TypeError);
 
 class BareShape {}
 
-$assertion_value_32 = function(): void {
+$assertion_value_32 = fn(): void {
   $x = new BareShape()->ghost;
 };
 
@@ -480,7 +480,7 @@ try {
 
 assert!($assertion_error_32 is TypeError);
 
-$assertion_value_33 = function(): void {
+$assertion_value_33 = fn(): void {
   throw 5;
 };
 
@@ -493,7 +493,7 @@ try {
 
 assert!($assertion_error_33 is TypeError);
 
-$assertion_value_34 = function(): void {
+$assertion_value_34 = fn(): void {
   $callable = 5;
   $callable();
 };
@@ -507,7 +507,7 @@ try {
 
 assert!($assertion_error_34 is TypeError);
 
-$assertion_value_35 = function(): void {
+$assertion_value_35 = fn(): void {
   Whim\Float\is_nan('x');
 };
 
@@ -520,7 +520,7 @@ try {
 
 assert!($assertion_error_35 is TypeError);
 
-$assertion_value_36 = function(): void {
+$assertion_value_36 = fn(): void {
   ghost();
 };
 
@@ -533,20 +533,16 @@ try {
 
 assert!($assertion_error_36 is UndefinedSymbolError);
 
-$assertion_value_37 = function(): void {
-  write_line!($neverAssigned);
-};
-
 $assertion_error_37 = null;
 try {
-  $assertion_value_37();
+  write_line!($neverAssigned);
 } catch (UndefinedVariableError $assertion_caught_37) {
   $assertion_error_37 = $assertion_caught_37;
 }
 
 assert!($assertion_error_37 is UndefinedVariableError);
 
-$assertion_value_38 = function(): void {
+$assertion_value_38 = fn(): void {
   $x = match (3) {
     1 => 'a',
   };
@@ -566,7 +562,7 @@ class LateSlot {
 }
 
 $late = new LateSlot();
-$assertion_value_39 = function() use ($late): void {
+$assertion_value_39 = fn(): void {
   $x = $late->slot;
 };
 
@@ -593,7 +589,7 @@ class SealedBox {
 
 $sealed = new SealedBox();
 assert!($sealed->reveal() == 3);
-$assertion_value_42 = function() use ($sealed): void {
+$assertion_value_42 = fn(): void {
   $x = $sealed->secret;
 };
 
@@ -606,7 +602,7 @@ try {
 
 assert!($assertion_error_42 is VisibilityError);
 
-$assertion_value_43 = function() use ($sealed): void {
+$assertion_value_43 = fn(): void {
   $x = $sealed->level;
 };
 

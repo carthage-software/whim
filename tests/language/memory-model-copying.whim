@@ -50,7 +50,7 @@ $alias = $shared;
 $alias->increment();
 assert!($shared->count() == 1);
 assert!($alias->count() == 1);
-$increment_through_capture = function() use ($shared): void {
+$increment_through_capture = fn(): void {
   $shared->increment();
 };
 

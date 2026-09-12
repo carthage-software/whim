@@ -160,7 +160,6 @@ where
             Expression::Variable(node) => node.format(f),
             Expression::Access(Access::Constant(node)) => f.text(node.name.value()),
             Expression::Closure(node) => node.format(f),
-            Expression::ShortClosure(node) => node.format(f),
             Expression::Match(node) => node.format(f),
             Expression::Instantiation(node) => node.format(f),
             Expression::Break(node) => node.format(f),

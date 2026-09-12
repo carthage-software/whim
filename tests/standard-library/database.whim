@@ -238,7 +238,7 @@ assert!($rows == vec[vec[1, 'one'], vec[2, 'two']]);
 $transactionConnection = new DatabaseTestConnection();
 $transactionResult = Database\transactional::<int>(
   $transactionConnection,
-  function(Transaction $transaction): int {
+  fn(Transaction $transaction): int {
     $result = $transaction->execute('UPDATE example SET value = $1', vec[1]);
     return $result->getAffectedRows() ?? 0;
   },

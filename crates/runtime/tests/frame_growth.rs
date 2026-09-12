@@ -116,7 +116,7 @@ function attempt_overflow(
     return false;
 }
 
-$callable = function(FrameGrowthArgument $argument, vec<int> $values, int $last): vec<int> {
+$callable = fn(FrameGrowthArgument $argument, vec<int> $values, int $last): vec<int> {
     $values[] = $argument->value;
     $values[] = $last;
     return $values;

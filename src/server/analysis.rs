@@ -185,7 +185,7 @@ pub(super) const fn is_name_token(kind: TokenKind) -> bool {
 const fn is_scope(kind: NodeKind) -> bool {
     matches!(
         kind,
-        NodeKind::Function | NodeKind::Method | NodeKind::ShortClosure | NodeKind::Closure
+        NodeKind::Function | NodeKind::Method | NodeKind::Closure
     )
 }
 

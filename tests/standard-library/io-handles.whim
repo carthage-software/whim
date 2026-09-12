@@ -177,7 +177,7 @@ assert!($fixedSource->tryRead() == 'abc');
 
 $copySource = new MemoryHandle('abc');
 $copyDestination = new MemoryHandle();
-$assertion_value_47 = function() use ($copySource, $copyDestination): void {
+$assertion_value_47 = fn(): void {
   Whim\IO\copy_chunked($copySource, $copyDestination, 0);
 };
 
@@ -450,7 +450,7 @@ assert!(FailingCloseReadHandle::$closes == 1);
 
 $writerAfterFailure = new CountingDuplexHandle();
 $readerFailure = null;
-$assertion_callable_99 = function() use ($writerAfterFailure): void {
+$assertion_callable_99 = fn(): void {
   new JoinedReadWriteHandle(
     new FailingCloseReadHandle(),
     $writerAfterFailure,
@@ -482,7 +482,7 @@ try {
 
 assert!($assertion_error_103 is IOException);
 
-$assertion_value_104 = function() use ($closed): void {
+$assertion_value_104 = fn(): void {
   $closed->waitUntilReadable();
 };
 
@@ -495,7 +495,7 @@ try {
 
 assert!($assertion_error_104 is IOException);
 
-$assertion_value_105 = function() use ($closed): void {
+$assertion_value_105 = fn(): void {
   $closed->waitUntilWritable();
 };
 

@@ -9,7 +9,7 @@ final class MicrotaskFlood {
   public int $iterations = 0;
 
   public function queue(): void {
-    _Private\queue_task(function() use ($this): void {
+    _Private\queue_task(fn(): void {
       $this->iterations++;
       if ($this->running) {
         $this->queue();
@@ -19,11 +19,11 @@ final class MicrotaskFlood {
 }
 
 $flood = new MicrotaskFlood();
-_Private\defer_task(function() use ($flood): void {
+_Private\defer_task(fn(): void {
   $flood->deferredRan = true;
 });
 
-_Private\delay_task(Duration::zero(), function() use ($flood): void {
+_Private\delay_task(Duration::zero(), fn(): void {
   $flood->timerRan = true;
   $flood->running = false;
 });
@@ -41,7 +41,7 @@ final class OrdinaryFlood {
   public int $iterations = 0;
 
   public function queue(): void {
-    _Private\defer_task(function() use ($this): void {
+    _Private\defer_task(fn(): void {
       $this->iterations++;
       if ($this->running) {
         $this->queue();
@@ -51,7 +51,7 @@ final class OrdinaryFlood {
 }
 
 $ordinary = new OrdinaryFlood();
-_Private\delay_task(Duration::zero(), function() use ($ordinary): void {
+_Private\delay_task(Duration::zero(), fn(): void {
   $ordinary->timerRan = true;
   $ordinary->running = false;
 });

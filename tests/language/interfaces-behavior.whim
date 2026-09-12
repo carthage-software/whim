@@ -16,7 +16,7 @@ $work = Filesystem\create_temporary_directory(null, 'whim-test-');
 
 $violation = $work . '/sealed-violation.whim';
 File\write($violation, 'class Y implements Other {}' . "\n");
-$assertion_value_2 = function() use ($violation): void {
+$assertion_value_2 = fn(): void {
   require!($violation);
 };
 

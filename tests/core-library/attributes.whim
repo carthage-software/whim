@@ -23,7 +23,7 @@ assert!(Attribute::TARGET_TYPE_ALIAS == 128);
 assert!(Attribute::TARGET_ALL == 959);
 assert!(Attribute::IS_REPEATABLE == 64);
 
-$assertion_value_27 = function(): void {
+$assertion_value_27 = fn(): void {
   new Whim\Marker\SensitiveParameterValue();
 };
 
@@ -46,7 +46,7 @@ function login(
 }
 
 $denied = null;
-$assertion_callable_29 = function(): void {
+$assertion_callable_29 = fn(): void {
   login('ada', 'hunter2');
 };
 

@@ -1,6 +1,6 @@
 namespace Limits\type_parameters_closure_at_limit;
 
-$f = function<
+$f = fn<
   T0,
   T1,
   T2,

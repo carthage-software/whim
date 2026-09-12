@@ -471,14 +471,13 @@ assert!(
 );
 
 $captured = 12;
-$closureValue = function(int $offset = 1) use ($captured): int {
+$closureValue = fn(int $offset = 1): int {
   return $captured + $offset;
 };
 
 $closure = Reflection\reflect_callable($closureValue);
 assert!($closure->getKind() == CallableKind::Closure);
 assert!($closure->getDeclaration() is Reflection\Callable\ClosureReflection);
-assert!(!$closure->getDeclaration()->isShort());
 assert!(length!($closure->getDeclaration()->getCaptures()) == 1);
 assert!($closure->getDeclaration()->getCaptures()[0]->getName() == 'captured');
 assert!($closure->getDeclaration()->getCaptures()[0]->getPosition() == 0);
@@ -488,11 +487,10 @@ assert!($closure->getCaptures()[0]->getCapture()->getName() == 'captured');
 assert!($closure->getCaptures()[0]->getType()->toString() == 'int');
 assert!($closure->getCaptures()[0]->getValue() == 12);
 
-$shortValue = fn(int $offset): int => $captured + $offset;
-$short = Reflection\reflect_callable($shortValue);
-assert!($short->getKind() == CallableKind::ShortClosure);
-assert!($short->getDeclaration()->isShort());
-assert!($short->getType()->toString() == 'fn(int): int');
+$expressionClosureValue = fn(int $offset): int => $captured + $offset;
+$expressionClosure = Reflection\reflect_callable($expressionClosureValue);
+assert!($expressionClosure->getKind() == CallableKind::Closure);
+assert!($expressionClosure->getType()->toString() == 'fn(int): int');
 
 $partial = Reflection\reflect_callable(describe('sum=', ?, 10));
 assert!($partial->getKind() == CallableKind::Partial);

@@ -33,7 +33,7 @@ const SEEDS: &[&str] = &[
     "try { throw new Failure('x', 0); } catch (Failure $e) { } finally { write!('done'); }",
     "enum Suit { case Hearts; case Spades; }",
     "$pair = (1, 'two'); $vector = vec[1, 2, 3]; $map = dict['k' => 1];",
-    "$double = function (int $n): int { return $n * 2; };",
+    "$double = fn (int $n): int { return $n * 2; };",
 ];
 
 const KEYWORDS: &[&str] = &[

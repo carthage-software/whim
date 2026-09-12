@@ -91,7 +91,7 @@ try {
   $staticBound = true;
 }
 
-$closure = function<T>(T $value): T {
+$closure = fn<T>(T $value): T {
   return $value;
 };
 
@@ -103,9 +103,9 @@ try {
   $closureMissing = true;
 }
 
-$shortClosure = fn<T = int>(T $value): T => $value;
-$shortClosureDefault = $shortClosure(2);
-$shortClosureString = $shortClosure::<string>('short closure');
+$expressionClosure = fn<T = int>(T $value): T => $value;
+$expressionClosureDefault = $expressionClosure(2);
+$expressionClosureString = $expressionClosure::<string>('expression closure');
 $bound = $closure::<int>(...);
 $boundResult = $bound(3);
 $respecialize = false;
@@ -121,8 +121,8 @@ assert!($methodMissing);
 assert!($staticBound);
 assert!($closureResult == 'closure');
 assert!($closureMissing);
-assert!($shortClosureDefault == 2);
-assert!($shortClosureString == 'short closure');
+assert!($expressionClosureDefault == 2);
+assert!($expressionClosureString == 'expression closure');
 assert!($boundResult == 3);
 assert!($respecialize);
 
@@ -203,7 +203,7 @@ $parent = $relative->asParent(4);
 assert!($self is RelativeBox<int>);
 assert!($static is RelativeChild<int>);
 assert!($parent is RelativeBox<int>);
-$assertion_value_33 = function() use ($relative): void {
+$assertion_value_33 = fn(): void {
   $relative->asStatic('bad');
 };
 
@@ -224,7 +224,7 @@ class LyingBox<T> {
   }
 }
 
-$assertion_value_34 = function(): void {
+$assertion_value_34 = fn(): void {
   new LyingBox::<int>(1)->lies();
 };
 
@@ -275,7 +275,7 @@ assert!($variant->replace(2) == 2);
 assert!($variant is VariantChild<int>);
 assert!($variant is VariantParent<int>);
 assert!(!($variant is VariantParent<string>));
-$assertion_value_39 = function() use ($variant): void {
+$assertion_value_39 = fn(): void {
   $variant->value = 'bad';
 };
 
@@ -288,7 +288,7 @@ try {
 
 assert!($assertion_error_39 is TypeError);
 
-$assertion_value_40 = function() use ($variant): void {
+$assertion_value_40 = fn(): void {
   $variant->replace('bad');
 };
 
@@ -301,7 +301,7 @@ try {
 
 assert!($assertion_error_40 is TypeError);
 
-$assertion_value_41 = function(): void {
+$assertion_value_41 = fn(): void {
   new VariantChild::<int>('bad');
 };
 
@@ -320,7 +320,7 @@ $sink = new ContravariantSink::<mixed>();
 assert!($sink is ContravariantSink<int>);
 $defaulted = new DefaultedBox();
 assert!($defaulted is DefaultedBox<int>);
-$assertion_value_45 = function(): void {
+$assertion_value_45 = fn(): void {
   instantiate::<BoundRestricted<BoundOther>>();
 };
 
@@ -340,7 +340,7 @@ File\write(
 );
 
 $brokenStatic = $work . '/broken-static-property.whim';
-$assertion_value_46 = function() use ($brokenStatic): void {
+$assertion_value_46 = fn(): void {
   require!($brokenStatic);
 };
 

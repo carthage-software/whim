@@ -38,40 +38,38 @@ function receive_client_frame(
 
 $listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
 $endpoint = $listener->getLocalEndpoint();
-$server = Async\spawn::<(string, string)>(
-  function() use ($listener): (string, string) {
-    $stream = $listener->accept();
-    $reader = new Reader($stream);
-    $head = $reader->readUntilBounded("\r\n\r\n", 8192) as string;
-    $parsed = http1_parse_request_head($head);
-    assert!($parsed is (_, _, _, _, _, _, _, _, _, _, _, _));
+$server = Async\spawn::<(string, string)>(fn(): (string, string) {
+  $stream = $listener->accept();
+  $reader = new Reader($stream);
+  $head = $reader->readUntilBounded("\r\n\r\n", 8192) as string;
+  $parsed = http1_parse_request_head($head);
+  assert!($parsed is (_, _, _, _, _, _, _, _, _, _, _, _));
 
-    $headers = FieldMap::fromPartsUnsafe($parsed[3], $parsed[4]);
-    $key = $headers->get('sec-websocket-key') as string;
-    $accept = websocket_accept_key($key) as string;
-    $stream->writeAll(
-      "HTTP/1.1 101 Switching Protocols\r\n"
-      . "Upgrade: websocket\r\n"
-      . "Connection: keep-alive, Upgrade\r\n"
-      . 'Sec-WebSocket-Accept: '
-      . $accept
-      . "\r\n"
-      . "Sec-WebSocket-Protocol: chat\r\n"
-      . "X-Server: Whim\r\n\r\n"
-      . "\x89\x01p"
-      . "\x81\x05hello",
-    );
+  $headers = FieldMap::fromPartsUnsafe($parsed[3], $parsed[4]);
+  $key = $headers->get('sec-websocket-key') as string;
+  $accept = websocket_accept_key($key) as string;
+  $stream->writeAll(
+    "HTTP/1.1 101 Switching Protocols\r\n"
+    . "Upgrade: websocket\r\n"
+    . "Connection: keep-alive, Upgrade\r\n"
+    . 'Sec-WebSocket-Accept: '
+    . $accept
+    . "\r\n"
+    . "Sec-WebSocket-Protocol: chat\r\n"
+    . "X-Server: Whim\r\n\r\n"
+    . "\x89\x01p"
+    . "\x81\x05hello",
+  );
 
-    $codec = WebSocketCodec::server(1024, 1024);
-    $codec->push($reader->tryRead());
-    $event = receive_client_frame($stream, $codec);
-    assert!($event == (2, "\x00\xff", 0));
+  $codec = WebSocketCodec::server(1024, 1024);
+  $codec->push($reader->tryRead());
+  $event = receive_client_frame($stream, $codec);
+  assert!($event == (2, "\x00\xff", 0));
 
-    $codec->close(1000, 'done');
-    $stream->writeAll($codec->takeOutput());
-    return ($head, $event[1]);
-  },
-);
+  $codec->close(1000, 'done');
+  $stream->writeAll($codec->takeOutput());
+  return ($head, $event[1]);
+});
 
 $url = URL::from('ws://127.0.0.1:' . $endpoint->port . '/chat?room=whim');
 $configuration = new Client\Configuration(
@@ -121,7 +119,7 @@ assert!(
 
 $listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
 $endpoint = $listener->getLocalEndpoint();
-$invalidServer = Async\spawn::<null>(function() use ($listener): null {
+$invalidServer = Async\spawn::<null>(fn(): null {
   $stream = $listener->accept();
   discard!(new Reader($stream)->readUntilBounded("\r\n\r\n", 8192));
   $stream->writeAll(

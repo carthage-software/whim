@@ -48,7 +48,7 @@ assert!($emptyDictionary is dict<int, string>);
 assert!($emptyDictionary is dict<string, int>);
 acceptsIntegers($emptyVector);
 acceptsStrings($emptyVector);
-$assertion_value_7 = function(): void {
+$assertion_value_7 = fn(): void {
   impossible(null);
 };
 
@@ -63,7 +63,7 @@ assert!($assertion_error_7 is TypeError);
 
 $bar = new Bar();
 assert!($bar is Foo<never>);
-$assertion_value_9 = function() use ($bar): void {
+$assertion_value_9 = fn(): void {
   $bar->bar();
 };
 
@@ -77,7 +77,7 @@ try {
 assert!($assertion_error_9 is SomeError);
 
 $failing = new FailingIntFoo();
-$assertion_value_10 = function() use ($failing): void {
+$assertion_value_10 = fn(): void {
   $failing->bar();
 };
 

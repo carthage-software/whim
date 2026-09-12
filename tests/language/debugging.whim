@@ -52,7 +52,7 @@ File\write(
   . "\n"
   . '$captured = "capture";'
   . "\n"
-  . 'debug!(function () use ($captured): string { return $captured; });'
+  . 'debug!(fn (): string { return $captured; });'
   . "\n"
   . '$items = vec[];'
   . "\n"

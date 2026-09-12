@@ -51,7 +51,7 @@ assert!(!('value' is Refine\Extract<string|int, int>));
 $predicate = fn(int $value): bool => $value > 0;
 $transform = fn(int $value): string => '' . $value;
 $reducer = fn(int $carry, int $value): int => $carry + $value;
-$consumer = function(int $_): void {};
+$consumer = fn(int $_): void {};
 $supplier = fn(): int => 1;
 $comparator = fn(
   int $left,

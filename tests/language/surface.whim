@@ -38,7 +38,7 @@ assert!(
 );
 
 assert!(Str\length('héllo') == 6);
-$assertion_value_9 = function(): void {
+$assertion_value_9 = fn(): void {
   $x = Math\INT_MAX + 1;
 };
 

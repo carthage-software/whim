@@ -43,7 +43,7 @@ final class ZeroKeyDictionary {
 }
 
 $zeroKeyed = new ZeroKeyDictionary();
-$assertion_value_6 = function() use ($zeroKeyed): void {
+$assertion_value_6 = fn(): void {
   $zeroKeyed->fill();
 };
 

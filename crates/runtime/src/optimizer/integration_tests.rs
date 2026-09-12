@@ -159,7 +159,8 @@ fn keeps_dead_writes_that_release_parameters_and_captures() {
         }
 
         function capture(mixed $value): fn(): void {
-            return function() use ($value): void {
+            return fn(): void {
+                discard!($value);
                 $value = null;
                 write_line!('done');
             };
@@ -2142,7 +2143,7 @@ fn interface_methods_with_omitted_defaults_elide_checks_inside_closures() {
         }
 
         function use_reader(Reader $reader): fn(): null {
-            return function () use ($reader): null {
+            return fn (): null {
                 $value = $reader->read();
                 $reader->write($value);
                 return null;

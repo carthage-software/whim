@@ -1,6 +1,6 @@
 namespace Limits\parameters_closure_at_limit;
 
-$f = function(
+$f = fn(
   int $p0,
   int $p1,
   int $p2,

@@ -209,10 +209,10 @@ File\write(
 );
 
 $newtypeLoader = new Autoload\Autoloader()->withFallback(
-  function(
+  fn(
     SymbolKind $kind,
     string $name,
-  ) use ($work): bool {
+  ): bool {
     if ($kind != SymbolKind::Newtype) {
       return false;
     }
@@ -262,8 +262,8 @@ while ($liveRefinementIndex < 4) {
 
 assert!($liveRefinementTotal == 10);
 
-$assertion_value_18 = function(): void {
-  new Autoload\Autoloader()->withFallback(function(SymbolKind $kind): bool {
+$assertion_value_18 = fn(): void {
+  new Autoload\Autoloader()->withFallback(fn(SymbolKind $kind): bool {
     return false;
   });
 };
@@ -291,12 +291,10 @@ $fallbackRecorder = new AutoloadFallbackRecorder();
 $missLoader = new Autoload\Autoloader()->withSymbolFile(
   'App\\lies',
   $work . '/unrelated.whim',
-)->withFallback(
-  function(SymbolKind $kind, string $name) use ($fallbackRecorder): bool {
-    $fallbackRecorder->seen[] = $name;
-    return false;
-  },
-);
+)->withFallback(fn(SymbolKind $kind, string $name): bool {
+  $fallbackRecorder->seen[] = $name;
+  return false;
+});
 
 Autoload\register($missLoader);
 $assertion_value_19 = fn(): string => App\lies();
@@ -337,9 +335,9 @@ Autoload\unregister($firstChainLoader);
 assert!(length!(Autoload\get_autoloaders()) == 1);
 Autoload\unregister($firstChainLoader);
 assert!(length!(Autoload\get_autoloaders()) == 1);
-$assertion_value_27 = function(): void {
+$assertion_value_27 = fn(): void {
   Whim\_Private\register_symbol_autoloader(
-    function(int $kind, string $name): void {},
+    fn(int $kind, string $name): void {},
   );
 };
 

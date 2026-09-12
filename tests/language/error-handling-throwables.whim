@@ -10,7 +10,7 @@ use Whim\Unwind\TypeError;
 
 $error = new Error('something failed', 42);
 $caught = null;
-$assertion_callable_1 = function() use ($error): void {
+$assertion_callable_1 = fn(): void {
   throw $error;
 };
 
@@ -28,7 +28,7 @@ assert!($caught is Error);
 assert!($caught->getMessage() == 'something failed');
 assert!($caught->getCode() == 42);
 
-$assertion_value_4 = function(): void {
+$assertion_value_4 = fn(): void {
   throw 5;
 };
 
@@ -41,7 +41,7 @@ try {
 
 assert!($assertion_error_4 is TypeError);
 
-$assertion_value_5 = function(): void {
+$assertion_value_5 = fn(): void {
   throw 'oops';
 };
 
@@ -56,7 +56,7 @@ assert!($assertion_error_5 is TypeError);
 
 class PlainValue {}
 
-$assertion_value_6 = function(): void {
+$assertion_value_6 = fn(): void {
   throw new PlainValue();
 };
 
@@ -71,7 +71,7 @@ assert!($assertion_error_6 is TypeError);
 
 class CustomError extends Error {}
 
-$assertion_value_7 = function(): void {
+$assertion_value_7 = fn(): void {
   throw new CustomError('mine', 1);
 };
 
@@ -105,7 +105,7 @@ assert!($application is Exception);
 assert!(new ArgumentCountError('arity') is TypeError);
 
 $caughtThrowable = null;
-$assertion_callable_17 = function() use ($typeError): void {
+$assertion_callable_17 = fn(): void {
   throw $typeError;
 };
 
@@ -120,7 +120,7 @@ assert!($caughtThrowable is Throwable);
 assert!($caughtThrowable is TypeError);
 
 $caughtApplication = null;
-$assertion_callable_19 = function() use ($application): void {
+$assertion_callable_19 = fn(): void {
   throw $application;
 };
 
@@ -144,7 +144,7 @@ function rethrow(Error $error): void {
 
 $pair = build_error_pair();
 $captured = null;
-$assertion_callable_21 = function() use ($pair): void {
+$assertion_callable_21 = fn(): void {
   rethrow($pair[0]);
 };
 
@@ -160,7 +160,7 @@ assert!($captured is Error);
 assert!($captured->getLine() == $pair[1]->getLine());
 assert!($captured->getTrace()[0]->function == 'build_error_pair');
 
-$assertion_value_24 = function(): void {
+$assertion_value_24 = fn(): void {
   $x = 1 / 0;
 };
 
@@ -173,7 +173,7 @@ try {
 
 assert!($assertion_error_24 is ArithmeticError);
 
-$assertion_value_25 = function(): void {
+$assertion_value_25 = fn(): void {
   $x = 9223372036854775807 + 1;
 };
 
@@ -186,7 +186,7 @@ try {
 
 assert!($assertion_error_25 is ArithmeticError);
 
-$assertion_value_26 = function(): void {
+$assertion_value_26 = fn(): void {
   $x = (-9223372036854775807 - 1) - 1;
 };
 
@@ -199,7 +199,7 @@ try {
 
 assert!($assertion_error_26 is ArithmeticError);
 
-$assertion_value_27 = function(): void {
+$assertion_value_27 = fn(): void {
   $x = '5' + 5;
 };
 
@@ -212,7 +212,7 @@ try {
 
 assert!($assertion_error_27 is TypeError);
 
-$assertion_value_28 = function(): void {
+$assertion_value_28 = fn(): void {
   $x = 1 / 0;
 };
 
@@ -232,7 +232,7 @@ assert!(!($divisionByZero is TypeError));
 class ParseFailure extends TypeError {}
 
 $parseFailure = null;
-$assertion_callable_31 = function(): void {
+$assertion_callable_31 = fn(): void {
   throw new ParseFailure('bad token', 3);
 };
 

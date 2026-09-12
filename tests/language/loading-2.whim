@@ -321,21 +321,21 @@ Autoload\unregister($newtypeLoader);
 
 $chainRecorder = new LoadingRecorder();
 $firstChainLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($chainRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $chainRecorder->seen[] = 'first:' . $kind->name . ':' . $name;
     return false;
   },
 );
 
 $secondChainLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($chainRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $chainRecorder->seen[] = 'second:' . $kind->name . ':' . $name;
     return true;
   },
 );
 
 $thirdChainLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($chainRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $chainRecorder->seen[] = 'third: never';
     return true;
   },
@@ -344,7 +344,7 @@ $thirdChainLoader = new Autoload\Autoloader()->withFallback(
 Autoload\register($firstChainLoader);
 Autoload\register($secondChainLoader);
 Autoload\register($thirdChainLoader);
-$assertion_value_20 = function(): void {
+$assertion_value_20 = fn(): void {
   missing_function();
 };
 
@@ -381,7 +381,7 @@ $hollowLoader = new Autoload\Autoloader()->withSymbolFile(
 
 $hollowRecorder = new LoadingRecorder();
 $hollowFallbackLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($hollowRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $hollowRecorder->seen[] = 'fallback: never';
     return true;
   },
@@ -389,7 +389,7 @@ $hollowFallbackLoader = new Autoload\Autoloader()->withFallback(
 
 Autoload\register($hollowLoader);
 Autoload\register($hollowFallbackLoader);
-$assertion_value_22 = function(): void {
+$assertion_value_22 = fn(): void {
   new HollowGhost();
 };
 
@@ -409,14 +409,14 @@ Autoload\unregister($hollowFallbackLoader);
 
 $orderRecorder = new LoadingRecorder();
 $firstOrderLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($orderRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $orderRecorder->seen[] = 'first asked';
     return false;
   },
 );
 
 $secondOrderLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($orderRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $orderRecorder->seen[] = 'second asked';
     return false;
   },
@@ -464,7 +464,7 @@ Autoload\unregister($wrongKindLoader);
 
 $existsRecorder = new LoadingRecorder();
 $existsLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($existsRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $existsRecorder->seen[] = 'probe:' . $kind->name;
     return false;
   },
@@ -495,7 +495,7 @@ Autoload\unregister($existsLoader);
 
 $kindRecorder = new LoadingRecorder();
 $kindLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($kindRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $kindRecorder->seen[] = 'probe: never';
     return true;
   },
@@ -526,7 +526,7 @@ assert!(Symbol\get_kind('KindSuit')->name == 'Enum');
 assert!(Symbol\get_kind('KindCountable')->name == 'Interface');
 assert!(Symbol\get_kind('\\KindScalar')->name == 'TypeAlias');
 assert!(Symbol\get_kind('KindUserId')->name == 'Newtype');
-$assertion_value_45 = function(): void {
+$assertion_value_45 = fn(): void {
   Symbol\get_kind('absent');
 };
 
@@ -558,7 +558,7 @@ assert!(Symbol\exists('BuilderWidget', false));
 
 $selfMissingRecorder = new LoadingRecorder();
 $selfMissingLoader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $kind, string $name) use ($selfMissingRecorder): bool {
+  fn(SymbolKind $kind, string $name): bool {
     $selfMissingRecorder->seen[] = 'asked:' . $name;
     ghost();
     return true;
@@ -566,7 +566,7 @@ $selfMissingLoader = new Autoload\Autoloader()->withFallback(
 );
 
 Autoload\register($selfMissingLoader);
-$assertion_value_50 = function(): void {
+$assertion_value_50 = fn(): void {
   ghost();
 };
 
@@ -635,7 +635,7 @@ $parameterGrowthLoader = new Autoload\Autoloader()->withSymbolFile(
 );
 
 Autoload\register($parameterGrowthLoader);
-$checkReentrantParameters = function(
+$checkReentrantParameters = fn(
   ReentrantParameterInteger $first,
   string $label,
   int $last,

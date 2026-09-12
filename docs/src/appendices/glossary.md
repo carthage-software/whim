@@ -26,7 +26,7 @@ A type rule that limits a generic type argument.
 
 ### Callable
 
-A closure, short closure, first-class function, bound method, or partial call.
+A closure, first-class function, bound method, or partial call.
 
 ### Cancellation token
 
@@ -38,7 +38,8 @@ A class and its parent and child classes.
 
 ### Closure
 
-An unnamed function with a block body and an explicit capture list.
+An unnamed function written with `fn`. Its body is an expression or block, and
+it captures the outer variables it uses by value.
 
 ### Constant expression
 

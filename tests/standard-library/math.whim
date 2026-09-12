@@ -151,9 +151,9 @@ assert!($frame->function == 'Whim\Math\clamp');
 assert!($frame->file == '<std>/Math/clamp.whim');
 
 $nanKeyObservation = new NanKeyObservation();
-$nanKey = function(
+$nanKey = fn(
   string $value,
-) use ($nanKeyObservation): int|float {
+): int|float {
   $nanKeyObservation->calls++;
   return match ($value) {
     'nan' => Whim\Math\NAN,
@@ -358,7 +358,7 @@ assert!($divisionError is Whim\Unwind\DivisionByZeroError);
 assert!($divisionError is Whim\Unwind\Error);
 assert!(!($divisionError is Whim\Unwind\Exception));
 
-$assertion_value_92 = function(): void {
+$assertion_value_92 = fn(): void {
   Whim\Float\is_finite(1.0);
 };
 
@@ -371,7 +371,7 @@ try {
 
 assert!($assertion_error_92 is Whim\Unwind\DiscardedResultError);
 
-$assertion_value_93 = function(): void {
+$assertion_value_93 = fn(): void {
   Whim\Float\from_bits(0);
 };
 

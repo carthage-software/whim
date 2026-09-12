@@ -146,14 +146,12 @@ use crate::cst::expression::Parenthesized;
 use crate::cst::expression::Return;
 use crate::cst::expression::Throw;
 use crate::cst::function::Closure;
-use crate::cst::function::ClosureUseClause;
+use crate::cst::function::ClosureBody;
 use crate::cst::function::Function;
 use crate::cst::function::Parameter;
 use crate::cst::function::ParameterDefault;
 use crate::cst::function::ParameterList;
 use crate::cst::function::ReturnType;
-use crate::cst::function::ShortClosure;
-use crate::cst::function::ShortClosureBody;
 use crate::cst::operation::Assignment;
 use crate::cst::operation::AssignmentOperator;
 use crate::cst::operation::AssignmentTarget;
@@ -310,9 +308,7 @@ define_nodes! {
     Modifier(Modifier<'arena>),
     Function(Function<'arena>),
     Closure(Closure<'arena>),
-    ClosureUseClause(ClosureUseClause<'arena>),
-    ShortClosure(ShortClosure<'arena>),
-    ShortClosureBody(ShortClosureBody<'arena>),
+    ClosureBody(ClosureBody<'arena>),
     ParameterList(ParameterList<'arena>),
     Parameter(Parameter<'arena>),
     ParameterDefault(ParameterDefault<'arena>),

@@ -161,11 +161,11 @@ function http_server_h1_ok_handler(
   null|HTTPServerH1ParityState $state = null,
 ): Handler {
   return new FunctionHandler(
-    function(
+    fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ) use ($state): Response {
+    ): Response {
       if ($state != null) {
         $state->calls++;
         $state->targets[] = $request->requestTarget;
@@ -315,7 +315,7 @@ assert!($continuedState->bodies == vec['hello']);
 $informational = http_server_h1_serve(
   "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
   new FunctionHandler(
-    function(
+    fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
@@ -405,11 +405,11 @@ $drainedState = new HTTPServerH1ParityState();
 $drained = http_server_h1_serve(
   "POST /first HTTP/1.0\r\nHost: example.com\r\nConnection: keep-alive\r\nContent-Length: 5\r\n\r\nhelloGET /second HTTP/1.0\r\nHost: example.com\r\n\r\n",
   new FunctionHandler(
-    function(
+    fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ) use ($drainedState): Response {
+    ): Response {
       $drainedState->targets[] = $request->requestTarget;
       return new Response(
         200,
@@ -427,12 +427,12 @@ $completedState = new HTTPServerH1ParityState();
 $completed = http_server_h1_serve(
   "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
   new FunctionHandler(
-    function(
+    fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ) use ($completedState): Response {
-      $context->onResponseComplete(function() use ($completedState): void {
+    ): Response {
+      $context->onResponseComplete(fn(): void {
         $completedState->completed++;
       });
 

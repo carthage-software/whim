@@ -59,7 +59,7 @@ final class TrackedFuture implements Future<int> {
 }
 
 $launched = new Strong::<bool>(false);
-Async\launch(function() use ($launched): void {
+Async\launch(fn(): void {
   $launched->value = true;
 });
 
@@ -68,7 +68,7 @@ Async\later();
 assert!($launched->value);
 
 $failedLaunch = new Strong::<bool>(false);
-Async\launch(function() use ($failedLaunch): void {
+Async\launch(fn(): void {
   $failedLaunch->value = true;
   throw new RuntimeException('ignored launch failure');
 });
@@ -77,12 +77,12 @@ Async\later();
 assert!($failedLaunch->value);
 
 $observation = new FutureEventRecorder();
-$lazySource = Async\spawn::<int>(function() use ($observation): int {
+$lazySource = Async\spawn::<int>(fn(): int {
   $observation->events[] = 'task';
   return 1;
 });
 
-$mapped = $lazySource->map::<int>(function(int $value) use ($observation): int {
+$mapped = $lazySource->map::<int>(fn(int $value): int {
   $observation->events[] = 'mapped';
   return $value + 1;
 });
@@ -92,15 +92,15 @@ assert!($mapped->await() == 2);
 assert!($observation->events == vec['task', 'mapped']);
 
 $observation->events = vec[];
-$thenSource = Async\spawn::<int>(function() use ($observation): int {
+$thenSource = Async\spawn::<int>(fn(): int {
   $observation->events[] = 'then source';
   return 2;
 });
 
-$then = $thenSource->then::<int>(function(int $value) use ($observation): int {
+$then = $thenSource->then::<int>(fn(int $value): int {
   $observation->events[] = 'then success';
   return $value + 1;
-}, function(Throwable $_) use ($observation): int {
+}, fn(Throwable $_): int {
   $observation->events[] = 'then failure';
   return 0;
 });
@@ -110,29 +110,27 @@ assert!($then->await() == 3);
 assert!($observation->events == vec['then source', 'then success']);
 
 $observation->events = vec[];
-$catchSource = Async\spawn::<int>(function() use ($observation): int {
+$catchSource = Async\spawn::<int>(fn(): int {
   $observation->events[] = 'catch source';
   throw new RuntimeException('failed');
 });
 
-$caught = $catchSource->catch::<int>(
-  function(Throwable $_) use ($observation): int {
-    $observation->events[] = 'catch failure';
-    return 4;
-  },
-);
+$caught = $catchSource->catch::<int>(fn(Throwable $_): int {
+  $observation->events[] = 'catch failure';
+  return 4;
+});
 
 assert!(length!($observation->events) == 0);
 assert!($caught->await() == 4);
 assert!($observation->events == vec['catch source', 'catch failure']);
 
 $observation->events = vec[];
-$alwaysSource = Async\spawn::<int>(function() use ($observation): int {
+$alwaysSource = Async\spawn::<int>(fn(): int {
   $observation->events[] = 'always source';
   return 5;
 });
 
-$always = $alwaysSource->always(function() use ($observation): void {
+$always = $alwaysSource->always(fn(): void {
   $observation->events[] = 'always callback';
 });
 
@@ -141,7 +139,7 @@ assert!($always->await() == 5);
 assert!($observation->events == vec['always source', 'always callback']);
 
 $mainCancellationToken = new Async\SignalCancellationToken();
-$pendingWork = Async\spawn::<int>(function() use ($observation): int {
+$pendingWork = Async\spawn::<int>(fn(): int {
   Async\later();
   Async\later();
   $observation->finished = true;
@@ -169,10 +167,10 @@ $allResults = Async\all::<string, int>(dict[
 
 assert!($allResults == dict['a' => 1, 'b' => 2, 'c' => 3]);
 
-$anyWinner = Async\any::<string>(vec[Async\spawn::<string>(function(): string {
+$anyWinner = Async\any::<string>(vec[Async\spawn::<string>(fn(): string {
   Async\sleep(Duration::fromMilliseconds(5));
   throw new RuntimeException('fast fail');
-}), Async\spawn::<string>(function(): string {
+}), Async\spawn::<string>(fn(): string {
   Async\sleep(Duration::fromMilliseconds(30));
   return 'winner';
 })]);
@@ -186,10 +184,10 @@ $dictionaryWinner = Async\any::<string>(dict[
 assert!($dictionaryWinner == 'dict');
 
 $assertion_value_18 = fn(): string => (
-  Async\first::<string>(vec[Async\spawn::<string>(function(): string {
+  Async\first::<string>(vec[Async\spawn::<string>(fn(): string {
     Async\sleep(Duration::fromMilliseconds(5));
     throw new RuntimeException('settled first');
-  }), Async\spawn::<string>(function(): string {
+  }), Async\spawn::<string>(fn(): string {
     Async\sleep(Duration::fromMilliseconds(30));
     return 'too slow';
   })])
@@ -254,7 +252,7 @@ $failedFutures = vec[];
 $trackedFailures = vec[];
 $failureIndex = 0;
 while ($failureIndex < 32) {
-  $tracked = new TrackedFuture(Async\spawn::<int>(function(): int {
+  $tracked = new TrackedFuture(Async\spawn::<int>(fn(): int {
     throw new RuntimeException('failed selection');
   }));
 
@@ -297,10 +295,10 @@ while ($round < 20) {
 assert!($fairLeft == 10);
 assert!($fairRight == 10);
 
-$concurrentResults = Async\concurrently::<int, int>(dict[0 => function(): int {
+$concurrentResults = Async\concurrently::<int, int>(dict[0 => fn(): int {
   Async\sleep(Duration::fromMilliseconds(10));
   return 7;
-}, 1 => function(): int {
+}, 1 => fn(): int {
   Async\sleep(Duration::fromMilliseconds(10));
   return 8;
 }]);
@@ -308,25 +306,22 @@ $concurrentResults = Async\concurrently::<int, int>(dict[0 => function(): int {
 assert!($concurrentResults == dict[0 => 7, 1 => 8]);
 
 $seriesRecorder = new FutureEventRecorder();
-$seriesResults = Async\series::<int, int>(dict[
-  0 => function() use ($seriesRecorder): int {
-    $seriesRecorder->events[] = 'first task';
-    return 10;
-  },
-  1 => function() use ($seriesRecorder): int {
-    $seriesRecorder->events[] = 'second task';
-    return 20;
-  },
-]);
+$seriesResults = Async\series::<int, int>(dict[0 => fn(): int {
+  $seriesRecorder->events[] = 'first task';
+  return 10;
+}, 1 => fn(): int {
+  $seriesRecorder->events[] = 'second task';
+  return 20;
+}]);
 
 assert!($seriesRecorder->events == vec['first task', 'second task']);
 assert!($seriesResults == dict[0 => 10, 1 => 20]);
 
 $singleFailure = null;
-$assertion_callable_33 = function(): void {
+$assertion_callable_33 = fn(): void {
   Async\all::<int, int>(dict[
     0 => Async\spawn::<int>(fn(): int => 1),
-    1 => Async\spawn::<int>(function(): int {
+    1 => Async\spawn::<int>(fn(): int {
       throw new RuntimeException('single');
     }),
   ]);
@@ -344,10 +339,10 @@ assert!($singleFailure is RuntimeException);
 assert!(!($singleFailure is CompositeException));
 
 $doubleFailure = null;
-$assertion_callable_35 = function(): void {
-  Async\all::<int, int>(dict[0 => Async\spawn::<int>(function(): int {
+$assertion_callable_35 = fn(): void {
+  Async\all::<int, int>(dict[0 => Async\spawn::<int>(fn(): int {
     throw new RuntimeException('e1');
-  }), 1 => Async\spawn::<int>(function(): int {
+  }), 1 => Async\spawn::<int>(fn(): int {
     throw new RuntimeException('e2');
   })]);
 };
@@ -363,13 +358,13 @@ assert!($doubleFailure is CompositeException);
 assert!(length!($doubleFailure->getReasons()) == 2);
 
 $selectRecorder = new FutureEventRecorder();
-$selectWorker = Async\spawn::<int>(function() use ($selectRecorder): int {
-  $selectWinner = Async\spawn::<string>(function(): string {
+$selectWorker = Async\spawn::<int>(fn(): int {
+  $selectWinner = Async\spawn::<string>(fn(): string {
     Async\sleep(Duration::fromMilliseconds(5));
     return 'w';
   });
 
-  $selectLoser = Async\spawn::<string>(function(): string {
+  $selectLoser = Async\spawn::<string>(fn(): string {
     Async\sleep(Duration::fromMilliseconds(50));
     return 'l';
   });
@@ -380,7 +375,7 @@ $selectWorker = Async\spawn::<int>(function() use ($selectRecorder): int {
   return 0;
 });
 
-$selectMiddle = Async\spawn::<int>(function() use ($selectRecorder): int {
+$selectMiddle = Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(60));
   $selectRecorder->events[] = 'mid';
   return 0;
@@ -391,11 +386,11 @@ $selectMiddle->await();
 assert!($selectRecorder->events == vec['mid', 'worker']);
 
 $loopRecorder = new EventLoopRecorder();
-$deferredTask = _Private\defer_task(function() use ($loopRecorder): void {
+$deferredTask = _Private\defer_task(fn(): void {
   $loopRecorder->order[] = 'deferred';
 });
 
-$queuedTask = _Private\queue_task(function() use ($loopRecorder): void {
+$queuedTask = _Private\queue_task(fn(): void {
   $loopRecorder->order[] = 'queued';
 });
 
@@ -403,24 +398,21 @@ assert!($deferredTask is _Private\TaskId);
 assert!($queuedTask is _Private\TaskId);
 assert!($deferredTask->id != $queuedTask->id);
 
-$cancelledTask = _Private\defer_task(function() use ($loopRecorder): void {
+$cancelledTask = _Private\defer_task(fn(): void {
   $loopRecorder->order[] = 'cancelled';
 });
 
 _Private\cancel_task($cancelledTask);
 
-$delayedTask = _Private\delay_task(
-  Duration::fromMilliseconds(1),
-  function() use ($loopRecorder): void {
-    $loopRecorder->order[] = 'delayed';
-  },
-);
+$delayedTask = _Private\delay_task(Duration::fromMilliseconds(1), fn(): void {
+  $loopRecorder->order[] = 'delayed';
+});
 
 assert!($delayedTask is _Private\TaskId);
 
 $loopRecorder->repeating = _Private\repeat_task(
   Duration::fromMilliseconds(1),
-  function() use ($loopRecorder): void {
+  fn(): void {
     $loopRecorder->repetitions++;
     if ($loopRecorder->repetitions == 2) {
       _Private\cancel_task($loopRecorder->repeating as _Private\TaskId);
@@ -429,12 +421,9 @@ $loopRecorder->repeating = _Private\repeat_task(
 );
 
 $unreferencedFired = new Strong::<bool>(false);
-$unreferencedTask = _Private\delay_task(
-  Duration::fromSeconds(30),
-  function() use ($unreferencedFired): void {
-    $unreferencedFired->value = true;
-  },
-);
+$unreferencedTask = _Private\delay_task(Duration::fromSeconds(30), fn(): void {
+  $unreferencedFired->value = true;
+});
 
 _Private\unreference_task($unreferencedTask);
 
@@ -445,14 +434,14 @@ assert!($loopRecorder->repetitions == 2);
 assert!(!($unreferencedFired->value));
 
 $resumedSuspension = _Private\create_suspension::<int>();
-_Private\defer_task(function() use ($resumedSuspension): void {
+_Private\defer_task(fn(): void {
   $resumedSuspension->resume(42);
 });
 
 assert!($resumedSuspension->suspend() == 42);
 
 $thrownSuspension = _Private\create_suspension::<int>();
-_Private\defer_task(function() use ($thrownSuspension): void {
+_Private\defer_task(fn(): void {
   $thrownSuspension->throw(new RuntimeException('suspension failed'));
 });
 

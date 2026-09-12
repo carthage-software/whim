@@ -595,7 +595,6 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
                 attributes: metadata.attributes,
                 captures_this: false,
                 capture_names: Vec::new(),
-                is_short_closure: false,
                 capture_types: Vec::new(),
                 chunk,
             },

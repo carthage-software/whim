@@ -24,7 +24,6 @@ use crate::cst::call::PartialApplication;
 use crate::cst::construct::Construct;
 use crate::cst::control_flow::Match;
 use crate::cst::function::Closure;
-use crate::cst::function::ShortClosure;
 use crate::cst::operation::Assignment;
 use crate::cst::operation::Binary;
 use crate::cst::operation::TypeOperation;
@@ -93,7 +92,6 @@ pub enum Expression<'arena> {
     Call(Call<'arena>),
     PartialApplication(PartialApplication<'arena>),
     Closure(Closure<'arena>),
-    ShortClosure(ShortClosure<'arena>),
     Match(Match<'arena>),
     Instantiation(Instantiation<'arena>),
     Break(Break<'arena>),
@@ -243,7 +241,6 @@ impl HasSpan for Expression<'_> {
             Expression::Call(expression) => expression.span(),
             Expression::PartialApplication(expression) => expression.span(),
             Expression::Closure(expression) => expression.span(),
-            Expression::ShortClosure(expression) => expression.span(),
             Expression::Match(expression) => expression.span(),
             Expression::Instantiation(expression) => expression.span(),
             Expression::Break(expression) => expression.span(),

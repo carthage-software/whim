@@ -120,7 +120,7 @@ function grouped_before_missing_type(mixed $value): int {
 }
 
 $loader = new Autoload\Autoloader()->withFallback(
-  function(SymbolKind $_, string $name): bool {
+  fn(SymbolKind $_, string $name): bool {
     throw new Error($name);
   },
 );

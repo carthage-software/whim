@@ -86,28 +86,20 @@ bounds          := ":" type ("+" type)*
 default-type    := "=" type
 ```
 
-A closure replaces the function name with a parameter list and may add a
-`use` capture list. A short closure uses `fn` and captures outer variables
-without a capture list. Its body is one expression or a block.
+A closure uses `fn` and captures outer variables by value. Its body is one
+expression or a block.
 
 ```text
-closure         := attributes? "function" type-parameters? parameter-list
-                   capture-list? return-type? block
+closure         := attributes? "fn" type-parameters? parameter-list
+                   return-type? closure-body
 
-capture-list    := "use" "(" (variable ("," variable)* ","?)? ")"
-
-short-closure   := attributes? "fn" type-parameters? parameter-list
-                   return-type? short-closure-body
-
-short-closure-body
-                := "=>" expression | block
+closure-body    := "=>" expression | block
 ```
 
 Visibility and `readonly` on a parameter promote it to a property and are
 valid only in a class constructor.
 
-See [Functions](../language/functions.md) and [Closures and Short
-Closures](../language/callables.md).
+See [Functions](../language/functions.md) and [Closures](../language/callables.md).
 
 ## Classes
 
@@ -290,7 +282,6 @@ expression      := literal
                  | vec-fill
                  | dict-literal
                  | closure
-                 | short-closure
                  | match-expression
                  | "new" class-expression call-arguments?
                  | "break" integer-literal?

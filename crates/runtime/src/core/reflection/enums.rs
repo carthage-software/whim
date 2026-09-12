@@ -44,8 +44,6 @@ pub(crate) enum CallableKind {
     InstanceMethod,
     #[whim_case("Closure")]
     Closure,
-    #[whim_case("ShortClosure")]
-    ShortClosure,
     #[whim_case("Partial")]
     Partial,
 }

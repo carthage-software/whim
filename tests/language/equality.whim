@@ -150,7 +150,7 @@ try {
 
 assert!($assertion_error_53 is IncompatibleOperandsError);
 
-$assertion_value_54 = function(): bool {
+$assertion_value_54 = fn(): bool {
   return (fn(): int => 1) < (fn(): int => 2);
 };
 

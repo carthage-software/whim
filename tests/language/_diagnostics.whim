@@ -8,7 +8,7 @@ require_once!('_files.whim');
  * and runs it, so whatever the engine objects to arrives as a throw.
  */
 function raises(string $fixture, string $message): void {
-  $assertion_value_1 = function() use ($fixture): void {
+  $assertion_value_1 = fn(): void {
     require!(beside($fixture));
   };
 

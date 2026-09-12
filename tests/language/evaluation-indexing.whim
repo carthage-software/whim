@@ -81,7 +81,7 @@ try {
 }
 
 assert!($assertion_error_29 is OutOfBoundsError);
-$assertion_value_30 = function() use ($pair): void {
+$assertion_value_30 = fn(): void {
   $pair[0] = 'z';
 };
 
@@ -107,7 +107,7 @@ try {
 }
 
 assert!($assertion_error_32 is OutOfBoundsError);
-$assertion_value_33 = function() use ($text): void {
+$assertion_value_33 = fn(): void {
   $text[0] = 'z';
 };
 
@@ -152,7 +152,7 @@ try {
 assert!($assertion_error_38 is TypeError);
 $letters[1] = 'B';
 assert!($letters[1] == 'B');
-$assertion_value_40 = function() use ($letters): void {
+$assertion_value_40 = fn(): void {
   $letters[3] = 'd';
 };
 

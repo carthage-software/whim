@@ -37,7 +37,7 @@ assert!($boundedReceiver->tryReceive() == 'b');
 
 $boundedSender->close();
 assert!($boundedReceiver->isClosed());
-$assertion_value_17 = function() use ($boundedSender): void {
+$assertion_value_17 = fn(): void {
   $boundedSender->send('c');
 };
 
@@ -61,7 +61,7 @@ try {
 assert!($assertion_error_18 is Channel\ClosedException);
 
 ($waitingSender, $waitingReceiver) = Channel\unbounded::<int>();
-$waiting = Async\spawn::<null>(function() use ($waitingReceiver): null {
+$waiting = Async\spawn::<null>(fn(): null {
   $waitingReceiver->waitUntilReceivable();
   return null;
 });
@@ -72,12 +72,10 @@ $waiting->await();
 assert!($waitingReceiver->receive() == 42);
 
 $cancellation = new SignalCancellationToken();
-$cancelledWait = Async\spawn::<null>(
-  function() use ($waitingReceiver, $cancellation): null {
-    $waitingReceiver->waitUntilReceivable($cancellation);
-    return null;
-  },
-);
+$cancelledWait = Async\spawn::<null>(fn(): null {
+  $waitingReceiver->waitUntilReceivable($cancellation);
+  return null;
+});
 
 Async\later();
 $cancellation->cancel();
@@ -93,7 +91,7 @@ assert!($assertion_error_20 is CancelledException);
 
 ($sendableSender, $sendableReceiver) = Channel\bounded::<int>(1);
 $sendableSender->send(1);
-$sendable = Async\spawn::<null>(function() use ($sendableSender): null {
+$sendable = Async\spawn::<null>(fn(): null {
   $sendableSender->waitUntilSendable();
   return null;
 });
@@ -104,12 +102,10 @@ $sendable->await();
 $sendableSender->send(2);
 
 $sendCancellation = new SignalCancellationToken();
-$cancelledSend = Async\spawn::<null>(
-  function() use ($sendableSender, $sendCancellation): null {
-    $sendableSender->waitUntilSendable($sendCancellation);
-    return null;
-  },
-);
+$cancelledSend = Async\spawn::<null>(fn(): null {
+  $sendableSender->waitUntilSendable($sendCancellation);
+  return null;
+});
 
 Async\later();
 $sendCancellation->cancel();

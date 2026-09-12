@@ -175,7 +175,6 @@ pub(in crate::compiler::declarations) fn compile_function_declaration(
         attributes,
         captures_this: false,
         capture_names: Vec::new(),
-        is_short_closure: false,
         capture_types: Vec::new(),
         chunk,
     })

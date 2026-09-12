@@ -21,8 +21,7 @@ constant expressions. Such an expression may use:
 - `embed!` with a literal relative path;
 - unary and binary operators;
 - tuple, vec, and dict literals, including vec and dict spreads;
-- a `fn` closure with no captures, or a `function` closure with no `use` list
-  and no `$this` use;
+- a `fn` closure with no captures;
 - a named class construction;
 - function, static method, and method calls whose inputs are constant
   expressions.

@@ -154,7 +154,7 @@ File\write(
   . "\n",
 );
 
-$assertion_value_1 = function() use ($sealed): void {
+$assertion_value_1 = fn(): void {
   require!($sealed);
 };
 
@@ -180,7 +180,7 @@ File\write(
   . "\n",
 );
 
-$assertion_value_2 = function() use ($transitive): void {
+$assertion_value_2 = fn(): void {
   require!($transitive);
 };
 
@@ -227,7 +227,7 @@ File\write(
   'final class Boat implements Motorized {}' . "\n",
 );
 
-$assertion_value_8 = function() use ($rogue_implementor): void {
+$assertion_value_8 = fn(): void {
   require!($rogue_implementor);
 };
 
@@ -242,7 +242,7 @@ assert!($assertion_error_8 is LinkerError);
 
 $rogue_interface = $work . '/rogue-interface.whim';
 File\write($rogue_interface, 'interface Flying extends Vehicle {}' . "\n");
-$assertion_value_9 = function() use ($rogue_interface): void {
+$assertion_value_9 = fn(): void {
   require!($rogue_interface);
 };
 

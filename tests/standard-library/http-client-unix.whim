@@ -18,7 +18,7 @@ $directory = Filesystem\create_temporary_directory(null, 'whim-http-unix-');
 $h1Path = $directory . '/h1.sock';
 $h1Listener = Unix\listen($h1Path);
 $h1Server = Async\spawn::<null>(
-  function() use ($h1Listener): null {
+  fn(): null {
     $stream = $h1Listener->accept();
     $round = 0;
     while ($round < 2) {
@@ -51,9 +51,7 @@ $first = $h1Client->send(
     URL\URL::from('http://service.internal/one'),
   ),
   new Client\SendConfiguration(
-    onConnection: function(
-      Client\ConnectionMetadata $metadata,
-    ) use ($h1Metadata): void {
+    onConnection: fn(Client\ConnectionMetadata $metadata): void {
       $h1Metadata->value = $metadata;
     },
   ),
@@ -84,7 +82,7 @@ Filesystem\delete_file($h1Path);
 
 $h2Path = $directory . '/h2.sock';
 $h2Listener = Unix\listen($h2Path);
-$h2Server = Async\spawn::<null>(function() use ($h2Listener): null {
+$h2Server = Async\spawn::<null>(fn(): null {
   $stream = $h2Listener->accept();
   $protocol = new H2\ServerConnection();
   $streamId = null;
@@ -121,9 +119,7 @@ $h2Transaction = $h2Client->send(
     URL\URL::from('http://service.internal/h2'),
   ),
   new Client\SendConfiguration(
-    onConnection: function(
-      Client\ConnectionMetadata $metadata,
-    ) use ($h2Metadata): void {
+    onConnection: fn(Client\ConnectionMetadata $metadata): void {
       $h2Metadata->value = $metadata;
     },
   ),
@@ -156,7 +152,7 @@ $tlsListener = TLS\listen::<UnixEndpoint>(
   new TLS\ServerConfiguration($identity, alpnProtocols: vec['http/1.1']),
 );
 
-$tlsServer = Async\spawn::<null>(function() use ($tlsListener): null {
+$tlsServer = Async\spawn::<null>(fn(): null {
   $stream = $tlsListener->accept();
   $request = $stream->read(8192);
   assert!($request != '');
@@ -194,9 +190,7 @@ $tlsTransaction = $tlsClient->send(
     URL\URL::from('https://localhost/secure'),
   ),
   new Client\SendConfiguration(
-    onConnection: function(
-      Client\ConnectionMetadata $metadata,
-    ) use ($tlsMetadata): void {
+    onConnection: fn(Client\ConnectionMetadata $metadata): void {
       $tlsMetadata->value = $metadata;
     },
   ),

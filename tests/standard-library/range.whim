@@ -42,7 +42,7 @@ try {
 
 assert!($assertion_error_13 is Range\InvalidRangeException);
 
-$assertion_value_14 = function(): void {
+$assertion_value_14 = fn(): void {
   Range\full();
 };
 
@@ -55,7 +55,7 @@ try {
 
 assert!($assertion_error_14 is DiscardedResultError);
 
-$assertion_value_15 = function() use ($between): void {
+$assertion_value_15 = fn(): void {
   $between->withUpperBoundInclusive(10);
 };
 

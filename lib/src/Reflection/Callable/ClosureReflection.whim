@@ -78,10 +78,6 @@ final class ClosureReflection implements CallableReflection {
     null|ClassTypeReflection $calledType = null,
   ): FunctionTypeReflection {}
 
-  /** Reports whether the closure used the auto-capturing `fn` form. */
-  #[MustUse]
-  public function isShort(): bool {}
-
   /** Returns capture declarations in capture-window order. */
   #[MustUse]
   public function getCaptures(): vec<CaptureReflection> {}

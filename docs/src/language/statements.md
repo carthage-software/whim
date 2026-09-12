@@ -117,10 +117,9 @@ source does not change that walk.
 
 ## Variable scope
 
-Each file body, function, method, closure, and short closure has its own
-variable scope.
+Each file body, function, method, and closure has its own variable scope.
 Control-flow blocks do not create another variable scope. A variable assigned
 on only some paths remains undefined when execution took another path.
 
-Functions cannot read file-scope variables. A closure must capture outer
-variables, while a short closure captures the outer variables it uses.
+Functions cannot read file-scope variables. A closure captures the outer
+variables it uses.

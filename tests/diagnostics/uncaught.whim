@@ -29,7 +29,7 @@ assert!(Whim\Str\contains($assertion_value_4, 'Stack backtrace:'));
 assert!(Whim\Str\contains($assertion_value_4, 'uncaught.whim:1'));
 
 $parse = $work . '/parse.whim';
-File\write($parse, 'function (;' . "\n");
+File\write($parse, 'fn (;' . "\n");
 $run = Command\run($binary, vec[$parse]);
 assert!(!($run->isSuccess()));
 assert!(Whim\Str\contains($run->standardError, 'Whim\Unwind\ParserError'));

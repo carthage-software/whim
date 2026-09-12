@@ -221,8 +221,7 @@ where
             }
             TokenKind::LeftParenthesis => self.parse_parenthesized_or_tuple_expression()?,
             TokenKind::Match => return self.parse_match(),
-            TokenKind::Function => Expression::Closure(self.parse_closure()?),
-            TokenKind::Fn => Expression::ShortClosure(self.parse_short_closure()?),
+            TokenKind::Fn => Expression::Closure(self.parse_closure()?),
             TokenKind::HashLeftBracket => return self.parse_attributed_expression(),
             TokenKind::New => Expression::Instantiation(self.parse_instantiation()?),
             TokenKind::Break => {
@@ -334,7 +333,6 @@ where
                 | TokenKind::Variable
                 | TokenKind::LeftParenthesis
                 | TokenKind::Match
-                | TokenKind::Function
                 | TokenKind::Fn
                 | TokenKind::HashLeftBracket
                 | TokenKind::New

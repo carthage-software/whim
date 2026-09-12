@@ -302,17 +302,11 @@ where
             TokenKind::Newtype => Ok(Statement::Newtype(
                 self.parse_newtype_with(attribute_lists)?,
             )),
-            TokenKind::Function
-                if self
-                    .lookahead(1)?
-                    .is_some_and(|token| token.kind.is_function_name()) =>
-            {
-                Ok(Statement::Function(
-                    self.parse_function_with(attribute_lists)?,
-                ))
-            }
-            TokenKind::Function | TokenKind::Fn => {
-                let expression = self.parse_closure_or_short_closure(attribute_lists)?;
+            TokenKind::Function => Ok(Statement::Function(
+                self.parse_function_with(attribute_lists)?,
+            )),
+            TokenKind::Fn => {
+                let expression = Expression::Closure(self.parse_closure_with(attribute_lists)?);
                 let expression = self.arena.alloc(expression);
                 let semicolon = self.expect_span(TokenKind::Semicolon)?;
 
@@ -330,23 +324,8 @@ where
     pub(crate) fn parse_attributed_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         let attribute_lists = self.parse_attribute_lists()?;
 
-        self.parse_closure_or_short_closure(attribute_lists)
-    }
-
-    fn parse_closure_or_short_closure(
-        &mut self,
-        attribute_lists: &'arena [AttributeList<'arena>],
-    ) -> Result<Expression<'arena>, ParseError> {
-        match self.peek_kind()? {
-            Some(TokenKind::Function) => Ok(Expression::Closure(
-                self.parse_closure_with(attribute_lists)?,
-            )),
-            Some(TokenKind::Fn) => Ok(Expression::ShortClosure(
-                self.parse_short_closure_with(attribute_lists)?,
-            )),
-            _ => Err(self.unexpected(Expected::Description(
-                "a closure or short closure after an attribute list",
-            ))),
-        }
+        Ok(Expression::Closure(
+            self.parse_closure_with(attribute_lists)?,
+        ))
     }
 }

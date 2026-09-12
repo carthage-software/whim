@@ -103,7 +103,7 @@ raises(
   'inherits a constant named value, but also inherits a method of that name',
 );
 
-$assertion_value_1 = function(): void {
+$assertion_value_1 = fn(): void {
   require!('_declarations-inheritance/incompatible-constant.whim');
 };
 
@@ -116,7 +116,7 @@ try {
 
 assert!($assertion_error_1 is LinkerError);
 
-$assertion_value_2 = function(): void {
+$assertion_value_2 = fn(): void {
   require!('_declarations-inheritance/cyclic-interfaces.whim');
 };
 
@@ -135,7 +135,7 @@ try {
 
 assert!($assertion_error_2 is LinkerError);
 
-$assertion_value_3 = function(): void {
+$assertion_value_3 = fn(): void {
   require!('_declarations-inheritance/private-method-narrows.whim');
 };
 
@@ -148,7 +148,7 @@ try {
 
 assert!($assertion_error_3 is LinkerError);
 
-$assertion_value_4 = function(): void {
+$assertion_value_4 = fn(): void {
   require!('_declarations-inheritance/sealed-both-subclasses.whim');
 };
 
@@ -327,7 +327,7 @@ class SealedDetailedLogin extends SealedLogin {}
 assert!(new SealedLogin() is SealedEvent);
 assert!(new SealedDetailedLogin() is SealedEvent);
 
-$assertion_value_25 = function(): void {
+$assertion_value_25 = fn(): void {
   require!('_declarations-inheritance/sealed-rogue.whim');
 };
 
@@ -349,7 +349,7 @@ final class SealedQuad extends SealedPolygon {}
 assert!(new SealedQuad() is SealedPolygon);
 assert!(new SealedQuad() is SealedShape);
 
-$assertion_value_28 = function(): void {
+$assertion_value_28 = fn(): void {
   require!('_declarations-inheritance/sealed-rogue-shape.whim');
 };
 
@@ -362,7 +362,7 @@ try {
 
 assert!($assertion_error_28 is LinkerError);
 
-$assertion_value_29 = function(): void {
+$assertion_value_29 = fn(): void {
   require!('_declarations-inheritance/sealed-rogue-polygon.whim');
 };
 

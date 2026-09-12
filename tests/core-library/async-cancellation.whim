@@ -16,7 +16,7 @@ final class CancellationProbe {
 }
 
 $signalToken = new Async\SignalCancellationToken();
-$signalSleeper = Async\spawn::<string>(function() use ($signalToken): string {
+$signalSleeper = Async\spawn::<string>(fn(): string {
   try {
     Async\sleep(Duration::fromSeconds(10), $signalToken);
     return 'slept';
@@ -54,7 +54,7 @@ assert!($loneCancellation is CancelledException);
 assert!($loneCancellation->getPrevious() is TimeoutException);
 
 $timedSleeper = Async\spawn::<string>(
-  function(): string {
+  fn(): string {
     $timeoutToken = new Async\TimeoutCancellationToken(
       Duration::fromMilliseconds(20),
     );
@@ -75,7 +75,7 @@ assert!($timedSleeper->await() == 'timeout');
 
 $awaitToken = new Async\SignalCancellationToken();
 $neverToken = new Async\SignalCancellationToken();
-$neverEnding = Async\spawn::<string>(function() use ($neverToken): string {
+$neverEnding = Async\spawn::<string>(fn(): string {
   try {
     Async\sleep(Duration::fromSeconds(10), $neverToken);
     return 'never';
@@ -84,15 +84,13 @@ $neverEnding = Async\spawn::<string>(function() use ($neverToken): string {
   }
 });
 
-$awaitWaiter = Async\spawn::<string>(
-  function() use ($neverEnding, $awaitToken): string {
-    try {
-      return $neverEnding->await($awaitToken);
-    } catch (CancelledException $_) {
-      return 'await cancelled';
-    }
-  },
-);
+$awaitWaiter = Async\spawn::<string>(fn(): string {
+  try {
+    return $neverEnding->await($awaitToken);
+  } catch (CancelledException $_) {
+    return 'await cancelled';
+  }
+});
 
 Async\later();
 $awaitToken->cancel();
@@ -107,7 +105,7 @@ $linkedToken = new Async\LinkedCancellationToken(vec[
 ]);
 
 assert!(!($linkedToken->isCancellationRequested()));
-$linkedSleeper = Async\spawn::<string>(function() use ($linkedToken): string {
+$linkedSleeper = Async\spawn::<string>(fn(): string {
   try {
     Async\sleep(Duration::fromSeconds(10), $linkedToken);
     return 'slept';
@@ -121,7 +119,7 @@ $linkedSecond->cancel();
 assert!($linkedToken->isCancellationRequested());
 assert!($linkedSleeper->await() == 'linked cancelled');
 
-$assertion_value_9 = function(): void {
+$assertion_value_9 = fn(): void {
   new Async\LinkedCancellationToken(vec[]);
 };
 
@@ -136,20 +134,18 @@ assert!($assertion_error_9 is InvalidArgumentException);
 
 $staleOrder = new CancellationEventRecorder();
 $staleToken = new Async\SignalCancellationToken();
-$staleWorker = Async\spawn::<int>(
-  function() use ($staleToken, $staleOrder): int {
-    try {
-      Async\sleep(Duration::fromMilliseconds(20), $staleToken);
-    } catch (CancelledException $_) {
-    }
+$staleWorker = Async\spawn::<int>(fn(): int {
+  try {
+    Async\sleep(Duration::fromMilliseconds(20), $staleToken);
+  } catch (CancelledException $_) {
+  }
 
-    Async\sleep(Duration::fromMilliseconds(80));
-    $staleOrder->events[] = 'worker';
-    return 0;
-  },
-);
+  Async\sleep(Duration::fromMilliseconds(80));
+  $staleOrder->events[] = 'worker';
+  return 0;
+});
 
-$staleMiddle = Async\spawn::<int>(function() use ($staleOrder): int {
+$staleMiddle = Async\spawn::<int>(fn(): int {
   Async\sleep(Duration::fromMilliseconds(40));
   $staleOrder->events[] = 'mid';
   return 0;
@@ -163,22 +159,22 @@ assert!($staleOrder->events == vec['mid', 'worker']);
 
 $callbackRecorder = new CancellationEventRecorder();
 $erroringToken = new Async\SignalCancellationToken();
-$erroringToken->register(function() use ($callbackRecorder): void {
+$erroringToken->register(fn(): void {
   $callbackRecorder->events[] = 'first';
   throw new RuntimeException('first failed');
 });
 
-$erroringToken->register(function() use ($callbackRecorder): void {
+$erroringToken->register(fn(): void {
   $callbackRecorder->events[] = 'second';
   throw new LogicException('second failed');
 });
 
-$erroringToken->register(function() use ($callbackRecorder): void {
+$erroringToken->register(fn(): void {
   $callbackRecorder->events[] = 'third';
 });
 
 $composite = null;
-$assertion_callable_11 = function() use ($erroringToken): void {
+$assertion_callable_11 = fn(): void {
   $erroringToken->cancel();
 };
 
@@ -202,8 +198,8 @@ assert!($callbackRecorder->events == vec['first', 'second', 'third']);
 $erroringToken->cancel();
 assert!($callbackRecorder->events == vec['first', 'second', 'third']);
 
-$assertion_value_20 = function() use ($erroringToken): void {
-  $erroringToken->register(function(): void {
+$assertion_value_20 = fn(): void {
+  $erroringToken->register(fn(): void {
     throw new RuntimeException('late failure');
   });
 };
@@ -224,13 +220,10 @@ $preCancelledToken = new Async\SignalCancellationToken();
 $preCancelledToken->cancel();
 
 $semaphoreProbe = new CancellationProbe();
-$probedSemaphore = new Async\Semaphore::<int, int>(
-  1,
-  function(int $value) use ($semaphoreProbe): int {
-    $semaphoreProbe->calls++;
-    return $value;
-  },
-);
+$probedSemaphore = new Async\Semaphore::<int, int>(1, fn(int $value): int {
+  $semaphoreProbe->calls++;
+  return $value;
+});
 
 $assertion_value_21 = fn(): int => (
   $probedSemaphore->waitFor(1, $preCancelledToken)
@@ -249,12 +242,10 @@ assert!($semaphoreProbe->calls == 0);
 assert!($probedSemaphore->waitFor(2, null) == 2);
 
 $sequenceProbe = new CancellationProbe();
-$probedSequence = new Async\Sequence::<int, int>(
-  function(int $value) use ($sequenceProbe): int {
-    $sequenceProbe->calls++;
-    return $value;
-  },
-);
+$probedSequence = new Async\Sequence::<int, int>(fn(int $value): int {
+  $sequenceProbe->calls++;
+  return $value;
+});
 
 $assertion_value_24 = fn(): int => (
   $probedSequence->waitFor(3, $preCancelledToken)
@@ -274,11 +265,11 @@ assert!($probedSequence->waitFor(4, null) == 4);
 
 $groupProbe = new CancellationProbe();
 $probedGroup = new Async\TaskGroup();
-$probedGroup->defer(function() use ($groupProbe): void {
+$probedGroup->defer(fn(): void {
   $groupProbe->calls++;
 });
 
-$assertion_value_27 = function() use ($probedGroup, $preCancelledToken): void {
+$assertion_value_27 = fn(): void {
   $probedGroup->awaitAll($preCancelledToken);
 };
 
@@ -298,22 +289,20 @@ assert!($groupProbe->calls == 1);
 $groupGate = new Async\Deferred::<null>();
 $waitingGroupProbe = new CancellationProbe();
 $waitingGroup = new Async\TaskGroup();
-$waitingGroup->defer(function() use ($groupGate, $waitingGroupProbe): void {
+$waitingGroup->defer(fn(): void {
   $groupGate->getFuture()->await();
   $waitingGroupProbe->calls++;
 });
 
 $groupCancellationToken = new Async\SignalCancellationToken();
-$groupWaiter = Async\spawn::<string>(
-  function() use ($waitingGroup, $groupCancellationToken): string {
-    try {
-      $waitingGroup->awaitAll($groupCancellationToken);
-      return 'completed';
-    } catch (CancelledException $_) {
-      return 'cancelled';
-    }
-  },
-);
+$groupWaiter = Async\spawn::<string>(fn(): string {
+  try {
+    $waitingGroup->awaitAll($groupCancellationToken);
+    return 'completed';
+  } catch (CancelledException $_) {
+    return 'cancelled';
+  }
+});
 
 Async\later();
 $groupCancellationToken->cancel();
@@ -325,29 +314,24 @@ assert!($waitingGroupProbe->calls == 1);
 
 $queueGate = new Async\Deferred::<null>();
 $queuedProbe = new CancellationProbe();
-$queuedSemaphore = new Async\Semaphore::<int, int>(
-  1,
-  function(int $value) use ($queueGate, $queuedProbe): int {
-    $queuedProbe->calls++;
-    if ($value == 1) {
-      $queueGate->getFuture()->await();
-    }
+$queuedSemaphore = new Async\Semaphore::<int, int>(1, fn(int $value): int {
+  $queuedProbe->calls++;
+  if ($value == 1) {
+    $queueGate->getFuture()->await();
+  }
 
-    return $value;
-  },
-);
+  return $value;
+});
 
 $firstQueued = Async\spawn::<int>(fn(): int => $queuedSemaphore->waitFor(1));
 $queuedCancellationToken = new Async\SignalCancellationToken();
-$secondQueued = Async\spawn::<int>(
-  function() use ($queuedSemaphore, $queuedCancellationToken): int {
-    try {
-      return $queuedSemaphore->waitFor(2, $queuedCancellationToken);
-    } catch (CancelledException $_) {
-      return -1;
-    }
-  },
-);
+$secondQueued = Async\spawn::<int>(fn(): int {
+  try {
+    return $queuedSemaphore->waitFor(2, $queuedCancellationToken);
+  } catch (CancelledException $_) {
+    return -1;
+  }
+});
 
 Async\later();
 assert!($queuedSemaphore->getOngoingOperations() == 1);

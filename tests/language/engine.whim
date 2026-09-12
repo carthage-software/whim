@@ -9,7 +9,7 @@ use Whim\Unwind\UndefinedSymbolError;
 
 class NotATask {}
 
-$assertion_value_1 = function(): void {
+$assertion_value_1 = fn(): void {
   Whim\_Private\cancel_task(new NotATask());
 };
 
@@ -163,7 +163,7 @@ assert!(Whim\_Private\cancel_task(...) is fn(Whim\_Private\TaskId): void);
 
 assert!(Whim\_Private\run_symbol_autoload(...) is fn(int, string): void);
 
-$assertion_value_16 = function(): void {
+$assertion_value_16 = fn(): void {
   Whim\_Private\cancel_task(42);
 };
 
@@ -182,7 +182,7 @@ try {
 
 assert!($assertion_error_16 is TypeError);
 
-$assertion_value_17 = function(): void {
+$assertion_value_17 = fn(): void {
   Whim\_Private\run_symbol_autoload(new NotATask(), 'X');
 };
 
@@ -230,7 +230,7 @@ File\write(
   . "\n",
 );
 
-$assertion_value_20 = function() use ($broken): void {
+$assertion_value_20 = fn(): void {
   require!($broken);
 };
 
@@ -252,7 +252,7 @@ try {
 }
 
 assert!($assertion_error_21 is UndefinedSymbolError);
-$assertion_value_22 = function() use ($broken): void {
+$assertion_value_22 = fn(): void {
   require!($broken);
 };
 

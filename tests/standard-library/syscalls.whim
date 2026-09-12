@@ -81,7 +81,7 @@ $resolved = $resolution->take() as vec<(int, (string&!''))>;
 assert!(length!($resolved) > 0);
 
 $openError = null;
-$assertion_callable_59 = function() use ($directory): mixed {
+$assertion_callable_59 = fn(): mixed {
   $operation = Whim\_Private\FileOperation::open(
     $directory . '/missing',
     Whim\_Private\OPEN_FLAG_READ_ONLY,

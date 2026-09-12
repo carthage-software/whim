@@ -61,36 +61,32 @@ function http_server_shutdown(string $mode, bool $enableH2c): void {
     $writer->writeAll("data: first\n\n");
   }
 
-  $handler = new FunctionHandler(
-    function(
-      CancellationToken $token,
-    ) use ($entered, $release, $finished, $inFlight, $body): Response {
-      $entered->complete($token);
-      try {
-        if ($inFlight) {
-          $release->getFuture()->await($token);
-        }
-      } catch (CancelledException $error) {
-        $finished->complete(false);
-        throw $error;
+  $handler = new FunctionHandler(fn(CancellationToken $token): Response {
+    $entered->complete($token);
+    try {
+      if ($inFlight) {
+        $release->getFuture()->await($token);
       }
+    } catch (CancelledException $error) {
+      $finished->complete(false);
+      throw $error;
+    }
 
-      $finished->complete(true);
-      if ($body != null) {
-        return new Response(
-          200,
-          headers: FieldMap::from(vec[('Content-Type', 'text/event-stream')]),
-          body: $body,
-        );
-      }
-
+    $finished->complete(true);
+    if ($body != null) {
       return new Response(
         200,
-        headers: FieldMap::from(vec[('Content-Length', '2')]),
-        body: new MemoryHandle('ok'),
+        headers: FieldMap::from(vec[('Content-Type', 'text/event-stream')]),
+        body: $body,
       );
-    },
-  );
+    }
+
+    return new Response(
+      200,
+      headers: FieldMap::from(vec[('Content-Length', '2')]),
+      body: new MemoryHandle('ok'),
+    );
+  });
 
   $listener = TCP\listen();
   $server = new Server(
@@ -112,13 +108,11 @@ function http_server_shutdown(string $mode, bool $enableH2c): void {
     new HTTPShutdownDriver($accepted),
   );
 
-  $task = Async\spawn::<null>(
-    function() use ($server, $handler, $cancellation, $stopped): null {
-      $server->serve($handler, $cancellation);
-      $stopped->complete(null);
-      return null;
-    },
-  );
+  $task = Async\spawn::<null>(fn(): null {
+    $server->serve($handler, $cancellation);
+    $stopped->complete(null);
+    return null;
+  });
 
   $socket = TCP\connect('127.0.0.1', $listener->getLocalEndpoint()->port);
   $reader = new Reader($socket);

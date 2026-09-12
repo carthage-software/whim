@@ -229,7 +229,7 @@ function sensitive_login(
 }
 
 $denied = null;
-$assertion_callable_39 = function(): void {
+$assertion_callable_39 = fn(): void {
   sensitive_login('ada', 'hunter2');
 };
 
@@ -257,7 +257,7 @@ function sensitive_never_login(
 }
 
 $sensitive_rendering = null;
-$assertion_callable_43 = function(): void {
+$assertion_callable_43 = fn(): void {
   sensitive_never_login('alice-username-marker', 'super-secret-pw-marker');
 };
 

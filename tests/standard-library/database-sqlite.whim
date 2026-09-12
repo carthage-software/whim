@@ -105,7 +105,7 @@ $slow = $connection->execute(
 );
 
 $advanced = new Strong::<bool>(false);
-$ticker = Async\spawn::<null>(function() use ($advanced): null {
+$ticker = Async\spawn::<null>(fn(): null {
   $advanced->value = true;
   return null;
 });
@@ -123,7 +123,7 @@ $cancelled = $connection->execute(
 );
 
 $cancellation = new SignalCancellationToken();
-Async\spawn::<null>(function() use ($cancellation): null {
+Async\spawn::<null>(fn(): null {
   Async\later();
   $cancellation->cancel();
   return null;
@@ -165,7 +165,7 @@ while ($iteration < 25) {
     . ') SELECT value FROM counter',
   );
 
-  $assertion_value_20 = function() use ($pooled): void {
+  $assertion_value_20 = fn(): void {
     $pooled->ping();
   };
 
@@ -193,7 +193,7 @@ $index = 0;
 while ($index < 12) {
   $pooled = Connector::inMemory()->connect();
   $connections[] = $pooled;
-  $futures[] = Async\spawn::<int>(function() use ($pooled): int {
+  $futures[] = Async\spawn::<int>(fn(): int {
     return Database\fetch_value($pooled->execute('SELECT 1'))->unwrap() as int;
   });
 

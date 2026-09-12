@@ -34,8 +34,7 @@ use whim_syn::cst::function::ParameterList;
 use whim_syn::cst::operation::UnaryPrefixOperator;
 use whim_syn::cst::r#type::Type;
 
-use crate::compiler::emit::analysis::references_this_in_block;
-use crate::compiler::emit::analysis::short_closure_has_captures;
+use crate::compiler::emit::analysis::closure_has_captures;
 use crate::compiler::emit::integer_gate;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
@@ -909,12 +908,7 @@ fn check_constant_expression_at(
             check_constant_instantiation(instantiation, position)
         }
         Expression::Call(call) => check_constant_call(call, position),
-        Expression::Closure(closure)
-            if closure.use_clause.is_none() && !references_this_in_block(&closure.body) =>
-        {
-            Ok(())
-        }
-        Expression::ShortClosure(closure) if !short_closure_has_captures(closure) => Ok(()),
+        Expression::Closure(closure) if !closure_has_captures(closure) => Ok(()),
         other => Err(non_constant_expression_error(other, position)),
     }
 }
@@ -1019,11 +1013,7 @@ fn non_constant_expression_error(
         Expression::Variable(_) => "a variable",
         Expression::InterpolatedString(_) => "an interpolated string",
         Expression::Assignment(_) => "an assignment",
-        Expression::Closure(closure) if closure.use_clause.is_some() => {
-            "a closure with a `use` clause"
-        }
-        Expression::Closure(_) => "a closure that captures `$this`",
-        Expression::ShortClosure(_) => "a short closure with captures",
+        Expression::Closure(_) => "a closure with captures",
         Expression::Match(_) => "a match",
         Expression::Break(_) => "a break",
         Expression::Continue(_) => "a continue",

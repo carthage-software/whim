@@ -54,15 +54,15 @@ fn descends_into_nested_expressions() {
 }
 
 #[test]
-fn short_closure_bodies_are_nodes() {
+fn closure_bodies_are_nodes() {
     let expression = kinds("$f = fn(int $value): int => $value * 2;");
-    assert!(expression.contains(&NodeKind::ShortClosure));
-    assert!(expression.contains(&NodeKind::ShortClosureBody));
+    assert!(expression.contains(&NodeKind::Closure));
+    assert!(expression.contains(&NodeKind::ClosureBody));
     assert!(expression.contains(&NodeKind::Binary));
 
     let block = kinds("$f = fn(int $value): int { return $value * 2; };");
-    assert!(block.contains(&NodeKind::ShortClosure));
-    assert!(block.contains(&NodeKind::ShortClosureBody));
+    assert!(block.contains(&NodeKind::Closure));
+    assert!(block.contains(&NodeKind::ClosureBody));
     assert!(block.contains(&NodeKind::Block));
     assert!(block.contains(&NodeKind::Return));
 }
@@ -191,7 +191,7 @@ function f(): int { return 1; }
 final class D extends E implements F {
 const int K = 1;
 public function m(): void {
-    $g = function () use ($x) { return $x; };
+    $g = fn () { return $x; };
     $h = fn () => 1;
     if ($x) { } else { }
     while ($x) { }

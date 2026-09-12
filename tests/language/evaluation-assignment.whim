@@ -96,7 +96,7 @@ assert!(($a, $b) == (1, 2));
 assert!($x . $y . $z == 'pqr');
 ($v, $w) = vec[3, 4];
 assert!(($v, $w) == (3, 4));
-$assertion_value_26 = function(): void {
+$assertion_value_26 = fn(): void {
   ($u, $t) = (1, 2, 3);
 };
 
@@ -109,7 +109,7 @@ try {
 
 assert!($assertion_error_26 is TypeError);
 
-$assertion_value_27 = function(): void {
+$assertion_value_27 = fn(): void {
   ($u, $t) = dict['a' => 1, 'b' => 2];
 };
 
@@ -174,7 +174,7 @@ foreach (vec[vec[1], vec[2, 3]] as ($left, $right = 10)) {
 
 assert!($rows == vec[(1, 10), (2, 3)]);
 
-$assertion_value_45 = function(): void {
+$assertion_value_45 = fn(): void {
   ($required, $alsoRequired, $optional = 3) = vec[1];
 };
 
@@ -187,7 +187,7 @@ try {
 
 assert!($assertion_error_45 is TypeError);
 
-$assertion_value_46 = function(): void {
+$assertion_value_46 = fn(): void {
   ($required, $optional = 2) = vec[1, 2, 3];
 };
 
@@ -207,7 +207,7 @@ File\write(
 );
 
 $requiredAfterDefault = $work . '/required-after-default.whim';
-$assertion_value_47 = function() use ($requiredAfterDefault): void {
+$assertion_value_47 = fn(): void {
   require!($requiredAfterDefault);
 };
 
@@ -276,7 +276,7 @@ assert!($profileName == 'Ada');
 assert!($pairLeft == 'left');
 assert!($pairRight == 'right');
 
-$assertion_value_62 = function(): void {
+$assertion_value_62 = fn(): void {
   dict['unknown' => $_] = dict[];
 };
 
@@ -289,7 +289,7 @@ try {
 
 assert!($assertion_error_62 is OutOfBoundsError);
 
-$assertion_value_63 = function(): void {
+$assertion_value_63 = fn(): void {
   dict[0 => $_] = vec['not a dict'];
 };
 
@@ -335,7 +335,7 @@ assert!($head == 1);
 assert!(length!($innerRest) == 2);
 assert!($label == 'end');
 
-$assertion_value_76 = function(): void {
+$assertion_value_76 = fn(): void {
   ($p, $q) = vec[1, 2, 3];
 };
 
@@ -354,7 +354,7 @@ try {
 
 assert!($assertion_error_76 is TypeError);
 
-$assertion_value_77 = function(): void {
+$assertion_value_77 = fn(): void {
   ($p, $q) = vec[1];
 };
 
@@ -373,7 +373,7 @@ try {
 
 assert!($assertion_error_77 is TypeError);
 
-$assertion_value_78 = function(): void {
+$assertion_value_78 = fn(): void {
   ($p, $q, ...$r) = vec[1];
 };
 
@@ -392,7 +392,7 @@ try {
 
 assert!($assertion_error_78 is TypeError);
 
-$assertion_value_79 = function(): void {
+$assertion_value_79 = fn(): void {
   ($p, $q) = dict['a' => 1, 'b' => 2];
 };
 
@@ -411,7 +411,7 @@ try {
 
 assert!($assertion_error_79 is TypeError);
 
-$assertion_value_80 = function(): void {
+$assertion_value_80 = fn(): void {
   ($p, ...$r) = dict['a' => 1, 'b' => 2];
 };
 
@@ -430,7 +430,7 @@ try {
 
 assert!($assertion_error_80 is TypeError);
 
-$assertion_value_81 = function(): void {
+$assertion_value_81 = fn(): void {
   ($p, $q) = 42;
 };
 
@@ -514,7 +514,7 @@ $propertySnapshot = $propertyBuffer->items;
 $propertyBuffer->push(2);
 assert!($propertySnapshot == vec[1]);
 assert!($propertyBuffer->items == vec[1, 2]);
-$assertion_value_99 = function() use ($propertyBuffer): void {
+$assertion_value_99 = fn(): void {
   $propertyBuffer->push('bad');
 };
 
@@ -533,7 +533,7 @@ $propertyIndexSnapshot = $propertyBuffer->items;
 $propertyBuffer->set(0, 3);
 assert!($propertyIndexSnapshot == vec[1, 2]);
 assert!($propertyBuffer->items == vec[3, 2]);
-$assertion_value_103 = function() use ($propertyBuffer): void {
+$assertion_value_103 = fn(): void {
   $propertyBuffer->set(0, 'bad');
 };
 
@@ -568,7 +568,7 @@ $propertyDictionary = new AssignmentPropertyDictionary();
 $propertyDictionary->set('second', 2);
 assert!($propertyDictionary->items == dict['first' => 1, 'second' => 2]);
 
-$assertion_value_106 = function() use ($propertyDictionary): void {
+$assertion_value_106 = fn(): void {
   $propertyDictionary->set(3, 3);
 };
 
@@ -581,7 +581,7 @@ try {
 
 assert!($assertion_error_106 is TypeError);
 
-$assertion_value_107 = function() use ($propertyDictionary): void {
+$assertion_value_107 = fn(): void {
   $propertyDictionary->set('first', 'bad');
 };
 
@@ -596,8 +596,8 @@ assert!($assertion_error_107 is TypeError);
 
 assert!($propertyDictionary->items == dict['first' => 1, 'second' => 2]);
 
-$assertion_value_109 = function() use ($propertyDictionary): void {
-  $propertyDictionary->setWith(function(): string {
+$assertion_value_109 = fn(): void {
+  $propertyDictionary->setWith(fn(): string {
     throw new TypeError('computed key failed');
   }, 3);
 };

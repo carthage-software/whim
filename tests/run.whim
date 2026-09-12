@@ -317,11 +317,7 @@ if (!$quiet) {
   $console->flush();
 }
 
-$run = function(
-  string $test,
-) use ($directory, $binary, $modes, $quiet, $color, $console, $width): vec<
-  (string, null|string, null|string, float),
-> {
+$run = fn(string $test): vec<(string, null|string, null|string, float)> {
   $file = $directory . '/' . $test;
   $results = vec[];
   $timings = dict[];
@@ -416,13 +412,9 @@ $futures = dict[];
 foreach (Vec\shuffle::<string>($tests) as $test) {
   $futures[$test] = Async\spawn::<
     vec<(string, null|string, null|string, float)>,
-  >(
-    function() use ($semaphore, $test): vec<
-      (string, null|string, null|string, float),
-    > {
-      return $semaphore->waitFor($test);
-    },
-  );
+  >(fn(): vec<(string, null|string, null|string, float)> {
+    return $semaphore->waitFor($test);
+  });
 }
 
 $outcomes = Async\all::<string, vec<(string, null|string, null|string, float)>>(

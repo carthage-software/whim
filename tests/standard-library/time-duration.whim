@@ -50,7 +50,7 @@ assert!(
 assert!(Duration::fromSeconds(90)->getTotalMinutes() == 1.5);
 assert!(Duration::fromMilliseconds(2500)->getTotalSeconds() == 2.5);
 
-$assertion_value_29 = function(): void {
+$assertion_value_29 = fn(): void {
   Duration::zero();
 };
 
@@ -63,7 +63,7 @@ try {
 
 assert!($assertion_error_29 is DiscardedResultError);
 
-$assertion_value_30 = function() use ($d): void {
+$assertion_value_30 = fn(): void {
   $d->plus(Duration::second());
 };
 

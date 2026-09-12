@@ -194,7 +194,7 @@ try {
 assert!($assertion_error_21 is ArgumentCountError);
 
 $seed = 1;
-$closure = function(int $value) use ($seed): int {
+$closure = fn(int $value): int {
   return $value + $seed;
 };
 
@@ -393,7 +393,7 @@ assert!(Whim\Str\contains($assertion_value_46, 'assertion failed: false'));
 assert!(Whim\Str\contains($assertion_value_46, 'message: boom'));
 
 $handmade = null;
-$assertion_callable_47 = function(): void {
+$assertion_callable_47 = fn(): void {
   throw new Error('handmade', 7);
 };
 

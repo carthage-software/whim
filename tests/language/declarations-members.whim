@@ -77,7 +77,7 @@ raises(
   'an interface cannot declare a property, and promoting a parameter declares one',
 );
 
-$assertion_value_1 = function(): void {
+$assertion_value_1 = fn(): void {
   require!('_declarations-members/top-level.whim');
 };
 
@@ -90,7 +90,7 @@ try {
 
 assert!($assertion_error_1 is CompilerError);
 
-$assertion_value_2 = function(): void {
+$assertion_value_2 = fn(): void {
   require!('_declarations-members/class-constant.whim');
 };
 
@@ -103,7 +103,7 @@ try {
 
 assert!($assertion_error_2 is CompilerError);
 
-$assertion_value_3 = function(): void {
+$assertion_value_3 = fn(): void {
   require!('_declarations-members/property.whim');
 };
 

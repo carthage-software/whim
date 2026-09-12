@@ -1,4 +1,4 @@
-$f = function<
+$f = fn<
   T0,
   T1,
   T2,

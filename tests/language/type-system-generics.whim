@@ -23,7 +23,7 @@ raises(
 );
 
 raises(
-  '_type-system-generics/covariant-short-closure-input.whim',
+  '_type-system-generics/covariant-expression-closure-input.whim',
   'covariant type parameter `T` is used in an incompatible position',
 );
 
@@ -147,7 +147,7 @@ assert!(specialized_identity::<int>(5) == 5);
 assert!(specialized_identity::<string>('runtime') == 'runtime');
 
 $unbound_identity = specialized_identity(...);
-$assertion_value_11 = function() use ($unbound_identity): void {
+$assertion_value_11 = fn(): void {
   $unbound_identity(1);
 };
 
@@ -164,7 +164,7 @@ assert!($unbound_identity::<int>(21) == 21);
 
 $bound_identity = specialized_identity::<int>(...);
 assert!($bound_identity(42) == 42);
-$assertion_value_14 = function() use ($bound_identity): void {
+$assertion_value_14 = fn(): void {
   $bound_identity('wrong');
 };
 
@@ -177,7 +177,7 @@ try {
 
 assert!($assertion_error_14 is TypeError);
 
-$assertion_value_15 = function() use ($bound_identity): void {
+$assertion_value_15 = fn(): void {
   $bound_identity::<string>('wrong');
 };
 

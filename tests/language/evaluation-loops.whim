@@ -33,7 +33,7 @@ while ($index < 3) {
 
 assert!($neverRan == 7);
 
-$assertion_value_4 = function(): void {
+$assertion_value_4 = fn(): void {
   $index = 0;
   $maximum = 9223372036854775807;
   while ($index < 1) {
@@ -51,7 +51,7 @@ try {
 
 assert!($assertion_error_4 is OverflowError);
 
-$assertion_value_5 = function(): void {
+$assertion_value_5 = fn(): void {
   $index = 0;
   $limit = 1;
   $value = 1.0;

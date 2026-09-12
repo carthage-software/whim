@@ -14,7 +14,7 @@ use Whim\URL\URL;
 $loopback = Address::v4('127.0.0.1');
 $listener = TCP\listen(new InternetEndpoint($loopback, 0));
 $endpoint = $listener->getLocalEndpoint();
-$server = Async\spawn::<string>(function() use ($listener): string {
+$server = Async\spawn::<string>(fn(): string {
   $stream = $listener->accept();
   assert!($stream->readFixedSize(3) == "\x05\x01\x00");
   $stream->writeAll("\x05\x00");
@@ -69,7 +69,7 @@ assert!(Str\starts_with($head, "GET /path HTTP/1.1\r\n"));
 
 $listener = TCP\listen(new InternetEndpoint($loopback, 0));
 $endpoint = $listener->getLocalEndpoint();
-$server = Async\spawn::<null>(function() use ($listener): null {
+$server = Async\spawn::<null>(fn(): null {
   $stream = $listener->accept();
   assert!($stream->readFixedSize(4) == "\x05\x02\x00\x02");
   $stream->writeAll("\x05\x02");
@@ -122,7 +122,7 @@ assert!(SOCKS\_Private\encode_host('example.com') == "\x03\x0bexample.com");
 
 $listener = TCP\listen(new InternetEndpoint($loopback, 0));
 $endpoint = $listener->getLocalEndpoint();
-$server = Async\spawn::<null>(function() use ($listener): null {
+$server = Async\spawn::<null>(fn(): null {
   $stream = $listener->accept();
   discard!($stream->readFixedSize(3));
   $stream->writeAll("\x05\x00");

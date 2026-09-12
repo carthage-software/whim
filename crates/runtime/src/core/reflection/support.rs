@@ -50,7 +50,6 @@ pub(crate) struct CallableInfo {
     pub(crate) span: Option<Span>,
     pub(crate) captures_this: bool,
     pub(crate) capture_names: Vec<Atom>,
-    pub(crate) is_short_closure: bool,
     pub(crate) declaring_class: Option<ClassId>,
 }
 
@@ -94,7 +93,6 @@ fn function_info(vm: &VirtualMachine<'_>, name: &Atom) -> Option<CallableInfo> {
                 span: None,
                 captures_this: false,
                 capture_names: Vec::new(),
-                is_short_closure: false,
                 declaring_class: None,
             })
         }
@@ -115,7 +113,6 @@ fn method_info(vm: &VirtualMachine<'_>, class: ClassId, name: &Atom) -> Option<C
             span: None,
             captures_this: !entry.is_static,
             capture_names: Vec::new(),
-            is_short_closure: false,
             declaring_class: Some(entry.declaring_class),
         }),
     }
@@ -138,7 +135,6 @@ fn user_function_info(
         span: Some(compiled.span),
         captures_this: runtime.captures_this,
         capture_names: compiled.capture_names.clone(),
-        is_short_closure: compiled.is_short_closure,
         declaring_class: runtime.declaring_class,
     })
 }

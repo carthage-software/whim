@@ -175,7 +175,7 @@ assert!($finishTwice is RuntimeException);
 assert!($finishTwice->getMessage() == 'the digest is already finished');
 
 $updateAfterFinish = null;
-$assertion_callable_29 = function() use ($hasher): void {
+$assertion_callable_29 = fn(): void {
   $hasher->update('more');
 };
 
@@ -213,7 +213,7 @@ assert!($finishedMac is RuntimeException);
 assert!($finishedMac->getMessage() == 'the digest is already finished');
 
 $updateFinishedMac = null;
-$assertion_callable_34 = function() use ($mac): void {
+$assertion_callable_34 = fn(): void {
   $mac->update('more');
 };
 

@@ -57,7 +57,7 @@ assert!(
   ],
 );
 
-$assertion_value_5 = function() use ($guardTrace): void {
+$assertion_value_5 = fn(): void {
   try {
     throw new RuntimeException('original');
   } catch (RuntimeException $error) if (false) {
@@ -77,7 +77,7 @@ try {
 
 assert!($assertion_error_5 is RuntimeException);
 
-$assertion_value_6 = function() use ($guardTrace): void {
+$assertion_value_6 = fn(): void {
   try {
     throw new RuntimeException('original');
   } catch (RuntimeException $error) if (guard_throws()) {
@@ -185,7 +185,7 @@ assert!(
 
 $work = Filesystem\create_temporary_directory(null, 'whim-test-');
 
-$assertion_value_10 = function(): void {
+$assertion_value_10 = fn(): void {
   undefined_fn();
 };
 
@@ -198,7 +198,7 @@ try {
 
 assert!($assertion_error_10 is Error);
 
-$assertion_value_11 = function(): void {
+$assertion_value_11 = fn(): void {
   $x = new Ghost\Widget();
 };
 
@@ -211,7 +211,7 @@ try {
 
 assert!($assertion_error_11 is Error);
 
-$assertion_value_12 = function(): void {
+$assertion_value_12 = fn(): void {
   $x = GHOST_CONSTANT;
 };
 
@@ -225,7 +225,7 @@ try {
 assert!($assertion_error_12 is Error);
 
 $nowhere = $work . '/nowhere.whim';
-$assertion_value_13 = function() use ($nowhere): void {
+$assertion_value_13 = fn(): void {
   require!($nowhere);
 };
 
@@ -242,7 +242,7 @@ function taken(): void {}
 
 $redeclares = $work . '/redeclares.whim';
 File\write($redeclares, 'function taken(): void {}' . "\n");
-$assertion_value_14 = function() use ($redeclares): void {
+$assertion_value_14 = fn(): void {
   require!($redeclares);
 };
 
@@ -257,7 +257,7 @@ assert!($assertion_error_14 is LinkerError);
 
 $badParent = $work . '/bad_parent.whim';
 File\write($badParent, 'class Orphan extends Missing\Parent {}' . "\n");
-$assertion_value_15 = function() use ($badParent): void {
+$assertion_value_15 = fn(): void {
   require!($badParent);
 };
 

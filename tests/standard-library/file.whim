@@ -53,7 +53,7 @@ $created = $directory . '/file.created';
 File\write($created, 'new', WriteMode::MustCreate);
 assert!(File\read($created) == 'new');
 
-$assertion_value_10 = function() use ($created): void {
+$assertion_value_10 = fn(): void {
   File\write($created, 'again', WriteMode::MustCreate);
 };
 
@@ -97,7 +97,7 @@ try {
 
 assert!($assertion_error_16 is File\NotFileException);
 
-$assertion_value_17 = function(): void {
+$assertion_value_17 = fn(): void {
   File\write('', 'no path');
 };
 
@@ -129,7 +129,7 @@ try {
 
 assert!($assertion_error_19 is TypeError);
 
-$assertion_value_20 = function() use ($file): void {
+$assertion_value_20 = fn(): void {
   File\write($file, 'invalid', null);
 };
 

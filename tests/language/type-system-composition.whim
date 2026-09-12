@@ -228,7 +228,7 @@ class NegatedStaticHolder {
 }
 
 $negated_holder = new NegatedHolder(1);
-$assertion_value_41 = function() use ($negated_holder): void {
+$assertion_value_41 = fn(): void {
   $negated_holder->value = null;
 };
 
@@ -243,7 +243,7 @@ assert!($assertion_error_41 is TypeError);
 
 assert!($negated_holder->value == 1);
 
-$assertion_value_43 = function(): void {
+$assertion_value_43 = fn(): void {
   NegatedStaticHolder::$value = null;
 };
 
@@ -308,7 +308,7 @@ function non_null(!null $value): !null {
 assert!(non_null(1) == 1);
 
 $non_null_message = null;
-$assertion_callable_49 = function(): void {
+$assertion_callable_49 = fn(): void {
   non_null(null);
 };
 

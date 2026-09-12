@@ -92,46 +92,46 @@ $sameOpenFiles = Process\get_resource_limit(Resource::OpenFiles);
 assert!($sameOpenFiles->soft == $openFiles->soft);
 assert!($sameOpenFiles->hard == $openFiles->hard);
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   Process\set_resource_limit(Resource::FileSize, new ResourceLimit(1, 0));
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   Process\set_user_identity(INVALID_POSIX_ID);
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   Process\set_group_identity(INVALID_POSIX_ID);
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   Process\set_supplementary_group_ids(vec[INVALID_POSIX_ID]);
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   Process\initialize_supplementary_group_ids(
     'whim-invalid-user',
     INVALID_POSIX_ID,
   );
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   discard!(Process\get_session_id(INVALID_PROCESS_ID));
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   discard!(Process\get_process_group_id(INVALID_PROCESS_ID));
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   Process\set_process_group_id(INVALID_PROCESS_ID);
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   discard!(Process\get_priority(INVALID_POSIX_ID));
 }));
 
-discard!(expect_process_failure(function(): void {
+discard!(expect_process_failure(fn(): void {
   Process\set_priority(0, INVALID_POSIX_ID);
 }));
 
@@ -143,7 +143,7 @@ assert!(Process\find_executable('whim-no-such-executable') == null);
 
 $uncatchableSignalError = null;
 try {
-  discard!(Process\watch_signal(Signal::Kill, function(): void {}));
+  discard!(Process\watch_signal(Signal::Kill, fn(): void {}));
 } catch (InvalidArgumentException $error) {
   $uncatchableSignalError = $error;
 }
@@ -153,7 +153,7 @@ assert!($uncatchableSignalError is InvalidArgumentException);
 $binary = Env\current_binary() as NonEmptyString;
 assert!(Process\find_executable($binary) == $binary);
 
-$replaceFailure = expect_process_failure(function(): void {
+$replaceFailure = expect_process_failure(fn(): void {
   Process\replace('/definitely/not/a/whim-process-test-program');
 });
 
@@ -225,7 +225,7 @@ $group = Command\create(
 Process\signal_group($group->getId() as 1.., Signal::Terminate);
 assert!($group->wait() is Signalled);
 
-$assertion_value_12 = function(): void {
+$assertion_value_12 = fn(): void {
   Whim\_Private\getmypid();
 };
 

@@ -6,7 +6,7 @@ use whim_syn::cst::class::MethodBody;
 use whim_syn::cst::declaration::NamespaceBody;
 use whim_syn::cst::declaration::UseItems;
 use whim_syn::cst::expression::Expression;
-use whim_syn::cst::function::ShortClosureBody;
+use whim_syn::cst::function::ClosureBody;
 use whim_syn::cst::statement::Statement;
 use whim_syn::error::ParseError;
 
@@ -87,7 +87,7 @@ fn a_parameter_cannot_be_variadic() {
         ParseError::UnexpectedToken(..)
     ));
     assert!(matches!(
-        error("$f = function (mixed ...$rest) { };"),
+        error("$f = fn (mixed ...$rest) { };"),
         ParseError::UnexpectedToken(..)
     ));
     assert!(matches!(
@@ -218,33 +218,17 @@ fn unbacked_enum_with_cases() {
 }
 
 #[test]
-fn closure_with_use_clause() {
+fn expression_bodied_closure() {
     let arena = LocalArena::new();
-    let Expression::Closure(closure) = expression(
-        &arena,
-        "function ($x) use ($y, $z): int { return $x + $y; };",
-    ) else {
+    let Expression::Closure(closure) = expression(&arena, "fn ($x): int => $x * 2;") else {
         panic!("expected a closure");
-    };
-
-    assert_eq!(closure.parameter_list.parameters.len(), 1);
-    let use_clause = closure.use_clause.as_ref().expect("a use clause");
-    assert_eq!(use_clause.variables.len(), 2);
-    assert!(closure.return_type.is_some());
-}
-
-#[test]
-fn expression_bodied_short_closure() {
-    let arena = LocalArena::new();
-    let Expression::ShortClosure(closure) = expression(&arena, "fn ($x): int => $x * 2;") else {
-        panic!("expected a short closure");
     };
 
     assert_eq!(closure.parameter_list.parameters.len(), 1);
     assert!(closure.return_type.is_some());
     assert!(matches!(
         closure.body,
-        ShortClosureBody::Expression {
+        ClosureBody::Expression {
             expression: Expression::Binary(_),
             ..
         }
@@ -252,16 +236,16 @@ fn expression_bodied_short_closure() {
 }
 
 #[test]
-fn block_bodied_short_closure() {
+fn block_bodied_closure() {
     let arena = LocalArena::new();
-    let Expression::ShortClosure(closure) = expression(
+    let Expression::Closure(closure) = expression(
         &arena,
         "fn(int $x): int { $result = $x * 2; return $result; };",
     ) else {
-        panic!("expected a short closure");
+        panic!("expected a closure");
     };
 
-    let ShortClosureBody::Block(block) = &closure.body else {
+    let ClosureBody::Block(block) = &closure.body else {
         panic!("expected a block body");
     };
     assert_eq!(block.statements.len(), 2);
@@ -284,7 +268,7 @@ fn attribute_on_a_class() {
 }
 
 #[test]
-fn attributed_function_and_short_closure() {
+fn attributed_function_and_closure() {
     let arena = LocalArena::new();
     assert!(matches!(
         statement(&arena, "#[Pure] function f(): int { return 1; }"),
@@ -293,7 +277,7 @@ fn attributed_function_and_short_closure() {
     let Statement::Expression(statement) = statement(&arena, "#[A] fn () => 1;") else {
         panic!("expected an expression statement");
     };
-    assert!(matches!(statement.expression, Expression::ShortClosure(_)));
+    assert!(matches!(statement.expression, Expression::Closure(_)));
 }
 
 #[test]

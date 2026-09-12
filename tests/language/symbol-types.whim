@@ -160,7 +160,7 @@ assert!(bounded_ok::<ALSO_OK>(ALSO_OK) == OK);
 assert!(OK is OK&int);
 assert!(NOT_FOUND is int&!OK);
 assert!(increment_ok(OK) == 201);
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   accept_object(OK);
 };
 
@@ -173,7 +173,7 @@ try {
 
 assert!($assertion_error_19 is TypeError);
 
-$assertion_value_20 = function(): void {
+$assertion_value_20 = fn(): void {
   accept_object(identity(...));
 };
 

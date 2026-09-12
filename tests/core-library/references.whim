@@ -47,7 +47,7 @@ try {
 
 assert!($assertion_error_10 is OutOfBoundsError);
 
-$assertion_value_11 = function() use ($map, $absentKey): void {
+$assertion_value_11 = fn(): void {
   $map->remove($absentKey);
 };
 
@@ -60,7 +60,7 @@ try {
 
 assert!($assertion_error_11 is OutOfBoundsError);
 
-$assertion_value_12 = function() use ($map): void {
+$assertion_value_12 = fn(): void {
   foreach ($map as $entry) {}
 };
 
@@ -73,7 +73,7 @@ try {
 
 assert!($assertion_error_12 is TypeError);
 
-$assertion_value_13 = function() use ($map, $storedKey): void {
+$assertion_value_13 = fn(): void {
   $entry = $map[$storedKey];
 };
 
@@ -131,7 +131,7 @@ assert!($bulkMap->length() == 1);
 $key = null;
 assert!($bulkMap->length() == 0);
 
-$assertion_value_19 = function() use ($weakConfig): void {
+$assertion_value_19 = fn(): void {
   $weakConfig->get();
 };
 
@@ -145,7 +145,7 @@ try {
 assert!($assertion_error_19 is DiscardedResultError);
 
 $weakGetter = $weakConfig->get(...);
-$assertion_value_20 = function() use ($weakGetter): void {
+$assertion_value_20 = fn(): void {
   $weakGetter();
 };
 
@@ -158,7 +158,7 @@ try {
 
 assert!($assertion_error_20 is DiscardedResultError);
 
-$assertion_value_21 = function() use ($lifecycleMap, $livingKey): void {
+$assertion_value_21 = fn(): void {
   $lifecycleMap->get($livingKey);
 };
 
@@ -171,7 +171,7 @@ try {
 
 assert!($assertion_error_21 is DiscardedResultError);
 
-$assertion_value_22 = function() use ($map, $storedKey): void {
+$assertion_value_22 = fn(): void {
   $map->has($storedKey);
 };
 
@@ -184,7 +184,7 @@ try {
 
 assert!($assertion_error_22 is DiscardedResultError);
 
-$assertion_value_23 = function() use ($map): void {
+$assertion_value_23 = fn(): void {
   $map->length();
 };
 

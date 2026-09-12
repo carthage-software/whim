@@ -1,6 +1,6 @@
 namespace Limits\binder_default_arguments_at_limit_5;
 
-$f = function<
+$f = fn<
   T = Box<
     A0,
     A1,

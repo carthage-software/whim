@@ -41,7 +41,7 @@ assert!($secondPass == vec['2:1']);
 
 class PlainObject {}
 
-$assertion_value_3 = function(): void {
+$assertion_value_3 = fn(): void {
   foreach (new PlainObject() as $entry) {}
 };
 

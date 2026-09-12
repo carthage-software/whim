@@ -299,9 +299,6 @@ pub(crate) struct CompiledFunction {
     pub captures_this: bool,
     /// Capture names in capture-window order, including `$this` when present.
     pub capture_names: Vec<Atom>,
-    /// Whether this is an auto-capturing `fn` closure.
-    #[seeded(with(serde_seeded::unseeded))]
-    pub is_short_closure: bool,
     /// Types inferred for captures other than the receiver.
     pub capture_types: Vec<Option<TypeDescriptor>>,
     pub chunk: Chunk,

@@ -19,7 +19,7 @@ File\write(
 );
 
 $defaultMustBeLast = $work . '/default-must-be-last.whim';
-$assertion_value_1 = function() use ($defaultMustBeLast): void {
+$assertion_value_1 = fn(): void {
   require!($defaultMustBeLast);
 };
 
@@ -47,7 +47,7 @@ File\write(
 );
 
 $duplicateBindings = $work . '/duplicate-bindings.whim';
-$assertion_value_2 = function() use ($duplicateBindings): void {
+$assertion_value_2 = fn(): void {
   require!($duplicateBindings);
 };
 
@@ -73,7 +73,7 @@ File\write(
 );
 
 $irrefutableMixed = $work . '/irrefutable-mixed-must-be-last.whim';
-$assertion_value_3 = function() use ($irrefutableMixed): void {
+$assertion_value_3 = fn(): void {
   require!($irrefutableMixed);
 };
 
@@ -99,7 +99,7 @@ File\write(
 );
 
 $typeDefaultMustBeLast = $work . '/type-default-must-be-last.whim';
-$assertion_value_4 = function() use ($typeDefaultMustBeLast): void {
+$assertion_value_4 = fn(): void {
   require!($typeDefaultMustBeLast);
 };
 
@@ -125,7 +125,7 @@ File\write(
 );
 
 $typeDuplicateDefault = $work . '/type-duplicate-default.whim';
-$assertion_value_5 = function() use ($typeDuplicateDefault): void {
+$assertion_value_5 = fn(): void {
   require!($typeDuplicateDefault);
 };
 

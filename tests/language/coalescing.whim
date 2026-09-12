@@ -135,78 +135,81 @@ assert!((Probe::$nullable ??= 8) == 8);
 assert!((Probe::$absent ?? 42) == 42);
 assert!(Probe::$calls == 2);
 
-raises::<VisibilityError>(function() use ($probe): mixed {
+raises::<VisibilityError>(fn(): mixed {
   return $probe->secret ?? 0;
 });
 
-raises::<VisibilityError>(function(): mixed {
+raises::<VisibilityError>(fn(): mixed {
   return Probe::$hidden ?? 0;
 });
 
-raises::<UndefinedVariableError>(function(): mixed {
+function undefined_read(): mixed {
   return $undefined ?? 0;
-});
+}
 
-raises::<UndefinedVariableError>(function(): mixed {
+function undefined_assignment(): mixed {
   return $undefined ??= 0;
-});
+}
 
-raises::<TypeError>(function(): mixed {
+raises::<UndefinedVariableError>(undefined_read(...));
+raises::<UndefinedVariableError>(undefined_assignment(...));
+
+raises::<TypeError>(fn(): mixed {
   return dict[][vec[]] ?? 0;
 });
 
-raises::<TypeError>(function(): mixed {
+raises::<TypeError>(fn(): mixed {
   return vec[]['key'] ?? 0;
 });
 
-raises::<TypeError>(function(): mixed {
+raises::<TypeError>(fn(): mixed {
   return 7[0] ?? 0;
 });
 
-raises::<TypeError>(function(): mixed {
+raises::<TypeError>(fn(): mixed {
   return missing(7);
 });
 
-raises::<TypeError>(function(): mixed {
+raises::<TypeError>(fn(): mixed {
   return new Probe()->number ??= 'invalid';
 });
 
-raises::<TypeError>(function() use ($probe): mixed {
+raises::<TypeError>(fn(): mixed {
   return $probe->absent ??= tick();
 });
 
 assert!(Probe::$calls == 3);
-raises::<TypeError>(function(): mixed {
+raises::<TypeError>(fn(): mixed {
   return Probe::$absent ??= tick();
 });
 
 assert!(Probe::$calls == 4);
-raises::<VisibilityError>(function() use ($probe): mixed {
+raises::<VisibilityError>(fn(): mixed {
   return $probe->secret ??= tick();
 });
 
 assert!(Probe::$calls == 4);
-raises::<UninitializedPropertyError>(function(): mixed {
+raises::<UninitializedPropertyError>(fn(): mixed {
   return new Probe()->number[0] ??= tick();
 });
 
-raises::<OutOfBoundsError>(function(): mixed {
+raises::<OutOfBoundsError>(fn(): mixed {
   $values = dict[];
   return $values['missing'][0] ??= tick();
 });
 
-raises::<TypeError>(function(): mixed {
+raises::<TypeError>(fn(): mixed {
   $values = dict['null' => null];
   return $values['null'][0] ??= tick();
 });
 
-raises::<TypeError>(function(): mixed {
+raises::<TypeError>(fn(): mixed {
   $value = null;
   return $value->number ??= tick();
 });
 
 assert!(Probe::$calls == 4);
-raises::<OutOfBoundsError>(function(): mixed {
+raises::<OutOfBoundsError>(fn(): mixed {
   $values = vec[];
   return $values[0] ??= tick();
 });
@@ -217,7 +220,7 @@ final class UnwrittenReadonly {
   public readonly int $value;
 }
 
-raises::<ReadonlyError>(function(): mixed {
+raises::<ReadonlyError>(fn(): mixed {
   $value = new UnwrittenReadonly();
   return $value->value ??= 1;
 });
@@ -230,15 +233,15 @@ function broken_key(): int {
   return vec[][0];
 }
 
-raises::<OutOfBoundsError>(function(): mixed {
+raises::<OutOfBoundsError>(fn(): mixed {
   return identity(dict[]['missing']) ?? 0;
 });
 
-raises::<OutOfBoundsError>(function(): mixed {
+raises::<OutOfBoundsError>(fn(): mixed {
   return dict[][broken_key()] ?? 0;
 });
 
-raises::<OutOfBoundsError>(function(): mixed {
+raises::<OutOfBoundsError>(fn(): mixed {
   return broken_key() ?? 0;
 });
 
@@ -247,18 +250,18 @@ assert!((identity(new Probe())->number ?? 42) == 42);
 assert!((identity(new Probe())?->number ?? 42) == 42);
 assert!(((identity(dict[])['missing']) ?? 42) == 42);
 
-raises::<UndefinedVariableError>(function(): mixed {
+raises::<UndefinedVariableError>(fn(): mixed {
   $values = dict[];
   $_ = $values['missing'][$skipped = 0] ?? 7;
   return $skipped;
 });
 
-raises::<UndefinedVariableError>(function(): mixed {
+raises::<UndefinedVariableError>(fn(): mixed {
   $values = dict[];
   return $values['missing'][$skipped = 0] ?? $skipped;
 });
 
-raises::<UndefinedVariableError>(function(): mixed {
+raises::<UndefinedVariableError>(fn(): mixed {
   $_ = 1 ?? ($skipped = 0);
   return $skipped;
 });

@@ -10,6 +10,5 @@ enum CallableKind implements UnitEnum {
   case StaticMethod;
   case InstanceMethod;
   case Closure;
-  case ShortClosure;
   case Partial;
 }

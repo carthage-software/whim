@@ -143,24 +143,22 @@ function websocket_server_request(
 
 $state = new WebSocketServerTestState();
 $handler = new Handler(
-  new FunctionConnectionHandler(
-    function(Connection $connection) use ($state): void {
-      assert!($connection->getSubprotocol() == 'chat');
-      $text = $connection->receive();
-      assert!($text is TextMessage);
-      $state->text = $text as string;
-      $connection->sendText('world');
+  new FunctionConnectionHandler(fn(Connection $connection): void {
+    assert!($connection->getSubprotocol() == 'chat');
+    $text = $connection->receive();
+    assert!($text is TextMessage);
+    $state->text = $text as string;
+    $connection->sendText('world');
 
-      $binary = $connection->receive();
-      assert!($binary is BinaryMessage);
-      $state->binary = $binary as string;
+    $binary = $connection->receive();
+    assert!($binary is BinaryMessage);
+    $state->binary = $binary as string;
 
-      $close = $connection->receive();
-      assert!($close is CloseMessage);
-      $state->closeCode = $close[0];
-      $state->closeReason = $close[1];
-    },
-  ),
+    $close = $connection->receive();
+    assert!($close is CloseMessage);
+    $state->closeCode = $close[0];
+    $state->closeReason = $close[1];
+  }),
   new Configuration(subprotocols: vec['chat']),
 );
 
@@ -211,7 +209,7 @@ assert!($duplicateConfiguration);
 $wrongVersion = websocket_server_serve(
   websocket_server_request(version: '12'),
   new Handler(
-    new FunctionConnectionHandler(function(Connection $_connection): void {}),
+    new FunctionConnectionHandler(fn(Connection $_connection): void {}),
   ),
 );
 
@@ -223,7 +221,7 @@ assert!(
 $wrongMethod = websocket_server_serve(
   websocket_server_request(method: 'POST'),
   new Handler(
-    new FunctionConnectionHandler(function(Connection $_connection): void {}),
+    new FunctionConnectionHandler(fn(Connection $_connection): void {}),
   ),
 );
 
@@ -232,7 +230,7 @@ assert!(Str\starts_with($wrongMethod->written, 'HTTP/1.1 400 '));
 $invalidKey = websocket_server_serve(
   websocket_server_request(key: 'invalid'),
   new Handler(
-    new FunctionConnectionHandler(function(Connection $_connection): void {}),
+    new FunctionConnectionHandler(fn(Connection $_connection): void {}),
   ),
 );
 
@@ -248,7 +246,7 @@ try {
 assert!($invalidConfiguration);
 
 $throwingUpgrade = new Handler(
-  new FunctionConnectionHandler(function(Connection $_connection): never {
+  new FunctionConnectionHandler(fn(Connection $_connection): never {
     throw new RuntimeException('upgrade callback failed');
   }),
 );
@@ -300,12 +298,10 @@ assert!($assertion_error_2 is CancelledException);
 
 assert!($connection->tryReceive() == null);
 $waitCancellation = new SignalCancellationToken();
-$pendingWait = Async\spawn::<null>(
-  function() use ($connection, $waitCancellation): null {
-    $connection->waitUntilReceivable($waitCancellation);
-    return null;
-  },
-);
+$pendingWait = Async\spawn::<null>(fn(): null {
+  $connection->waitUntilReceivable($waitCancellation);
+  return null;
+});
 
 Async\later();
 $waitCancellation->cancel();
@@ -319,7 +315,7 @@ try {
 
 assert!($assertion_error_4 is CancelledException);
 
-$pendingWait = Async\spawn::<null>(function() use ($connection): null {
+$pendingWait = Async\spawn::<null>(fn(): null {
   $connection->waitUntilReceivable();
   return null;
 });

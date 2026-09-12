@@ -1,4 +1,4 @@
-//! Function-like constructs: functions, closures, short closures, parameters, and return types.
+//! Function-like constructs: functions, closures, parameters, and return types.
 
 use whim_span::HasSpan;
 use whim_span::Span;
@@ -36,57 +36,20 @@ impl HasSpan for Function<'_> {
     }
 }
 
-/// An anonymous function.
+/// A closure that captures enclosing variables automatically, by value.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct Closure<'arena> {
-    pub attribute_lists: &'arena [AttributeList<'arena>],
-    pub function: Keyword<'arena>,
-    pub type_parameters: Option<TypeParameterList<'arena>>,
-    pub parameter_list: ParameterList<'arena>,
-    pub use_clause: Option<ClosureUseClause<'arena>>,
-    pub return_type: Option<ReturnType<'arena>>,
-    pub body: Block<'arena>,
-}
-
-/// The capture clause of a closure.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct ClosureUseClause<'arena> {
-    pub r#use: Keyword<'arena>,
-    pub left_parenthesis: Span,
-    pub variables: TokenSeparatedSequence<'arena, Variable<'arena>>,
-    pub right_parenthesis: Span,
-}
-
-impl HasSpan for Closure<'_> {
-    fn span(&self) -> Span {
-        if let Some(attribute_list) = self.attribute_lists.first() {
-            return attribute_list.span().join(self.body.span());
-        }
-
-        self.function.span().join(self.body.span())
-    }
-}
-
-impl HasSpan for ClosureUseClause<'_> {
-    fn span(&self) -> Span {
-        self.r#use.span().join(self.right_parenthesis)
-    }
-}
-
-/// A short closure that captures enclosing variables automatically, by value.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct ShortClosure<'arena> {
     pub attribute_lists: &'arena [AttributeList<'arena>],
     pub r#fn: Keyword<'arena>,
     pub type_parameters: Option<TypeParameterList<'arena>>,
     pub parameter_list: ParameterList<'arena>,
     pub return_type: Option<ReturnType<'arena>>,
-    pub body: ShortClosureBody<'arena>,
+    pub body: ClosureBody<'arena>,
 }
 
-/// The expression or statement block executed by a short closure.
+/// The expression or statement block executed by a closure.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum ShortClosureBody<'arena> {
+pub enum ClosureBody<'arena> {
     Expression {
         arrow: Span,
         expression: &'arena Expression<'arena>,
@@ -94,7 +57,7 @@ pub enum ShortClosureBody<'arena> {
     Block(Block<'arena>),
 }
 
-impl HasSpan for ShortClosure<'_> {
+impl HasSpan for Closure<'_> {
     fn span(&self) -> Span {
         if let Some(attribute_list) = self.attribute_lists.first() {
             return attribute_list.span().join(self.body.span());
@@ -104,7 +67,7 @@ impl HasSpan for ShortClosure<'_> {
     }
 }
 
-impl HasSpan for ShortClosureBody<'_> {
+impl HasSpan for ClosureBody<'_> {
     fn span(&self) -> Span {
         match self {
             Self::Expression { arrow, expression } => arrow.join(expression.span()),

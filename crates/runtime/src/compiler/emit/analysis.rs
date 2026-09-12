@@ -4,8 +4,8 @@ use hashbrown::HashSet;
 
 use whim_syn::cst::binding::BindingTarget as BindTarget;
 use whim_syn::cst::binding::ElementBindingTarget as BindElement;
-use whim_syn::cst::function::ShortClosure;
-use whim_syn::cst::function::ShortClosureBody;
+use whim_syn::cst::function::Closure;
+use whim_syn::cst::function::ClosureBody;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::operation::UnaryPrefixOperator;
 use whim_syn::cst::pattern::ObjectPatternEntry;
@@ -15,7 +15,6 @@ use whim_syn::cst::walker::Visitor;
 use whim_syn::cst::walker::walk;
 
 use crate::compiler::emit::AssignmentTarget;
-use crate::compiler::emit::Block;
 use crate::compiler::emit::DestructureTarget;
 use crate::compiler::emit::Expression;
 use crate::compiler::emit::ParameterList;
@@ -88,10 +87,7 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for AssignedNames<'_, 'arena> {
                 self.names.insert(variable.name);
                 Flow::Skip
             }
-            Node::AssignmentTarget(_)
-            | Node::BindingTarget(_)
-            | Node::Closure(_)
-            | Node::ShortClosure(_) => Flow::Skip,
+            Node::AssignmentTarget(_) | Node::BindingTarget(_) | Node::Closure(_) => Flow::Skip,
             _ => Flow::Descend,
         }
     }
@@ -202,7 +198,7 @@ fn collect_scoped_bindings(node: Node<'_, '_>, bindings: &mut Vec<(String, Span)
                         .push((variable.name.to_string(), variable.span));
                     Flow::Skip
                 }
-                Node::BindingTarget(_) | Node::Closure(_) | Node::ShortClosure(_) => Flow::Skip,
+                Node::BindingTarget(_) | Node::Closure(_) => Flow::Skip,
                 _ => Flow::Descend,
             }
         }
@@ -275,7 +271,6 @@ fn collect_local_names<'arena>(node: Node<'_, 'arena>, names: &mut Names<'arena>
                     Flow::Skip
                 }
                 Node::Closure(_)
-                | Node::ShortClosure(_)
                 | Node::Function(_)
                 | Node::Class(_)
                 | Node::Interface(_)
@@ -288,15 +283,12 @@ fn collect_local_names<'arena>(node: Node<'_, 'arena>, names: &mut Names<'arena>
     walk(node, &mut LocalNames { names });
 }
 
-fn collect_short_closure_free_variables<'arena>(
-    closure: &ShortClosure<'arena>,
-    names: &mut Names<'arena>,
-) {
+fn collect_closure_free_variables<'arena>(closure: &Closure<'arena>, names: &mut Names<'arena>) {
     let mut inner = Names::default();
     let mut locals = Names::default();
     let body = match &closure.body {
-        ShortClosureBody::Expression { expression, .. } => Node::Expression(expression),
-        ShortClosureBody::Block(block) => Node::Block(block),
+        ClosureBody::Expression { expression, .. } => Node::Expression(expression),
+        ClosureBody::Block(block) => Node::Block(block),
     };
 
     collect_local_names(body, &mut locals);
@@ -311,9 +303,9 @@ fn collect_short_closure_free_variables<'arena>(
     merge_unbound(&closure.parameter_list, inner, names);
 }
 
-pub(in crate::compiler) fn short_closure_has_captures(closure: &ShortClosure<'_>) -> bool {
+pub(in crate::compiler) fn closure_has_captures(closure: &Closure<'_>) -> bool {
     let mut names = Names::default();
-    collect_short_closure_free_variables(closure, &mut names);
+    collect_closure_free_variables(closure, &mut names);
     !names.ordered.is_empty()
 }
 
@@ -465,24 +457,11 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for ReferencedNames<'_, 'arena> {
 
                 Flow::Descend
             }
-            Node::ShortClosure(closure) => {
+            Node::Closure(closure) => {
                 let mut inner = Names::default();
-                collect_short_closure_free_variables(closure, &mut inner);
+                collect_closure_free_variables(closure, &mut inner);
                 for name in inner.ordered {
                     self.reference(name);
-                }
-
-                Flow::Skip
-            }
-            Node::Closure(closure) => {
-                if let Some(use_clause) = &closure.use_clause {
-                    for variable in use_clause.variables {
-                        self.reference(variable.name);
-                    }
-                }
-
-                if references_this_in_block(&closure.body) {
-                    self.reference("$this");
                 }
 
                 Flow::Skip
@@ -507,14 +486,6 @@ fn collect_variables<'arena>(node: Node<'_, 'arena>, names: &mut Names<'arena>) 
             locals: None,
         },
     );
-}
-
-/// Whether a block references `$this`, for automatic capture.
-pub(in crate::compiler) fn references_this_in_block(block: &Block<'_>) -> bool {
-    let mut names = Names::default();
-    collect_variables(Node::Block(block), &mut names);
-
-    names.contains("$this")
 }
 
 pub(in crate::compiler::emit) fn collect_variables_in_statements(

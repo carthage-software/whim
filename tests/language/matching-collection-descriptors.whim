@@ -188,7 +188,7 @@ $loader = new Autoload\Autoloader()->withSymbolFile(
 
 Autoload\register($loader);
 
-$matchesLate = function(
+$matchesLate = fn(
   mixed $value,
 ): bool {
   return match ($value) {

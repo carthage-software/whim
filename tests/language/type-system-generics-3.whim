@@ -311,7 +311,7 @@ class Observation {
 }
 
 $observation = new Observation();
-$same = $ok->inspect(function(int $value) use ($observation): void {
+$same = $ok->inspect(fn(int $value): void {
   $observation->value = $value;
 });
 
@@ -320,7 +320,7 @@ assert!($same->unwrap() == 42);
 assert!($observation->value == 42);
 
 $observation->value = null;
-$same = $err->inspectErr(function(string $error) use ($observation): void {
+$same = $err->inspectErr(fn(string $error): void {
   $observation->value = $error;
 });
 

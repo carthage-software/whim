@@ -56,7 +56,7 @@ assert!(new UnixEndpoint(null)->toString() == '<anonymous>');
 
 $listener = TCP\listen();
 $tcpEndpoint = $listener->getLocalEndpoint();
-$server = Async\spawn::<null>(function() use ($listener): null {
+$server = Async\spawn::<null>(fn(): null {
   $stream = $listener->accept();
   assert!($stream->readFixedSize(4) == 'ping');
   $stream->writeAll('pong');
@@ -89,7 +89,7 @@ $right->close();
 $directory = Filesystem\create_temporary_directory(null, 'whim-network-');
 $socketPath = $directory . '/socket';
 $unixListener = Unix\listen($socketPath);
-$unixServer = Async\spawn::<null>(function() use ($unixListener): null {
+$unixServer = Async\spawn::<null>(fn(): null {
   $stream = $unixListener->accept();
   assert!($stream->readFixedSize(5) == 'hello');
   $stream->writeAll('world');

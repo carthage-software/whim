@@ -193,13 +193,10 @@ class SortKeyCounter {
 }
 
 $sort_key_counter = new SortKeyCounter();
-$sorted_by = Vec\sort_by::<int, int>(
-  vec[3, 1, 2],
-  function(int $value) use ($sort_key_counter): int {
-    $sort_key_counter->calls++;
-    return $value;
-  },
-);
+$sorted_by = Vec\sort_by::<int, int>(vec[3, 1, 2], fn(int $value): int {
+  $sort_key_counter->calls++;
+  return $value;
+});
 
 assert!($sorted_by == vec[1, 2, 3]);
 assert!($sort_key_counter->calls == 3);

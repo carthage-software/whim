@@ -97,7 +97,6 @@ pub(crate) enum Operation {
     IsRepeatable,
     IsResolved,
     IsSensitive,
-    IsShort,
     IsStatic,
     IsStaticInitialized,
     IsSubtypeOf,

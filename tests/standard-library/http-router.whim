@@ -68,11 +68,11 @@ function router_test_context(): RouterTestContext {
 
 function router_test_handler(int $status): FunctionHandler {
   return new FunctionHandler(
-    function(
+    fn(
       Context $_context,
       Request $_request,
       CancellationToken $_cancellation,
-    ) use ($status): Response {
+    ): Response {
       return new Response($status);
     },
   );
@@ -202,7 +202,7 @@ assert!(
   == 219,
 );
 
-$assertion_value_19 = function(): Router {
+$assertion_value_19 = fn(): Router {
   return new Router()->get('/static/*/nested', router_test_handler(218));
 };
 
@@ -290,7 +290,7 @@ try {
   assert!($error->allowedMethods == vec['GET', 'HEAD']);
 }
 
-$assertion_value_28 = function() use ($headRouter): Response {
+$assertion_value_28 = fn(): Response {
   return router_test_dispatch(
     $headRouter,
     'GET',
@@ -308,7 +308,7 @@ try {
 
 assert!($assertion_error_28 is NotFoundException);
 
-$assertion_value_29 = function() use ($headRouter): Router {
+$assertion_value_29 = fn(): Router {
   return $headRouter->add('GET', '/fallback', router_test_handler(224));
 };
 
@@ -321,7 +321,7 @@ try {
 
 assert!($assertion_error_29 is InvalidArgumentException);
 
-$assertion_value_30 = function(): Router {
+$assertion_value_30 = fn(): Router {
   return new Router()->add(
     'GET',
     '/broken/{value:[}',
@@ -378,10 +378,10 @@ foreach (dict[
   );
 }
 
-$collection->prefix('/api', function(RouteCollection $routes): void {
+$collection->prefix('/api', fn(RouteCollection $routes): void {
   $routes->get('/users', router_test_handler(240))->prefix(
     '/v1',
-    function(RouteCollection $routes): void {
+    fn(RouteCollection $routes): void {
       $routes->post('/users', router_test_handler(241));
     },
   );
@@ -411,7 +411,7 @@ $firstMiddleware = new RouterTestMiddleware(1);
 $secondMiddleware = new RouterTestMiddleware(2);
 $collection->through(
   vec[$firstMiddleware, $secondMiddleware],
-  function(RouteCollection $routes): void {
+  fn(RouteCollection $routes): void {
     $routes->get('/wrapped', router_test_handler(200));
   },
 )->get('/unwrapped', router_test_handler(200));
@@ -442,17 +442,11 @@ assert!($firstMiddleware->calls == 1);
 assert!($secondMiddleware->calls == 1);
 
 $nestedMiddleware = new RouterTestMiddleware(3);
-$collection->prefix(
-  '/nested',
-  function(RouteCollection $routes) use ($nestedMiddleware): void {
-    $routes->through(
-      $nestedMiddleware,
-      function(RouteCollection $routes): void {
-        $routes->get('/route', router_test_handler(200));
-      },
-    );
-  },
-);
+$collection->prefix('/nested', fn(RouteCollection $routes): void {
+  $routes->through($nestedMiddleware, fn(RouteCollection $routes): void {
+    $routes->get('/route', router_test_handler(200));
+  });
+});
 
 assert!(
   router_test_dispatch(
@@ -466,7 +460,7 @@ assert!(
 
 $transactional = new Router();
 try {
-  $transactional->prefix('/discarded', function(RouteCollection $routes): void {
+  $transactional->prefix('/discarded', fn(RouteCollection $routes): void {
     $routes->get('/route', router_test_handler(250));
     throw new RouterTestGroupException('discard the route group');
   });
@@ -475,7 +469,7 @@ try {
 } catch (RouterTestGroupException $_) {
 }
 
-$assertion_value_44 = function() use ($transactional): Response {
+$assertion_value_44 = fn(): Response {
   return router_test_dispatch(
     $transactional,
     'GET',

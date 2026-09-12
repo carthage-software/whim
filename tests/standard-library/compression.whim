@@ -145,7 +145,7 @@ foreach ($codecs as $codec) {
 
   assert!(!($encoded == $payload));
   assert!(compression_test_decode($codec, $encoded) == $payload);
-  $assertion_value_3 = function() use ($codec): void {
+  $assertion_value_3 = fn(): void {
     compression_test_truncated($codec);
   };
 
@@ -158,7 +158,7 @@ foreach ($codecs as $codec) {
 
   assert!($assertion_error_3 is DecompressionException);
 
-  $assertion_value_4 = function() use ($codec): void {
+  $assertion_value_4 = fn(): void {
     compression_test_malformed($codec);
   };
 
@@ -228,7 +228,7 @@ assert!($assertion_error_14 is LimitExceededException);
 
 $cancellation = new SignalCancellationToken();
 $echo = new FunctionHandler(
-  function(
+  fn(
     Context $context,
     Request $request,
     CancellationToken $cancellation,

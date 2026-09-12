@@ -33,7 +33,7 @@ class UninitializedBag {
   public int $x;
 }
 
-$assertion_value_3 = function(): void {
+$assertion_value_3 = fn(): void {
   $bag = new UninitializedBag();
   $bag->x;
 };
@@ -51,7 +51,7 @@ class InitializedBag {
   public int $x = 1;
 }
 
-$assertion_value_4 = function(): void {
+$assertion_value_4 = fn(): void {
   $bag = new InitializedBag();
   $bag->missing;
 };
@@ -65,7 +65,7 @@ try {
 
 assert!($assertion_error_4 is TypeError);
 
-$assertion_value_5 = function(): void {
+$assertion_value_5 = fn(): void {
   $number = 5;
   $number->x;
 };
@@ -83,7 +83,7 @@ class SealedBox {
   private int $secret = 1;
 }
 
-$assertion_value_6 = function(): void {
+$assertion_value_6 = fn(): void {
   $sealed = new SealedBox();
   $sealed->secret;
 };
@@ -119,7 +119,7 @@ class PrivateChild extends PrivateBase {
   }
 }
 
-$assertion_value_8 = function(): void {
+$assertion_value_8 = fn(): void {
   new PrivateChild()->reveal();
 };
 
@@ -136,7 +136,7 @@ class LockedMethods {
   private function hidden(): void {}
 }
 
-$assertion_value_9 = function(): void {
+$assertion_value_9 = fn(): void {
   new LockedMethods()->hidden();
 };
 
@@ -168,7 +168,7 @@ class DoubleWriteUser {
   }
 }
 
-$assertion_value_11 = function(): void {
+$assertion_value_11 = fn(): void {
   new DoubleWriteUser();
 };
 
@@ -189,7 +189,7 @@ class OnceWrittenUser {
   }
 }
 
-$assertion_value_12 = function(): void {
+$assertion_value_12 = fn(): void {
   $user = new OnceWrittenUser();
   $user->id = 9;
 };
@@ -243,7 +243,7 @@ class PrivateReadonlyChildValue extends PrivateReadonlyParentValue {
   }
 }
 
-$assertion_value_15 = function(): void {
+$assertion_value_15 = fn(): void {
   new PrivateReadonlyChildValue();
 };
 
@@ -270,7 +270,7 @@ class NarrowPoint {
   public function __construct(public int $x) {}
 }
 
-$assertion_value_18 = function(): void {
+$assertion_value_18 = fn(): void {
   $point = new NarrowPoint(1);
   clone!($point, z: 2);
 };
@@ -284,7 +284,7 @@ try {
 
 assert!($assertion_error_18 is TypeError);
 
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   clone!(5);
 };
 
@@ -313,7 +313,7 @@ class HiddenStatic {
   private static int $secret = 1;
 }
 
-$assertion_value_21 = function(): void {
+$assertion_value_21 = fn(): void {
   HiddenStatic::$secret;
 };
 
@@ -347,7 +347,7 @@ class PrivateConstant {
   private const int SECRET = 1;
 }
 
-$assertion_value_24 = function(): void {
+$assertion_value_24 = fn(): void {
   PrivateConstant::SECRET;
 };
 
@@ -362,7 +362,7 @@ assert!($assertion_error_24 is VisibilityError);
 
 class ConstantFree {}
 
-$assertion_value_25 = function(): void {
+$assertion_value_25 = fn(): void {
   ConstantFree::MISSING;
 };
 
@@ -559,7 +559,7 @@ function release_resource(): void {
   $resource = new ThrowingResource();
 }
 
-$assertion_value_37 = function(): void {
+$assertion_value_37 = fn(): void {
   release_resource();
 };
 
@@ -700,7 +700,7 @@ File\write(
   . "\n"
   . '}'
   . "\n"
-  . '$future = Whim\Async\spawn::<null>(function (): null {'
+  . '$future = Whim\Async\spawn::<null>(fn (): null {'
   . "\n"
   . '    make_async_cycle();'
   . "\n"
@@ -754,8 +754,8 @@ function make_throwing_cycle(): void {
   $plain->next = $throwing;
 }
 
-$assertion_value_49 = function(): void {
-  $future = Async\spawn::<null>(function(): null {
+$assertion_value_49 = fn(): void {
+  $future = Async\spawn::<null>(fn(): null {
     make_throwing_cycle();
     GC\collect_cycles();
     return null;

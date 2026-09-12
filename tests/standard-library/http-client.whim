@@ -433,9 +433,7 @@ $observed = new MetadataRecorder();
 $transaction = $client->send(
   Request::fromParts(Message\METHOD_GET, 'users?id=1'),
   new Client\SendConfiguration(
-    onConnection: function(
-      Client\ConnectionMetadata $value,
-    ) use ($observed): void {
+    onConnection: fn(Client\ConnectionMetadata $value): void {
       $observed->value = $value;
     },
   ),
@@ -1573,7 +1571,7 @@ assert!($assertion_error_87 is Client\ProtocolException);
 
 $plainServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
 
-$plainServerTask = Async\spawn::<null>(function() use ($plainServer): null {
+$plainServerTask = Async\spawn::<null>(fn(): null {
   $stream = $plainServer->accept();
   $requestBytes = $stream->read(8192);
   assert!(Str\contains($requestBytes, "GET /direct HTTP/1.1\r\n"));
@@ -1619,7 +1617,7 @@ assert!($resolutionTimeout is Async\CancelledException);
 assert!($resolutionTimeout->getPrevious() is Async\TimeoutException);
 
 $resetServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
-$resetServerTask = Async\spawn::<null>(function() use ($resetServer): null {
+$resetServerTask = Async\spawn::<null>(fn(): null {
   $stream = $resetServer->accept();
   $protocol = new H2\ServerConnection(
     new H2\Configuration(
@@ -1683,7 +1681,7 @@ assert!($resetFailure is Client\ProtocolException);
 
 $earlyH2Server = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
 
-$earlyH2ServerTask = Async\spawn::<null>(function() use ($earlyH2Server): null {
+$earlyH2ServerTask = Async\spawn::<null>(fn(): null {
   $stream = $earlyH2Server->accept();
   $protocol = new H2\ServerConnection(
     new H2\Configuration(
@@ -1751,38 +1749,36 @@ $h2TlsServer = TLS\listen::<InternetEndpoint>(
 );
 
 $h2ResponseConsumed = new Async\Deferred::<null>();
-$h2ServerTask = Async\spawn::<null>(
-  function() use ($h2TlsServer, $h2ResponseConsumed): null {
-    $stream = $h2TlsServer->accept();
-    $protocol = new H2\ServerConnection();
-    $streamId = null;
-    while ($streamId == null) {
-      foreach ($protocol->receive($stream->read(16384)) as $event) {
-        if ($event is H2\Event\RequestHeadersReceived) {
-          $streamId = $event[1];
-        }
-      }
-
-      $outbound = $protocol->takeOutboundBytes();
-      if ($outbound != '') {
-        $stream->writeAll($outbound);
+$h2ServerTask = Async\spawn::<null>(fn(): null {
+  $stream = $h2TlsServer->accept();
+  $protocol = new H2\ServerConnection();
+  $streamId = null;
+  while ($streamId == null) {
+    foreach ($protocol->receive($stream->read(16384)) as $event) {
+      if ($event is H2\Event\RequestHeadersReceived) {
+        $streamId = $event[1];
       }
     }
 
-    $protocol->sendHeaders(
-      $streamId,
-      vec[(':status', '200', false), ('x-negotiated', 'h2', false)],
-    );
+    $outbound = $protocol->takeOutboundBytes();
+    if ($outbound != '') {
+      $stream->writeAll($outbound);
+    }
+  }
 
-    $protocol->sendData($streamId, 'negotiated h2', true);
-    $stream->writeAll($protocol->takeOutboundBytes());
-    $h2ResponseConsumed->getFuture()->await(
-      new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
-    );
+  $protocol->sendHeaders(
+    $streamId,
+    vec[(':status', '200', false), ('x-negotiated', 'h2', false)],
+  );
 
-    return null;
-  },
-);
+  $protocol->sendData($streamId, 'negotiated h2', true);
+  $stream->writeAll($protocol->takeOutboundBytes());
+  $h2ResponseConsumed->getFuture()->await(
+    new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+  );
+
+  return null;
+});
 
 $h2Client = new Client\DefaultClient(
   configuration: new Client\Configuration(
@@ -1828,49 +1824,42 @@ $streamingTlsServer = TLS\listen::<InternetEndpoint>(
 $streamingHeadersSent = new Async\Deferred::<null>();
 $streamingBodyAllowed = new Async\Deferred::<null>();
 $streamingResponseConsumed = new Async\Deferred::<null>();
-$streamingServerTask = Async\spawn::<null>(
-  function() use (
-    $streamingTlsServer,
-    $streamingHeadersSent,
-    $streamingBodyAllowed,
-    $streamingResponseConsumed,
-  ): null {
-    $stream = $streamingTlsServer->accept();
-    $protocol = new H2\ServerConnection();
-    $streamId = null;
-    while ($streamId == null) {
-      foreach ($protocol->receive($stream->read(16384)) as $event) {
-        if ($event is H2\Event\RequestHeadersReceived) {
-          $streamId = $event[1];
-        }
-      }
-
-      $outbound = $protocol->takeOutboundBytes();
-      if ($outbound != '') {
-        $stream->writeAll($outbound);
+$streamingServerTask = Async\spawn::<null>(fn(): null {
+  $stream = $streamingTlsServer->accept();
+  $protocol = new H2\ServerConnection();
+  $streamId = null;
+  while ($streamId == null) {
+    foreach ($protocol->receive($stream->read(16384)) as $event) {
+      if ($event is H2\Event\RequestHeadersReceived) {
+        $streamId = $event[1];
       }
     }
 
-    $protocol->sendHeaders($streamId, vec[(':status', '200', false)]);
+    $outbound = $protocol->takeOutboundBytes();
+    if ($outbound != '') {
+      $stream->writeAll($outbound);
+    }
+  }
 
-    $stream->writeAll($protocol->takeOutboundBytes());
-    $streamingHeadersSent->complete(null);
-    $streamingBodyAllowed->getFuture()->await();
-    $protocol->sendData($streamId, 'streamed h2');
-    $protocol->sendHeaders(
-      $streamId,
-      vec[('x-stream-trailer', 'h2', false)],
-      true,
-    );
+  $protocol->sendHeaders($streamId, vec[(':status', '200', false)]);
 
-    $stream->writeAll($protocol->takeOutboundBytes());
-    $streamingResponseConsumed->getFuture()->await(
-      new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
-    );
+  $stream->writeAll($protocol->takeOutboundBytes());
+  $streamingHeadersSent->complete(null);
+  $streamingBodyAllowed->getFuture()->await();
+  $protocol->sendData($streamId, 'streamed h2');
+  $protocol->sendHeaders(
+    $streamId,
+    vec[('x-stream-trailer', 'h2', false)],
+    true,
+  );
 
-    return null;
-  },
-);
+  $stream->writeAll($protocol->takeOutboundBytes());
+  $streamingResponseConsumed->getFuture()->await(
+    new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+  );
+
+  return null;
+});
 
 $streamingClient = new Client\DefaultClient(
   configuration: new Client\Configuration(
@@ -1883,28 +1872,22 @@ $streamingClient = new Client\DefaultClient(
 );
 
 $streamingResponse = new Async\Deferred::<Transaction>();
-$streamingClientTask = Async\spawn::<null>(
-  function() use (
-    $streamingClient,
-    $streamingTcpServer,
-    $streamingResponse,
-  ): null {
-    $streamingResponse->complete(
-      $streamingClient->send(
-        Request::fromURL(
-          Message\METHOD_GET,
-          URL::from(
-            'https://localhost:'
-            . $streamingTcpServer->getLocalEndpoint()->port
-            . '/stream',
-          ),
+$streamingClientTask = Async\spawn::<null>(fn(): null {
+  $streamingResponse->complete(
+    $streamingClient->send(
+      Request::fromURL(
+        Message\METHOD_GET,
+        URL::from(
+          'https://localhost:'
+          . $streamingTcpServer->getLocalEndpoint()->port
+          . '/stream',
         ),
       ),
-    );
+    ),
+  );
 
-    return null;
-  },
-);
+  return null;
+});
 
 $streamingHeadersSent->getFuture()->await();
 Async\sleep(Duration::fromMilliseconds(10));
@@ -1934,45 +1917,39 @@ $multiplexTlsServer = TLS\listen::<InternetEndpoint>(
 
 $firstRequestReceived = new Async\Deferred::<null>();
 $multiplexResponsesConsumed = new Async\Deferred::<null>();
-$multiplexServerTask = Async\spawn::<null>(
-  function() use (
-    $multiplexTlsServer,
-    $firstRequestReceived,
-    $multiplexResponsesConsumed,
-  ): null {
-    $stream = $multiplexTlsServer->accept();
-    $protocol = new H2\ServerConnection();
-    $streams = vec[];
-    while (length!($streams) < 2) {
-      foreach ($protocol->receive($stream->read(16384)) as $event) {
-        if ($event is H2\Event\RequestHeadersReceived) {
-          $streams[] = $event[1];
-          if (length!($streams) == 1) {
-            $firstRequestReceived->complete(null);
-          }
+$multiplexServerTask = Async\spawn::<null>(fn(): null {
+  $stream = $multiplexTlsServer->accept();
+  $protocol = new H2\ServerConnection();
+  $streams = vec[];
+  while (length!($streams) < 2) {
+    foreach ($protocol->receive($stream->read(16384)) as $event) {
+      if ($event is H2\Event\RequestHeadersReceived) {
+        $streams[] = $event[1];
+        if (length!($streams) == 1) {
+          $firstRequestReceived->complete(null);
         }
-      }
-
-      $outbound = $protocol->takeOutboundBytes();
-      if ($outbound != '') {
-        $stream->writeAll($outbound);
       }
     }
 
-    $protocol->sendHeaders($streams[1], vec[(':status', '200', false)]);
+    $outbound = $protocol->takeOutboundBytes();
+    if ($outbound != '') {
+      $stream->writeAll($outbound);
+    }
+  }
 
-    $protocol->sendData($streams[1], 'second', true);
-    $protocol->sendHeaders($streams[0], vec[(':status', '200', false)]);
+  $protocol->sendHeaders($streams[1], vec[(':status', '200', false)]);
 
-    $protocol->sendData($streams[0], 'first', true);
-    $stream->writeAll($protocol->takeOutboundBytes());
-    $multiplexResponsesConsumed->getFuture()->await(
-      new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
-    );
+  $protocol->sendData($streams[1], 'second', true);
+  $protocol->sendHeaders($streams[0], vec[(':status', '200', false)]);
 
-    return null;
-  },
-);
+  $protocol->sendData($streams[0], 'first', true);
+  $stream->writeAll($protocol->takeOutboundBytes());
+  $multiplexResponsesConsumed->getFuture()->await(
+    new Async\TimeoutCancellationToken(Duration::fromSeconds(2)),
+  );
+
+  return null;
+});
 
 $multiplexClient = new Client\DefaultClient(
   configuration: new Client\Configuration(

@@ -198,7 +198,7 @@ $noAuthenticationConnection = new Connection(
 
 discard!($noAuthenticationConnection->ehlo('client.example'));
 assert!($noAuthenticationConnection->capability('AUTH') == null);
-$assertion_value_32 = function() use ($noAuthenticationConnection): void {
+$assertion_value_32 = fn(): void {
   new PlainAuthenticator('user', 'secret')->authenticate(
     $noAuthenticationConnection,
   );
@@ -378,14 +378,12 @@ assert!($assertion_error_55 is InvalidArgumentException);
 
 $listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
 $endpoint = $listener->getLocalEndpoint();
-$server = Async\spawn::<(string, string)>(
-  function() use ($listener): (string, string) {
-    return (
-      smtp_receive_data_message($listener),
-      smtp_receive_data_message($listener),
-    );
-  },
-);
+$server = Async\spawn::<(string, string)>(fn(): (string, string) {
+  return (
+    smtp_receive_data_message($listener),
+    smtp_receive_data_message($listener),
+  );
+});
 
 $transport = new DefaultTransport(
   new TransportConfiguration(
@@ -429,7 +427,7 @@ assert!(Str\contains($secondPayload, "\r\n\r\nsecond message") == true);
 
 $listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
 $endpoint = $listener->getLocalEndpoint();
-$server = Async\spawn::<string>(function() use ($listener): string {
+$server = Async\spawn::<string>(fn(): string {
   $stream = $listener->accept();
   $reader = new Reader($stream);
   $stream->writeAll("220 smtp.example ESMTP ready\r\n");

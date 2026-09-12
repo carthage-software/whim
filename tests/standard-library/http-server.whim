@@ -451,11 +451,11 @@ $protocolStream = new HTTPServerProtocolStream(
 );
 
 $protocolHandler = new Handler\FunctionHandler(
-  function(
+  fn(
     Context\Context $context,
     Request $request,
     CancellationToken $cancellation,
-  ) use ($state): Response {
+  ): Response {
     $state->request = $request;
     $state->body = $request->body?->readAll() ?? '';
     $state->calls++;
@@ -493,11 +493,11 @@ $pipelineStream = new HTTPServerProtocolStream(
 );
 
 $pipelineHandler = new Handler\FunctionHandler(
-  function(
+  fn(
     Context\Context $context,
     Request $request,
     CancellationToken $cancellation,
-  ) use ($pipelineState): Response {
+  ): Response {
     $pipelineState->targets[] = $request->requestTarget;
     $pipelineState->calls++;
     return new Response(204);
@@ -524,11 +524,11 @@ $chunkStream = new HTTPServerProtocolStream(
 );
 
 $chunkHandler = new Handler\FunctionHandler(
-  function(
+  fn(
     Context\Context $context,
     Request $request,
     CancellationToken $cancellation,
-  ) use ($chunkState): Response {
+  ): Response {
     $chunkState->body = $request->body?->readAll() ?? '';
     $chunkState->trailer = $request->trailers?->await()->get('x-checksum');
     $chunkState->calls++;
@@ -558,11 +558,11 @@ $invalidStream = new HTTPServerProtocolStream(
 );
 
 $invalidHandler = new Handler\FunctionHandler(
-  function(
+  fn(
     Context\Context $context,
     Request $request,
     CancellationToken $cancellation,
-  ) use ($invalidState): Response {
+  ): Response {
     $invalidState->calls++;
     return new Response(200);
   },
@@ -591,11 +591,11 @@ new ServerPrivate\StreamDriverImpl()->serve(
   $shortH1Stream,
   true,
   new Handler\FunctionHandler(
-    function(
+    fn(
       Context\Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ) use ($shortH1State): Response {
+    ): Response {
       $shortH1State->calls++;
       return new Response(204);
     },
@@ -630,11 +630,11 @@ $h2Stream = new HTTPServerH2Stream(
 );
 
 $h2Handler = new Handler\FunctionHandler(
-  function(
+  fn(
     Context\Context $context,
     Request $request,
     CancellationToken $cancellation,
-  ) use ($h2State): Response {
+  ): Response {
     $h2State->request = $request;
     $h2State->body = $request->body?->readAll() ?? '';
     $h2State->calls++;
@@ -706,11 +706,11 @@ $upgradeStream = new HTTPServerH2Stream(
 );
 
 $upgradeHandler = new Handler\FunctionHandler(
-  function(
+  fn(
     Context\Context $context,
     Request $request,
     CancellationToken $cancellation,
-  ) use ($upgradeState): Response {
+  ): Response {
     $upgradeState->request = $request;
     $upgradeState->calls++;
     return new Response(204);

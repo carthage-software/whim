@@ -174,7 +174,7 @@ pub(crate) fn callable_dispatch(
         context.type_error("the reflected callable declaration is no longer loaded")
     })?;
     match operation {
-        Operation::CallableKind => callable_kind(context, &function, &callable, &info),
+        Operation::CallableKind => callable_kind(context, &function, &callable),
         Operation::Declaration => objects::declaration(context, callable_declaration(&callable)),
         Operation::Type => {
             let value = values
@@ -477,7 +477,6 @@ fn callable_kind(
     context: &mut Context<'_, '_, '_>,
     function: &ManagedRef<FunctionObject>,
     callable: &CallableKey,
-    info: &support::CallableInfo,
 ) -> Result<Value, Throw> {
     let partial = function
         .presets()
@@ -494,7 +493,6 @@ fn callable_kind(
             CallableKey::Function(_) => b"Function".as_slice(),
             CallableKey::Method { .. } if function.this().is_some() => b"InstanceMethod".as_slice(),
             CallableKey::Method { .. } => b"StaticMethod".as_slice(),
-            CallableKey::Closure(_) if info.is_short_closure => b"ShortClosure".as_slice(),
             CallableKey::Closure(_) => b"Closure".as_slice(),
         }
     };

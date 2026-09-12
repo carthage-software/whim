@@ -70,7 +70,7 @@ assert!(Whim\Str\contains($assertion_value_9, 'tuple(1) ['));
 assert!(Whim\Str\contains($assertion_value_9, 'vec(1) ['));
 
 $tuple_assertion = null;
-$assertion_callable_10 = function(): void {
+$assertion_callable_10 = fn(): void {
   assert!((1,) == (2,));
 };
 
@@ -106,7 +106,7 @@ foreach ($ordered as $key => $value) {
 assert!($ordered_keys == vec['a', 'c', 'b']);
 assert!($ordered_values == vec[10, 3, 20]);
 
-$assertion_value_16 = function(): void {
+$assertion_value_16 = fn(): void {
   $probe = vec[1];
   $probe[1];
 };
@@ -120,7 +120,7 @@ try {
 
 assert!($assertion_error_16 is OutOfBoundsError);
 
-$assertion_value_17 = function(): void {
+$assertion_value_17 = fn(): void {
   $probe = vec[1];
   $probe[-1];
 };
@@ -134,7 +134,7 @@ try {
 
 assert!($assertion_error_17 is OutOfBoundsError);
 
-$assertion_value_18 = function(): void {
+$assertion_value_18 = fn(): void {
   $probe = vec[1];
   $probe['0'];
 };
@@ -148,7 +148,7 @@ try {
 
 assert!($assertion_error_18 is TypeError);
 
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   $probe = vec[1];
   $probe[1] = 2;
 };
@@ -162,7 +162,7 @@ try {
 
 assert!($assertion_error_19 is OutOfBoundsError);
 
-$assertion_value_20 = function(): void {
+$assertion_value_20 = fn(): void {
   $probe = dict[1 => 'a'];
   $probe[2];
 };
@@ -176,7 +176,7 @@ try {
 
 assert!($assertion_error_20 is OutOfBoundsError);
 
-$assertion_value_21 = function(): void {
+$assertion_value_21 = fn(): void {
   $probe = dict[1 => 'a'];
   $probe[1.5];
 };
@@ -206,7 +206,7 @@ $indexed_text = 'abc';
 assert!($indexed_tuple[0] == 10);
 assert!($indexed_tuple[1] == 'x');
 assert!($indexed_text[1] == 'b');
-$assertion_value_30 = function(): void {
+$assertion_value_30 = fn(): void {
   $tuple = (1, 2);
   $tuple[0] = 3;
 };
@@ -220,7 +220,7 @@ try {
 
 assert!($assertion_error_30 is TypeError);
 
-$assertion_value_31 = function(): void {
+$assertion_value_31 = fn(): void {
   $text = 'abc';
   $text[0] = 'z';
 };
@@ -234,7 +234,7 @@ try {
 
 assert!($assertion_error_31 is TypeError);
 
-$assertion_value_32 = function(): void {
+$assertion_value_32 = fn(): void {
   $text = 'abc';
   $text[3];
 };
@@ -357,7 +357,7 @@ $discarded_removal_holder->removeLastItem();
 assert!($discarded_removal_holder->entries == dict[]);
 assert!($discarded_removal_holder->items == vec['middle']);
 
-$assertion_value_41 = function(): void {
+$assertion_value_41 = fn(): void {
   $empty = vec[];
   remove_first!($empty);
 };
@@ -371,7 +371,7 @@ try {
 
 assert!($assertion_error_41 is OutOfBoundsError);
 
-$assertion_value_42 = function(): void {
+$assertion_value_42 = fn(): void {
   $keyed = dict[1 => 2];
   remove!($keyed, '9');
 };
@@ -391,7 +391,7 @@ try {
 
 assert!($assertion_error_42 is OutOfBoundsError);
 
-$assertion_value_43 = function(): void {
+$assertion_value_43 = fn(): void {
   remove!('text', 0);
 };
 
@@ -404,7 +404,7 @@ try {
 
 assert!($assertion_error_43 is TypeError);
 
-$assertion_value_swap_remove_bounds = function(): void {
+$assertion_value_swap_remove_bounds = fn(): void {
   $items = vec[1];
   swap_remove!($items, 1);
 };
@@ -418,7 +418,7 @@ try {
 
 assert!($assertion_error_swap_remove_bounds is OutOfBoundsError);
 
-$assertion_value_swap_remove_type = function(): void {
+$assertion_value_swap_remove_type = fn(): void {
   $items = dict[0 => 1];
   swap_remove!($items, 0);
 };
@@ -432,7 +432,7 @@ try {
 
 assert!($assertion_error_swap_remove_type is TypeError);
 
-$assertion_value_44 = function(): void {
+$assertion_value_44 = fn(): void {
   $keyed = dict[];
   $keyed[] = 1;
 };
@@ -450,7 +450,7 @@ assert!(length!('abcd') == 4);
 assert!(length!(vec[1]) == 1);
 assert!(length!(dict['k' => 1]) == 1);
 assert!(length!((1, 2)) == 2);
-$assertion_value_49 = function(): void {
+$assertion_value_49 = fn(): void {
   length!(5);
 };
 
@@ -470,7 +470,7 @@ assert!(($nested_first, $nested_second, $nested_third) == (1, 2, 3));
 assert!(($mixed_first, $mixed_second) == (1, 2));
 assert!(length!($mixed_rest) == 2);
 
-$assertion_value_53 = function(): void {
+$assertion_value_53 = fn(): void {
   ($left, $right) = (1, 2, 3);
 };
 
@@ -483,7 +483,7 @@ try {
 
 assert!($assertion_error_53 is TypeError);
 
-$assertion_value_54 = function(): void {
+$assertion_value_54 = fn(): void {
   ($left, $right) = dict['a' => 1, 'b' => 2];
 };
 

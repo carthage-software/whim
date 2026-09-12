@@ -535,10 +535,7 @@ assert!(
 $probe = new ShapeValue(new ShapeChild());
 $fixture = beside('_object-shapes/late-alias.whim');
 $loader = new Whim\Autoload\Autoloader()->withFallback(
-  function(
-    Whim\Symbol\SymbolKind $kind,
-    string $name,
-  ) use ($probe, $fixture): bool {
+  fn(Whim\Symbol\SymbolKind $kind, string $name): bool {
     if ($name != 'LateObjectShapeAlias') {
       return false;
     }

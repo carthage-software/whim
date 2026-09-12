@@ -126,7 +126,7 @@ $store->replace('identifier', 0, dict['count' => 2], $ttl, $cancellation);
 assert!($store->load('identifier', $cancellation)?->revision == 1);
 assert!($store->load('identifier', $cancellation)?->data == dict['count' => 2]);
 
-$assertion_value_22 = function() use ($store, $ttl, $cancellation): void {
+$assertion_value_22 = fn(): void {
   $store->replace('identifier', 0, dict[], $ttl, $cancellation);
 };
 
@@ -144,21 +144,16 @@ $conflictingMiddleware = new SessionMiddleware(
   new Configuration(rollingExpiration: true),
 );
 
-$assertion_value_23 = function() use (
-  $conflictingMiddleware,
-  $store,
-  $ttl,
-  $cancellation,
-): Response {
+$assertion_value_23 = fn(): Response {
   return $conflictingMiddleware->handle(
     http_session_test_context(),
     http_session_request('identifier'),
     new FunctionHandler(
-      function(
+      fn(
         Context\Context $_context,
         Request $_request,
         CancellationToken $_cancellation,
-      ) use ($store, $ttl): Response {
+      ): Response {
         $store->replace('identifier', 1, dict['external' => true], $ttl);
         return new Response(200);
       },
@@ -186,7 +181,7 @@ $response = $middleware->handle(
   $context,
   http_session_request(),
   new FunctionHandler(
-    function(
+    fn(
       Context\Context $context,
       Request $_request,
       CancellationToken $_cancellation,
@@ -209,7 +204,7 @@ $response = $middleware->handle(
   $context,
   http_session_request($identifier),
   new FunctionHandler(
-    function(
+    fn(
       Context\Context $context,
       Request $_request,
       CancellationToken $_cancellation,
@@ -231,7 +226,7 @@ $response = $middleware->handle(
   $context,
   http_session_request($identifier),
   new FunctionHandler(
-    function(
+    fn(
       Context\Context $context,
       Request $_request,
       CancellationToken $_cancellation,
@@ -255,7 +250,7 @@ $response = $middleware->handle(
   $context,
   http_session_request($freshIdentifier),
   new FunctionHandler(
-    function(
+    fn(
       Context\Context $context,
       Request $_request,
       CancellationToken $_cancellation,
@@ -320,7 +315,7 @@ assert!(
   ],
 );
 
-$assertion_value_42 = function() use ($databaseStore, $ttl): void {
+$assertion_value_42 = fn(): void {
   $databaseStore->replace('database', 0, dict[], $ttl);
 };
 
@@ -333,7 +328,7 @@ try {
 
 assert!($assertion_error_42 is ConflictException);
 
-$assertion_value_43 = function() use ($databaseStore, $ttl): void {
+$assertion_value_43 = fn(): void {
   $databaseStore->create('database', dict[], $ttl);
 };
 

@@ -1,10 +1,9 @@
-//! Closures, short closures, and the bodies synthesized for them.
+//! Closures and the bodies synthesized for them.
 
 use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::function::Closure;
+use whim_syn::cst::function::ClosureBody;
 use whim_syn::cst::function::ParameterList;
-use whim_syn::cst::function::ShortClosure;
-use whim_syn::cst::function::ShortClosureBody;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeParameterList;
 
@@ -40,10 +39,8 @@ use crate::compiler::emit::analysis::collect_free_variables_in_expression;
 use crate::compiler::emit::analysis::collect_free_variables_in_statements;
 use crate::compiler::emit::analysis::collect_scoped_bindings_in_expression;
 use crate::compiler::emit::capture_gate;
-use crate::compiler::emit::check_sequence;
 use crate::compiler::emit::collect_assigned_in_expression;
 use crate::compiler::emit::line_and_column;
-use crate::compiler::emit::references_this_in_block;
 use crate::compiler::types::TypeScope;
 use crate::compiler::types::descriptor_is_never;
 use crate::compiler::types::lowering::lower_type;
@@ -64,7 +61,6 @@ struct SynthesizedFunctionSource<'source, 'arena, 'captures> {
     return_type: Option<&'source Type<'arena>>,
     body: FunctionBodySource<'source, 'arena>,
     captures: &'captures [String],
-    is_short: bool,
 }
 
 impl SynthesizedFunctionSource<'_, '_, '_> {
@@ -94,91 +90,23 @@ impl BodyCompiler<'_, '_> {
             check_type_parameters(self.heap, scope, self.aliases, list)?;
         }
 
-        let mut captures: Vec<String> = Vec::new();
-        if let Some(use_clause) = &closure.use_clause {
-            check_sequence(
-                CompileErrorKind::TooManyCaptures,
-                "a `use` clause may capture",
-                "variables",
-                use_clause.variables,
-            )?;
-
-            for variable in use_clause.variables {
-                if captures.iter().any(|capture| capture == variable.name) {
-                    return Err(CompileError::new(
-                        CompileErrorKind::DuplicateCapture,
-                        format!("the variable {} is captured twice", variable.name),
-                        variable.span(),
-                    ));
-                }
-                if closure
-                    .parameter_list
-                    .parameters
-                    .iter()
-                    .any(|parameter| parameter.variable.name == variable.name)
-                {
-                    return Err(CompileError::new(
-                        CompileErrorKind::DuplicateCapture,
-                        format!(
-                            "the variable {} is both captured and declared as a parameter",
-                            variable.name
-                        ),
-                        variable.span(),
-                    ));
-                }
-
-                captures.push(variable.name.to_string());
-            }
-        }
-
-        if self.shape.is_instance_method && references_this_in_block(&closure.body) {
-            captures.insert(0, "$this".to_string());
-        }
-
-        self.synthesize_function(
-            scope,
-            SynthesizedFunctionSource {
-                span: closure.span(),
-                attribute_lists: closure.attribute_lists,
-                type_parameters: closure.type_parameters.as_ref(),
-                parameter_list: &closure.parameter_list,
-                return_type: closure
-                    .return_type
-                    .as_ref()
-                    .map(|annotation| annotation.r#type),
-                body: FunctionBodySource::Block(&closure.body),
-                captures: &captures,
-                is_short: false,
-            },
-        )
-    }
-
-    pub(in crate::compiler) fn short_closure(
-        &mut self,
-        scope: &Scope<'_>,
-        closure: &ShortClosure<'_>,
-    ) -> Result<Register, CompileError> {
-        if let Some(list) = &closure.type_parameters {
-            check_type_parameters(self.heap, scope, self.aliases, list)?;
-        }
-
-        if matches!(closure.body, ShortClosureBody::Expression { .. })
+        if matches!(closure.body, ClosureBody::Expression { .. })
             && let Some(return_type) = &closure.return_type
             && matches!(return_type.r#type.unparenthesized(), Type::Void(_))
         {
             return Err(CompileError::new(
-                CompileErrorKind::VoidExpressionShortClosure,
-                "an expression-bodied short closure always returns its expression's value and cannot declare `void`",
+                CompileErrorKind::VoidExpressionClosure,
+                "an expression-bodied closure always returns its expression's value and cannot declare `void`",
                 return_type.r#type.span(),
             ));
         }
 
         let (referenced, body) = match &closure.body {
-            ShortClosureBody::Expression { expression, .. } => (
+            ClosureBody::Expression { expression, .. } => (
                 collect_free_variables_in_expression(expression),
                 FunctionBodySource::Expression(expression),
             ),
-            ShortClosureBody::Block(block) => (
+            ClosureBody::Block(block) => (
                 collect_free_variables_in_statements(block.statements),
                 FunctionBodySource::Block(block),
             ),
@@ -221,7 +149,6 @@ impl BodyCompiler<'_, '_> {
                     .map(|annotation| annotation.r#type),
                 body,
                 captures: &captures,
-                is_short: true,
             },
         )
     }
@@ -475,7 +402,6 @@ impl BodyCompiler<'_, '_> {
                 .iter()
                 .map(|capture| self.heap.intern(capture.as_bytes()))
                 .collect(),
-            is_short_closure: source.is_short,
             capture_types: Vec::new(),
             chunk,
         });

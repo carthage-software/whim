@@ -82,7 +82,7 @@ The arrays are distinct values. Both hold the same object.
 
 ## Closure captures
 
-A short closure captures each outer variable it uses. It captures the current
+A closure captures each outer variable it uses. It captures the current
 value. An object value still points to the same object:
 
 ```whim

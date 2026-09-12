@@ -18,12 +18,9 @@ $error = $error as Whim\OS\FileDescriptor;
 $input->close();
 
 $processStatus = Whim\_Private\create_suspension::<int>();
-$processTask = Whim\_Private\watch_process(
-  $process,
-  function(int $status) use ($processStatus): void {
-    $processStatus->resume($status);
-  },
-);
+$processTask = Whim\_Private\watch_process($process, fn(int $status): void {
+  $processStatus->resume($status);
+});
 
 assert!($processStatus->suspend() == 0);
 Whim\_Private\cancel_task($processTask);
@@ -35,7 +32,7 @@ $error->close();
 $signalReceived = Whim\_Private\create_suspension::<null>();
 $signalWatcher = Whim\Process\watch_signal(
   Whim\Process\Signal::UserDefined1,
-  function() use ($signalReceived): void {
+  fn(): void {
     $signalReceived->resume(null);
   },
 );
@@ -70,12 +67,9 @@ $sender = Whim\_Private\create_socket(
 );
 
 $readable = Whim\_Private\create_suspension::<null>();
-$readableTask = Whim\_Private\watch_readable(
-  $receiver,
-  function() use ($readable): void {
-    $readable->resume(null);
-  },
-);
+$readableTask = Whim\_Private\watch_readable($receiver, fn(): void {
+  $readable->resume(null);
+});
 
 assert!(Whim\_Private\send_to($sender, 'datagram', $host, $port) == 8);
 
@@ -105,12 +99,9 @@ $sender = Whim\_Private\create_socket(
 );
 
 $readable = Whim\_Private\create_suspension::<null>();
-$readableTask = Whim\_Private\watch_readable(
-  $receiver,
-  function() use ($readable): void {
-    $readable->resume(null);
-  },
-);
+$readableTask = Whim\_Private\watch_readable($receiver, fn(): void {
+  $readable->resume(null);
+});
 
 assert!(
   Whim\_Private\send_message(

@@ -54,7 +54,7 @@ try {
 
 assert!($assertion_error_19 is VisibilityError);
 
-$assertion_value_20 = function(): void {
+$assertion_value_20 = fn(): void {
   SystemTime::unixEpoch();
 };
 
@@ -67,7 +67,7 @@ try {
 
 assert!($assertion_error_20 is DiscardedResultError);
 
-$assertion_value_21 = function() use ($start): void {
+$assertion_value_21 = fn(): void {
   $start->plus(Duration::second());
 };
 

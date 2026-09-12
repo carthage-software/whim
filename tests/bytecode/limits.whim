@@ -4,7 +4,7 @@
  * compiles, links, and runs it, so a limit violation arrives as a throw.
  */
 function raises(string $fixture, string $message): void {
-  $assertion_value_1 = function() use ($fixture): void {
+  $assertion_value_1 = fn(): void {
     require!('_limits/' . $fixture . '.whim');
   };
 
@@ -31,7 +31,7 @@ require!('_limits/grouped-union-in-intersection.whim');
 require!('_limits/parameters-function-at-limit.whim');
 require!('_limits/parameters-method-at-limit.whim');
 require!('_limits/parameters-closure-at-limit.whim');
-require!('_limits/parameters-short-closure-at-limit.whim');
+require!('_limits/parameters-expression-closure-at-limit.whim');
 require!('_limits/parameters-promoted-at-limit.whim');
 require!('_limits/function-type-at-limit.whim');
 require!('_limits/binder-intersection-bound-0.whim');
@@ -66,7 +66,7 @@ require!('_limits/self-bound-class.whim');
 require!('_limits/self-bound-interface.whim');
 require!('_limits/self-bound-method.whim');
 require!('_limits/self-bound-method-closure.whim');
-require!('_limits/self-bound-method-short-closure.whim');
+require!('_limits/self-bound-method-expression-closure.whim');
 require!('_limits/binder-bound-arguments-at-limit-0.whim');
 require!('_limits/binder-bound-arguments-at-limit-1.whim');
 require!('_limits/binder-bound-arguments-at-limit-2.whim');
@@ -158,7 +158,7 @@ raises(
 );
 
 raises(
-  'parameters-short-closure-past-limit',
+  'parameters-expression-closure-past-limit',
   'a callable may declare at most 64 parameters',
 );
 
@@ -335,7 +335,7 @@ raises(
 );
 
 raises(
-  'self-bound-short-closure',
+  'self-bound-expression-closure',
   '`self` refers to the enclosing class, and there is none here',
 );
 
@@ -505,7 +505,7 @@ raises(
 );
 
 raises(
-  'type-parameters-short-closure-past-limit',
+  'type-parameters-expression-closure-past-limit',
   'a declaration may bind at most 64 type parameters',
 );
 

@@ -154,7 +154,7 @@ File\write(
 
 $redeclaresUnit = $work . '/redeclares.whim';
 require!($redeclaresUnit);
-$assertion_value_8 = function() use ($redeclaresUnit): void {
+$assertion_value_8 = fn(): void {
   require!($redeclaresUnit);
 };
 
@@ -171,7 +171,7 @@ try {
 assert!($assertion_error_8 is LinkerError);
 
 $absentUnit = $work . '/absent.whim';
-$assertion_value_9 = function() use ($absentUnit): void {
+$assertion_value_9 = fn(): void {
   require!($absentUnit);
 };
 
@@ -193,7 +193,7 @@ File\write(
 );
 
 $brokenUnit = $work . '/broken.whim';
-$assertion_value_10 = function() use ($brokenUnit): void {
+$assertion_value_10 = fn(): void {
   require!($brokenUnit);
 };
 
@@ -207,7 +207,7 @@ try {
 assert!($assertion_error_10 is ParserError);
 
 $uncompilableUnit = $work . '/uncompilable.whim';
-$assertion_value_11 = function() use ($uncompilableUnit): void {
+$assertion_value_11 = fn(): void {
   require!($uncompilableUnit);
 };
 
@@ -221,7 +221,7 @@ try {
 assert!($assertion_error_11 is CompilerError);
 
 $unlinkableUnit = $work . '/unlinkable.whim';
-$assertion_value_12 = function() use ($unlinkableUnit): void {
+$assertion_value_12 = fn(): void {
   require!($unlinkableUnit);
 };
 
@@ -292,7 +292,7 @@ require!($genericsUnit);
 assert!(external_id::<int>(1) == 1);
 assert!(external_default(2) == 2);
 
-$assertion_value_19 = function(): void {
+$assertion_value_19 = fn(): void {
   external_id(1);
 };
 
@@ -305,7 +305,7 @@ try {
 
 assert!($assertion_error_19 is TypeError);
 
-$assertion_value_20 = function(): void {
+$assertion_value_20 = fn(): void {
   external_id::<float>(1.0);
 };
 
@@ -318,7 +318,7 @@ try {
 
 assert!($assertion_error_20 is TypeError);
 
-$assertion_value_21 = function(): void {
+$assertion_value_21 = fn(): void {
   external_plain::<int>(1);
 };
 
@@ -334,7 +334,7 @@ assert!($assertion_error_21 is TypeError);
 $box = new ExternalBox::<vec<int>>(vec[1, 2]);
 assert!($box is ExternalBox<vec<int>>);
 
-$assertion_value_23 = function(): void {
+$assertion_value_23 = fn(): void {
   new ExternalBox(1);
 };
 
@@ -351,7 +351,7 @@ $calls = new ExternalCalls();
 assert!($calls->method::<string>('method') == 'method');
 assert!(ExternalCalls::statically::<string>('static') == 'static');
 
-$assertion_value_26 = function() use ($calls): void {
+$assertion_value_26 = fn(): void {
   $calls->method(1);
 };
 
@@ -364,7 +364,7 @@ try {
 
 assert!($assertion_error_26 is TypeError);
 
-$assertion_value_27 = function(): void {
+$assertion_value_27 = fn(): void {
   ExternalCalls::statically(1);
 };
 

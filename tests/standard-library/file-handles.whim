@@ -14,7 +14,7 @@ use Whim\_Private\FileOperation;
 
 ($pipeReader, $pipeWriter) = Whim\_Private\create_pipe();
 $operation = FileOperation::read($pipeReader, 1);
-$producer = Async\spawn::<null>(function() use ($pipeWriter): null {
+$producer = Async\spawn::<null>(fn(): null {
   discard!(Whim\_Private\write_descriptor($pipeWriter, 'x'));
   return null;
 });
@@ -143,7 +143,7 @@ $handle->waitUntilReadable();
 $handle->waitUntilWritable();
 $handle->close();
 
-$assertion_value_30 = function() use ($handle): void {
+$assertion_value_30 = fn(): void {
   $handle->waitUntilReadable();
 };
 
@@ -156,7 +156,7 @@ try {
 
 assert!($assertion_error_30 is RuntimeException);
 
-$assertion_value_31 = function() use ($handle): void {
+$assertion_value_31 = fn(): void {
   $handle->waitUntilWritable();
 };
 

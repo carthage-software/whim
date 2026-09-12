@@ -63,13 +63,7 @@ where
             {
                 return self.parse_class_like_statement();
             }
-            TokenKind::Function
-                if self
-                    .lookahead(1)?
-                    .is_some_and(|token| token.kind.is_function_name()) =>
-            {
-                Statement::Function(self.parse_function()?)
-            }
+            TokenKind::Function => Statement::Function(self.parse_function()?),
             TokenKind::Type
                 if matches!(
                     self.lookahead(1)?.map(|token| token.kind),

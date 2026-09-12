@@ -12,10 +12,10 @@ const LOADER_BODY: &str = r"];
 
 Autoload\register(
   new Autoload\Autoloader()->withFallback(
-    function (
+    fn (
       SymbolKind $kind,
       string $name,
-    ) use ($namespaces): bool {
+    ): bool {
       $separator = Str\search($name, '\\');
       $segment = match ($separator) {
         null => $name,

@@ -1,17 +1,17 @@
 use Whim\Unwind\UndefinedVariableError;
 
 $n = 1;
-$closure = function() use ($n): int {
+$closure = fn(): int {
   return $n;
 };
 
-$shortClosure = fn(): int => $n;
+$expressionClosure = fn(): int => $n;
 $n = 2;
 assert!($closure() == 1);
-assert!($shortClosure() == 1);
+assert!($expressionClosure() == 1);
 
 $counter = 10;
-$bump_copy = function() use ($counter): int {
+$bump_copy = fn(): int {
   $counter += 1;
   return $counter;
 };
@@ -45,21 +45,19 @@ assert!($top_level == 'set at the top');
 class Greeter {
   private string $word = 'hello';
 
-  public function shortClosureSpeaker(): fn(): string {
-    return fn(): string {
-      return $this->word;
-    };
+  public function expressionClosureSpeaker(): fn(): string {
+    return fn(): string => $this->word;
   }
 
   public function closureSpeaker(): fn(): string {
-    return function(): string {
+    return fn(): string {
       return $this->word;
     };
   }
 }
 
 $greeter = new Greeter();
-assert!($greeter->shortClosureSpeaker()() == 'hello');
+assert!($greeter->expressionClosureSpeaker()() == 'hello');
 assert!($greeter->closureSpeaker()() == 'hello');
 
 const LIMIT = 10;
@@ -87,7 +85,7 @@ function bump_tally(): void {
 bump_tally();
 bump_tally();
 assert!(Tally::$count == 2);
-$bump_through_closure = function(): void {
+$bump_through_closure = fn(): void {
   Tally::$count += 10;
 };
 

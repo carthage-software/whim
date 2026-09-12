@@ -37,10 +37,10 @@
 - [Match and Destructuring](language/patterns.md)
 - [Language Constructs](language/constructs.md)
 
-# 5. Functions and Callables
+# 5. Functions and Closures
 
 - [Functions](language/functions.md)
-- [Closures and Short Closures](language/callables.md)
+- [Closures](language/closures.md)
 - [First-Class and Partial Calls](language/partial-calls.md)
 
 # 6. Classes, Interfaces, and Enums

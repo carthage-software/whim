@@ -48,7 +48,7 @@ $sized = shape(?, mode: 'deep');
 assert!($sized('cube') == 'cube:1:deep');
 $open = shape(?, mode: 'deep', ...);
 assert!($open('cone', 4) == 'cone:4:deep');
-$assertion_value_8 = function() use ($sized): void {
+$assertion_value_8 = fn(): void {
   $_ = $sized('cone', 4);
 };
 
@@ -72,7 +72,7 @@ function invoke(fn(int, string): string $callback): string {
 $format = format(label: ?, loud: true, id: ?);
 assert!($format is fn(string, int): string);
 assert!($format('item', 7) == 'item:7');
-$assertion_value_11 = function() use ($format): void {
+$assertion_value_11 = fn(): void {
   $_ = invoke($format);
 };
 
@@ -89,7 +89,7 @@ function tag(string $name, string $value): string {
   return $name . '=' . $value;
 }
 
-$assertion_value_12 = function(): void {
+$assertion_value_12 = fn(): void {
   $_ = tag(value: ?);
 };
 
@@ -110,7 +110,7 @@ function need(int $a, int $b): int {
 }
 
 $one = need(?, 2);
-$assertion_value_14 = function() use ($one): void {
+$assertion_value_14 = fn(): void {
   $_ = $one();
 };
 
@@ -202,7 +202,7 @@ function only_a(int $a): int {
   return $a;
 }
 
-$assertion_value_26 = function(): void {
+$assertion_value_26 = fn(): void {
   $_ = only_a(missing: 1);
 };
 
@@ -226,7 +226,7 @@ assert!(File\read($sample, length: 5) == 'abcde');
 Filesystem\delete_directory($work, true);
 
 $memchr_error = null;
-$assertion_callable_30 = function(): void {
+$assertion_callable_30 = fn(): void {
   $_ = _Private\memchr(
     needle: 97,
     offset: 0,
@@ -269,7 +269,7 @@ $class = 'Kit';
 assert!($class::open('b') == 'open:b');
 $instance = new $class();
 assert!($instance is Kit);
-$assertion_value_37 = function(): void {
+$assertion_value_37 = fn(): void {
   $missing = 'Missing';
   $_ = new $missing();
 };
@@ -283,7 +283,7 @@ try {
 
 assert!($assertion_error_37 is UndefinedSymbolError);
 
-$assertion_value_38 = function(): void {
+$assertion_value_38 = fn(): void {
   $number = 5;
   $_ = new $number();
 };
@@ -318,7 +318,7 @@ function make(): fn(): string {
   return fn() => 1;
 }
 
-$assertion_value_40 = function(): void {
+$assertion_value_40 = fn(): void {
   $_ = make();
 };
 
@@ -350,7 +350,7 @@ class StepCounter {
 
 StepCounter::$count--;
 assert!(StepCounter::$count == 4);
-$assertion_value_44 = function(): void {
+$assertion_value_44 = fn(): void {
   $letter = 'x';
   $letter++;
 };
@@ -378,7 +378,7 @@ assert!(Str\join(', ', dict['a' => 'Ada', 'b' => 'Grace']) == 'Ada, Grace');
 
 assert!(Str\join(', ', vec[]) == '');
 
-$assertion_value_51 = function(): void {
+$assertion_value_51 = fn(): void {
   $_ = Str\chr(256);
 };
 
@@ -391,7 +391,7 @@ try {
 
 assert!($assertion_error_51 is TypeError);
 
-$assertion_value_52 = function(): void {
+$assertion_value_52 = fn(): void {
   $_ = Str\ord('');
 };
 
@@ -416,7 +416,7 @@ assert!(Str\search_ci('abc', '') == 0);
 assert!(Str\search_last('abc', '') == 3);
 assert!(Str\search_last_ci('abc', '') == 3);
 
-$assertion_value_64 = function(): void {
+$assertion_value_64 = fn(): void {
   $_ = Vec\range(1, 1, 0);
 };
 

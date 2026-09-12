@@ -30,7 +30,7 @@ rejects(
 );
 
 $missingUnit = $work . '/does-not-exist.whim';
-$assertion_value_1 = function() use ($missingUnit): void {
+$assertion_value_1 = fn(): void {
   require!($missingUnit);
 };
 
@@ -45,7 +45,7 @@ assert!($assertion_error_1 is RequireError);
 
 File\write($work . '/broken.whim', 'this is not whim at all ((' . "\n");
 $brokenUnit = $work . '/broken.whim';
-$assertion_value_2 = function() use ($brokenUnit): void {
+$assertion_value_2 = fn(): void {
   require!($brokenUnit);
 };
 
@@ -68,7 +68,7 @@ File\write(
 );
 
 $duplicateFunction = $work . '/duplicate-function.whim';
-$assertion_value_3 = function() use ($duplicateFunction): void {
+$assertion_value_3 = fn(): void {
   require!($duplicateFunction);
 };
 
@@ -85,7 +85,7 @@ assert!(units_helper() == 'original');
 
 File\write($work . '/cross-kind.whim', 'class units_helper {}' . "\n");
 $crossKind = $work . '/cross-kind.whim';
-$assertion_value_5 = function() use ($crossKind): void {
+$assertion_value_5 = fn(): void {
   require!($crossKind);
 };
 

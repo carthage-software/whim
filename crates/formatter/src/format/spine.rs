@@ -426,7 +426,6 @@ fn should_inline_binary_rhs(binary: &Binary<'_>) -> bool {
             | Expression::Tuple(_)
             | Expression::Call(_)
             | Expression::Closure(_)
-            | Expression::ShortClosure(_)
             | Expression::Match(_)
             | Expression::Instantiation(_)
     )
