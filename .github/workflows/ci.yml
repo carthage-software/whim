@@ -43,6 +43,15 @@ jobs:
       - run: cargo build --locked --release --bin whim
       - run: target/release/whim tests/run.whim '' 2
 
+  rust-windows:
+    runs-on: windows-latest
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --locked -p whim-syn -p whim-formatter -p whim-span --all-features
+
   msrv:
     runs-on: ubuntu-latest
     steps:

@@ -17,7 +17,6 @@ allocator-api2 = { workspace = true }
 annotate-snippets = { workspace = true }
 blink-alloc = { workspace = true }
 memchr = { workspace = true }
-target-guard = { workspace = true }
 whim-span = { workspace = true }
 
 [dev-dependencies]

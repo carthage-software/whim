@@ -17,7 +17,6 @@ serde = ["dep:serde"]
 
 [dependencies]
 serde = { workspace = true, optional = true }
-target-guard = { workspace = true }
 unicode-width = { workspace = true }
 whim-span = { workspace = true }
 whim-syn = { workspace = true }
