@@ -13,7 +13,6 @@ publish.workspace = true
 corosensei = { workspace = true }
 hashbrown = { workspace = true }
 polling = { workspace = true }
-target-guard = { workspace = true }
 
 [lints]
 workspace = true

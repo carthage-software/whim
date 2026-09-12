@@ -1,13 +1,14 @@
 //! OS file-descriptor readiness, over the `polling` crate.
 
 use std::io;
-use std::os::fd::BorrowedFd;
 use std::time::Duration;
 
 use polling::Event;
 use polling::Events;
 use polling::PollMode;
 use polling::Poller;
+
+use crate::BorrowedDescriptor;
 
 /// The readiness direction a coroutine waits on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,7 +59,7 @@ impl Reactor {
     /// Returns an operating-system error when registration fails.
     pub(crate) unsafe fn register(
         &self,
-        fd: BorrowedFd<'_>,
+        fd: BorrowedDescriptor<'_>,
         key: usize,
         interest: Interest,
     ) -> io::Result<()> {
@@ -76,7 +77,7 @@ impl Reactor {
     /// Returns an operating-system error when the registration cannot be changed.
     pub(crate) fn rearm(
         &self,
-        fd: BorrowedFd<'_>,
+        fd: BorrowedDescriptor<'_>,
         key: usize,
         interest: Interest,
     ) -> io::Result<()> {
@@ -96,7 +97,7 @@ impl Reactor {
     /// # Errors
     ///
     /// Returns an operating-system error when the descriptor cannot be removed.
-    pub(crate) fn deregister(&self, fd: BorrowedFd<'_>) -> io::Result<()> {
+    pub(crate) fn deregister(&self, fd: BorrowedDescriptor<'_>) -> io::Result<()> {
         self.poller.delete(fd)
     }
 
@@ -129,11 +130,11 @@ const fn event_for(key: usize, interest: Interest) -> Event {
 #[cfg(test)]
 mod tests {
     use crate::reactor::*;
+    use polling::AsSource;
     use std::io::Read;
     use std::io::Write;
     use std::net::TcpListener;
     use std::net::TcpStream;
-    use std::os::fd::AsFd;
 
     fn socket_pair() -> (TcpStream, TcpStream) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
@@ -149,7 +150,7 @@ mod tests {
         let (server, mut client) = socket_pair();
         let mut reactor = Reactor::new().expect("reactor");
         // SAFETY: `server` remains open until it is deregistered.
-        unsafe { reactor.register(server.as_fd(), 42, Interest::Readable) }.expect("register");
+        unsafe { reactor.register(server.source(), 42, Interest::Readable) }.expect("register");
 
         let mut idle = Vec::new();
         reactor
@@ -165,7 +166,7 @@ mod tests {
         assert_eq!(ready.len(), 1, "exactly one source ready");
         assert_eq!(ready[0], 42);
 
-        reactor.deregister(server.as_fd()).expect("deregister");
+        reactor.deregister(server.source()).expect("deregister");
     }
 
     #[test]
@@ -173,7 +174,7 @@ mod tests {
         let (mut server, mut client) = socket_pair();
         let mut reactor = Reactor::new().expect("reactor");
         // SAFETY: `server` remains open for the whole test.
-        unsafe { reactor.register(server.as_fd(), 7, Interest::Readable) }.expect("register");
+        unsafe { reactor.register(server.source(), 7, Interest::Readable) }.expect("register");
 
         client.write_all(b"a").expect("write");
         let mut first = Vec::new();
@@ -186,7 +187,7 @@ mod tests {
         let mut buffer = [0u8; 1];
         server.read_exact(&mut buffer).expect("read");
         reactor
-            .rearm(server.as_fd(), 7, Interest::Readable)
+            .rearm(server.source(), 7, Interest::Readable)
             .expect("rearm");
 
         client.write_all(b"b").expect("write");
@@ -196,5 +197,7 @@ mod tests {
             .expect("wait");
         assert_eq!(second.len(), 1);
         assert_eq!(second[0], 7);
+
+        reactor.deregister(server.source()).expect("deregister");
     }
 }

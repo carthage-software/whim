@@ -1,6 +1,5 @@
 //! Runs database work off the event-loop thread.
 
-#![cfg(unix)]
 #![deny(clippy::nursery, clippy::pedantic)]
 #![forbid(unsafe_code)]
 
@@ -17,9 +16,20 @@ use std::io::Read;
 use std::io::Write;
 use std::mem::replace;
 use std::mem::swap;
+#[cfg(windows)]
+use std::net::TcpListener;
+#[cfg(windows)]
+use std::net::TcpStream as NotificationStream;
+#[cfg(unix)]
 use std::os::fd::AsRawFd;
-use std::os::fd::RawFd;
-use std::os::unix::net::UnixStream;
+#[cfg(unix)]
+use std::os::fd::RawFd as RawDescriptor;
+#[cfg(unix)]
+use std::os::unix::net::UnixStream as NotificationStream;
+#[cfg(windows)]
+use std::os::windows::io::AsRawSocket;
+#[cfg(windows)]
+use std::os::windows::io::RawSocket as RawDescriptor;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Condvar;
@@ -90,25 +100,45 @@ pub struct Configuration {
 }
 
 struct Notifier {
-    reader: UnixStream,
-    writer: UnixStream,
+    reader: NotificationStream,
+    writer: NotificationStream,
+    #[cfg(unix)]
     pending: AtomicBool,
 }
 
 impl Notifier {
     fn new() -> io::Result<Self> {
-        let (reader, writer) = UnixStream::pair()?;
+        #[cfg(unix)]
+        let (reader, writer) = NotificationStream::pair()?;
+        #[cfg(windows)]
+        let (reader, writer) = {
+            let listener = TcpListener::bind("127.0.0.1:0")?;
+            let writer = NotificationStream::connect(listener.local_addr()?)?;
+            writer.set_nodelay(true)?;
+            let (reader, peer) = listener.accept()?;
+            if peer != writer.local_addr()? {
+                return Err(io::Error::other("unexpected SQLite notifier peer"));
+            }
+            (reader, writer)
+        };
         reader.set_nonblocking(true)?;
         writer.set_nonblocking(true)?;
         Ok(Self {
             reader,
             writer,
+            #[cfg(unix)]
             pending: AtomicBool::new(false),
         })
     }
 
-    fn descriptor(&self) -> RawFd {
+    #[cfg(unix)]
+    fn descriptor(&self) -> RawDescriptor {
         self.reader.as_raw_fd()
+    }
+
+    #[cfg(windows)]
+    fn descriptor(&self) -> RawDescriptor {
+        self.reader.as_raw_socket()
     }
 
     fn signal(&self) {
@@ -116,6 +146,7 @@ impl Notifier {
             match (&self.writer).write(&[1]) {
                 Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
                 Ok(_) | Err(_) => {
+                    #[cfg(unix)]
                     self.pending.store(true, Ordering::Release);
                     return;
                 }
@@ -124,6 +155,7 @@ impl Notifier {
     }
 
     fn drain(&self) {
+        #[cfg(unix)]
         if !self.pending.swap(false, Ordering::AcqRel) {
             return;
         }
@@ -212,7 +244,7 @@ impl Operation {
 
     /// Returns the descriptor used to signal completion.
     #[must_use]
-    pub fn descriptor(&self) -> RawFd {
+    pub fn descriptor(&self) -> RawDescriptor {
         self.shared.connection.notifier.descriptor()
     }
 
@@ -363,7 +395,7 @@ impl ResultSet {
 
     /// Returns the descriptor used to signal rows and completion.
     #[must_use]
-    pub fn descriptor(&self) -> RawFd {
+    pub fn descriptor(&self) -> RawDescriptor {
         self.shared.connection.notifier.descriptor()
     }
 

@@ -1,6 +1,5 @@
 //! A nonblocking libpq driver for the Whim runtime.
 
-#![cfg(unix)]
 #![deny(clippy::nursery, clippy::pedantic)]
 #![deny(clippy::undocumented_unsafe_blocks)]
 #![forbid(unsafe_op_in_unsafe_fn)]
@@ -14,8 +13,8 @@ use std::collections::VecDeque;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::ffi::c_char;
+#[cfg(unix)]
 use std::os::fd::BorrowedFd;
-use std::os::fd::RawFd;
 use std::ptr;
 use std::ptr::NonNull;
 use std::rc::Rc;
@@ -60,8 +59,14 @@ use pq_sys::PQsetnonblocking;
 use pq_sys::PQsocket;
 use pq_sys::PQstatus;
 use pq_sys::PostgresPollingStatusType;
+#[cfg(unix)]
 use rustix::net;
 use whim_loop::Interest;
+use whim_loop::RawDescriptor;
+#[cfg(windows)]
+use windows_sys::Win32::Networking::WinSock::SD_BOTH;
+#[cfg(windows)]
+use windows_sys::Win32::Networking::WinSock::shutdown;
 
 pub use error::Error;
 pub use value::Column;
@@ -96,7 +101,7 @@ pub enum Progress<T> {
     /// The operation needs descriptor readiness.
     Pending {
         /// The libpq socket.
-        descriptor: RawFd,
+        descriptor: RawDescriptor,
         /// The required readiness direction.
         interest: Interest,
     },
@@ -124,13 +129,15 @@ impl ConnectionState {
             .ok_or_else(|| Error::message("the PostgreSQL connection is closed"))
     }
 
-    fn descriptor(&self) -> Result<RawFd, Error> {
+    fn descriptor(&self) -> Result<RawDescriptor, Error> {
         let raw = self.raw()?;
         // SAFETY: `raw` is a live libpq connection.
         let descriptor = unsafe { PQsocket(raw.as_ptr()) };
-        if descriptor < 0 {
+        if descriptor == -1 {
             return Err(connection_error(raw.as_ptr()));
         }
+        #[cfg(windows)]
+        let descriptor = RawDescriptor::from(descriptor.cast_unsigned());
         Ok(descriptor)
     }
 
@@ -428,8 +435,16 @@ impl Connection {
             return;
         };
         // SAFETY: `descriptor` belongs to the live connection.
-        let descriptor = unsafe { BorrowedFd::borrow_raw(descriptor) };
-        _ = net::shutdown(descriptor, net::Shutdown::Both);
+        unsafe {
+            #[cfg(unix)]
+            {
+                _ = net::shutdown(BorrowedFd::borrow_raw(descriptor), net::Shutdown::Both);
+            }
+            #[cfg(windows)]
+            if let Ok(socket) = descriptor.try_into() {
+                _ = shutdown(socket, SD_BOTH);
+            }
+        }
     }
 
     fn fail_if_cancelled(&self) -> Result<(), Error> {
@@ -954,7 +969,7 @@ enum RowDisposition {
 }
 
 struct PendingIo {
-    descriptor: RawFd,
+    descriptor: RawDescriptor,
     interest: Interest,
 }
 
@@ -1433,7 +1448,13 @@ mod tests {
     use std::cell::Cell;
     use std::cell::RefCell;
     use std::ffi::CString;
+    use std::io;
+    use std::io::Read;
+    use std::net::TcpListener;
     use std::rc::Rc;
+    use std::thread;
+    use std::time::Duration;
+    use std::time::Instant;
 
     use crate::BOOL_OID;
     use crate::BYTEA_OID;
@@ -1446,6 +1467,7 @@ mod tests {
     use crate::ParameterStorage;
     use crate::Parameters;
     use crate::Phase;
+    use crate::Progress;
     use crate::Statement;
     use crate::TEXT_OID;
     use crate::Value;
@@ -1453,6 +1475,41 @@ mod tests {
     use crate::decode_text_bytea;
     use crate::retirement_query;
     use crate::supports_binary_result;
+
+    #[test]
+    fn cancelling_a_pending_connection_shuts_down_its_socket() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let configuration = format!(
+            "hostaddr=127.0.0.1 port={} user=whim dbname=whim sslmode=disable gssencmode=disable",
+            listener.local_addr().unwrap().port()
+        );
+        let (connection, operation) = Connection::open(configuration.as_bytes()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut peer = loop {
+            match listener.accept() {
+                Ok((peer, _)) => break peer,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    assert!(Instant::now() < deadline, "connection timed out");
+                    thread::yield_now();
+                }
+                Err(error) => panic!("connection failed: {error}"),
+            }
+        };
+        peer.set_nonblocking(false).unwrap();
+        peer.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        assert!(matches!(
+            operation.poll().unwrap(),
+            Progress::Pending { .. }
+        ));
+
+        operation.cancel();
+
+        peer.read_to_end(&mut Vec::new()).unwrap();
+        assert!(connection.state.borrow().raw.is_some());
+        assert!(operation.poll().is_err());
+        assert!(connection.is_closed());
+    }
 
     #[test]
     fn dropped_statements_queue_one_batched_retirement_query() {

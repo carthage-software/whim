@@ -14,4 +14,3 @@ workspace = true
 
 [dependencies]
 rusqlite = { workspace = true }
-target-guard = { workspace = true }

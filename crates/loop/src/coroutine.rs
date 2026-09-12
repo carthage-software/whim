@@ -94,3 +94,30 @@ impl<I, Y, R> Coroutine<I, Y, R> {
         unsafe { self.0.force_reset() };
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::Coroutine;
+    use crate::Resumption;
+    use crate::Stack;
+
+    #[test]
+    fn coroutines_suspend_resume_and_reuse_their_stack() {
+        let mut stack = Stack::new(64 * 1024).expect("allocate stack");
+        for input in [3, 7] {
+            let mut coroutine = Coroutine::with_stack(stack, |yielder, value| {
+                let resumed = yielder.suspend(value * 2);
+                resumed + value
+            });
+            assert!(matches!(
+                coroutine.resume(input),
+                Resumption::Suspended(value) if value == input * 2
+            ));
+            assert!(matches!(
+                coroutine.resume(10),
+                Resumption::Finished(value) if value == input + 10
+            ));
+            stack = coroutine.into_stack();
+        }
+    }
+}

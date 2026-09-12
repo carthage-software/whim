@@ -6,13 +6,13 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::collections::VecDeque;
 use std::io;
-use std::os::fd::BorrowedFd;
-use std::os::fd::RawFd;
 use std::time::Duration;
 use std::time::Instant;
 
 use hashbrown::HashMap;
 
+use crate::BorrowedDescriptor;
+use crate::RawDescriptor;
 use crate::reactor::Interest;
 use crate::reactor::Reactor;
 
@@ -91,9 +91,9 @@ pub struct Scheduler<H, V> {
     ready: VecDeque<TaskId>,
     microtasks: VecDeque<TaskId>,
     /// Descriptors awaited by parked tasks.
-    waiters: HashMap<usize, RawFd>,
+    waiters: HashMap<usize, RawDescriptor>,
     /// Registrations retained between rearms.
-    registrations: HashMap<usize, (RawFd, Interest)>,
+    registrations: HashMap<usize, (RawDescriptor, Interest)>,
     timers: BinaryHeap<Reverse<(Instant, TaskId, u64)>>,
     live_timers: usize,
     stale_timers: usize,
@@ -235,7 +235,7 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
     pub unsafe fn arm_descriptor(
         &mut self,
         id: TaskId,
-        fd: RawFd,
+        fd: RawDescriptor,
         interest: Interest,
     ) -> io::Result<()> {
         let key = id.reactor_key();
@@ -426,7 +426,7 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
         self.waiters.remove(&key);
         if let Some((fd, _)) = self.registrations.remove(&key) {
             // SAFETY: registration requires the descriptor to remain open until disarmed.
-            let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
+            let borrowed = unsafe { BorrowedDescriptor::borrow_raw(fd) };
             let _ = self.reactor.deregister(borrowed);
         }
     }
@@ -600,7 +600,7 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
     /// Returns an operating-system error when the descriptor cannot be watched.
     pub unsafe fn park_current_on_descriptor(
         &mut self,
-        fd: RawFd,
+        fd: RawDescriptor,
         interest: Interest,
     ) -> io::Result<()> {
         let Some(task) = self.current else {
@@ -617,7 +617,7 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
     unsafe fn register_descriptor(
         &mut self,
         key: usize,
-        fd: RawFd,
+        fd: RawDescriptor,
         interest: Interest,
     ) -> io::Result<()> {
         if let Some((registered, registered_interest)) = self.registrations.get(&key).copied() {
@@ -626,20 +626,20 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
                     return Ok(());
                 }
                 // SAFETY: the caller keeps `fd` open while it is registered.
-                let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
+                let borrowed = unsafe { BorrowedDescriptor::borrow_raw(fd) };
                 self.reactor.rearm(borrowed, key, interest)?;
                 self.registrations.insert(key, (fd, interest));
                 return Ok(());
             }
 
             // SAFETY: registered descriptors remain open until removed.
-            let borrowed = unsafe { BorrowedFd::borrow_raw(registered) };
+            let borrowed = unsafe { BorrowedDescriptor::borrow_raw(registered) };
             self.reactor.deregister(borrowed)?;
             self.registrations.remove(&key);
         }
 
         // SAFETY: the caller keeps `fd` open while it is registered.
-        let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
+        let borrowed = unsafe { BorrowedDescriptor::borrow_raw(fd) };
         // SAFETY: the same caller contract holds until deregistration.
         unsafe { self.reactor.register(borrowed, key, interest)? };
         self.registrations.insert(key, (fd, interest));
@@ -721,16 +721,27 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
 #[cfg(test)]
 mod tests {
     use std::io::Write;
-    use std::os::fd::AsRawFd;
-    use std::os::unix::net::UnixStream;
+    use std::net::TcpListener;
+    use std::net::TcpStream;
     use std::time::Duration;
     use std::time::Instant;
+
+    use polling::AsRawSource;
 
     use crate::reactor::Interest;
     use crate::scheduler::Activation;
     use crate::scheduler::ERROR_COMPACTION_THRESHOLD;
     use crate::scheduler::Scheduler;
     use crate::scheduler::TIMER_COMPACTION_THRESHOLD;
+
+    fn socket_pair() -> (TcpStream, TcpStream) {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+        let writer =
+            TcpStream::connect(listener.local_addr().expect("local address")).expect("connect");
+        let (reader, _) = listener.accept().expect("accept");
+        reader.set_nonblocking(true).expect("non-blocking");
+        (reader, writer)
+    }
 
     #[test]
     fn observed_errors_do_not_leave_an_unbounded_order_queue() {
@@ -887,12 +898,10 @@ mod tests {
         };
         let task = scheduler.spawn(1, Vec::new());
         assert!(scheduler.next_activation().is_some());
-        let Ok((reader, _writer)) = UnixStream::pair() else {
-            panic!("the socket pair must open");
-        };
+        let (reader, _writer) = socket_pair();
         // SAFETY: `reader` remains open until the task is woken and disarmed.
         let watched =
-            unsafe { scheduler.park_current_on_descriptor(reader.as_raw_fd(), Interest::Readable) };
+            unsafe { scheduler.park_current_on_descriptor((&reader).raw(), Interest::Readable) };
         let Ok(()) = watched else {
             panic!("the descriptor must be registered");
         };
@@ -914,12 +923,10 @@ mod tests {
         };
         let task = scheduler.spawn(1, Vec::new());
         assert!(scheduler.next_activation().is_some());
-        let Ok((reader, mut writer)) = UnixStream::pair() else {
-            panic!("the socket pair must open");
-        };
+        let (reader, mut writer) = socket_pair();
         // SAFETY: `reader` remains open until the readiness event disarms it.
         let watched =
-            unsafe { scheduler.park_current_on_descriptor(reader.as_raw_fd(), Interest::Readable) };
+            unsafe { scheduler.park_current_on_descriptor((&reader).raw(), Interest::Readable) };
         let Ok(()) = watched else {
             panic!("the descriptor must be registered");
         };
@@ -928,9 +935,16 @@ mod tests {
             .write_all(&[0])
             .expect("the socket pair must remain open");
 
-        scheduler
-            .poll_reactor_nonblocking()
-            .expect("the readable descriptor must wake the reactor");
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while scheduler.has_wake_source() {
+            assert!(
+                Instant::now() < deadline,
+                "the descriptor did not become ready"
+            );
+            scheduler
+                .poll_reactor_with_timeout(Some(deadline.saturating_duration_since(Instant::now())))
+                .expect("the readable descriptor must wake the reactor");
+        }
 
         assert!(!scheduler.registrations.contains_key(&task.reactor_key()));
         let Some(activation) = scheduler.next_activation() else {

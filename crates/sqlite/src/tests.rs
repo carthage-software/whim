@@ -290,6 +290,7 @@ fn queries_cross_result_batches_without_losing_rows() {
 }
 
 #[test]
+#[cfg(unix)]
 fn notifications_drain_while_the_producer_signals() {
     use std::io::Read;
 
@@ -318,4 +319,29 @@ fn notifications_drain_while_the_producer_signals() {
         (&notifier.reader).read(&mut [0; 1]).unwrap_err().kind(),
         io::ErrorKind::WouldBlock
     );
+}
+
+#[test]
+#[cfg(windows)]
+fn socket_notifications_can_be_drained_and_reused() {
+    let notifier = Notifier::new().unwrap();
+    for _ in 0..16 {
+        notifier.signal();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match notifier.reader.peek(&mut [0; 1]) {
+                Ok(1) => break,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    assert!(Instant::now() < deadline, "notification timed out");
+                    thread::yield_now();
+                }
+                result => panic!("unexpected notification: {result:?}"),
+            }
+        }
+        notifier.drain();
+        assert_eq!(
+            notifier.reader.peek(&mut [0; 1]).unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+    }
 }

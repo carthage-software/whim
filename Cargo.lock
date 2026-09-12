@@ -3387,7 +3387,6 @@ dependencies = [
  "corosensei",
  "hashbrown 0.17.1",
  "polling",
- "whim-support",
 ]
 
 [[package]]
@@ -3412,7 +3411,7 @@ dependencies = [
  "rustix",
  "ryu",
  "whim-loop",
- "whim-support",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3504,7 +3503,6 @@ name = "whim-sqlite"
 version = "0.6.0"
 dependencies = [
  "rusqlite",
- "whim-support",
 ]
 
 [[package]]
