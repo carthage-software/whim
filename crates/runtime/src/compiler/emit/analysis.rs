@@ -22,7 +22,7 @@ use crate::compiler::emit::ParameterList;
 use crate::compiler::emit::Span;
 use crate::compiler::emit::Statement;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Names<'arena> {
     ordered: Vec<&'arena str>,
     seen: HashSet<&'arena str>,
@@ -249,11 +249,6 @@ fn collect_local_names<'arena>(node: Node<'_, 'arena>, names: &mut Names<'arena>
 
                     Flow::Descend
                 }
-                Node::Assignment(assignment) if assignment.operator.is_assign() => {
-                    collect_target_names(&assignment.target, self.names);
-
-                    Flow::Descend
-                }
                 Node::Foreach(r#foreach) => {
                     if let Some(key) = r#foreach.target.key() {
                         collect_target_names(key, self.names);
@@ -303,9 +298,16 @@ fn collect_short_closure_free_variables<'arena>(
         ShortClosureBody::Expression { expression, .. } => Node::Expression(expression),
         ShortClosureBody::Block(block) => Node::Block(block),
     };
-    collect_variables(body, &mut inner);
+
     collect_local_names(body, &mut locals);
-    inner.ordered.retain(|name| !locals.contains(name));
+    walk(
+        body,
+        &mut ReferencedNames {
+            names: &mut inner,
+            locals: Some(locals),
+        },
+    );
+
     merge_unbound(&closure.parameter_list, inner, names);
 }
 
@@ -314,9 +316,15 @@ pub(in crate::compiler::emit) fn collect_free_variables_in_expression(
 ) -> Vec<String> {
     let mut names = Names::default();
     let mut locals = Names::default();
-    collect_variables(Node::Expression(expression), &mut names);
     collect_local_names(Node::Expression(expression), &mut locals);
-    names.ordered.retain(|name| !locals.contains(name));
+    walk(
+        Node::Expression(expression),
+        &mut ReferencedNames {
+            names: &mut names,
+            locals: Some(locals),
+        },
+    );
+
     names.into_owned()
 }
 
@@ -326,55 +334,149 @@ pub(in crate::compiler::emit) fn collect_free_variables_in_statements(
     let mut names = Names::default();
     let mut locals = Names::default();
     for statement in statements {
-        collect_variables(Node::Statement(statement), &mut names);
         collect_local_names(Node::Statement(statement), &mut locals);
     }
-    names.ordered.retain(|name| !locals.contains(name));
+
+    let mut visitor = ReferencedNames {
+        names: &mut names,
+        locals: Some(locals),
+    };
+
+    for statement in statements {
+        walk(Node::Statement(statement), &mut visitor);
+    }
+
     names.into_owned()
 }
 
 struct ReferencedNames<'names, 'arena> {
     names: &'names mut Names<'arena>,
+    locals: Option<Names<'arena>>,
+}
+
+impl<'arena> ReferencedNames<'_, 'arena> {
+    fn reference(&mut self, name: &'arena str) {
+        if !self
+            .locals
+            .as_ref()
+            .is_some_and(|locals| locals.contains(name))
+        {
+            self.names.insert(name);
+        }
+    }
+
+    fn branches<'ast>(&mut self, branches: impl IntoIterator<Item = Node<'ast, 'arena>>)
+    where
+        'arena: 'ast,
+    {
+        let before = self.locals.clone();
+        let mut merged = before.clone();
+        for branch in branches {
+            self.locals = before.clone();
+            walk(branch, self);
+            if let (Some(merged), Some(locals)) = (&mut merged, &self.locals) {
+                for name in &locals.ordered {
+                    merged.insert(name);
+                }
+            }
+        }
+
+        self.locals = merged;
+    }
 }
 
 impl<'ast, 'arena> Visitor<'ast, 'arena> for ReferencedNames<'_, 'arena> {
     fn enter(&mut self, node: Node<'ast, 'arena>) -> Flow {
         match node {
+            Node::If(statement) if self.locals.is_some() => {
+                walk(Node::Expression(statement.condition), self);
+                self.branches(
+                    [
+                        Some(Node::Block(&statement.body)),
+                        statement.r#else.as_ref().map(Node::Else),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                );
+
+                Flow::Skip
+            }
+            Node::Match(expression) if self.locals.is_some() => {
+                walk(Node::Expression(expression.expression), self);
+                self.branches(expression.arms.iter().map(Node::MatchArm));
+
+                Flow::Skip
+            }
+            Node::For(statement) if self.locals.is_some() => {
+                for expression in statement
+                    .initializations
+                    .iter()
+                    .chain(statement.conditions.iter())
+                {
+                    walk(Node::Expression(expression), self);
+                }
+                walk(Node::Block(&statement.body), self);
+                for expression in &statement.increments {
+                    walk(Node::Expression(expression), self);
+                }
+
+                Flow::Skip
+            }
             Node::Statement(Statement::Using(using)) => {
-                for binding in &using.bindings {
-                    collect_bind_target_names(&binding.target, self.names);
+                if self.locals.is_none() {
+                    for binding in &using.bindings {
+                        collect_bind_target_names(&binding.target, self.names);
+                    }
                 }
 
                 Flow::Descend
             }
             Node::StaticPropertyAccess(access) => {
-                collect_variables(Node::ClassReference(&access.class), self.names);
+                walk(Node::ClassReference(&access.class), self);
 
                 Flow::Skip
             }
             Node::Variable(variable) => {
-                self.names.insert(variable.name);
+                self.reference(variable.name);
 
                 Flow::Skip
             }
             Node::Assignment(assignment) => {
-                collect_target_names(&assignment.target, self.names);
+                if self.locals.is_some() && assignment.operator.is_assign() {
+                    walk(Node::Expression(assignment.value), self);
+                    if let Some(locals) = &mut self.locals {
+                        collect_target_names(&assignment.target, locals);
+                    }
+
+                    walk(Node::AssignmentTarget(&assignment.target), self);
+
+                    return Flow::Skip;
+                }
+
+                if self.locals.is_none() {
+                    collect_target_names(&assignment.target, self.names);
+                }
 
                 Flow::Descend
             }
             Node::ShortClosure(closure) => {
-                collect_short_closure_free_variables(closure, self.names);
+                let mut inner = Names::default();
+                collect_short_closure_free_variables(closure, &mut inner);
+                for name in inner.ordered {
+                    self.reference(name);
+                }
 
                 Flow::Skip
             }
             Node::Closure(closure) => {
                 if let Some(use_clause) = &closure.use_clause {
                     for variable in use_clause.variables {
-                        self.names.insert(variable.name);
+                        self.reference(variable.name);
                     }
                 }
+
                 if references_this_in_block(&closure.body) {
-                    self.names.insert("$this");
+                    self.reference("$this");
                 }
 
                 Flow::Skip
@@ -392,7 +494,13 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for ReferencedNames<'_, 'arena> {
 }
 
 fn collect_variables<'arena>(node: Node<'_, 'arena>, names: &mut Names<'arena>) {
-    walk(node, &mut ReferencedNames { names });
+    walk(
+        node,
+        &mut ReferencedNames {
+            names,
+            locals: None,
+        },
+    );
 }
 
 /// Whether a block references `$this`, for automatic capture.

@@ -22,7 +22,7 @@ $blockClosure = fn(int $value): int {
 $blockCaptured = 20;
 assert!($blockClosure(5) == 15);
 
-$shadowed = 100;
+final $shadowed = 100;
 $localClosure = fn(): int {
   $shadowed = 4;
   return $shadowed;
@@ -30,6 +30,29 @@ $localClosure = fn(): int {
 
 assert!($localClosure() == 4);
 assert!($shadowed == 100);
+
+$branchLocal = fn(bool $replace): int {
+  if ($replace) {
+    $shadowed = 3;
+  } else {
+    return 4;
+  }
+
+  return $shadowed;
+};
+
+assert!($branchLocal(true) == 3);
+assert!($branchLocal(false) == 4);
+
+$forLocal = fn(): int {
+  for ($index = 0; $index < 1; $index = $nextIndex) {
+    $nextIndex = 1;
+  }
+
+  return $index;
+};
+
+assert!($forLocal() == 1);
 
 $blockCounter = 10;
 $bumpBlockCopy = fn(): int {
@@ -40,6 +63,39 @@ $bumpBlockCopy = fn(): int {
 assert!($bumpBlockCopy() == 11);
 assert!($blockCounter == 10);
 
+$assignBlockCopy = fn(): int {
+  $blockCounter = $blockCounter + 1;
+  return $blockCounter;
+};
+
+$blockCounter = 20;
+assert!($assignBlockCopy() == 11);
+assert!($assignBlockCopy() == 11);
+assert!($blockCounter == 20);
+
+$readBeforeWrite = fn(): (int, int) {
+  $before = $blockCounter;
+  $blockCounter = 7;
+  return ($before, $blockCounter);
+};
+
+assert!($readBeforeWrite() == (20, 7));
+assert!($blockCounter == 20);
+
+$conditionalCopy = fn(bool $replace): int {
+  if ($replace) {
+    $blockCounter = 5;
+  } else {
+    $blockCounter = $blockCounter + 1;
+  }
+
+  return $blockCounter;
+};
+
+assert!($conditionalCopy(false) == 21);
+assert!($conditionalCopy(true) == 5);
+assert!($blockCounter == 20);
+
 $expressionLocal = 8;
 $assignExpressionLocal = fn(): int => $expressionLocal = 3;
 assert!($assignExpressionLocal() == 3);
@@ -49,6 +105,14 @@ $expressionCounter = 4;
 $bumpExpressionCopy = fn(): int => $expressionCounter += 1;
 assert!($bumpExpressionCopy() == 5);
 assert!($expressionCounter == 4);
+
+$assignExpressionCopy = fn(): int => (
+  $expressionCounter = $expressionCounter + 1
+);
+
+$expressionCounter = 9;
+assert!($assignExpressionCopy() == 5);
+assert!($expressionCounter == 9);
 
 $sumValues = fn(vec<int> $values): int {
   $sum = 0;
@@ -93,6 +157,21 @@ $factory = fn(int $offset): fn(int): int {
 
 $nested = $factory(4);
 assert!($nested(5) == 12);
+
+$nestedAssignment = fn(): fn(): int => fn(): int {
+  $base = $base + 1;
+  return $base;
+};
+
+$nestedLocal = fn(): fn(): int {
+  $base = 10;
+  return fn(): int => $base = $base + 1;
+};
+
+$base = 8;
+assert!($nestedAssignment()() == 4);
+assert!($nestedLocal()() == 11);
+assert!($base == 8);
 
 $identity = fn<T>(T $value): T {
   return $value;
