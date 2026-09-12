@@ -62,7 +62,7 @@ enum Algorithm: int {
   public function isCryptographic(): bool {
     return match ($this) {
       Algorithm::Crc32 | Algorithm::Crc32c | Algorithm::Adler32 | Algorithm::Xxhash64 | Algorithm::Xxhash3 => false,
-      $_ => true,
+      _ => true,
     };
   }
 }

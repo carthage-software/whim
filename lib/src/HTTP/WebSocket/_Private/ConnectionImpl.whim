@@ -227,7 +227,7 @@ abstract class ConnectionImpl implements Connection {
           1 => TextMessage($event[1]),
           2 => BinaryMessage($event[1]),
           8 => $this->closeMessage($event[1], $event[2]),
-          $_ => $this->invalidEvent(),
+          _ => $this->invalidEvent(),
         };
       }
 
@@ -261,7 +261,7 @@ abstract class ConnectionImpl implements Connection {
     $this->terminated = true;
     $this->closeCode = match ($code) {
       0 => null,
-      $_ => $code,
+      _ => $code,
     };
 
     $this->closeReason = $reason;

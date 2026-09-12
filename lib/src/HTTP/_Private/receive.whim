@@ -51,7 +51,7 @@ function receive(State $state, string $bytes): vec<Event\WeakendEvent> {
         foreach ($events as $event) {
           $streamId = match ($event[0]) {
             1 | 2 | 5 | 7 | 8 | 9 | 10 => $event[1],
-            $_ => null,
+            _ => null,
           };
 
           if ($streamId != $error->streamId) {

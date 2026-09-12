@@ -32,7 +32,7 @@ final readonly class ResponseCompression implements Middleware {
     $acceptEncoding = $request->headers->getAll('Accept-Encoding');
     $field = match ($acceptEncoding) {
       vec[] => null,
-      $_ => join(',', $acceptEncoding),
+      _ => join(',', $acceptEncoding),
     };
 
     ($codec, $acceptable) = _Private\select_response_codec(

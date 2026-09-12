@@ -191,7 +191,7 @@ fn tuple_window_descriptor(descriptor: &TypeDescriptor, element_count: usize) ->
         }
         TypeDescriptor::Union(members) => members
             .iter()
-            .any(|member| tuple_window_descriptor(member, element_count)),
+            .all(|member| tuple_window_descriptor(member, element_count)),
         TypeDescriptor::Intersection(members) => members
             .iter()
             .all(|member| tuple_window_descriptor(member, element_count)),
@@ -293,16 +293,17 @@ fn dictionary_shape_table(
 fn collect_match_keys(heap: &Heap, pattern: &Pattern<'_>, keys: &mut Vec<MatchKey>) -> bool {
     match pattern {
         Pattern::Parenthesized(pattern) => collect_match_keys(heap, pattern.pattern, keys),
-        Pattern::As(pattern) if pattern_only_binds(pattern.left) => {
+        Pattern::As(pattern) if pattern_needs_no_check(pattern.left) => {
             collect_match_keys(heap, pattern.right, keys)
         }
-        Pattern::As(pattern) if pattern_only_binds(pattern.right) => {
+        Pattern::As(pattern) if pattern_needs_no_check(pattern.right) => {
             collect_match_keys(heap, pattern.left, keys)
         }
         Pattern::Intersection(_)
         | Pattern::Object(_)
         | Pattern::NamedObject(_)
         | Pattern::As(_)
+        | Pattern::Wildcard(_)
         | Pattern::Variable(_)
         | Pattern::Vec(_)
         | Pattern::Dict(_)
@@ -351,15 +352,15 @@ fn collect_match_keys(heap: &Heap, pattern: &Pattern<'_>, keys: &mut Vec<MatchKe
     }
 }
 
-fn pattern_only_binds(pattern: &Pattern<'_>) -> bool {
+fn pattern_needs_no_check(pattern: &Pattern<'_>) -> bool {
     match pattern {
-        Pattern::Variable(_) => true,
-        Pattern::Parenthesized(pattern) => pattern_only_binds(pattern.pattern),
+        Pattern::Wildcard(_) | Pattern::Variable(_) => true,
+        Pattern::Parenthesized(pattern) => pattern_needs_no_check(pattern.pattern),
         Pattern::Intersection(pattern) => {
-            pattern_only_binds(pattern.left) && pattern_only_binds(pattern.right)
+            pattern_needs_no_check(pattern.left) && pattern_needs_no_check(pattern.right)
         }
         Pattern::As(pattern) => {
-            pattern_only_binds(pattern.left) && pattern_only_binds(pattern.right)
+            pattern_needs_no_check(pattern.left) && pattern_needs_no_check(pattern.right)
         }
         Pattern::Object(_)
         | Pattern::NamedObject(_)
@@ -1776,7 +1777,7 @@ impl BodyCompiler<'_, '_> {
         pattern: &Pattern<'_>,
     ) -> Result<bool, CompileError> {
         match pattern {
-            Pattern::Variable(_) => Ok(true),
+            Pattern::Wildcard(_) | Pattern::Variable(_) => Ok(true),
             Pattern::Parenthesized(pattern) => self.pattern_is_irrefutable(scope, pattern.pattern),
             Pattern::Intersection(pattern) => {
                 let left = self.lower_match_pattern(scope, pattern.left)?;
@@ -1850,7 +1851,7 @@ impl BodyCompiler<'_, '_> {
                 lower_pattern_type(&self.types(scope), &Type::Named(pattern.name))?,
                 self.lower_object_pattern(scope, &pattern.object)?,
             ])),
-            Pattern::Variable(_) => Ok(TypeDescriptor::Wildcard),
+            Pattern::Wildcard(_) | Pattern::Variable(_) => Ok(TypeDescriptor::Wildcard),
             Pattern::Parenthesized(pattern) => self.lower_match_pattern(scope, pattern.pattern),
             Pattern::Intersection(IntersectionPattern { left, right, .. })
             | Pattern::As(AsPattern { left, right, .. }) => Ok(TypeDescriptor::Intersection(vec![
@@ -2002,7 +2003,7 @@ impl BodyCompiler<'_, '_> {
                 }
                 Ok(())
             }
-            Pattern::Type(_) => Ok(()),
+            Pattern::Wildcard(_) | Pattern::Type(_) => Ok(()),
         }
     }
 
@@ -2041,7 +2042,7 @@ impl BodyCompiler<'_, '_> {
                 pattern.trailing.as_ref(),
                 value,
             ),
-            Pattern::Type(_) => Ok(()),
+            Pattern::Wildcard(_) | Pattern::Type(_) => Ok(()),
         }
     }
 
@@ -2567,7 +2568,7 @@ fn check_pattern_bindings<'arena>(
             object: pattern, ..
         }) => check_object_pattern_bindings(pattern, bindings),
         Pattern::Variable(variable) => collect_pattern_binding(variable, bindings),
-        Pattern::Type(_) => Ok(()),
+        Pattern::Wildcard(_) | Pattern::Type(_) => Ok(()),
         Pattern::Parenthesized(pattern) => check_pattern_bindings(pattern.pattern, bindings),
         Pattern::Intersection(pattern) => {
             check_pattern_bindings(pattern.left, bindings)?;
@@ -2718,7 +2719,7 @@ fn pattern_has_bindings(pattern: &Pattern<'_>) -> bool {
                     .and_then(|trailing| trailing.pattern)
                     .is_some_and(pattern_has_bindings)
         }
-        Pattern::Type(_) => false,
+        Pattern::Wildcard(_) | Pattern::Type(_) => false,
     }
 }
 

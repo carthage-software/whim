@@ -51,7 +51,7 @@ function read_h1_response_head(
     match ($version) {
       10 => ProtocolVersion::V10,
       11 => ProtocolVersion::V11,
-      $_ => ProtocolVersion::V11,
+      _ => ProtocolVersion::V11,
     },
     $status as StatusCode,
     $headers,

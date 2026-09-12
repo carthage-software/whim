@@ -74,7 +74,7 @@ final readonly class RedirectClient implements Client {
         301 | 302 => $request->method == Message\METHOD_POST,
         303 => $request->method != Message\METHOD_GET
         && $request->method != Message\METHOD_HEAD,
-        $_ => false,
+        _ => false,
       };
 
       if ($rewriteToGet) {

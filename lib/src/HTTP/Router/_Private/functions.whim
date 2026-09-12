@@ -64,7 +64,7 @@ function decode_parameters(
   foreach ($names as $name) {
     $captureName = match ($name) {
       '*' => WILDCARD_CAPTURE,
-      $_ => $name,
+      _ => $name,
     };
 
     if (!contains_key!($captures, $captureName)) {

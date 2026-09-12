@@ -249,11 +249,11 @@ function get_resource_limit(Resource $resource): ResourceLimit {
   return new ResourceLimit(
     match ($soft) {
       -1 => null,
-      $_ => $soft as NonNegativeInt,
+      _ => $soft as NonNegativeInt,
     },
     match ($hard) {
       -1 => null,
-      $_ => $hard as NonNegativeInt,
+      _ => $hard as NonNegativeInt,
     },
   );
 }

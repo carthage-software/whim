@@ -215,7 +215,7 @@ final class PoolState {
     $timeout = $this->configuration->acquisitionTimeout;
     $effectiveCancellation = match ($timeout) {
       null => $cancellation,
-      $_ => new TimeoutCancellationToken($timeout, $cancellation),
+      _ => new TimeoutCancellationToken($timeout, $cancellation),
     };
 
     $suspension = Whim\_Private\create_suspension::<null|Entry>();

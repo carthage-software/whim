@@ -95,6 +95,12 @@ fn mark_tree(analysis: &Analysis<'_>, marked: &mut BTreeMap<usize, Marked>) {
             ancestors.pop();
         }
 
+        if element.kind == NodeKind::Pattern
+            && analysis.source().get(element.start..element.end) == Some("_")
+        {
+            insert(marked, element.start, element.end, KEYWORD, NONE);
+        }
+
         let named = is_identifier(element.kind)
             || (element.kind == NodeKind::Variable
                 && ancestors.last().is_some_and(|parent| {

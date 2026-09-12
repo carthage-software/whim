@@ -138,26 +138,88 @@ try {
 
 assert!($assertion_error_5 is CompilerError);
 
-File\write(
-  $work . '/standalone-wildcard.whim',
-  '$value = match (1) {' . "\n" . '    _ => \'fallback\',' . "\n" . '};' . "\n",
-);
+Filesystem\delete_directory($work, true);
 
-$standaloneWildcard = $work . '/standalone-wildcard.whim';
-$assertion_value_6 = function() use ($standaloneWildcard): void {
-  require!($standaloneWildcard);
-};
+$_ = 'outer';
+foreach (vec[
+  null,
+  false,
+  true,
+  42,
+  1.5,
+  'text',
+  vec[],
+  dict[],
+  (1,),
+] as $value) {
+  assert!(
+    match ($value) {
+      _ => $_,
+    }
+    == 'outer',
+  );
 
-$assertion_error_6 = null;
-try {
-  $assertion_value_6();
-} catch (CompilerError $assertion_caught_6) {
-  $assertion_error_6 = $assertion_caught_6;
+  assert!(
+    match ($value) {
+      $_ => $_,
+    }
+    == $value,
+  );
+
+  assert!(
+    match (($value, $value)) {
+      (_, _) => true,
+      _ => false,
+    },
+  );
+
+  assert!(
+    match (vec[$value, $value]) {
+      vec[_, ..._] => true,
+      _ => false,
+    },
+  );
+
+  assert!(
+    match (dict['value' => $value]) {
+      dict['value' => _] => true,
+      _ => false,
+    },
+  );
 }
 
-assert!($assertion_error_6 is CompilerError);
+assert!($_ == 'outer');
+assert!(
+  (
+    fn(): string => (
+      match (42) {
+        _ => $_,
+      }
+    )
+  )()
+  == 'outer',
+);
 
-Filesystem\delete_directory($work, true);
+assert!(
+  match (vec[(1, 2), ('a', 'b')]) {
+    vec[...(_, _)] => true,
+    _ => false,
+  },
+);
+
+assert!(
+  match (42) {
+    $number @ (_ & int) => $number,
+    _ => 0,
+  }
+  == 42,
+);
+
+assert!(
+  match (42) {
+    null | (_) => true,
+  },
+);
 
 enum Color {
   case Red;
@@ -259,6 +321,27 @@ final class Circle extends Shape {
 final class Rectangle extends Shape {
   public function __construct(public float $width, public float $height) {}
 }
+
+assert!(
+  match (new Circle(2.0)) {
+    Circle #{ radius: _ } => true,
+    _ => false,
+  },
+);
+
+assert!(
+  !match (new Rectangle(2.0, 3.0)) {
+    Circle #{ radius: _ } => true,
+    _ => false,
+  },
+);
+
+assert!(
+  !match (new Circle(2.0)) {
+    #{ missing: _, ... } => true,
+    _ => false,
+  },
+);
 
 final class EvaluationCount {
   public int $value = 0;

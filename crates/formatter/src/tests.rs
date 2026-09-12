@@ -127,8 +127,8 @@ fn dictionary_pattern_keys_preserve_negative_integer_spelling() {
         "$x=match($v){dict[-0x10=>_,-0b1=>_,-1_000=>_]=>1,_=>0};",
         concat!(
             "$x = match ($v) {\n",
-            "  dict[-0x10 => $_, -0b1 => $_, -1_000 => $_] => 1,\n",
-            "  $_ => 0,\n",
+            "  dict[-0x10 => _, -0b1 => _, -1_000 => _] => 1,\n",
+            "  _ => 0,\n",
             "};\n",
         ),
     );
@@ -283,7 +283,7 @@ fn match_expression() {
         "$x = match ($code) {\n",
         "  200 => 'ok',\n",
         "  404 => 'missing',\n",
-        "  $_ => 'error',\n",
+        "  _ => 'error',\n",
         "};\n",
     );
     assert_formats(source, expected);
@@ -331,7 +331,7 @@ fn match_expression() {
             "$x = match ($value) {\n",
             "  $circle @ Circle => $circle->radius,\n",
             "  ($first, ...$rest) @ vec<int> => $first,\n",
-            "  $_ => 0,\n",
+            "  _ => 0,\n",
             "};\n",
         ),
     );

@@ -21,7 +21,7 @@ function family(): string {
     'linux' => 'Linux',
     'freebsd' | 'netbsd' | 'openbsd' | 'dragonfly' => 'BSD',
     'solaris' | 'illumos' => 'Solaris',
-    $_ => 'Unknown',
+    _ => 'Unknown',
   };
 }
 

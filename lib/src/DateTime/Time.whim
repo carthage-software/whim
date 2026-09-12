@@ -99,7 +99,7 @@ final readonly class Time implements Order<Time>, ToString {
     $hour = $this->hour % 12;
     return match ($hour) {
       0 => 12,
-      $_ => $hour as HourOfMeridiem,
+      _ => $hour as HourOfMeridiem,
     };
   }
 

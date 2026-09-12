@@ -71,7 +71,7 @@ enum Month: int {
       Month::June => 30,
       Month::September => 30,
       Month::November => 30,
-      $_ => 31,
+      _ => 31,
     };
   }
 }

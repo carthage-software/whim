@@ -13,7 +13,6 @@ use whim_syn::cst::array::TupleExpression;
 use whim_syn::cst::array::VecElement;
 use whim_syn::cst::array::VecExpression;
 use whim_syn::cst::array::VecFillExpression;
-use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::atom::Literal;
 use whim_syn::cst::atom::LiteralString;
 use whim_syn::cst::atom::LiteralStringKind;
@@ -51,7 +50,6 @@ use whim_syn::cst::pattern::ObjectPatternEntry;
 use whim_syn::cst::pattern::Pattern;
 use whim_syn::cst::pattern::TrailingPattern;
 use whim_syn::cst::sequence::TokenSeparatedSequence;
-use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeArgumentList;
 
 use crate::document::Document;
@@ -618,8 +616,8 @@ where
 {
     fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
         match self {
+            Pattern::Wildcard(_) => f.text("_"),
             Pattern::Variable(variable) => variable.format(f),
-            Pattern::Type(r#type) if pattern_type_is_wildcard(r#type) => f.text("$_"),
             Pattern::Type(r#type) => r#type.format(f),
             Pattern::Parenthesized(pattern) => {
                 let inner = pattern.pattern.format(f);
@@ -709,17 +707,6 @@ where
     }
 }
 
-fn pattern_type_is_wildcard(r#type: &Type<'_>) -> bool {
-    matches!(
-        r#type.unparenthesized(),
-        Type::Named(named)
-            if matches!(
-                &named.identifier,
-                Identifier::Local(local) if local.value == "_"
-            ) && named.type_arguments.is_none()
-    )
-}
-
 fn pattern_binds(pattern: &Pattern<'_>) -> bool {
     match pattern {
         Pattern::Variable(_) => true,
@@ -760,7 +747,7 @@ fn pattern_binds(pattern: &Pattern<'_>) -> bool {
                     .and_then(|trailing| trailing.pattern)
                     .is_some_and(pattern_binds)
         }
-        Pattern::Type(_) => false,
+        Pattern::Wildcard(_) | Pattern::Type(_) => false,
     }
 }
 

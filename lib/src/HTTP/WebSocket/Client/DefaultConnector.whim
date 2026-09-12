@@ -57,7 +57,7 @@ final readonly class DefaultConnector implements Connector {
       $port = match ($url->scheme) {
         'ws' => 80,
         'wss' => 443,
-        $_ => throw new HandshakeException(
+        _ => throw new HandshakeException(
           'unsupported WebSocket URL scheme: `' . $url->scheme . '`',
         ),
       };
@@ -293,7 +293,7 @@ final readonly class DefaultConnector implements Connector {
   private function requestTarget(URL $url): string {
     $target = match ($url->path) {
       '' => '/',
-      $_ => $url->path,
+      _ => $url->path,
     };
 
     if ($url->query != null) {
@@ -315,7 +315,7 @@ final readonly class DefaultConnector implements Connector {
         $host->name,
         $host->name as NonEmptyString,
       ),
-      $_ => throw new HandshakeException(
+      _ => throw new HandshakeException(
         'an IPvFuture host cannot serve as a network endpoint',
       ),
     };

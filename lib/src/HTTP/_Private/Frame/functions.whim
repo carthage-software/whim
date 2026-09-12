@@ -19,7 +19,7 @@ function encode(WeakendFrame $frame): string {
     7 => _Private\encode_go_away($frame as GoAwayFrame),
     8 => _Private\encode_window_update($frame as WindowUpdateFrame),
     9 => _Private\encode_continuation($frame as ContinuationFrame),
-    $_ => (
+    _ => (
       $frame[1] as int,
       $frame[2] as int,
       $frame[3] as int,

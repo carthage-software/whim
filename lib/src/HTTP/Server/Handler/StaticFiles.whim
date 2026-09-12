@@ -172,7 +172,7 @@ final readonly class StaticFiles implements Handler {
     ) {
       $range = match (length!($rangeFields)) {
         1 => $this->parseRange($rangeFields[0], $size),
-        $_ => false,
+        _ => false,
       };
     }
 
@@ -478,7 +478,7 @@ final readonly class StaticFiles implements Handler {
       'mp4' => 'video/mp4',
       'webm' => 'video/webm',
       'ogg' => 'application/ogg',
-      $_ => 'application/octet-stream',
+      _ => 'application/octet-stream',
     };
   }
 }

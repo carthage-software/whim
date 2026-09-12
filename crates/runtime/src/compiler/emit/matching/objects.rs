@@ -50,7 +50,7 @@ pub(super) fn contains_object_pattern(pattern: &Pattern<'_>) -> bool {
                     .and_then(|rest| rest.pattern)
                     .is_some_and(nested)
         }
-        Pattern::Variable(_) | Pattern::Type(_) => false,
+        Pattern::Wildcard(_) | Pattern::Variable(_) | Pattern::Type(_) => false,
     }
 }
 
@@ -154,6 +154,7 @@ impl BodyCompiler<'_, '_> {
         failures: &mut Vec<u32>,
     ) -> Result<(), CompileError> {
         match pattern {
+            Pattern::Wildcard(_) => Ok(()),
             Pattern::Variable(variable) => self.bind_pattern_variable(variable, value),
             Pattern::Parenthesized(pattern) => {
                 self.test_and_bind_pattern(scope, pattern.pattern, value, failures)

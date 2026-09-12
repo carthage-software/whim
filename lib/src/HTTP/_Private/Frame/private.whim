@@ -25,7 +25,7 @@ function parse(
     0x7 => parse_go_away($stream, $payload),
     0x8 => parse_window_update($stream, $payload),
     0x9 => parse_continuation($flags, $stream, $payload),
-    $_ => (10, $type, $flags, $stream, $payload),
+    _ => (10, $type, $flags, $stream, $payload),
   };
 }
 

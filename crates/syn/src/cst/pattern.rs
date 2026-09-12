@@ -14,6 +14,7 @@ use crate::cst::r#type::Type;
 impl HasSpan for Pattern<'_> {
     fn span(&self) -> Span {
         match self {
+            Self::Wildcard(span) => *span,
             Self::Variable(variable) => variable.span,
             Self::Parenthesized(pattern) => pattern.span(),
             Self::As(pattern) => pattern.span(),
@@ -92,6 +93,7 @@ impl HasSpan for TrailingPattern<'_> {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Pattern<'arena> {
+    Wildcard(Span),
     Variable(Variable<'arena>),
     Parenthesized(ParenthesizedPattern<'arena>),
     As(AsPattern<'arena>),

@@ -81,7 +81,7 @@ final class CookieJar implements ClientMiddleware {
     $host = _Private\host($url);
     $path = match ($url->path) {
       '' => '/',
-      $_ => $url->path,
+      _ => $url->path,
     };
 
     $secure = $url->scheme == 'https';

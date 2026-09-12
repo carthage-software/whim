@@ -12,7 +12,7 @@ function label(mixed $value): string {
   return match ($value) {
     0 => 'zero',
     1 | 2 | 3 => 'small',
-    $_ => 'other',
+    _ => 'other',
   };
 }
 
@@ -21,6 +21,23 @@ assert!(label('2') == 'other');
 ```
 
 If no arm matches, Whim throws `UnhandledMatchError`.
+
+## Wildcard patterns
+
+`_` accepts any value without binding a variable. As a fallback arm, it must
+come last. Inside another pattern, it ignores that part of the value:
+
+```whim
+$outer = 'outer';
+assert!(match (42) { _ => $outer } == 'outer');
+
+$second = match ((1, 'two')) {
+  (_, $value) => $value,
+  _ => 'other',
+};
+
+assert!($second == 'two');
+```
 
 ## Variable patterns
 
@@ -31,19 +48,6 @@ arm:
 $description = match (42) {
   $value => 'value:' . $value,
 };
-```
-
-`$_` is an ordinary variable. Use it when an arm needs a fallback but does not
-need to read the value:
-
-```whim
-$value = null;
-$label = match ($value) {
-  null => 'none',
-  $_ => 'some',
-};
-
-assert!($label == 'none');
 ```
 
 The binding exists only in its arm. It may shadow an outer variable without
@@ -58,15 +62,14 @@ function kind(mixed $value): string {
   return match ($value) {
     int => 'integer',
     string => 'text',
-    $_ => 'other',
+    _ => 'other',
   };
 }
 
 assert!(kind(42) == 'integer');
 ```
 
-`_` is not a standalone match pattern. It remains valid as an ignored slot in
-a larger type, such as `vec<_>`.
+`_` also marks an ignored slot in a larger type, such as `vec<_>`.
 
 ## Combining patterns with `@`
 
@@ -78,7 +81,7 @@ function describe(mixed $value): string {
   return match ($value) {
     $number @ int => 'int:' . $number,
     $text @ string => 'string:' . $text,
-    $_ => 'other',
+    _ => 'other',
   };
 }
 ```
@@ -112,7 +115,7 @@ length must match exactly:
 function point_name(mixed $value): string {
   return match ($value) {
     ($x @ int, $y @ int) => $x . ',' . $y,
-    $_ => 'not a point',
+    _ => 'not a point',
   };
 }
 
@@ -126,7 +129,7 @@ the remainder. A variable after it binds the remainder as a vec:
 ```whim
 $total = match (vec[2, 3, 4]) {
   ($first, ...$rest) @ vec<int> => $first + length!($rest),
-  $_ => 0,
+  _ => 0,
 };
 
 assert!($total == 4);
@@ -141,7 +144,7 @@ type Point = (int, int);
 
 $point = match ((3, 4)) {
   ($x, $y) @ Point => ($x, $y),
-  $_ => null,
+  _ => null,
 };
 ```
 
@@ -152,7 +155,7 @@ $point = match ((3, 4)) {
 ```whim
 $first = match (vec[1, 2, 3]) {
   vec[$head @ int, ...int] => $head,
-  $_ => 0,
+  _ => 0,
 };
 
 assert!($first == 1);
@@ -167,7 +170,7 @@ pattern requires the exact key set. With `...`, it permits unlisted keys:
 ```whim
 $name = match (dict['id' => 7, 'name' => 'Ada']) {
   dict['name' => $value @ string, ...] => $value,
-  $_ => 'unknown',
+  _ => 'unknown',
 };
 
 assert!($name == 'Ada');
@@ -184,7 +187,7 @@ function extract(mixed $value): null|(int, string) {
       $foo,
       $bar,
     ),
-    $_ => null,
+    _ => null,
   };
 }
 
@@ -206,7 +209,7 @@ Parentheses do not change these rules.
 ```whim
 $result = match (vec[1, 'two', 'three']) {
   vec[$first @ int, ...$strings @ string] => ($first, $strings),
-  $_ => null,
+  _ => null,
 };
 assert!($result == (1, vec['two', 'three']));
 ```
@@ -228,7 +231,7 @@ tightly than `@` and `|`, and can combine type checks with destructuring:
 ```whim
 $pair = match ((3, 4)) {
   ($x, $y) & (int, int) => ($x, $y),
-  $_ => null,
+  _ => null,
 };
 assert!($pair == (3, 4));
 ```
@@ -264,7 +267,7 @@ function describe_result(mixed $result): string {
     Ok<string> #{ $value } => $value,
     Err<int> #{ error: $code @ 400..=499 } => 'client error: ' . $code,
     Err<int> #{ $error } => 'error: ' . $error,
-    $_ => 'other',
+    _ => 'other',
   };
 }
 

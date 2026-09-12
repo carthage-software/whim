@@ -501,7 +501,7 @@ final class H2Connection implements MultiplexedConnection {
   private function eventStreamId(Event\WeakendEvent $event): null|int {
     return match ($event[0]) {
       1 | 2 | 5 | 7 | 8 | 9 | 10 => $event[1],
-      $_ => null,
+      _ => null,
     };
   }
 

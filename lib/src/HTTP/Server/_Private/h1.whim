@@ -80,7 +80,7 @@ function h1_read_request_head(
       match ($parsed) {
         417 => 'the request expectation is unsupported',
         505 => 'the HTTP version is unsupported',
-        $_ => 'the request head is invalid',
+        _ => 'the request head is invalid',
       },
     );
   }
@@ -108,7 +108,7 @@ function h1_read_request_head(
     match ($version) {
       10 => ProtocolVersion::V10,
       11 => ProtocolVersion::V11,
-      $_ => ProtocolVersion::V11,
+      _ => ProtocolVersion::V11,
     },
     $headers,
     $contentLength,

@@ -27,7 +27,7 @@ function origin_host(Origin $origin): (Network\Host, NonEmptyString) {
       $host->address->toString() as NonEmptyString,
     ),
     $host @ RegisteredNameHost => ($host->name, $host->name as NonEmptyString),
-    $_ => throw new ConnectionException(
+    _ => throw new ConnectionException(
       'an IPvFuture host cannot serve as a network endpoint',
     ),
   };

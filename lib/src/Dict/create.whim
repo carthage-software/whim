@@ -105,7 +105,7 @@ function group_by<K: ArrayKey, V>(
   foreach ($values as $value) {
     $key = match ($keyFunction($value)) {
       $some @ Some<K> => $some->value,
-      $_ => continue,
+      _ => continue,
     };
 
     try {

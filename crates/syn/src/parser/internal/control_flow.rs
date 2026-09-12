@@ -5,6 +5,7 @@ use std::mem;
 use crate::arena::Arena;
 use crate::arena::Vec;
 
+use crate::cst::atom::Identifier;
 use crate::cst::atom::Literal;
 use crate::cst::atom::Variable;
 use crate::cst::control_flow::DoWhile;
@@ -219,6 +220,12 @@ where
                     name: named,
                     object,
                 })))
+            } else if named.member.is_none()
+                && named.type_arguments.is_none()
+                && let Identifier::Local(identifier) = &named.identifier
+                && identifier.value == "_"
+            {
+                Ok(self.arena.alloc(Pattern::Wildcard(identifier.span)))
             } else {
                 Ok(self.arena.alloc(Pattern::Type(Type::Named(named))))
             };

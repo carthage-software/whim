@@ -70,7 +70,7 @@ function h2_push_request(
       ':scheme' => $scheme = $header[1],
       ':authority' => $authority = $header[1],
       ':path' => $path = $header[1],
-      $_ => $fields[] = ($header[0], $header[1]),
+      _ => $fields[] = ($header[0], $header[1]),
     };
   }
 

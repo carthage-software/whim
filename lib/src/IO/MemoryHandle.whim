@@ -71,7 +71,7 @@ final class MemoryHandle implements
     $byteBuffer = $this->byteBuffer;
     $result = match ($byteBuffer) {
       null => Str\slice($this->buffer, $this->cursor, $length),
-      $_ => $byteBuffer->read($this->cursor, $length),
+      _ => $byteBuffer->read($this->cursor, $length),
     };
 
     $this->cursor += $length;
@@ -156,7 +156,7 @@ final class MemoryHandle implements
     $byteBuffer = $this->byteBuffer;
     return match ($byteBuffer) {
       null => $this->buffer,
-      $_ => $byteBuffer->toString(),
+      _ => $byteBuffer->toString(),
     };
   }
 
@@ -206,7 +206,7 @@ final class MemoryHandle implements
       $pending = Str\join('', $this->pendingWrites);
       $this->buffer = match ($this->buffer) {
         '' => $pending,
-        $_ => $this->buffer . $pending,
+        _ => $this->buffer . $pending,
       };
     } else {
       $byteBuffer->appendAll($this->pendingWrites);

@@ -451,6 +451,35 @@ fn match_expression() {
 }
 
 #[test]
+fn match_wildcards_have_their_own_pattern() {
+    let arena = LocalArena::new();
+    let source = "match ($x) { vec[_, _] => 1, $_ => 2, _ => 3 };";
+    let Expression::Match(matching) = expression(&arena, source) else {
+        panic!("expected a match");
+    };
+
+    assert!(matches!(
+        matching.arms.as_slice()[0].pattern,
+        Pattern::Vec(vector)
+            if vector.elements.iter().all(|pattern| matches!(pattern, Pattern::Wildcard(_)))
+    ));
+
+    assert!(matches!(
+        matching.arms.as_slice()[1].pattern,
+        Pattern::Variable(_)
+    ));
+
+    let Pattern::Wildcard(span) = matching.arms.as_slice()[2].pattern else {
+        panic!("expected a wildcard");
+    };
+
+    assert_eq!(
+        &source[span.start.offset as usize..span.end.offset as usize],
+        "_"
+    );
+}
+
+#[test]
 fn match_has_recursive_checking_and_binding_patterns() {
     let arena = LocalArena::new();
     let Expression::Match(matching) = expression(

@@ -46,7 +46,7 @@ function disposition(Stream $stream): (int, null|FileDescriptor) {
   $descriptor = match ($stream) {
     $attached @ AttachedInput => $attached->handle->getFileDescriptor(),
     $attached @ AttachedOutput => $attached->handle->getFileDescriptor(),
-    $_ => null,
+    _ => null,
   };
 
   return ($stream->getDisposition()->value, $descriptor);

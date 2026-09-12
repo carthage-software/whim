@@ -70,6 +70,6 @@ function reason_phrase(StatusCode $statusCode): null|string {
     508 => 'Loop Detected',
     510 => 'Not Extended',
     511 => 'Network Authentication Required',
-    $_ => null,
+    _ => null,
   };
 }

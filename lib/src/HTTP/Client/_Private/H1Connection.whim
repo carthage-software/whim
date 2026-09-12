@@ -303,7 +303,7 @@ final class H1Connection implements Connection {
       && match ($head->protocolVersion) {
         ProtocolVersion::V11 => true,
         ProtocolVersion::V10 => $responseKeepsAlive,
-        $_ => false,
+        _ => false,
       };
 
     if ($hasBody) {

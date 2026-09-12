@@ -77,7 +77,7 @@ final readonly class RequestDecompression implements Middleware {
           $this->codecs->get($coding)->createDecompressor(),
           match ($remaining) {
             0 => $this->maximumDecodedBytes,
-            $_ => null,
+            _ => null,
           },
         );
       }

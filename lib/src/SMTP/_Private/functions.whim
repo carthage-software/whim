@@ -72,14 +72,14 @@ function parse_reply(
   $space = Str\search($message, ' ');
   $candidate = match ($space) {
     null => $message,
-    $_ => Str\slice($message, 0, $space),
+    _ => Str\slice($message, 0, $space),
   };
 
   $enhanced = EnhancedStatusCode::parse($candidate);
   if ($enhanced != null) {
     $message = match ($space) {
       null => '',
-      $_ => Str\slice($message, $space + 1),
+      _ => Str\slice($message, $space + 1),
     };
   }
 

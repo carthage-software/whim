@@ -121,7 +121,7 @@ function read_bound_address(
     1 => 4,
     4 => 16,
     3 => Str\ord($stream->readFixedSize(1, $cancellation)),
-    $_ => throw new ProtocolException(
+    _ => throw new ProtocolException(
       'the SOCKS proxy returned an unknown address type',
     ),
   };
@@ -146,6 +146,6 @@ function reply_message(int $status): string {
     6 => 'the SOCKS connection expired',
     7 => 'the SOCKS proxy does not support CONNECT',
     8 => 'the SOCKS proxy does not support the destination address type',
-    $_ => 'the SOCKS proxy returned an unknown connection failure',
+    _ => 'the SOCKS proxy returned an unknown connection failure',
   };
 }

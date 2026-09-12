@@ -37,7 +37,7 @@ final class SecureConnector implements Connector {
     $stream = $this->connector->connect($host, $port, $cancellation);
     $serverName = match ($host) {
       $name @ string => $name,
-      $_ => $host->toString(),
+      _ => $host->toString(),
     };
 
     $connection = Whim\TLS\_Private\establish_client::<InternetEndpoint>(

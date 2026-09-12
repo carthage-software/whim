@@ -36,7 +36,7 @@ function offset(int $offset, int $length): int {
 function ascii_lower(int $byte): int {
   return match ($byte) {
     65..90 => $byte + 32,
-    $_ => $byte,
+    _ => $byte,
   };
 }
 
@@ -45,7 +45,7 @@ function ascii_lower(int $byte): int {
 function ascii_upper(int $byte): int {
   return match ($byte) {
     97..122 => $byte - 32,
-    $_ => $byte,
+    _ => $byte,
   };
 }
 

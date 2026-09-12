@@ -204,7 +204,7 @@ final readonly class SetCookie implements ToString {
           'strict' => SameSite::Strict,
           'lax' => SameSite::Lax,
           'none' => SameSite::None,
-          $_ => $sameSite,
+          _ => $sameSite,
         };
       }
 

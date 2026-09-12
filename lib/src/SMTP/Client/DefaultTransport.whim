@@ -248,7 +248,7 @@ final class DefaultTransport implements Transport {
   private function target(Host $host): (Host, NonEmptyString) {
     return match ($host) {
       $name @ string => $this->hostnameTarget($name),
-      $_ => ($host, $host->toString() as NonEmptyString),
+      _ => ($host, $host->toString() as NonEmptyString),
     };
   }
 
@@ -330,7 +330,7 @@ final class DefaultTransport implements Transport {
     if (!$mailReply->isPositiveCompletion()) {
       $sender = match ($envelope->sender) {
         null => '<>',
-        $_ => $envelope->sender->address,
+        _ => $envelope->sender->address,
       };
 
       _Private\sender_rejected($sender, $mailReply);

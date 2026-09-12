@@ -544,6 +544,7 @@ impl Node<'_, '_> {
                 f(Node::Expression(node.expression));
             }
             Node::Pattern(node) => match node {
+                Pattern::Wildcard(_) => {}
                 Pattern::Variable(variable) => f(Node::Variable(variable)),
                 Pattern::Parenthesized(pattern) => f(Node::ParenthesizedPattern(pattern)),
                 Pattern::As(pattern) => f(Node::AsPattern(pattern)),

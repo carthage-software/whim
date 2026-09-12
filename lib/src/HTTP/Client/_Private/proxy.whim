@@ -30,7 +30,7 @@ function should_use_proxy(
   $host = match ($origin->host) {
     $value @ IPHost => $value->address->toString(),
     $value @ RegisteredNameHost => Str\lowercase($value->name),
-    $_ => $origin->host->toString(),
+    _ => $origin->host->toString(),
   };
 
   foreach ($configuration->bypass as $candidate) {
@@ -65,7 +65,7 @@ function connect_proxy(
       $configuration->url->scheme
     ) {
       'https' => 443,
-      $_ => 80,
+      _ => 80,
     };
 
   $stream = $connector->connect($host, $port, $cancellation);
@@ -156,7 +156,7 @@ function absolute_request_target(Request $request): string {
   $target = $url->scheme . '://' . $authority;
   $target .= match ($url->path) {
     '' => '/',
-    $_ => $url->path,
+    _ => $url->path,
   };
 
   if ($url->query != null) {
@@ -171,7 +171,7 @@ function absolute_request_target(Request $request): string {
 function known_destination(Origin $origin): null|InternetEndpoint {
   return match ($origin->host) {
     $host @ IPHost => new InternetEndpoint($host->address, $origin->port),
-    $_ => null,
+    _ => null,
   };
 }
 
@@ -189,7 +189,7 @@ function proxy_host(
       $host->name as NonEmptyString,
       $host->name as NonEmptyString,
     ),
-    $_ => throw new ConnectionException(
+    _ => throw new ConnectionException(
       'an IPvFuture proxy host cannot serve as a network endpoint',
     ),
   };

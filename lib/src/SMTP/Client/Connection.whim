@@ -77,12 +77,12 @@ final class Connection implements WriteHandle {
       $space = Str\search($line, ' ');
       $keyword = match ($space) {
         null => Str\uppercase($line),
-        $_ => Str\uppercase(Str\slice($line, 0, $space)),
+        _ => Str\uppercase(Str\slice($line, 0, $space)),
       };
 
       $value = match ($space) {
         null => '',
-        $_ => Str\trim(Str\slice($line, $space + 1)),
+        _ => Str\trim(Str\slice($line, $space + 1)),
       };
 
       $this->capabilities[$keyword] = $value;

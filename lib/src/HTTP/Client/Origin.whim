@@ -24,7 +24,7 @@ final readonly class Origin {
       $port = match ($url->scheme) {
         'http' => 80,
         'https' => 443,
-        $_ => throw new RequestException(
+        _ => throw new RequestException(
           'unsupported HTTP URL scheme: `' . $url->scheme . '`',
         ),
       };
