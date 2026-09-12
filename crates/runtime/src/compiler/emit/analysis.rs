@@ -311,6 +311,12 @@ fn collect_short_closure_free_variables<'arena>(
     merge_unbound(&closure.parameter_list, inner, names);
 }
 
+pub(in crate::compiler) fn short_closure_has_captures(closure: &ShortClosure<'_>) -> bool {
+    let mut names = Names::default();
+    collect_short_closure_free_variables(closure, &mut names);
+    !names.ordered.is_empty()
+}
+
 pub(in crate::compiler::emit) fn collect_free_variables_in_expression(
     expression: &Expression<'_>,
 ) -> Vec<String> {

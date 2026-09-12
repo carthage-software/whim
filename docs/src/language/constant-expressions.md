@@ -21,7 +21,8 @@ constant expressions. Such an expression may use:
 - `embed!` with a literal relative path;
 - unary and binary operators;
 - tuple, vec, and dict literals, including vec and dict spreads;
-- a closure with no `use` list and no `$this` use;
+- a `fn` closure with no captures, or a `function` closure with no `use` list
+  and no `$this` use;
 - a named class construction;
 - function, static method, and method calls whose inputs are constant
   expressions.
@@ -49,6 +50,23 @@ const BOX = Box::from(TOTAL);
 assert!(BOX->value == 42);
 ```
 
+A `fn` closure may use an expression or block body. Its parameters and locals
+are not captures. The compiler rejects closures that need outer variables or
+`$this`:
+
+```whim
+const DOUBLE = fn(int $value): int => $value * 2;
+const MAKE_READER = fn(int $value): fn(): int {
+  return fn(): int => $value;
+};
+
+assert!((DOUBLE)(21) == 42);
+assert!((MAKE_READER)(42)() == 42);
+```
+
+`MAKE_READER` captures nothing. When called, it creates a closure that captures
+the supplied `$value`.
+
 ## Forms that do not qualify
 
 A constant expression cannot use:
@@ -56,7 +74,7 @@ A constant expression cannot use:
 - a variable or `$this`;
 - assignment, indexing, or a property read;
 - interpolation;
-- a short closure or a closure capture;
+- a closure with captures;
 - `match`, `throw`, a partial call, or a language construct other than
   `embed!`;
 - `vec[$value; $size]`;

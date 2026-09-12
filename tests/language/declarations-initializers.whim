@@ -106,16 +106,27 @@ const DOUBLE = function(int $value): int {
   return $value * 2;
 };
 
+const SHORT_DOUBLE = fn(int $value): int => $value * 2;
+const MAKE_READER = fn(int $value): fn(): int => fn(): int => $value;
+const MAKE_LOCAL_READER = fn(): fn(): int {
+  $value = 42;
+  return fn(): int => $value;
+};
+
 #[ObjectHolds(new Box(2))]
-#[ObjectHolds(function(int $value): int {
-  return $value + 3;
-})]
+#[ObjectHolds(fn(int $value): int => $value + 3)]
 final class ObjectTarget {
   public const CLASS_BOX = new Box(3);
+  public const CLASS_TRANSFORM = fn(int $value): int => $value + 8;
   public Box $box = new Box(4);
-  public (fn(int): int) $transform = function(int $value): int {
-    return $value + 5;
+  public (fn(int): int) $transform = fn(int $value): int {
+    $increment = 5;
+    return $value + $increment;
   };
+
+  public static (fn(int): int) $staticTransform = fn(
+    int $value,
+  ): int => $value + 6;
 }
 
 final class StaticHolder {
@@ -128,9 +139,7 @@ final readonly class Later {
 
 function object_defaults(
   Box $box = new Box(6),
-  (fn(int): int) $transform = function(int $value): int {
-    return $value + 7;
-  },
+  (fn(int): int) $transform = fn(int $value): int => $value + 7,
 ): (int, int) {
   return ($box->value, $transform(1));
 }
@@ -138,7 +147,12 @@ function object_defaults(
 assert!(GLOBAL_BOX->value == 1);
 $double = DOUBLE;
 assert!($double(4) == 8);
+assert!((SHORT_DOUBLE)(4) == 8);
+assert!((MAKE_READER)(42)() == 42);
+assert!((MAKE_LOCAL_READER)()() == 42);
 assert!(ObjectTarget::CLASS_BOX->value == 3);
+assert!((ObjectTarget::CLASS_TRANSFORM)(1) == 9);
+assert!((ObjectTarget::$staticTransform)(1) == 7);
 assert!(StaticHolder::$value->value == 10);
 
 $first = new ObjectTarget();
@@ -227,29 +241,34 @@ try {
 
 assert!($assertion_error_28 is CompilerError);
 
-$shortClosure = $work . '/short-closure.whim';
-File\write(
-  $shortClosure,
-  'function invalid((fn(): int) $callback = fn(): int => 1): int {'
-  . "\n"
-  . '  return $callback();'
-  . "\n"
-  . '}'
-  . "\n",
-);
+foreach (dict[
+  'constant' => 'const INVALID = fn(): int => $captured;',
+  'class-constant' => 'class Invalid { public const VALUE = fn(): int => $captured; }',
+  'property' => 'class Invalid { public mixed $value = fn(): int => $captured; }',
+  'static-property' => 'class Invalid { public static mixed $value = fn(): int => $captured; }',
+  'parameter' => 'function invalid(mixed $value = fn(): int => $captured): void {}',
+  'attribute' => '#[Whim\\Attribute\\Attribute] class Holds { public function __construct(public mixed $value) {} }'
+  . '#[Holds(fn(): int => $captured)] class Invalid {}',
+  'this' => 'class Invalid { public mixed $value = fn(): object => $this; }',
+  'nested' => 'const INVALID = fn(): fn(): int => fn(): int => $captured;',
+  'nested-this' => 'class Invalid { public mixed $value = fn(): fn(): object => fn(): object => $this; }',
+  'read-before-assignment' => 'const INVALID = fn(): int { $captured = $captured + 1; return $captured; };',
+  'container' => 'const INVALID = vec[fn(): int => $captured];',
+] as $name => $source) {
+  $path = $work . '/capturing-short-' . $name . '.whim';
+  File\write($path, '$captured = 1;' . $source);
+  $error = null;
+  try {
+    require!($path);
+  } catch (CompilerError $caught) {
+    $error = $caught;
+  }
 
-$assertion_value_29 = function() use ($shortClosure): void {
-  require!($shortClosure);
-};
-
-$assertion_error_29 = null;
-try {
-  $assertion_value_29();
-} catch (CompilerError $assertion_caught_29) {
-  $assertion_error_29 = $assertion_caught_29;
+  assert!($error is CompilerError);
+  assert!(
+    Whim\Str\contains($error->getMessage(), 'a short closure with captures'),
+  );
 }
-
-assert!($assertion_error_29 is CompilerError);
 
 $dynamic = $work . '/dynamic.whim';
 File\write(

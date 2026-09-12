@@ -35,6 +35,7 @@ use whim_syn::cst::operation::UnaryPrefixOperator;
 use whim_syn::cst::r#type::Type;
 
 use crate::compiler::emit::analysis::references_this_in_block;
+use crate::compiler::emit::analysis::short_closure_has_captures;
 use crate::compiler::emit::integer_gate;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
@@ -913,6 +914,7 @@ fn check_constant_expression_at(
         {
             Ok(())
         }
+        Expression::ShortClosure(closure) if !short_closure_has_captures(closure) => Ok(()),
         other => Err(non_constant_expression_error(other, position)),
     }
 }
@@ -1021,7 +1023,7 @@ fn non_constant_expression_error(
             "a closure with a `use` clause"
         }
         Expression::Closure(_) => "a closure that captures `$this`",
-        Expression::ShortClosure(_) => "a short closure",
+        Expression::ShortClosure(_) => "a short closure with captures",
         Expression::Match(_) => "a match",
         Expression::Break(_) => "a break",
         Expression::Continue(_) => "a continue",
