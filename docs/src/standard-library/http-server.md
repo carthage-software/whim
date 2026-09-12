@@ -56,8 +56,9 @@ HTTP/2.
 $cancellation)` runs until cancellation, closed bindings, or a fatal accept or
 connection error. One server object can serve only once.
 
-Shutdown stops accepts, lets active requests drain up to the shutdown timeout,
-then closes remaining connections.
+Shutdown stops accepts and closes idle HTTP/1 connections without sending a
+timeout response. Active requests can finish until `shutdownTimeout` expires;
+the server then cancels their work and closes the remaining connections.
 
 Configuration bounds idle time, header and body time, response writes,
 connections, connections per peer, concurrent requests, server pushes, header

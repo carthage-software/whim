@@ -3,6 +3,7 @@ namespace Whim\HTTP\Server\_Private;
 use Whim;
 use Whim\Async\CancellationToken;
 use Whim\Async\CancelledException;
+use Whim\Async\LinkedCancellationToken;
 use Whim\HTTP\Message;
 use Whim\HTTP\Message\FieldMap;
 use Whim\HTTP\Message\ProtocolVersion;
@@ -112,6 +113,7 @@ final class H1Driver implements StreamDriver {
 
     $localEndpoint = $stream->getLocalEndpoint();
     $peerEndpoint = $stream->getPeerEndpoint();
+    $idleCancellation = new LinkedCancellationToken(vec[$draining, $forced]);
 
     $requestCount = 0;
     while ($requestCount < $configuration->maximumRequestsPerConnection) {
@@ -124,8 +126,13 @@ final class H1Driver implements StreamDriver {
 
       try {
         $reader->waitUntilReadable(
-          h1_cancellation($forced, $configuration->connectionIdleTimeout),
+          h1_cancellation(
+            $idleCancellation,
+            $configuration->connectionIdleTimeout,
+          ),
         );
+
+        $idleCancellation->throwIfCancellationRequested();
       } catch (CancelledException $_) {
         return null;
       }

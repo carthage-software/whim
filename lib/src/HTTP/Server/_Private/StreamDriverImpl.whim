@@ -1,6 +1,8 @@
 namespace Whim\HTTP\Server\_Private;
 
 use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\LinkedCancellationToken;
 use Whim\HTTP\_Private as H2;
 use Whim\HTTP\Server\Configuration;
 use Whim\HTTP\Server\Handler\Handler;
@@ -65,25 +67,36 @@ final class StreamDriverImpl implements StreamDriver {
 
     $prefix = '';
     $cancellation = h1_cancellation(
-      $forced,
+      new LinkedCancellationToken(vec[$draining, $forced]),
       $configuration->requestHeaderTimeout,
     );
 
-    while (
-      length!($prefix) < length!(H2\CLIENT_PREFACE)
-      && Str\starts_with(H2\CLIENT_PREFACE, $prefix)
-    ) {
-      $bytes = match (
-        $stream->read(
-          length!(H2\CLIENT_PREFACE) - length!($prefix),
-          $cancellation,
-        )
+    try {
+      while (
+        length!($prefix) < length!(H2\CLIENT_PREFACE)
+        && Str\starts_with(H2\CLIENT_PREFACE, $prefix)
       ) {
-        '' => break,
-        $bytes => $bytes,
-      };
+        $bytes = match (
+          $stream->read(
+            length!(H2\CLIENT_PREFACE) - length!($prefix),
+            $cancellation,
+          )
+        ) {
+          '' => break,
+          $bytes => $bytes,
+        };
 
-      $prefix .= $bytes;
+        $prefix .= $bytes;
+      }
+    } catch (CancelledException $error) {
+      if (
+        $draining->isCancellationRequested()
+        || $forced->isCancellationRequested()
+      ) {
+        return;
+      }
+
+      throw $error;
     }
 
     if ($prefix == H2\CLIENT_PREFACE) {

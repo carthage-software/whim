@@ -1,0 +1,243 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\Deferred;
+use Whim\Async\SignalCancellationToken;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\HTTP\_Private as H2;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Binding\Stream as StreamBinding;
+use Whim\HTTP\Server\Configuration;
+use Whim\HTTP\Server\Handler\FunctionHandler;
+use Whim\HTTP\Server\Handler\Handler;
+use Whim\HTTP\Server\Server;
+use Whim\HTTP\Server\_Private\StreamDriver;
+use Whim\HTTP\Server\_Private\StreamDriverImpl;
+use Whim\IO;
+use Whim\IO\MemoryHandle;
+use Whim\IO\Reader;
+use Whim\Network\Stream;
+use Whim\Str;
+use Whim\TCP;
+use Whim\Time\Duration;
+use Whim\Time\Instant;
+
+final readonly class HTTPShutdownDriver implements StreamDriver {
+  public function __construct(private Deferred<null> $accepted) {}
+
+  public function serve(
+    Stream<_> $stream,
+    bool $enableH2c,
+    Handler $handler,
+    Configuration $configuration,
+    CancellationToken $draining,
+    CancellationToken $forced,
+  ): void {
+    $this->accepted->complete(null);
+    new StreamDriverImpl()->serve(
+      $stream,
+      $enableH2c,
+      $handler,
+      $configuration,
+      $draining,
+      $forced,
+    );
+  }
+}
+
+function http_server_shutdown(string $mode, bool $enableH2c): void {
+  $accepted = new Deferred::<null>();
+  $entered = new Deferred::<CancellationToken>();
+  $release = new Deferred::<null>();
+  $finished = new Deferred::<bool>();
+  $stopped = new Deferred::<null>();
+  $cancellation = new SignalCancellationToken();
+  $inFlight = $mode == 'graceful' || $mode == 'forced';
+  $body = null;
+  $writer = null;
+  if ($mode == 'sse') {
+    ($body, $writer) = IO\pipe();
+    $writer->writeAll("data: first\n\n");
+  }
+
+  $handler = new FunctionHandler(
+    function(
+      CancellationToken $token,
+    ) use ($entered, $release, $finished, $inFlight, $body): Response {
+      $entered->complete($token);
+      try {
+        if ($inFlight) {
+          $release->getFuture()->await($token);
+        }
+      } catch (CancelledException $error) {
+        $finished->complete(false);
+        throw $error;
+      }
+
+      $finished->complete(true);
+      if ($body != null) {
+        return new Response(
+          200,
+          headers: FieldMap::from(vec[('Content-Type', 'text/event-stream')]),
+          body: $body,
+        );
+      }
+
+      return new Response(
+        200,
+        headers: FieldMap::from(vec[('Content-Length', '2')]),
+        body: new MemoryHandle('ok'),
+      );
+    },
+  );
+
+  $listener = TCP\listen();
+  $server = new Server(
+    vec[new StreamBinding($listener, $enableH2c)],
+    new Configuration(
+      connectionIdleTimeout: match ($enableH2c) {
+        true => null,
+        false => Duration::fromSeconds(30),
+      },
+      requestHeaderTimeout: match ($enableH2c) {
+        true => null,
+        false => Duration::fromSeconds(30),
+      },
+      shutdownTimeout: match ($mode) {
+        'forced' => Duration::fromMilliseconds(200),
+        $_ => Duration::fromSeconds(5),
+      },
+    ),
+    new HTTPShutdownDriver($accepted),
+  );
+
+  $task = Async\spawn::<null>(
+    function() use ($server, $handler, $cancellation, $stopped): null {
+      $server->serve($handler, $cancellation);
+      $stopped->complete(null);
+      return null;
+    },
+  );
+
+  $socket = TCP\connect('127.0.0.1', $listener->getLocalEndpoint()->port);
+  $reader = new Reader($socket);
+  $h2 = null;
+  $token = null;
+  $deadline = new TimeoutCancellationToken(Duration::fromSeconds(2));
+  try {
+    $accepted->getFuture()->await($deadline);
+    if ($mode == 'preface') {
+      $socket->writeAll('PRI', $deadline);
+    } else if ($mode == 'h2') {
+      $h2 = new H2\ClientConnection();
+      $socket->writeAll($h2->takeOutboundBytes(), $deadline);
+      $acknowledged = false;
+      while (!$acknowledged) {
+        foreach ($h2->receive($socket->read(16_384, $deadline)) as $event) {
+          if ($event is H2\Event\SettingsAcknowledged) {
+            $acknowledged = true;
+          }
+        }
+      }
+    } else if ($mode != 'first') {
+      $socket->writeAll(
+        "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: keep-alive\r\n\r\n",
+        $deadline,
+      );
+
+      $token = $entered->getFuture()->await($deadline);
+      if (!$inFlight) {
+        $head = $reader->readUntil("\r\n\r\n", $deadline) ?? '';
+        assert!(Str\starts_with($head, 'HTTP/1.1 200 '), $head);
+        assert!(!Str\contains($head, 'connection: close'), $head);
+        if ($mode == 'sse') {
+          assert!(Str\contains($head, 'text/event-stream'), $head);
+          assert!(
+            $reader->readUntil("data: first\n\n\r\n", $deadline)
+            == "d\r\ndata: first\n\n\r\n",
+          );
+        } else {
+          assert!($reader->readFixedSize(2, $deadline) == 'ok');
+        }
+      }
+    }
+
+    Async\later();
+    $started = Instant::now();
+    $cancellation->cancel();
+    Async\later();
+    if ($inFlight) {
+      assert!(!$token?->isCancellationRequested());
+      assert!(!$finished->isComplete());
+      assert!(!$stopped->isComplete());
+      if ($mode == 'graceful') {
+        $release->complete(null);
+      }
+    } else if ($writer != null) {
+      assert!(!$token?->isCancellationRequested());
+      assert!(!$stopped->isComplete());
+      $writer->writeAll("data: last\n\n", $deadline);
+      $writer->close();
+    }
+
+    $task->await(new TimeoutCancellationToken(Duration::fromSeconds(1)));
+    assert!($listener->isClosed());
+    if ($mode == 'preface') {
+      assert!(!$entered->isComplete());
+      return;
+    }
+
+    $remaining = $reader->readAll(null, $deadline);
+    assert!(!Str\contains($remaining, '408'), $remaining);
+    if ($mode == 'graceful') {
+      assert!($finished->getFuture()->await($deadline));
+      assert!(Str\starts_with($remaining, 'HTTP/1.1 200 '), $remaining);
+      assert!(Str\contains($remaining, "connection: close\r\n"), $remaining);
+      assert!(Str\ends_with($remaining, "\r\n\r\nok"), $remaining);
+      assert!(!$token?->isCancellationRequested());
+    } else if ($mode == 'forced') {
+      assert!(!$finished->getFuture()->await($deadline));
+      assert!($token?->isCancellationRequested());
+      assert!($started->elapsed()->getTotalMilliseconds() >= 150.0);
+      assert!($remaining == '', $remaining);
+    } else if ($mode == 'sse') {
+      assert!($remaining == "c\r\ndata: last\n\n\r\n0\r\n\r\n", $remaining);
+      assert!(!$token?->isCancellationRequested());
+    } else if ($h2 != null) {
+      $goAway = false;
+      foreach ($h2->receive($remaining) as $event) {
+        if ($event is H2\Event\GoAwayReceived) {
+          assert!($event[2] == H2\ErrorCode::NoError->value);
+          $goAway = true;
+        }
+      }
+
+      assert!($goAway);
+    } else {
+      assert!($remaining == '', $remaining);
+      assert!($entered->isComplete() == ($mode == 'idle'));
+    }
+  } finally {
+    $socket->close();
+    if ($writer != null && !$writer->isClosed()) {
+      $writer->close();
+    }
+
+    if ($body != null && !$body->isClosed()) {
+      $body->close();
+    }
+
+    $cancellation->cancel();
+    $task->await(new TimeoutCancellationToken(Duration::fromSeconds(6)));
+  }
+}
+
+foreach (vec[false, true] as $enableH2c) {
+  foreach (vec['idle', 'first', 'graceful', 'forced', 'sse'] as $mode) {
+    http_server_shutdown($mode, $enableH2c);
+  }
+}
+
+http_server_shutdown('preface', true);
+http_server_shutdown('h2', true);
