@@ -146,6 +146,7 @@ unicode-width = "0.2"
 url = "2.5.8"
 uuid = { version = "1.24.0", features = ["v4", "v7"] }
 whim-formatter = { path = "crates/formatter", version = "0.6.0" }
+whim-linter = { path = "crates/linter", version = "0.6.0" }
 whim-loop = { path = "crates/loop", version = "0.6.0" }
 whim-macros = { path = "crates/macros", version = "0.6.0" }
 whim-pgsql = { path = "crates/pgsql", version = "0.6.0" }
@@ -165,6 +166,7 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
+annotate-snippets = { workspace = true }
 blake3 = { workspace = true }
 clap = { workspace = true }
 fs2 = { workspace = true }
@@ -191,6 +193,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 whim-formatter = { workspace = true, features = ["serde"] }
+whim-linter = { workspace = true, features = ["serde"] }
 whim-runtime = { workspace = true }
 whim-span = { workspace = true }
 whim-lib = { workspace = true }

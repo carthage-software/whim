@@ -3330,6 +3330,7 @@ dependencies = [
 name = "whim"
 version = "0.6.0"
 dependencies = [
+ "annotate-snippets",
  "blake3",
  "clap",
  "fs2",
@@ -3356,6 +3357,7 @@ dependencies = [
  "url",
  "whim-formatter",
  "whim-lib",
+ "whim-linter",
  "whim-runtime",
  "whim-span",
  "whim-support",
@@ -3378,6 +3380,20 @@ version = "0.6.0"
 dependencies = [
  "whim-runtime",
  "whim-support",
+]
+
+[[package]]
+name = "whim-linter"
+version = "0.6.0"
+dependencies = [
+ "annotate-snippets",
+ "globset",
+ "hashbrown 0.17.1",
+ "indoc",
+ "regex",
+ "serde",
+ "whim-span",
+ "whim-syn",
 ]
 
 [[package]]

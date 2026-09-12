@@ -1,0 +1,26 @@
+[package]
+name = "whim-linter"
+description = "The Whim source linter"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+serde = ["dep:serde"]
+
+[dependencies]
+annotate-snippets = { workspace = true }
+globset = { workspace = true }
+hashbrown = { workspace = true }
+indoc = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true, optional = true }
+whim-span = { workspace = true }
+whim-syn = { workspace = true }

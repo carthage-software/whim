@@ -1,0 +1,12 @@
+pub mod no_redundant_static;
+pub use no_redundant_static::NoRedundantStaticConfig;
+pub use no_redundant_static::NoRedundantStaticRule;
+pub mod no_redundant_final;
+pub use no_redundant_final::NoRedundantFinalConfig;
+pub use no_redundant_final::NoRedundantFinalRule;
+pub mod no_redundant_else;
+pub use no_redundant_else::NoRedundantElseConfig;
+pub use no_redundant_else::NoRedundantElseRule;
+pub mod no_redundant_continue;
+pub use no_redundant_continue::NoRedundantContinueConfig;
+pub use no_redundant_continue::NoRedundantContinueRule;
