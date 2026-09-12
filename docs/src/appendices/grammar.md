@@ -99,7 +99,7 @@ closure-body    := "=>" expression | block
 Visibility and `readonly` on a parameter promote it to a property and are
 valid only in a class constructor.
 
-See [Functions](../language/functions.md) and [Closures](../language/callables.md).
+See [Functions](../language/functions.md) and [Closures](../language/closures.md).
 
 ## Classes
 
