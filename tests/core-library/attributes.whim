@@ -1,4 +1,6 @@
 use Whim\Attribute\Attribute;
+use Whim\Lint\{Allow, Deny, Forbid, Warn};
+use Whim\Reflection;
 use Whim\Unwind\ArgumentCountError;
 use Whim\Unwind\Error;
 
@@ -66,3 +68,115 @@ assert!($wrappedPassword is Whim\Marker\SensitiveParameterValue);
 
 assert!($wrappedPassword->getValue() == 'hunter2');
 assert!(!Whim\Str\contains($denied->toString(), 'hunter2'));
+
+#[Allow('no-debug-symbols')]
+#[Allow(
+  rule: 'sensitive' . '-' . 'parameter',
+  reason: 'Grammar token',
+)]
+#[Warn(
+  reason: 'Test fixture',
+  rule: 'no-redundant-variable',
+)]
+#[Deny('no-self-assignment', reason: 'Keep the check')]
+#[Forbid('no-literal-password', 'Keep secrets out of source')]
+function lint_attributes(): string {
+  return 'checked';
+}
+
+assert!(lint_attributes() == 'checked');
+$linted = Reflection\reflect_function('lint_attributes');
+assert!($linted != null);
+$allowed = $linted->getAttributes::<Allow>();
+assert!(length!($allowed) == 2);
+assert!($allowed[0]->newInstance()->rule == 'no-debug-symbols');
+assert!($allowed[0]->newInstance()->reason == null);
+assert!($allowed[1]->newInstance()->rule == 'sensitive-parameter');
+assert!($allowed[1]->newInstance()->reason == 'Grammar token');
+assert!(
+  $allowed[1]->getNamedArguments() == dict[
+    'rule' => 'sensitive-parameter',
+    'reason' => 'Grammar token',
+  ],
+);
+
+assert!(
+  $linted->getAttributes::<Warn>()[0]->newInstance()->rule
+  == 'no-redundant-variable',
+);
+
+assert!(
+  $linted->getAttributes::<Warn>()[0]->newInstance()->reason == 'Test fixture',
+);
+
+assert!(
+  $linted->getAttributes::<Deny>()[0]->newInstance()->rule
+  == 'no-self-assignment',
+);
+
+assert!(
+  $linted->getAttributes::<Deny>()[0]->newInstance()->reason
+  == 'Keep the check',
+);
+
+assert!(
+  $linted->getAttributes::<Forbid>()[0]->newInstance()->rule
+  == 'no-literal-password',
+);
+
+assert!(
+  $linted->getAttributes::<Forbid>()[0]->newInstance()->reason
+  == 'Keep secrets out of source',
+);
+
+foreach (vec[
+  new Allow('no-debug-symbols'),
+  new Warn('no-debug-symbols'),
+  new Deny('no-debug-symbols'),
+  new Forbid('no-debug-symbols'),
+] as $control) {
+  assert!($control->rule == 'no-debug-symbols');
+  assert!($control->reason == null);
+  $control->rule = 'no-self-assignment';
+  assert!($control->rule == 'no-self-assignment');
+  $definition = Reflection\reflect_class($control)?->getAttributeDefinition();
+  assert!($definition != null);
+  assert!($definition->isRepeatable());
+  assert!(length!($definition->getTargets()) == 9);
+}
+
+class LintAttributeParameters {
+  #[Allow(
+    rule: 'no-insecure-comparison',
+    reason: 'The token is not security-sensitive',
+  )]
+  private function hasToken(
+    string $candidate,
+    #[Allow(
+      reason: 'This is not a security-sensitive parameter',
+      rule: 'sensitive-parameter',
+    )]
+    string $token,
+  ): bool {
+    return $candidate == $token;
+  }
+}
+
+$tokenMethod = Reflection\reflect_class('LintAttributeParameters')?->getMethod(
+  'hasToken',
+);
+
+assert!($tokenMethod != null);
+$methodAttribute = $tokenMethod->getAttributes::<Allow>()[0]->newInstance();
+assert!($methodAttribute->rule == 'no-insecure-comparison');
+assert!($methodAttribute->reason == 'The token is not security-sensitive');
+$tokenParameter = $tokenMethod->getParameter('token');
+assert!($tokenParameter != null);
+$parameterAttribute = $tokenParameter->getAttributes::<
+  Allow,
+>()[0]->newInstance();
+
+assert!($parameterAttribute->rule == 'sensitive-parameter');
+assert!(
+  $parameterAttribute->reason == 'This is not a security-sensitive parameter',
+);

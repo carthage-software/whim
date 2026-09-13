@@ -9,6 +9,7 @@ use Whim\HTTP\Message\Request;
 use Whim\HTTP\Message\StatusCode;
 use Whim\IO\BufferedReadHandle;
 use Whim\IO\LimitExceededException;
+use Whim\Lint\Allow;
 use Whim\Math;
 use Whim\Str;
 use Whim\Unwind\OverflowException;
@@ -170,7 +171,18 @@ function is_chunked(FieldMap $headers): bool {
 }
 
 /** Reports whether a comma-separated Connection field contains a token. */
-function connection_token(FieldMap $headers, string $token): bool {
+#[Allow(
+  rule: 'no-insecure-comparison',
+  reason: 'The token is not security-sensitive',
+)]
+function connection_token(
+  FieldMap $headers,
+  #[Allow(
+    rule: 'sensitive-parameter',
+    reason: 'This is not a security-sensitive parameter',
+  )]
+  string $token,
+): bool {
   $token = Str\lowercase($token);
   foreach ($headers->getAll('connection') as $value) {
     foreach (Str\split($value, ',') as $candidate) {

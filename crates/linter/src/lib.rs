@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod attributes;
 pub mod category;
 pub mod context;
 pub mod registry;
@@ -12,11 +13,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use annotate_snippets::Group;
+
 use whim_syn::arena::Arena;
 use whim_syn::arena::Vec as ArenaVec;
 use whim_syn::cst::Program;
 use whim_syn::cst::node::Node;
 
+use crate::attributes::AttributeScopes;
 use crate::context::DiagnosticCallback;
 use crate::context::LintContext;
 use crate::registry::RuleRegistry;
@@ -66,9 +69,12 @@ impl<'arena, A: Arena> Linter<'arena, A> {
     ) -> Vec<Group<'arena>> {
         let mut context = LintContext::new(self.arena, &self.registry, path, program);
         context.on_diagnostic = on_diagnostic;
+        context.attributes = AttributeScopes::collect(&mut context);
         let mut excluded_rules = ArenaVec::new_in(self.arena);
-        for index in 0..self.registry.len() {
-            if self.registry.excludes(index, matching_path) {
+        for (index, rule) in self.registry.all_rules().iter().enumerate() {
+            if self.registry.excludes(index, matching_path)
+                || (index >= self.registry.len() && !context.attributes.enables(rule.code()))
+            {
                 excluded_rules.push(index);
             }
         }

@@ -6,6 +6,7 @@ use Whim\HTTP\Message\FieldMap;
 use Whim\HTTP\WebSocket\Client\_Private\ConnectionImpl;
 use Whim\IO\LimitExceededException;
 use Whim\IO\Reader;
+use Whim\Lint\Allow;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
@@ -236,9 +237,17 @@ final readonly class DefaultConnector implements Connector {
   }
 
   #[MustUse]
+  #[Allow(
+    rule: 'no-insecure-comparison',
+    reason: 'The token is not security-sensitive',
+  )]
   private function hasToken(
     FieldMap $headers,
     string $name,
+    #[Allow(
+      rule: 'sensitive-parameter',
+      reason: 'This is not a security-sensitive parameter',
+    )]
     string $token,
   ): bool {
     foreach ($headers->getAll($name) as $field) {

@@ -301,3 +301,40 @@ fn invalid_configs_report_errors_without_using_default_filters() {
             .is_some()
     );
 }
+
+#[test]
+fn lint_attributes_apply_to_lsp_diagnostics_and_report_invalid_arguments() {
+    let fixture = Fixture::new("lint-attributes");
+    fixture.write(
+        "whim.toml",
+        "manifest-version = 1\n[lint.rules.no-debug-symbols]\nenabled = false\n",
+    );
+    let source = r"
+#[Whim\Lint\Allow(rule: 'no-debug-symbols', reason: 'Test fixture')]
+function allowed(): void { debug!(1); }
+#[Whim\Lint\Warn(reason: 'Test fixture', rule: 'no-debug-symbols')]
+function warned(): void { debug!(2); }
+#[Whim\Lint\Deny('no-debug-symbols', reason: 'Test fixture')]
+function denied(): void { debug!(3); }
+#[Whim\Lint\Allow(reason: 'Test fixture', rule: UNKNOWN)]
+function broken(): void {}
+";
+    fixture.write("source.whim", source);
+    let (server, _connection, _client) = start(json!({"rootUri": fixture.uri("")}), None);
+    let diagnostics = server
+        .document_diagnostics(&fixture.uri("source.whim"))
+        .unwrap();
+    assert_eq!(diagnostics.len(), 3);
+    assert_eq!(
+        diagnostics[0].code,
+        Some(lsp_types::NumberOrString::String("lint-attribute".into()))
+    );
+    assert_eq!(diagnostics[0].severity, Some(DiagnosticSeverity::ERROR));
+    assert_eq!(diagnostics[0].range.start.line, 7);
+    assert_eq!(
+        diagnostics[0].range.end.character - diagnostics[0].range.start.character,
+        7
+    );
+    assert_eq!(diagnostics[1].severity, Some(DiagnosticSeverity::WARNING));
+    assert_eq!(diagnostics[2].severity, Some(DiagnosticSeverity::ERROR));
+}

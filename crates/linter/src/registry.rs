@@ -3,6 +3,7 @@ use std::path::Path;
 use globset::GlobBuilder;
 use globset::GlobSet;
 use globset::GlobSetBuilder;
+
 use whim_syn::cst::node::NodeKind;
 
 use crate::rule::AnyRule;
@@ -11,6 +12,7 @@ use crate::settings::Settings;
 #[derive(Debug, Clone)]
 pub struct RuleRegistry {
     rules: Vec<AnyRule>,
+    enabled_count: usize,
     rule_excludes: Vec<GlobSet>,
     by_kind: Vec<Box<[usize]>>,
 }
@@ -23,7 +25,13 @@ impl RuleRegistry {
     ) -> Result<Self, globset::Error> {
         let mut rules = Vec::new();
         let mut rule_excludes = Vec::new();
-        for (rule, patterns) in AnyRule::get_all_for(settings, only, include_disabled) {
+        let (enabled, disabled): (Vec<_>, Vec<_>) = AnyRule::get_all_for(settings, only, true)
+            .into_iter()
+            .partition(|(rule, _)| {
+                only.is_some() || include_disabled || rule.is_enabled_in(settings)
+            });
+        let enabled_count = enabled.len();
+        for (rule, patterns) in enabled.into_iter().chain(disabled) {
             let mut excludes = GlobSetBuilder::new();
             for pattern in patterns {
                 excludes.add(
@@ -44,6 +52,7 @@ impl RuleRegistry {
         }
         Ok(Self {
             rules,
+            enabled_count,
             rule_excludes,
             by_kind: by_kind.into_iter().map(Vec::into_boxed_slice).collect(),
         })
@@ -51,22 +60,26 @@ impl RuleRegistry {
 
     #[must_use]
     pub fn rules(&self) -> &[AnyRule] {
+        &self.rules[..self.enabled_count]
+    }
+
+    pub(crate) fn all_rules(&self) -> &[AnyRule] {
         &self.rules
     }
 
     #[must_use]
     pub fn len(&self) -> usize {
-        self.rules.len()
+        self.enabled_count
     }
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.rules.is_empty()
+        self.enabled_count == 0
     }
 
     #[must_use]
     pub fn is_rule_enabled(&self, code: &str) -> bool {
-        self.rules.iter().any(|rule| rule.code() == code)
+        self.rules().iter().any(|rule| rule.code() == code)
     }
 
     #[must_use]

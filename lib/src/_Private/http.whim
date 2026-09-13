@@ -1,5 +1,6 @@
 namespace Whim\_Private;
 
+use Whim\Lint\Allow;
 use Whim\Marker\Stub;
 use Whim\Marker\TraceBoundary;
 use Whim\Marker\TrackCaller;
@@ -8,7 +9,13 @@ use Whim\Marker\TrackCaller;
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function http_valid_token(string $token): bool {}
+function http_valid_token(
+  #[Allow(
+    rule: 'sensitive-parameter',
+    reason: 'This is not a security-sensitive parameter',
+  )]
+  string $token,
+): bool {}
 
 /** Reports whether a string is a safe HTTP field value. */
 #[Stub]

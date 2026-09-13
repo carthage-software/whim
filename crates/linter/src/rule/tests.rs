@@ -1,5 +1,7 @@
+use std::path::Path;
 use std::slice::from_ref;
 
+use annotate_snippets::Level;
 use annotate_snippets::Renderer;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
@@ -8,8 +10,12 @@ use crate::Linter;
 use crate::rule::LintRule;
 use crate::settings::Settings;
 
-pub fn run_lint_test<R, F>(source: &str, expected: Option<usize>, settings_fn: Option<F>)
-where
+pub fn run_lint_test<R, F>(
+    source: &str,
+    expected: Option<usize>,
+    settings_fn: Option<F>,
+    diagnostic: Option<(&str, Level<'static>)>,
+) where
     R: LintRule,
     F: FnOnce(&mut Settings),
 {
@@ -26,7 +32,17 @@ where
         .unwrap_or_else(|error| panic!("failed to build rule `{code}`: {error}"));
     assert_eq!(linter.rules().len(), 1, "rule `{code}` is not registered");
 
-    let diagnostics = linter.lint("test.whim", program);
+    let mut reported = Vec::new();
+    let mut report = |_, code: &str, level: &Level<'static>, _: &str| {
+        reported.push((code.to_owned(), level.clone()));
+    };
+    let diagnostics = linter.lint_with_diagnostics(
+        "test.whim",
+        Path::new("test.whim"),
+        program,
+        Some(&mut report),
+    );
+    assert_eq!(reported.len(), diagnostics.len());
     if let Some(expected) = expected {
         assert_eq!(
             diagnostics.len(),
@@ -40,10 +56,17 @@ where
         );
     }
 
-    for diagnostic in &diagnostics {
-        let rendered = Renderer::plain().render(from_ref(diagnostic));
-        assert!(rendered.contains(code), "{rendered}");
+    for (group, (reported_code, level)) in diagnostics.iter().zip(reported) {
+        let rendered = Renderer::plain().render(from_ref(group));
+        assert_eq!(
+            reported_code,
+            diagnostic.as_ref().map_or(code, |(code, _)| code),
+            "{rendered}"
+        );
+        if let Some((_, expected_level)) = &diagnostic {
+            assert_eq!(level, *expected_level, "{rendered}");
+        }
         assert!(rendered.contains(" = help:"), "{rendered}");
-        Renderer::styled().render(from_ref(diagnostic));
+        Renderer::styled().render(from_ref(group));
     }
 }

@@ -1,0 +1,12 @@
+namespace Whim\Lint;
+
+use Whim\Attribute\Attribute;
+
+/** Reports one lint rule as an error within the declaration. */
+#[Attribute(Attribute::TARGET_ALL | Attribute::IS_REPEATABLE)]
+final class Deny {
+  public function __construct(
+    public string $rule,
+    public null|string $reason = null,
+  ) {}
+}

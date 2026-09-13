@@ -17,7 +17,7 @@ pub mod correctness;
 pub mod maintainability;
 pub mod redundancy;
 pub mod security;
-mod utils;
+pub(crate) mod utils;
 
 #[cfg(test)]
 pub mod tests;
@@ -124,6 +124,15 @@ macro_rules! define_rules {
         pub enum AnyRule { $($variant($rule)),* }
 
         impl AnyRule {
+            pub fn meta_for_code(code: &str) -> Option<&'static RuleMeta> {
+                $(if code == $rule::meta().code { return Some($rule::meta()); })*
+                None
+            }
+
+            pub(crate) fn is_enabled_in(&self, settings: &Settings) -> bool {
+                match self { $(Self::$variant(_) => settings.rules.$module.is_enabled()),* }
+            }
+
             pub fn get_all_for(settings: &Settings, only: Option<&[String]>, include_disabled: bool) -> Vec<(Self, Vec<String>)> {
                 let mut rules = Vec::new();
                 $(
@@ -213,7 +222,7 @@ macro_rules! test_lint_success {
     } => {
         #[test]
         fn $test_name() {
-            $crate::rule::tests::run_lint_test::<$rule, _>($code, Some(0), Some($settings));
+            $crate::rule::tests::run_lint_test::<$rule, _>($code, Some(0), Some($settings), None);
         }
     };
     {
@@ -227,6 +236,7 @@ macro_rules! test_lint_success {
                 $code,
                 Some(0),
                 None,
+                None,
             );
         }
     };
@@ -238,6 +248,7 @@ macro_rules! test_lint_failure {
         name = $test_name:ident,
         rule = $rule:ty,
         $(count = $count:expr,)?
+        $(diagnostic = $diagnostic:expr,)?
         settings = $settings:expr,
         code = $code:expr $(,)?
     } => {
@@ -247,6 +258,7 @@ macro_rules! test_lint_failure {
                 $code,
                 None $(.or(Some($count)))?,
                 Some($settings),
+                None $(.or(Some($diagnostic)))?,
             );
         }
     };
@@ -254,6 +266,7 @@ macro_rules! test_lint_failure {
         name = $test_name:ident,
         rule = $rule:ty,
         $(count = $count:expr,)?
+        $(diagnostic = $diagnostic:expr,)?
         code = $code:expr $(,)?
     } => {
         #[test]
@@ -262,6 +275,7 @@ macro_rules! test_lint_failure {
                 $code,
                 None $(.or(Some($count)))?,
                 None,
+                None $(.or(Some($diagnostic)))?,
             );
         }
     };

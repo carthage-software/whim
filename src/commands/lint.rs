@@ -38,7 +38,7 @@ pub(super) fn execute(
     }
 
     if registry.is_empty() {
-        tracing::warn!("no lint rules are enabled; only checking syntax");
+        tracing::warn!("no lint rules are enabled by default; source attributes may enable them");
     }
 
     let patterns = lint.patterns()?;

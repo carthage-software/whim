@@ -6,9 +6,3 @@ include = ["lib", "scripts"]
 [lint]
 include = ["lib", "scripts"]
 minimum_fail_level = "note"
-
-[lint.rules.no-insecure-comparison]
-exclude = [
-  "lib/src/HTTP/Client/_Private/h1.whim",
-  "lib/src/HTTP/WebSocket/Client/DefaultConnector.whim",
-]

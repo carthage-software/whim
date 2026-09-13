@@ -83,6 +83,73 @@ fn lint_reports_without_rewriting_and_uses_mago_severities() {
 }
 
 #[test]
+fn lint_attributes_control_json_text_and_exit_status() {
+    let project = Project::new(
+        "[lint]\nminimum_fail_level = 'error'\n[lint.rules.no-debug-symbols]\nenabled = false\n",
+    );
+    project.write(
+        "source.whim",
+        r"
+use Whim\Lint\{Allow, Warn};
+#[Allow(rule: 'no-debug-symbols', reason: 'Test fixture')]
+function allowed(): void { debug!(1); }
+#[Warn(reason: 'Test fixture', rule: 'no-debug-symbols')]
+function warned(): void { debug!(2); }
+function disabled(): void { debug!(3); }
+",
+    );
+    let output = project.lint(&["--json"]);
+    assert!(output.status.success(), "{output:?}");
+    let diagnostics: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], "no-debug-symbols");
+    assert_eq!(diagnostics[0]["level"], "warning");
+    let text = project.lint(&[]);
+    assert!(text.status.success());
+    assert!(
+        String::from_utf8(text.stdout)
+            .unwrap()
+            .contains("warning[no-debug-symbols]")
+    );
+
+    project.write(
+        "denied.whim",
+        r"#[Whim\Lint\Deny('no-debug-symbols', reason: 'Test fixture')] function denied(): void { debug!(4); }",
+    );
+    let output = project.lint(&["--json"]);
+    assert_eq!(output.status.code(), Some(1));
+    let diagnostics: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(diagnostics.len(), 2);
+    assert_eq!(diagnostics[0]["level"], "error");
+    assert_eq!(diagnostics[1]["level"], "warning");
+}
+
+#[test]
+fn invalid_lint_attributes_fail_even_when_the_rule_is_disabled_and_excluded() {
+    let project = Project::new(
+        "[lint]\nminimum_fail_level = 'error'\n[lint.rules.no-debug-symbols]\nenabled = false\nexclude = ['**']\n",
+    );
+    let source = r"#[Whim\Lint\Allow('no-debug-symbols')] #[Whim\Lint\Warn(reason: 'Test fixture', rule: rule_name())] function example(): void {}";
+    project.write("source.whim", source);
+    let output = project.lint(&["--json"]);
+    assert_eq!(output.status.code(), Some(1));
+    let diagnostics: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["code"], "lint-attribute");
+    assert_eq!(diagnostics[0]["level"], "error");
+    let start = diagnostics[0]["span"]["start"]["offset"].as_u64().unwrap() as usize;
+    let end = diagnostics[0]["span"]["end"]["offset"].as_u64().unwrap() as usize;
+    assert_eq!(&source[start..end], "rule_name()");
+    let output = project.lint(&[]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("error[lint-attribute]")
+    );
+}
+
+#[test]
 fn lint_shares_format_discovery_and_applies_rule_options() {
     let project = Project::new(
         r#"

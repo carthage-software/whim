@@ -1,6 +1,14 @@
 # Built-in Attributes
 
-Whim supplies attributes for call contracts and error reports.
+Whim supplies attributes for call contracts, error reports, and lint settings.
+
+## Lint settings
+
+`Whim\Lint\Allow`, `Warn`, `Deny`, and `Forbid` set a lint rule's level within a
+declaration. All four are repeatable and accept a string `$rule` and an optional
+`null|string $reason = null`. They support every attribute target and remain
+ordinary attribute objects at runtime. See [Scoped lint attributes](../usage/linting.md#scoped-lint-attributes)
+for their scope and argument rules.
 
 ## MustUse
 

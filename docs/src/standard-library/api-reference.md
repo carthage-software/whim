@@ -15,6 +15,7 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Default` | the default-value contract |
 | `Whim\Enum` | interfaces implemented by all enums |
 | `Whim\GC` | explicit cycle collection |
+| `Whim\Lint` | scoped lint settings |
 | `Whim\Marker` | built-in attributes and compiler markers |
 | `Whim\Option` | `Some`, `None`, and option helpers |
 | `Whim\Promise` | the read-only async result contract |

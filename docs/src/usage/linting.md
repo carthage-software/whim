@@ -31,7 +31,7 @@ Each entry contains:
 | Field      | Value                                                                              |
 | ---------- | ---------------------------------------------------------------------------------- |
 | `path`     | Source path, using the same spelling as text output                                |
-| `code`     | Rule code, or `syntax` or `read` for a file error                                  |
+| `code`     | Rule code, `lint-attribute` for an invalid lint attribute, or `syntax` or `read` for a file error |
 | `level`    | `error`, `warning`, `info`, `note`, or `help`                                      |
 | `message`  | Diagnostic message                                                                 |
 | `span`     | `start` and `end` objects, each with a byte `offset`; `null` for read errors       |
@@ -104,6 +104,79 @@ local checks, not a proof that a program is secure. Use `Whim\Hash\equals()` for
 secret string comparisons and `Whim\Password\verify()` for password hashes.
 `sensitive-parameter` accepts the exact `Whim\Marker\SensitiveParameter`
 attribute, including an imported alias, and skips Boolean-only parameters.
+
+## Scoped lint attributes
+
+Use `Whim\Lint\Allow`, `Warn`, `Deny`, and `Forbid` to set a rule's level
+on a declaration:
+
+```whim
+use Whim\Lint\{Allow, Deny};
+
+#[Deny('no-debug-symbols')]
+class HeaderParser {
+  #[Allow(
+    rule: 'no-insecure-comparison',
+    reason: 'The token is not security-sensitive',
+  )]
+  public function hasToken(
+    string $value,
+    #[Allow(
+      rule: 'sensitive-parameter',
+      reason: 'This is an HTTP grammar token',
+    )]
+    string $token,
+  ): bool {
+    return $value == $token;
+  }
+}
+```
+
+`Allow` suppresses the rule. `Warn` reports a warning. `Deny` reports an error.
+`Forbid` reports an error and prevents any nested scope from lowering its level.
+Trying to lower a forbidden rule produces an error on the conflicting attribute,
+even when the code has no finding for that rule. A nested `Deny` keeps an
+enclosing `Forbid` in force.
+
+The setting covers the declaration, its signature, and its contents. It ends
+at the declaration's boundary. Nested declarations can override an outer
+`Allow`, `Warn`, or `Deny`. Attributes follow source order; the last setting for
+a rule wins unless an earlier `Forbid` prevents it. The setting follows source
+scope, not calls or inheritance.
+
+All four attributes are repeatable. They support classes, interfaces, enums,
+functions, methods, closures, parameters, properties, constants, enum cases,
+type aliases, and newtypes. Each takes a required `string $rule` and an optional
+`null|string $reason = null`, both exposed as public properties. Use one
+attribute per rule. File-level attributes are not yet supported.
+
+Arguments may use positions or names. Named arguments can appear in either
+order, and a positional rule can be followed by `reason: ...`. The reason
+explains the setting; the linter only evaluates the rule argument.
+
+Rule names must use exact lint codes. The linter reads string literals,
+parentheses, and string concatenation, so these are equivalent:
+
+```whim
+use Whim\Lint\Allow;
+
+#[Allow('sensitive-parameter')]
+#[Allow(rule: 'sensitive' . '-' . 'parameter')]
+function token_value(string $token): string {
+  return $token;
+}
+```
+
+The linter does not resolve constants or run code to read a rule name. An
+unknown rule, missing rule argument, duplicate or extra argument, non-string
+rule name, or rule expression that it cannot read produces a `lint-attribute`
+error. These errors cannot be suppressed or lowered by another attribute or
+by rule settings.
+
+Project settings supply the starting policy. `Warn`, `Deny`, or `Forbid` can
+enable a disabled rule within a declaration. File and per-rule exclusions still
+apply. The CLI and language server use the same attribute rules, and
+`minimum_fail_level` still determines whether a warning fails the command.
 
 ## Settings
 

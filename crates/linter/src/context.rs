@@ -14,6 +14,7 @@ use whim_syn::cst::Program;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::node::NodeKind;
 
+use crate::attributes::AttributeScopes;
 use crate::registry::RuleRegistry;
 use crate::rule_meta::RuleMeta;
 use crate::scope::ScopeStack;
@@ -29,6 +30,7 @@ pub struct LintContext<'ctx, 'arena, A: Arena> {
     pub diagnostics: Vec<Group<'arena>>,
     pub scope: ScopeStack<'arena, A>,
     pub(crate) on_diagnostic: Option<&'ctx mut DiagnosticCallback<'ctx>>,
+    pub(crate) attributes: AttributeScopes,
     ancestors: ArenaVec<'arena, Node<'ctx, 'arena>, A>,
 }
 
@@ -48,6 +50,7 @@ impl<'ctx, 'arena, A: Arena> LintContext<'ctx, 'arena, A> {
             diagnostics: Vec::new(),
             scope: ScopeStack::new_in(arena),
             on_diagnostic: None,
+            attributes: AttributeScopes::default(),
             ancestors: ArenaVec::with_capacity_in(32, arena),
         }
     }
@@ -61,9 +64,54 @@ impl<'ctx, 'arena, A: Arena> LintContext<'ctx, 'arena, A> {
         annotations: impl IntoIterator<Item = Annotation<'arena>>,
         details: impl IntoIterator<Item = Element<'arena>>,
     ) {
+        let level = match self.attributes.get(meta.code, span) {
+            Some(control) => match control.level() {
+                Some(level) => level,
+                None => return,
+            },
+            None if self.registry.is_rule_enabled(meta.code) => level,
+            None => return,
+        };
+
+        self.emit(
+            meta.code,
+            level,
+            (span, label),
+            message,
+            annotations,
+            details,
+        );
+    }
+
+    pub(crate) fn attribute_error(
+        &mut self,
+        span: Span,
+        message: impl Into<Cow<'arena, str>>,
+        annotations: impl IntoIterator<Item = Annotation<'arena>>,
+        help: impl Into<Cow<'arena, str>>,
+    ) {
+        self.emit(
+            "lint-attribute",
+            Level::ERROR,
+            (span, "invalid lint attribute"),
+            message,
+            annotations,
+            [Level::HELP.message(help).into()],
+        );
+    }
+
+    fn emit(
+        &mut self,
+        code: &'static str,
+        level: Level<'static>,
+        (span, label): (Span, impl Into<Cow<'arena, str>>),
+        message: impl Into<Cow<'arena, str>>,
+        annotations: impl IntoIterator<Item = Annotation<'arena>>,
+        details: impl IntoIterator<Item = Element<'arena>>,
+    ) {
         let message = message.into();
         if let Some(callback) = &mut self.on_diagnostic {
-            callback(span, meta.code, &level, &message);
+            callback(span, code, &level, &message);
         }
 
         let annotation = Snippet::source(self.source)
@@ -80,7 +128,7 @@ impl<'ctx, 'arena, A: Arena> LintContext<'ctx, 'arena, A> {
         self.diagnostics.push(
             level
                 .primary_title(message)
-                .id(meta.code)
+                .id(code)
                 .element(annotation)
                 .elements(details),
         );

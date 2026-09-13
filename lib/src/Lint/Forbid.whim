@@ -1,0 +1,12 @@
+namespace Whim\Lint;
+
+use Whim\Attribute\Attribute;
+
+/** Reports one lint rule as an error and prevents nested scopes from lowering its level. */
+#[Attribute(Attribute::TARGET_ALL | Attribute::IS_REPEATABLE)]
+final class Forbid {
+  public function __construct(
+    public string $rule,
+    public null|string $reason = null,
+  ) {}
+}
