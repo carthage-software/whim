@@ -53,7 +53,7 @@ pub(super) fn execute(arguments: &Arguments) -> Result<(), Error> {
     let version =
         Version::parse(env!("CARGO_PKG_VERSION")).map_err(Error::InvalidCurrentVersion)?;
     let manifest_contents = format!(
-        "manifest-version = 1\n\n[requirements]\nwhim = \"^{}.{}\"\n",
+        "manifest-version = 1\n\n[requirements]\nwhim = \"^{}.{}\"\n\n[lint]\ninclude = [\"**/*.whim\"]\nexclude = []\nminimum_fail_level = \"error\"\n",
         version.major, version.minor
     );
     let source_directory = directory.join("src");

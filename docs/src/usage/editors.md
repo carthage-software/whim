@@ -8,7 +8,8 @@ whim language-server
 ```
 
 The language server provides highlighting, basic completion, snippets, formatting,
-folding, selection ranges, and occurrence highlighting.
+folding, selection ranges, occurrence highlighting, and lint and syntax diagnostics.
+It uses the [lint settings](linting.md) in `whim.toml`.
 
 ## Zed
 

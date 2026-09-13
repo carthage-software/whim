@@ -135,39 +135,41 @@ pub(crate) enum Error {
     EscapingAutoloadDirectory(String),
     #[error("autoload directories may not contain control characters")]
     ControlAutoloadDirectory,
+    #[error("invalid lint settings: {0}")]
+    InvalidLintSettings(#[source] GlobError),
     #[error("invalid format settings: {0}")]
     InvalidFormatSettings(#[source] SettingsError),
-    #[error("format.{setting} contains an empty pattern")]
-    EmptyFormatPattern { setting: &'static str },
-    #[error("format.{setting} pattern `{pattern}` must be relative")]
-    AbsoluteFormatPattern {
+    #[error("{setting} contains an empty pattern")]
+    EmptyFilePattern { setting: &'static str },
+    #[error("{setting} pattern `{pattern}` must be relative")]
+    AbsoluteFilePattern {
         setting: &'static str,
         pattern: String,
     },
-    #[error("format.{setting} pattern `{pattern}` may not escape the project")]
-    EscapingFormatPattern {
+    #[error("{setting} pattern `{pattern}` may not escape the project")]
+    EscapingFilePattern {
         setting: &'static str,
         pattern: String,
     },
-    #[error("format.{setting} pattern `{pattern}` must use `/` as its separator")]
-    BackslashFormatPattern {
+    #[error("{setting} pattern `{pattern}` must use `/` as its separator")]
+    BackslashFilePattern {
         setting: &'static str,
         pattern: String,
     },
-    #[error("format.{setting} pattern `{pattern}` contains a control character")]
-    ControlFormatPattern {
+    #[error("{setting} pattern `{pattern}` contains a control character")]
+    ControlFilePattern {
         setting: &'static str,
         pattern: String,
     },
-    #[error("invalid format.{setting} pattern `{pattern}`: {source}")]
-    InvalidFormatPattern {
+    #[error("invalid {setting} pattern `{pattern}`: {source}")]
+    InvalidFilePattern {
         setting: &'static str,
         pattern: String,
         #[source]
         source: GlobError,
     },
-    #[error("could not compile format.{setting} patterns: {source}")]
-    CompileFormatPatterns {
+    #[error("could not compile {setting} patterns: {source}")]
+    CompileFilePatterns {
         setting: &'static str,
         #[source]
         source: GlobError,

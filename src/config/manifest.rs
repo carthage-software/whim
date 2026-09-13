@@ -12,6 +12,7 @@ use url::Url;
 
 use crate::config::Error;
 use crate::config::FormatConfiguration;
+use crate::config::LintConfiguration;
 use crate::config::RuntimeSettings;
 use crate::filesystem;
 use crate::filesystem::LimitedString;
@@ -44,6 +45,8 @@ pub(crate) struct Manifest {
     pub(crate) overrides: BTreeMap<String, String>,
     #[serde(default)]
     pub(crate) format: FormatConfiguration,
+    #[serde(default)]
+    pub(crate) lint: LintConfiguration,
     #[serde(default)]
     pub(crate) runtime: RuntimeSettings,
 }
@@ -195,6 +198,7 @@ impl Manifest {
         }
 
         self.format.validate()?;
+        self.lint.validate()?;
 
         Ok(())
     }

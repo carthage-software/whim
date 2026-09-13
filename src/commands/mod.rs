@@ -5,6 +5,7 @@ mod fund;
 mod init;
 mod install;
 mod language_server;
+mod lint;
 mod remove;
 mod run;
 mod show;
@@ -76,6 +77,9 @@ enum Command {
     /// Format Whim source files and directories.
     Fmt(format::Arguments),
 
+    /// Lint Whim source files and directories.
+    Lint(lint::Arguments),
+
     /// Print the bytecode of a Whim program.
     Disassemble(disassemble::Arguments),
 
@@ -118,6 +122,7 @@ impl Command {
         match self {
             Self::Run(_) => "run",
             Self::Fmt(_) => "fmt",
+            Self::Lint(_) => "lint",
             Self::Disassemble(_) => "disassemble",
             Self::Init(_) => "init",
             Self::Add(_) => "add",
@@ -163,6 +168,7 @@ pub(super) fn execute() -> Result<ExitCode, Error> {
             run::execute(command, configuration.runtime()?, arguments.colors)
         }
         Some(Command::Fmt(command)) => format::execute(&command, &configuration, arguments.colors),
+        Some(Command::Lint(command)) => lint::execute(&command, &configuration, arguments.colors),
         Some(Command::Disassemble(command)) => {
             disassemble::execute(command, configuration.runtime()?, arguments.colors)
         }

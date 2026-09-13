@@ -9,6 +9,7 @@
 - [Your First Program](usage/getting-started.md)
 - [A Small Program](usage/project.md)
 - [The `whim` Command](usage/cli.md)
+- [Linting](usage/linting.md)
 
 # 2. Source Files
 

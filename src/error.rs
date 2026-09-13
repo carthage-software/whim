@@ -156,9 +156,9 @@ pub(crate) enum Error {
     #[error("the entry file is missing")]
     MissingEntryFile,
     #[error("{}: is not a file or directory", .0.display())]
-    InvalidFormatTarget(PathBuf),
-    #[error("format target `{}` is outside discovery root `{}`", path.display(), root.display())]
-    FormatTargetEscapesRoot {
+    InvalidFileTarget(PathBuf),
+    #[error("file `{}` is outside discovery root `{}`", path.display(), root.display())]
+    FileTargetEscapesRoot {
         path: PathBuf,
         root: PathBuf,
         #[source]

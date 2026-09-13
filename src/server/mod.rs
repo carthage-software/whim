@@ -1,5 +1,6 @@
 mod analysis;
 mod completion;
+pub(crate) mod diagnostics;
 mod error;
 mod folding;
 mod highlight;
@@ -8,7 +9,9 @@ mod semantic;
 mod text;
 
 use std::collections::HashMap;
+use std::io::Error as IoError;
 
+use crate::server::diagnostics::Diagnostics;
 use lsp_server::Connection;
 use lsp_server::ErrorCode;
 use lsp_server::Message;
@@ -19,14 +22,21 @@ use lsp_server::Response;
 use lsp_server::ResponseError;
 use lsp_types::CompletionOptions;
 use lsp_types::CompletionResponse;
+use lsp_types::DiagnosticOptions;
+use lsp_types::DiagnosticServerCapabilities;
 use lsp_types::DidChangeTextDocumentParams;
+use lsp_types::DocumentDiagnosticReport;
+use lsp_types::DocumentDiagnosticReportResult;
 use lsp_types::DocumentFormattingParams;
 use lsp_types::DocumentHighlightParams;
 use lsp_types::FoldingRangeParams;
 use lsp_types::FoldingRangeProviderCapability;
+use lsp_types::FullDocumentDiagnosticReport;
 use lsp_types::InitializeResult;
 use lsp_types::OneOf;
 use lsp_types::PositionEncodingKind;
+use lsp_types::PublishDiagnosticsParams;
+use lsp_types::RelatedFullDocumentDiagnosticReport;
 use lsp_types::SelectionRangeParams;
 use lsp_types::SemanticTokensFullOptions;
 use lsp_types::SemanticTokensOptions;
@@ -43,13 +53,16 @@ use lsp_types::notification::DidChangeTextDocument;
 use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::notification::Notification as LspNotification;
+use lsp_types::notification::PublishDiagnostics;
 use lsp_types::request::Completion;
+use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::request::DocumentHighlightRequest;
 use lsp_types::request::FoldingRangeRequest;
 use lsp_types::request::Formatting;
 use lsp_types::request::Request as LspRequest;
 use lsp_types::request::SelectionRangeRequest;
 use lsp_types::request::SemanticTokensFullRequest;
+use lsp_types::request::WorkspaceDiagnosticRequest;
 use serde::de::DeserializeOwned;
 use whim_formatter::settings::FormatSettings;
 use whim_syn::arena::LocalArena;
@@ -58,15 +71,22 @@ use crate::server::analysis::Analysis;
 pub(crate) use crate::server::error::Error;
 
 struct Server {
-    documents: HashMap<Uri, String>,
+    documents: HashMap<Uri, Document>,
+    diagnostics: Diagnostics,
     format: FormatSettings,
 }
 
+struct Document {
+    text: String,
+    version: i32,
+}
+
 impl Server {
-    fn new(format: FormatSettings) -> Self {
+    fn new(format: FormatSettings, diagnostics: Diagnostics) -> Self {
         Self {
             documents: HashMap::new(),
             format,
+            diagnostics,
         }
     }
 
@@ -80,7 +100,9 @@ impl Server {
 
                     self.request(connection, request)?;
                 }
-                Message::Notification(notification) => self.notification(notification),
+                Message::Notification(notification) => {
+                    self.notification(connection, notification)?;
+                }
                 Message::Response(response) => {
                     tracing::debug!(?response, "ignored an unexpected client response");
                 }
@@ -92,6 +114,24 @@ impl Server {
 
     fn request(&self, connection: &Connection, request: ServerRequest) -> Result<(), Error> {
         match request.method.as_str() {
+            DocumentDiagnosticRequest::METHOD => {
+                respond::<DocumentDiagnosticRequest>(connection, request, |params| {
+                    Ok(DocumentDiagnosticReportResult::Report(
+                        DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+                            related_documents: None,
+                            full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                                result_id: None,
+                                items: self.document_diagnostics(&params.text_document.uri)?,
+                            },
+                        }),
+                    ))
+                })
+            }
+            WorkspaceDiagnosticRequest::METHOD => {
+                respond::<WorkspaceDiagnosticRequest>(connection, request, |params| {
+                    self.workspace_diagnostics(&params)
+                })
+            }
             Completion::METHOD => {
                 respond::<Completion>(connection, request, |params| self.complete(&params))
             }
@@ -123,20 +163,36 @@ impl Server {
         }
     }
 
-    fn notification(&mut self, notification: ServerNotification) {
+    fn notification(
+        &mut self,
+        connection: &Connection,
+        notification: ServerNotification,
+    ) -> Result<(), Error> {
         match notification.method.as_str() {
             DidOpenTextDocument::METHOD => {
                 match decode_notification::<DidOpenTextDocument>(notification) {
                     Ok(params) => {
-                        self.documents
-                            .insert(params.text_document.uri, params.text_document.text);
+                        let document = params.text_document;
+                        let uri = document.uri;
+                        self.documents.insert(
+                            uri.clone(),
+                            Document {
+                                text: document.text,
+                                version: document.version,
+                            },
+                        );
+                        self.publish(connection, &uri)?;
                     }
                     Err(error) => tracing::warn!(%error, "ignored an invalid document-open event"),
                 }
             }
             DidChangeTextDocument::METHOD => {
                 match decode_notification::<DidChangeTextDocument>(notification) {
-                    Ok(params) => self.change(params),
+                    Ok(params) => {
+                        let uri = params.text_document.uri.clone();
+                        self.change(params);
+                        self.publish(connection, &uri)?;
+                    }
                     Err(error) => {
                         tracing::warn!(%error, "ignored an invalid document-change event");
                     }
@@ -146,11 +202,37 @@ impl Server {
                 match decode_notification::<DidCloseTextDocument>(notification) {
                     Ok(params) => {
                         self.documents.remove(&params.text_document.uri);
+                        publish(
+                            connection,
+                            PublishDiagnosticsParams::new(
+                                params.text_document.uri,
+                                Vec::new(),
+                                None,
+                            ),
+                        )?;
                     }
                     Err(error) => tracing::warn!(%error, "ignored an invalid document-close event"),
                 }
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    fn publish(&self, connection: &Connection, uri: &Uri) -> Result<(), Error> {
+        match self.document_diagnostics(uri) {
+            Ok(diagnostics) => publish(
+                connection,
+                PublishDiagnosticsParams::new(
+                    uri.clone(),
+                    diagnostics,
+                    self.documents.get(uri).map(|document| document.version),
+                ),
+            ),
+            Err(error) => {
+                tracing::warn!(%error, "could not lint document");
+                Ok(())
+            }
         }
     }
 
@@ -158,16 +240,17 @@ impl Server {
         let Some(change) = params.content_changes.into_iter().last() else {
             return;
         };
-
         if change.range.is_some() {
-            tracing::warn!(
-                uri = %params.text_document.uri.as_str(),
-                "ignored an incremental change after requesting full document sync"
-            );
+            tracing::warn!(uri = %params.text_document.uri.as_str(), "ignored an incremental change after requesting full document sync");
             return;
         }
-
-        self.documents.insert(params.text_document.uri, change.text);
+        self.documents.insert(
+            params.text_document.uri,
+            Document {
+                text: change.text,
+                version: params.text_document.version,
+            },
+        );
     }
 
     fn complete(
@@ -254,13 +337,17 @@ impl Server {
     fn document(&self, uri: &Uri) -> Result<&str, RequestError> {
         self.documents
             .get(uri)
-            .map(String::as_str)
+            .map(|document| document.text.as_str())
             .ok_or_else(|| RequestError::DocumentNotOpen(uri.as_str().to_owned()))
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 enum RequestError {
+    #[error("could not read `{document}`: {source}")]
+    ReadDocument { document: String, source: IoError },
+    #[error("could not lint workspace: {0}")]
+    Workspace(String),
     #[error("document `{0}` is not open")]
     DocumentNotOpen(String),
     #[error("could not format `{document}`:\n{diagnostics}")]
@@ -274,18 +361,20 @@ impl RequestError {
     const fn code(&self) -> ErrorCode {
         match self {
             Self::DocumentNotOpen(_) => ErrorCode::InvalidRequest,
-            Self::Format { .. } => ErrorCode::RequestFailed,
+            Self::Format { .. } | Self::ReadDocument { .. } | Self::Workspace(_) => {
+                ErrorCode::RequestFailed
+            }
         }
     }
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
-pub(crate) fn serve(format: FormatSettings) -> Result<(), Error> {
+pub(crate) fn serve(format: FormatSettings, mut diagnostics: Diagnostics) -> Result<(), Error> {
     let (connection, threads) = Connection::stdio();
-    initialize(&connection)?;
+    initialize(&connection, &mut diagnostics)?;
     tracing::debug!("language server initialized");
 
-    let result = Server::new(format).run(&connection);
+    let result = Server::new(format, diagnostics).run(&connection);
     drop(connection);
     let transport = threads.join().map_err(Error::Transport);
 
@@ -295,8 +384,36 @@ pub(crate) fn serve(format: FormatSettings) -> Result<(), Error> {
     Ok(())
 }
 
-fn initialize(connection: &Connection) -> Result<(), Error> {
-    let (id, _) = connection.initialize_start()?;
+fn initialize(connection: &Connection, diagnostics: &mut Diagnostics) -> Result<(), Error> {
+    let (id, params) = connection.initialize_start()?;
+    let mut roots = Vec::new();
+    if let Some(folders) = params
+        .get("workspaceFolders")
+        .and_then(serde_json::Value::as_array)
+    {
+        for folder in folders {
+            if let Some(uri) = folder
+                .get("uri")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|uri| uri.parse().ok())
+                && let Some(path) = diagnostics::file_path(&uri)
+            {
+                roots.push(path);
+            }
+        }
+    }
+    if roots.is_empty()
+        && let Some(uri) = params
+            .get("rootUri")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|uri| uri.parse().ok())
+        && let Some(path) = diagnostics::file_path(&uri)
+    {
+        roots.push(path);
+    }
+    if !roots.is_empty() {
+        diagnostics.roots = roots;
+    }
     let result = InitializeResult {
         capabilities: capabilities(),
         server_info: Some(ServerInfo {
@@ -315,6 +432,12 @@ fn initialize(connection: &Connection) -> Result<(), Error> {
 
 fn capabilities() -> ServerCapabilities {
     ServerCapabilities {
+        diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+            identifier: Some("whim".to_owned()),
+            inter_file_dependencies: false,
+            workspace_diagnostics: true,
+            ..DiagnosticOptions::default()
+        })),
         position_encoding: Some(PositionEncodingKind::UTF16),
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         completion_provider: Some(CompletionOptions::default()),
@@ -379,6 +502,16 @@ where
     send(connection, response)
 }
 
+fn publish(connection: &Connection, params: PublishDiagnosticsParams) -> Result<(), Error> {
+    connection
+        .sender
+        .send(Message::Notification(ServerNotification::new(
+            PublishDiagnostics::METHOD.to_owned(),
+            params,
+        )))
+        .map_err(|_disconnected| Error::Disconnected)
+}
+
 fn send_error(
     connection: &Connection,
     id: RequestId,
@@ -418,6 +551,7 @@ mod tests {
             Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL))
         );
         assert!(capabilities.completion_provider.is_some());
+        assert!(capabilities.diagnostic_provider.is_some());
         assert!(capabilities.document_formatting_provider.is_some());
         assert!(capabilities.document_highlight_provider.is_some());
         assert!(capabilities.folding_range_provider.is_some());

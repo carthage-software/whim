@@ -8,6 +8,7 @@ use whim_runtime::engine::EngineConfiguration;
 
 use crate::config::Error;
 use crate::config::FormatConfiguration;
+use crate::config::LintConfiguration;
 use crate::config::MANIFEST_NAME;
 use crate::config::Manifest;
 use crate::config::runtime::apply_environment;
@@ -16,6 +17,7 @@ pub(crate) struct Configuration {
     manifest: Option<LoadedManifest>,
     search_root: PathBuf,
     format: FormatConfiguration,
+    lint: LintConfiguration,
     runtime: EngineConfiguration,
 }
 
@@ -56,6 +58,12 @@ impl Configuration {
                 loaded.manifest.format.clone()
             });
 
+        let lint = manifest
+            .as_ref()
+            .map_or_else(LintConfiguration::default, |loaded| {
+                loaded.manifest.lint.clone()
+            });
+
         if let Some(loaded) = &manifest {
             tracing::trace!(path = %loaded.path.display(), "loaded configuration");
         } else {
@@ -66,6 +74,7 @@ impl Configuration {
             manifest,
             search_root,
             format,
+            lint,
             runtime,
         })
     }
@@ -76,6 +85,10 @@ impl Configuration {
 
     pub(crate) const fn format(&self) -> &FormatConfiguration {
         &self.format
+    }
+
+    pub(crate) const fn lint(&self) -> &LintConfiguration {
+        &self.lint
     }
 
     pub(crate) fn root(&self) -> &Path {

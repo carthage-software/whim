@@ -1,6 +1,6 @@
 # The `whim` Command
 
-The `whim` program runs source, formats it, prints bytecode, and manages Git
+The `whim` program runs source, formats and lints it, prints bytecode, and manages Git
 dependencies.
 
 Use `whim --help` or `whim COMMAND --help` for the installed version's exact
@@ -108,6 +108,23 @@ This command compiles the program and prints its register bytecode. It does not
 run the entry file. `WHIM_OPTIMIZATIONS=off` prints the form before
 optimization.
 
+## Lint
+
+```console
+whim lint
+whim lint src/ tests/
+```
+
+With no paths, `whim lint` finds the nearest `whim.toml` and checks that project.
+It uses the same file discovery as `fmt`, with separate `lint.include` and
+`lint.exclude` settings. Explicit directories ignore the inclusion list;
+explicit files bypass file filters. Per-rule exclusions still apply.
+
+All 15 rules start enabled. The command prints source diagnostics and leaves
+files unchanged. Error-level findings, syntax errors, and file errors return a
+nonzero status. Lower levels still print; set `lint.minimum_fail_level` to make
+them fail the command too. See [Linting](linting.md) for rules and settings.
+
 ## Language server
 
 ```console
@@ -116,8 +133,11 @@ whim language-server
 
 The language server speaks LSP over standard input and output. It provides
 keyword completion, snippets, formatting, keyword colors, folding, selection
-ranges, and occurrence highlights. It does not index the project or provide
-symbol navigation.
+ranges, occurrence highlights, and lint and syntax diagnostics. It publishes
+diagnostics as open documents change and supports document and workspace
+diagnostic requests. Workspace checks use open buffers for unsaved files and
+read other files from disk. The server reads lint settings at startup; restart
+it after changing `whim.toml`. It does not provide symbol navigation.
 
 ## Project commands
 
@@ -142,9 +162,34 @@ text while still returning a nonzero status. This is intended.
 Log errors are not Whim exceptions. Disabling log output does not catch or
 change a thrown value, an uncaught throwable, or a `panic!` trace.
 
+`lint` and `fmt` log the selected file count and a final summary at `info` level.
+The summary includes clean files, changed files, findings by level, file errors,
+elapsed time, and whether the command failed. For `fmt --check`, changed files
+are files that need formatting. A file error does not stop checks on other files.
+
+Use `debug` to inspect the loaded configuration, file filters, discovery totals,
+worker count, and pipeline duration. Use `trace` to see why paths were skipped,
+which lint rules are enabled, and how long each file spends in reading, parsing,
+linting or formatting, and reporting:
+
+```console
+WHIM_LOG=whim=debug whim lint src/
+WHIM_LOG=whim=trace whim fmt --check src/
+WHIM_LOG=error whim lint src/
+```
+
+The `whim=` filter limits these logs to the CLI. Logs go to standard error;
+lint diagnostics and format diffs go to standard output in file discovery order.
+Directory entries are sorted by name. Trace records carry the command, batch,
+and file context across workers. Detailed phase timers run only at `trace` level.
+
+The commands check output writes and the final buffer flush. If the receiving
+process closes a pipe, they stop reporting and exit successfully, as with
+`whim lint src/ | head`. Other output failures return a nonzero status.
+
 ## Exit status
 
 The CLI returns zero on success. `exit!($status)` selects another status.
 `panic!` and an uncaught throwable use 255. CLI errors return a nonzero status.
-Error text goes to standard error; program output goes to the handle used by
-its write calls.
+CLI error text goes to standard error. Lint findings go to standard output.
+Program output goes to the handle used by its write calls.

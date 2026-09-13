@@ -17,7 +17,9 @@ mod git;
 mod logger;
 mod output;
 mod package;
+mod pipeline;
 mod server;
+mod service;
 mod source;
 mod style;
 
