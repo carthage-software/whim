@@ -26,7 +26,7 @@ final readonly class DirectConnector implements Connector {
   ): Connection {
     $versions = _Private\resolve_protocol_versions($request, $configuration);
     $proxy = $configuration->proxy;
-    if ($proxy != null && _Private\should_use_proxy($origin, $proxy)) {
+    if (null != $proxy && _Private\should_use_proxy($origin, $proxy)) {
       return $this->connectThroughProxy(
         $origin,
         $versions,
@@ -39,14 +39,14 @@ final readonly class DirectConnector implements Connector {
     ($host, $serverName) = _Private\origin_host($origin);
     $tcpProxied = $this->tcp is TCP\ProxyConnector;
 
-    if ($origin->scheme == 'http') {
+    if ('http' == $origin->scheme) {
       $stream = $this->tcp->connect($host, $origin->port, $cancellation);
       $destination = match ($tcpProxied) {
         true => _Private\known_destination($origin),
         false => $stream->getPeerEndpoint(),
       };
 
-      if (length!($versions) == 1 && $versions[0] == ProtocolVersion::V2) {
+      if (length!($versions) == 1 && ProtocolVersion::V2 == $versions[0]) {
         return new _Private\H2Connection(
           $stream,
           new ConnectionMetadata(
@@ -62,7 +62,7 @@ final readonly class DirectConnector implements Connector {
       }
 
       $h1 = _Private\preferred_h1_protocol($versions);
-      if ($h1 != null) {
+      if (null != $h1) {
         return new _Private\H1Connection(
           $stream,
           new ConnectionMetadata(
@@ -108,9 +108,9 @@ final readonly class DirectConnector implements Connector {
     ProxyConfiguration $proxy,
     null|CancellationToken $cancellation,
   ): Connection {
-    if ($origin->scheme == 'http') {
+    if ('http' == $origin->scheme) {
       $h1 = _Private\preferred_h1_protocol($versions);
-      if ($h1 == null) {
+      if (null == $h1) {
         throw new ConnectionException(
           'forward proxying over HTTP requires HTTP/1.0 or HTTP/1.1',
         );

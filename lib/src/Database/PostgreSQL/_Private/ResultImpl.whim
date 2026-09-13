@@ -22,20 +22,20 @@ final class ResultImpl implements Result, BatchResult {
   /** Returns column metadata in row order. */
   #[MustUse]
   public function getColumns(): vec<Column> {
-    if ($this->columns != null) {
+    if (null != $this->columns) {
       return $this->columns;
     }
 
     $columns = vec[];
     foreach ($this->result->columns() as $column) {
-      if ($column[0] == '') {
+      if ('' == $column[0]) {
         throw new QueryException(
           'the PostgreSQL server returned an empty column name',
         );
       }
 
       $typeName = $column[1];
-      if ($typeName == '') {
+      if ('' == $typeName) {
         $typeName = null;
       }
 

@@ -86,7 +86,7 @@ final class H1Driver implements StreamDriver {
     } catch (Throwable $_) {
     }
 
-    if ($upgrade == null) {
+    if (null == $upgrade) {
       return;
     }
 
@@ -166,12 +166,12 @@ final class H1Driver implements StreamDriver {
         return null;
       }
 
-      if ($head == null) {
+      if (null == $head) {
         return null;
       }
 
       if (
-        $head->contentLength != null
+        null != $head->contentLength
         && $head->contentLength > $configuration->maximumRequestBodySize
       ) {
         $this->writeError($stream, $configuration, 413, null, $forced);
@@ -190,7 +190,7 @@ final class H1Driver implements StreamDriver {
 
         $body = $chunkedBody;
         $trailers = $chunkedBody->getTrailers();
-      } else if ($head->contentLength != null && $head->contentLength != 0) {
+      } else if (null != $head->contentLength && 0 != $head->contentLength) {
         $body = new H1FixedLengthBody(
           $reader,
           $head->contentLength,
@@ -200,8 +200,8 @@ final class H1Driver implements StreamDriver {
 
       if (
         $head->expectContinue
-        && $head->protocolVersion == ProtocolVersion::V11
-        && $body != null
+        && ProtocolVersion::V11 == $head->protocolVersion
+        && null != $body
       ) {
         $stream->writeAll(
           "HTTP/1.1 100 Continue\r\n\r\n",
@@ -225,7 +225,7 @@ final class H1Driver implements StreamDriver {
       }
 
       $h2cSettings = null;
-      if ($enableH2c && $head->upgrade == 'h2c') {
+      if ($enableH2c && 'h2c' == $head->upgrade) {
         try {
           $h2cSettings = h1_h2c_settings($head);
         } catch (HTTPException $error) {
@@ -241,8 +241,8 @@ final class H1Driver implements StreamDriver {
         }
       }
 
-      if ($h2cSettings != null) {
-        if ($body != null) {
+      if (null != $h2cSettings) {
+        if (null != $body) {
           try {
             $buffer = $body->readAll();
           } catch (Throwable $error) {
@@ -292,7 +292,7 @@ final class H1Driver implements StreamDriver {
         || !$configuration->keepAlive
         || $requestCount >= $configuration->maximumRequestsPerConnection
         || (
-          $head->protocolVersion == ProtocolVersion::V10
+          ProtocolVersion::V10 == $head->protocolVersion
           && !$head->connectionKeepAlive
         );
 
@@ -315,7 +315,7 @@ final class H1Driver implements StreamDriver {
         $shouldClose = true;
       }
 
-      if ($body != null) {
+      if (null != $body) {
         try {
           $body->readAll();
         } catch (Throwable $error) {
@@ -327,7 +327,7 @@ final class H1Driver implements StreamDriver {
       $upgrade = $context->takeUpgrade();
       if (
         $response->status is 100..=199
-        && !($response->status == 101 && $upgrade != null)
+        && !(101 == $response->status && null != $upgrade)
       ) {
         $response = $configuration->errorResponder->respond(500, null);
         $shouldClose = true;
@@ -338,7 +338,7 @@ final class H1Driver implements StreamDriver {
         $configuration->responseWriteTimeout,
       );
 
-      if ($response->status == 101 && $upgrade != null) {
+      if (101 == $response->status && null != $upgrade) {
         $this->writeUpgrade($stream, $response, $writeCancellation);
         return ($upgrade, $reader);
       }
@@ -411,7 +411,7 @@ final class H1Driver implements StreamDriver {
   ): bool {
     $headers = $response->headers;
     $bodyAllowed =
-      $method != Message\METHOD_HEAD
+      Message\METHOD_HEAD != $method
       && !($response->status is 100..=199|204|304);
 
     $contentLength = null;
@@ -428,13 +428,13 @@ final class H1Driver implements StreamDriver {
 
     $chunked = false;
     $addContentLength = false;
-    if ($bodyAllowed && $response->body == null) {
-      if ($contentLength == null) {
+    if ($bodyAllowed && null == $response->body) {
+      if (null == $contentLength) {
         $contentLength = 0;
         $addContentLength = true;
       }
-    } else if ($contentLength == null) {
-      if ($bodyAllowed && $requestVersion == ProtocolVersion::V11) {
+    } else if (null == $contentLength) {
+      if ($bodyAllowed && ProtocolVersion::V11 == $requestVersion) {
         $chunked = true;
       } else if ($bodyAllowed) {
         $close = true;
@@ -453,12 +453,12 @@ final class H1Driver implements StreamDriver {
       DateHeader::getValue(),
     );
 
-    if (!$bodyAllowed || $response->body == null) {
+    if (!$bodyAllowed || null == $response->body) {
       $stream->writeAll($head, $cancellation);
       return true;
     }
 
-    if (!$chunked && $contentLength != null && $contentLength <= 16_384) {
+    if (!$chunked && null != $contentLength && $contentLength <= 16_384) {
       $data = $response->body->readAll($contentLength, $cancellation);
       $stream->writeAll($head . $data, $cancellation);
       return length!($data) == $contentLength;
@@ -480,7 +480,7 @@ final class H1Driver implements StreamDriver {
       }
 
       $tail = "0\r\n";
-      if ($response->trailers != null) {
+      if (null != $response->trailers) {
         $trailers = $response->trailers->await($cancellation);
         foreach ($trailers as ($name, $value)) {
           $tail .= Str\lowercase($name) . ': ' . $value . "\r\n";
@@ -494,10 +494,10 @@ final class H1Driver implements StreamDriver {
     $remaining = $contentLength;
     while (
       !$response->body->reachedEndOfDataSource()
-      && ($remaining == null || $remaining > 0)
+      && (null == $remaining || $remaining > 0)
     ) {
       $maximum = 16_384;
-      if ($remaining != null && $remaining < $maximum) {
+      if (null != $remaining && $remaining < $maximum) {
         $maximum = $remaining;
       }
 
@@ -507,11 +507,11 @@ final class H1Driver implements StreamDriver {
       };
 
       $stream->writeAll($data, $cancellation);
-      if ($remaining != null) {
+      if (null != $remaining) {
         $remaining -= length!($data);
       }
     }
 
-    return $remaining == null || $remaining == 0;
+    return null == $remaining || 0 == $remaining;
   }
 }

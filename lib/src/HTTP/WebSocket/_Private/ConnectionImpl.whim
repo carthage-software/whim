@@ -46,7 +46,7 @@ abstract class ConnectionImpl implements Connection {
   public function receive(
     null|CancellationToken $cancellation = null,
   ): null|Message {
-    if ($this->pendingMessage != null) {
+    if (null != $this->pendingMessage) {
       $message = $this->pendingMessage;
       $this->pendingMessage = null;
       return $message;
@@ -59,7 +59,7 @@ abstract class ConnectionImpl implements Connection {
     $cancellation = $this->combineCancellation($cancellation);
     while (true) {
       $message = $this->tryReceiveUnbuffered();
-      if ($message != null) {
+      if (null != $message) {
         return $message;
       }
 
@@ -76,14 +76,14 @@ abstract class ConnectionImpl implements Connection {
   public function waitUntilReceivable(
     null|CancellationToken $cancellation = null,
   ): void {
-    if ($this->pendingMessage != null || $this->terminated) {
+    if (null != $this->pendingMessage || $this->terminated) {
       return;
     }
 
     $cancellation = $this->combineCancellation($cancellation);
     while (true) {
       $message = $this->tryReceiveUnbuffered();
-      if ($message != null) {
+      if (null != $message) {
         $this->pendingMessage = $message;
         return;
       }
@@ -100,7 +100,7 @@ abstract class ConnectionImpl implements Connection {
   #[TrackCaller]
   #[TraceBoundary]
   public function tryReceive(): null|Message {
-    if ($this->pendingMessage != null) {
+    if (null != $this->pendingMessage) {
       $message = $this->pendingMessage;
       $this->pendingMessage = null;
       return $message;
@@ -188,7 +188,7 @@ abstract class ConnectionImpl implements Connection {
   #[TraceBoundary]
   private function flush(): void {
     $bytes = $this->codec->takeOutput();
-    if ($bytes != '') {
+    if ('' != $bytes) {
       $this->write->writeAll($bytes, $this->cancellation);
     }
   }
@@ -197,11 +197,11 @@ abstract class ConnectionImpl implements Connection {
   private function combineCancellation(
     null|CancellationToken $cancellation,
   ): null|CancellationToken {
-    if ($this->cancellation == null) {
+    if (null == $this->cancellation) {
       return $cancellation;
     }
 
-    if ($cancellation == null) {
+    if (null == $cancellation) {
       return $this->cancellation;
     }
 
@@ -222,7 +222,7 @@ abstract class ConnectionImpl implements Connection {
         $this->flush();
       }
 
-      if ($event != null) {
+      if (null != $event) {
         return match ($event[0]) {
           1 => TextMessage($event[1]),
           2 => BinaryMessage($event[1]),
@@ -242,7 +242,7 @@ abstract class ConnectionImpl implements Connection {
       }
 
       $bytes = $this->read->tryRead($this->readSize);
-      if ($bytes == '') {
+      if ('' == $bytes) {
         if ($this->read->reachedEndOfDataSource()) {
           $this->finishInput();
           continue;

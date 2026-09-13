@@ -54,7 +54,7 @@ final readonly class Entry {
   public function needsValidation(PoolConfiguration $configuration): bool {
     $interval = $configuration->validationInterval;
     return (
-      $interval != null
+      null != $interval
       && $this->idleSince->elapsed()->compare($interval)->isGreaterOrEqual()
     );
   }

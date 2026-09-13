@@ -11,8 +11,8 @@ final class SecureSequence implements Default, Sequence {
   /** Creates the canonical default value. */
   #[MustUse]
   #[TrackCaller]
-  public static function default(): static {
-    return new static();
+  public static function default(): self {
+    return new self();
   }
 
   /** Return the next value in the sequence. */

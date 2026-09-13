@@ -46,7 +46,7 @@ function compile_expression(string $source, bool $complete): Regex {
   }
 
   $regex = Regex::compile($expression);
-  if ($regex == null) {
+  if (null == $regex) {
     throw new LogicException('a validated route expression failed to compile');
   }
 
@@ -90,7 +90,7 @@ function decode_parameters(
 /** Returns the path component used for routing. */
 #[MustUse]
 function request_path(Request $request): string {
-  if ($request->url != null) {
+  if (null != $request->url) {
     return match ($request->url->path) {
       '' => '/',
       $path @ string => $path,
@@ -98,7 +98,7 @@ function request_path(Request $request): string {
   }
 
   $target = $request->requestTarget;
-  if ($target == '' || $target[0] != '/') {
+  if ('' == $target || '/' != $target[0]) {
     return $target;
   }
 

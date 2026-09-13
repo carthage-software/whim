@@ -34,7 +34,7 @@ final class LinkedCancellationToken implements CancellationToken {
     foreach ($tokens as $token) {
       $id = $token->register(fn(): void {
         $linked = $weak->get();
-        if ($linked != null) {
+        if (null != $linked) {
           $linked->cancelFromSource();
         }
       });
@@ -121,7 +121,7 @@ final class LinkedCancellationToken implements CancellationToken {
   #[NeverInline]
   #[TrackCaller]
   public function throwIfCancellationRequested(): void {
-    if ($this->exception != null) {
+    if (null != $this->exception) {
       throw $this->exception;
     }
   }

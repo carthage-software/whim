@@ -119,8 +119,8 @@ final readonly class BetweenRange implements
   /** Changes whether the upper bound is inclusive. */
   #[MustUse]
   #[TrackCaller]
-  public function withUpperInclusive(bool $upperInclusive): static {
-    return new static($this->lowerBound, $this->upperBound, $upperInclusive);
+  public function withUpperInclusive(bool $upperInclusive): self {
+    return new self($this->lowerBound, $this->upperBound, $upperInclusive);
   }
 
   /** Creates an iterator over the range. */

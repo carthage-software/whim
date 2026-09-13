@@ -27,13 +27,13 @@ interface ReadHandle extends Handle {
     null|int $maxBytes = null,
     null|CancellationToken $cancellation = null,
   ): string {
-    if ($maxBytes == 0) {
+    if (0 == $maxBytes) {
       return '';
     }
 
     while (!$this->reachedEndOfDataSource()) {
       $data = $this->tryRead($maxBytes);
-      if ($data != '') {
+      if ('' != $data) {
         return $data;
       }
 
@@ -50,9 +50,9 @@ interface ReadHandle extends Handle {
     null|CancellationToken $cancellation = null,
   ): string {
     $result = '';
-    while ($maxBytes == null || length!($result) < $maxBytes) {
+    while (null == $maxBytes || length!($result) < $maxBytes) {
       $remaining = null;
-      if ($maxBytes != null) {
+      if (null != $maxBytes) {
         $remaining = $maxBytes - length!($result);
       }
 

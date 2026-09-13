@@ -84,7 +84,7 @@ final class CookieJar implements ClientMiddleware {
       _ => $url->path,
     };
 
-    $secure = $url->scheme == 'https';
+    $secure = 'https' == $url->scheme;
     $provided = Collection::fromHeaders($request->headers);
     $matches = vec[];
     foreach ($this->cookies as $cookie) {
@@ -104,7 +104,7 @@ final class CookieJar implements ClientMiddleware {
       $matches[] = $cookie;
     }
 
-    if ($matches == vec[]) {
+    if (vec[] == $matches) {
       return $request;
     }
 
@@ -112,7 +112,7 @@ final class CookieJar implements ClientMiddleware {
       $matches,
       fn(StoredCookie $left, StoredCookie $right): Ordering {
         $pathOrder = length!($right->path) <=> length!($left->path);
-        if ($pathOrder != 0) {
+        if (0 != $pathOrder) {
           return Ordering::from($pathOrder);
         }
 
@@ -127,7 +127,7 @@ final class CookieJar implements ClientMiddleware {
 
     $value = Collection::fromParts($pairs)->toString();
     $existing = $request->headers->getAll('Cookie');
-    if ($existing != vec[]) {
+    if (vec[] != $existing) {
       $value = Str\join('; ', $existing) . '; ' . $value;
     }
 
@@ -139,14 +139,14 @@ final class CookieJar implements ClientMiddleware {
     $hostIsAddress = $url->authority->host is IPHost;
     foreach ($response->headers->getAll('Set-Cookie') as $field) {
       $cookie = SetCookie::parse($field);
-      if ($cookie == null || ($cookie->secure && $url->scheme != 'https')) {
+      if (null == $cookie || ($cookie->secure && 'https' != $url->scheme)) {
         continue;
       }
 
-      $hostOnly = $cookie->domain == null;
+      $hostOnly = null == $cookie->domain;
       $domain = $cookie->domain ?? $host;
       if (
-        $domain == ''
+        '' == $domain
         || (!$hostOnly && $hostIsAddress)
         || (!$hostOnly && !_Private\domain_matches($host, $domain))
       ) {
@@ -159,7 +159,7 @@ final class CookieJar implements ClientMiddleware {
         $expires @ SystemTime => $expires->seconds,
       };
 
-      if ($cookie->maxAge != null) {
+      if (null != $cookie->maxAge) {
         if ($cookie->maxAge <= 0) {
           $this->replace($cookie, $domain, $path, null, $hostOnly, false);
           continue;
@@ -171,7 +171,7 @@ final class CookieJar implements ClientMiddleware {
         };
       }
 
-      $keep = $expiresAt == null || $expiresAt > $now;
+      $keep = null == $expiresAt || $expiresAt > $now;
       $this->replace($cookie, $domain, $path, $expiresAt, $hostOnly, $keep);
     }
   }
@@ -223,7 +223,7 @@ final class CookieJar implements ClientMiddleware {
   private function purge(int $now): void {
     $cookies = vec[];
     foreach ($this->cookies as $cookie) {
-      if ($cookie->expiresAt == null || $cookie->expiresAt > $now) {
+      if (null == $cookie->expiresAt || $cookie->expiresAt > $now) {
         $cookies[] = $cookie;
       }
     }

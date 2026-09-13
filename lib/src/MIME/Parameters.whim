@@ -36,7 +36,7 @@ final readonly class Parameters implements
   #[TrackCaller]
   public static function from(string $input): Parameters {
     $parameters = Parameters::parse($input);
-    if ($parameters == null) {
+    if (null == $parameters) {
       throw new InvalidArgumentException('invalid MIME parameter list');
     }
 
@@ -66,7 +66,7 @@ final readonly class Parameters implements
   /** Creates an empty parameter collection. */
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
+  public static function default(): self {
     return new Parameters(vec[]);
   }
 

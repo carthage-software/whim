@@ -48,12 +48,12 @@ final class FixedLengthReadHandle implements ReadHandle {
     }
 
     $wanted = $remaining;
-    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $remaining) {
+    if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $remaining) {
       $wanted = $maxBytes;
     }
 
     $data = $this->handle->tryRead($wanted);
-    if ($data == '' && $this->handle->reachedEndOfDataSource()) {
+    if ('' == $data && $this->handle->reachedEndOfDataSource()) {
       throw new Exception(
         'the data source ended before the fixed length was read',
       );

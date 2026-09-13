@@ -50,15 +50,15 @@ final readonly class Mailbox implements ToString {
     $parts = _Private\strip_comments(Str\trim($input));
     $input = Str\trim($parts[0]);
     $comment = $parts[1];
-    if ($input == '') {
+    if ('' == $input) {
       return null;
     }
 
     $displayName = null;
     $open = Str\search($input, '<');
-    if ($open != null) {
+    if (null != $open) {
       $close = Str\search($input, '>', $open + 1);
-      if ($close == null || $close + 1 != length!($input)) {
+      if (null == $close || $close + 1 != length!($input)) {
         return null;
       }
 
@@ -67,7 +67,7 @@ final readonly class Mailbox implements ToString {
     }
 
     $at = Str\search_last($input, '@');
-    if ($at == null || $at == 0 || $at + 1 >= length!($input)) {
+    if (null == $at || 0 == $at || $at + 1 >= length!($input)) {
       return null;
     }
 
@@ -97,7 +97,7 @@ final readonly class Mailbox implements ToString {
   #[TrackCaller]
   public static function from(string $input): Mailbox {
     $mailbox = Mailbox::parse($input);
-    if ($mailbox == null) {
+    if (null == $mailbox) {
       throw new InvalidArgumentException('invalid mailbox: `' . $input . '`');
     }
 
@@ -109,7 +109,7 @@ final readonly class Mailbox implements ToString {
   #[TrackCaller]
   public function toString(): string {
     $result = $this->address;
-    if ($this->displayName != null && $this->displayName != '') {
+    if (null != $this->displayName && '' != $this->displayName) {
       $result =
         _Private\serialize_display($this->displayName)
         . ' <'
@@ -117,7 +117,7 @@ final readonly class Mailbox implements ToString {
         . '>';
     }
 
-    if ($this->comment != null) {
+    if (null != $this->comment) {
       $result .= ' (' . $this->comment . ')';
     }
 

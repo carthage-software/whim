@@ -87,7 +87,7 @@ final readonly class ZonedDateTime implements Order<ZonedDateTime>, ToString {
   #[TrackCaller]
   public static function from(string $value): ZonedDateTime {
     $dateTime = ZonedDateTime::parse($value);
-    if ($dateTime == null) {
+    if (null == $dateTime) {
       throw new InvalidArgumentException(
         'invalid zoned date and time: `' . $value . '`',
       );

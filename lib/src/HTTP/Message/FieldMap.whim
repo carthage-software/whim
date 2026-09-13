@@ -38,7 +38,7 @@ final readonly class FieldMap implements Default, ToIterator<int, Field> {
     }
 
     $values = http_index_fields($entries);
-    if ($values == null) {
+    if (null == $values) {
       foreach ($entries as ($name, $value)) {
         if (!http_valid_token($name)) {
           throw new InvalidArgumentException(
@@ -76,7 +76,7 @@ final readonly class FieldMap implements Default, ToIterator<int, Field> {
   /** Creates an empty field map. */
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
+  public static function default(): self {
     return new FieldMap(vec[], dict[]);
   }
 
@@ -193,7 +193,7 @@ final readonly class FieldMap implements Default, ToIterator<int, Field> {
   #[AlwaysInline]
   #[MustUse]
   public function isEmpty(): bool {
-    return $this->fields == vec[];
+    return vec[] == $this->fields;
   }
 
   /** Returns an iterator over field entries in insertion order. */

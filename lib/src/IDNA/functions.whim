@@ -17,7 +17,7 @@ use Whim\Marker\TrackCaller;
 #[TrackCaller]
 function to_ascii(string $domain): string {
   $ascii = Whim\_Private\idna_to_ascii($domain);
-  if ($ascii == null) {
+  if (null == $ascii) {
     throw new EncodingException('the domain name cannot be encoded using IDNA');
   }
 
@@ -34,7 +34,7 @@ function to_ascii(string $domain): string {
 #[TrackCaller]
 function to_unicode(string $domain): string {
   $unicode = Whim\_Private\idna_to_unicode($domain);
-  if ($unicode == null) {
+  if (null == $unicode) {
     throw new DecodingException('the domain name is not valid IDNA');
   }
 

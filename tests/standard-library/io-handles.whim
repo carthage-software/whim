@@ -315,7 +315,7 @@ final class OneByteWriteHandle implements WriteHandle {
       return 0;
     }
 
-    $this->buffer = $this->buffer . $bytes[0];
+    $this->buffer .= $bytes[0];
     return 1;
   }
 

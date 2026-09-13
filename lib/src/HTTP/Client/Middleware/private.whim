@@ -11,12 +11,12 @@ function host(URL $url): string {
 /** Returns the default cookie path for a request URL. */
 function default_path(URL $url): string {
   $path = $url->path;
-  if ($path == '' || !Str\starts_with($path, '/')) {
+  if ('' == $path || !Str\starts_with($path, '/')) {
     return '/';
   }
 
   $last = Str\search_last($path, '/');
-  if ($last == null || $last == 0) {
+  if (null == $last || 0 == $last) {
     return '/';
   }
 
@@ -42,7 +42,7 @@ function path_matches(string $requestPath, string $cookiePath): bool {
     Str\ends_with($cookiePath, '/')
     || (
       length!($requestPath) > length!($cookiePath)
-      && $requestPath[length!($cookiePath)] == '/'
+      && '/' == $requestPath[length!($cookiePath)]
     )
   );
 }

@@ -56,7 +56,7 @@ final class SettingsRegistry {
   }
 
   public function acknowledgeLocal(): void {
-    if ($this->pendingAcknowledgments == 0) {
+    if (0 == $this->pendingAcknowledgments) {
       throw new H2\ProtocolException(
         'the peer acknowledged settings which were not sent',
       );

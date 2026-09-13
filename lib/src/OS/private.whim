@@ -84,7 +84,7 @@ function group_from_record(
 /** Converts an optional operating-system text field. */
 #[AlwaysInline]
 function non_empty(string $value): null|NonEmptyString {
-  if ($value == '') {
+  if ('' == $value) {
     return null;
   }
 

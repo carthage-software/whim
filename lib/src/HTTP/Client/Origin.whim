@@ -20,7 +20,7 @@ final readonly class Origin {
   #[MustUse]
   public static function fromURL(URL $url): Origin {
     $port = $url->authority->port;
-    if ($port == null) {
+    if (null == $port) {
       $port = match ($url->scheme) {
         'http' => 80,
         'https' => 443,

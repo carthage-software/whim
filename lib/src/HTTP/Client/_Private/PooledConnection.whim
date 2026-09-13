@@ -66,7 +66,7 @@ final class PooledConnection implements Connection {
     $version = $connection->getMetadata()->protocolVersion;
     if ($version is ProtocolVersion::V10|ProtocolVersion::V11) {
       $body = $transaction->response->body;
-      if ($body == null || $body->reachedEndOfDataSource()) {
+      if (null == $body || $body->reachedEndOfDataSource()) {
         $this->lease->release($connection->isReusable());
         return $transaction;
       }

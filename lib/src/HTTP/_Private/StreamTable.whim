@@ -70,7 +70,7 @@ final class StreamTable {
 
   public function reserveLocal(StreamId $streamId): StreamEntry {
     $entry = $this->getOrCreate($streamId, true);
-    if ($entry->state == StreamState::Idle) {
+    if (StreamState::Idle == $entry->state) {
       $entry->state = StreamState::ReservedLocal;
     }
 
@@ -87,7 +87,7 @@ final class StreamTable {
     }
 
     $entry = $this->getOrCreate($streamId, false);
-    if ($entry->state == StreamState::Idle) {
+    if (StreamState::Idle == $entry->state) {
       $entry->state = StreamState::ReservedRemote;
       $this->peerReserved++;
     }
@@ -128,7 +128,7 @@ final class StreamTable {
     bool $locallyInitiated,
   ): StreamEntry {
     $entry = $this->getOrCreate($streamId, $locallyInitiated);
-    if ($entry->state == StreamState::Idle) {
+    if (StreamState::Idle == $entry->state) {
       $entry->state = StreamState::Open;
       if ($locallyInitiated) {
         $this->localActive++;
@@ -144,7 +144,7 @@ final class StreamTable {
     $entry = $this->get($streamId) ?? return;
 
     if (
-      $entry->state == StreamState::ReservedRemote
+      StreamState::ReservedRemote == $entry->state
       && $this->peerReserved > 0
     ) {
       $this->peerReserved--;

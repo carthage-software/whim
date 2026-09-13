@@ -36,7 +36,7 @@ function from_parsed_headers(vec<Header> $pairs, Reader $reader): Message {
 
 /** Parses all bracketed Message-IDs in a header value. */
 function parse_message_ids(null|string $value): vec<MessageId> {
-  if ($value == null) {
+  if (null == $value) {
     return vec[];
   }
 
@@ -48,7 +48,7 @@ function parse_message_ids(null|string $value): vec<MessageId> {
     $close = Str\search($value, '>', $open + 1) ?? break;
 
     $id = MessageId::parse(Str\slice($value, $open, $close - $open + 1));
-    if ($id != null) {
+    if (null != $id) {
       $ids[] = $id;
     }
 

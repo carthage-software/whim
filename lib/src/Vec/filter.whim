@@ -62,7 +62,7 @@ function filter_keys<K, T>(
 function filter_nulls<T>(Iterable<_, null|T> $values): vec<T> {
   $result = vec[];
   foreach ($values as $value) {
-    if ($value != null) {
+    if (!($value is null)) {
       $result[] = $value;
     }
   }

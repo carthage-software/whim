@@ -13,7 +13,7 @@ function accept_upgrade_request(
   vec<Header> $headers,
   dict<SettingId, SettingValue> $settings,
 ): vec<Event\WeakendEvent> {
-  if ($state->role != Role::Server || $state->lastPeerStreamId != 0) {
+  if (Role::Server != $state->role || 0 != $state->lastPeerStreamId) {
     throw new H2\ProtocolException(
       'an HTTP/2 upgrade must be the first server request',
     );

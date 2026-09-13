@@ -29,7 +29,7 @@ final class StreamDriverImpl implements StreamDriver {
     CancellationToken $forced,
   ): void {
     if ($stream is TLSStream<_>) {
-      if ($stream->getConnectionState()->alpnProtocol == 'h2') {
+      if ('h2' == $stream->getConnectionState()->alpnProtocol) {
         new H2Driver()->serve(
           $stream,
           false,
@@ -99,7 +99,7 @@ final class StreamDriverImpl implements StreamDriver {
       throw $error;
     }
 
-    if ($prefix == H2\CLIENT_PREFACE) {
+    if (H2\CLIENT_PREFACE == $prefix) {
       new H2Driver()->serveFrom(
         $stream,
         $prefix,

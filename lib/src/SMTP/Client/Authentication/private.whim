@@ -17,7 +17,7 @@ function require_mechanism(
 ): void {
   $available = $connection->capability(Capability::Authentication);
   if (
-    $available == null
+    null == $available
     || !Str\contains(
       ' ' . Str\uppercase($available) . ' ',
       ' ' . $mechanism . ' ',
@@ -57,7 +57,7 @@ function require_authentication_success(
 function parse_scram_attributes(string $message): dict<string, string> {
   $attributes = dict[];
   foreach (Str\split($message, ',') as $attribute) {
-    if (!($attribute is string[3..]) || $attribute[1] != '=') {
+    if (!($attribute is string[3..]) || '=' != $attribute[1]) {
       throw new AuthenticationException(
         'the SMTP server sent malformed SCRAM data',
       );
@@ -108,7 +108,7 @@ function parse_server_first(
 
   $iterationText = $attributes['i'];
   $iterations = parse_decimal($iterationText);
-  if ($iterations == null || $iterations < 1 || $iterations > 1000000) {
+  if (null == $iterations || $iterations < 1 || $iterations > 1000000) {
     throw new AuthenticationException('the SCRAM iteration count is invalid');
   }
 

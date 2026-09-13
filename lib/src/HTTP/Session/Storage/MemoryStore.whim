@@ -63,7 +63,7 @@ final class MemoryStore implements Store {
     $cancellation?->throwIfCancellationRequested();
     $this->validateTtl($ttl);
     $entry = $this->getEntry($identifier);
-    if ($entry == null || $entry->record->revision != $revision) {
+    if (null == $entry || $entry->record->revision != $revision) {
       throw new ConflictException('the session record has changed');
     }
 

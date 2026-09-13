@@ -61,7 +61,7 @@ final class WriteHandleImpl implements
     string $bytes,
     null|CancellationToken $cancellation = null,
   ): int {
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return 0;
     }
 

@@ -35,7 +35,7 @@ function should_use_proxy(
 
   foreach ($configuration->bypass as $candidate) {
     $rule = Str\lowercase($candidate);
-    if ($rule == '*') {
+    if ('*' == $rule) {
       return false;
     }
 
@@ -69,7 +69,7 @@ function connect_proxy(
     };
 
   $stream = $connector->connect($host, $port, $cancellation);
-  if ($configuration->url->scheme == 'http') {
+  if ('http' == $configuration->url->scheme) {
     return $stream;
   }
 
@@ -78,7 +78,7 @@ function connect_proxy(
   )->connect($stream, $configuration->serverName ?? $serverName, $cancellation);
 
   $protocol = $stream->getConnectionState()->alpnProtocol;
-  if ($protocol != null && $protocol != 'http/1.1') {
+  if (null != $protocol && 'http/1.1' != $protocol) {
     $stream->close();
     throw new ConnectionException(
       'the HTTP proxy selected an unsupported application protocol',
@@ -101,7 +101,7 @@ function establish_tunnel(
   $request =
     'CONNECT ' . $authority . " HTTP/1.1\r\nHost: " . $authority . "\r\n";
 
-  if ($configuration->authorization != null) {
+  if (null != $configuration->authorization) {
     $request .=
       'Proxy-Authorization: ' . $configuration->authorization . "\r\n";
   }
@@ -128,7 +128,7 @@ function establish_tunnel(
     $informational++;
     if (
       $informational > 16
-      || $head->status == Message\STATUS_SWITCHING_PROTOCOLS
+      || Message\STATUS_SWITCHING_PROTOCOLS == $head->status
     ) {
       $stream->close();
       throw new ProtocolException(
@@ -142,14 +142,14 @@ function establish_tunnel(
 #[MustUse]
 function absolute_request_target(Request $request): string {
   $url = $request->url;
-  if ($url == null) {
+  if (null == $url) {
     throw new RequestException(
       'a forward-proxy request requires an absolute URL',
     );
   }
 
   $authority = $url->authority->host->toString();
-  if ($url->authority->port != null) {
+  if (null != $url->authority->port) {
     $authority .= ':' . $url->authority->port;
   }
 
@@ -159,7 +159,7 @@ function absolute_request_target(Request $request): string {
     _ => $url->path,
   };
 
-  if ($url->query != null) {
+  if (null != $url->query) {
     $target .= '?' . $url->query;
   }
 

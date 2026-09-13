@@ -26,7 +26,7 @@ final readonly class Deflate implements Codec {
   #[TraceBoundary]
   public function createCompressor(): Compressor {
     $encoder = CompressionEncoder::deflate($this->level);
-    if ($encoder == null) {
+    if (null == $encoder) {
       throw new Exception('failed to create a deflate compression stream');
     }
 
@@ -39,7 +39,7 @@ final readonly class Deflate implements Codec {
   #[TraceBoundary]
   public function createDecompressor(): Decompressor {
     $decoder = CompressionDecoder::deflate();
-    if ($decoder == null) {
+    if (null == $decoder) {
       throw new DecompressionException(
         'failed to create a deflate decompression stream',
       );

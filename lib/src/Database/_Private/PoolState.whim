@@ -41,12 +41,12 @@ final class PoolState {
   public function acquire(null|CancellationToken $cancellation): Entry {
     while (true) {
       $this->ensureOpen();
-      if ($cancellation != null) {
+      if (null != $cancellation) {
         $cancellation->throwIfCancellationRequested();
       }
 
       $entry = $this->takeIdle($cancellation);
-      if ($entry != null) {
+      if (null != $entry) {
         return $entry;
       }
 
@@ -55,7 +55,7 @@ final class PoolState {
       }
 
       $entry = $this->wait($cancellation);
-      if ($entry != null) {
+      if (null != $entry) {
         return $entry;
       }
     }
@@ -77,14 +77,14 @@ final class PoolState {
     }
 
     $waiter = $this->takeWaiter();
-    if ($waiter != null) {
+    if (null != $waiter) {
       $waiter->active = false;
       $waiter->suspension->resumeEagerly($entry);
       return;
     }
 
     if (
-      $this->configuration->maximumIdleConnections == 0
+      0 == $this->configuration->maximumIdleConnections
       || $this->idle->count() >= $this->configuration->maximumIdleConnections
     ) {
       $this->discard($entry);
@@ -223,7 +223,7 @@ final class PoolState {
     $this->pending->pushBack($waiter);
 
     $id = null;
-    if ($effectiveCancellation != null) {
+    if (null != $effectiveCancellation) {
       $id = $effectiveCancellation->register(fn(): void {
         if (!$waiter->active) {
           return;
@@ -253,7 +253,7 @@ final class PoolState {
       }
     } finally {
       $waiter->active = false;
-      if ($effectiveCancellation != null && $id != null) {
+      if (null != $effectiveCancellation && null != $id) {
         $effectiveCancellation->unregister($id);
       }
     }
@@ -283,7 +283,7 @@ final class PoolState {
     }
 
     $waiter = $this->takeWaiter();
-    if ($waiter != null) {
+    if (null != $waiter) {
       $waiter->active = false;
       $waiter->suspension->resume(null);
     }

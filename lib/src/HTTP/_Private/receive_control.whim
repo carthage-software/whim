@@ -24,11 +24,11 @@ function receive_reset(
   Frame\RstStreamFrame $frame,
 ): vec<Event\WeakendEvent> {
   $streamState = stream_state($state, $frame[1]);
-  if ($streamState == StreamState::Idle) {
+  if (StreamState::Idle == $streamState) {
     throw new ProtocolException('`RST_STREAM` cannot target an idle stream');
   }
 
-  if ($streamState == StreamState::Closed) {
+  if (StreamState::Closed == $streamState) {
     return vec[];
   }
 
@@ -51,7 +51,7 @@ function receive_go_away(
   State $state,
   Frame\GoAwayFrame $frame,
 ): vec<Event\WeakendEvent> {
-  if ($state->receivedGoAway != null && $frame[1] > $state->receivedGoAway) {
+  if (null != $state->receivedGoAway && $frame[1] > $state->receivedGoAway) {
     throw new ProtocolException(
       'an HTTP/2 GOAWAY last stream identifier increased',
     );
@@ -66,22 +66,22 @@ function receive_window_update(
   State $state,
   Frame\WindowUpdateFrame $frame,
 ): vec<Event\WeakendEvent> {
-  if ($frame[1] == 0) {
+  if (0 == $frame[1]) {
     $state->flow->updateConnectionSend($frame[2]);
   } else {
     $streamState = stream_state($state, $frame[1]);
-    if ($streamState == StreamState::Idle) {
+    if (StreamState::Idle == $streamState) {
       throw new ProtocolException(
         '`WINDOW_UPDATE` cannot target an idle stream',
       );
     }
 
-    if ($streamState == StreamState::Closed) {
+    if (StreamState::Closed == $streamState) {
       return vec[(10, $frame[1], $frame[2])];
     }
 
     $entry = $state->streams->get($frame[1]);
-    if ($entry == null) {
+    if (null == $entry) {
       throw new ProtocolException('the HTTP/2 stream state was lost');
     }
 

@@ -23,7 +23,7 @@ final class TaskGroup {
         $this->errors[] = $error;
       } finally {
         $this->pending--;
-        if ($this->pending == 0) {
+        if (0 == $this->pending) {
           $waiters = $this->waiters;
           $this->waiters = vec[];
           foreach ($waiters as $waiter) {
@@ -46,16 +46,16 @@ final class TaskGroup {
   #[NeverInline]
   #[TrackCaller]
   public function awaitAll(null|CancellationToken $cancellation = null): void {
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $cancellation->throwIfCancellationRequested();
     }
 
-    if ($this->pending != 0) {
+    if (0 != $this->pending) {
       $suspension = Whim\_Private\create_suspension::<null>();
       $waiter = new _Private\Waiter::<null>($suspension);
       $this->waiters[] = $waiter;
       $id = null;
-      if ($cancellation != null) {
+      if (null != $cancellation) {
         $id = $cancellation->register(fn(): void {
           if (!$waiter->active) {
             return;
@@ -74,7 +74,7 @@ final class TaskGroup {
         $suspension->suspend();
       } finally {
         $waiter->active = false;
-        if ($cancellation != null && $id != null) {
+        if (null != $cancellation && null != $id) {
           $cancellation->unregister($id);
         }
       }

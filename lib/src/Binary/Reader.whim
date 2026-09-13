@@ -75,7 +75,7 @@ interface Reader {
   /** Advances past a number of bytes without returning them. */
   #[TrackCaller]
   public function skip(NonNegativeInt $length): void {
-    if ($length == 0) {
+    if (0 == $length) {
       return;
     }
 

@@ -13,7 +13,7 @@ final class MapIterator<K, T, U> implements Iterator<K, U> {
   /** Returns the next transformed entry. */
   public function next(): null|(K, U) {
     $entry = $this->iterator->next();
-    if ($entry == null) {
+    if (null == $entry) {
       return null;
     }
 

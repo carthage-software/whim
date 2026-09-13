@@ -51,7 +51,7 @@ final readonly class AddressList implements
   #[TrackCaller]
   public static function from(string $input): AddressList {
     $addresses = AddressList::parse($input);
-    if ($addresses == null) {
+    if (null == $addresses) {
       throw new InvalidArgumentException(
         'invalid address list: `' . $input . '`',
       );
@@ -63,7 +63,7 @@ final readonly class AddressList implements
   /** Creates an empty address list. */
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
+  public static function default(): self {
     return new AddressList();
   }
 
@@ -109,7 +109,7 @@ final readonly class AddressList implements
         }
       }
 
-      if ($mailboxes != vec[]) {
+      if (vec[] != $mailboxes) {
         $addresses[] = new Group($group->displayName, $mailboxes);
       }
     }

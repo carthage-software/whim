@@ -16,7 +16,7 @@ final readonly class Debug implements Responder {
   ): Response {
     $phrase = Message\reason_phrase($status) ?? 'Error';
     $body = $status . ' ' . $phrase;
-    if ($cause != null) {
+    if (null != $cause) {
       $body .= "\n\n" . $cause->toString();
     }
 

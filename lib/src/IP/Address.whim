@@ -45,7 +45,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[TrackCaller]
   public static function from(string $address): Address {
     $parsed = Address::parse($address);
-    if ($parsed == null) {
+    if (null == $parsed) {
       throw new InvalidArgumentException(
         'invalid IP address: `' . $address . '`',
       );
@@ -64,7 +64,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[TrackCaller]
   public static function v4(string $address): Address {
     $parsed = Address::parse($address);
-    if ($parsed == null || $parsed->family != Family::V4) {
+    if (null == $parsed || Family::V4 != $parsed->family) {
       throw new InvalidArgumentException(
         'invalid IPv4 address: `' . $address . '`',
       );
@@ -83,7 +83,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[TrackCaller]
   public static function v6(string $address): Address {
     $parsed = Address::parse($address);
-    if ($parsed == null || $parsed->family != Family::V6) {
+    if (null == $parsed || Family::V6 != $parsed->family) {
       throw new InvalidArgumentException(
         'invalid IPv6 address: `' . $address . '`',
       );
@@ -121,7 +121,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[MustUse]
   #[TrackCaller]
   public function toExpandedString(): NonEmptyString {
-    if ($this->family == Family::V4) {
+    if (Family::V4 == $this->family) {
       return $this->toString();
     }
 
@@ -143,7 +143,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[MustUse]
   #[TrackCaller]
   public function toArpaName(): NonEmptyString {
-    if ($this->family == Family::V4) {
+    if (Family::V4 == $this->family) {
       $parts = Str\split($this->toString(), '.');
       return (
         (Str\join('.', Vec\reverse::<string>($parts)) . '.in-addr.arpa')
@@ -176,7 +176,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[MustUse]
   public function isIPv4Mapped(): bool {
     return (
-      $this->family == Family::V6
+      Family::V6 == $this->family
       && Str\starts_with(
         $this->bytes,
         "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff",
@@ -188,7 +188,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[MustUse]
   #[TrackCaller]
   public function toIPv4Mapped(): Address {
-    if ($this->family == Family::V6) {
+    if (Family::V6 == $this->family) {
       return $this;
     }
 
@@ -202,13 +202,13 @@ final readonly class Address implements Order<Address>, ToString {
   #[AlwaysInline]
   #[MustUse]
   public function isLoopback(): bool {
-    if ($this->family == Family::V4) {
-      return $this->bytes[0] == "\x7f";
+    if (Family::V4 == $this->family) {
+      return "\x7f" == $this->bytes[0];
     }
 
     return (
-      $this->bytes
-      == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+      "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+      == $this->bytes
     );
   }
 
@@ -216,14 +216,14 @@ final readonly class Address implements Order<Address>, ToString {
   #[AlwaysInline]
   #[MustUse]
   public function isPrivate(): bool {
-    if ($this->family == Family::V4) {
+    if (Family::V4 == $this->family) {
       return (
-        $this->bytes[0] == "\x0a"
+        "\x0a" == $this->bytes[0]
         || (
-          $this->bytes[0] == "\xac"
+          "\xac" == $this->bytes[0]
           && (Str\ord($this->bytes[1]) & 0xf0) == 0x10
         )
-        || ($this->bytes[0] == "\xc0" && $this->bytes[1] == "\xa8")
+        || ("\xc0" == $this->bytes[0] && "\xa8" == $this->bytes[1])
       );
     }
 
@@ -234,12 +234,12 @@ final readonly class Address implements Order<Address>, ToString {
   #[AlwaysInline]
   #[MustUse]
   public function isLinkLocal(): bool {
-    if ($this->family == Family::V4) {
-      return $this->bytes[0] == "\xa9" && $this->bytes[1] == "\xfe";
+    if (Family::V4 == $this->family) {
+      return "\xa9" == $this->bytes[0] && "\xfe" == $this->bytes[1];
     }
 
     return (
-      $this->bytes[0] == "\xfe"
+      "\xfe" == $this->bytes[0]
       && (Str\ord($this->bytes[1]) & 0xc0) == 0x80
     );
   }
@@ -248,24 +248,24 @@ final readonly class Address implements Order<Address>, ToString {
   #[AlwaysInline]
   #[MustUse]
   public function isMulticast(): bool {
-    if ($this->family == Family::V4) {
+    if (Family::V4 == $this->family) {
       return (Str\ord($this->bytes[0]) & 0xf0) == 0xe0;
     }
 
-    return $this->bytes[0] == "\xff";
+    return "\xff" == $this->bytes[0];
   }
 
   /** Reports whether this is the all-zero unspecified address. */
   #[AlwaysInline]
   #[MustUse]
   public function isUnspecified(): bool {
-    if ($this->family == Family::V4) {
-      return $this->bytes == "\x00\x00\x00\x00";
+    if (Family::V4 == $this->family) {
+      return "\x00\x00\x00\x00" == $this->bytes;
     }
 
     return (
-      $this->bytes
-      == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+      "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+      == $this->bytes
     );
   }
 
@@ -273,7 +273,7 @@ final readonly class Address implements Order<Address>, ToString {
   #[AlwaysInline]
   #[MustUse]
   public function isDocumentation(): bool {
-    if ($this->family == Family::V4) {
+    if (Family::V4 == $this->family) {
       return (
         Str\starts_with($this->bytes, "\xc0\x00\x02")
         || Str\starts_with($this->bytes, "\xc6\x33\x64")

@@ -27,23 +27,20 @@ final class MemoryWriter implements BufferedWriter, Default {
   /** A writer holding nothing, in network byte order. */
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
+  public static function default(): self {
     return new MemoryWriter();
   }
 
   #[AlwaysInline]
   #[MustUse]
-  public function u8(Uint8 $value): static {
+  public function u8(Uint8 $value): self {
     $this->buffer->appendInteger($value, 1, false);
     return $this;
   }
 
   #[AlwaysInline]
   #[MustUse]
-  public function u16(
-    Uint16 $value,
-    null|Endianness $endianness = null,
-  ): static {
+  public function u16(Uint16 $value, null|Endianness $endianness = null): self {
     $this->buffer->appendInteger(
       $value,
       2,
@@ -55,10 +52,7 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function u32(
-    Uint32 $value,
-    null|Endianness $endianness = null,
-  ): static {
+  public function u32(Uint32 $value, null|Endianness $endianness = null): self {
     $this->buffer->appendInteger(
       $value,
       4,
@@ -73,7 +67,7 @@ final class MemoryWriter implements BufferedWriter, Default {
   public function u64(
     NonNegativeInt $value,
     null|Endianness $endianness = null,
-  ): static {
+  ): self {
     $this->buffer->appendInteger(
       $value,
       8,
@@ -85,17 +79,14 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function i8(Int8 $value): static {
+  public function i8(Int8 $value): self {
     $this->buffer->appendInteger($value, 1, false);
     return $this;
   }
 
   #[AlwaysInline]
   #[MustUse]
-  public function i16(
-    Int16 $value,
-    null|Endianness $endianness = null,
-  ): static {
+  public function i16(Int16 $value, null|Endianness $endianness = null): self {
     $this->buffer->appendInteger(
       $value,
       2,
@@ -107,10 +98,7 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function i32(
-    Int32 $value,
-    null|Endianness $endianness = null,
-  ): static {
+  public function i32(Int32 $value, null|Endianness $endianness = null): self {
     $this->buffer->appendInteger(
       $value,
       4,
@@ -122,7 +110,7 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function i64(int $value, null|Endianness $endianness = null): static {
+  public function i64(int $value, null|Endianness $endianness = null): self {
     $this->buffer->appendInteger(
       $value,
       8,
@@ -134,10 +122,7 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function f32(
-    float $value,
-    null|Endianness $endianness = null,
-  ): static {
+  public function f32(float $value, null|Endianness $endianness = null): self {
     $this->buffer->appendFloat(
       $value,
       4,
@@ -149,10 +134,7 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function f64(
-    float $value,
-    null|Endianness $endianness = null,
-  ): static {
+  public function f64(float $value, null|Endianness $endianness = null): self {
     $this->buffer->appendFloat(
       $value,
       8,
@@ -164,7 +146,7 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function bytes(string $value): static {
+  public function bytes(string $value): self {
     $this->buffer->append($value);
     return $this;
   }

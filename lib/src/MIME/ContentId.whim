@@ -29,7 +29,7 @@ final readonly class ContentId implements ToString {
       $input = Str\slice($input, 1, length!($input) - 2);
     }
 
-    if ($input == '') {
+    if ('' == $input) {
       return null;
     }
 
@@ -42,7 +42,7 @@ final readonly class ContentId implements ToString {
   #[TrackCaller]
   public static function from(string $input): ContentId {
     $id = ContentId::parse($input);
-    if ($id == null) {
+    if (null == $id) {
       throw new InvalidArgumentException('invalid MIME Content-ID');
     }
 

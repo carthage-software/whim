@@ -33,7 +33,7 @@ final class Router implements
     Method $method,
     NonEmptyString $pattern,
     Handler $handler,
-  ): static {
+  ): self {
     if (!http_valid_token($method)) {
       throw new InvalidArgumentException(
         'invalid HTTP method: `' . $method . '`',
@@ -67,11 +67,11 @@ final class Router implements
     $path = request_path($request);
     $resolver = $this->getResolver();
     $resolution = $resolver->resolve($request->method, $path);
-    if ($resolution == null && $request->method == Message\METHOD_HEAD) {
+    if (null == $resolution && Message\METHOD_HEAD == $request->method) {
       $resolution = $resolver->resolve(Message\METHOD_GET, $path);
     }
 
-    if ($resolution == null) {
+    if (null == $resolution) {
       $allowedMethods = $resolver->allowedMethods($path);
       if (length!($allowedMethods) == 0) {
         throw new NotFoundException();
@@ -105,7 +105,7 @@ final class Router implements
   #[MustUse]
   private function getResolver(): Resolver {
     $resolver = $this->resolver;
-    if ($resolver == null) {
+    if (null == $resolver) {
       $resolver = Resolver::fromRoutes($this->routes);
       $this->resolver = $resolver;
     }

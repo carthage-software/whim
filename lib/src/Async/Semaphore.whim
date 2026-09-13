@@ -34,7 +34,7 @@ final class Semaphore<in Tin, out Tout> {
     Tin $input,
     null|CancellationToken $cancellation = null,
   ): Tout {
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $cancellation->throwIfCancellationRequested();
     }
 
@@ -45,7 +45,7 @@ final class Semaphore<in Tin, out Tout> {
 
       $this->pending->pushBack($waiter);
       $id = null;
-      if ($cancellation != null) {
+      if (null != $cancellation) {
         $id = $cancellation->register(fn(): void {
           if (!$waiter->active) {
             return;
@@ -65,7 +65,7 @@ final class Semaphore<in Tin, out Tout> {
         $inherited = true;
       } finally {
         $waiter->active = false;
-        if ($cancellation != null && $id != null) {
+        if (null != $cancellation && null != $id) {
           $cancellation->unregister($id);
         }
       }
@@ -106,7 +106,7 @@ final class Semaphore<in Tin, out Tout> {
       return;
     }
 
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $cancellation->throwIfCancellationRequested();
     }
 
@@ -115,7 +115,7 @@ final class Semaphore<in Tin, out Tout> {
 
     $this->waits->pushBack($waiter);
     $id = null;
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $id = $cancellation->register(fn(): void {
         if (!$waiter->active) {
           return;
@@ -134,7 +134,7 @@ final class Semaphore<in Tin, out Tout> {
       $suspension->suspend();
     } finally {
       $waiter->active = false;
-      if ($cancellation != null && $id != null) {
+      if (null != $cancellation && null != $id) {
         $cancellation->unregister($id);
       }
     }
@@ -168,7 +168,7 @@ final class Semaphore<in Tin, out Tout> {
   /** Reports whether an operation is currently running. */
   #[AlwaysInline]
   public function hasOngoingOperations(): bool {
-    return $this->ongoing != 0;
+    return 0 != $this->ongoing;
   }
 
   /** Reports whether an operation is waiting for a slot. */

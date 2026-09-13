@@ -50,32 +50,32 @@ final class DefaultClient implements Client {
     SendConfiguration $configuration = new SendConfiguration(),
     null|CancellationToken $cancellation = null,
   ): Transaction {
-    if ($request->body == null && $request->trailers != null) {
+    if (null == $request->body && null != $request->trailers) {
       throw new RequestException('request trailers require a message body');
     }
 
-    if ($request->method == Message\METHOD_CONNECT) {
+    if (Message\METHOD_CONNECT == $request->method) {
       throw new RequestException(
         '`CONNECT` requires a full-duplex tunnel transport',
       );
     }
 
-    if ($request->method == Message\METHOD_TRACE && $request->body != null) {
+    if (Message\METHOD_TRACE == $request->method && null != $request->body) {
       throw new RequestException('`TRACE` requests must not include a body');
     }
 
     $effective = $this->configuration->withOverrides($configuration);
     $url = $request->url;
-    if ($url == null && $effective->baseURL != null) {
+    if (null == $url && null != $effective->baseURL) {
       $reference = URI::parse($request->requestTarget);
-      if ($reference != null) {
+      if (null != $reference) {
         $url = URL::parseURI(
           Whim\URI\resolve($effective->baseURL->toURI(), $reference),
         );
       }
     }
 
-    if ($url == null) {
+    if (null == $url) {
       throw new RequestException(
         'the request needs an absolute URL or a configured base URL',
       );
@@ -84,12 +84,12 @@ final class DefaultClient implements Client {
     $request = $request->withURL($url);
     $versions = _Private\resolve_protocol_versions($request, $effective);
     $connectionCancellation = $cancellation;
-    if ($configuration->connectionTimeout != null) {
+    if (null != $configuration->connectionTimeout) {
       $timeout = new TimeoutCancellationToken(
         $configuration->connectionTimeout,
       );
 
-      if ($cancellation == null) {
+      if (null == $cancellation) {
         $connectionCancellation = $timeout;
       } else {
         $connectionCancellation = new LinkedCancellationToken(vec[
@@ -117,7 +117,7 @@ final class DefaultClient implements Client {
       );
     }
 
-    if ($configuration->onConnection != null) {
+    if (null != $configuration->onConnection) {
       ($configuration->onConnection)($connection->getMetadata());
     }
 
@@ -128,7 +128,7 @@ final class DefaultClient implements Client {
       $cancellation,
     );
 
-    if ($configuration->onInformationalResponse != null) {
+    if (null != $configuration->onInformationalResponse) {
       foreach ($transaction->informational as $response) {
         ($configuration->onInformationalResponse)($response);
       }

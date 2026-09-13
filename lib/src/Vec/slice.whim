@@ -56,11 +56,11 @@ function slice<T>(
   $result = vec[];
   $index = 0;
   foreach ($values as $value) {
-    if ($index >= $start && ($length == null || length!($result) < $length)) {
+    if ($index >= $start && ($length is null || length!($result) < $length)) {
       $result[] = $value;
     }
 
-    if ($length != null && length!($result) == $length) {
+    if (null != $length && length!($result) == $length) {
       break;
     }
 

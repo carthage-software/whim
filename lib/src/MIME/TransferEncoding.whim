@@ -23,14 +23,14 @@ enum TransferEncoding: string {
     $index = 0;
     while ($index < length!($content)) {
       $byte = Str\ord($content[$index]);
-      if ($byte == 10) {
+      if (10 == $byte) {
         $longLine = $longLine || $line > 998;
         $line = 0;
-      } else if ($byte != 13) {
+      } else if (13 != $byte) {
         $line++;
         if ($byte > 127) {
           $high++;
-        } else if ($byte < 32 && $byte != 9) {
+        } else if ($byte < 32 && 9 != $byte) {
           $control++;
         }
       }
@@ -43,7 +43,7 @@ enum TransferEncoding: string {
       return TransferEncoding::Base64;
     }
 
-    if ($high == 0 && !$longLine) {
+    if (0 == $high && !$longLine) {
       return TransferEncoding::SevenBit;
     }
 

@@ -17,7 +17,7 @@ function parse_reply(
   $code = null;
   while (true) {
     $wireLine = $reader->readUntilBounded("\n", 512, $cancellation);
-    if ($wireLine == null || !Str\ends_with($wireLine, "\r\n")) {
+    if (null == $wireLine || !Str\ends_with($wireLine, "\r\n")) {
       throw new ProtocolException('the SMTP server sent a malformed reply');
     }
 
@@ -35,7 +35,7 @@ function parse_reply(
       );
     }
 
-    if ($code == null) {
+    if (null == $code) {
       $code = $lineCode;
     } else if ($lineCode != $code) {
       throw new ProtocolException(
@@ -58,17 +58,16 @@ function parse_reply(
       }
     }
 
-    if ($message != '') {
+    if ('' != $message) {
       $message .= "\n";
     }
 
     $message .= $text;
-    if ($separator != '-') {
+    if ('-' != $separator) {
       break;
     }
   }
 
-  $enhanced = null;
   $space = Str\search($message, ' ');
   $candidate = match ($space) {
     null => $message,
@@ -76,7 +75,7 @@ function parse_reply(
   };
 
   $enhanced = EnhancedStatusCode::parse($candidate);
-  if ($enhanced != null) {
+  if (null != $enhanced) {
     $message = match ($space) {
       null => '',
       _ => Str\slice($message, $space + 1),

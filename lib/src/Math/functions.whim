@@ -46,7 +46,7 @@ function log_base(float $number, float $base): float {
     throw new InvalidArgumentException('$number must be positive');
   }
 
-  if ($base <= 0.0 || $base == 1.0) {
+  if ($base <= 0.0 || 1.0 == $base) {
     throw new InvalidArgumentException('$base must be positive and not 1');
   }
 
@@ -65,11 +65,11 @@ function log(float $number, null|float $base = null): float {
     throw new InvalidArgumentException('$number must be positive');
   }
 
-  if ($base == null) {
+  if (null == $base) {
     return _Private\math_ln($number);
   }
 
-  if ($base <= 0.0 || $base == 1.0) {
+  if ($base <= 0.0 || 1.0 == $base) {
     throw new InvalidArgumentException('$base must be positive and not 1');
   }
 

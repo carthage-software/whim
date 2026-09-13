@@ -52,7 +52,7 @@ final class ListenerImpl implements Whim\TCP\Listener {
         Whim\Network\_Private\failure($error);
       }
 
-      if ($accepted == null) {
+      if (null == $accepted) {
         Whim\Network\_Private\wait_readable(
           $this->getFileDescriptor(),
           $cancellation,

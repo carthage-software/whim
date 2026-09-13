@@ -57,7 +57,7 @@ function disposition(Stream $stream): (int, null|FileDescriptor) {
 #[TrackCaller]
 #[TraceBoundary]
 function environment(Definition $command): null|dict<string, string> {
-  if ($command->inheritsEnvironment && $command->environment == dict[]) {
+  if ($command->inheritsEnvironment && dict[] == $command->environment) {
     return null;
   }
 
@@ -108,17 +108,17 @@ function start(Definition $command): Child {
   }
 
   $inputHandle = null;
-  if ($input != null) {
+  if (null != $input) {
     $inputHandle = new WriteHandleImpl($input);
   }
 
   $outputHandle = null;
-  if ($output != null) {
+  if (null != $output) {
     $outputHandle = new ReadHandleImpl($output);
   }
 
   $errorHandle = null;
-  if ($error != null) {
+  if (null != $error) {
     $errorHandle = new ReadHandleImpl($error);
   }
 
@@ -143,7 +143,7 @@ function start(Definition $command): Child {
 #[TraceBoundary]
 function exit_status(int $status): ExitStatus {
   $signal = $status & 127;
-  if ($signal == 0) {
+  if (0 == $signal) {
     return new Exited(($status >> 8) & 255);
   }
 
@@ -209,7 +209,7 @@ final class ChildImpl implements Child {
   #[AlwaysInline]
   #[MustUse]
   public function isRunning(): bool {
-    return $this->status == null;
+    return null == $this->status;
   }
 
   #[MustUse]
@@ -218,7 +218,7 @@ final class ChildImpl implements Child {
   #[TraceBoundary]
   public function getStandardInput(): WriteHandle&FileDescriptorHandle {
     $handle = $this->input;
-    if ($handle == null) {
+    if (null == $handle) {
       throw new StreamUnavailableException(
         'the command did not pipe the child\'s standard input',
       );
@@ -233,7 +233,7 @@ final class ChildImpl implements Child {
   #[TraceBoundary]
   public function getStandardOutput(): ReadHandle&FileDescriptorHandle {
     $handle = $this->output;
-    if ($handle == null) {
+    if (null == $handle) {
       throw new StreamUnavailableException(
         'the command did not pipe the child\'s standard output',
       );
@@ -248,7 +248,7 @@ final class ChildImpl implements Child {
   #[TraceBoundary]
   public function getStandardError(): ReadHandle&FileDescriptorHandle {
     $handle = $this->error;
-    if ($handle == null) {
+    if (null == $handle) {
       throw new StreamUnavailableException(
         'the command did not pipe the child\'s standard error',
       );
@@ -261,7 +261,7 @@ final class ChildImpl implements Child {
   #[TrackCaller]
   #[TraceBoundary]
   public function signal(Signal $signal): void {
-    if ($this->status != null) {
+    if (null != $this->status) {
       return;
     }
 
@@ -280,7 +280,7 @@ final class ChildImpl implements Child {
     null|CancellationToken $cancellation = null,
   ): ExitStatus {
     $settled = $this->status;
-    if ($settled != null) {
+    if (null != $settled) {
       return $settled;
     }
 
@@ -322,13 +322,13 @@ final class ChildImpl implements Child {
     $error = $this->error;
 
     $readers = dict[];
-    if ($output != null) {
+    if (null != $output) {
       $readers['output'] = fn(): string {
         return $output->readAll(null, $cancellation);
       };
     }
 
-    if ($error != null) {
+    if (null != $error) {
       $readers['error'] = fn(): string {
         return $error->readAll(null, $cancellation);
       };
@@ -356,7 +356,7 @@ final class ChildImpl implements Child {
   #[TraceBoundary]
   public function terminate(null|Duration $grace = null): ExitStatus {
     $settled = $this->status;
-    if ($settled != null) {
+    if (null != $settled) {
       return $settled;
     }
 
@@ -365,7 +365,7 @@ final class ChildImpl implements Child {
     // Without a grace the caller asked to terminate, not to kill, so this
     // waits as long as the child takes. A grace is what turns the request
     // into an escalation.
-    if ($grace == null) {
+    if (null == $grace) {
       return $this->waiting->await();
     }
 
@@ -386,7 +386,7 @@ final class ChildImpl implements Child {
   #[TraceBoundary]
   public function kill(): ExitStatus {
     $settled = $this->status;
-    if ($settled != null) {
+    if (null != $settled) {
       return $settled;
     }
 

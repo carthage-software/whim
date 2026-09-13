@@ -40,7 +40,7 @@ function decode_u16(
       0,
       2,
       false,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     )
       as int
   );
@@ -59,7 +59,7 @@ function decode_i16(
       0,
       2,
       true,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     )
       as int
   );
@@ -78,7 +78,7 @@ function decode_u32(
       0,
       4,
       false,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     )
       as int
   );
@@ -97,7 +97,7 @@ function decode_i32(
       0,
       4,
       true,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     )
       as int
   );
@@ -120,10 +120,10 @@ function decode_u64(
     0,
     8,
     false,
-    $endianness == Endianness::Little,
+    Endianness::Little == $endianness,
   );
 
-  if ($value == null) {
+  if (null == $value) {
     throw new OverflowException(
       'the value does not fit in a signed 64-bit integer',
     );
@@ -145,7 +145,7 @@ function decode_i64(
       0,
       8,
       true,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     )
       as int
   );
@@ -163,7 +163,7 @@ function decode_f32(
     0,
     4,
     false,
-    $endianness == Endianness::Little,
+    Endianness::Little == $endianness,
   )
     as int;
 
@@ -182,7 +182,7 @@ function decode_f64(
     0,
     8,
     true,
-    $endianness == Endianness::Little,
+    Endianness::Little == $endianness,
   )
     as int;
 

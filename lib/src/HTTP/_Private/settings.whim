@@ -26,8 +26,8 @@ function validate_setting(
 ): void {
   if ($id == Setting::EnablePush->value) {
     if (
-      ($local && $receiver == Role::Server)
-      || (!$local && $receiver == Role::Client)
+      ($local && Role::Server == $receiver)
+      || (!$local && Role::Client == $receiver)
     ) {
       throw new ProtocolException(
         'a server must not send SETTINGS_ENABLE_PUSH',

@@ -85,13 +85,13 @@ final class JoinedReadWriteHandle implements
       try {
         $this->writer->close();
       } catch (Throwable $throwable) {
-        if ($failure == null) {
+        if (null == $failure) {
           $failure = $throwable;
         }
       }
     }
 
-    if ($failure != null) {
+    if (null != $failure) {
       throw $failure;
     }
   }

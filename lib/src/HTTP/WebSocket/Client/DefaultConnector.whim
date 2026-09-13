@@ -41,11 +41,11 @@ final readonly class DefaultConnector implements Connector {
     Configuration $configuration = new Configuration(),
     null|CancellationToken $cancellation = null,
   ): Connection {
-    if ($url->fragment != null) {
+    if (null != $url->fragment) {
       throw new HandshakeException('a WebSocket URL cannot contain a fragment');
     }
 
-    if ($url->authority->userInfo != null) {
+    if (null != $url->authority->userInfo) {
       throw new HandshakeException(
         'a WebSocket URL cannot contain user information',
       );
@@ -53,7 +53,7 @@ final readonly class DefaultConnector implements Connector {
 
     ($host, $serverName) = $this->networkHost($url);
     $port = $url->authority->port;
-    if ($port == null) {
+    if (null == $port) {
       $port = match ($url->scheme) {
         'ws' => 80,
         'wss' => 443,
@@ -68,7 +68,7 @@ final readonly class DefaultConnector implements Connector {
     }
 
     $stream = $this->tcp->connect($host, $port, $cancellation);
-    if ($url->scheme == 'ws') {
+    if ('ws' == $url->scheme) {
       return $this->upgrade($stream, null, $url, $configuration, $cancellation);
     }
 
@@ -127,14 +127,14 @@ final readonly class DefaultConnector implements Connector {
         );
       }
 
-      if ($block == null) {
+      if (null == $block) {
         throw new HandshakeException(
           'the peer closed before completing the WebSocket handshake',
         );
       }
 
       $parsed = http1_parse_response_head($block);
-      if ($parsed == null) {
+      if (null == $parsed) {
         throw new HandshakeException(
           'the WebSocket response head is malformed',
         );
@@ -175,7 +175,7 @@ final readonly class DefaultConnector implements Connector {
     string $expectedAccept,
     vec<string> $offeredSubprotocols,
   ): null|string {
-    if ($version != 11 || $status != 101) {
+    if (11 != $version || 101 != $status) {
       throw new HandshakeException(
         'the server did not switch to the WebSocket protocol',
         $status as null|(100..=599),
@@ -265,14 +265,14 @@ final readonly class DefaultConnector implements Connector {
     $fields[] = ('Sec-WebSocket-Key', $key);
     $fields[] = ('Sec-WebSocket-Version', '13');
 
-    if ($configuration->subprotocols != vec[]) {
+    if (vec[] != $configuration->subprotocols) {
       $fields[] = (
         'Sec-WebSocket-Protocol',
         Str\join(', ', $configuration->subprotocols),
       );
     }
 
-    if ($configuration->origin != null) {
+    if (null != $configuration->origin) {
       $fields[] = ('Origin', $configuration->origin);
     }
 
@@ -282,7 +282,7 @@ final readonly class DefaultConnector implements Connector {
   #[MustUse]
   private function hostField(URL $url): string {
     $host = $url->authority->host->toString();
-    if ($url->authority->port != null) {
+    if (null != $url->authority->port) {
       return $host . ':' . $url->authority->port;
     }
 
@@ -296,7 +296,7 @@ final readonly class DefaultConnector implements Connector {
       _ => $url->path,
     };
 
-    if ($url->query != null) {
+    if (null != $url->query) {
       $target .= '?' . $url->query;
     }
 

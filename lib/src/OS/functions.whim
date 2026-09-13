@@ -88,7 +88,7 @@ function find_user(
     _Private\failure($error, 'look up an operating-system user');
   }
 
-  if ($record == null) {
+  if (null == $record) {
     return null;
   }
 
@@ -111,7 +111,7 @@ function find_group(
     _Private\failure($error, 'look up an operating-system group');
   }
 
-  if ($record == null) {
+  if (null == $record) {
     return null;
   }
 

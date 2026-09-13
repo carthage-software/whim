@@ -29,7 +29,7 @@ function uppercase(string $string): string {
 #[MustUse]
 #[TrackCaller]
 function capitalize(string $string): string {
-  if ($string == '') {
+  if ('' == $string) {
     return '';
   }
 
@@ -57,11 +57,11 @@ function reverse(string $string): string {
 #[MustUse]
 #[TrackCaller]
 function repeat(string $string, NonNegativeInt $times): string {
-  if ($times == 0 || $string == '') {
+  if (0 == $times || '' == $string) {
     return '';
   }
 
-  if ($times == 1) {
+  if (1 == $times) {
     return $string;
   }
 
@@ -116,20 +116,20 @@ function replace_every(
   while ($offset < $length) {
     $best = null;
     foreach ($replacements as $needle => $replacement) {
-      if ($needle == '') {
+      if ('' == $needle) {
         continue;
       }
 
       $position = Whim\_Private\memmem($haystack, $needle, $offset, false);
-      if ($position != null) {
+      if (null != $position) {
         $candidate = $position;
-        if ($best == null || $candidate < $best[0]) {
+        if (null == $best || $candidate < $best[0]) {
           $best = ($candidate, $needle, $replacement);
         }
       }
     }
 
-    if ($best == null) {
+    if (null == $best) {
       return $result . slice($haystack, $offset);
     }
 
@@ -155,20 +155,20 @@ function replace_every_ci(
   while ($offset < $length) {
     $best = null;
     foreach ($replacements as $needle => $replacement) {
-      if ($needle == '') {
+      if ('' == $needle) {
         continue;
       }
 
       $position = search_ci($haystack, $needle, $offset);
-      if ($position != null) {
+      if (null != $position) {
         $candidate = $position;
-        if ($best == null || $candidate < $best[0]) {
+        if (null == $best || $candidate < $best[0]) {
           $best = ($candidate, $needle, $replacement);
         }
       }
     }
 
-    if ($best == null) {
+    if (null == $best) {
       return $result . slice($haystack, $offset);
     }
 
@@ -294,7 +294,7 @@ function words(
       }
 
       if (
-        ($byte == 39 || $byte == 45)
+        (39 == $byte || 45 == $byte)
         && $index + 1 < length!($string)
         && _Private\word_byte(ord($string[$index + 1]), $additionalCharacters)
       ) {
@@ -324,14 +324,14 @@ function wrap(
   $lineLength = 0;
   $index = 0;
   while ($index < length!($string)) {
-    if ($string[$index] == "\n") {
+    if ("\n" == $string[$index]) {
       $result .= "\n";
       $lineLength = 0;
       $index++;
       continue;
     }
 
-    if ($lineLength == 0 && $string[$index] == ' ') {
+    if (0 == $lineLength && ' ' == $string[$index]) {
       $index++;
       continue;
     }
@@ -339,8 +339,8 @@ function wrap(
     $wordEnd = $index;
     while (
       $wordEnd < length!($string)
-      && $string[$wordEnd] != ' '
-      && $string[$wordEnd] != "\n"
+      && ' ' != $string[$wordEnd]
+      && "\n" != $string[$wordEnd]
     ) {
       $wordEnd++;
     }
@@ -364,7 +364,7 @@ function wrap(
     $result .= $word;
     $lineLength += length!($word);
     $index = $wordEnd;
-    if ($index < length!($string) && $string[$index] == ' ') {
+    if ($index < length!($string) && ' ' == $string[$index]) {
       if ($lineLength + 1 > $width) {
         $result .= $break;
         $lineLength = 0;

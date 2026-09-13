@@ -18,7 +18,7 @@ use Whim;
 #[TrackCaller]
 function case_fold(string $value): string {
   $folded = Whim\_Private\unicode_case_fold($value);
-  if ($folded == null) {
+  if (null == $folded) {
     throw new EncodingException('the value is not valid UTF-8');
   }
 

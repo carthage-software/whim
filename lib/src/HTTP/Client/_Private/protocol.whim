@@ -44,7 +44,7 @@ function resolve_protocol_versions(
   }
 
   $requested = $request->protocolVersion;
-  if ($requested == ProtocolVersion::V11) {
+  if (ProtocolVersion::V11 == $requested) {
     return $versions;
   }
 
@@ -74,14 +74,14 @@ function preferred_h1_protocol(
 function alpn_protocols(vec<ProtocolVersion> $versions): vec<string> {
   $protocols = vec[];
   foreach ($versions as $version) {
-    if ($version == ProtocolVersion::V10) {
+    if (ProtocolVersion::V10 == $version) {
       break;
     }
 
-    if ($version == ProtocolVersion::V2 && !contains!($protocols, 'h2')) {
+    if (ProtocolVersion::V2 == $version && !contains!($protocols, 'h2')) {
       $protocols[] = 'h2';
     } else if (
-      $version == ProtocolVersion::V11
+      ProtocolVersion::V11 == $version
       && !contains!($protocols, 'http/1.1')
     ) {
       $protocols[] = 'http/1.1';
@@ -123,7 +123,7 @@ function connect_secure<TEndpoint: Endpoint>(
   )->connect($stream, $serverName, $cancellation);
 
   $state = $stream->getConnectionState();
-  if ($state->alpnProtocol == 'h2') {
+  if ('h2' == $state->alpnProtocol) {
     return new H2Connection(
       $stream,
       new ConnectionMetadata(
@@ -139,7 +139,7 @@ function connect_secure<TEndpoint: Endpoint>(
   }
 
   if (
-    $state->alpnProtocol == 'http/1.1'
+    'http/1.1' == $state->alpnProtocol
     && contains!($versions, ProtocolVersion::V11)
   ) {
     return new H1Connection(
@@ -156,7 +156,7 @@ function connect_secure<TEndpoint: Endpoint>(
   }
 
   $h1 = preferred_h1_protocol($versions);
-  if ($state->alpnProtocol == null && $h1 != null) {
+  if (null == $state->alpnProtocol && null != $h1) {
     return new H1Connection(
       $stream,
       new ConnectionMetadata(

@@ -41,7 +41,7 @@ function reproduce<T>(
 #[NeverInline]
 #[TrackCaller]
 function range(int $start, int $end, null|int $step = null): vec<int> {
-  if ($step != null && $step == 0) {
+  if (null != $step && $step is 0) {
     throw new LogicException('$step must not be zero');
   }
 
@@ -50,7 +50,7 @@ function range(int $start, int $end, null|int $step = null): vec<int> {
   }
 
   $ascending = $start < $end;
-  if ($step == null) {
+  if ($step is null) {
     if ($ascending) {
       $step = 1;
     } else {

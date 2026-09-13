@@ -12,12 +12,12 @@ final class TakeIterator<K, V> implements Iterator<K, V> {
 
   /** Returns the next entry while the limit has not been reached. */
   public function next(): null|(K, V) {
-    if ($this->remaining == 0) {
+    if (0 == $this->remaining) {
       return null;
     }
 
     $entry = $this->iterator->next();
-    if ($entry == null) {
+    if (null == $entry) {
       $this->remaining = 0;
       return null;
     }

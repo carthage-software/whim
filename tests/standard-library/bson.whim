@@ -216,9 +216,9 @@ final readonly class BsonPoint implements ToBson, FromBson {
     return dict['x' => $this->x, 'y' => $this->y];
   }
 
-  public static function fromBson(Document $document): static {
+  public static function fromBson(Document $document): self {
     return match ($document) {
-      dict['x' => $x @ int, 'y' => $y @ int] => new static($x, $y),
+      dict['x' => $x @ int, 'y' => $y @ int] => new self($x, $y),
       $_ => throw new DecodingException('a point needs x and y fields'),
     };
   }

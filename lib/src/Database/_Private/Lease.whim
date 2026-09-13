@@ -52,7 +52,7 @@ final class Lease {
 
     $this->reusable = $this->reusable && $reusable;
     $this->references--;
-    if ($this->references != 0) {
+    if (0 != $this->references) {
       return;
     }
 

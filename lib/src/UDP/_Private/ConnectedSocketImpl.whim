@@ -39,7 +39,7 @@ final class ConnectedSocketImpl extends DatagramSocketImpl implements
     null|CancellationToken $cancellation = null,
   ): int {
     if (
-      $metadata != null
+      null != $metadata
       && $metadata->sourceAddress->family
       != $this->peerEndpoint->address->family
     ) {
@@ -50,7 +50,7 @@ final class ConnectedSocketImpl extends DatagramSocketImpl implements
 
     while (true) {
       try {
-        if ($metadata == null) {
+        if (null == $metadata) {
           return Whim\_Private\write_descriptor(
             $this->getFileDescriptor(),
             $bytes,

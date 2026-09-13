@@ -20,19 +20,19 @@ final class DotStuffingReadHandle implements ReadHandle {
   public function waitUntilReadable(
     null|CancellationToken $cancellation = null,
   ): void {
-    if ($this->buffer == '' && !$this->sourceEnded) {
+    if ('' == $this->buffer && !$this->sourceEnded) {
       $this->source->waitUntilReadable($cancellation);
     }
   }
 
   #[TrackCaller]
   public function reachedEndOfDataSource(): bool {
-    return $this->terminatorQueued && $this->buffer == '';
+    return $this->terminatorQueued && '' == $this->buffer;
   }
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->buffer == '') {
+    if ('' == $this->buffer) {
       $this->fill(false, null);
     }
 
@@ -44,7 +44,7 @@ final class DotStuffingReadHandle implements ReadHandle {
     null|int $maxBytes = null,
     null|CancellationToken $cancellation = null,
   ): string {
-    if ($this->buffer == '') {
+    if ('' == $this->buffer) {
       $this->fill(true, $cancellation);
     }
 
@@ -66,7 +66,7 @@ final class DotStuffingReadHandle implements ReadHandle {
         false => $this->source->tryRead(8192),
       };
 
-      if ($chunk != '') {
+      if ('' != $chunk) {
         $this->process($chunk);
         return;
       }
@@ -91,24 +91,24 @@ final class DotStuffingReadHandle implements ReadHandle {
     $index = 0;
     while ($index < length!($chunk)) {
       $byte = $chunk[$index];
-      if ($this->atLineStart && $byte == '.') {
+      if ($this->atLineStart && '.' == $byte) {
         $this->buffer .= '.';
       }
 
       $this->buffer .= $byte;
-      $this->atLineStart = $byte == "\n";
+      $this->atLineStart = "\n" == $byte;
       $index++;
     }
   }
 
   #[TrackCaller]
   private function consume(null|int $maxBytes): string {
-    if ($this->buffer == '' || $maxBytes == 0) {
+    if ('' == $this->buffer || 0 == $maxBytes) {
       return '';
     }
 
     $length = length!($this->buffer);
-    if ($maxBytes != null && $maxBytes > 0 && $maxBytes < $length) {
+    if (null != $maxBytes && $maxBytes > 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 

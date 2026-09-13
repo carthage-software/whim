@@ -137,7 +137,7 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
       }
 
       $this->entries[$current] = $entry;
-      if ($index == 0) {
+      if (0 == $index) {
         return;
       }
 
@@ -203,7 +203,7 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
   private function removeRoot(): (T, P) {
     $count = length!($this->entries);
     $root = $this->entries[0];
-    if ($count == 1) {
+    if (1 == $count) {
       $this->entries = vec[];
       return $root;
     }

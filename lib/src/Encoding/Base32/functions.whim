@@ -45,7 +45,7 @@ function decode(
     Alphabet::Hex => Whim\_Private\base32_decode_hex($encoded, $padding),
   };
 
-  if ($decoded == null) {
+  if (null == $decoded) {
     throw new DecodingException(
       'the input is not base32 in the chosen alphabet and padding mode',
     );

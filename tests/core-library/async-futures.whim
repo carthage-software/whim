@@ -32,7 +32,7 @@ final class TrackedFuture implements Future<int> {
     return $this->future->await($cancellation);
   }
 
-  public function ignore(): static {
+  public function ignore(): self {
     $this->ignores++;
     $this->future->ignore();
     return $this;

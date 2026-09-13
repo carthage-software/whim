@@ -59,7 +59,7 @@ final readonly class Headers implements
   /** Creates an empty header collection. */
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
+  public static function default(): self {
     return new Headers(vec[], dict[]);
   }
 

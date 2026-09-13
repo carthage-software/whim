@@ -10,7 +10,7 @@ use Whim\Unwind\UndefinedSymbolError;
 #[TrackCaller]
 function get_kind(string $name): SymbolKind {
   $kind = _Private\get_symbol_kind($name);
-  if ($kind == null) {
+  if (null == $kind) {
     throw new UndefinedSymbolError('the symbol `' . $name . '` is not defined');
   }
 

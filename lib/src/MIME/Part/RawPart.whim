@@ -21,13 +21,13 @@ final readonly class RawPart implements Part {
     private ReadHandle $handle,
   ) {
     $contentType = $headers->get('content-type');
-    if ($contentType == null) {
+    if (null == $contentType) {
       $this->mediaType = MediaType::fromParts('text', 'plain');
       return;
     }
 
     $mediaType = MediaType::parse($contentType);
-    if ($mediaType == null) {
+    if (null == $mediaType) {
       throw new InvalidArgumentException('invalid MIME Content-Type header');
     }
 

@@ -69,7 +69,7 @@ final class State {
   #[TraceBoundary]
   public function seek(int $offset, SeekWhence $whence): int {
     $this->ensureOpen();
-    if ($whence == SeekWhence::Set && $offset < 0) {
+    if (SeekWhence::Set == $whence && $offset < 0) {
       throw new RuntimeException('cannot seek before the start of the file');
     }
 
@@ -97,7 +97,7 @@ final class State {
     null|CancellationToken $cancellation,
   ): void {
     $this->ensureOpen();
-    if ($this->readOperation != null) {
+    if (null != $this->readOperation) {
       await_operation($this->readOperation, $cancellation);
     } else {
       $cancellation?->throwIfCancellationRequested();
@@ -111,7 +111,7 @@ final class State {
     null|CancellationToken $cancellation,
   ): void {
     $this->ensureOpen();
-    if ($this->writeOperation != null) {
+    if (null != $this->writeOperation) {
       await_operation($this->writeOperation, $cancellation);
     } else {
       $cancellation?->throwIfCancellationRequested();
@@ -139,11 +139,11 @@ final class State {
       );
     }
 
-    if ($maximum == 0) {
+    if (0 == $maximum) {
       return '';
     }
 
-    if ($this->readOperation == null) {
+    if (null == $this->readOperation) {
       $this->readOperation = FileOperation::read($this->descriptor, $maximum);
     }
 
@@ -153,13 +153,13 @@ final class State {
       $this->operationFailure($error, 'read from');
     }
 
-    if ($bytes == null) {
+    if (null == $bytes) {
       return '';
     }
 
     $this->readOperation = null;
 
-    if ($bytes == '') {
+    if ('' == $bytes) {
       $this->reachedEnd = true;
     }
 
@@ -171,11 +171,11 @@ final class State {
   #[TraceBoundary]
   public function tryWrite(string $bytes): int {
     $this->ensureOpen();
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return 0;
     }
 
-    if ($this->writeOperation == null) {
+    if (null == $this->writeOperation) {
       $this->writeOperation = FileOperation::write($this->descriptor, $bytes);
     }
 
@@ -185,7 +185,7 @@ final class State {
       $this->operationFailure($error, 'write to');
     }
 
-    if ($written == null) {
+    if (null == $written) {
       return 0;
     }
 
@@ -201,13 +201,13 @@ final class State {
     null|CancellationToken $cancellation,
   ): int {
     $cancellation?->throwIfCancellationRequested();
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return 0;
     }
 
     while (true) {
       $written = $this->tryWrite($bytes);
-      if ($written != 0) {
+      if (0 != $written) {
         return $written;
       }
 

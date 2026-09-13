@@ -45,7 +45,7 @@ abstract class ConnectionImpl {
 
   #[MustUse]
   public function availableSendWindow(ConnectionStreamId $streamId): int {
-    if ($streamId == 0) {
+    if (0 == $streamId) {
       return $this->state->flow->connectionSendWindow();
     }
 

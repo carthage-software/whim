@@ -39,7 +39,7 @@ function duration_between(
 
   if ($laterSeconds < 0 && $earlierSeconds >= 0) {
     if ($nanoseconds > 0) {
-      if ($earlierSeconds == 0) {
+      if (0 == $earlierSeconds) {
         $seconds = $laterSeconds + 1;
       } else {
         $seconds = $laterSeconds - ($earlierSeconds - 1);

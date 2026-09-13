@@ -17,7 +17,7 @@ function decode_headers(State $state, string $bytes): vec<Header> {
 
   $size = 0;
   foreach ($decoded as ($name, $value, $sensitive)) {
-    if ($name == '') {
+    if ('' == $name) {
       throw new ProtocolException(
         'field names must not be empty',
         ErrorCode::CompressionError->value,

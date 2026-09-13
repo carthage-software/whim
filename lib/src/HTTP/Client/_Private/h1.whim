@@ -33,14 +33,14 @@ function read_h1_response_head(
     );
   }
 
-  if ($block == null) {
+  if (null == $block) {
     throw new ProtocolException(
       'the peer closed before completing the response head',
     );
   }
 
   $parsed = http1_parse_response_head($block);
-  if ($parsed == null) {
+  if (null == $parsed) {
     throw new ProtocolException('the response head is malformed');
   }
 
@@ -79,7 +79,7 @@ function validate_response_framing(H1ResponseHead $head): void {
     return;
   }
 
-  if ($head->status != 205) {
+  if (205 != $head->status) {
     return;
   }
 
@@ -90,14 +90,14 @@ function validate_response_framing(H1ResponseHead $head): void {
   }
 
   $length = content_length($head->headers);
-  if ($length != null && $length != 0) {
+  if (null != $length && 0 != $length) {
     throw new ProtocolException('an HTTP/1 205 response must have no content');
   }
 }
 
 /** Parses one unsigned decimal integer. */
 function decimal(string $value): int {
-  if ($value == '') {
+  if ('' == $value) {
     throw new ProtocolException('an HTTP decimal value is empty');
   }
 
@@ -152,7 +152,7 @@ function is_chunked(FieldMap $headers): bool {
   foreach ($headers->getAll('transfer-encoding') as $field) {
     foreach (Str\split($field, ',') as $coding) {
       $coding = Str\lowercase(Str\trim($coding, " \t"));
-      if ($coding != '') {
+      if ('' != $coding) {
         $codings[] = $coding;
       }
     }
@@ -162,7 +162,7 @@ function is_chunked(FieldMap $headers): bool {
     return false;
   }
 
-  if (length!($codings) != 1 || $codings[0] != 'chunked') {
+  if (length!($codings) != 1 || 'chunked' != $codings[0]) {
     throw new ProtocolException('the response transfer coding is unsupported');
   }
 
@@ -204,7 +204,7 @@ function request_content_length(FieldMap $headers): null|int {
 /** Returns a Host field value without credentials. */
 function request_host(Request $request): string {
   $url = $request->url;
-  if ($url == null) {
+  if (null == $url) {
     throw new RequestException('the request URL is missing');
   }
 
@@ -212,8 +212,8 @@ function request_host(Request $request): string {
   $port = $url->authority->port ?? return $host;
 
   $default =
-    ($url->scheme == 'http' && $port == 80)
-    || ($url->scheme == 'https' && $port == 443);
+    ('http' == $url->scheme && 80 == $port)
+    || ('https' == $url->scheme && 443 == $port);
 
   if ($default) {
     return $host;

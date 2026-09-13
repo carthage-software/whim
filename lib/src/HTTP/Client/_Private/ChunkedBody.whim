@@ -47,7 +47,7 @@ final class ChunkedBody implements ReadHandle {
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->completed || $this->chunkRemaining == 0) {
+    if ($this->completed || 0 == $this->chunkRemaining) {
       return '';
     }
 
@@ -65,7 +65,7 @@ final class ChunkedBody implements ReadHandle {
       return '';
     }
 
-    if ($this->chunkRemaining == 0) {
+    if (0 == $this->chunkRemaining) {
       $this->beginChunk($cancellation);
       if ($this->completed) {
         return '';
@@ -73,7 +73,7 @@ final class ChunkedBody implements ReadHandle {
     }
 
     $data = $this->reader->read($this->limit($maxBytes), $cancellation);
-    if ($data == '' && $this->reader->reachedEndOfDataSource()) {
+    if ('' == $data && $this->reader->reachedEndOfDataSource()) {
       $this->transport->close();
       throw new ProtocolException('the response ended inside a chunk');
     }
@@ -93,7 +93,7 @@ final class ChunkedBody implements ReadHandle {
         );
       }
 
-      if ($terminator != "\r\n") {
+      if ("\r\n" != $terminator) {
         throw new ProtocolException('a response chunk has no CRLF terminator');
       }
 
@@ -109,13 +109,13 @@ final class ChunkedBody implements ReadHandle {
       );
     }
 
-    if ($line == null || !Str\ends_with($line, "\r\n")) {
+    if (null == $line || !Str\ends_with($line, "\r\n")) {
       throw new ProtocolException('the response ended before a chunk size');
     }
 
     $line = Str\slice($line, 0, length!($line) - 2);
     $extension = Str\search($line, ';');
-    if ($extension != null) {
+    if (null != $extension) {
       $line = Str\slice($line, 0, $extension);
     }
 
@@ -143,7 +143,7 @@ final class ChunkedBody implements ReadHandle {
       );
     }
 
-    if ($this->chunkRemaining == 0) {
+    if (0 == $this->chunkRemaining) {
       $this->readTrailers($cancellation);
       $this->completed = true;
       if ($this->closeAtEnd) {
@@ -171,7 +171,7 @@ final class ChunkedBody implements ReadHandle {
         );
       }
 
-      if ($line == null || !Str\ends_with($line, "\r\n")) {
+      if (null == $line || !Str\ends_with($line, "\r\n")) {
         throw new ProtocolException('the response ended inside its trailers');
       }
 
@@ -186,7 +186,7 @@ final class ChunkedBody implements ReadHandle {
       }
 
       $separator = Str\search($line, ':');
-      if ($separator == null || $separator == 0) {
+      if (null == $separator || 0 == $separator) {
         throw new ProtocolException(
           'the response contains a malformed trailer',
         );
@@ -209,7 +209,7 @@ final class ChunkedBody implements ReadHandle {
   }
 
   private function limit(null|int $maximum): int {
-    if ($maximum == null || $maximum < 0 || $maximum > $this->chunkRemaining) {
+    if (null == $maximum || $maximum < 0 || $maximum > $this->chunkRemaining) {
       return $this->chunkRemaining;
     }
 

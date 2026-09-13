@@ -69,7 +69,7 @@ function sort<T>(
   null|Comparator<T> $comparator = null,
 ): vec<T> {
   $values = values::<T>($values);
-  if ($comparator == null) {
+  if ($comparator is null) {
     return Whim\_Private\vec_sort($values, null);
   }
 
@@ -93,7 +93,7 @@ function sort_by<T, S>(
     $keys[] = $scalar($value);
   }
 
-  if ($comparator == null) {
+  if ($comparator is null) {
     return Whim\_Private\vec_sort_by($values, $keys, null);
   }
 

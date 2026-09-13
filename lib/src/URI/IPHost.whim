@@ -21,7 +21,7 @@ final readonly class IPHost implements Host {
   #[AlwaysInline]
   #[MustUse]
   public function toString(): string {
-    if ($this->address->family == Family::V4) {
+    if (Family::V4 == $this->address->family) {
       return $this->address->toString();
     }
 

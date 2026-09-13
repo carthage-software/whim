@@ -128,7 +128,7 @@ function compare(
   string $other,
   null|NonNegativeInt $length = null,
 ): Ordering {
-  if ($length != null) {
+  if (null != $length) {
     $string = slice($string, 0, $length);
     $other = slice($other, 0, $length);
   }
@@ -161,11 +161,11 @@ function search(
 ): null|NonNegativeInt {
   $offset = _Private\offset($offset, length!($haystack));
   $needleLength = length!($needle);
-  if ($needleLength == 0) {
+  if (0 == $needleLength) {
     return $offset;
   }
 
-  if ($needleLength == 1) {
+  if (1 == $needleLength) {
     return Whim\_Private\memchr($haystack, ord($needle), $offset);
   }
 
@@ -206,11 +206,11 @@ function search_last(
 ): null|NonNegativeInt {
   $offset = _Private\offset($offset, length!($haystack));
   $needleLength = length!($needle);
-  if ($needleLength == 0) {
+  if (0 == $needleLength) {
     return length!($haystack);
   }
 
-  if ($needleLength == 1) {
+  if (1 == $needleLength) {
     return Whim\_Private\memrchr($haystack, ord($needle), $offset);
   }
 
@@ -245,7 +245,7 @@ function search_last_ci(
 #[MustUse]
 #[TrackCaller]
 function contains(string $haystack, string $needle, int $offset = 0): bool {
-  if ($needle == '') {
+  if ('' == $needle) {
     _Private\offset($offset, length!($haystack));
     return true;
   }
@@ -261,7 +261,7 @@ function contains(string $haystack, string $needle, int $offset = 0): bool {
 #[MustUse]
 #[TrackCaller]
 function contains_ci(string $haystack, string $needle, int $offset = 0): bool {
-  if ($needle == '') {
+  if ('' == $needle) {
     _Private\offset($offset, length!($haystack));
     return true;
   }
@@ -273,14 +273,14 @@ function contains_ci(string $haystack, string $needle, int $offset = 0): bool {
 #[MustUse]
 #[TrackCaller]
 function starts_with(string $string, string $prefix): bool {
-  return $prefix == '' || _Private\equal_at($string, $prefix, 0, false);
+  return '' == $prefix || _Private\equal_at($string, $prefix, 0, false);
 }
 
 /** Reports prefix matching without ASCII case sensitivity. */
 #[MustUse]
 #[TrackCaller]
 function starts_with_ci(string $string, string $prefix): bool {
-  return $prefix == '' || _Private\equal_at($string, $prefix, 0, true);
+  return '' == $prefix || _Private\equal_at($string, $prefix, 0, true);
 }
 
 /** Reports whether a string ends with a suffix. */
@@ -289,7 +289,7 @@ function starts_with_ci(string $string, string $prefix): bool {
 function ends_with(string $string, string $suffix): bool {
   $offset = length!($string) - length!($suffix);
   return (
-    $suffix == ''
+    '' == $suffix
     || ($offset >= 0 && _Private\equal_at($string, $suffix, $offset, false))
   );
 }
@@ -300,7 +300,7 @@ function ends_with(string $string, string $suffix): bool {
 function ends_with_ci(string $string, string $suffix): bool {
   $offset = length!($string) - length!($suffix);
   return (
-    $suffix == ''
+    '' == $suffix
     || ($offset >= 0 && _Private\equal_at($string, $suffix, $offset, true))
   );
 }

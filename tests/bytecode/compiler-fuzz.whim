@@ -137,7 +137,7 @@ function fuzz_program(): string {
   $statements = PseudoRandom\int(1, 8);
   $index = 0;
   while ($index < $statements) {
-    $source = $source . fuzz_statement(2);
+    $source .= fuzz_statement(2);
     $index++;
   }
 

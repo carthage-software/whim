@@ -56,9 +56,9 @@ final readonly class Pattern {
     $length = length!($source);
     while ($offset < $length) {
       $byte = $source[$offset];
-      if ($closing != null && $byte == $closing) {
+      if (null != $closing && $byte == $closing) {
         $nodes = Pattern::appendLiteral($nodes, $literal);
-        if ($nodes == vec[]) {
+        if (vec[] == $nodes) {
           throw new InvalidArgumentException(
             'an optional route-pattern sequence cannot be empty',
           );
@@ -67,7 +67,7 @@ final readonly class Pattern {
         return ($nodes, $offset + 1);
       }
 
-      if ($byte == '{') {
+      if ('{' == $byte) {
         $nodes = Pattern::appendLiteral($nodes, $literal);
         $literal = '';
         ($parameter, $offset) = Pattern::parseParameter($source, $offset + 1);
@@ -75,7 +75,7 @@ final readonly class Pattern {
         continue;
       }
 
-      if ($byte == '[') {
+      if ('[' == $byte) {
         $nodes = Pattern::appendLiteral($nodes, $literal);
         $literal = '';
         ($optional, $offset) = Pattern::parseSequence(
@@ -88,7 +88,7 @@ final readonly class Pattern {
         continue;
       }
 
-      if ($byte == '*') {
+      if ('*' == $byte) {
         if ($offset + 1 != $length) {
           throw new InvalidArgumentException(
             'a route wildcard must terminate the pattern',
@@ -101,16 +101,16 @@ final readonly class Pattern {
       }
 
       if (
-        $byte == '\\'
+        '\\' == $byte
         && $offset + 1 < $length
-        && $source[$offset + 1] == '*'
+        && '*' == $source[$offset + 1]
       ) {
         $literal .= '*';
         $offset += 2;
         continue;
       }
 
-      if ($byte == '}' || $byte == ']') {
+      if ('}' == $byte || ']' == $byte) {
         throw new InvalidArgumentException(
           'the route pattern contains an unmatched `' . $byte . '`',
         );
@@ -120,7 +120,7 @@ final readonly class Pattern {
       $offset++;
     }
 
-    if ($closing != null) {
+    if (null != $closing) {
       throw new InvalidArgumentException(
         'the route pattern is missing its closing `' . $closing . '`',
       );
@@ -148,7 +148,7 @@ final readonly class Pattern {
       $offset++;
     }
 
-    if ($name == '') {
+    if ('' == $name) {
       throw new InvalidArgumentException('a route parameter must have a name');
     }
 
@@ -158,12 +158,12 @@ final readonly class Pattern {
       );
     }
 
-    if ($source[$offset] == '}') {
+    if ('}' == $source[$offset]) {
       return (new ParameterNode($name as NonEmptyString, null), $offset + 1);
     }
 
     ($constraint, $offset) = Pattern::parseConstraint($source, $offset + 1);
-    if ($constraint == '') {
+    if ('' == $constraint) {
       throw new InvalidArgumentException(
         'a route parameter constraint cannot be empty',
       );
@@ -195,21 +195,21 @@ final readonly class Pattern {
         continue;
       }
 
-      if ($byte == '\\') {
+      if ('\\' == $byte) {
         $constraint .= $byte;
         $escaped = true;
         $offset++;
         continue;
       }
 
-      if ($byte == '[' && !$characterClass) {
+      if ('[' == $byte && !$characterClass) {
         $characterClass = true;
-      } else if ($byte == ']' && $characterClass) {
+      } else if (']' == $byte && $characterClass) {
         $characterClass = false;
-      } else if (!$characterClass && $byte == '{') {
+      } else if (!$characterClass && '{' == $byte) {
         $depth++;
-      } else if (!$characterClass && $byte == '}') {
-        if ($depth == 0) {
+      } else if (!$characterClass && '}' == $byte) {
+        if (0 == $depth) {
           return ($constraint, $offset + 1);
         }
 
@@ -230,7 +230,7 @@ final readonly class Pattern {
     vec<Node> $nodes,
     string $literal,
   ): vec<Node> {
-    if ($literal != '') {
+    if ('' != $literal) {
       $nodes[] = new LiteralNode($literal as NonEmptyString);
     }
 

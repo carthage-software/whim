@@ -116,10 +116,10 @@ final class ConnectionImpl implements Connection {
       );
     }
 
-    $readUncommitted = $isolation == TransactionIsolation::ReadUncommitted;
+    $readUncommitted = TransactionIsolation::ReadUncommitted == $isolation;
     if (
-      $isolation != null
-      && $isolation != TransactionIsolation::Serializable
+      null != $isolation
+      && TransactionIsolation::Serializable != $isolation
       && !$readUncommitted
     ) {
       throw new TransactionException(

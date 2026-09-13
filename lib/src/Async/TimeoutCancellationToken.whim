@@ -41,14 +41,14 @@ final class TimeoutCancellationToken implements CancellationToken {
   #[NeverInline]
   #[TrackCaller]
   private function arm(): void {
-    if ($this->watcher != null || $this->cancelled) {
+    if (null != $this->watcher || $this->cancelled) {
       return;
     }
 
     $weak = new Weak::<TimeoutCancellationToken>($this);
     $this->watcher = Whim\_Private\delay_task($this->remaining(), fn(): void {
       $token = $weak->get();
-      if ($token != null) {
+      if (null != $token) {
         $token->cancelAtTimeout();
       }
     });
@@ -57,7 +57,7 @@ final class TimeoutCancellationToken implements CancellationToken {
 
     $subscription = $parent->register(fn(): void {
       $token = $weak->get();
-      if ($token != null) {
+      if (null != $token) {
         $token->cancelFromSource();
       }
     });
@@ -75,14 +75,14 @@ final class TimeoutCancellationToken implements CancellationToken {
   private function disarm(): void {
     $watcher = $this->watcher;
     $this->watcher = null;
-    if ($watcher != null) {
+    if (null != $watcher) {
       Whim\_Private\cancel_task($watcher);
     }
 
     $parent = $this->parent;
     $subscription = $this->parentSubscription;
     $this->parentSubscription = null;
-    if ($parent != null && $subscription != null) {
+    if (null != $parent && null != $subscription) {
       try {
         $parent->unregister($subscription);
       } catch (Throwable $_) {
@@ -134,7 +134,7 @@ final class TimeoutCancellationToken implements CancellationToken {
     }
 
     $parent = $this->parent;
-    if ($parent != null && $parent->isCancellationRequested()) {
+    if (null != $parent && $parent->isCancellationRequested()) {
       $this->cancelFromSource();
       return;
     }
@@ -243,7 +243,7 @@ final class TimeoutCancellationToken implements CancellationToken {
   #[TrackCaller]
   public function throwIfCancellationRequested(): void {
     $this->refresh();
-    if ($this->exception != null) {
+    if (null != $this->exception) {
       throw $this->exception;
     }
   }

@@ -27,7 +27,7 @@ interface Sequence {
   #[NeverInline]
   #[TrackCaller]
   public function nextIn(int $min, int $max): int {
-    if ($min == Math\INT_MIN && $max == Math\INT_MAX) {
+    if (Math\INT_MIN == $min && Math\INT_MAX == $max) {
       return $this->next();
     }
 

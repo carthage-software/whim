@@ -64,7 +64,7 @@ function decode(
     ),
   };
 
-  if ($decoded == null) {
+  if (null == $decoded) {
     throw new DecodingException(
       'the input is not base64 in the chosen alphabet and padding mode',
     );

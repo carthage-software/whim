@@ -17,7 +17,7 @@ use Whim\Marker\TrackCaller;
 #[TrackCaller]
 function encode(string $input): string {
   $encoded = Whim\_Private\punycode_encode($input);
-  if ($encoded == null) {
+  if (null == $encoded) {
     throw new EncodingException('the input cannot be encoded as punycode');
   }
 
@@ -34,7 +34,7 @@ function encode(string $input): string {
 #[TrackCaller]
 function decode(string $input): string {
   $decoded = Whim\_Private\punycode_decode($input);
-  if ($decoded == null) {
+  if (null == $decoded) {
     throw new DecodingException('the input is not valid punycode');
   }
 

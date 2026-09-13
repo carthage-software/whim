@@ -14,7 +14,7 @@ final class FilterIterator<K, V> implements Iterator<K, V> {
   public function next(): null|(K, V) {
     while (true) {
       $entry = $this->iterator->next();
-      if ($entry == null || ($this->predicate)($entry[1])) {
+      if (null == $entry || ($this->predicate)($entry[1])) {
         return $entry;
       }
     }

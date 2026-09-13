@@ -58,11 +58,11 @@ final readonly class PrefixMap {
 
       if (
         $node is ParameterNode
-        && $node->constraint == null
+        && null == $node->constraint
         && length!($remaining) > 0
       ) {
         $next = $remaining[0];
-        if ($next is LiteralNode && $next->text[0] == '/') {
+        if ($next is LiteralNode && '/' == $next->text[0]) {
           $regexEntries[] = (
             $node->expression(),
             $remaining,
@@ -106,7 +106,7 @@ final readonly class PrefixMap {
         );
 
         $result = $this->prefixes[$prefix]->resolve($remaining);
-        if ($result != null) {
+        if (null != $result) {
           return $result;
         }
       }
@@ -116,11 +116,11 @@ final readonly class PrefixMap {
       $match = $branch->regex->find($path) ?? continue;
 
       ($start, $end, $captures) = $match;
-      if ($start != 0) {
+      if (0 != $start) {
         continue;
       }
 
-      if ($branch->handler != null) {
+      if (null != $branch->handler) {
         return (
           $branch->handler,
           decode_parameters($captures, $branch->parameterNames),

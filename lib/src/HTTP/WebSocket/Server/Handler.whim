@@ -33,12 +33,12 @@ final readonly class Handler implements HTTPHandler {
     Request $request,
     CancellationToken $cancellation,
   ): Response {
-    if ($request->method != Message\METHOD_GET) {
+    if (Message\METHOD_GET != $request->method) {
       throw new HTTPException(400, 'a WebSocket handshake requires GET');
     }
 
     if (
-      $request->protocolVersion != ProtocolVersion::V11
+      ProtocolVersion::V11 != $request->protocolVersion
       || !($context is Upgrade)
     ) {
       throw new HTTPException(400, 'a WebSocket handshake requires HTTP/1.1');
@@ -65,7 +65,7 @@ final readonly class Handler implements HTTPHandler {
     }
 
     $accept = websocket_accept_key(Str\trim($keys[0], " \t"));
-    if ($accept == null) {
+    if (null == $accept) {
       throw new HTTPException(400, 'the WebSocket handshake key is invalid');
     }
 
@@ -76,7 +76,7 @@ final readonly class Handler implements HTTPHandler {
       ('Sec-WebSocket-Accept', $accept),
     ];
 
-    if ($subprotocol != null) {
+    if (null != $subprotocol) {
       $headers[] = ('Sec-WebSocket-Protocol', $subprotocol);
     }
 
@@ -116,7 +116,7 @@ final readonly class Handler implements HTTPHandler {
     foreach ($request->headers->getAll('sec-websocket-protocol') as $field) {
       foreach (Str\split($field, ',') as $candidate) {
         $candidate = Str\trim($candidate, " \t");
-        if ($candidate == '' || !http_valid_token($candidate)) {
+        if ('' == $candidate || !http_valid_token($candidate)) {
           throw new HTTPException(
             400,
             'the WebSocket subprotocol list is invalid',

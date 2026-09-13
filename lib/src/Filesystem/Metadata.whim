@@ -27,18 +27,18 @@ final readonly class Metadata {
   /** Whether the node is a regular file. */
   #[AlwaysInline]
   public function isFile(): bool {
-    return $this->kind == NodeKind::File;
+    return NodeKind::File == $this->kind;
   }
 
   /** Whether the node is a directory. */
   #[AlwaysInline]
   public function isDirectory(): bool {
-    return $this->kind == NodeKind::Directory;
+    return NodeKind::Directory == $this->kind;
   }
 
   /** Whether the node is a symbolic link. */
   #[AlwaysInline]
   public function isSymbolicLink(): bool {
-    return $this->kind == NodeKind::SymbolicLink;
+    return NodeKind::SymbolicLink == $this->kind;
   }
 }

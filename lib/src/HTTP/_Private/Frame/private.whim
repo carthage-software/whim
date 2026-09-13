@@ -108,7 +108,7 @@ function parse_settings(
 ): Frame\SettingsFrame {
   require_connection($stream, 'SETTINGS');
   $ack = ($flags & 0x1) != 0;
-  if ($ack && $payload != '') {
+  if ($ack && '' != $payload) {
     frame_size_error('a SETTINGS acknowledgment must have an empty payload');
   }
 
@@ -123,7 +123,7 @@ function parse_settings(
   while ($offset < length!($payload)) {
     $id = Binary\decode_u16(Str\slice($payload, $offset, 2));
     $value = Binary\decode_u32(Str\slice($payload, $offset + 2, 4));
-    if ($id != 0) {
+    if (0 != $id) {
       $settings[$id] = $value;
     }
 
@@ -189,8 +189,8 @@ function parse_window_update(
   }
 
   $increment = Binary\decode_u32($payload) & 0x7fffffff;
-  if ($increment == 0) {
-    if ($stream != 0) {
+  if (0 == $increment) {
+    if (0 != $stream) {
       throw new StreamException(
         'a WINDOW_UPDATE increment must not be zero',
         $stream,
@@ -240,7 +240,7 @@ function encode_headers(Frame\HeadersFrame $frame): (int, int, int, string) {
   }
 
   $payload = $frame[2];
-  if ($frame[5] != null) {
+  if (null != $frame[5]) {
     $flags |= 0x20;
     $dependency = $frame[5];
     if ($frame[7]) {
@@ -280,7 +280,7 @@ function encode_reset(Frame\RstStreamFrame $frame): (int, int, int, string) {
 }
 
 function encode_settings(Frame\SettingsFrame $frame): (int, int, int, string) {
-  if ($frame[2] && $frame[1] != dict[]) {
+  if ($frame[2] && dict[] != $frame[1]) {
     malformed('a SETTINGS acknowledgment cannot carry settings');
   }
 
@@ -362,7 +362,7 @@ function unpad(int $flags, string $payload, int $minimum): (string, int) {
     return ($payload, 0);
   }
 
-  if ($payload == '') {
+  if ('' == $payload) {
     malformed('the padded HTTP/2 frame omits its padding length');
   }
 
@@ -375,7 +375,7 @@ function unpad(int $flags, string $payload, int $minimum): (string, int) {
 }
 
 function padding(int $length): string {
-  if ($length == 0) {
+  if (0 == $length) {
     return '';
   }
 
@@ -383,13 +383,13 @@ function padding(int $length): string {
 }
 
 function require_stream(int $stream, string $type): void {
-  if ($stream == 0) {
+  if (0 == $stream) {
     malformed('`' . $type . '` requires a non-zero stream identifier');
   }
 }
 
 function require_connection(int $stream, string $type): void {
-  if ($stream != 0) {
+  if (0 != $stream) {
     malformed('`' . $type . '` must use stream zero');
   }
 }

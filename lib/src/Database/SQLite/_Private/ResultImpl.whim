@@ -27,14 +27,14 @@ final class ResultImpl implements Result {
   /** Returns column metadata in row order. */
   #[MustUse]
   public function getColumns(): vec<Column> {
-    if ($this->columns != null) {
+    if (null != $this->columns) {
       return $this->columns;
     }
 
     $columns = vec[];
     foreach ($this->result->columns() as $column) {
       $typeName = $column[1];
-      if ($typeName == '') {
+      if ('' == $typeName) {
         $typeName = null;
       }
 

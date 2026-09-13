@@ -97,7 +97,7 @@ function internet_endpoint((string, int) $address): InternetEndpoint {
 #[TraceBoundary]
 function unix_endpoint((string, int) $address): UnixEndpoint {
   $path = null;
-  if ($address[0] != '') {
+  if ('' != $address[0]) {
     $path = $address[0] as NonEmptyString;
   }
 
@@ -158,7 +158,7 @@ function resolve_host_addresses(
   }
 
   $parsed = Address::parse($host);
-  if ($parsed != null) {
+  if (null != $parsed) {
     return vec[$parsed];
   }
 

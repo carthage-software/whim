@@ -103,7 +103,7 @@ enum Signal: int {
   #[AlwaysInline]
   #[MustUse]
   public function isCatchable(): bool {
-    return $this != self::Kill && $this != self::Stop;
+    return self::Kill != $this && self::Stop != $this;
   }
 
   /** Whether the running system names this signal. */

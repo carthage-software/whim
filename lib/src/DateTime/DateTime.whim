@@ -82,7 +82,7 @@ final readonly class DateTime implements Order<DateTime>, ToString {
   #[TrackCaller]
   public static function from(string $value): DateTime {
     $dateTime = DateTime::parse($value);
-    if ($dateTime == null) {
+    if (null == $dateTime) {
       throw new InvalidArgumentException(
         'invalid civil date and time: `' . $value . '`',
       );
@@ -196,7 +196,7 @@ final readonly class DateTime implements Order<DateTime>, ToString {
       $overflow->value,
     );
 
-    if ($parts == null) {
+    if (null == $parts) {
       throw new InvalidArgumentException(
         'date-time arithmetic produced an invalid value',
       );

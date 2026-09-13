@@ -98,12 +98,12 @@ final readonly class Request extends Message {
     null|ReadHandle $body = null,
     null|Future<FieldMap> $trailers = null,
   ): Request {
-    $requestTarget = match ($url->path == '') {
+    $requestTarget = match ('' == $url->path) {
       true => '/',
       false => $url->path,
     };
 
-    if ($url->query != null) {
+    if (null != $url->query) {
       $requestTarget .= '?' . $url->query;
     }
 
@@ -136,16 +136,16 @@ final readonly class Request extends Message {
   #[AlwaysInline]
   #[MustUse]
   public function withURL(null|URL $url): Request {
-    if ($url == null) {
+    if (null == $url) {
       return clone!($this, url: null);
     }
 
-    $requestTarget = match ($url->path == '') {
+    $requestTarget = match ('' == $url->path) {
       true => '/',
       false => $url->path,
     };
 
-    if ($url->query != null) {
+    if (null != $url->query) {
       $requestTarget .= '?' . $url->query;
     }
 

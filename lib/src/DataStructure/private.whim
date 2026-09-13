@@ -8,7 +8,7 @@ use Whim\Option\Some;
 /** Converts an optional slot into an option. */
 #[AlwaysInline]
 function option<T>(null|(T,) $slot): Option<T> {
-  if ($slot == null) {
+  if (null == $slot) {
     return new None();
   }
 

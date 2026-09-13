@@ -5,7 +5,7 @@ use Whim\Str;
 
 /** Parses an unsigned decimal integer. */
 function parse_decimal(string $value): null|int {
-  if ($value == '') {
+  if ('' == $value) {
     return null;
   }
 
@@ -31,7 +31,7 @@ function split_enhanced_status(
   $first = Str\search($value, '.') ?? return null;
 
   $second = Str\search($value, '.', $first + 1);
-  if ($second == null || Str\search($value, '.', $second + 1) != null) {
+  if (null == $second || Str\search($value, '.', $second + 1) != null) {
     return null;
   }
 

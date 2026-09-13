@@ -23,7 +23,7 @@ final readonly class Group implements ToString {
   public static function parse(string $input): null|Group {
     $input = Str\trim($input);
     $colon = Str\search($input, ':');
-    if ($colon == null || $colon == 0 || !Str\ends_with($input, ';')) {
+    if (null == $colon || 0 == $colon || !Str\ends_with($input, ';')) {
       return null;
     }
 
@@ -35,7 +35,7 @@ final readonly class Group implements ToString {
     );
 
     $mailboxes = vec[];
-    if ($body != '') {
+    if ('' != $body) {
       foreach (_Private\split_addresses($body) as $value) {
         $mailbox = Mailbox::parse($value) ?? return null;
 
@@ -52,7 +52,7 @@ final readonly class Group implements ToString {
   #[TrackCaller]
   public static function from(string $input): Group {
     $group = Group::parse($input);
-    if ($group == null) {
+    if (null == $group) {
       throw new InvalidArgumentException(
         'invalid mailbox group: `' . $input . '`',
       );
@@ -66,7 +66,7 @@ final readonly class Group implements ToString {
   #[TrackCaller]
   public function toString(): string {
     $result = _Private\serialize_display($this->displayName) . ':';
-    if ($this->mailboxes != vec[]) {
+    if (vec[] != $this->mailboxes) {
       $values = vec[];
       foreach ($this->mailboxes as $mailbox) {
         $values[] = $mailbox->toString();

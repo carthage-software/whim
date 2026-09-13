@@ -49,9 +49,9 @@ final readonly class Resolver {
       }
 
       $methods[] = $method;
-      if ($method == Message\METHOD_GET) {
+      if (Message\METHOD_GET == $method) {
         $get = true;
-      } else if ($method == Message\METHOD_HEAD) {
+      } else if (Message\METHOD_HEAD == $method) {
         $head = true;
       }
     }

@@ -21,7 +21,7 @@ function send_headers(
 ): void {
   require_open($state);
   $entry = $state->streams->get($streamId);
-  $trailers = $entry != null && $entry->sentInitialHeaders;
+  $trailers = null != $entry && $entry->sentInitialHeaders;
   $receiver = match ($state->role) {
     Role::Client => Role::Server,
     Role::Server => Role::Client,
@@ -39,7 +39,7 @@ function send_headers(
   $requestMethod = null;
   $status = null;
   if (!$trailers) {
-    if ($receiver == Role::Server) {
+    if (Role::Server == $receiver) {
       $requestMethod = HeaderValidator::requestMethod($streamId, $headers);
     } else {
       $status = HeaderValidator::responseStatus($streamId, $headers);
@@ -69,7 +69,7 @@ function send_headers(
     false => $contentLength,
   };
 
-  if (!$trailers && $status != null) {
+  if (!$trailers && null != $status) {
     $method = match ($entry) {
       null => null,
       $stream @ StreamEntry => $stream->requestMethod,
@@ -86,20 +86,20 @@ function send_headers(
   if (
     $endStream
     && !$informational
-    && $expectedLength != null
+    && null != $expectedLength
     && $sentLength != $expectedLength
   ) {
     stream_error($streamId, 'the sent HTTP/2 content length does not match');
   }
 
-  if ($entry == null) {
+  if (null == $entry) {
     if (stream_state($state, $streamId) == StreamState::Closed) {
       send_entry($state, $streamId);
     }
 
     require_connected($state);
     $entry = open_local_stream($state, $streamId);
-  } else if ($entry->state == StreamState::ReservedLocal) {
+  } else if (StreamState::ReservedLocal == $entry->state) {
     $state->streams->activateLocal($entry);
   } else {
     $entry = send_entry($state, $streamId);
@@ -107,7 +107,7 @@ function send_headers(
 
   if (!$trailers && !$informational) {
     $entry->sentInitialHeaders = true;
-    if ($requestMethod != null) {
+    if (null != $requestMethod) {
       $entry->requestMethod = $requestMethod;
     }
 
@@ -155,7 +155,7 @@ function send_response_headers(
   if (
     $endStream
     && !$informational
-    && $expectedLength != null
+    && null != $expectedLength
     && $entry->sentContentLength != $expectedLength
   ) {
     stream_error($streamId, 'the sent HTTP/2 content length does not match');
@@ -235,7 +235,7 @@ function send_data(
 
   $sentLength = $entry->sentContentLength + length!($data);
   if (
-    $entry->expectedSentContentLength != null
+    null != $entry->expectedSentContentLength
     && $sentLength > $entry->expectedSentContentLength
   ) {
     stream_error($streamId, 'the sent HTTP/2 content length was exceeded');
@@ -243,7 +243,7 @@ function send_data(
 
   if (
     $endStream
-    && $entry->expectedSentContentLength != null
+    && null != $entry->expectedSentContentLength
     && $sentLength != $entry->expectedSentContentLength
   ) {
     stream_error($streamId, 'the sent HTTP/2 content length does not match');
@@ -253,7 +253,7 @@ function send_data(
 
   $maximum = $state->settings->remote(Setting::MaxFrameSize);
   $offset = 0;
-  if ($data == '') {
+  if ('' == $data) {
     queue_raw_frame(
       $state,
       0x0,
@@ -295,7 +295,7 @@ function send_reset(
 ): void {
   require_open($state);
   $streamState = stream_state($state, $streamId);
-  if ($streamState == StreamState::Closed) {
+  if (StreamState::Closed == $streamState) {
     stream_error(
       $streamId,
       '`RST_STREAM` cannot target a closed stream',
@@ -304,7 +304,7 @@ function send_reset(
   }
 
   $entry = $state->streams->get($streamId);
-  if ($entry == null || $streamState == StreamState::Idle) {
+  if (null == $entry || StreamState::Idle == $streamState) {
     throw new ProtocolException('`RST_STREAM` cannot target an idle stream');
   }
 
@@ -319,11 +319,11 @@ function send_go_away(
   null|ConnectionStreamId $lastStreamId,
 ): void {
   require_open($state);
-  if ($lastStreamId == null) {
+  if (null == $lastStreamId) {
     $lastStreamId = $state->lastPeerStreamId;
   }
 
-  if ($state->sentGoAway != null && $lastStreamId > $state->sentGoAway) {
+  if (null != $state->sentGoAway && $lastStreamId > $state->sentGoAway) {
     throw new ProtocolException(
       'an HTTP/2 GOAWAY last stream identifier cannot increase',
     );
@@ -343,7 +343,7 @@ function send_push_promise(
 ): void {
   require_open($state);
   require_connected($state);
-  if ($state->role != Role::Server) {
+  if (Role::Server != $state->role) {
     throw new ProtocolException('an HTTP/2 client cannot send PUSH_PROMISE');
   }
 
@@ -388,7 +388,7 @@ function verify_sent_content_length(
   StreamEntry $entry,
 ): void {
   if (
-    $entry->expectedSentContentLength != null
+    null != $entry->expectedSentContentLength
     && $entry->sentContentLength != $entry->expectedSentContentLength
   ) {
     stream_error($streamId, 'the sent HTTP/2 content length does not match');

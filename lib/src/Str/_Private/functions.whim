@@ -92,8 +92,8 @@ function mask_contains(string $mask, int $byte): bool {
     $start = Str\ord($mask[$index]);
     if (
       $index + 3 < $length
-      && $mask[$index + 1] == '.'
-      && $mask[$index + 2] == '.'
+      && '.' == $mask[$index + 1]
+      && '.' == $mask[$index + 2]
     ) {
       $end = Str\ord($mask[$index + 3]);
       if ($start <= $end && $byte >= $start && $byte <= $end) {
@@ -133,5 +133,5 @@ function word_byte(int $byte, null|string $additional): bool {
     return true;
   }
 
-  return $additional != null && mask_contains($additional, $byte);
+  return null != $additional && mask_contains($additional, $byte);
 }

@@ -44,7 +44,7 @@ function wait_readable(
   FileDescriptor $descriptor,
   null|CancellationToken $cancellation,
 ): void {
-  if ($cancellation == null && park_readable($descriptor)) {
+  if (null == $cancellation && park_readable($descriptor)) {
     return;
   }
 
@@ -87,7 +87,7 @@ function wait_writable(
   FileDescriptor $descriptor,
   null|CancellationToken $cancellation,
 ): void {
-  if ($cancellation == null && park_writable($descriptor)) {
+  if (null == $cancellation && park_writable($descriptor)) {
     return;
   }
 

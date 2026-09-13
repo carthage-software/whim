@@ -46,7 +46,7 @@ final readonly class Data implements Part {
       ('Content-Transfer-Encoding', TransferEncoding::Base64->value),
     ];
 
-    if ($contentId != null) {
+    if (null != $contentId) {
       $headers[] = ('Content-ID', $contentId->toString());
     }
 

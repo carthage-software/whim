@@ -53,7 +53,7 @@ final class TruncatedReadHandle implements ReadHandle {
     }
 
     $wanted = $remaining;
-    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $remaining) {
+    if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $remaining) {
       $wanted = $maxBytes;
     }
 

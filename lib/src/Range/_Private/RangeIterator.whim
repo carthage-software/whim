@@ -37,7 +37,7 @@ final class RangeIterator implements Iterator<int, int> {
       throw new OverflowException('integer range overflow');
     }
 
-    if ($this->upper != null) {
+    if (null != $this->upper) {
       if ($this->inclusive && $this->current > $this->upper) {
         return null;
       }
@@ -51,9 +51,9 @@ final class RangeIterator implements Iterator<int, int> {
     $value = $this->current;
     $this->key++;
 
-    if ($value != Math\INT_MAX) {
+    if (Math\INT_MAX != $value) {
       $this->current++;
-    } else if ($this->upper == null) {
+    } else if (null == $this->upper) {
       $this->overflowPending = true;
     } else {
       $this->inclusive = false;

@@ -93,7 +93,7 @@ final class Server {
       DateHeader::unregister();
     }
 
-    if ($this->failure != null) {
+    if (null != $this->failure) {
       throw $this->failure;
     }
   }
@@ -143,7 +143,7 @@ final class Server {
     }
 
     $id = $this->reserveConnection($stream, $peer);
-    if ($id == null) {
+    if (null == $id) {
       $this->closeHandle($stream);
       return;
     }
@@ -183,7 +183,7 @@ final class Server {
     }
 
     $peerLimit = $this->configuration->maximumConnectionsPerPeer;
-    if ($peerLimit != null && $peerCount >= $peerLimit) {
+    if (null != $peerLimit && $peerCount >= $peerLimit) {
       return null;
     }
 
@@ -205,7 +205,7 @@ final class Server {
 
     $peer = $this->connectionPeers[$id];
     $peerCount = $this->connectionsByPeer[$peer];
-    if ($peerCount == 1) {
+    if (1 == $peerCount) {
       remove!($this->connectionsByPeer, $peer);
     } else {
       $this->connectionsByPeer[$peer] = $peerCount - 1;
@@ -219,7 +219,7 @@ final class Server {
   #[TrackCaller]
   #[TraceBoundary]
   private function beginDrain(null|Throwable $failure): void {
-    if ($failure != null && $this->failure == null) {
+    if (null != $failure && null == $this->failure) {
       $this->failure = $failure;
     }
 
@@ -231,7 +231,7 @@ final class Server {
     try {
       $this->acceptCancellation->cancel();
     } catch (Throwable $error) {
-      if ($this->failure == null) {
+      if (null == $this->failure) {
         $this->failure = $error;
       }
     }
@@ -239,7 +239,7 @@ final class Server {
     try {
       $this->drainCancellation->cancel();
     } catch (Throwable $error) {
-      if ($this->failure == null) {
+      if (null == $this->failure) {
         $this->failure = $error;
       }
     }
@@ -259,7 +259,7 @@ final class Server {
       try {
         $this->forceCancellation->cancel();
       } catch (Throwable $error) {
-        if ($this->failure == null) {
+        if (null == $this->failure) {
           $this->failure = $error;
         }
       }
@@ -297,7 +297,7 @@ final class Server {
 
       $handle->close();
     } catch (Throwable $error) {
-      if ($this->failure == null) {
+      if (null == $this->failure) {
         $this->failure = $error;
       }
     }

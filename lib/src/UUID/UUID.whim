@@ -45,7 +45,7 @@ final readonly class UUID implements Equal<UUID>, ToString {
   #[TrackCaller]
   public static function from(string $value): UUID {
     $uuid = UUID::parse($value);
-    if ($uuid == null) {
+    if ($uuid is null) {
       throw new InvalidArgumentException(
         'invalid canonical UUID: `' . $value . '`',
       );

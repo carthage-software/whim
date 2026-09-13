@@ -38,7 +38,7 @@ $published = Str\trim(
   ),
 );
 
-if ($published != '') {
+if ('' != $published) {
   fail('tag ' . $tag . ' is already published');
 }
 

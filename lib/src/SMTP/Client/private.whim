@@ -61,7 +61,7 @@ function encode_xtext(string $value): string {
   $index = 0;
   while ($index < length!($value)) {
     $byte = Str\ord($value[$index]);
-    if ($byte >= 33 && $byte <= 126 && $byte != 43 && $byte != 61) {
+    if ($byte >= 33 && $byte <= 126 && 43 != $byte && 61 != $byte) {
       $encoded .= $value[$index];
     } else {
       $encoded .= '+' . Str\uppercase(Hex\encode($value[$index]));
@@ -89,14 +89,14 @@ function require_capability(
 function delivery_status_notifications(
   vec<DeliveryStatusNotification> $notifications,
 ): null|string {
-  if ($notifications == vec[]) {
+  if (vec[] == $notifications) {
     return null;
   }
 
   $parts = vec[];
   $never = false;
   foreach ($notifications as $notification) {
-    if ($notification == DeliveryStatusNotification::Never) {
+    if (DeliveryStatusNotification::Never == $notification) {
       $never = true;
     }
 
@@ -117,7 +117,7 @@ function delivery_status_notifications(
 /** Reports whether an envelope requires SMTPUTF8. */
 function envelope_requires_utf8(Envelope $envelope): bool {
   if (
-    $envelope->sender != null
+    null != $envelope->sender
     && requires_utf8($envelope->sender->localPart)
   ) {
     return true;
@@ -150,15 +150,15 @@ function mail_from_command(
   }
 
   if (
-    $configuration->deliveryStatusReturn != null
-    || $configuration->envelopeIdentifier != null
+    null != $configuration->deliveryStatusReturn
+    || null != $configuration->envelopeIdentifier
   ) {
     require_capability($connection, Capability::DeliveryStatusNotification);
-    if ($configuration->deliveryStatusReturn != null) {
+    if (null != $configuration->deliveryStatusReturn) {
       $parameters .= ' RET=' . $configuration->deliveryStatusReturn->value;
     }
 
-    if ($configuration->envelopeIdentifier != null) {
+    if (null != $configuration->envelopeIdentifier) {
       $parameters .=
         ' ENVID=' . encode_xtext($configuration->envelopeIdentifier);
     }
@@ -169,12 +169,12 @@ function mail_from_command(
     $parameters .= ' REQUIRETLS';
   }
 
-  if ($configuration->priority != null) {
+  if (null != $configuration->priority) {
     require_capability($connection, Capability::MessageTransferPriority);
     $parameters .= ' MT-PRIORITY=' . $configuration->priority->value;
   }
 
-  if ($configuration->deliverBy != null) {
+  if (null != $configuration->deliverBy) {
     require_capability($connection, Capability::DeliverBy);
     $parameters .=
       ' BY='
@@ -183,12 +183,12 @@ function mail_from_command(
       . $configuration->deliverBy->mode->value;
   }
 
-  if ($configuration->futureRelease != null) {
+  if (null != $configuration->futureRelease) {
     require_capability($connection, Capability::FutureRelease);
-    if ($configuration->futureRelease->delay != null) {
+    if (null != $configuration->futureRelease->delay) {
       $parameters .=
         ' HOLDFOR=' . duration_seconds($configuration->futureRelease->delay);
-    } else if ($configuration->futureRelease->dateTime != null) {
+    } else if (null != $configuration->futureRelease->dateTime) {
       $parameters .=
         ' HOLDUNTIL='
         . $configuration->futureRelease->dateTime->format(Formatter::rfc3339());
@@ -209,7 +209,7 @@ function recipient_command(
     $configuration->deliveryStatusNotifications,
   );
 
-  if ($notifications != null) {
+  if (null != $notifications) {
     require_capability($connection, Capability::DeliveryStatusNotification);
     $parameters = ' NOTIFY=' . $notifications;
   }

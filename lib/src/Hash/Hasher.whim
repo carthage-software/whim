@@ -45,7 +45,7 @@ final class Hasher {
   #[TrackCaller]
   public function finish(): string {
     $digest = Whim\_Private\finish_hash_state($this->state);
-    if ($digest == null) {
+    if (null == $digest) {
       throw new RuntimeException('the digest is already finished');
     }
 

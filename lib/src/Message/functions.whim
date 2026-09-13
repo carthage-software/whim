@@ -23,7 +23,7 @@ function parse(
 ): Message {
   if ($input is string) {
     $parsed = Whim\_Private\message_parse_headers($input);
-    if ($parsed != null) {
+    if (null != $parsed) {
       return _Private\from_parsed_headers(
         $parsed[0],
         new Reader(new MemoryHandle($parsed[1])),
@@ -41,21 +41,21 @@ function parse(
   $name = null;
   $value = '';
   while (($line = $reader->readLine($cancellation)) != null) {
-    if ($line == '') {
+    if ('' == $line) {
       break;
     }
 
-    if (($line[0] is ' '|"\t") && $name != null) {
+    if (($line[0] is ' '|"\t") && null != $name) {
       $value .= ' ' . Str\trim($line);
       continue;
     }
 
-    if ($name != null) {
+    if (null != $name) {
       $pairs[] = ($name, $value);
     }
 
     $colon = Str\search($line, ':');
-    if ($colon == null || $colon == 0) {
+    if (null == $colon || 0 == $colon) {
       throw new InvalidArgumentException('invalid RFC 5322 message header');
     }
 
@@ -63,11 +63,11 @@ function parse(
     $value = Str\trim(Str\slice($line, $colon + 1));
   }
 
-  if ($name != null) {
+  if (null != $name) {
     $pairs[] = ($name, $value);
   }
 
-  if ($pairs == vec[]) {
+  if (vec[] == $pairs) {
     throw new InvalidArgumentException('an RFC 5322 message needs headers');
   }
 

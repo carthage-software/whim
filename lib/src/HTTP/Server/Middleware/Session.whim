@@ -40,7 +40,7 @@ final readonly class Session implements Middleware {
 
     $identifier = null as null|NonEmptyString;
     $record = null as null|Record;
-    if ($cookieValue != null && $cookieValue != '') {
+    if (null != $cookieValue && '' != $cookieValue) {
       $identifier = $cookieValue as NonEmptyString;
       $record = $this->store->load($identifier, $cancellation);
     }
@@ -57,7 +57,7 @@ final readonly class Session implements Middleware {
       $session,
       $identifier,
       $record,
-      $cookieValue != null,
+      null != $cookieValue,
       $cancellation,
     );
   }
@@ -72,7 +72,7 @@ final readonly class Session implements Middleware {
     CancellationToken $cancellation,
   ): Response {
     if ($session->isDestroyed()) {
-      if ($identifier != null) {
+      if (null != $identifier) {
         $this->store->delete($identifier, $cancellation);
       }
 
@@ -92,14 +92,14 @@ final readonly class Session implements Middleware {
         $cancellation,
       );
 
-      if ($identifier != null) {
+      if (null != $identifier) {
         $this->store->delete($identifier, $cancellation);
       }
 
       return add($response, $this->activeCookie($freshIdentifier));
     }
 
-    if ($record == null) {
+    if (null == $record) {
       if (!$session->isDirty()) {
         if ($hadCookie) {
           return add($response, $this->expiredCookie());
@@ -132,7 +132,7 @@ final readonly class Session implements Middleware {
 
     if (
       $this->configuration->rollingExpiration
-      && $this->configuration->cookieLifetime != null
+      && null != $this->configuration->cookieLifetime
     ) {
       return add($response, $this->activeCookie($identifier));
     }
@@ -154,7 +154,7 @@ final readonly class Session implements Middleware {
     $lifetime = $this->configuration->cookieLifetime;
     $expires = null as null|SystemTime;
     $maximumAge = null as null|int;
-    if ($lifetime != null) {
+    if (null != $lifetime) {
       $expires = SystemTime::now()->plus($lifetime);
       $maximumAge = $lifetime->seconds;
       if ($lifetime->nanoseconds > 0) {

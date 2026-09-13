@@ -53,7 +53,7 @@ final class H2Connection implements MultiplexedConnection {
     $enablePush = H2\Setting::EnablePush->value;
     $this->pushEnabled =
       !contains_key!($settings, $enablePush)
-      || $settings[$enablePush] != 0;
+      || 0 != $settings[$enablePush];
 
     $this->maximumPushes = $configuration->maximumReservedPushes;
 
@@ -172,7 +172,7 @@ final class H2Connection implements MultiplexedConnection {
     CancellationToken $cancellation,
   ): void {
     $body = $request->body;
-    $endStream = $body == null && $request->trailers == null;
+    $endStream = null == $body && null == $request->trailers;
     $this->protocol->sendHeaders(
       $streamId,
       h2_request_headers($request),
@@ -180,7 +180,7 @@ final class H2Connection implements MultiplexedConnection {
     );
 
     $this->flush();
-    if ($body != null) {
+    if (null != $body) {
       while (true) {
         $window = $this->protocol->availableSendWindow($streamId);
         while ($window <= 0) {
@@ -201,7 +201,7 @@ final class H2Connection implements MultiplexedConnection {
           return;
         }
 
-        if ($data == '') {
+        if ('' == $data) {
           if ($body->reachedEndOfDataSource()) {
             break;
           }
@@ -214,7 +214,7 @@ final class H2Connection implements MultiplexedConnection {
       }
     }
 
-    if ($request->trailers != null) {
+    if (null != $request->trailers) {
       if ($exchange->hasFinalResponse()) {
         return;
       }
@@ -258,7 +258,7 @@ final class H2Connection implements MultiplexedConnection {
     while (true) {
       if (length!($events) == 0) {
         $batch = $exchange->receive($cancellation);
-        if ($batch->error != null) {
+        if (null != $batch->error) {
           throw $batch->error;
         }
 
@@ -266,7 +266,7 @@ final class H2Connection implements MultiplexedConnection {
       }
 
       foreach ($events as $event) {
-        if ($event[0] == 2) {
+        if (2 == $event[0]) {
           ($status, $headers) = h2_response_headers($event[2]);
           if ($event[5]) {
             if (length!($informational) >= $maximumInformationalResponses) {
@@ -328,9 +328,13 @@ final class H2Connection implements MultiplexedConnection {
             ),
             true,
           );
-        } else if ($event[0] == 7) {
+        }
+
+        if (7 == $event[0]) {
           throw new ProtocolException('the HTTP/2 response stream was reset');
-        } else if ($event[0] == 8) {
+        }
+
+        if (8 == $event[0]) {
           throw new ProtocolException(
             'the HTTP/2 stream ended without a response',
           );
@@ -360,12 +364,12 @@ final class H2Connection implements MultiplexedConnection {
     CancellationToken $cancellation,
   ): bool {
     $batch = $exchange->receive($cancellation);
-    if ($batch->error != null) {
+    if (null != $batch->error) {
       throw $batch->error;
     }
 
     foreach ($batch->events as $event) {
-      if ($event[0] == 7) {
+      if (7 == $event[0]) {
         if (
           $exchange->hasFinalResponse()
           && $event[2] == H2\ErrorCode::NoError->value
@@ -379,7 +383,7 @@ final class H2Connection implements MultiplexedConnection {
         );
       }
 
-      if ($event[0] == 8) {
+      if (8 == $event[0]) {
         if ($exchange->hasFinalResponse()) {
           $exchange->defer($event);
           continue;
@@ -390,7 +394,7 @@ final class H2Connection implements MultiplexedConnection {
         );
       }
 
-      if ($event[0] != 10 || ($event[1] != 0 && $event[1] != $streamId)) {
+      if (10 != $event[0] || (0 != $event[1] && $event[1] != $streamId)) {
         $exchange->defer($event);
       }
     }
@@ -418,7 +422,7 @@ final class H2Connection implements MultiplexedConnection {
       while (true) {
         $cancellation->throwIfCancellationRequested();
         $bytes = $this->stream->read(16384, $cancellation);
-        if ($bytes == '' && $this->stream->reachedEndOfDataSource()) {
+        if ('' == $bytes && $this->stream->reachedEndOfDataSource()) {
           throw new ProtocolException(
             'the HTTP/2 transport closed unexpectedly',
           );
@@ -453,34 +457,34 @@ final class H2Connection implements MultiplexedConnection {
   }
 
   private function dispatch(Event\WeakendEvent $event): void {
-    if ($event[0] == 6) {
+    if (6 == $event[0]) {
       $this->goAway($event);
       return;
     }
 
-    if ($event[0] == 3 || $event[0] == 4) {
+    if (3 == $event[0] || 4 == $event[0]) {
       $this->capacitySender->send(null);
       $this->broadcast($event);
       return;
     }
 
-    if ($event[0] == 10 && $event[1] == 0) {
+    if (10 == $event[0] && 0 == $event[1]) {
       $this->broadcast($event);
       return;
     }
 
-    if ($event[0] == 5) {
+    if (5 == $event[0]) {
       $this->acceptPush($event);
       return;
     }
 
     $streamId = $this->eventStreamId($event);
 
-    if ($streamId == null || !contains_key!($this->exchanges, $streamId)) {
+    if (null == $streamId || !contains_key!($this->exchanges, $streamId)) {
       return;
     }
 
-    if ($event[0] == 9) {
+    if (9 == $event[0]) {
       $this->exchanges[$streamId]->fail(new ProtocolException($event[3]));
 
       $this->unregister($streamId);
@@ -493,7 +497,7 @@ final class H2Connection implements MultiplexedConnection {
       return;
     }
 
-    if ($event[0] == 7 || $event[0] == 8) {
+    if (7 == $event[0] || 8 == $event[0]) {
       $this->unregister($streamId);
     }
   }
@@ -513,13 +517,13 @@ final class H2Connection implements MultiplexedConnection {
 
     $parent = $this->exchanges[$event[1]];
     $pushes = $parent->pushes();
-    if ($pushes == null) {
+    if (null == $pushes) {
       $this->rejectPush($event[2]);
       return;
     }
 
     $request = h2_push_request($parent->request(), $event[3]);
-    if ($request == null || !$pushes->accept()) {
+    if (null == $request || !$pushes->accept()) {
       $this->rejectPush($event[2]);
       return;
     }

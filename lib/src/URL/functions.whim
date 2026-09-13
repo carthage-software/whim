@@ -10,14 +10,14 @@ use Whim\Str;
 #[MustUse]
 #[TrackCaller]
 function parse_query(string $query): dict<string, vec<string>> {
-  if ($query == '') {
+  if ($query is '') {
     return dict[];
   }
 
   $parameters = dict[];
   foreach (Str\split($query, '&') as $field) {
     $separator = Str\search($field, '=');
-    if ($separator == null) {
+    if ($separator is null) {
       $name = $field;
       $value = '';
     } else {

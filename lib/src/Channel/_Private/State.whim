@@ -79,7 +79,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
   /** Reports whether the channel buffer is full. */
   #[AlwaysInline]
   public function isFull(): bool {
-    return $this->capacity != null && $this->buffer->count() >= $this->capacity;
+    return null != $this->capacity && $this->buffer->count() >= $this->capacity;
   }
 
   /** Reports whether the channel buffer is empty. */
@@ -111,7 +111,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
     null|CancellationToken $cancellation,
   ): void {
     while (true) {
-      if ($cancellation != null) {
+      if (null != $cancellation) {
         $cancellation->throwIfCancellationRequested();
       }
 
@@ -132,7 +132,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
   #[TraceBoundary]
   public function send(T $value, null|CancellationToken $cancellation): void {
     while (true) {
-      if ($cancellation != null) {
+      if (null != $cancellation) {
         $cancellation->throwIfCancellationRequested();
       }
 
@@ -174,7 +174,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
     null|CancellationToken $cancellation,
   ): void {
     while (true) {
-      if ($cancellation != null) {
+      if (null != $cancellation) {
         $cancellation->throwIfCancellationRequested();
       }
 
@@ -195,7 +195,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
   #[TraceBoundary]
   public function receive(null|CancellationToken $cancellation): T {
     while (true) {
-      if ($cancellation != null) {
+      if (null != $cancellation) {
         $cancellation->throwIfCancellationRequested();
       }
 
@@ -230,7 +230,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
     }
 
     $id = null;
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $id = $cancellation->register(fn(): void {
         if (!$waiter->active) {
           return;
@@ -249,7 +249,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
       $suspension->suspend();
     } finally {
       $waiter->active = false;
-      if ($cancellation != null && $id != null) {
+      if (null != $cancellation && null != $id) {
         $cancellation->unregister($id);
       }
     }

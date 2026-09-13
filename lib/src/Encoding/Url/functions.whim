@@ -24,7 +24,7 @@ function encode(string $bytes): string {
 #[TrackCaller]
 function decode(string $encoded): string {
   $decoded = Whim\_Private\url_decode($encoded);
-  if ($decoded == null) {
+  if (null == $decoded) {
     throw new DecodingException(
       'a percent escape must be two hexadecimal digits',
     );
@@ -50,7 +50,7 @@ function encode_form(string $bytes): string {
 #[TrackCaller]
 function decode_form(string $encoded): string {
   $decoded = Whim\_Private\url_decode_form($encoded);
-  if ($decoded == null) {
+  if (null == $decoded) {
     throw new DecodingException(
       'a percent escape must be two hexadecimal digits',
     );

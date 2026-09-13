@@ -131,11 +131,11 @@ function slice<K: ArrayKey, V>(
   $result = dict[];
   $index = 0;
   foreach ($values as $key => $value) {
-    if ($index >= $start && ($length == null || length!($result) < $length)) {
+    if ($index >= $start && (null == $length || length!($result) < $length)) {
       $result[$key] = $value;
     }
 
-    if ($length != null && length!($result) == $length) {
+    if (null != $length && length!($result) == $length) {
       break;
     }
 

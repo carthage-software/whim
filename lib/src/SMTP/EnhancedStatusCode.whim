@@ -42,7 +42,7 @@ final readonly class EnhancedStatusCode implements ToString {
   #[TrackCaller]
   public static function from(string $value): EnhancedStatusCode {
     $status = EnhancedStatusCode::parse($value);
-    if ($status == null) {
+    if (null == $status) {
       throw new InvalidArgumentException(
         'invalid enhanced SMTP status code: `' . $value . '`',
       );
@@ -54,19 +54,19 @@ final readonly class EnhancedStatusCode implements ToString {
   #[AlwaysInline]
   #[MustUse]
   public function isSuccess(): bool {
-    return $this->class == 2;
+    return 2 == $this->class;
   }
 
   #[AlwaysInline]
   #[MustUse]
   public function isPersistentTransientFailure(): bool {
-    return $this->class == 4;
+    return 4 == $this->class;
   }
 
   #[AlwaysInline]
   #[MustUse]
   public function isPermanentFailure(): bool {
-    return $this->class == 5;
+    return 5 == $this->class;
   }
 
   #[AlwaysInline]

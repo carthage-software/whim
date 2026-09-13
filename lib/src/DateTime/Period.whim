@@ -49,10 +49,10 @@ final readonly class Period implements Equal<Period> {
   #[MustUse]
   public function isZero(): bool {
     return (
-      $this->years == 0
-      && $this->months == 0
-      && $this->weeks == 0
-      && $this->days == 0
+      0 == $this->years
+      && 0 == $this->months
+      && 0 == $this->weeks
+      && 0 == $this->days
     );
   }
 

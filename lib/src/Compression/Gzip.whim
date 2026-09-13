@@ -26,7 +26,7 @@ final readonly class Gzip implements Codec {
   #[TraceBoundary]
   public function createCompressor(): Compressor {
     $encoder = CompressionEncoder::gzip($this->level);
-    if ($encoder == null) {
+    if (null == $encoder) {
       throw new Exception('failed to create a gzip compression stream');
     }
 
@@ -39,7 +39,7 @@ final readonly class Gzip implements Codec {
   #[TraceBoundary]
   public function createDecompressor(): Decompressor {
     $decoder = CompressionDecoder::gzip();
-    if ($decoder == null) {
+    if (null == $decoder) {
       throw new DecompressionException(
         'failed to create a gzip decompression stream',
       );

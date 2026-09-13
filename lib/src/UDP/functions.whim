@@ -63,12 +63,12 @@ function connect(
 
   $last = null;
   foreach ($addresses as $address) {
-    if ($bindTo != null && $bindTo->address->family != $address->family) {
+    if (null != $bindTo && $bindTo->address->family != $address->family) {
       continue;
     }
 
     $local = $bindTo;
-    if ($local == null) {
+    if (null == $local) {
       $localAddress = match ($address->family) {
         Whim\IP\Family::V4 => Address::v4('0.0.0.0'),
         Whim\IP\Family::V6 => Address::v6('::'),

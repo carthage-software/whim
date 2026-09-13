@@ -24,7 +24,7 @@ function encode(string $bytes, bool $binary = false): string {
 #[TrackCaller]
 function decode(string $encoded, bool $strict = true): string {
   $decoded = Whim\_Private\mime_quoted_printable_decode($encoded, $strict);
-  if ($decoded == null) {
+  if (null == $decoded) {
     throw new DecodingException('the input is not valid quoted-printable data');
   }
 

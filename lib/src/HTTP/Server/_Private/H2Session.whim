@@ -92,7 +92,7 @@ final class H2Session {
 
     $setting = H2\Setting::EnablePush->value;
     if (contains_key!($settings, $setting)) {
-      $this->pushEnabled = $settings[$setting] == 1;
+      $this->pushEnabled = 1 == $settings[$setting];
     }
 
     $state = new H2StreamState(null, null, new SignalCancellationToken());
@@ -116,7 +116,7 @@ final class H2Session {
     $handlersAwaited = false;
     try {
       $this->flush($this->forced);
-      if ($initialBytes != '') {
+      if ('' != $initialBytes) {
         $this->dispatch($this->receive($initialBytes, $this->forced));
       }
 
@@ -126,7 +126,7 @@ final class H2Session {
           && !$this->drainingStarted
         ) {
           $this->beginDrain();
-          if ($this->activeRequests == 0) {
+          if (0 == $this->activeRequests) {
             break;
           }
         }
@@ -158,7 +158,7 @@ final class H2Session {
             && !$this->drainingStarted
           ) {
             $this->beginDrain();
-            if ($this->activeRequests != 0) {
+            if (0 != $this->activeRequests) {
               continue;
             }
           }
@@ -166,7 +166,7 @@ final class H2Session {
           break;
         }
 
-        if ($bytes == '') {
+        if ('' == $bytes) {
           if ($this->read->reachedEndOfDataSource()) {
             break;
           }
@@ -276,18 +276,18 @@ final class H2Session {
   #[TraceBoundary]
   private function dispatch(vec<Event\WeakendEvent> $events): void {
     foreach ($events as $event) {
-      if ($event[0] == 2) {
+      if (2 == $event[0]) {
         $this->receiveHeaders($event);
-      } else if ($event[0] == 11) {
+      } else if (11 == $event[0]) {
         $this->receiveRequest($event);
-      } else if ($event[0] == 1) {
+      } else if (1 == $event[0]) {
         $this->receiveData($event);
-      } else if ($event[0] == 9) {
+      } else if (9 == $event[0]) {
         $this->failStream(
           $event[1],
           new H2\ProtocolException($event[3], $event[2]),
         );
-      } else if ($event[0] == 7) {
+      } else if (7 == $event[0]) {
         $this->failStream(
           $event[1],
           new H2\StreamException(
@@ -296,16 +296,16 @@ final class H2Session {
             $event[2],
           ),
         );
-      } else if ($event[0] == 3) {
+      } else if (3 == $event[0]) {
         $setting = H2\Setting::EnablePush->value;
         if (contains_key!($event[1], $setting)) {
-          $this->pushEnabled = $event[1][$setting] == 1;
+          $this->pushEnabled = 1 == $event[1][$setting];
         }
 
         $this->capacitySender->send(null);
-      } else if ($event[0] == 4) {
+      } else if (4 == $event[0]) {
         $this->capacitySender->send(null);
-      } else if ($event[0] == 10) {
+      } else if (10 == $event[0]) {
         $this->capacitySender->send(null);
       }
     }
@@ -320,7 +320,7 @@ final class H2Session {
       }
 
       $state = $this->streams[$event[1]];
-      if ($state->trailers != null && !$state->trailers->isComplete()) {
+      if (null != $state->trailers && !$state->trailers->isComplete()) {
         $state->trailers->complete(h2_field_map($event[2]));
       }
 
@@ -359,7 +359,7 @@ final class H2Session {
         $trailers?->getFuture(),
       );
 
-      if ($request == null) {
+      if (null == $request) {
         $this->sendResponse(
           $event[1],
           Message\METHOD_GET,
@@ -400,7 +400,7 @@ final class H2Session {
       );
 
       $state->body?->fail($error);
-      if ($state->trailers != null && !$state->trailers->isComplete()) {
+      if (null != $state->trailers && !$state->trailers->isComplete()) {
         $state->trailers->complete(FieldMap::default());
       }
 
@@ -412,7 +412,7 @@ final class H2Session {
     $state->body?->push($event[2]);
     if ($event[3]) {
       $state->body?->complete();
-      if ($state->trailers != null && !$state->trailers->isComplete()) {
+      if (null != $state->trailers && !$state->trailers->isComplete()) {
         $state->trailers->complete(FieldMap::default());
       }
     }
@@ -452,7 +452,7 @@ final class H2Session {
         $context->completeResponse();
         $this->removeStream($streamId);
         $this->activeRequests--;
-        if ($this->drainingStarted && $this->activeRequests == 0) {
+        if ($this->drainingStarted && 0 == $this->activeRequests) {
           $this->drainWake->cancel();
         }
       }
@@ -472,10 +472,10 @@ final class H2Session {
       $allowPush
       && $this->pushEnabled
       && ($request->method is 'GET'|'HEAD')
-      && ($pushLimit == null || $this->pushCount < $pushLimit);
+      && (null == $pushLimit || $this->pushCount < $pushLimit);
 
     if ($canPush) {
-      if ($this->security != null) {
+      if (null != $this->security) {
         return new H2SecurePushContext(
           ProtocolVersion::V2,
           $this->localEndpoint,
@@ -497,7 +497,7 @@ final class H2Session {
       );
     }
 
-    if ($this->security != null) {
+    if (null != $this->security) {
       return new H2SecureContext(
         ProtocolVersion::V2,
         $this->localEndpoint,
@@ -575,11 +575,11 @@ final class H2Session {
     CancellationToken $cancellation,
   ): void {
     $bodyAllowed =
-      $method != Message\METHOD_HEAD
+      Message\METHOD_HEAD != $method
       && !($response->status is 100..=199|204|304);
 
     $body = $response->body;
-    if (!$bodyAllowed && $body != null) {
+    if (!$bodyAllowed && null != $body) {
       if ($body is CloseHandle) {
         $body->close();
       }
@@ -587,12 +587,12 @@ final class H2Session {
       $body = null;
     }
 
-    $hasTrailers = $response->trailers != null;
+    $hasTrailers = null != $response->trailers;
     $contentLength = h1_content_length($response->headers);
     if (
       $body is MemoryHandle
       && !$hasTrailers
-      && $contentLength != null
+      && null != $contentLength
       && $contentLength <= 16_384
     ) {
       try {
@@ -625,12 +625,12 @@ final class H2Session {
       h2_response_headers($response->status, $response->headers),
       $response->status,
       $contentLength,
-      $body == null
+      null == $body
       && !$hasTrailers,
       $cancellation,
     );
 
-    if ($body != null) {
+    if (null != $body) {
       try {
         while (!$body->reachedEndOfDataSource()) {
           $data = match ($body->read(16_384, $cancellation)) {
@@ -658,7 +658,7 @@ final class H2Session {
       }
 
       $this->sendHeaders($streamId, $headers, true, $cancellation);
-    } else if ($body != null) {
+    } else if (null != $body) {
       $this->sendData($streamId, '', true, $cancellation);
     }
   }
@@ -705,7 +705,7 @@ final class H2Session {
     bool $endStream,
     CancellationToken $cancellation,
   ): void {
-    if ($data == '') {
+    if ('' == $data) {
       $this->withWrite(fn(): void {
         $this->protocol->sendData($streamId, '', $endStream);
       }, $cancellation);
@@ -755,14 +755,14 @@ final class H2Session {
   #[TraceBoundary]
   public function push(H2\StreamId $parentStreamId, Request $request): void {
     $headers = h2_push_headers($request);
-    if ($headers == null) {
+    if (null == $headers) {
       throw new H2\ProtocolException(
         'an HTTP/2 push request requires an absolute URL',
       );
     }
 
     $limit = $this->configuration->maximumServerPushes;
-    if (!$this->pushEnabled || ($limit != null && $this->pushCount >= $limit)) {
+    if (!$this->pushEnabled || (null != $limit && $this->pushCount >= $limit)) {
       throw new H2\ProtocolException('server push is unavailable for HTTP/2');
     }
 
@@ -811,7 +811,7 @@ final class H2Session {
 
     $state = $this->streams[$streamId];
     $state->body?->fail($error);
-    if ($state->trailers != null && !$state->trailers->isComplete()) {
+    if (null != $state->trailers && !$state->trailers->isComplete()) {
       $state->trailers->complete(FieldMap::default());
     }
 
@@ -828,7 +828,7 @@ final class H2Session {
   #[TrackCaller]
   private function failIncompleteStreams(Throwable $error): void {
     foreach ($this->streams as $streamId => $state) {
-      if ($state->body != null && !$state->body->isComplete()) {
+      if (null != $state->body && !$state->body->isComplete()) {
         $this->failStream($streamId, $error);
       }
     }
@@ -914,7 +914,7 @@ final class H2Session {
   #[TraceBoundary]
   private function writeOutbound(CancellationToken $cancellation): void {
     $bytes = $this->protocol->takeOutboundBytes();
-    if ($bytes != '') {
+    if ('' != $bytes) {
       $this->stream->writeAll($bytes, $cancellation);
     }
   }

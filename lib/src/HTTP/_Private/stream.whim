@@ -30,7 +30,7 @@ function reserve_peer_stream(State $state, StreamId $streamId): StreamEntry {
 }
 
 function accept_local_stream_id(State $state, StreamId $streamId): void {
-  $expectedOdd = $state->role == Role::Client;
+  $expectedOdd = Role::Client == $state->role;
   if (($streamId % 2 == 1) != $expectedOdd) {
     throw new ProtocolException(
       'the local HTTP/2 stream identifier has the wrong parity',
@@ -53,7 +53,7 @@ function accept_peer_stream_id(State $state, StreamId $streamId): void {
     );
   }
 
-  $expectedOdd = $state->role == Role::Server;
+  $expectedOdd = Role::Server == $state->role;
   if (($streamId % 2 == 1) != $expectedOdd) {
     throw new ProtocolException(
       'the peer HTTP/2 stream identifier has the wrong parity',
@@ -69,11 +69,11 @@ function accept_peer_stream_id(State $state, StreamId $streamId): void {
 
 function stream_state(State $state, StreamId $streamId): StreamState {
   $entry = $state->streams->get($streamId);
-  if ($entry != null) {
+  if (null != $entry) {
     return $entry->state;
   }
 
-  $locallyInitiated = (($streamId % 2) == 1) == ($state->role == Role::Client);
+  $locallyInitiated = (($streamId % 2) == 1) == (Role::Client == $state->role);
   $lastStreamId = match ($locallyInitiated) {
     true => $state->lastLocalStreamId,
     false => $state->lastPeerStreamId,
@@ -87,7 +87,7 @@ function stream_state(State $state, StreamId $streamId): StreamState {
 
 function send_entry(State $state, StreamId $streamId): StreamEntry {
   $entry = $state->streams->get($streamId);
-  if ($entry == null) {
+  if (null == $entry) {
     if (stream_state($state, $streamId) == StreamState::Closed) {
       stream_error(
         $streamId,
@@ -112,7 +112,7 @@ function send_entry(State $state, StreamId $streamId): StreamEntry {
 
 function receive_entry(State $state, StreamId $streamId): StreamEntry {
   $entry = $state->streams->get($streamId);
-  if ($entry == null) {
+  if (null == $entry) {
     if (stream_state($state, $streamId) == StreamState::Closed) {
       stream_error(
         $streamId,
@@ -136,12 +136,12 @@ function receive_entry(State $state, StreamId $streamId): StreamEntry {
 }
 
 function end_local(State $state, StreamId $streamId, StreamEntry $entry): bool {
-  if ($entry->state == StreamState::Open) {
+  if (StreamState::Open == $entry->state) {
     $entry->state = StreamState::HalfClosedLocal;
     return false;
   }
 
-  if ($entry->state == StreamState::HalfClosedRemote) {
+  if (StreamState::HalfClosedRemote == $entry->state) {
     close_stream($state, $streamId);
     return true;
   }
@@ -158,12 +158,12 @@ function end_remote(
   StreamId $streamId,
   StreamEntry $entry,
 ): bool {
-  if ($entry->state == StreamState::Open) {
+  if (StreamState::Open == $entry->state) {
     $entry->state = StreamState::HalfClosedRemote;
     return false;
   }
 
-  if ($entry->state == StreamState::HalfClosedLocal) {
+  if (StreamState::HalfClosedLocal == $entry->state) {
     close_stream($state, $streamId);
     return true;
   }

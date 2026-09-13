@@ -26,7 +26,7 @@ final readonly class UnixConnector implements Connector {
     $versions = _Private\resolve_protocol_versions($request, $configuration);
 
     $stream = Unix\connect($this->path, $cancellation);
-    if ($origin->scheme == 'https') {
+    if ('https' == $origin->scheme) {
       ($_host, $serverName) = _Private\origin_host($origin);
       return _Private\connect_secure::<UnixEndpoint>(
         $stream,
@@ -38,7 +38,7 @@ final readonly class UnixConnector implements Connector {
       );
     }
 
-    if (length!($versions) == 1 && $versions[0] == ProtocolVersion::V2) {
+    if (length!($versions) == 1 && ProtocolVersion::V2 == $versions[0]) {
       return new _Private\H2Connection(
         $stream,
         new ConnectionMetadata(
@@ -51,7 +51,7 @@ final readonly class UnixConnector implements Connector {
     }
 
     $h1 = _Private\preferred_h1_protocol($versions);
-    if ($h1 != null) {
+    if (null != $h1) {
       return new _Private\H1Connection(
         $stream,
         new ConnectionMetadata(

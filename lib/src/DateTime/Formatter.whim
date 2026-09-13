@@ -25,7 +25,7 @@ final readonly class Formatter {
   #[TrackCaller]
   public static function fromPattern(string $pattern): Formatter {
     $inner = DateTimeFormatterImpl::fromPattern($pattern);
-    if ($inner == null) {
+    if (null == $inner) {
       throw new InvalidArgumentException(
         'invalid date-time format: `' . $pattern . '`',
       );
@@ -155,7 +155,7 @@ final readonly class Formatter {
   #[NeverInline]
   #[TrackCaller]
   private function require(null|string $result): string {
-    if ($result == null) {
+    if (null == $result) {
       throw new InvalidArgumentException(
         'the format cannot represent this date-time value',
       );

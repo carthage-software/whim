@@ -80,14 +80,14 @@ final readonly class StaticFiles implements Handler {
       $prefix = slice($prefix, 0, length!($prefix) - 1) as NonEmptyString;
     }
 
-    if ($index != null && !$this->validRelativePath($index)) {
+    if (null != $index && !$this->validRelativePath($index)) {
       throw new InvalidArgumentException(
         'a static-file index must be a safe relative path',
       );
     }
 
     $directory = open_directory_descriptor($root);
-    if ($directory == null) {
+    if (null == $directory) {
       throw new InvalidArgumentException(
         'the static-file root must be a readable directory without symbolic links',
       );
@@ -107,7 +107,7 @@ final readonly class StaticFiles implements Handler {
     Request $request,
     CancellationToken $cancellation,
   ): Response {
-    if ($request->method != METHOD_GET && $request->method != METHOD_HEAD) {
+    if (METHOD_GET != $request->method && METHOD_HEAD != $request->method) {
       return new Response(
         STATUS_METHOD_NOT_ALLOWED,
         $request->protocolVersion,
@@ -116,7 +116,7 @@ final readonly class StaticFiles implements Handler {
     }
 
     $relative = $this->relativePath($this->requestPath($request));
-    if ($relative == null) {
+    if (null == $relative) {
       throw new HTTPException(STATUS_NOT_FOUND);
     }
 
@@ -130,8 +130,8 @@ final readonly class StaticFiles implements Handler {
       );
     }
 
-    if ($relative == '' || ends_with($relative, '/')) {
-      if ($this->index == null) {
+    if ('' == $relative || ends_with($relative, '/')) {
+      if (null == $this->index) {
         throw new HTTPException(STATUS_NOT_FOUND);
       }
 
@@ -139,7 +139,7 @@ final readonly class StaticFiles implements Handler {
     }
 
     $opened = open_regular_file_beneath($this->directory, $relative);
-    if ($opened == null) {
+    if (null == $opened) {
       throw new HTTPException(STATUS_NOT_FOUND);
     }
 
@@ -167,7 +167,7 @@ final readonly class StaticFiles implements Handler {
     $range = null as null|false|(int, int);
     $rangeFields = $request->headers->getAll('Range');
     if (
-      $rangeFields != vec[]
+      vec[] != $rangeFields
       && $this->ifRangeMatches($request, $modifiedSeconds)
     ) {
       $range = match (length!($rangeFields)) {
@@ -176,7 +176,7 @@ final readonly class StaticFiles implements Handler {
       };
     }
 
-    if ($range == false) {
+    if (false == $range) {
       return new Response(
         STATUS_RANGE_NOT_SATISFIABLE,
         $request->protocolVersion,
@@ -211,7 +211,7 @@ final readonly class StaticFiles implements Handler {
   /** Returns the request path without a query. */
   #[MustUse]
   private function requestPath(Request $request): string {
-    if ($request->url != null) {
+    if (null != $request->url) {
       return match ($request->url->path) {
         '' => '/',
         $path @ string => $path,
@@ -227,7 +227,7 @@ final readonly class StaticFiles implements Handler {
   /** Removes the configured mount from a request path. */
   #[MustUse]
   private function relativePath(string $path): null|string {
-    if ($this->prefix == '/') {
+    if ('/' == $this->prefix) {
       if (!starts_with($path, '/')) {
         return null;
       }
@@ -269,7 +269,7 @@ final readonly class StaticFiles implements Handler {
       $headers = $headers->with('X-Content-Type-Options', 'nosniff');
     }
 
-    if ($this->cacheControl != null) {
+    if (null != $this->cacheControl) {
       $headers = $headers->with('Cache-Control', $this->cacheControl);
     }
 
@@ -301,12 +301,12 @@ final readonly class StaticFiles implements Handler {
     int $modifiedSeconds,
   ): bool {
     $validators = $request->headers->getAll('If-None-Match');
-    if ($validators != vec[]) {
+    if (vec[] != $validators) {
       foreach ($validators as $field) {
         foreach (split($field, ',') as $candidate) {
           $candidate = trim($candidate);
           if (
-            $candidate == '*'
+            '*' == $candidate
             || $this->weakTag($candidate) == $this->weakTag($etag)
           ) {
             return true;
@@ -320,7 +320,7 @@ final readonly class StaticFiles implements Handler {
     $field = $request->headers->get('If-Modified-Since') ?? return false;
 
     $date = ZonedDateTime::parseRfc2822($field);
-    return $date != null && $modifiedSeconds <= $date->systemTime->seconds;
+    return null != $date && $modifiedSeconds <= $date->systemTime->seconds;
   }
 
   /** Reports whether an If-Range date permits a range response. */
@@ -331,7 +331,7 @@ final readonly class StaticFiles implements Handler {
     $field = $request->headers->get('If-Range') ?? return true;
 
     $date = ZonedDateTime::parseRfc2822($field);
-    return $date != null && $modifiedSeconds <= $date->systemTime->seconds;
+    return null != $date && $modifiedSeconds <= $date->systemTime->seconds;
   }
 
   /** Parses one byte range, returning false when it is unsatisfiable. */
@@ -345,20 +345,20 @@ final readonly class StaticFiles implements Handler {
     }
 
     $value = trim(slice($field, 6));
-    if ($value == '' || contains($value, ',')) {
+    if ('' == $value || contains($value, ',')) {
       return false;
     }
 
     $parts = split($value, '-');
-    if (length!($parts) != 2 || $size == 0) {
+    if (length!($parts) != 2 || 0 == $size) {
       return false;
     }
 
     $first = trim($parts[0]);
     $last = trim($parts[1]);
-    if ($first == '') {
+    if ('' == $first) {
       $suffix = $this->decimal($last);
-      if ($suffix == null || $suffix == 0) {
+      if (null == $suffix || 0 == $suffix) {
         return false;
       }
 
@@ -370,16 +370,16 @@ final readonly class StaticFiles implements Handler {
     }
 
     $start = $this->decimal($first);
-    if ($start == null || $start >= $size) {
+    if (null == $start || $start >= $size) {
       return false;
     }
 
-    if ($last == '') {
+    if ('' == $last) {
       return ($start, $size - 1);
     }
 
     $end = $this->decimal($last);
-    if ($end == null || $end < $start) {
+    if (null == $end || $end < $start) {
       return false;
     }
 
@@ -392,7 +392,7 @@ final readonly class StaticFiles implements Handler {
 
   /** Parses an unsigned decimal that fits in an integer. */
   private function decimal(string $value): null|int {
-    if ($value == '') {
+    if ('' == $value) {
       return null;
     }
 
@@ -427,12 +427,12 @@ final readonly class StaticFiles implements Handler {
 
   /** Reports whether an index path is safe beneath the root. */
   private function validRelativePath(string $path): bool {
-    if ($path == '' || starts_with($path, '/') || contains($path, "\x00")) {
+    if ('' == $path || starts_with($path, '/') || contains($path, "\x00")) {
       return false;
     }
 
     foreach (split($path, '/') as $component) {
-      if ($component == '' || $component == '.' || $component == '..') {
+      if ('' == $component || '.' == $component || '..' == $component) {
         return false;
       }
     }
@@ -445,7 +445,7 @@ final readonly class StaticFiles implements Handler {
   private function contentType(string $path): NonEmptyString {
     $dot = search_last($path, '.');
     $slash = search_last($path, '/');
-    if ($dot == null || ($slash != null && $dot < $slash)) {
+    if (null == $dot || (null != $slash && $dot < $slash)) {
       return 'application/octet-stream';
     }
 

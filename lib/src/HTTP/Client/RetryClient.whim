@@ -55,8 +55,8 @@ final readonly class RetryClient implements Client {
           throw $error;
         }
 
-        if ($body != null) {
-          if (!($body is SeekHandle) || $bodyOffset == null) {
+        if (null != $body) {
+          if (!($body is SeekHandle) || null == $bodyOffset) {
             throw $error;
           }
 

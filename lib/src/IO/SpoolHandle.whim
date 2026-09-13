@@ -36,7 +36,7 @@ final class SpoolHandle implements
     null|CancellationToken $cancellation = null,
   ): void {
     $this->ensureOpen();
-    if ($this->file != null) {
+    if (null != $this->file) {
       $this->file->waitUntilReadable($cancellation);
       return;
     }
@@ -55,13 +55,13 @@ final class SpoolHandle implements
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
     $this->ensureOpen();
-    if ($maxBytes != null && $maxBytes < 0) {
+    if (null != $maxBytes && $maxBytes < 0) {
       throw new InvalidArgumentException(
         'the maximum byte count must be non-negative',
       );
     }
 
-    if ($this->file != null) {
+    if (null != $this->file) {
       $bytes = $this->file->tryRead($maxBytes);
     } else {
       $bytes = ($this->memory as MemoryHandle)->tryRead($maxBytes);
@@ -82,7 +82,7 @@ final class SpoolHandle implements
       $this->spill($cancellation);
     }
 
-    if ($this->file != null) {
+    if (null != $this->file) {
       $this->file->waitUntilWritable($cancellation);
       return;
     }
@@ -94,11 +94,11 @@ final class SpoolHandle implements
   #[TrackCaller]
   public function tryWrite(string $bytes): int {
     $this->ensureOpen();
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return 0;
     }
 
-    if ($this->file == null) {
+    if (null == $this->file) {
       $end = $this->position + length!($bytes);
       if ($this->spillRequired || $end > $this->memoryThreshold) {
         $this->spillRequired = true;
@@ -121,14 +121,14 @@ final class SpoolHandle implements
     null|CancellationToken $cancellation = null,
   ): int {
     $cancellation?->throwIfCancellationRequested();
-    if ($bytes == '') {
+    if ('' == $bytes) {
       $this->ensureOpen();
       return 0;
     }
 
     while (true) {
       $written = $this->tryWrite($bytes);
-      if ($written != 0) {
+      if (0 != $written) {
         return $written;
       }
 
@@ -140,7 +140,7 @@ final class SpoolHandle implements
   #[TrackCaller]
   public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
     $this->ensureOpen();
-    if ($this->file != null) {
+    if (null != $this->file) {
       $this->position = $this->file->seek($offset, $whence);
     } else {
       $this->position = ($this->memory as MemoryHandle)->seek($offset, $whence);
@@ -157,7 +157,7 @@ final class SpoolHandle implements
     }
 
     $this->closed = true;
-    if ($this->file != null) {
+    if (null != $this->file) {
       $this->file->close();
       return;
     }
@@ -184,7 +184,7 @@ final class SpoolHandle implements
   #[NeverInline]
   #[TrackCaller]
   private function spill(null|CancellationToken $cancellation): void {
-    if ($this->file != null) {
+    if (null != $this->file) {
       $this->spillRequired = false;
       return;
     }
@@ -192,7 +192,7 @@ final class SpoolHandle implements
     $memory = $this->memory as MemoryHandle;
     $file = FilePrivate\open_temporary_handle($cancellation);
     $bytes = $memory->toString();
-    if ($bytes != '') {
+    if ('' != $bytes) {
       $file->writeAll($bytes, $cancellation);
     }
 

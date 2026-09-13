@@ -26,7 +26,7 @@ function receive(State $state, string $bytes): vec<Event\WeakendEvent> {
         $frame = Frame\_Private\parse($type, $flags, $stream, $payload);
 
         if (!$state->receivedInitialSettings) {
-          if ($frame[0] != 4 || $frame[2]) {
+          if (4 != $frame[0] || $frame[2]) {
             throw new ProtocolException(
               'the peer connection preface must begin with SETTINGS',
             );
@@ -35,7 +35,7 @@ function receive(State $state, string $bytes): vec<Event\WeakendEvent> {
           $state->receivedInitialSettings = true;
         }
 
-        if ($state->headerBlocks->active() && $frame[0] != 9) {
+        if ($state->headerBlocks->active() && 9 != $frame[0]) {
           throw new ProtocolException('an HTTP/2 header block was interrupted');
         }
 
@@ -80,7 +80,7 @@ function receive(State $state, string $bytes): vec<Event\WeakendEvent> {
 }
 
 function finish(State $state): vec<Event\WeakendEvent> {
-  if (!$state->receivedClientPreface || $state->pendingClientPreface != '') {
+  if (!$state->receivedClientPreface || '' != $state->pendingClientPreface) {
     throw new ProtocolException('the HTTP/2 client preface is truncated');
   }
 
@@ -126,38 +126,28 @@ function receive_frame(
   State $state,
   Frame\WeakendFrame $frame,
 ): vec<Event\WeakendEvent> {
-  if ($frame[0] == 0) {
-    return receive_data($state, $frame as Frame\DataFrame);
-  } else if ($frame[0] == 1) {
-    return receive_headers($state, $frame as Frame\HeadersFrame);
-  } else if ($frame[0] == 2) {
-    return receive_priority($state, $frame as Frame\PriorityFrame);
-  } else if ($frame[0] == 3) {
-    return receive_reset($state, $frame as Frame\RstStreamFrame);
-  } else if ($frame[0] == 4) {
-    return vec[receive_settings($state, $frame as Frame\SettingsFrame)];
-  } else if ($frame[0] == 5) {
-    return receive_push_promise($state, $frame as Frame\PushPromiseFrame);
-  } else if ($frame[0] == 6) {
-    return receive_ping($state, $frame as Frame\PingFrame);
-  } else if ($frame[0] == 7) {
-    return receive_go_away($state, $frame as Frame\GoAwayFrame);
-  } else if ($frame[0] == 8) {
-    return receive_window_update($state, $frame as Frame\WindowUpdateFrame);
-  } else if ($frame[0] == 9) {
-    return receive_continuation($state, $frame as Frame\ContinuationFrame);
-  }
-
-  return vec[];
+  return match ($frame[0]) {
+    0 => receive_data($state, $frame as Frame\DataFrame),
+    1 => receive_headers($state, $frame as Frame\HeadersFrame),
+    2 => receive_priority($state, $frame as Frame\PriorityFrame),
+    3 => receive_reset($state, $frame as Frame\RstStreamFrame),
+    4 => vec[receive_settings($state, $frame as Frame\SettingsFrame)],
+    5 => receive_push_promise($state, $frame as Frame\PushPromiseFrame),
+    6 => receive_ping($state, $frame as Frame\PingFrame),
+    7 => receive_go_away($state, $frame as Frame\GoAwayFrame),
+    8 => receive_window_update($state, $frame as Frame\WindowUpdateFrame),
+    9 => receive_continuation($state, $frame as Frame\ContinuationFrame),
+    _ => vec[],
+  };
 }
 
 function record_frame(State $state, Frame\WeakendFrame $frame): void {
   $limiter = $state->configuration->rateLimiter ?? return;
 
   $type = $frame[0];
-  if ($type == 0 && $frame[2] == '' && !$frame[3]) {
+  if (0 == $type && '' == $frame[2] && !$frame[3]) {
     $type = Whim\HTTP\_Private\RateLimiter::EMPTY_DATA_FRAME;
-  } else if ($type == 10) {
+  } else if (10 == $type) {
     $type = $frame[1];
   }
 

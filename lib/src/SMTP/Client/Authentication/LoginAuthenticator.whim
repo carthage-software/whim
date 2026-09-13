@@ -28,7 +28,7 @@ final readonly class LoginAuthenticator implements Authenticator {
   ): void {
     _Private\require_mechanism($connection, $this->mechanism());
     $reply = $connection->sendCommand('AUTH LOGIN', $cancellation);
-    if ($reply->code != 334) {
+    if (334 != $reply->code) {
       throw _Private\rejected($this->mechanism(), $reply);
     }
 
@@ -37,7 +37,7 @@ final readonly class LoginAuthenticator implements Authenticator {
       $cancellation,
     );
 
-    if ($reply->code != 334) {
+    if (334 != $reply->code) {
       throw _Private\rejected($this->mechanism(), $reply);
     }
 

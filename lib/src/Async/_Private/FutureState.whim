@@ -126,7 +126,7 @@ final class FutureState<T> {
     }
 
     $this->observe();
-    if ($this->error != null) {
+    if (null != $this->error) {
       throw $this->error;
     }
 
@@ -136,7 +136,7 @@ final class FutureState<T> {
   #[TrackCaller]
   #[TraceBoundary]
   private function observe(): void {
-    if ($this->unhandledRecord != null) {
+    if (null != $this->unhandledRecord) {
       Whim\_Private\forget_unhandled($this->unhandledRecord);
       $this->unhandledRecord = null;
     }

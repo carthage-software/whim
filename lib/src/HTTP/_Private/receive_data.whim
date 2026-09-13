@@ -21,7 +21,7 @@ function receive_data(
   $state->flow->consumeReceive($frame[1], $entry, $flowSize);
   $entry->receivedContentLength += length!($frame[2]);
   if (
-    $entry->expectedContentLength != null
+    null != $entry->expectedContentLength
     && $entry->receivedContentLength > $entry->expectedContentLength
   ) {
     stream_error($frame[1], 'the received HTTP/2 content length was exceeded');
@@ -51,7 +51,7 @@ function verify_received_content_length(
   StreamEntry $entry,
 ): void {
   if (
-    $entry->expectedContentLength != null
+    null != $entry->expectedContentLength
     && $entry->receivedContentLength != $entry->expectedContentLength
   ) {
     stream_error(

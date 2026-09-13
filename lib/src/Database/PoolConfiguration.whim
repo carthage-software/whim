@@ -40,7 +40,7 @@ final readonly class PoolConfiguration {
       );
     }
 
-    if ($acquisitionTimeout != null && !$acquisitionTimeout->isPositive()) {
+    if (null != $acquisitionTimeout && !$acquisitionTimeout->isPositive()) {
       throw new InvalidArgumentException(
         'connection acquisition timeout must be positive',
       );

@@ -62,7 +62,7 @@ final readonly class Configuration implements Default {
       }
     }
 
-    if ($origin != null && !http_valid_field_value($origin)) {
+    if (null != $origin && !http_valid_field_value($origin)) {
       throw new InvalidArgumentException('invalid WebSocket origin');
     }
   }
@@ -70,8 +70,8 @@ final readonly class Configuration implements Default {
   /** Creates the default client configuration. */
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
-    return new static();
+  public static function default(): self {
+    return new self();
   }
 
   /** Returns a copy with a new message-size limit. */

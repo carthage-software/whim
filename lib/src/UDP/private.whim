@@ -53,7 +53,7 @@ function configure(
     $broadcast,
   );
 
-  if ($family == Family::V6) {
+  if (Family::V6 == $family) {
     $onlyIPv6 = 0;
     if ($configuration->onlyIPv6) {
       $onlyIPv6 = 1;
@@ -67,7 +67,7 @@ function configure(
     );
   }
 
-  if ($configuration->receiveBuffer != null) {
+  if (null != $configuration->receiveBuffer) {
     Whim\_Private\set_socket_option(
       $descriptor,
       Whim\_Private\SOCKET_LEVEL_SOCKET,
@@ -76,7 +76,7 @@ function configure(
     );
   }
 
-  if ($configuration->sendBuffer != null) {
+  if (null != $configuration->sendBuffer) {
     Whim\_Private\set_socket_option(
       $descriptor,
       Whim\_Private\SOCKET_LEVEL_SOCKET,

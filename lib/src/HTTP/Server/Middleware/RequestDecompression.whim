@@ -44,7 +44,7 @@ final readonly class RequestDecompression implements Middleware {
       ?? return new Response(STATUS_BAD_REQUEST, $request->protocolVersion);
 
     foreach ($codings as $coding) {
-      if ($coding != 'identity' && !$this->codecs->contains($coding)) {
+      if ('identity' != $coding && !$this->codecs->contains($coding)) {
         return new Response(
           STATUS_UNSUPPORTED_MEDIA_TYPE,
           $request->protocolVersion,
@@ -58,16 +58,16 @@ final readonly class RequestDecompression implements Middleware {
 
     $remaining = 0;
     foreach ($codings as $coding) {
-      if ($coding != 'identity') {
+      if ('identity' != $coding) {
         $remaining++;
       }
     }
 
     $body = $request->body;
     if ($remaining > 0) {
-      $body = $body ?? new MemoryHandle();
+      $body ??= new MemoryHandle();
       foreach (reverse::<NonEmptyString>($codings) as $coding) {
-        if ($coding == 'identity') {
+        if ('identity' == $coding) {
           continue;
         }
 

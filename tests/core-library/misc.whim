@@ -10,7 +10,7 @@ $boundedSender = $boundedPair[0];
 $boundedReceiver = $boundedPair[1];
 assert!($boundedSender->getCapacity() == 2);
 Async\spawn::<int>(fn(): int {
-  for ($i = 1; $i <= 5; $i = $i + 1) {
+  for ($i = 1; $i <= 5; $i++) {
     $boundedSender->send($i);
   }
 
@@ -19,7 +19,7 @@ Async\spawn::<int>(fn(): int {
 })->ignore();
 
 $received = vec[];
-for ($j = 0; $j < 5; $j = $j + 1) {
+for ($j = 0; $j < 5; $j++) {
   Async\sleep(Duration::fromMilliseconds(5));
   $received[] = $boundedReceiver->receive();
 }
@@ -39,7 +39,7 @@ $unboundedPair = Channel\unbounded::<int>();
 $unboundedSender = $unboundedPair[0];
 $unboundedReceiver = $unboundedPair[1];
 assert!($unboundedSender->getCapacity() == null);
-for ($k = 1; $k <= 50; $k = $k + 1) {
+for ($k = 1; $k <= 50; $k++) {
   $unboundedSender->send($k);
 }
 

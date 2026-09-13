@@ -56,7 +56,7 @@ final class H1ChunkedBody implements ReadHandle {
   #[TrackCaller]
   #[TraceBoundary]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->completed || $this->failed || $this->chunkRemaining == 0) {
+    if ($this->completed || $this->failed || 0 == $this->chunkRemaining) {
       return '';
     }
 
@@ -76,7 +76,7 @@ final class H1ChunkedBody implements ReadHandle {
       return '';
     }
 
-    if ($this->chunkRemaining == 0) {
+    if (0 == $this->chunkRemaining) {
       $this->beginChunk();
       if ($this->completed) {
         return '';
@@ -104,7 +104,7 @@ final class H1ChunkedBody implements ReadHandle {
         $this->fail('the request ended inside a chunk terminator');
       }
 
-      if ($terminator != "\r\n") {
+      if ("\r\n" != $terminator) {
         $this->fail('a request chunk has no CRLF terminator');
       }
 
@@ -121,13 +121,13 @@ final class H1ChunkedBody implements ReadHandle {
       $this->fail('the request chunk size line is too large');
     }
 
-    if ($line == null || !Str\ends_with($line, "\r\n")) {
+    if (null == $line || !Str\ends_with($line, "\r\n")) {
       $this->fail('the request ended before a chunk size');
     }
 
     $line = Str\slice($line, 0, length!($line) - 2);
     $extension = Str\search($line, ';');
-    if ($extension != null) {
+    if (null != $extension) {
       $value = Str\slice($line, $extension + 1);
       if (!($value is string[..=4096]) || !$this->validExtension($value)) {
         $this->fail('the request contains an invalid chunk extension');
@@ -157,7 +157,7 @@ final class H1ChunkedBody implements ReadHandle {
       $this->fail('the request chunk size is too large');
     }
 
-    if ($this->chunkRemaining == 0) {
+    if (0 == $this->chunkRemaining) {
       $this->readTrailers();
       $this->completed = true;
     } else {
@@ -181,7 +181,7 @@ final class H1ChunkedBody implements ReadHandle {
         $this->fail('the request trailers exceed their configured limit');
       }
 
-      if ($line == null || !Str\ends_with($line, "\r\n")) {
+      if (null == $line || !Str\ends_with($line, "\r\n")) {
         $this->fail('the request ended inside its trailers');
       }
 
@@ -196,7 +196,7 @@ final class H1ChunkedBody implements ReadHandle {
       }
 
       $separator = Str\search($line, ':');
-      if ($separator == null || $separator == 0) {
+      if (null == $separator || 0 == $separator) {
         $this->fail('the request contains a malformed trailer');
       }
 
@@ -238,7 +238,7 @@ final class H1ChunkedBody implements ReadHandle {
   }
 
   private function limit(null|int $maximum): int {
-    if ($maximum == null || $maximum < 0 || $maximum > $this->chunkRemaining) {
+    if (null == $maximum || $maximum < 0 || $maximum > $this->chunkRemaining) {
       return $this->chunkRemaining;
     }
 

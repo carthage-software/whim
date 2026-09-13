@@ -30,7 +30,7 @@ final class HandleReader implements Reader {
   #[NeverInline]
   #[TrackCaller]
   private function consume(NonNegativeInt $length): string {
-    if ($length == 0) {
+    if (0 == $length) {
       return '';
     }
 
@@ -180,7 +180,7 @@ final class HandleReader implements Reader {
   #[NeverInline]
   #[TrackCaller]
   public function skip(NonNegativeInt $length): void {
-    if ($length == 0) {
+    if (0 == $length) {
       return;
     }
 

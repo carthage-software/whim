@@ -17,7 +17,7 @@ final class FixedLengthBody implements ReadHandle {
     private bool $closeAtEnd,
   ) {
     $this->remaining = $length;
-    if ($length == 0 && $this->closeAtEnd) {
+    if (0 == $length && $this->closeAtEnd) {
       $this->transport->close();
     }
   }
@@ -33,12 +33,12 @@ final class FixedLengthBody implements ReadHandle {
 
   #[TrackCaller]
   public function reachedEndOfDataSource(): bool {
-    return $this->remaining == 0;
+    return 0 == $this->remaining;
   }
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->remaining == 0) {
+    if (0 == $this->remaining) {
       return '';
     }
 
@@ -53,12 +53,12 @@ final class FixedLengthBody implements ReadHandle {
     null|int $maxBytes = null,
     null|CancellationToken $cancellation = null,
   ): string {
-    if ($this->remaining == 0) {
+    if (0 == $this->remaining) {
       return '';
     }
 
     $data = $this->reader->read($this->limit($maxBytes), $cancellation);
-    if ($data == '' && $this->reader->reachedEndOfDataSource()) {
+    if ('' == $data && $this->reader->reachedEndOfDataSource()) {
       $this->transport->close();
       throw new ProtocolException(
         'the response ended before its declared content length',
@@ -70,7 +70,7 @@ final class FixedLengthBody implements ReadHandle {
   }
 
   private function limit(null|int $maximum): int {
-    if ($maximum == null || $maximum < 0 || $maximum > $this->remaining) {
+    if (null == $maximum || $maximum < 0 || $maximum > $this->remaining) {
       return $this->remaining;
     }
 
@@ -79,7 +79,7 @@ final class FixedLengthBody implements ReadHandle {
 
   private function consume(string $data): void {
     $this->remaining -= length!($data);
-    if ($this->remaining == 0 && $this->closeAtEnd) {
+    if (0 == $this->remaining && $this->closeAtEnd) {
       $this->transport->close();
     }
   }

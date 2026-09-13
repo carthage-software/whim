@@ -165,7 +165,7 @@ function create_temporary_file(
     );
   }
 
-  if ($directory == null) {
+  if (null == $directory) {
     $directory = Whim\_Private\temporary_directory();
   }
 
@@ -202,7 +202,7 @@ function create_temporary_directory(
     );
   }
 
-  if ($directory == null) {
+  if (null == $directory) {
     $directory = Whim\_Private\temporary_directory();
   }
 

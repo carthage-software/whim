@@ -108,7 +108,7 @@ final class H1Connection implements Connection {
 
     if (
       $this->forwardProxy
-      && $this->proxyAuthorization != null
+      && null != $this->proxyAuthorization
       && !$headers->has('proxy-authorization')
     ) {
       $headers = $headers->with(
@@ -119,7 +119,7 @@ final class H1Connection implements Connection {
 
     $contentLength = request_content_length($headers);
     $transferEncoding = $headers->has('transfer-encoding');
-    if ($contentLength != null && $transferEncoding) {
+    if (null != $contentLength && $transferEncoding) {
       throw new RequestException(
         'an HTTP/1 request cannot contain both Content-Length and Transfer-Encoding',
       );
@@ -134,8 +134,8 @@ final class H1Connection implements Connection {
       }
     }
 
-    if ($request->body != null && $contentLength == null && !$chunked) {
-      if ($this->metadata->protocolVersion == ProtocolVersion::V10) {
+    if (null != $request->body && null == $contentLength && !$chunked) {
+      if (ProtocolVersion::V10 == $this->metadata->protocolVersion) {
         throw new RequestException(
           'an HTTP/1.0 request body needs a Content-Length field',
         );
@@ -146,9 +146,9 @@ final class H1Connection implements Connection {
     }
 
     if (
-      $request->body == null
-      && $contentLength != null
-      && $contentLength != 0
+      null == $request->body
+      && null != $contentLength
+      && 0 != $contentLength
     ) {
       throw new RequestException(
         'the request has a non-zero Content-Length but no body',
@@ -156,8 +156,8 @@ final class H1Connection implements Connection {
     }
 
     if (
-      $request->body == null
-      && $contentLength == null
+      null == $request->body
+      && null == $contentLength
       && !$transferEncoding
     ) {
       $headers = $headers->with('Content-Length', '0');
@@ -212,9 +212,9 @@ final class H1Connection implements Connection {
 
     $informational = vec[];
     $responseHead = null;
-    if ($request->body == null && $chunked) {
+    if (null == $request->body && $chunked) {
       $this->stream->writeAll("0\r\n\r\n", $cancellation);
-    } else if ($request->body != null) {
+    } else if (null != $request->body) {
       if (expects_continue($headers)) {
         while (true) {
           $candidate = read_h1_response_head(
@@ -225,7 +225,7 @@ final class H1Connection implements Connection {
 
           if (
             $candidate->status >= 200
-            || $candidate->status == Message\STATUS_SWITCHING_PROTOCOLS
+            || Message\STATUS_SWITCHING_PROTOCOLS == $candidate->status
           ) {
             $responseHead = $candidate;
             break;
@@ -246,7 +246,7 @@ final class H1Connection implements Connection {
             $candidate->headers,
           );
 
-          if ($candidate->status == Message\STATUS_CONTINUE) {
+          if (Message\STATUS_CONTINUE == $candidate->status) {
             $this->writeBody($request, $contentLength, $chunked, $cancellation);
 
             break;
@@ -257,7 +257,7 @@ final class H1Connection implements Connection {
       }
     }
 
-    while ($responseHead == null) {
+    while (null == $responseHead) {
       $candidate = read_h1_response_head(
         $this->reader,
         $configuration->maximumResponseHeaderSize,
@@ -266,7 +266,7 @@ final class H1Connection implements Connection {
 
       if (
         $candidate->status < 200
-        && $candidate->status != Message\STATUS_SWITCHING_PROTOCOLS
+        && Message\STATUS_SWITCHING_PROTOCOLS != $candidate->status
       ) {
         if (
           length!($informational)
@@ -299,7 +299,7 @@ final class H1Connection implements Connection {
     $this->reusable =
       !$requestCloses
       && !$responseCloses
-      && $head->status != Message\STATUS_SWITCHING_PROTOCOLS
+      && Message\STATUS_SWITCHING_PROTOCOLS != $head->status
       && match ($head->protocolVersion) {
         ProtocolVersion::V11 => true,
         ProtocolVersion::V10 => $responseKeepsAlive,
@@ -309,14 +309,14 @@ final class H1Connection implements Connection {
     if ($hasBody) {
       $contentLength = content_length($head->headers);
       $chunked = is_chunked($head->headers);
-      if ($contentLength != null && $chunked) {
+      if (null != $contentLength && $chunked) {
         $this->stream->close();
         throw new ProtocolException(
           'the response contains both Content-Length and Transfer-Encoding',
         );
       }
 
-      if ($contentLength != null) {
+      if (null != $contentLength) {
         if ($contentLength > $configuration->maximumResponseBodySize) {
           $this->stream->close();
           throw new ProtocolException(
@@ -324,7 +324,7 @@ final class H1Connection implements Connection {
           );
         }
 
-        if ($contentLength == 0) {
+        if (0 == $contentLength) {
           if (!$this->reusable) {
             $this->stream->close();
           }
@@ -361,7 +361,7 @@ final class H1Connection implements Connection {
       }
     }
 
-    if ($body != null && !$body->reachedEndOfDataSource()) {
+    if (null != $body && !$body->reachedEndOfDataSource()) {
       $this->responseActive = true;
       $body = new H1ResponseBody($body, $this);
     }
@@ -386,7 +386,7 @@ final class H1Connection implements Connection {
     null|CancellationToken $cancellation,
   ): void {
     $body = $request->body;
-    assert!($body != null);
+    assert!(null != $body);
     if ($chunked) {
       while (true) {
         $data = match ($body->read(8192, $cancellation)) {
@@ -404,7 +404,7 @@ final class H1Connection implements Connection {
       }
 
       $this->stream->writeAll("0\r\n", $cancellation);
-      if ($request->trailers != null) {
+      if (null != $request->trailers) {
         foreach ($request->trailers->await($cancellation) as ($name, $value)) {
           $this->stream->writeAll(
             $name . ': ' . $value . "\r\n",
@@ -417,14 +417,14 @@ final class H1Connection implements Connection {
       return;
     }
 
-    if ($contentLength == null) {
+    if (null == $contentLength) {
       throw new RequestException('the request body has no framing');
     }
 
     $remaining = $contentLength;
     while ($remaining > 0) {
       $data = $body->read($remaining, $cancellation);
-      if ($data == '' && $body->reachedEndOfDataSource()) {
+      if ('' == $data && $body->reachedEndOfDataSource()) {
         throw new RequestException(
           'the request body ended before its declared content length',
         );

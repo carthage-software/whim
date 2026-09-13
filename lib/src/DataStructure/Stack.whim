@@ -43,7 +43,7 @@ final class Stack<T> implements ToIterator<int, T> {
   #[AlwaysInline]
   public function peek(): Option<T> {
     $count = length!($this->values);
-    if ($count == 0) {
+    if (0 == $count) {
       return new None();
     }
 

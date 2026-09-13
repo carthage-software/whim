@@ -43,7 +43,7 @@ final class Pool {
         $this->close($entry->connection);
       } else {
         if (
-          $selected == null
+          null == $selected
           && $entry->matches($origin, $configuration, $versions)
         ) {
           $selected = $entry;
@@ -60,7 +60,7 @@ final class Pool {
       if (!$entry->connection->isReusable()) {
         $this->close($entry->connection);
       } else if (
-        $selected == null
+        null == $selected
         && $entry->matches($origin, $configuration, $versions)
       ) {
         $selected = $entry;
@@ -70,12 +70,12 @@ final class Pool {
     }
 
     $this->idle = $idle;
-    if ($selected == null) {
+    if (null == $selected) {
       $pending = $this->findPending($origin, $configuration);
-      if ($pending != null) {
+      if (null != $pending) {
         $selected = $pending->await($cancellation);
         if (
-          $selected != null
+          null != $selected
           && $selected->connection->isReusable()
           && $selected->matches($origin, $configuration, $versions)
         ) {
@@ -149,8 +149,8 @@ final class Pool {
     }
 
     if (
-      $this->maximumIdleConnections == 0
-      || $this->maximumIdleConnectionsPerOrigin == 0
+      0 == $this->maximumIdleConnections
+      || 0 == $this->maximumIdleConnectionsPerOrigin
     ) {
       $this->close($entry->connection);
       return;
@@ -193,7 +193,7 @@ final class Pool {
 
   private function evictShared(): void {
     if (
-      $this->maximumIdleConnections == 0
+      0 == $this->maximumIdleConnections
       || length!($this->shared) < $this->maximumIdleConnections
     ) {
       return;

@@ -22,7 +22,7 @@ final class RequestCancellationToken implements CancellationToken {
   #[TrackCaller]
   public function addTimeout(Duration $timeout): void {
     $parent = $this->timeout;
-    if ($parent == null) {
+    if (null == $parent) {
       $parent = $this->source();
     }
 
@@ -31,7 +31,7 @@ final class RequestCancellationToken implements CancellationToken {
 
   #[AlwaysInline]
   public function isCancellationRequested(): bool {
-    if ($this->timeout != null) {
+    if (null != $this->timeout) {
       return $this->timeout->isCancellationRequested();
     }
 
@@ -43,7 +43,7 @@ final class RequestCancellationToken implements CancellationToken {
 
   #[TrackCaller]
   public function throwIfCancellationRequested(): void {
-    if ($this->timeout != null) {
+    if (null != $this->timeout) {
       $this->timeout->throwIfCancellationRequested();
       return;
     }
@@ -54,7 +54,7 @@ final class RequestCancellationToken implements CancellationToken {
 
   #[TrackCaller]
   public function register(fn(): void $callback): int {
-    if ($this->timeout != null) {
+    if (null != $this->timeout) {
       return $this->timeout->register($callback);
     }
 
@@ -63,7 +63,7 @@ final class RequestCancellationToken implements CancellationToken {
 
   #[TrackCaller]
   public function unregister(int $id): void {
-    if ($this->timeout != null) {
+    if (null != $this->timeout) {
       $this->timeout->unregister($id);
       return;
     }
@@ -73,11 +73,11 @@ final class RequestCancellationToken implements CancellationToken {
 
   #[TrackCaller]
   private function source(): CancellationToken {
-    if ($this->second == null) {
+    if (null == $this->second) {
       return $this->first;
     }
 
-    if ($this->linked == null) {
+    if (null == $this->linked) {
       $this->linked = new LinkedCancellationToken(vec[
         $this->first,
         $this->second,

@@ -28,7 +28,7 @@ final class EncodingReadHandle implements ReadHandle {
   public function waitUntilReadable(
     null|CancellationToken $cancellation = null,
   ): void {
-    if ($this->encodedBuffer != '' || $this->sourceEnded) {
+    if ('' != $this->encodedBuffer || $this->sourceEnded) {
       return;
     }
 
@@ -43,14 +43,14 @@ final class EncodingReadHandle implements ReadHandle {
 
     return (
       $this->sourceEnded
-      && $this->sourceBuffer == ''
-      && $this->encodedBuffer == ''
+      && '' == $this->sourceBuffer
+      && '' == $this->encodedBuffer
     );
   }
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($maxBytes == 0) {
+    if (0 == $maxBytes) {
       return '';
     }
 
@@ -58,7 +58,7 @@ final class EncodingReadHandle implements ReadHandle {
       return $this->source->tryRead($maxBytes);
     }
 
-    if ($this->encodedBuffer == '') {
+    if ('' == $this->encodedBuffer) {
       $this->fillEncodedBuffer();
     }
 
@@ -76,7 +76,7 @@ final class EncodingReadHandle implements ReadHandle {
     while (length!($this->sourceBuffer) < $chunkSize && !$this->sourceEnded) {
       $remaining = $chunkSize - length!($this->sourceBuffer);
       $chunk = $this->source->tryRead($remaining);
-      if ($chunk != '') {
+      if ('' != $chunk) {
         $this->sourceBuffer .= $chunk;
         continue;
       }
@@ -89,7 +89,7 @@ final class EncodingReadHandle implements ReadHandle {
     }
 
     if (
-      $this->sourceBuffer == ''
+      '' == $this->sourceBuffer
       || (length!($this->sourceBuffer) < $chunkSize && !$this->sourceEnded)
     ) {
       return;
@@ -128,7 +128,7 @@ final class EncodingReadHandle implements ReadHandle {
   #[TrackCaller]
   private function drain(null|int $maxBytes): string {
     if (
-      $maxBytes == null
+      null == $maxBytes
       || $maxBytes < 0
       || $maxBytes >= length!($this->encodedBuffer)
     ) {

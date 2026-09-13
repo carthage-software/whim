@@ -32,7 +32,7 @@ final readonly class IRI implements Equal<IRI>, ToString {
       $value @ string => Authority::parse($value),
     };
 
-    if ($components[1] != null && $authority == null) {
+    if (null != $components[1] && null == $authority) {
       return null;
     }
 
@@ -51,7 +51,7 @@ final readonly class IRI implements Equal<IRI>, ToString {
   #[TrackCaller]
   public static function from(string $iri): IRI {
     $parsed = IRI::parse($iri);
-    if ($parsed == null) {
+    if (null == $parsed) {
       throw new InvalidArgumentException(
         'invalid IRI reference: `' . $iri . '`',
       );
@@ -184,7 +184,7 @@ final readonly class IRI implements Equal<IRI>, ToString {
   #[AlwaysInline]
   #[MustUse]
   public function isAbsolute(): bool {
-    return $this->scheme != null;
+    return null != $this->scheme;
   }
 
   /** Reports whether two IRI references have the same components. */
@@ -203,16 +203,16 @@ final readonly class IRI implements Equal<IRI>, ToString {
       $value @ string => $value . ':',
     };
 
-    if ($this->authority != null) {
+    if (null != $this->authority) {
       $result .= '//' . $this->authority->toString();
     }
 
     $result .= $this->path;
-    if ($this->query != null) {
+    if (null != $this->query) {
       $result .= '?' . $this->query;
     }
 
-    if ($this->fragment != null) {
+    if (null != $this->fragment) {
       $result .= '#' . $this->fragment;
     }
 

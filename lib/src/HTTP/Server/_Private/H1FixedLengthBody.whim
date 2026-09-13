@@ -24,19 +24,19 @@ final class H1FixedLengthBody implements ReadHandle {
   public function waitUntilReadable(
     null|CancellationToken $cancellation = null,
   ): void {
-    if ($this->remaining != 0) {
+    if (0 != $this->remaining) {
       $this->reader->waitUntilReadable($this->cancellation);
     }
   }
 
   public function reachedEndOfDataSource(): bool {
-    return $this->remaining == 0;
+    return 0 == $this->remaining;
   }
 
   #[TrackCaller]
   #[TraceBoundary]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->remaining == 0) {
+    if (0 == $this->remaining) {
       return '';
     }
 
@@ -53,7 +53,7 @@ final class H1FixedLengthBody implements ReadHandle {
     null|int $maxBytes = null,
     null|CancellationToken $cancellation = null,
   ): string {
-    if ($this->remaining == 0) {
+    if (0 == $this->remaining) {
       return '';
     }
 
@@ -71,7 +71,7 @@ final class H1FixedLengthBody implements ReadHandle {
   }
 
   private function limit(null|int $maximum): int {
-    if ($maximum == null || $maximum < 0 || $maximum > $this->remaining) {
+    if (null == $maximum || $maximum < 0 || $maximum > $this->remaining) {
       return $this->remaining;
     }
 

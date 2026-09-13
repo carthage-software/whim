@@ -50,7 +50,7 @@ function read(
   null|CancellationToken $cancellation = null,
 ): string {
   try {
-    if ($cancellation == null) {
+    if (null == $cancellation) {
       return read_file($file, $offset, $length);
     }
 

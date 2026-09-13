@@ -24,7 +24,7 @@ final readonly class FutureImpl<T> implements Future<T> {
   #[TrackCaller]
   #[TraceBoundary]
   public function await(null|CancellationToken $cancellation = null): T {
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $cancellation->throwIfCancellationRequested();
     }
 
@@ -35,7 +35,7 @@ final readonly class FutureImpl<T> implements Future<T> {
     $suspension = Whim\_Private\create_suspension::<T>();
     $gate = new Strong::<bool>(false);
     $cancellationId = null;
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $cancellationId = $cancellation->register(fn(): void {
         if ($gate->value) {
           return;
@@ -52,7 +52,7 @@ final readonly class FutureImpl<T> implements Future<T> {
 
     $stateId = $this->state->subscribe(
       fn(null|Throwable $error, null|(T,) $result): void {
-        if ($cancellation != null && $cancellationId != null) {
+        if (null != $cancellation && null != $cancellationId) {
           $cancellation->unregister($cancellationId);
         }
 
@@ -61,7 +61,7 @@ final readonly class FutureImpl<T> implements Future<T> {
         }
 
         $gate->value = true;
-        if ($error != null) {
+        if (null != $error) {
           $suspension->throw($error);
         } else {
           $suspension->resume(($result as (T,))[0]);
@@ -74,7 +74,7 @@ final readonly class FutureImpl<T> implements Future<T> {
     } finally {
       $gate->value = true;
       $this->state->unsubscribe($stateId);
-      if ($cancellation != null && $cancellationId != null) {
+      if (null != $cancellation && null != $cancellationId) {
         $cancellation->unregister($cancellationId);
       }
     }
@@ -83,7 +83,7 @@ final readonly class FutureImpl<T> implements Future<T> {
   /** Marks the future as intentionally unobserved. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function ignore(): static {
+  public function ignore(): self {
     $this->state->ignore();
     return $this;
   }
@@ -110,7 +110,7 @@ final readonly class FutureImpl<T> implements Future<T> {
     $deferred = new Deferred::<U>();
     $this->state->subscribe(fn(null|Throwable $error, null|(T,) $result): void {
       try {
-        if ($error != null) {
+        if (null != $error) {
           $deferred->complete($failure($error));
         } else {
           $deferred->complete($success(($result as (T,))[0]));
@@ -140,7 +140,7 @@ final readonly class FutureImpl<T> implements Future<T> {
     $this->state->subscribe(fn(null|Throwable $error, null|(T,) $result): void {
       try {
         $always();
-        if ($error != null) {
+        if (null != $error) {
           $deferred->error($error);
         } else {
           $deferred->complete(($result as (T,))[0]);

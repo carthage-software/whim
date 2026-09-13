@@ -121,7 +121,7 @@ assert!($message == 'hi!');
 assert!($demoStart->elapsed()->isPositive());
 
 $waitGroup = new Async\WaitGroup();
-for ($i = 0; $i < 3; $i = $i + 1) {
+for ($i = 0; $i < 3; $i++) {
   $waitGroup->add();
   Async\spawn::<int>(fn(): int {
     Async\sleep(Duration::fromMilliseconds(15));

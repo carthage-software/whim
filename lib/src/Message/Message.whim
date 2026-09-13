@@ -36,7 +36,7 @@ final readonly class Message {
   #[MustUse]
   #[TrackCaller]
   public static function create(null|Part $content = null): Message {
-    $content = $content ?? new RawPart(Headers::default(), new MemoryHandle());
+    $content ??= new RawPart(Headers::default(), new MemoryHandle());
     return new Message(
       Headers::default(),
       null,
@@ -67,7 +67,7 @@ final readonly class Message {
     $date = Message::parseDate($headers->get('date'));
     $messageId = Message::parseIdentifier($headers->get('message-id'));
     $subject = $headers->get('subject');
-    if ($subject != null) {
+    if (null != $subject) {
       $subject = EncodedWord\decode($subject);
     }
 
@@ -225,7 +225,7 @@ final readonly class Message {
   #[MustUse]
   #[TrackCaller]
   private static function parseAddresses(null|string $value): null|AddressList {
-    if ($value == null) {
+    if (null == $value) {
       return null;
     }
 
@@ -235,7 +235,7 @@ final readonly class Message {
   #[MustUse]
   #[TrackCaller]
   private static function parseMailbox(null|string $value): null|Mailbox {
-    if ($value == null) {
+    if (null == $value) {
       return null;
     }
 
@@ -245,7 +245,7 @@ final readonly class Message {
   #[MustUse]
   #[TrackCaller]
   private static function parseDate(null|string $value): null|ZonedDateTime {
-    if ($value == null) {
+    if (null == $value) {
       return null;
     }
 
@@ -255,7 +255,7 @@ final readonly class Message {
   #[MustUse]
   #[TrackCaller]
   private static function parseIdentifier(null|string $value): null|MessageId {
-    if ($value == null) {
+    if (null == $value) {
       return null;
     }
 

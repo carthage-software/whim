@@ -54,12 +54,12 @@ final readonly class CORS implements Middleware {
     $allowedOrigin = $this->allowedOrigin($origin);
     $requestedMethod = $request->headers->get('Access-Control-Request-Method');
 
-    if ($request->method == METHOD_OPTIONS && $requestedMethod != null) {
+    if (METHOD_OPTIONS == $request->method && null != $requestedMethod) {
       return $this->preflight($request, $allowedOrigin, $requestedMethod);
     }
 
     $response = $next->handle($context, $request, $cancellation);
-    if ($allowedOrigin == null) {
+    if (null == $allowedOrigin) {
       return $response;
     }
 
@@ -92,10 +92,10 @@ final readonly class CORS implements Middleware {
   ): Response {
     $requestedHeaders = $this->requestedHeaders($request);
     if (
-      $allowedOrigin == null
+      null == $allowedOrigin
       || !http_valid_token($requestedMethod)
       || !contains!($this->allowedMethods, $requestedMethod)
-      || $requestedHeaders == null
+      || null == $requestedHeaders
       || !$this->allowsHeaders($requestedHeaders)
     ) {
       return new Response(STATUS_FORBIDDEN, $request->protocolVersion);
@@ -106,7 +106,7 @@ final readonly class CORS implements Middleware {
       ('Access-Control-Allow-Methods', $requestedMethod),
     ]);
 
-    if ($requestedHeaders != vec[]) {
+    if (vec[] != $requestedHeaders) {
       $headers = $headers->with(
         'Access-Control-Allow-Headers',
         join(', ', $requestedHeaders),
@@ -117,13 +117,13 @@ final readonly class CORS implements Middleware {
       $headers = $headers->with('Access-Control-Allow-Credentials', 'true');
     }
 
-    if ($this->maxAge != null) {
+    if (null != $this->maxAge) {
       $headers = $headers->with('Access-Control-Max-Age', '' . $this->maxAge);
     }
 
     $headers = $this->vary($headers, 'Access-Control-Request-Method');
     $headers = $this->vary($headers, 'Access-Control-Request-Headers');
-    if ($allowedOrigin != '*') {
+    if ('*' != $allowedOrigin) {
       $headers = $this->vary($headers, 'Origin');
     }
 
@@ -140,14 +140,14 @@ final readonly class CORS implements Middleware {
       $headers = $headers->with('Access-Control-Allow-Credentials', 'true');
     }
 
-    if ($this->exposedHeaders != vec[]) {
+    if (vec[] != $this->exposedHeaders) {
       $headers = $headers->with(
         'Access-Control-Expose-Headers',
         join(', ', $this->exposedHeaders),
       );
     }
 
-    if ($allowedOrigin != '*') {
+    if ('*' != $allowedOrigin) {
       $headers = $this->vary($headers, 'Origin');
     }
 
@@ -157,14 +157,14 @@ final readonly class CORS implements Middleware {
   /** Parses requested preflight field names. */
   private function requestedHeaders(Request $request): null|vec<FieldName> {
     $field = $request->headers->get('Access-Control-Request-Headers');
-    if ($field == null || trim($field) == '') {
+    if (null == $field || trim($field) == '') {
       return vec[];
     }
 
     $headers = vec[];
     foreach (split($field, ',') as $part) {
       $header = trim($part);
-      if ($header == '' || !http_valid_token($header)) {
+      if ('' == $header || !http_valid_token($header)) {
         return null;
       }
 
@@ -204,7 +204,7 @@ final readonly class CORS implements Middleware {
     foreach ($headers->getAll('Vary') as $field) {
       foreach (split($field, ',') as $candidate) {
         $candidate = string_lowercase(trim($candidate));
-        if ($candidate == '*' || $candidate == $normalized) {
+        if ('*' == $candidate || $candidate == $normalized) {
           return $headers;
         }
       }

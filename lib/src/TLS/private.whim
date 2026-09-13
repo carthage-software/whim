@@ -27,15 +27,15 @@ use Whim\TLS\Version;
 function failure(Whim\_Private\TlsError $error): never {
   $message = $error->getMessage();
   $code = $error->kind();
-  if ($code == Whim\_Private\TLS_ERROR_CONFIGURATION) {
+  if (Whim\_Private\TLS_ERROR_CONFIGURATION == $code) {
     throw new ConfigurationException($message, $code, $error);
   }
 
-  if ($code == Whim\_Private\TLS_ERROR_CERTIFICATE) {
+  if (Whim\_Private\TLS_ERROR_CERTIFICATE == $code) {
     throw new CertificateException($message, $code, $error);
   }
 
-  if ($code == Whim\_Private\TLS_ERROR_HANDSHAKE) {
+  if (Whim\_Private\TLS_ERROR_HANDSHAKE == $code) {
     throw new HandshakeException($message, $code, $error);
   }
 
@@ -64,7 +64,7 @@ function client_configuration(
 ): Whim\_Private\TlsClientConfiguration {
   $chain = null;
   $key = null;
-  if ($configuration->identity != null) {
+  if (null != $configuration->identity) {
     $chain = certificate_bytes($configuration->identity->certificateChain);
     $key = $configuration->identity->privateKey;
   }
@@ -136,7 +136,7 @@ function transmit<TEndpoint: Endpoint>(
       failure($error);
     }
 
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return;
     }
 
@@ -159,7 +159,7 @@ function handshake<TEndpoint: Endpoint>(
     }
 
     $bytes = $stream->read(65536, $cancellation);
-    if ($bytes == '' && $stream->reachedEndOfDataSource()) {
+    if ('' == $bytes && $stream->reachedEndOfDataSource()) {
       throw new HandshakeException(
         'the transport ended during the TLS handshake',
       );
@@ -232,7 +232,7 @@ function connection_state(
     failure($error);
   }
 
-  if ($version == null || $cipherSuite == null || $handshakeKind == null) {
+  if (null == $version || null == $cipherSuite || null == $handshakeKind) {
     throw new ProtocolException('the TLS handshake has not completed');
   }
 

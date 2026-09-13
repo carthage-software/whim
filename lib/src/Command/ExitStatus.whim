@@ -23,7 +23,7 @@ final readonly class Exited implements ExitStatus {
   #[AlwaysInline]
   #[MustUse]
   public function isSuccess(): bool {
-    return $this->code == 0;
+    return 0 == $this->code;
   }
 }
 

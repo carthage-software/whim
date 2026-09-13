@@ -107,7 +107,7 @@ final class DefaultTransport implements Transport {
       throw new ConnectionException('the SMTP transport is closed');
     }
 
-    while ($this->idle != vec[]) {
+    while (vec[] != $this->idle) {
       $session = remove_last!($this->idle);
       if ($session->isExpired($this->configuration->idleConnectionTimeout)) {
         $this->closeSession($session);
@@ -136,7 +136,7 @@ final class DefaultTransport implements Transport {
   private function checkin(_Private\Session $session): void {
     if (
       $this->closed
-      || $this->configuration->maximumIdleConnections == 0
+      || 0 == $this->configuration->maximumIdleConnections
       || length!($this->idle) >= $this->configuration->maximumIdleConnections
     ) {
       $this->closeSession($session);
@@ -168,7 +168,7 @@ final class DefaultTransport implements Transport {
         $cancellation,
       );
 
-      if ($this->configuration->security == Security::ImplicitTls) {
+      if (Security::ImplicitTls == $this->configuration->security) {
         $tls = new TlsConnector::<InternetEndpoint>($this->configuration->tls);
 
         $stream = $tls->connect($stream, $serverName, $cancellation);
@@ -177,7 +177,7 @@ final class DefaultTransport implements Transport {
       $connection = new Connection($stream);
       discard!($connection->readGreeting($cancellation));
       $this->ehlo($connection, $cancellation);
-      if ($this->configuration->security == Security::StartTls) {
+      if (Security::StartTls == $this->configuration->security) {
         if (!$connection->supportsCapability(Capability::StartTls)) {
           throw new ConnectionException(
             'the SMTP server does not advertise STARTTLS',
@@ -185,7 +185,7 @@ final class DefaultTransport implements Transport {
         }
 
         $reply = $connection->sendCommand('STARTTLS', $cancellation);
-        if ($reply->code != 220) {
+        if (220 != $reply->code) {
           throw new ConnectionException(
             'the SMTP server rejected STARTTLS with '
             . $reply->code
@@ -201,7 +201,7 @@ final class DefaultTransport implements Transport {
         $this->ehlo($connection, $cancellation);
       }
 
-      if ($this->authenticator != null) {
+      if (null != $this->authenticator) {
         $this->authenticator->authenticate($connection, $cancellation);
       }
 
@@ -263,7 +263,7 @@ final class DefaultTransport implements Transport {
       throw new ConnectionException('the SMTP host name is not valid');
     }
 
-    if ($ascii == '') {
+    if ('' == $ascii) {
       throw new ConnectionException('the SMTP host name is not valid');
     }
 
@@ -352,7 +352,7 @@ final class DefaultTransport implements Transport {
       $rejected[] = ($recipient, $reply);
     }
 
-    if ($accepted == 0) {
+    if (0 == $accepted) {
       if ($this->configuration->allowPartialSuccess) {
         return new DeliveryReport($rejected);
       }
@@ -370,8 +370,8 @@ final class DefaultTransport implements Transport {
     if ($chunking) {
       $this->transmitChunked($connection, $source, $cancellation);
     } else {
-      if ($dataReply == null || $dataReply->code != 354) {
-        if ($dataReply == null) {
+      if (null == $dataReply || 354 != $dataReply->code) {
+        if (null == $dataReply) {
           throw new ProtocolException('the SMTP server omitted the DATA reply');
         }
 
@@ -399,14 +399,14 @@ final class DefaultTransport implements Transport {
     while (true) {
       $chunk = $source->read($this->configuration->chunkSize, $cancellation);
 
-      $last = $chunk == '' || $source->reachedEndOfDataSource();
+      $last = '' == $chunk || $source->reachedEndOfDataSource();
       $command = 'BDAT ' . length!($chunk);
       if ($last) {
         $command .= ' LAST';
       }
 
       $connection->writeCommand(Command::from($command), $cancellation);
-      if ($chunk != '') {
+      if ('' != $chunk) {
         $connection->writeAll($chunk, $cancellation);
       }
 

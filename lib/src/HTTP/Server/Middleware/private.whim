@@ -16,7 +16,7 @@ function content_codings(vec<string> $values): null|vec<NonEmptyString> {
   $codings = vec[];
   foreach (split(join(',', $values), ',') as $part) {
     $coding = string_lowercase(trim($part));
-    if ($coding == '' || !http_valid_token($coding)) {
+    if ('' == $coding || !http_valid_token($coding)) {
       return null;
     }
 
@@ -31,7 +31,7 @@ function select_response_codec(
   Registry $registry,
   null|string $field,
 ): (null|Codec, bool) {
-  if ($field == null) {
+  if (null == $field) {
     return (null, true);
   }
 
@@ -51,7 +51,7 @@ function select_response_codec(
   $identityQuality = 1000;
   if (contains_key!($qualities, 'identity')) {
     $identityQuality = $qualities['identity'];
-  } else if ($wildcard == 0) {
+  } else if (0 == $wildcard) {
     $identityQuality = 0;
   }
 
@@ -81,7 +81,7 @@ function vary_by_accept_encoding(FieldMap $headers): FieldMap {
   foreach ($headers->getAll('Vary') as $field) {
     foreach (split($field, ',') as $name) {
       $name = string_lowercase(trim($name));
-      if ($name == '*' || $name == 'accept-encoding') {
+      if ('*' == $name || 'accept-encoding' == $name) {
         return $headers;
       }
     }
@@ -107,7 +107,7 @@ function forbids_transformation(FieldMap $headers): bool {
 function weighted_coding(string $part): null|(string, int) {
   $segments = split($part, ';');
   $coding = string_lowercase(trim($segments[0]));
-  if ($coding == '' || ($coding != '*' && !http_valid_token($coding))) {
+  if ('' == $coding || ('*' != $coding && !http_valid_token($coding))) {
     return null;
   }
 
@@ -132,17 +132,17 @@ function weighted_coding(string $part): null|(string, int) {
 
 /** Parses an HTTP quality value into thousandths. */
 function quality(string $value): null|int {
-  if ($value == '0') {
+  if ('0' == $value) {
     return 0;
   }
 
-  if ($value == '1') {
+  if ('1' == $value) {
     return 1000;
   }
 
   if (
     !($value is string[2..=5])
-    || $value[1] != '.'
+    || '.' != $value[1]
     || !($value[0] is '0'|'1')
   ) {
     return null;
@@ -164,11 +164,11 @@ function quality(string $value): null|int {
     }
 
     $digit = $byte - 48;
-    if ($result == 1000 && $digit != 0) {
+    if (1000 == $result && 0 != $digit) {
       return null;
     }
 
-    if ($result != 1000) {
+    if (1000 != $result) {
       $result += $digit * $factor;
     }
 

@@ -46,8 +46,8 @@ final readonly class Command implements ToString {
   #[TrackCaller]
   public static function from(string $command): Command {
     $space = Str\search($command, ' ');
-    if ($space == null) {
-      if ($command == '') {
+    if (null == $space) {
+      if ('' == $command) {
         throw new InvalidArgumentException('an SMTP command cannot be empty');
       }
 
@@ -70,7 +70,7 @@ final readonly class Command implements ToString {
   #[AlwaysInline]
   #[MustUse]
   public function toString(): string {
-    if ($this->argument == '') {
+    if ('' == $this->argument) {
       return $this->verb;
     }
 

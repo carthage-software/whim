@@ -77,9 +77,9 @@ final class State {
       Role::Server => 2,
     };
 
-    $this->receivedClientPreface = $role == Role::Client;
+    $this->receivedClientPreface = Role::Client == $role;
 
-    if ($role == Role::Client) {
+    if (Role::Client == $role) {
       $this->outbound = Whim\HTTP\_Private\CLIENT_PREFACE;
     }
 

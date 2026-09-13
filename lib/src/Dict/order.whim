@@ -50,7 +50,7 @@ function sort<K: ArrayKey, V>(
   null|Comparator<V> $comparator = null,
 ): dict<K, V> {
   $values = from_iterable::<K, V>($values);
-  if ($comparator == null) {
+  if (null == $comparator) {
     return Whim\_Private\dict_sort($values, null);
   }
 
@@ -75,7 +75,7 @@ function sort_by<K: ArrayKey, V, S>(
     $keys[] = $scalar($value);
   }
 
-  if ($comparator == null) {
+  if (null == $comparator) {
     return from_entries::<K, V>(
       Whim\_Private\vec_sort_by($entries, $keys, null),
     );
@@ -104,7 +104,7 @@ function sort_by_key<K: ArrayKey, V>(
     $keys[] = $key;
   }
 
-  if ($comparator == null) {
+  if (null == $comparator) {
     return from_entries::<K, V>(
       Whim\_Private\vec_sort_by($entries, $keys, null),
     );

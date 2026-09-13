@@ -45,7 +45,7 @@ final readonly class ScramSha256Authenticator implements Authenticator {
       $cancellation,
     );
 
-    if ($reply->code != 334) {
+    if (334 != $reply->code) {
       throw _Private\rejected($this->mechanism(), $reply);
     }
 
@@ -80,7 +80,7 @@ final readonly class ScramSha256Authenticator implements Authenticator {
     );
 
     _Private\require_authentication_success($this->mechanism(), $reply);
-    if ($reply->message == '') {
+    if ('' == $reply->message) {
       return;
     }
 

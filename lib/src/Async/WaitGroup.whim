@@ -27,12 +27,12 @@ final class WaitGroup {
   #[NeverInline]
   #[TrackCaller]
   public function done(): void {
-    if ($this->count == 0) {
+    if (0 == $this->count) {
       throw new LogicException('the wait group counter is already zero');
     }
 
     $this->count--;
-    if ($this->count != 0) {
+    if (0 != $this->count) {
       return;
     }
 
@@ -50,11 +50,11 @@ final class WaitGroup {
   #[NeverInline]
   #[TrackCaller]
   public function wait(null|CancellationToken $cancellation = null): void {
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $cancellation->throwIfCancellationRequested();
     }
 
-    if ($this->count == 0) {
+    if (0 == $this->count) {
       return;
     }
 
@@ -62,7 +62,7 @@ final class WaitGroup {
     $waiter = new _Private\Waiter::<null>($suspension);
     $this->waiters[] = $waiter;
     $id = null;
-    if ($cancellation != null) {
+    if (null != $cancellation) {
       $id = $cancellation->register(fn(): void {
         if (!$waiter->active) {
           return;
@@ -81,7 +81,7 @@ final class WaitGroup {
       $suspension->suspend();
     } finally {
       $waiter->active = false;
-      if ($cancellation != null && $id != null) {
+      if (null != $cancellation && null != $id) {
         $cancellation->unregister($id);
       }
     }

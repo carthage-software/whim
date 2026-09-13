@@ -32,7 +32,7 @@ final readonly class TimeZone implements Equal<TimeZone> {
   #[TrackCaller]
   public static function from(string $identifier): TimeZone {
     $timezone = TimeZone::parse($identifier);
-    if ($timezone == null) {
+    if (null == $timezone) {
       throw new InvalidArgumentException(
         'invalid timezone: `' . $identifier . '`',
       );
@@ -54,7 +54,7 @@ final readonly class TimeZone implements Equal<TimeZone> {
   #[TrackCaller]
   public static function fixedOffset(OffsetSeconds $seconds): TimeZone {
     $inner = DateTimeZoneImpl::fixedOffset($seconds);
-    if ($inner == null) {
+    if (null == $inner) {
       throw new InvalidArgumentException('invalid UTC offset');
     }
 
@@ -67,7 +67,7 @@ final readonly class TimeZone implements Equal<TimeZone> {
   #[TrackCaller]
   public static function system(): TimeZone {
     $inner = DateTimeZoneImpl::system();
-    if ($inner == null) {
+    if (null == $inner) {
       throw new RuntimeException('unable to detect the system timezone');
     }
 
@@ -87,7 +87,7 @@ final readonly class TimeZone implements Equal<TimeZone> {
   #[TrackCaller]
   public function offsetAt(SystemTime $time): Duration {
     $offset = $this->inner->offsetAt($time->seconds, $time->nanoseconds);
-    if ($offset == null) {
+    if (null == $offset) {
       throw new InvalidArgumentException(
         'the system time is outside the supported date-time range',
       );
@@ -106,7 +106,7 @@ final readonly class TimeZone implements Equal<TimeZone> {
       $time->nanoseconds,
     );
 
-    if ($abbreviation == null) {
+    if (null == $abbreviation) {
       throw new InvalidArgumentException(
         'the system time is outside the supported date-time range',
       );
@@ -148,7 +148,7 @@ final readonly class TimeZone implements Equal<TimeZone> {
       $time->nanoseconds,
     );
 
-    if ($parts == null) {
+    if (null == $parts) {
       throw new InvalidArgumentException(
         'the system time is outside the supported date-time range',
       );
@@ -191,7 +191,7 @@ final readonly class TimeZone implements Equal<TimeZone> {
       $disambiguation->value,
     );
 
-    if ($resolved == null) {
+    if (null == $resolved) {
       throw new InvalidArgumentException(
         'the local time cannot be resolved in this timezone',
       );

@@ -69,17 +69,17 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
       return;
     }
 
-    if ($this->readBuffer != '') {
+    if ('' != $this->readBuffer) {
       return;
     }
 
     $plaintext = $this->readPlaintext(65536);
-    if ($plaintext == null) {
+    if (null == $plaintext) {
       $this->reachedEnd = true;
       return;
     }
 
-    if ($plaintext != '') {
+    if ('' != $plaintext) {
       $this->readBuffer = $plaintext;
       return;
     }
@@ -104,7 +104,7 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
       return '';
     }
 
-    if ($this->readBuffer != '') {
+    if ('' != $this->readBuffer) {
       if ($maximum >= length!($this->readBuffer)) {
         $plaintext = $this->readBuffer;
         $this->readBuffer = '';
@@ -118,17 +118,17 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
 
     while (true) {
       $plaintext = $this->readPlaintext($maximum as PositiveInt);
-      if ($plaintext == null) {
+      if (null == $plaintext) {
         $this->reachedEnd = true;
         return '';
       }
 
-      if ($plaintext != '') {
+      if ('' != $plaintext) {
         return $plaintext;
       }
 
       $ciphertext = $this->stream->tryRead(65536);
-      if ($ciphertext == '') {
+      if ('' == $ciphertext) {
         if ($this->stream->reachedEndOfDataSource()) {
           $this->receiveEnd();
           continue;
@@ -148,7 +148,7 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
     null|CancellationToken $cancellation = null,
   ): void {
     $this->flushNonBlocking();
-    if ($this->writeBuffer == '') {
+    if ('' == $this->writeBuffer) {
       return;
     }
 
@@ -158,12 +158,12 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
   #[TrackCaller]
   #[TraceBoundary]
   public function tryWrite(string $bytes): int {
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return 0;
     }
 
     $this->flushNonBlocking();
-    if ($this->writeBuffer != '') {
+    if ('' != $this->writeBuffer) {
       return 0;
     }
 
@@ -178,7 +178,7 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
     string $bytes,
     null|CancellationToken $cancellation = null,
   ): int {
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return 0;
     }
 
@@ -193,13 +193,13 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
   public function shutdown(
     ShutdownDirection $direction = ShutdownDirection::Write,
   ): void {
-    if ($direction != ShutdownDirection::Read) {
+    if (ShutdownDirection::Read != $direction) {
       $this->sendCloseNotify();
       $this->flush(null);
     }
 
     $this->stream->shutdown($direction);
-    if ($direction != ShutdownDirection::Write) {
+    if (ShutdownDirection::Write != $direction) {
       $this->reachedEnd = true;
     }
   }
@@ -293,9 +293,9 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
   #[TraceBoundary]
   private function flushNonBlocking(): void {
     while (true) {
-      if ($this->writeBuffer == '') {
+      if ('' == $this->writeBuffer) {
         $this->writeBuffer = $this->nextCiphertext();
-        if ($this->writeBuffer == '') {
+        if ('' == $this->writeBuffer) {
           return;
         }
       }
@@ -317,9 +317,9 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
   #[TraceBoundary]
   private function flush(null|CancellationToken $cancellation): void {
     while (true) {
-      if ($this->writeBuffer == '') {
+      if ('' == $this->writeBuffer) {
         $this->writeBuffer = $this->nextCiphertext();
-        if ($this->writeBuffer == '') {
+        if ('' == $this->writeBuffer) {
           return;
         }
       }

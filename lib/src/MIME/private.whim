@@ -70,8 +70,8 @@ function parse_parameters(string $input): null|vec<Parameter> {
     }
 
     $nameStart = $index;
-    while ($index < $length && $input[$index] != '=') {
-      if ($input[$index] == ';') {
+    while ($index < $length && '=' != $input[$index]) {
+      if (';' == $input[$index]) {
         return null;
       }
 
@@ -96,17 +96,17 @@ function parse_parameters(string $input): null|vec<Parameter> {
     }
 
     $value = '';
-    if ($index < $length && $input[$index] == '"') {
+    if ($index < $length && '"' == $input[$index]) {
       $index++;
       $closed = false;
       while ($index < $length) {
         $byte = $input[$index++];
-        if ($byte == '"') {
+        if ('"' == $byte) {
           $closed = true;
           break;
         }
 
-        if ($byte == '\\' && $index < $length) {
+        if ('\\' == $byte && $index < $length) {
           $value .= $input[$index++];
         } else {
           $value .= $byte;
@@ -118,7 +118,7 @@ function parse_parameters(string $input): null|vec<Parameter> {
       }
     } else {
       $valueStart = $index;
-      while ($index < $length && $input[$index] != ';') {
+      while ($index < $length && ';' != $input[$index]) {
         $index++;
       }
 
@@ -130,7 +130,7 @@ function parse_parameters(string $input): null|vec<Parameter> {
       $index++;
     }
 
-    if ($index < $length && $input[$index] != ';') {
+    if ($index < $length && ';' != $input[$index]) {
       return null;
     }
   }
@@ -152,14 +152,14 @@ function serialize_parameter_value(string $value): string {
 /** Reports whether a MIME header pair is safe to serialize. */
 #[AlwaysInline]
 function valid_header(string $name, string $value): bool {
-  if ($name == '' || Str\contains($value, "\r") || Str\contains($value, "\n")) {
+  if ('' == $name || Str\contains($value, "\r") || Str\contains($value, "\n")) {
     return false;
   }
 
   $index = 0;
   while ($index < length!($name)) {
     $byte = Str\ord($name[$index]);
-    if ($byte < 33 || $byte > 126 || $name[$index] == ':') {
+    if ($byte < 33 || $byte > 126 || ':' == $name[$index]) {
       return false;
     }
 

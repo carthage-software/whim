@@ -32,7 +32,7 @@ function encode_u16(
   Uint16 $value,
   Endianness $endianness = Endianness::Big,
 ): string[2] {
-  return _Private\binary_encode($value, 2, $endianness == Endianness::Little);
+  return _Private\binary_encode($value, 2, Endianness::Little == $endianness);
 }
 
 /** Writes a signed 16-bit integer as two bytes. */
@@ -42,7 +42,7 @@ function encode_i16(
   Int16 $value,
   Endianness $endianness = Endianness::Big,
 ): string[2] {
-  return _Private\binary_encode($value, 2, $endianness == Endianness::Little);
+  return _Private\binary_encode($value, 2, Endianness::Little == $endianness);
 }
 
 /** Writes an unsigned 32-bit integer as four bytes. */
@@ -52,7 +52,7 @@ function encode_u32(
   Uint32 $value,
   Endianness $endianness = Endianness::Big,
 ): string[4] {
-  return _Private\binary_encode($value, 4, $endianness == Endianness::Little);
+  return _Private\binary_encode($value, 4, Endianness::Little == $endianness);
 }
 
 /** Writes a signed 32-bit integer as four bytes. */
@@ -62,7 +62,7 @@ function encode_i32(
   Int32 $value,
   Endianness $endianness = Endianness::Big,
 ): string[4] {
-  return _Private\binary_encode($value, 4, $endianness == Endianness::Little);
+  return _Private\binary_encode($value, 4, Endianness::Little == $endianness);
 }
 
 /** Writes an unsigned 64-bit integer as eight bytes. */
@@ -72,7 +72,7 @@ function encode_u64(
   NonNegativeInt $value,
   Endianness $endianness = Endianness::Big,
 ): string[8] {
-  return _Private\binary_encode($value, 8, $endianness == Endianness::Little);
+  return _Private\binary_encode($value, 8, Endianness::Little == $endianness);
 }
 
 /** Writes a signed 64-bit integer as eight bytes. */
@@ -82,7 +82,7 @@ function encode_i64(
   int $value,
   Endianness $endianness = Endianness::Big,
 ): string[8] {
-  return _Private\binary_encode($value, 8, $endianness == Endianness::Little);
+  return _Private\binary_encode($value, 8, Endianness::Little == $endianness);
 }
 
 /** Writes a single-precision floating-point value as four bytes. */
@@ -95,7 +95,7 @@ function encode_f32(
   return _Private\binary_encode(
     _Private\float_to_bits32($value),
     4,
-    $endianness == Endianness::Little,
+    Endianness::Little == $endianness,
   );
 }
 
@@ -109,6 +109,6 @@ function encode_f64(
   return _Private\binary_encode(
     _Private\float_to_bits($value),
     8,
-    $endianness == Endianness::Little,
+    Endianness::Little == $endianness,
   );
 }

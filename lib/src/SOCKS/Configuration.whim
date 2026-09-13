@@ -17,7 +17,7 @@ final readonly class Configuration {
     public null|string[1..=255] $username = null,
     #[SensitiveParameter] public null|string[1..=255] $password = null,
   ) {
-    if (($username == null) != ($password == null)) {
+    if ((null == $username) != (null == $password)) {
       throw new InvalidArgumentException(
         'a SOCKS username and password must be configured together',
       );

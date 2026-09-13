@@ -36,7 +36,7 @@ final class PooledResult implements Result, BatchResult {
   #[TraceBoundary]
   public function fetch(null|CancellationToken $cancellation = null): null|Row {
     $row = $this->result->fetch($cancellation);
-    if ($row == null) {
+    if (null == $row) {
       $this->close();
     }
 

@@ -51,7 +51,7 @@ final class PushCollection {
 
   /** Releases a reserved result that the server cancelled. */
   public function cancel(): void {
-    if ($this->deferred->isComplete() || $this->pending == 0) {
+    if ($this->deferred->isComplete() || 0 == $this->pending) {
       return;
     }
 
@@ -73,7 +73,7 @@ final class PushCollection {
   private function finish(): void {
     if (
       $this->sealed
-      && $this->pending == 0
+      && 0 == $this->pending
       && !$this->deferred->isComplete()
     ) {
       $this->deferred->complete($this->exchanges);

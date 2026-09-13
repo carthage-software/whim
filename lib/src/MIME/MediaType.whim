@@ -42,7 +42,7 @@ final readonly class MediaType implements ToString {
 
     $suffix = '';
     $suffixPosition = Str\search_last($subtype, '+');
-    if ($suffixPosition != null && $suffixPosition + 1 < length!($subtype)) {
+    if (null != $suffixPosition && $suffixPosition + 1 < length!($subtype)) {
       $suffix = Str\slice($subtype, $suffixPosition + 1);
     }
 
@@ -51,7 +51,7 @@ final readonly class MediaType implements ToString {
       $tree = 'x';
     } else {
       $dot = Str\search($subtype, '.');
-      if ($dot != null && $dot > 0) {
+      if (null != $dot && $dot > 0) {
         $candidate = Str\slice($subtype, 0, $dot);
         if ($candidate is 'vnd'|'prs'|'x') {
           $tree = $candidate;
@@ -70,14 +70,14 @@ final readonly class MediaType implements ToString {
     $semicolon = Str\search($input, ';');
     $essence = $input;
     $parameters = Parameters::default();
-    if ($semicolon != null) {
+    if (null != $semicolon) {
       $essence = Str\trim(Str\slice($input, 0, $semicolon));
       $parameters =
         Parameters::parse(Str\slice($input, $semicolon + 1)) ?? return null;
     }
 
     $slash = Str\search($essence, '/');
-    if ($slash == null || $slash == 0 || $slash + 1 >= length!($essence)) {
+    if (null == $slash || 0 == $slash || $slash + 1 >= length!($essence)) {
       return null;
     }
 
@@ -99,7 +99,7 @@ final readonly class MediaType implements ToString {
   #[TrackCaller]
   public static function from(string $input): MediaType {
     $mediaType = MediaType::parse($input);
-    if ($mediaType == null) {
+    if (null == $mediaType) {
       throw new InvalidArgumentException(
         'invalid MIME media type: `' . $input . '`',
       );

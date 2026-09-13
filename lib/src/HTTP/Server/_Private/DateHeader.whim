@@ -21,7 +21,7 @@ final class DateHeader {
   /** Starts refreshing the shared date while a server is running. */
   public static function register(): void {
     DateHeader::$registrations++;
-    if (DateHeader::$task != null) {
+    if (null != DateHeader::$task) {
       return;
     }
 
@@ -36,12 +36,12 @@ final class DateHeader {
 
   /** Stops refreshing the shared date. */
   public static function unregister(): void {
-    if (DateHeader::$registrations == 0) {
+    if (0 == DateHeader::$registrations) {
       return;
     }
 
     DateHeader::$registrations--;
-    if (DateHeader::$registrations != 0 || DateHeader::$task == null) {
+    if (0 != DateHeader::$registrations || null == DateHeader::$task) {
       return;
     }
 
@@ -52,7 +52,7 @@ final class DateHeader {
   /** Returns the current HTTP date. */
   #[AlwaysInline]
   public static function getValue(): string[29] {
-    if (DateHeader::$value == '') {
+    if ('' == DateHeader::$value) {
       DateHeader::update();
     }
 

@@ -14,21 +14,21 @@ function receive_headers(
 ): vec<Event\WeakendEvent> {
   $entry = $state->streams->get($frame[1]);
   if (
-    $entry == null
+    null == $entry
     && stream_state($state, $frame[1]) == StreamState::Closed
   ) {
     receive_entry($state, $frame[1]);
   }
 
-  if ($entry == null) {
+  if (null == $entry) {
     $entry = open_peer_stream($state, $frame[1]);
-  } else if ($entry->state == StreamState::ReservedRemote) {
+  } else if (StreamState::ReservedRemote == $entry->state) {
     $state->streams->activatePeer($frame[1], $entry);
   } else {
     $entry = receive_entry($state, $frame[1]);
   }
 
-  if ($frame[5] != null && $frame[5] == $frame[1]) {
+  if (null != $frame[5] && $frame[5] == $frame[1]) {
     stream_error($frame[1], 'an HTTP/2 stream cannot depend on itself');
   }
 
@@ -54,7 +54,7 @@ function receive_push_promise(
   State $state,
   Frame\PushPromiseFrame $frame,
 ): vec<Event\WeakendEvent> {
-  if ($state->role != Role::Client) {
+  if (Role::Client != $state->role) {
     throw new ProtocolException('an HTTP/2 client cannot send PUSH_PROMISE');
   }
 
@@ -82,9 +82,9 @@ function complete_header_block(
 ): vec<Event\WeakendEvent> {
   $headers = decode_headers($state, $block->bytes);
 
-  if ($block->kind == HeaderBlockKind::PushPromise) {
+  if (HeaderBlockKind::PushPromise == $block->kind) {
     $promisedStreamId = $block->promisedStreamId;
-    if ($promisedStreamId == null) {
+    if (null == $promisedStreamId) {
       throw new ProtocolException(
         'an HTTP/2 push promise lost its promised stream',
       );
@@ -100,7 +100,7 @@ function complete_header_block(
     );
 
     $promised = $state->streams->get($promisedStreamId);
-    if ($promised == null) {
+    if (null == $promised) {
       throw new ProtocolException(
         'an HTTP/2 push promise lost its promised stream',
       );
@@ -120,7 +120,7 @@ function complete_header_block(
     stream_error($block->streamId, 'trailers in HTTP/2 must end the stream');
   }
 
-  if (!$trailers && $state->role == Role::Server) {
+  if (!$trailers && Role::Server == $state->role) {
     (
       $contentLength,
       $method,
@@ -172,7 +172,7 @@ function complete_header_block(
   $requestMethod = null;
   $status = null;
   if (!$trailers) {
-    if ($state->role == Role::Server) {
+    if (Role::Server == $state->role) {
       $requestMethod = HeaderValidator::requestMethod(
         $block->streamId,
         $headers,
@@ -200,7 +200,7 @@ function complete_header_block(
 
   if (!$trailers && !$informational) {
     $entry->receivedInitialHeaders = true;
-    if ($requestMethod != null) {
+    if (null != $requestMethod) {
       $entry->requestMethod = $requestMethod;
     }
 

@@ -36,9 +36,9 @@ final readonly class Configuration {
     $idleTimeout ??= Duration::fromMinutes(30);
 
     if (
-      $cookie->value != ''
-      || $cookie->expires != null
-      || $cookie->maxAge != null
+      '' != $cookie->value
+      || null != $cookie->expires
+      || null != $cookie->maxAge
     ) {
       throw new InvalidArgumentException(
         'the session cookie template must have an empty value and no expiry',
@@ -51,7 +51,7 @@ final readonly class Configuration {
       );
     }
 
-    if ($cookieLifetime != null && !$cookieLifetime->isPositive()) {
+    if (null != $cookieLifetime && !$cookieLifetime->isPositive()) {
       throw new InvalidArgumentException(
         'the session cookie lifetime must be positive',
       );

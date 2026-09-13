@@ -25,7 +25,7 @@ final readonly class Envelope {
     null|Mailbox $sender,
     vec<Mailbox> $recipients,
   ): Envelope {
-    if ($recipients == vec[]) {
+    if (vec[] == $recipients) {
       throw new InvalidArgumentException('an SMTP envelope needs a recipient');
     }
 
@@ -38,16 +38,16 @@ final readonly class Envelope {
   #[TrackCaller]
   public static function fromMessage(Message $message): Envelope {
     $sender = $message->sender;
-    if ($sender == null && $message->from != null) {
+    if (null == $sender && null != $message->from) {
       $mailboxes = $message->from->mailboxes();
-      if ($mailboxes != vec[]) {
+      if (vec[] != $mailboxes) {
         $sender = $mailboxes[0];
       }
     }
 
     $recipients = vec[];
     foreach (vec[$message->to, $message->cc, $message->bcc] as $addresses) {
-      if ($addresses == null) {
+      if (null == $addresses) {
         continue;
       }
 

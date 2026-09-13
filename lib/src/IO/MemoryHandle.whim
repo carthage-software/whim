@@ -64,7 +64,7 @@ final class MemoryHandle implements
     }
 
     $length = $available;
-    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $available) {
+    if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $available) {
       $length = $maxBytes;
     }
 
@@ -169,7 +169,7 @@ final class MemoryHandle implements
 
     $this->flushWrites();
     $length = length!($bytes);
-    if ($length == 0) {
+    if (0 == $length) {
       return 0;
     }
 
@@ -186,7 +186,7 @@ final class MemoryHandle implements
   /** Queues bytes written at the end. */
   private function append(string $bytes): int {
     $length = length!($bytes);
-    if ($length != 0) {
+    if (0 != $length) {
       $this->pendingWrites[] = $bytes;
       $this->pendingBytes += $length;
       $this->cursor += $length;
@@ -197,12 +197,12 @@ final class MemoryHandle implements
 
   /** Commits queued writes. */
   private function flushWrites(): void {
-    if ($this->pendingBytes == 0) {
+    if (0 == $this->pendingBytes) {
       return;
     }
 
     $byteBuffer = $this->byteBuffer;
-    if ($byteBuffer == null) {
+    if (null == $byteBuffer) {
       $pending = Str\join('', $this->pendingWrites);
       $this->buffer = match ($this->buffer) {
         '' => $pending,
@@ -225,7 +225,7 @@ final class MemoryHandle implements
   /** Promotes the stored string when an in-place write needs mutable bytes. */
   private function mutableBuffer(): ByteBuffer {
     $buffer = $this->byteBuffer;
-    if ($buffer == null) {
+    if (null == $buffer) {
       $buffer = ByteBuffer::fromString($this->buffer);
       $this->byteBuffer = $buffer;
       $this->buffer = '';

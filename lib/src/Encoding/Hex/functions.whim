@@ -24,7 +24,7 @@ function encode(string $bytes): string {
 #[TrackCaller]
 function decode(string $encoded): string {
   $decoded = Whim\_Private\hex_decode($encoded);
-  if ($decoded == null) {
+  if (null == $decoded) {
     throw new DecodingException('the input is not hexadecimal');
   }
 

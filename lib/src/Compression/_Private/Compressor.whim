@@ -18,7 +18,7 @@ final class Compressor implements CompressorInterface {
   #[TraceBoundary]
   public function push(string $bytes): string {
     $result = $this->encoder->push($bytes);
-    if ($result == null) {
+    if (null == $result) {
       throw new Exception('the compression stream failed');
     }
 
@@ -31,7 +31,7 @@ final class Compressor implements CompressorInterface {
   #[TraceBoundary]
   public function flush(): string {
     $result = $this->encoder->flush();
-    if ($result == null) {
+    if (null == $result) {
       throw new Exception('the compression stream failed');
     }
 
@@ -44,7 +44,7 @@ final class Compressor implements CompressorInterface {
   #[TraceBoundary]
   public function finish(): string {
     $result = $this->encoder->finish();
-    if ($result == null) {
+    if (null == $result) {
       throw new Exception('the compression stream failed');
     }
 

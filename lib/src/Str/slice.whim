@@ -25,7 +25,7 @@ function slice(
   $stringLength = length!($string);
   $offset = _Private\offset($offset, $stringLength);
   $remaining = $stringLength - $offset;
-  $length = $length ?? $remaining;
+  $length ??= $remaining;
   if ($length > $remaining) {
     $length = $remaining;
   }
@@ -48,7 +48,7 @@ function splice(
 ): string {
   $stringLength = length!($string);
   $offset = _Private\offset($offset, $stringLength);
-  $length = $length ?? $stringLength - $offset;
+  $length ??= $stringLength - $offset;
   $end = $offset + $length;
   if ($end > $stringLength) {
     $end = $stringLength;
@@ -89,12 +89,12 @@ function split(
   string $delimiter,
   null|PositiveInt $limit = null,
 ): vec<string> {
-  if ($delimiter == '') {
-    if ($limit == null || $limit >= length!($string)) {
+  if ('' == $delimiter) {
+    if (null == $limit || $limit >= length!($string)) {
       return chunk($string);
     }
 
-    if ($limit == 1) {
+    if (1 == $limit) {
       return vec[$string];
     }
 

@@ -381,10 +381,10 @@ $run = fn(string $test): vec<(string, null|string, null|string, float)> {
       }
 
       if ($timings != '') {
-        $timings = $timings . paint($color, ' | ', "\e[2m");
+        $timings .= paint($color, ' | ', "\e[2m");
       }
 
-      $timings = $timings . $label;
+      $timings .= $label;
     }
 
     $console->write(
@@ -433,7 +433,7 @@ foreach ($tests as $test) {
   $executed++;
   $fileTotal = 0.0;
   foreach ($outcomes[$test] as ($mode, $failure, $warning, $milliseconds)) {
-    $fileTotal = $fileTotal + $milliseconds;
+    $fileTotal += $milliseconds;
     $modeTotals[$mode] = tally($modeTotals, $mode) + $milliseconds;
     if ($failure == null) {
       $modePassed[$mode] = count_of($modePassed, $mode) + 1;
@@ -471,9 +471,11 @@ foreach ($modes as ($mode, $_optimizations)) {
   $status = paint($color, $passed . ' passed', "\e[32m");
 
   if ($passed < $executed) {
-    $status =
-      $status
-      . paint($color, ' | ' . ($executed - $passed) . ' failed', "\e[31;1m");
+    $status .= paint(
+      $color,
+      ' | ' . ($executed - $passed) . ' failed',
+      "\e[31;1m",
+    );
   }
 
   $console->write(

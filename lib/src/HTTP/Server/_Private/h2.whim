@@ -28,7 +28,7 @@ function h2_cancellation(
   CancellationToken $parent,
   null|Duration $timeout,
 ): CancellationToken {
-  if ($timeout == null) {
+  if (null == $timeout) {
     return $parent;
   }
 
@@ -80,16 +80,16 @@ function h2_request(
   null|ReadHandle $body,
   null|Future<FieldMap> $trailers,
 ): null|Request {
-  if ($method == 'CONNECT' && $path == '') {
+  if ('CONNECT' == $method && '' == $path) {
     $path = $authority;
   }
 
-  if ($scheme != '' && !($scheme is 'http'|'https')) {
+  if ('' != $scheme && !($scheme is 'http'|'https')) {
     return null;
   }
 
   $url = null;
-  if ($authority != '' && $scheme != '' && Str\starts_with($path, '/')) {
+  if ('' != $authority && '' != $scheme && Str\starts_with($path, '/')) {
     $url = h1_url($scheme, $authority, $path);
   }
 
@@ -110,7 +110,7 @@ function h2_request(
 function h2_field_map(vec<Header> $headers): FieldMap {
   $fields = vec[];
   foreach ($headers as $header) {
-    if ($header[0][0] != ':') {
+    if (':' != $header[0][0]) {
       $fields[] = ($header[0], $header[1]);
     }
   }
@@ -138,9 +138,9 @@ function h2_response_headers(
       continue;
     }
 
-    if ($name == 'server') {
+    if ('server' == $name) {
       $hasServer = true;
-    } else if ($name == 'date') {
+    } else if ('date' == $name) {
       $hasDate = true;
     }
 
@@ -161,7 +161,7 @@ function h2_response_headers(
 /** Encodes one server-push request field section. */
 function h2_push_headers(Request $request): null|vec<Header> {
   $url = $request->url;
-  if ($url == null || $url->authority == null) {
+  if (null == $url || null == $url->authority) {
     return null;
   }
 

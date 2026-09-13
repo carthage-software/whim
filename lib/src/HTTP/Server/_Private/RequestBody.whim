@@ -21,7 +21,7 @@ final class RequestBody implements ReadHandle {
 
   #[TrackCaller]
   public function push(string $data): void {
-    if ($data == '' || $this->complete) {
+    if ('' == $data || $this->complete) {
       return;
     }
 
@@ -63,7 +63,7 @@ final class RequestBody implements ReadHandle {
     null|CancellationToken $cancellation = null,
   ): void {
     $this->throwIfFailed();
-    if ($this->buffer != '' || $this->complete) {
+    if ('' != $this->buffer || $this->complete) {
       return;
     }
 
@@ -80,23 +80,23 @@ final class RequestBody implements ReadHandle {
   public function reachedEndOfDataSource(): bool {
     $this->drain();
     $this->throwIfFailed();
-    return $this->complete && $this->buffer == '';
+    return $this->complete && '' == $this->buffer;
   }
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($maxBytes == 0) {
+    if (0 == $maxBytes) {
       return '';
     }
 
     $this->drain();
     $this->throwIfFailed();
-    if ($this->buffer == '') {
+    if ('' == $this->buffer) {
       return '';
     }
 
     $length = length!($this->buffer);
-    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+    if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
@@ -121,7 +121,7 @@ final class RequestBody implements ReadHandle {
 
   #[TrackCaller]
   private function throwIfFailed(): void {
-    if ($this->error != null) {
+    if (null != $this->error) {
       throw $this->error;
     }
   }

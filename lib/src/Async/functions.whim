@@ -56,7 +56,7 @@ function sleep(
   Duration $duration,
   null|CancellationToken $cancellation = null,
 ): void {
-  if ($cancellation != null) {
+  if (null != $cancellation) {
     $cancellation->throwIfCancellationRequested();
   }
 
@@ -66,7 +66,7 @@ function sleep(
   });
 
   $id = null;
-  if ($cancellation != null) {
+  if (null != $cancellation) {
     $id = $cancellation->register(fn(): void {
       Whim\_Private\cancel_task($task);
       try {
@@ -81,7 +81,7 @@ function sleep(
     $suspension->suspend();
   } finally {
     Whim\_Private\cancel_task($task);
-    if ($cancellation != null && $id != null) {
+    if (null != $cancellation && null != $id) {
       $cancellation->unregister($id);
     }
   }

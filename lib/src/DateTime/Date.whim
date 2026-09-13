@@ -57,7 +57,7 @@ final readonly class Date implements Order<Date>, ToString {
   #[TrackCaller]
   public static function from(string $value): Date {
     $date = Date::parse($value);
-    if ($date == null) {
+    if (null == $date) {
       throw new InvalidArgumentException(
         'invalid civil date: `' . $value . '`',
       );
@@ -142,7 +142,7 @@ final readonly class Date implements Order<Date>, ToString {
       $overflow->value,
     );
 
-    if ($parts == null) {
+    if (null == $parts) {
       throw new InvalidArgumentException(
         'calendar arithmetic produced an invalid date',
       );

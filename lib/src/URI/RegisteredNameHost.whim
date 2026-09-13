@@ -18,11 +18,11 @@ final readonly class RegisteredNameHost implements Host {
   public static function parse(string $name): null|RegisteredNameHost {
     $parts = Whim\_Private\uri_parse_authority($name);
     if (
-      $parts == null
-      || $parts[0] != null
-      || $parts[1] != 'name'
+      null == $parts
+      || null != $parts[0]
+      || 'name' != $parts[1]
       || $parts[2] != $name
-      || $parts[3] != null
+      || null != $parts[3]
     ) {
       return null;
     }
@@ -36,7 +36,7 @@ final readonly class RegisteredNameHost implements Host {
   #[TrackCaller]
   public static function from(string $name): RegisteredNameHost {
     $host = RegisteredNameHost::parse($name);
-    if ($host == null) {
+    if (null == $host) {
       throw new InvalidArgumentException(
         'invalid URI registered name: `' . $name . '`',
       );

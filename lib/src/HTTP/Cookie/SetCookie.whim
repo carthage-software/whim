@@ -50,16 +50,16 @@ final readonly class SetCookie implements ToString {
     }
 
     if (
-      ($domain != null && !_Private\valid_attribute($domain))
+      (null != $domain && !_Private\valid_attribute($domain))
       || (
-        $path != null
+        null != $path
         && (!Str\starts_with($path, '/') || !_Private\valid_attribute($path))
       )
     ) {
       throw new InvalidArgumentException('invalid HTTP cookie attribute');
     }
 
-    if ($sameSite == SameSite::None && !$secure) {
+    if (SameSite::None == $sameSite && !$secure) {
       throw new InvalidArgumentException(
         'cookies with SameSite=None must also be Secure',
       );
@@ -73,7 +73,7 @@ final readonly class SetCookie implements ToString {
 
     if (
       Str\starts_with_ci($name, '__Host-')
-      && (!$secure || $domain != null || $path != '/')
+      && (!$secure || null != $domain || '/' != $path)
     ) {
       throw new InvalidArgumentException(
         '__Host- cookies must be Secure, host-only, and scoped to /',
@@ -124,7 +124,7 @@ final readonly class SetCookie implements ToString {
   #[MustUse]
   public static function parse(string $field): null|SetCookie {
     $parts = Str\split($field, ';');
-    if ($parts == vec[]) {
+    if (vec[] == $parts) {
       return null;
     }
 
@@ -134,7 +134,7 @@ final readonly class SetCookie implements ToString {
     $name = Str\trim(Str\slice($pair, 0, $separator));
     $value = Str\trim(Str\slice($pair, $separator + 1));
     if (
-      $name == ''
+      '' == $name
       || !Whim\_Private\http_valid_token($name)
       || !_Private\valid_value($value)
     ) {
@@ -152,7 +152,7 @@ final readonly class SetCookie implements ToString {
     while ($index < length!($parts)) {
       $attribute = Str\trim($parts[$index]);
       $equals = Str\search($attribute, '=');
-      if ($equals == null) {
+      if (null == $equals) {
         $attributeName = Str\lowercase($attribute);
         $attributeValue = null;
       } else {
@@ -163,24 +163,24 @@ final readonly class SetCookie implements ToString {
         $attributeValue = Str\trim(Str\slice($attribute, $equals + 1));
       }
 
-      if ($attributeName == 'expires' && $attributeValue != null) {
+      if ('expires' == $attributeName && null != $attributeValue) {
         $date = ZonedDateTime::parseRfc2822($attributeValue);
-        if ($date != null) {
+        if (null != $date) {
           $expires = $date->systemTime;
         }
-      } else if ($attributeName == 'max-age' && $attributeValue != null) {
+      } else if ('max-age' == $attributeName && null != $attributeValue) {
         $parsed = _Private\parse_integer($attributeValue);
-        if ($parsed != null) {
+        if (null != $parsed) {
           $maxAge = $parsed;
         }
-      } else if ($attributeName == 'domain' && $attributeValue != null) {
+      } else if ('domain' == $attributeName && null != $attributeValue) {
         $candidate = Str\lowercase($attributeValue);
         if (Str\starts_with($candidate, '.')) {
           $candidate = Str\slice($candidate, 1);
         }
 
         if (
-          $candidate == ''
+          '' == $candidate
           || Str\ends_with($candidate, '.')
           || !_Private\valid_attribute($candidate)
         ) {
@@ -189,17 +189,17 @@ final readonly class SetCookie implements ToString {
 
         $domain = $candidate as NonEmptyString;
       } else if (
-        $attributeName == 'path'
-        && $attributeValue != null
+        'path' == $attributeName
+        && null != $attributeValue
         && Str\starts_with($attributeValue, '/')
         && _Private\valid_attribute($attributeValue)
       ) {
         $path = $attributeValue as NonEmptyString;
-      } else if ($attributeName == 'secure') {
+      } else if ('secure' == $attributeName) {
         $secure = true;
-      } else if ($attributeName == 'httponly') {
+      } else if ('httponly' == $attributeName) {
         $httpOnly = true;
-      } else if ($attributeName == 'samesite' && $attributeValue != null) {
+      } else if ('samesite' == $attributeName && null != $attributeValue) {
         $sameSite = match (Str\lowercase($attributeValue)) {
           'strict' => SameSite::Strict,
           'lax' => SameSite::Lax,
@@ -211,7 +211,7 @@ final readonly class SetCookie implements ToString {
       $index++;
     }
 
-    if ($sameSite == SameSite::None && !$secure) {
+    if (SameSite::None == $sameSite && !$secure) {
       return null;
     }
 
@@ -221,7 +221,7 @@ final readonly class SetCookie implements ToString {
 
     if (
       Str\starts_with_ci($name, '__Host-')
-      && (!$secure || $domain != null || $path != '/')
+      && (!$secure || null != $domain || '/' != $path)
     ) {
       return null;
     }
@@ -349,19 +349,19 @@ final readonly class SetCookie implements ToString {
   #[MustUse]
   public function toString(): string {
     $result = $this->name . '=' . $this->value;
-    if ($this->expires != null) {
+    if (null != $this->expires) {
       $result .= '; Expires=' . _Private\format_expires($this->expires);
     }
 
-    if ($this->maxAge != null) {
+    if (null != $this->maxAge) {
       $result .= '; Max-Age=' . $this->maxAge;
     }
 
-    if ($this->domain != null) {
+    if (null != $this->domain) {
       $result .= '; Domain=' . $this->domain;
     }
 
-    if ($this->path != null) {
+    if (null != $this->path) {
       $result .= '; Path=' . $this->path;
     }
 
@@ -373,7 +373,7 @@ final readonly class SetCookie implements ToString {
       $result .= '; HttpOnly';
     }
 
-    if ($this->sameSite != null) {
+    if (null != $this->sameSite) {
       $result .= '; SameSite=' . $this->sameSite->value;
     }
 

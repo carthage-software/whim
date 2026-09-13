@@ -37,7 +37,7 @@ final class H2ResponseBody implements ReadHandle, CloseHandle {
     null|CancellationToken $cancellation = null,
   ): void {
     $this->throwIfError();
-    if ($this->buffer == '' && !$this->complete && !$this->closed) {
+    if ('' == $this->buffer && !$this->complete && !$this->closed) {
       $this->process($this->exchange->receive($cancellation));
     }
 
@@ -48,7 +48,7 @@ final class H2ResponseBody implements ReadHandle, CloseHandle {
   public function reachedEndOfDataSource(): bool {
     $this->drain();
     $this->throwIfError();
-    $ended = $this->buffer == '' && ($this->complete || $this->closed);
+    $ended = '' == $this->buffer && ($this->complete || $this->closed);
     if ($ended) {
       $this->close();
     }
@@ -58,13 +58,13 @@ final class H2ResponseBody implements ReadHandle, CloseHandle {
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($maxBytes == 0) {
+    if (0 == $maxBytes) {
       return '';
     }
 
     $this->drain();
     $this->throwIfError();
-    if ($this->buffer == '') {
+    if ('' == $this->buffer) {
       if ($this->complete) {
         $this->close();
       }
@@ -73,13 +73,13 @@ final class H2ResponseBody implements ReadHandle, CloseHandle {
     }
 
     $length = length!($this->buffer);
-    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+    if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
     $data = Str\slice($this->buffer, 0, $length);
     $this->buffer = Str\slice($this->buffer, $length);
-    if ($this->buffer == '' && $this->complete) {
+    if ('' == $this->buffer && $this->complete) {
       $this->close();
     }
 
@@ -109,18 +109,18 @@ final class H2ResponseBody implements ReadHandle, CloseHandle {
   }
 
   private function process(H2EventBatch $batch): void {
-    if ($batch->error != null) {
+    if (null != $batch->error) {
       $this->fail($batch->error);
       return;
     }
 
     foreach ($batch->events as $event) {
-      if ($event[0] == 1) {
+      if (1 == $event[0]) {
         $this->buffer .= $event[2];
         if ($event[3]) {
           $this->complete = true;
         }
-      } else if ($event[0] == 2 && $event[4]) {
+      } else if (2 == $event[0] && $event[4]) {
         $fields = vec[];
         foreach ($event[2] as $header) {
           $fields[] = ($header[0], $header[1]);
@@ -133,13 +133,13 @@ final class H2ResponseBody implements ReadHandle, CloseHandle {
         if ($event[3]) {
           $this->complete = true;
         }
-      } else if ($event[0] == 7) {
+      } else if (7 == $event[0]) {
         if (!$this->complete || $event[2] != H2\ErrorCode::NoError->value) {
           $this->fail(
             new ProtocolException('the HTTP/2 response stream was reset'),
           );
         }
-      } else if ($event[0] == 8) {
+      } else if (8 == $event[0]) {
         $this->complete = true;
         if (!$this->trailers->isComplete()) {
           $this->trailers->complete(FieldMap::default());
@@ -159,7 +159,7 @@ final class H2ResponseBody implements ReadHandle, CloseHandle {
   }
 
   private function throwIfError(): void {
-    if ($this->error != null) {
+    if (null != $this->error) {
       throw $this->error;
     }
   }

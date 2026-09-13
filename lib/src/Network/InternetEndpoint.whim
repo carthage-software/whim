@@ -16,7 +16,7 @@ final readonly class InternetEndpoint implements Endpoint {
   #[MustUse]
   public function toString(): NonEmptyString {
     $host = $this->address->toString();
-    if ($this->address->family == Family::V6) {
+    if (Family::V6 == $this->address->family) {
       return ('[' . $host . ']:' . $this->port) as NonEmptyString;
     }
 

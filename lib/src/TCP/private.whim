@@ -21,7 +21,7 @@ function connect_endpoint(
   null|CancellationToken $cancellation,
 ): Whim\TCP\Stream {
   if (
-    $configuration->bindTo != null
+    null != $configuration->bindTo
     && $configuration->bindTo->address->family != $endpoint->address->family
   ) {
     throw new ConnectionException(
@@ -44,7 +44,7 @@ function connect_endpoint(
       );
     }
 
-    if ($configuration->bindTo != null) {
+    if (null != $configuration->bindTo) {
       Whim\_Private\bind_socket(
         $descriptor,
         $configuration->bindTo->address->toString(),

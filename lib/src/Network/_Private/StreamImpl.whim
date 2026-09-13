@@ -82,11 +82,11 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
       failure($error);
     }
 
-    if ($bytes == null) {
+    if (null == $bytes) {
       return '';
     }
 
-    if ($bytes == '') {
+    if ('' == $bytes) {
       $this->reachedEnd = true;
     }
 
@@ -116,12 +116,12 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
         failure($error);
       }
 
-      if ($bytes == null) {
+      if (null == $bytes) {
         wait_readable($descriptor, $cancellation);
         continue;
       }
 
-      if ($bytes == '') {
+      if ('' == $bytes) {
         $this->reachedEnd = true;
       }
 
@@ -153,7 +153,7 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
     string $bytes,
     null|CancellationToken $cancellation = null,
   ): int {
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return 0;
     }
 
@@ -178,14 +178,14 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
       throw new ClosedException('the network stream is closed');
     }
 
-    while ($bytes != '') {
+    while ('' != $bytes) {
       try {
         $written = Whim\_Private\write_descriptor($descriptor, $bytes);
       } catch (Whim\_Private\SystemError $error) {
         failure($error);
       }
 
-      if ($written == 0) {
+      if (0 == $written) {
         wait_writable($descriptor, $cancellation);
         continue;
       }

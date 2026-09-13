@@ -24,7 +24,7 @@ final class MultiPartReadHandle implements ReadHandle {
     private NonEmptyString $boundary,
     private vec<Part> $parts,
   ) {
-    $this->state = match ($parts == vec[]) {
+    $this->state = match (vec[] == $parts) {
       true => self::STATE_CLOSING,
       false => self::STATE_BOUNDARY,
     };
@@ -34,7 +34,7 @@ final class MultiPartReadHandle implements ReadHandle {
   public function waitUntilReadable(
     null|CancellationToken $cancellation = null,
   ): void {
-    if ($this->buffer != '' || $this->state != self::STATE_BODY) {
+    if ('' != $this->buffer || self::STATE_BODY != $this->state) {
       return;
     }
 
@@ -43,33 +43,33 @@ final class MultiPartReadHandle implements ReadHandle {
 
   #[TrackCaller]
   public function reachedEndOfDataSource(): bool {
-    return $this->state == self::STATE_END && $this->buffer == '';
+    return self::STATE_END == $this->state && '' == $this->buffer;
   }
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($maxBytes == 0 || $this->reachedEndOfDataSource()) {
+    if (0 == $maxBytes || $this->reachedEndOfDataSource()) {
       return '';
     }
 
-    while ($this->buffer == '') {
-      if ($this->state == self::STATE_BOUNDARY) {
+    while ('' == $this->buffer) {
+      if (self::STATE_BOUNDARY == $this->state) {
         $this->enterBoundary();
         continue;
       }
 
-      if ($this->state == self::STATE_CLOSING) {
+      if (self::STATE_CLOSING == $this->state) {
         $this->enterClosing();
         continue;
       }
 
-      if ($this->state == self::STATE_END) {
+      if (self::STATE_END == $this->state) {
         return '';
       }
 
       $body = $this->body as ReadHandle;
       $chunk = $body->tryRead($maxBytes);
-      if ($chunk != '') {
+      if ('' != $chunk) {
         return $chunk;
       }
 
@@ -85,7 +85,7 @@ final class MultiPartReadHandle implements ReadHandle {
 
   #[TrackCaller]
   private function enterBoundary(): void {
-    $prefix = match ($this->index == 0) {
+    $prefix = match (0 == $this->index) {
       true => '--',
       false => "\r\n--",
     };
@@ -114,7 +114,7 @@ final class MultiPartReadHandle implements ReadHandle {
 
   #[TrackCaller]
   private function enterClosing(): void {
-    $prefix = match ($this->parts == vec[]) {
+    $prefix = match (vec[] == $this->parts) {
       true => '--',
       false => "\r\n--",
     };
@@ -125,7 +125,7 @@ final class MultiPartReadHandle implements ReadHandle {
 
   #[TrackCaller]
   private function drain(null|int $maxBytes): string {
-    if ($maxBytes == null || $maxBytes >= length!($this->buffer)) {
+    if (null == $maxBytes || $maxBytes >= length!($this->buffer)) {
       $result = $this->buffer;
       $this->buffer = '';
       return $result;

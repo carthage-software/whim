@@ -27,7 +27,7 @@ final class MersenneTwisterSequence implements WordSequence {
 
   /** Creates a mersenne twister sequence with a secure random seed. */
   #[TrackCaller]
-  public static function fromSecureSeed(): static {
+  public static function fromSecureSeed(): self {
     return new MersenneTwisterSequence(SecureRandom\int(0, 0xffffffff));
   }
 
@@ -67,10 +67,10 @@ final class MersenneTwisterSequence implements WordSequence {
 
     $value = $this->state[$this->index];
     $this->index++;
-    $value = $value ^ (($value >> 11) & 0x001fffff);
-    $value = $value ^ (($value << 7) & 0x9d2c5680);
-    $value = $value ^ (($value << 15) & 0xefc60000);
-    $value = $value ^ (($value >> 18) & 0x00003fff);
+    $value ^= ($value >> 11) & 0x001fffff;
+    $value ^= ($value << 7) & 0x9d2c5680;
+    $value ^= ($value << 15) & 0xefc60000;
+    $value ^= ($value >> 18) & 0x00003fff;
     return $value;
   }
 

@@ -55,7 +55,7 @@ function fetch_value(
 ): Option<Value> {
   $row = fetch_one($result, $cancellation) ?? return new None();
 
-  if ($row == vec[]) {
+  if (vec[] == $row) {
     throw new QueryException('the database returned a row without columns');
   }
 

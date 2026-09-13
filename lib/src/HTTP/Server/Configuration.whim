@@ -38,7 +38,7 @@ final readonly class Configuration implements Default {
   /** Returns the production defaults. */
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
-    return new static();
+  public static function default(): self {
+    return new self();
   }
 }

@@ -342,7 +342,7 @@ function find_executable(NonEmptyString $name): null|NonEmptyString {
   $path = Env\get_variable('PATH') ?? return null;
 
   foreach (Str\split($path, ':') as $directory) {
-    if ($directory == '') {
+    if ('' == $directory) {
       $directory = Env\current_directory() ?? '.';
     }
 

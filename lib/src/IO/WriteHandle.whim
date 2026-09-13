@@ -36,7 +36,7 @@ interface WriteHandle extends Handle {
     string $bytes,
     null|CancellationToken $cancellation = null,
   ): void {
-    while ($bytes != '') {
+    while ('' != $bytes) {
       $written = $this->write($bytes, $cancellation);
       if ($written <= 0) {
         throw new Exception('the write handle stalled with bytes remaining');

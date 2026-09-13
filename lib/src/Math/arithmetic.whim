@@ -17,7 +17,7 @@ use Whim\Unwind\OverflowException;
 #[TrackCaller]
 function div(int $numerator, int $denominator): int {
   $value = Whim\_Private\math_div($numerator, $denominator);
-  if ($value == null) {
+  if (null == $value) {
     throw new OverflowException('integer division overflow');
   }
 

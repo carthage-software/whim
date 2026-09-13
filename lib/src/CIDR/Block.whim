@@ -48,7 +48,7 @@ final readonly class Block implements Equal<Block>, ToString {
   #[TrackCaller]
   public static function from(string $cidr): Block {
     $block = Block::parse($cidr);
-    if ($block == null) {
+    if (null == $block) {
       throw new InvalidArgumentException('invalid CIDR block: `' . $cidr . '`');
     }
 
@@ -68,7 +68,7 @@ final readonly class Block implements Equal<Block>, ToString {
     0..=128 $prefixLength,
   ): Block {
     $block = Block::create($network, $prefixLength);
-    if ($block == null) {
+    if (null == $block) {
       throw new InvalidArgumentException(
         'the prefix is invalid for the address family, or the address contains host bits',
       );
@@ -142,7 +142,7 @@ final readonly class Block implements Equal<Block>, ToString {
   /** Parses a decimal prefix length. */
   #[TrackCaller]
   private static function parsePrefix(string $prefix): null|int {
-    if ($prefix == '') {
+    if ('' == $prefix) {
       return null;
     }
 

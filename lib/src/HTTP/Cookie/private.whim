@@ -44,7 +44,7 @@ function parse_pairs(string $value): vec<Pair> {
     $name = Str\trim(Str\slice($part, 0, $offset));
     $cookieValue = Str\trim(Str\slice($part, $offset + 1));
     if (
-      $name == ''
+      '' == $name
       || !Whim\_Private\http_valid_token($name)
       || !valid_value($cookieValue)
     ) {
@@ -59,12 +59,12 @@ function parse_pairs(string $value): vec<Pair> {
 
 /** Parses a signed decimal integer, or returns null. */
 function parse_integer(string $value): null|int {
-  if ($value == '') {
+  if ('' == $value) {
     return null;
   }
 
-  $negative = $value[0] == '-';
-  $offset = match ($negative || $value[0] == '+') {
+  $negative = '-' == $value[0];
+  $offset = match ($negative || '+' == $value[0]) {
     true => 1,
     false => 0,
   };

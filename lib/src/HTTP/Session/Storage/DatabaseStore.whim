@@ -59,7 +59,7 @@ final readonly class DatabaseStore implements Store {
         $cancellation,
       );
 
-      if ($row == null) {
+      if (null == $row) {
         $this->deleteExpired($connection, $identifier, $now, $cancellation);
         return null;
       }

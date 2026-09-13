@@ -32,9 +32,7 @@ function string(
   NonNegativeInt $length,
   null|string[2..] $alphabet = null,
 ): string {
-  $alphabet =
-    $alphabet
-    ?? '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  $alphabet ??= '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
   $result = random_string($length, $alphabet);
   if ($result is null) {

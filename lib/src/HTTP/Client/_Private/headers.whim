@@ -13,7 +13,7 @@ use Whim\URL\URL;
 /** Builds an HTTP/2 request field section. */
 function h2_request_headers(Request $request): vec<H2\Header> {
   $url = $request->url;
-  if ($url == null) {
+  if (null == $url) {
     throw new RequestException('the request URL is missing');
   }
 
@@ -42,7 +42,7 @@ function h2_request_headers(Request $request): vec<H2\Header> {
       );
     }
 
-    if ($name == 'te' && Str\lowercase($value) != 'trailers') {
+    if ('te' == $name && Str\lowercase($value) != 'trailers') {
       throw new RequestException(
         'the HTTP/2 TE field may contain only `trailers`',
       );
@@ -75,18 +75,18 @@ function h2_push_request(
   }
 
   if (
-    $method == null
-    || $scheme == null
-    || $authority == null
-    || $path == null
+    null == $method
+    || null == $scheme
+    || null == $authority
+    || null == $path
   ) {
     return null;
   }
 
   $url = URL::parse($scheme . '://' . $authority . $path);
   if (
-    $url == null
-    || $parent->url == null
+    null == $url
+    || null == $parent->url
     || !$url->origin()->equals($parent->url->origin())
   ) {
     return null;
@@ -106,14 +106,14 @@ function h2_response_headers(vec<H2\Header> $headers): (int, FieldMap) {
   $status = null;
   $fields = vec[];
   foreach ($headers as $header) {
-    if ($header[0] == ':status') {
+    if (':status' == $header[0]) {
       $status = decimal($header[1]);
     } else if (!Str\starts_with($header[0], ':')) {
       $fields[] = ($header[0], $header[1]);
     }
   }
 
-  if ($status == null || !($status is 100..=599)) {
+  if (null == $status || !($status is 100..=599)) {
     throw new ProtocolException('the HTTP/2 response has no valid status');
   }
 
@@ -127,10 +127,10 @@ function sensitive(string $name): bool {
 /** Reports whether an HTTP response may carry content. */
 function response_has_body(Request $request, int $status): bool {
   return (
-    $request->method != Message\METHOD_HEAD
+    Message\METHOD_HEAD != $request->method
     && $status >= 200
-    && $status != Message\STATUS_NO_CONTENT
-    && $status != Message\STATUS_RESET_CONTENT
-    && $status != Message\STATUS_NOT_MODIFIED
+    && Message\STATUS_NO_CONTENT != $status
+    && Message\STATUS_RESET_CONTENT != $status
+    && Message\STATUS_NOT_MODIFIED != $status
   );
 }

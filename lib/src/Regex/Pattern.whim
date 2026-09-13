@@ -19,7 +19,7 @@ final readonly class Pattern {
   #[TrackCaller]
   public static function compile(string $source): Pattern {
     $compiled = BuiltInRegex::compile($source);
-    if ($compiled == null) {
+    if (null == $compiled) {
       throw new InvalidPatternException('invalid regular expression');
     }
 

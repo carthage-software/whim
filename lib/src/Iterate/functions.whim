@@ -96,7 +96,7 @@ function reduce<K, T, R>(
   $result = $initial;
   while (true) {
     $entry = $iterator->next();
-    if ($entry == null) {
+    if (null == $entry) {
       return $result;
     }
 
@@ -112,7 +112,7 @@ function to_vec<K, V>(Iterable<K, V> $values): vec<V> {
   $result = vec[];
   while (true) {
     $entry = $iterator->next();
-    if ($entry == null) {
+    if (null == $entry) {
       return $result;
     }
 
@@ -128,7 +128,7 @@ function to_dict<K: ArrayKey, V>(Iterable<K, V> $values): dict<K, V> {
   $result = dict[];
   while (true) {
     $entry = $iterator->next();
-    if ($entry == null) {
+    if (null == $entry) {
       return $result;
     }
 

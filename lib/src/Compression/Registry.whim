@@ -25,8 +25,8 @@ final readonly class Registry {
       $coding = string_lowercase($codec->coding());
       if (
         !http_valid_token($coding)
-        || $coding == 'identity'
-        || $coding == '*'
+        || 'identity' == $coding
+        || '*' == $coding
       ) {
         throw new InvalidArgumentException(
           'invalid compression content coding: `' . $coding . '`',

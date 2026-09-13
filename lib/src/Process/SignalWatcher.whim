@@ -46,7 +46,7 @@ final class SignalWatcher {
   #[AlwaysInline]
   #[MustUse]
   public function isClosed(): bool {
-    return $this->task == null;
+    return null == $this->task;
   }
 
   /** Stops watching the signal when this object is collected. */

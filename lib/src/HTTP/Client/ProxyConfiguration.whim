@@ -20,22 +20,22 @@ final readonly class ProxyConfiguration {
     public TLS\ClientConfiguration $tls = new TLS\ClientConfiguration(),
     public vec<NonEmptyString> $bypass = vec[],
   ) {
-    if ($url->scheme != 'http' && $url->scheme != 'https') {
+    if ('http' != $url->scheme && 'https' != $url->scheme) {
       throw new InvalidArgumentException(
         'an HTTP proxy URL must use the http or https scheme',
       );
     }
 
-    if ($url->authority->userInfo != null) {
+    if (null != $url->authority->userInfo) {
       throw new InvalidArgumentException(
         'the HTTP proxy credentials must use the authorization parameter',
       );
     }
 
     if (
-      ($url->path != '' && $url->path != '/')
-      || $url->query != null
-      || $url->fragment != null
+      ('' != $url->path && '/' != $url->path)
+      || null != $url->query
+      || null != $url->fragment
     ) {
       throw new InvalidArgumentException(
         'an HTTP proxy URL cannot contain a path, query, or fragment',
@@ -43,7 +43,7 @@ final readonly class ProxyConfiguration {
     }
 
     if (
-      $authorization != null
+      null != $authorization
       && !Whim\_Private\http_valid_field_value($authorization)
     ) {
       throw new InvalidArgumentException(

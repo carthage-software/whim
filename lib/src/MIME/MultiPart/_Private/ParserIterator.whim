@@ -80,7 +80,7 @@ final class ParserIterator implements Iterator<int, Part> {
   private function initialize(): void {
     while (true) {
       $line = $this->readLine(0);
-      if ($line == null) {
+      if (null == $line) {
         throw new MultiPartException(
           'the multipart body does not contain its opening boundary',
         );
@@ -111,7 +111,7 @@ final class ParserIterator implements Iterator<int, Part> {
 
     while (true) {
       $line = $this->readLine($this->maximumHeaderSize);
-      if ($line == null) {
+      if (null == $line) {
         throw new MultiPartException(
           'the multipart part headers are incomplete',
         );
@@ -126,8 +126,8 @@ final class ParserIterator implements Iterator<int, Part> {
         );
       }
 
-      if ($line == '') {
-        if ($currentName != null) {
+      if ('' == $line) {
+        if (null != $currentName) {
           $pairs[] = ($currentName, $currentValue);
         }
 
@@ -141,17 +141,17 @@ final class ParserIterator implements Iterator<int, Part> {
         }
       }
 
-      if ($currentName != null && ($line[0] == ' ' || $line[0] == "\t")) {
+      if (null != $currentName && (' ' == $line[0] || "\t" == $line[0])) {
         $currentValue .= ' ' . Str\trim($line);
         continue;
       }
 
-      if ($currentName != null) {
+      if (null != $currentName) {
         $pairs[] = ($currentName, $currentValue);
       }
 
       $colon = memmem($line, ':', 0, false);
-      if ($colon == null) {
+      if (null == $colon) {
         throw new MultiPartException(
           'the multipart part contains a header without a colon',
         );
@@ -181,7 +181,7 @@ final class ParserIterator implements Iterator<int, Part> {
 
         $after = $position + length!($marker);
         ($status, $closing, $consumed) = $this->inspectSuffix($after);
-        if ($status == self::SUFFIX_VALID) {
+        if (self::SUFFIX_VALID == $status) {
           $bodyEnd = $this->bodyEnd($position);
           $this->writeBody($spool, string_slice($this->buffer, 0, $bodyEnd));
 
@@ -194,7 +194,7 @@ final class ParserIterator implements Iterator<int, Part> {
           return $closing;
         }
 
-        if ($status == self::SUFFIX_INCOMPLETE) {
+        if (self::SUFFIX_INCOMPLETE == $status) {
           $bodyEnd = $this->bodyEnd($position);
           if ($bodyEnd > 0) {
             $this->writeBody($spool, $this->consume($bodyEnd));
@@ -219,7 +219,7 @@ final class ParserIterator implements Iterator<int, Part> {
 
       $safeLength = length!($this->buffer) - $tailSize;
       if ($safeLength > 0) {
-        if ($this->buffer[$safeLength - 1] == "\r") {
+        if ("\r" == $this->buffer[$safeLength - 1]) {
           $safeLength--;
         }
 
@@ -249,7 +249,7 @@ final class ParserIterator implements Iterator<int, Part> {
     }
 
     $closing = false;
-    if ($this->buffer[$offset] == '-') {
+    if ('-' == $this->buffer[$offset]) {
       if ($offset + 1 >= $length) {
         return match ($this->sourceEnded) {
           true => (self::SUFFIX_INVALID, false, 0),
@@ -257,7 +257,7 @@ final class ParserIterator implements Iterator<int, Part> {
         };
       }
 
-      if ($this->buffer[$offset + 1] != '-') {
+      if ('-' != $this->buffer[$offset + 1]) {
         return (self::SUFFIX_INVALID, false, 0);
       }
 
@@ -267,7 +267,7 @@ final class ParserIterator implements Iterator<int, Part> {
 
     while (
       $offset < $length
-      && ($this->buffer[$offset] == ' ' || $this->buffer[$offset] == "\t")
+      && (' ' == $this->buffer[$offset] || "\t" == $this->buffer[$offset])
     ) {
       $offset++;
     }
@@ -283,11 +283,11 @@ final class ParserIterator implements Iterator<int, Part> {
       };
     }
 
-    if ($this->buffer[$offset] == "\n") {
+    if ("\n" == $this->buffer[$offset]) {
       return (self::SUFFIX_VALID, $closing, $offset + 1);
     }
 
-    if ($this->buffer[$offset] != "\r") {
+    if ("\r" != $this->buffer[$offset]) {
       return (self::SUFFIX_INVALID, false, 0);
     }
 
@@ -298,7 +298,7 @@ final class ParserIterator implements Iterator<int, Part> {
       };
     }
 
-    if ($this->buffer[$offset + 1] != "\n") {
+    if ("\n" != $this->buffer[$offset + 1]) {
       return (self::SUFFIX_INVALID, false, 0);
     }
 
@@ -307,7 +307,7 @@ final class ParserIterator implements Iterator<int, Part> {
 
   /** Returns the body end before a delimiter's line break. */
   private function bodyEnd(NonNegativeInt $position): NonNegativeInt {
-    if ($position > 0 && $this->buffer[$position - 1] == "\r") {
+    if ($position > 0 && "\r" == $this->buffer[$position - 1]) {
       return $position - 1;
     }
 
@@ -318,7 +318,7 @@ final class ParserIterator implements Iterator<int, Part> {
   #[NeverInline]
   #[TrackCaller]
   private function writeBody(SpoolHandle $spool, string $bytes): void {
-    if ($bytes == '') {
+    if ('' == $bytes) {
       return;
     }
 
@@ -341,10 +341,10 @@ final class ParserIterator implements Iterator<int, Part> {
   private function readLine(NonNegativeInt $maximum): null|string {
     while (true) {
       $position = memmem($this->buffer, "\n", 0, false);
-      if ($position != null) {
+      if (null != $position) {
         $line = $this->consume($position + 1);
         $length = length!($line) - 1;
-        if ($length > 0 && $line[$length - 1] == "\r") {
+        if ($length > 0 && "\r" == $line[$length - 1]) {
           $length--;
         }
 
@@ -360,7 +360,7 @@ final class ParserIterator implements Iterator<int, Part> {
       }
 
       if (!$this->fill()) {
-        if ($this->buffer == '') {
+        if ('' == $this->buffer) {
           return null;
         }
 
@@ -380,7 +380,7 @@ final class ParserIterator implements Iterator<int, Part> {
     }
 
     $chunk = $this->source->read(self::CHUNK_SIZE, $this->cancellation);
-    if ($chunk == '') {
+    if ('' == $chunk) {
       $this->sourceEnded = true;
       return false;
     }

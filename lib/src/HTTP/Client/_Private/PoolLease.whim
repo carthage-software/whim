@@ -28,7 +28,7 @@ final class PoolLease {
   #[MustUse]
   #[TrackCaller]
   public function connection(): Connection {
-    if ($this->entry == null) {
+    if (null == $this->entry) {
       throw new ProtocolException('the pooled connection has been released');
     }
 

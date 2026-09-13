@@ -26,7 +26,7 @@ function handshake(
 ): void {
   $username = $configuration->username;
   $password = $configuration->password;
-  if ($username != null && $password != null) {
+  if (null != $username && null != $password) {
     $stream->writeAll("\x05\x02\x00\x02", $cancellation);
   } else {
     $stream->writeAll("\x05\x01\x00", $cancellation);
@@ -40,19 +40,19 @@ function handshake(
   }
 
   $method = Str\ord($selection[1]);
-  if ($method == 255) {
+  if (255 == $method) {
     throw new AuthenticationException(
       'the SOCKS proxy rejected every authentication method',
     );
   }
 
-  if ($method == 2) {
-    if ($username == null || $password == null) {
+  if (2 == $method) {
+    if (null == $username || null == $password) {
       throw new AuthenticationException('the SOCKS proxy requires credentials');
     }
 
     authenticate($stream, $username, $password, $cancellation);
-  } else if ($method != 0) {
+  } else if (0 != $method) {
     throw new ProtocolException(
       'the SOCKS proxy selected an unsupported authentication method',
     );
@@ -68,7 +68,7 @@ function handshake(
   }
 
   $status = Str\ord($response[1]);
-  if ($status != 0) {
+  if (0 != $status) {
     throw new ConnectionException(reply_message($status));
   }
 
@@ -126,7 +126,7 @@ function read_bound_address(
     ),
   };
 
-  if ($type == 3 && $length == 0) {
+  if (3 == $type && 0 == $length) {
     throw new ProtocolException(
       'the SOCKS proxy returned an empty bound host name',
     );

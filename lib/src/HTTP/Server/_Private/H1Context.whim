@@ -56,7 +56,7 @@ final class H1Context implements Context, Informational, Upgrade {
     InformationalStatusCode $status,
     FieldMap $headers = FieldMap::default(),
   ): void {
-    if ($this->protocolVersion != ProtocolVersion::V11) {
+    if (ProtocolVersion::V11 != $this->protocolVersion) {
       return;
     }
 

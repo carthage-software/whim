@@ -105,7 +105,7 @@ function listen(
       $reusePort,
     );
 
-    if ($endpoint->address->family == Family::V6) {
+    if (Family::V6 == $endpoint->address->family) {
       $onlyIPv6 = 0;
       if ($configuration->onlyIPv6) {
         $onlyIPv6 = 1;

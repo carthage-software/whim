@@ -135,7 +135,7 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
       }
 
       $this->values[$current] = $value;
-      if ($index == 0) {
+      if (0 == $index) {
         return;
       }
 
@@ -197,7 +197,7 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
   private function removeRoot(): T {
     $count = length!($this->values);
     $root = $this->values[0];
-    if ($count == 1) {
+    if (1 == $count) {
       $this->values = vec[];
       return $root;
     }

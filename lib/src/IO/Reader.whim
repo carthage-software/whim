@@ -19,7 +19,7 @@ final class Reader implements BufferedReadHandle {
   public function waitUntilReadable(
     null|CancellationToken $cancellation = null,
   ): void {
-    if ($this->buffer == '') {
+    if ('' == $this->buffer) {
       $this->handle->waitUntilReadable($cancellation);
     }
   }
@@ -27,18 +27,18 @@ final class Reader implements BufferedReadHandle {
   /** Reports exhaustion only after both the buffer and source are empty. */
   #[TrackCaller]
   public function reachedEndOfDataSource(): bool {
-    return $this->buffer == '' && $this->handle->reachedEndOfDataSource();
+    return '' == $this->buffer && $this->handle->reachedEndOfDataSource();
   }
 
   /** Reads from the buffer before delegating to the wrapped handle. */
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->buffer == '') {
+    if ('' == $this->buffer) {
       return $this->handle->tryRead($maxBytes);
     }
 
     $length = length!($this->buffer);
-    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
+    if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
@@ -57,11 +57,11 @@ final class Reader implements BufferedReadHandle {
   public function readByte(
     null|CancellationToken $cancellation = null,
   ): null|string[1] {
-    if ($this->buffer == '' && !$this->pullChunk($cancellation)) {
+    if ('' == $this->buffer && !$this->pullChunk($cancellation)) {
       return null;
     }
 
-    if ($this->buffer == '') {
+    if ('' == $this->buffer) {
       return null;
     }
 
@@ -78,9 +78,9 @@ final class Reader implements BufferedReadHandle {
   ): null|string {
     $line = $this->readUntil("\n", $cancellation) ?? return null;
 
-    if ($line != '' && $line[length!($line) - 1] == "\n") {
+    if ('' != $line && "\n" == $line[length!($line) - 1]) {
       $line = string_slice($line, 0, length!($line) - 1);
-      if ($line != '' && $line[length!($line) - 1] == "\r") {
+      if ('' != $line && "\r" == $line[length!($line) - 1]) {
         $line = string_slice($line, 0, length!($line) - 1);
       }
     }
@@ -96,12 +96,12 @@ final class Reader implements BufferedReadHandle {
   ): null|string {
     while (true) {
       $position = $this->findSuffix($suffix);
-      if ($position != null) {
+      if (null != $position) {
         return $this->consume($position + length!($suffix));
       }
 
       if (!$this->pullChunk($cancellation)) {
-        if ($this->buffer == '') {
+        if ('' == $this->buffer) {
           return null;
         }
 
@@ -125,7 +125,7 @@ final class Reader implements BufferedReadHandle {
   ): null|string {
     while (true) {
       $position = $this->findSuffix($suffix);
-      if ($position != null) {
+      if (null != $position) {
         $end = $position + length!($suffix);
         if ($end > $maxBytes) {
           throw new LimitExceededException(
@@ -143,7 +143,7 @@ final class Reader implements BufferedReadHandle {
       }
 
       if (!$this->pullChunk($cancellation)) {
-        if ($this->buffer == '') {
+        if ('' == $this->buffer) {
           return null;
         }
 
@@ -167,7 +167,7 @@ final class Reader implements BufferedReadHandle {
   /** Finds a suffix, treating an empty suffix as the buffer's start. */
   #[TrackCaller]
   private function findSuffix(string $suffix): null|int {
-    if ($suffix == '') {
+    if ('' == $suffix) {
       return 0;
     }
 

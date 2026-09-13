@@ -25,7 +25,7 @@ final readonly class ResponseCompression implements Middleware {
   ): Response {
     $response = $next->handle($context, $request, $cancellation);
     $body = $response->body;
-    if ($body == null || !$this->eligible($request, $response)) {
+    if (null == $body || !$this->eligible($request, $response)) {
       return $response;
     }
 
@@ -45,7 +45,7 @@ final readonly class ResponseCompression implements Middleware {
     }
 
     $headers = _Private\vary_by_accept_encoding($response->headers);
-    if ($codec == null) {
+    if (null == $codec) {
       return $response->withHeaders($headers);
     }
 
@@ -62,10 +62,10 @@ final readonly class ResponseCompression implements Middleware {
   /** Reports whether a response may carry a transformed representation. */
   private function eligible(Request $request, Response $response): bool {
     if (
-      $request->method == METHOD_HEAD
+      METHOD_HEAD == $request->method
       || ($response->status >= 100 && $response->status < 200)
-      || $response->status == 204
-      || $response->status == 304
+      || 204 == $response->status
+      || 304 == $response->status
       || $response->headers->has('Content-Encoding')
       || $response->headers->has('Content-Range')
     ) {

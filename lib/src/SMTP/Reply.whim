@@ -41,7 +41,7 @@ final readonly class Reply implements ToString {
   #[AlwaysInline]
   #[MustUse]
   public function toString(): string {
-    if ($this->enhancedStatus == null) {
+    if (null == $this->enhancedStatus) {
       return $this->code . ' ' . $this->message;
     }
 

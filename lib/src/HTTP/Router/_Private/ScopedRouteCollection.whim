@@ -16,7 +16,7 @@ final class ScopedRouteCollection implements RouteCollection {
     Method $method,
     NonEmptyString $pattern,
     Handler $handler,
-  ): static {
+  ): self {
     $this->routes[] = ($method, $pattern, $handler);
     return $this;
   }

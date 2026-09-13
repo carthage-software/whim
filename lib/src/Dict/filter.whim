@@ -65,7 +65,7 @@ function filter_keys<K: ArrayKey, V>(
 function filter_nulls<K: ArrayKey, V>(Iterable<K, null|V> $values): dict<K, V> {
   $result = dict[];
   foreach ($values as $key => $value) {
-    if ($value != null) {
+    if (null != $value) {
       $result[$key] = $value;
     }
   }

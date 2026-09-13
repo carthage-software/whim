@@ -16,7 +16,7 @@ final class HeaderBlockAssembler {
   public function __construct(private NonNegativeInt $maximumSize) {}
 
   public function active(): bool {
-    return $this->kind != null;
+    return null != $this->kind;
   }
 
   public function headers(
@@ -87,7 +87,7 @@ final class HeaderBlockAssembler {
     string $bytes,
     bool $endHeaders,
   ): null|CompletedHeaderBlock {
-    if ($this->kind == null || $this->streamId == null) {
+    if (null == $this->kind || null == $this->streamId) {
       throw new ProtocolException(
         'a CONTINUATION frame has no open header block',
       );
@@ -122,7 +122,7 @@ final class HeaderBlockAssembler {
   }
 
   private function guardSize(int $size): void {
-    if ($this->maximumSize != 0 && $size > $this->maximumSize) {
+    if (0 != $this->maximumSize && $size > $this->maximumSize) {
       throw new ProtocolException(
         'the compressed HTTP/2 header block exceeds its configured limit',
         Whim\HTTP\_Private\ErrorCode::CompressionError->value,

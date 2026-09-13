@@ -41,25 +41,25 @@ function failure(
   string $action,
 ): never {
   $number = $error->errno();
-  if ($number == Whim\_Private\ERRNO_NOT_FOUND) {
+  if (Whim\_Private\ERRNO_NOT_FOUND == $number) {
     throw new NotFoundException('path `' . $path . '` was not found', $number);
   }
 
-  if ($number == Whim\_Private\ERRNO_NOT_DIRECTORY) {
+  if (Whim\_Private\ERRNO_NOT_DIRECTORY == $number) {
     throw new NotDirectoryException(
       'path `' . $path . '` does not point to a directory',
       $number,
     );
   }
 
-  if ($number == Whim\_Private\ERRNO_IS_DIRECTORY) {
+  if (Whim\_Private\ERRNO_IS_DIRECTORY == $number) {
     throw new NotFileException(
       'path `' . $path . '` does not point to a file',
       $number,
     );
   }
 
-  if ($number == Whim\_Private\ERRNO_ALREADY_EXISTS) {
+  if (Whim\_Private\ERRNO_ALREADY_EXISTS == $number) {
     throw new AlreadyCreatedException(
       'path `' . $path . '` already exists',
       $number,
@@ -67,8 +67,8 @@ function failure(
   }
 
   if (
-    $number == Whim\_Private\ERRNO_PERMISSION_DENIED
-    || $number == Whim\_Private\ERRNO_OPERATION_NOT_PERMITTED
+    Whim\_Private\ERRNO_PERMISSION_DENIED == $number
+    || Whim\_Private\ERRNO_OPERATION_NOT_PERMITTED == $number
   ) {
     throw new PermissionDeniedException(
       'failed to ' . $action . ' `' . $path . '`: permission denied',
@@ -76,7 +76,7 @@ function failure(
     );
   }
 
-  if ($number == Whim\_Private\ERRNO_DIRECTORY_NOT_EMPTY) {
+  if (Whim\_Private\ERRNO_DIRECTORY_NOT_EMPTY == $number) {
     throw new NotEmptyException(
       'directory `' . $path . '` is not empty',
       $number,
@@ -150,23 +150,23 @@ function into_metadata(vec<int> $raw): Metadata {
 #[TraceBoundary]
 function parent_directory(NonEmptyString $path): null|NonEmptyString {
   $length = length!($path);
-  while ($length > 0 && $path[$length - 1] == '/') {
-    $length = $length - 1;
+  while ($length > 0 && '/' == $path[$length - 1]) {
+    $length--;
   }
 
-  while ($length > 0 && $path[$length - 1] != '/') {
-    $length = $length - 1;
+  while ($length > 0 && '/' != $path[$length - 1]) {
+    $length--;
   }
 
-  while ($length > 1 && $path[$length - 1] == '/') {
-    $length = $length - 1;
+  while ($length > 1 && '/' == $path[$length - 1]) {
+    $length--;
   }
 
-  if ($length == 0) {
+  if (0 == $length) {
     return null;
   }
 
-  if ($length == 1 && $path[0] == '/') {
+  if (1 == $length && '/' == $path[0]) {
     return null;
   }
 
@@ -208,7 +208,7 @@ function create_directory_recursively(
     return;
   } catch (Whim\_Private\SystemError $error) {
     $number = $error->errno();
-    if ($number == Whim\_Private\ERRNO_ALREADY_EXISTS) {
+    if (Whim\_Private\ERRNO_ALREADY_EXISTS == $number) {
       if (is_existing_directory($path, true)) {
         return;
       }
@@ -216,13 +216,13 @@ function create_directory_recursively(
       failure($error, $path, 'create directory');
     }
 
-    if ($number != Whim\_Private\ERRNO_NOT_FOUND) {
+    if (Whim\_Private\ERRNO_NOT_FOUND != $number) {
       failure($error, $path, 'create directory');
     }
   }
 
   $parent = parent_directory($path);
-  if ($parent != null) {
+  if (null != $parent) {
     create_directory_recursively($parent, $permissions);
   }
 
@@ -260,7 +260,7 @@ function delete_directory_recursively(NonEmptyString $path): void {
   foreach ($entries as $entry) {
     $child = $prefix . '/' . $entry[0];
     $bits = $entry[1];
-    if ($bits == 0) {
+    if (0 == $bits) {
       try {
         $metadata = metadata_values($child, false);
         $bits = $metadata[0];

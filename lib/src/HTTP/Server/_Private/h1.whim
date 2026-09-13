@@ -39,7 +39,7 @@ function h1_cancellation(
   CancellationToken $forced,
   null|Duration $timeout,
 ): CancellationToken {
-  if ($timeout == null) {
+  if (null == $timeout) {
     return $forced;
   }
 
@@ -69,7 +69,7 @@ function h1_read_request_head(
     );
   }
 
-  if ($block == null) {
+  if (null == $block) {
     return null;
   }
 
@@ -128,7 +128,7 @@ function h1_field_tokens(string $field): vec<string> {
   foreach (string_split($field, ',', 0) as $token) {
     $token = string_lowercase(string_trim($token, " \t", 1));
 
-    if ($token != '') {
+    if ('' != $token) {
       $tokens[] = $token;
     }
   }
@@ -189,7 +189,7 @@ function h1_content_length(FieldMap $headers): null|int {
 #[TrackCaller]
 #[TraceBoundary]
 function h1_decimal(string $value): int {
-  if ($value == '') {
+  if ('' == $value) {
     throw new HTTPException(400, 'the request content length is empty');
   }
 
@@ -215,10 +215,10 @@ function h1_decimal(string $value): int {
 
 /** Builds an absolute URL when a request target has an origin form. */
 function h1_url(string $scheme, null|string $host, string $target): null|URL {
-  if ($host != null && $target != '' && $target[0] == '/') {
+  if (null != $host && '' != $target && '/' == $target[0]) {
     $authority = Authority::parse($host);
     $components = uri_parse_reference($target);
-    if ($authority == null || $components == null) {
+    if (null == $authority || null == $components) {
       return null;
     }
 
@@ -241,7 +241,7 @@ function h1_url(string $scheme, null|string $host, string $target): null|URL {
 function h1_h2c_settings(
   H1RequestHead $head,
 ): dict<H2\SettingId, H2\SettingValue> {
-  if ($head->protocolVersion != ProtocolVersion::V11) {
+  if (ProtocolVersion::V11 != $head->protocolVersion) {
     throw new HTTPException(400, 'h2c requires HTTP/1.1');
   }
 
@@ -282,7 +282,7 @@ function h1_h2c_settings(
   $offset = 0;
   while ($offset < length!($payload)) {
     $id = Binary\decode_u16(Str\slice($payload, $offset, 2));
-    if ($id == 0) {
+    if (0 == $id) {
       throw new HTTPException(
         400,
         'an HTTP/2 setting identifier cannot be zero',

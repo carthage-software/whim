@@ -65,11 +65,11 @@ final class ReadHandleImpl implements ReadHandle, FileDescriptorHandle {
       failure($error);
     }
 
-    if ($bytes == null) {
+    if (null == $bytes) {
       return '';
     }
 
-    if ($bytes == '') {
+    if ('' == $bytes) {
       $this->reachedEnd = true;
     }
 

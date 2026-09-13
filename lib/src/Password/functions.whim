@@ -53,7 +53,7 @@ function hash(
     ),
   };
 
-  if ($hash == null) {
+  if (null == $hash) {
     throw new RuntimeException('the password could not be hashed');
   }
 

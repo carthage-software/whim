@@ -40,7 +40,7 @@ final readonly class Origin implements Equal<Origin>, ToString {
   #[MustUse]
   public function toString(): string {
     $origin = $this->scheme . '://' . $this->host->toString();
-    if ($this->port != null) {
+    if (null != $this->port) {
       $origin .= ':' . $this->port;
     }
 

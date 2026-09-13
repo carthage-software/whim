@@ -46,7 +46,7 @@ final readonly class DeniedDestinationsMiddleware implements Middleware {
   ): Transaction {
     $metadata = $connection->getMetadata();
     $endpoint = $metadata->destinationEndpoint;
-    if ($endpoint == null) {
+    if (null == $endpoint) {
       if ($metadata->proxied) {
         throw new DestinationDeniedException(
           'the proxy-resolved destination cannot be verified',

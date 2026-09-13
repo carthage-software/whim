@@ -39,7 +39,7 @@ final readonly class Authority implements ToString {
   #[TrackCaller]
   public static function from(string $authority): Authority {
     $parsed = Authority::parse($authority);
-    if ($parsed == null) {
+    if (null == $parsed) {
       throw new InvalidArgumentException(
         'invalid IRI authority: `' . $authority . '`',
       );
@@ -63,7 +63,7 @@ final readonly class Authority implements ToString {
     };
 
     $authority .= $host->toString();
-    if ($port != null) {
+    if (null != $port) {
       $authority .= ':' . $port;
     }
 
@@ -101,7 +101,7 @@ final readonly class Authority implements ToString {
     };
 
     $authority .= $this->host->toString();
-    if ($this->port != null) {
+    if (null != $this->port) {
       $authority .= ':' . $this->port;
     }
 

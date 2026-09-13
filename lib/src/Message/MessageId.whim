@@ -26,7 +26,7 @@ final readonly class MessageId implements ToString {
     }
 
     if (
-      $input == ''
+      '' == $input
       || Str\contains($input, "\r")
       || Str\contains($input, "\n")
     ) {
@@ -42,7 +42,7 @@ final readonly class MessageId implements ToString {
   #[TrackCaller]
   public static function from(string $input): MessageId {
     $id = MessageId::parse($input);
-    if ($id == null) {
+    if (null == $id) {
       throw new InvalidArgumentException('invalid Message-ID');
     }
 

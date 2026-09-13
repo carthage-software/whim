@@ -60,7 +60,7 @@ final class BoundedReadHandle implements ReadHandle {
 
     $remaining = $this->limit - $this->consumed;
     $wanted = $remaining;
-    if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $remaining) {
+    if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $remaining) {
       $wanted = $maxBytes;
     }
 

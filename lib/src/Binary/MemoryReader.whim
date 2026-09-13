@@ -33,7 +33,7 @@ final class MemoryReader implements BufferedReader {
   #[NeverInline]
   #[TrackCaller]
   private function consume(NonNegativeInt $length): string {
-    if ($length == 0) {
+    if (0 == $length) {
       return '';
     }
 
@@ -87,7 +87,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       2,
       false,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 2;
@@ -109,7 +109,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       4,
       false,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 4;
@@ -132,7 +132,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       8,
       false,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 8;
@@ -175,7 +175,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       2,
       true,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 2;
@@ -197,7 +197,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       4,
       true,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 4;
@@ -219,7 +219,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       8,
       true,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 8;
@@ -241,7 +241,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       4,
       false,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 4;
@@ -263,7 +263,7 @@ final class MemoryReader implements BufferedReader {
       $this->position,
       8,
       true,
-      $endianness == Endianness::Little,
+      Endianness::Little == $endianness,
     );
 
     $this->position += 8;

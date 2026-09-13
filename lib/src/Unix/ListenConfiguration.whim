@@ -12,8 +12,8 @@ final readonly class ListenConfiguration implements Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public static function default(): static {
-    return new static();
+  public static function default(): self {
+    return new self();
   }
 
   #[AlwaysInline]

@@ -18,7 +18,7 @@ final class Decompressor implements DecompressorInterface {
   #[TraceBoundary]
   public function push(string $bytes): string {
     $result = $this->decoder->push($bytes);
-    if ($result == null) {
+    if (null == $result) {
       throw new DecompressionException('the compressed stream is invalid');
     }
 
@@ -31,7 +31,7 @@ final class Decompressor implements DecompressorInterface {
   #[TraceBoundary]
   public function finish(): string {
     $result = $this->decoder->finish();
-    if ($result == null) {
+    if (null == $result) {
       throw new DecompressionException(
         'the compressed stream is invalid or truncated',
       );

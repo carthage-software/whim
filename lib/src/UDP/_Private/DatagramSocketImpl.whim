@@ -33,7 +33,7 @@ abstract class DatagramSocketImpl implements
   #[TrackCaller]
   #[TraceBoundary]
   public function getFileDescriptor(): FileDescriptor {
-    if ($this->descriptor == null || $this->descriptor->isClosed()) {
+    if (null == $this->descriptor || $this->descriptor->isClosed()) {
       throw new ClosedException('the UDP socket is closed');
     }
 
@@ -60,7 +60,7 @@ abstract class DatagramSocketImpl implements
       Whim\Network\_Private\failure($error);
     }
 
-    if ($message == null) {
+    if (null == $message) {
       return null;
     }
 
@@ -83,7 +83,7 @@ abstract class DatagramSocketImpl implements
   ): Datagram {
     while (true) {
       $datagram = $this->tryReceive($maxBytes);
-      if ($datagram != null) {
+      if (null != $datagram) {
         return $datagram;
       }
 
@@ -106,7 +106,7 @@ abstract class DatagramSocketImpl implements
     if (
       $peer->address->family != $this->localEndpoint->address->family
       || (
-        $metadata != null
+        null != $metadata
         && $metadata->sourceAddress->family != $peer->address->family
       )
     ) {
@@ -117,7 +117,7 @@ abstract class DatagramSocketImpl implements
 
     while (true) {
       try {
-        if ($metadata == null) {
+        if (null == $metadata) {
           return Whim\_Private\send_to(
             $this->getFileDescriptor(),
             $bytes,

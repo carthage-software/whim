@@ -26,7 +26,7 @@ final readonly class Brotli implements Codec {
   #[TraceBoundary]
   public function createCompressor(): Compressor {
     $encoder = CompressionEncoder::brotli($this->quality);
-    if ($encoder == null) {
+    if (null == $encoder) {
       throw new Exception('failed to create a Brotli compression stream');
     }
 
@@ -39,7 +39,7 @@ final readonly class Brotli implements Codec {
   #[TraceBoundary]
   public function createDecompressor(): Decompressor {
     $decoder = CompressionDecoder::brotli();
-    if ($decoder == null) {
+    if (null == $decoder) {
       throw new DecompressionException(
         'failed to create a Brotli decompression stream',
       );

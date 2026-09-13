@@ -76,7 +76,7 @@ final readonly class Time implements Order<Time>, ToString {
   #[TrackCaller]
   public static function from(string $value): Time {
     $time = Time::parse($value);
-    if ($time == null) {
+    if (null == $time) {
       throw new InvalidArgumentException(
         'invalid civil time: `' . $value . '`',
       );

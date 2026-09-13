@@ -81,7 +81,7 @@ final class SignalCancellationToken implements CancellationToken {
   #[NeverInline]
   #[TrackCaller]
   public function throwIfCancellationRequested(): void {
-    if ($this->exception != null) {
+    if (null != $this->exception) {
       throw $this->exception;
     }
   }

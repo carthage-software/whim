@@ -94,7 +94,7 @@ function flatten<L: ArrayKey, V>(
 ): dict<L, V> {
   if ($values is array<_, _>) {
     $flattened = Whim\_Private\dict_flatten($values);
-    if ($flattened != null) {
+    if (null != $flattened) {
       return $flattened;
     }
   }

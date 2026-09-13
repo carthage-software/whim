@@ -60,13 +60,13 @@ function failure(
 ): never {
   $number = $error->errno();
   if (
-    $number == Whim\_Private\ERRNO_NOT_FOUND
-    || $number == Whim\_Private\ERRNO_NOT_DIRECTORY
+    Whim\_Private\ERRNO_NOT_FOUND == $number
+    || Whim\_Private\ERRNO_NOT_DIRECTORY == $number
   ) {
     throw new NotFoundException('file `' . $path . '` was not found', $number);
   }
 
-  if ($number == Whim\_Private\ERRNO_ALREADY_EXISTS) {
+  if (Whim\_Private\ERRNO_ALREADY_EXISTS == $number) {
     throw new AlreadyCreatedException(
       'file `' . $path . '` already exists',
       $number,
@@ -74,8 +74,8 @@ function failure(
   }
 
   if (
-    $number == Whim\_Private\ERRNO_PERMISSION_DENIED
-    || $number == Whim\_Private\ERRNO_OPERATION_NOT_PERMITTED
+    Whim\_Private\ERRNO_PERMISSION_DENIED == $number
+    || Whim\_Private\ERRNO_OPERATION_NOT_PERMITTED == $number
   ) {
     if ($write) {
       throw new NotWritableException(
@@ -90,7 +90,7 @@ function failure(
     );
   }
 
-  if ($number == Whim\_Private\ERRNO_IS_DIRECTORY) {
+  if (Whim\_Private\ERRNO_IS_DIRECTORY == $number) {
     throw new NotFileException(
       'path `' . $path . '` does not point to a file',
       $number,

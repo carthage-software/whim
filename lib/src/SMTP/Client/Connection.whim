@@ -34,7 +34,7 @@ final class Connection implements WriteHandle {
     null|CancellationToken $cancellation = null,
   ): Reply {
     $reply = $this->readReply($cancellation);
-    if ($reply->code != 220) {
+    if (220 != $reply->code) {
       throw new ConnectionException(
         'the SMTP server greeted with '
         . $reply->code
@@ -65,7 +65,7 @@ final class Connection implements WriteHandle {
     $this->capabilities = dict[];
     $this->maximumMessageSize = null;
     foreach (Str\split($reply->message, "\n") as $index => $line) {
-      if ($index == 0) {
+      if (0 == $index) {
         continue;
       }
 
@@ -86,9 +86,9 @@ final class Connection implements WriteHandle {
       };
 
       $this->capabilities[$keyword] = $value;
-      if ($keyword == Capability::Size->value && $value != '') {
+      if ($keyword == Capability::Size->value && '' != $value) {
         $size = _Private\parse_decimal($value);
-        if ($size != null && $size >= 0) {
+        if (null != $size && $size >= 0) {
           $this->maximumMessageSize = $size;
         }
       }

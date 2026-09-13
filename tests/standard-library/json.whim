@@ -126,9 +126,9 @@ final readonly class Point implements ToJson, FromJson {
     return dict['x' => $this->x, 'y' => $this->y];
   }
 
-  public static function fromJson(Value $value): static {
+  public static function fromJson(Value $value): self {
     return match ($value) {
-      dict['x' => $x @ int, 'y' => $y @ int] => new static($x, $y),
+      dict['x' => $x @ int, 'y' => $y @ int] => new self($x, $y),
       $_ => throw new DecodingException(
         'a point needs a dict with x and y fields',
       ),

@@ -60,7 +60,7 @@ final readonly class URL implements Equal<URL>, ToString {
   #[TrackCaller]
   public static function from(string $url): URL {
     $parsed = URL::parse($url);
-    if ($parsed == null) {
+    if (null == $parsed) {
       throw new InvalidArgumentException('invalid URL: `' . $url . '`');
     }
 
@@ -80,7 +80,7 @@ final readonly class URL implements Equal<URL>, ToString {
   #[TrackCaller]
   public static function fromURI(URI $uri): URL {
     $parsed = URL::parseURI($uri);
-    if ($parsed == null) {
+    if (null == $parsed) {
       throw new InvalidArgumentException('the URI is not a URL');
     }
 
@@ -100,7 +100,7 @@ final readonly class URL implements Equal<URL>, ToString {
   #[TrackCaller]
   public static function fromIRI(IRI $iri): URL {
     $parsed = URL::parseIRI($iri);
-    if ($parsed == null) {
+    if (null == $parsed) {
       throw new InvalidArgumentException('the IRI is not a URL');
     }
 
@@ -119,11 +119,11 @@ final readonly class URL implements Equal<URL>, ToString {
     null|string $fragment = null,
   ): URL {
     $url = $scheme . '://' . $authority->toString() . $path;
-    if ($query != null) {
+    if (null != $query) {
       $url .= '?' . $query;
     }
 
-    if ($fragment != null) {
+    if (null != $fragment) {
       $url .= '#' . $fragment;
     }
 
@@ -244,11 +244,11 @@ final readonly class URL implements Equal<URL>, ToString {
   #[MustUse]
   public function toString(): string {
     $url = $this->scheme . '://' . $this->authority->toString() . $this->path;
-    if ($this->query != null) {
+    if (null != $this->query) {
       $url .= '?' . $this->query;
     }
 
-    if ($this->fragment != null) {
+    if (null != $this->fragment) {
       $url .= '#' . $this->fragment;
     }
 
