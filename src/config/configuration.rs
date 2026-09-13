@@ -30,10 +30,14 @@ impl Configuration {
     #[tracing::instrument(level = "debug", skip_all, fields(explicit = path.is_some()))]
     pub(crate) fn load(path: Option<&Path>) -> Result<Self, Error> {
         let current = env::current_dir().map_err(Error::CurrentDirectory)?;
-        let search_root = current
+        Self::load_from(&current, path)
+    }
+
+    pub(crate) fn load_from(start: &Path, path: Option<&Path>) -> Result<Self, Error> {
+        let search_root = start
             .canonicalize()
             .map_err(|source| Error::ResolveSearchPath {
-                path: current,
+                path: start.to_path_buf(),
                 source,
             })?;
         let path = match path {

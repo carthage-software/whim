@@ -161,6 +161,10 @@ pub(super) fn execute() -> Result<ExitCode, Error> {
         return init::execute(command).map(|()| ExitCode::SUCCESS);
     }
 
+    if matches!(&arguments.command, Some(Command::LanguageServer)) {
+        return language_server::execute(arguments.config.as_deref());
+    }
+
     let configuration = Configuration::load(arguments.config.as_deref())?;
 
     match arguments.command {
@@ -197,7 +201,9 @@ pub(super) fn execute() -> Result<ExitCode, Error> {
             suggestions::execute(&configuration).map(|()| ExitCode::SUCCESS)
         }
         Some(Command::Fund) => fund::execute(&configuration).map(|()| ExitCode::SUCCESS),
-        Some(Command::LanguageServer) => language_server::execute(&configuration),
+        Some(Command::LanguageServer) => {
+            unreachable!("the language server is dispatched before configuration")
+        }
         Some(Command::Init(_)) => {
             unreachable!("the init command is dispatched before configuration")
         }

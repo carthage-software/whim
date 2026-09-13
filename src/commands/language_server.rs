@@ -1,17 +1,17 @@
+use std::path::Path;
+use std::path::absolute;
 use std::process::ExitCode;
 
-use crate::config::Configuration;
+use crate::config::Error as ConfigurationError;
 use crate::error::Error;
 use crate::server;
-use crate::server::diagnostics::Diagnostics;
 
-pub(super) fn execute(configuration: &Configuration) -> Result<ExitCode, Error> {
-    let diagnostics = Diagnostics::new(
-        configuration.lint().registry()?,
-        configuration.lint().patterns()?,
-        configuration.root().to_owned(),
-    );
-    server::serve(configuration.format().settings(), diagnostics)?;
+pub(super) fn execute(path: Option<&Path>) -> Result<ExitCode, Error> {
+    let path = path
+        .map(absolute)
+        .transpose()
+        .map_err(ConfigurationError::CurrentDirectory)?;
+    server::serve(path.as_deref())?;
 
     Ok(ExitCode::SUCCESS)
 }

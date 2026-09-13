@@ -1,17 +1,21 @@
 mod analysis;
 mod completion;
-pub(crate) mod diagnostics;
+mod diagnostics;
 mod error;
 mod folding;
 mod highlight;
+mod project;
+#[cfg(test)]
+mod project_tests;
 mod selection;
 mod semantic;
 mod text;
 
 use std::collections::HashMap;
 use std::io::Error as IoError;
+use std::path::Path;
+use std::path::PathBuf;
 
-use crate::server::diagnostics::Diagnostics;
 use lsp_server::Connection;
 use lsp_server::ErrorCode;
 use lsp_server::Message;
@@ -33,6 +37,7 @@ use lsp_types::FoldingRangeParams;
 use lsp_types::FoldingRangeProviderCapability;
 use lsp_types::FullDocumentDiagnosticReport;
 use lsp_types::InitializeResult;
+use lsp_types::MessageType;
 use lsp_types::OneOf;
 use lsp_types::PositionEncodingKind;
 use lsp_types::PublishDiagnosticsParams;
@@ -44,6 +49,7 @@ use lsp_types::SemanticTokensParams;
 use lsp_types::SemanticTokensResult;
 use lsp_types::ServerCapabilities;
 use lsp_types::ServerInfo;
+use lsp_types::ShowMessageParams;
 use lsp_types::TextDocumentSyncCapability;
 use lsp_types::TextDocumentSyncKind;
 use lsp_types::TextEdit;
@@ -54,6 +60,7 @@ use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::notification::Notification as LspNotification;
 use lsp_types::notification::PublishDiagnostics;
+use lsp_types::notification::ShowMessage;
 use lsp_types::request::Completion;
 use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::request::DocumentHighlightRequest;
@@ -64,16 +71,16 @@ use lsp_types::request::SelectionRangeRequest;
 use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use serde::de::DeserializeOwned;
-use whim_formatter::settings::FormatSettings;
 use whim_syn::arena::LocalArena;
 
 use crate::server::analysis::Analysis;
 pub(crate) use crate::server::error::Error;
+use crate::server::project::Project;
 
 struct Server {
     documents: HashMap<Uri, Document>,
-    diagnostics: Diagnostics,
-    format: FormatSettings,
+    projects: HashMap<PathBuf, Option<Project>>,
+    standalone: Project,
 }
 
 struct Document {
@@ -82,12 +89,71 @@ struct Document {
 }
 
 impl Server {
-    fn new(format: FormatSettings, diagnostics: Diagnostics) -> Self {
-        Self {
+    fn new() -> Result<Self, Error> {
+        Ok(Self {
             documents: HashMap::new(),
-            format,
-            diagnostics,
-        }
+            projects: HashMap::new(),
+            standalone: Project::standalone()?,
+        })
+    }
+
+    fn add_project(
+        &mut self,
+        connection: &Connection,
+        root: PathBuf,
+        configuration: Option<&Path>,
+    ) -> Result<(), Error> {
+        let root = root.canonicalize().unwrap_or(root);
+        let project = match Project::load(&root, configuration) {
+            Ok(project) => {
+                if project.has_manifest {
+                    tracing::info!(root = %root.display(), configuration_root = %project.root.display(), "loaded language-server project");
+                } else {
+                    show_error(
+                        connection,
+                        format!(
+                            "No whim.toml found for `{}`. Create one with `whim init` and restart the language server to enable workspace diagnostics. Only open files will be checked until then.",
+                            root.display(),
+                        ),
+                    )?;
+                }
+                Some(project)
+            }
+            Err(error) => {
+                show_error(
+                    connection,
+                    format!(
+                        "Could not load Whim settings for `{}`: {error}. Fix the config and restart the language server. Formatting and diagnostics are disabled for this project.",
+                        root.display(),
+                    ),
+                )?;
+                None
+            }
+        };
+        self.projects.insert(root, project);
+        Ok(())
+    }
+
+    fn project(&self, uri: &Uri) -> Option<&Project> {
+        let path = diagnostics::file_path(uri);
+        path.as_ref()
+            .and_then(|path| {
+                self.projects
+                    .iter()
+                    .filter_map(|(root, project)| {
+                        let root = if path.starts_with(root) {
+                            root
+                        } else {
+                            &project
+                                .as_ref()
+                                .filter(|project| path.starts_with(&project.root))?
+                                .root
+                        };
+                        Some((root.components().count(), project))
+                    })
+                    .max_by_key(|(depth, _)| *depth)
+            })
+            .map_or(Some(&self.standalone), |(_, project)| project.as_ref())
     }
 
     fn run(&mut self, connection: &Connection) -> Result<(), Error> {
@@ -294,14 +360,21 @@ impl Server {
         params: &DocumentFormattingParams,
     ) -> Result<Option<Vec<TextEdit>>, RequestError> {
         let document = &params.text_document.uri;
+        let Some(project) = self
+            .project(document)
+            .filter(|project| project.can_format(document))
+        else {
+            return Ok(None);
+        };
         let source = self.document(document)?;
         let arena = LocalArena::new();
-        let formatted = whim_formatter::format(&arena, source, self.format).map_err(|errors| {
-            RequestError::Format {
-                document: document.as_str().to_owned(),
-                diagnostics: errors.render(source, document.as_str()),
-            }
-        })?;
+        let formatted =
+            whim_formatter::format(&arena, source, project.format).map_err(|errors| {
+                RequestError::Format {
+                    document: document.as_str().to_owned(),
+                    diagnostics: errors.render(source, document.as_str()),
+                }
+            })?;
 
         if formatted == source {
             return Ok(Some(Vec::new()));
@@ -369,12 +442,12 @@ impl RequestError {
 }
 
 #[tracing::instrument(level = "debug", skip_all)]
-pub(crate) fn serve(format: FormatSettings, mut diagnostics: Diagnostics) -> Result<(), Error> {
+pub(crate) fn serve(configuration: Option<&Path>) -> Result<(), Error> {
     let (connection, threads) = Connection::stdio();
-    initialize(&connection, &mut diagnostics)?;
+    let mut server = initialize(&connection, configuration)?;
     tracing::debug!("language server initialized");
 
-    let result = Server::new(format, diagnostics).run(&connection);
+    let result = server.run(&connection);
     drop(connection);
     let transport = threads.join().map_err(Error::Transport);
 
@@ -384,7 +457,7 @@ pub(crate) fn serve(format: FormatSettings, mut diagnostics: Diagnostics) -> Res
     Ok(())
 }
 
-fn initialize(connection: &Connection, diagnostics: &mut Diagnostics) -> Result<(), Error> {
+fn initialize(connection: &Connection, configuration: Option<&Path>) -> Result<Server, Error> {
     let (id, params) = connection.initialize_start()?;
     let mut roots = Vec::new();
     if let Some(folders) = params
@@ -411,8 +484,10 @@ fn initialize(connection: &Connection, diagnostics: &mut Diagnostics) -> Result<
     {
         roots.push(path);
     }
-    if !roots.is_empty() {
-        diagnostics.roots = roots;
+    if roots.is_empty()
+        && let Some(root) = configuration.and_then(Path::parent)
+    {
+        roots.push(root.to_owned());
     }
     let result = InitializeResult {
         capabilities: capabilities(),
@@ -427,7 +502,11 @@ fn initialize(connection: &Connection, diagnostics: &mut Diagnostics) -> Result<
     })?;
     connection.initialize_finish(id, value)?;
 
-    Ok(())
+    let mut server = Server::new()?;
+    for root in roots {
+        server.add_project(connection, root, configuration)?;
+    }
+    Ok(server)
 }
 
 fn capabilities() -> ServerCapabilities {
@@ -508,6 +587,20 @@ fn publish(connection: &Connection, params: PublishDiagnosticsParams) -> Result<
         .send(Message::Notification(ServerNotification::new(
             PublishDiagnostics::METHOD.to_owned(),
             params,
+        )))
+        .map_err(|_disconnected| Error::Disconnected)
+}
+
+fn show_error(connection: &Connection, message: String) -> Result<(), Error> {
+    tracing::error!("{message}");
+    connection
+        .sender
+        .send(Message::Notification(ServerNotification::new(
+            ShowMessage::METHOD.to_owned(),
+            ShowMessageParams {
+                typ: MessageType::ERROR,
+                message,
+            },
         )))
         .map_err(|_disconnected| Error::Disconnected)
 }

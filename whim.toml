@@ -1,0 +1,10 @@
+manifest-version = 1
+
+[lint]
+include = ["lib", "scripts"]
+
+[lint.rules.no-insecure-comparison]
+exclude = [
+  "lib/src/HTTP/Client/_Private/h1.whim",
+  "lib/src/HTTP/WebSocket/Client/DefaultConnector.whim",
+]

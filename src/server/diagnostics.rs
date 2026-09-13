@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -23,50 +25,27 @@ use whim_span::Span;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
 
-use crate::config::FilePatterns;
 use crate::pipeline::files::discover;
 use crate::server::Document;
 use crate::server::RequestError;
 use crate::server::Server;
+use crate::server::project::Project;
 use crate::server::text::LineIndex;
 
-pub(crate) struct Diagnostics {
-    registry: Arc<RuleRegistry>,
-    patterns: FilePatterns,
-    pub(super) roots: Vec<PathBuf>,
-}
-
-impl Diagnostics {
-    pub(crate) fn new(registry: RuleRegistry, patterns: FilePatterns, root: PathBuf) -> Self {
-        Self {
-            registry: Arc::new(registry),
-            patterns,
-            roots: vec![root],
-        }
-    }
-
-    fn path(&self, uri: &Uri) -> Option<PathBuf> {
-        let path = file_path(uri)?;
-        Some(
-            self.roots
-                .iter()
-                .find_map(|root| path.strip_prefix(root).ok())
-                .unwrap_or(&path)
-                .to_owned(),
-        )
-    }
-
+impl Project {
     fn document(
         &self,
         arena: &LocalArena,
         uri: &Uri,
         document: Option<&Document>,
     ) -> Result<Vec<Diagnostic>, RequestError> {
+        if !self.has_manifest && document.is_none() {
+            return Ok(Vec::new());
+        }
         let path = self.path(uri);
-        if path
-            .as_ref()
-            .is_some_and(|path| !self.patterns.includes(path) || self.patterns.excludes(path))
-        {
+        if path.as_ref().is_some_and(|path| {
+            !self.lint_patterns.includes(path) || self.lint_patterns.excludes(path)
+        }) {
             return Ok(Vec::new());
         }
 
@@ -91,8 +70,14 @@ impl Diagnostics {
 
 impl Server {
     pub(super) fn document_diagnostics(&self, uri: &Uri) -> Result<Vec<Diagnostic>, RequestError> {
-        self.diagnostics
-            .document(&LocalArena::new(), uri, self.documents.get(uri))
+        self.diagnose(&LocalArena::new(), uri)
+    }
+
+    fn diagnose(&self, arena: &LocalArena, uri: &Uri) -> Result<Vec<Diagnostic>, RequestError> {
+        self.project(uri).map_or_else(
+            || Ok(Vec::new()),
+            |project| project.document(arena, uri, self.documents.get(uri)),
+        )
     }
 
     pub(super) fn workspace_diagnostics(
@@ -100,11 +85,23 @@ impl Server {
         params: &WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult, RequestError> {
         let mut uris = Vec::new();
-        for root in &self.diagnostics.roots {
-            let files = discover(&[], root, &self.diagnostics.patterns)
+        let open_paths: HashMap<_, _> = self
+            .documents
+            .keys()
+            .filter_map(|uri| Some((file_path(uri)?, uri)))
+            .collect();
+        let mut roots = HashSet::new();
+        for project in self.projects.values().flatten() {
+            if !project.has_manifest || !roots.insert(&project.root) {
+                continue;
+            }
+            let files = discover(&[], &project.root, &project.lint_patterns)
                 .map_err(|error| RequestError::Workspace(error.to_string()))?;
             for file in files {
-                uris.push(file_uri(&file.path)?);
+                uris.push(match open_paths.get(&file.path) {
+                    Some(uri) => (*uri).clone(),
+                    None => file_uri(&file.path)?,
+                });
             }
         }
         uris.extend(self.documents.keys().cloned());
@@ -115,7 +112,7 @@ impl Server {
             .map_init(LocalArena::new, |arena, uri| {
                 arena.reset();
                 let document = self.documents.get(uri);
-                let items = self.diagnostics.document(arena, uri, document)?;
+                let items = self.diagnose(arena, uri)?;
                 Ok(WorkspaceFullDocumentDiagnosticReport {
                     uri: uri.clone(),
                     version: document.map(|document| i64::from(document.version)),
@@ -187,10 +184,19 @@ fn lint(
 }
 
 pub(super) fn file_path(uri: &Uri) -> Option<PathBuf> {
-    Url::parse(uri.as_str()).ok()?.to_file_path().ok()
+    let path = Url::parse(uri.as_str()).ok()?.to_file_path().ok()?;
+    Some(
+        path.ancestors()
+            .find_map(|ancestor| {
+                let mut resolved = ancestor.canonicalize().ok()?;
+                resolved.extend(path.strip_prefix(ancestor).ok()?.components());
+                Some(resolved)
+            })
+            .unwrap_or(path),
+    )
 }
 
-fn file_uri(path: &Path) -> Result<Uri, RequestError> {
+pub(super) fn file_uri(path: &Path) -> Result<Uri, RequestError> {
     Url::from_file_path(path)
         .ok()
         .and_then(|url| url.as_str().parse().ok())
@@ -206,10 +212,12 @@ fn file_uri(path: &Path) -> Result<Uri, RequestError> {
 mod tests {
     use std::env::temp_dir;
     use std::fs;
-    use std::path::PathBuf;
     use std::process::id;
     use std::time::Duration;
 
+    use super::file_uri;
+    use crate::server::Document;
+    use crate::server::Server;
     use lsp_server::Connection;
     use lsp_server::Message;
     use lsp_server::Notification;
@@ -221,25 +229,6 @@ mod tests {
     use lsp_types::WorkspaceDiagnosticReportResult;
     use lsp_types::WorkspaceDocumentDiagnosticReport;
     use serde_json::json;
-    use whim_formatter::settings::FormatSettings;
-
-    use super::Diagnostics;
-    use super::file_uri;
-    use crate::config::LintConfiguration;
-    use crate::server::Document;
-    use crate::server::Server;
-
-    fn server(root: PathBuf) -> Server {
-        let settings = LintConfiguration::default();
-        Server::new(
-            FormatSettings::default(),
-            Diagnostics::new(
-                settings.registry().unwrap(),
-                settings.patterns().unwrap(),
-                root,
-            ),
-        )
-    }
 
     fn published(connection: &Connection) -> PublishDiagnosticsParams {
         let Message::Notification(notification) = connection
@@ -255,7 +244,7 @@ mod tests {
 
     #[test]
     fn document_changes_publish_lints_syntax_errors_and_clear_stale_diagnostics() {
-        let mut server = server(temp_dir());
+        let mut server = Server::new().unwrap();
         let (connection, client) = Connection::memory();
         let uri: Uri = "untitled:source.whim".parse().unwrap();
         server.notification(&connection, Notification::new("textDocument/didOpen".to_owned(), json!({
@@ -308,10 +297,13 @@ mod tests {
     fn workspace_reports_disk_files_unsaved_text_and_deleted_files() {
         let root = temp_dir().join(format!("whim-lsp-lint-{}", id()));
         fs::create_dir_all(root.join("vendor")).unwrap();
+        fs::write(root.join("whim.toml"), "manifest-version = 1\n").unwrap();
         fs::write(root.join("closed.whim"), "// TODO: track this\n").unwrap();
         fs::write(root.join("open.whim"), "$password = 'secret';").unwrap();
         fs::write(root.join("vendor/skip.whim"), "$password = 'secret';").unwrap();
-        let mut server = server(root.clone());
+        let mut server = Server::new().unwrap();
+        let (connection, _client) = Connection::memory();
+        server.add_project(&connection, root.clone(), None).unwrap();
         let open = file_uri(&root.join("open.whim")).unwrap();
         let removed = file_uri(&root.join("removed.whim")).unwrap();
         server.documents.insert(

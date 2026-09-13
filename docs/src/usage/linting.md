@@ -89,7 +89,8 @@ the left. `no-assign-in-condition.ignore-while-statements` defaults to `false`
 and covers both `while` and `do`/`while`. `excessive-nesting.threshold` defaults
 to 7; its optional `function-like-threshold` counts each function body from 1.
 
-The language server uses the same rules and settings. Editors receive lint and
-syntax diagnostics for open files and can request a full workspace check. Open
-buffers take precedence over disk contents. Restart the server after changing
-lint settings.
+The language server uses each workspace's `whim.toml`, including file and rule
+exclusions. These filters also apply to open files. Editors can request a full
+workspace check when a manifest exists; without one, Whim reports the missing
+config and checks only open files. Open buffers take precedence over disk
+contents. Restart the server after creating or changing the config.

@@ -4,8 +4,12 @@ use lsp_server::ProtocolError;
 use serde_json::Error as JsonError;
 use thiserror::Error as ThisError;
 
+use crate::config::Error as ConfigurationError;
+
 #[derive(Debug, ThisError)]
 pub(crate) enum Error {
+    #[error("could not configure the language server: {0}")]
+    Configuration(#[from] ConfigurationError),
     #[error("the language-server protocol failed: {0}")]
     Protocol(#[from] ProtocolError),
     #[error("the language-server transport failed: {0}")]
