@@ -242,6 +242,29 @@ exclude = ["src/rule-skipped.whim"]
 }
 
 #[test]
+fn workspace_config_applies_disallowed_symbols_to_lsp_diagnostics() {
+    let fixture = Fixture::new("disallowed-symbols");
+    fixture.write(
+        "whim.toml",
+        "manifest-version = 1\n[lint.rules.disallowed-symbols]\nsymbols = [{ name = 'Legacy\\run', level = 'error' }]\n",
+    );
+    fixture.write("source.whim", "Legacy\\run();\n");
+    let (server, _connection, _client) = start(json!({"rootUri": fixture.uri("")}), None);
+
+    let diagnostics = server
+        .document_diagnostics(&fixture.uri("source.whim"))
+        .unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].code,
+        Some(lsp_types::NumberOrString::String(
+            "disallowed-symbols".to_owned()
+        ))
+    );
+    assert_eq!(diagnostics[0].severity, Some(DiagnosticSeverity::ERROR));
+}
+
+#[test]
 fn invalid_configs_report_errors_without_using_default_filters() {
     let fixture = Fixture::new("invalid-config");
     fixture.write("whim.toml", "[format]\nexclude = [");

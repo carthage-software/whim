@@ -126,3 +126,15 @@ impl LintRule for NoDeadStoreRule {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::NoDeadStoreRule;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = loop_rescan_does_not_create_a_dead_store,
+        rule = NoDeadStoreRule,
+        code = "function f(bool $flag) { $x = 0; while ($flag) { $x = 1; } return $x; }",
+    }
+}

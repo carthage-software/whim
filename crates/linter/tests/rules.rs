@@ -3,6 +3,7 @@ use std::slice::from_ref;
 
 use annotate_snippets::Renderer;
 use whim_linter::Linter;
+use whim_linter::rule::DisallowedSymbol;
 use whim_linter::rule::best_practices::yoda_conditions::YodaConditionsMode;
 use whim_linter::settings::Settings;
 use whim_span::Span;
@@ -130,7 +131,7 @@ fn rules_keep_mago_options_and_all_start_enabled() {
     let arena = LocalArena::new();
     let mut settings = Settings::default();
     let linter = Linter::new(&arena, &settings, None, false).unwrap();
-    assert_eq!(linter.rules().len(), 15);
+    assert_eq!(linter.rules().len(), 35);
     assert!(linter.rules().iter().all(|rule| rule.default_enabled()));
     settings.rules.yoda_conditions.config.mode = YodaConditionsMode::Deny;
     assert_eq!(
@@ -307,13 +308,22 @@ fn metadata_examples_are_valid_whim_and_match_the_rule() {
     let linter = Linter::new(&arena, &settings, None, false).unwrap();
     for rule in linter.rules() {
         let meta = rule.meta();
+        let mut example_settings = settings.clone();
+        if meta.code == "disallowed-symbols" {
+            example_settings
+                .rules
+                .disallowed_symbols
+                .config
+                .symbols
+                .push(DisallowedSymbol::Simple("Legacy\\run".to_owned()));
+        }
         assert!(
-            !spans(meta.bad_example, meta.code, &settings).is_empty(),
+            !spans(meta.bad_example, meta.code, &example_settings).is_empty(),
             "{}",
             meta.code
         );
         assert!(
-            spans(meta.good_example, meta.code, &settings).is_empty(),
+            spans(meta.good_example, meta.code, &example_settings).is_empty(),
             "{}",
             meta.code
         );

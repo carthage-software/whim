@@ -134,6 +134,47 @@ enabled = false
 }
 
 #[test]
+fn lint_loads_new_rule_settings_and_advanced_disallowed_symbols() {
+    let project = Project::new(
+        r#"
+[lint]
+minimum_fail_level = "error"
+[lint.rules.readable-literal]
+min-digits = 4
+[lint.rules.prefer-early-return]
+max-allowed-statements = 2
+[lint.rules.prefer-early-continue]
+max-allowed-statements = 2
+[lint.rules.no-empty-comment]
+preserve-single-line-comments = true
+[lint.rules.cyclomatic-complexity]
+threshold = 99
+method-threshold = 99
+[lint.rules.disallowed-symbols]
+symbols = [
+    { name = 'Legacy\run', help = 'Use Modern\run.', level = 'error' },
+]
+"#,
+    );
+    project.write(
+        "source.whim",
+        "use Legacy\\run as blocked;\n//\nblocked();\n1234;\n",
+    );
+
+    let output = project.lint(&[]);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert_eq!(
+        text.matches("error[disallowed-symbols]").count(),
+        2,
+        "{text}"
+    );
+    assert!(text.contains("help: Use Modern\\run."), "{text}");
+    assert!(text.contains("warning[readable-literal]"), "{text}");
+    assert!(!text.contains("no-empty-comment"), "{text}");
+}
+
+#[test]
 fn syntax_errors_fail_and_valid_files_still_get_linted() {
     let project = Project::new("");
     project.write("broken.whim", "$x = ;\n");

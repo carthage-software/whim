@@ -1,15 +1,35 @@
 use crate::rule::Config;
+use crate::rule::ConstantConditionConfig;
+use crate::rule::CyclomaticComplexityConfig;
+use crate::rule::DisallowedSymbolsConfig;
 use crate::rule::ExcessiveNestingConfig;
+use crate::rule::InlineVariableReturnConfig;
 use crate::rule::LoopDoesNotIterateConfig;
 use crate::rule::NoAssignInArgumentConfig;
 use crate::rule::NoAssignInConditionConfig;
 use crate::rule::NoDeadStoreConfig;
+use crate::rule::NoDebugSymbolsConfig;
+use crate::rule::NoEmptyCatchClauseConfig;
+use crate::rule::NoEmptyCommentConfig;
 use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoLiteralPasswordConfig;
+use crate::rule::NoMultiAssignmentsConfig;
+use crate::rule::NoParameterShadowingConfig;
 use crate::rule::NoRedundantContinueConfig;
 use crate::rule::NoRedundantElseConfig;
 use crate::rule::NoRedundantFinalConfig;
+use crate::rule::NoRedundantNullsafeConfig;
+use crate::rule::NoRedundantReadonlyConfig;
 use crate::rule::NoRedundantStaticConfig;
+use crate::rule::NoRedundantStringConcatConfig;
+use crate::rule::NoRedundantUseConfig;
+use crate::rule::NoRedundantVariableConfig;
+use crate::rule::NoSelfAssignmentConfig;
+use crate::rule::PreferEarlyContinueConfig;
+use crate::rule::PreferEarlyReturnConfig;
+use crate::rule::PreferWhileLoopConfig;
+use crate::rule::ReadableLiteralConfig;
+use crate::rule::SensitiveParameterConfig;
 use crate::rule::TaggedFixmeConfig;
 use crate::rule::TaggedTodoConfig;
 use crate::rule::UseCompoundAssignmentConfig;
@@ -60,6 +80,49 @@ pub mod level {
                 &["error", "warning", "info", "help", "note"],
             )),
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+pub mod optional_level {
+    use annotate_snippets::Level;
+    use serde::Deserialize;
+    use serde::Deserializer;
+    use serde::Serializer;
+    use serde::de::Error;
+    use serde::ser::Error as SerializeError;
+
+    pub fn serialize<S: Serializer>(
+        level: &Option<Level<'static>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match level {
+            Some(level) if *level == Level::ERROR => serializer.serialize_some("error"),
+            Some(level) if *level == Level::WARNING => serializer.serialize_some("warning"),
+            Some(level) if *level == Level::INFO => serializer.serialize_some("info"),
+            Some(level) if *level == Level::HELP => serializer.serialize_some("help"),
+            Some(level) if *level == Level::NOTE => serializer.serialize_some("note"),
+            Some(_) => Err(S::Error::custom("unsupported diagnostic level")),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<Level<'static>>, D::Error> {
+        let name = Option::<String>::deserialize(deserializer)?;
+        name.map(|name| match name.as_str() {
+            "error" | "Error" | "err" => Ok(Level::ERROR),
+            "warning" | "Warning" | "warn" => Ok(Level::WARNING),
+            "info" | "Info" => Ok(Level::INFO),
+            "help" | "Help" => Ok(Level::HELP),
+            "note" | "Note" => Ok(Level::NOTE),
+            _ => Err(D::Error::unknown_variant(
+                &name,
+                &["error", "warning", "info", "help", "note"],
+            )),
+        })
+        .transpose()
     }
 }
 
@@ -125,4 +188,24 @@ pub struct RulesSettings {
     pub no_redundant_continue: RuleSettings<NoRedundantContinueConfig>,
     pub no_literal_password: RuleSettings<NoLiteralPasswordConfig>,
     pub no_insecure_comparison: RuleSettings<NoInsecureComparisonConfig>,
+    pub no_redundant_variable: RuleSettings<NoRedundantVariableConfig>,
+    pub no_self_assignment: RuleSettings<NoSelfAssignmentConfig>,
+    pub no_parameter_shadowing: RuleSettings<NoParameterShadowingConfig>,
+    pub no_redundant_use: RuleSettings<NoRedundantUseConfig>,
+    pub sensitive_parameter: RuleSettings<SensitiveParameterConfig>,
+    pub no_debug_symbols: RuleSettings<NoDebugSymbolsConfig>,
+    pub no_empty_catch_clause: RuleSettings<NoEmptyCatchClauseConfig>,
+    pub no_redundant_readonly: RuleSettings<NoRedundantReadonlyConfig>,
+    pub no_redundant_nullsafe: RuleSettings<NoRedundantNullsafeConfig>,
+    pub constant_condition: RuleSettings<ConstantConditionConfig>,
+    pub inline_variable_return: RuleSettings<InlineVariableReturnConfig>,
+    pub no_multi_assignments: RuleSettings<NoMultiAssignmentsConfig>,
+    pub prefer_while_loop: RuleSettings<PreferWhileLoopConfig>,
+    pub prefer_early_return: RuleSettings<PreferEarlyReturnConfig>,
+    pub prefer_early_continue: RuleSettings<PreferEarlyContinueConfig>,
+    pub readable_literal: RuleSettings<ReadableLiteralConfig>,
+    pub no_redundant_string_concat: RuleSettings<NoRedundantStringConcatConfig>,
+    pub no_empty_comment: RuleSettings<NoEmptyCommentConfig>,
+    pub cyclomatic_complexity: RuleSettings<CyclomaticComplexityConfig>,
+    pub disallowed_symbols: RuleSettings<DisallowedSymbolsConfig>,
 }
