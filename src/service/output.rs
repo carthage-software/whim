@@ -20,6 +20,8 @@ use crate::pipeline::timed;
 use crate::service::FileError;
 use crate::service::FileResult;
 use crate::service::FileStatus;
+use crate::service::OutputFormat;
+use crate::service::json;
 
 #[derive(Default)]
 pub(super) struct DiagnosticCounts {
@@ -108,10 +110,12 @@ impl RunSummary {
 pub(super) struct OutputReducer {
     output: BufWriter<File>,
     summary: RunSummary,
+    format: OutputFormat,
+    wrote_json: bool,
 }
 
 impl OutputReducer {
-    pub(super) fn new() -> Result<Self, Error> {
+    pub(super) fn new(format: OutputFormat) -> Result<Self, Error> {
         let descriptor = io::stdout()
             .as_fd()
             .try_clone_to_owned()
@@ -119,7 +123,19 @@ impl OutputReducer {
         Ok(Self {
             output: BufWriter::new(File::from(descriptor)),
             summary: RunSummary::default(),
+            format,
+            wrote_json: false,
         })
+    }
+
+    fn write(&mut self, text: &str) -> io::Result<()> {
+        if self.format == OutputFormat::Json {
+            self.output
+                .write_all(if self.wrote_json { b",\n" } else { b"[\n" })?;
+            self.wrote_json = true;
+        }
+
+        self.output.write_all(text.as_bytes())
     }
 
     fn written(&mut self, result: io::Result<()>) -> Result<ControlFlow<()>, Error> {
@@ -147,13 +163,13 @@ impl OutputReducer {
                 self.summary.diagnostics.notes += counts.notes;
                 self.summary.diagnostics.help += counts.help;
                 self.summary.failed |= failed;
-                let result = self.output.write_all(text.as_bytes());
+                let result = self.write(&text);
                 return self.written(result);
             }
             Ok(FileStatus::Differs(diff)) => {
                 self.summary.changed += 1;
                 self.summary.failed = true;
-                let result = self.output.write_all(diff.as_bytes());
+                let result = self.write(&diff);
                 return self.written(result);
             }
             Ok(FileStatus::Changed(_)) => {
@@ -166,12 +182,26 @@ impl OutputReducer {
                 match error {
                     FileError::Read(error) => {
                         tracing::error!(file = %target.spelling.display(), phase = "read", %error, "could not process file");
+                        if self.format == OutputFormat::Json {
+                            let result =
+                                self.write(&json::file_error(target, "read", &error.to_string()));
+                            return self.written(result);
+                        }
                     }
                     FileError::Write(error) => {
                         tracing::error!(file = %target.spelling.display(), phase = "write", %error, "could not process file");
+                        if self.format == OutputFormat::Json {
+                            let result =
+                                self.write(&json::file_error(target, "write", &error.to_string()));
+                            return self.written(result);
+                        }
                     }
                     FileError::Syntax(diagnostic) => {
                         tracing::debug!(file = %target.spelling.display(), phase = "parse", "could not parse file");
+                        if self.format == OutputFormat::Json {
+                            let result = self.write(&diagnostic);
+                            return self.written(result);
+                        }
                         if tracing::enabled!(tracing::Level::ERROR) {
                             output::write_error(&diagnostic)?;
                         }
@@ -229,7 +259,14 @@ impl Reducer<FileResult> for OutputReducer {
         let result = if self.summary.output_closed {
             Ok(ControlFlow::Break(()))
         } else {
-            let result = self.output.flush();
+            let result = if self.format == OutputFormat::Json {
+                self.output
+                    .write_all(if self.wrote_json { b"\n]\n" } else { b"[]\n" })
+                    .and_then(|()| self.output.flush())
+            } else {
+                self.output.flush()
+            };
+
             self.written(result)
         };
         let _ = self.output.into_parts();

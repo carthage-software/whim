@@ -9,6 +9,7 @@ use crate::pipeline::files::Target;
 use crate::pipeline::timed;
 use crate::service::FileResult;
 use crate::service::FileStatus;
+use crate::service::OutputFormat;
 use crate::service::RunSummary;
 use crate::service::output::OutputReducer;
 use crate::service::read;
@@ -34,7 +35,7 @@ impl FormatService {
     pub(crate) fn run(&self, targets: &[Target]) -> Result<RunSummary, Error> {
         StatelessParallelPipeline::new(targets, self).run(
             |service, arena, target| service.process(arena, target),
-            OutputReducer::new()?,
+            OutputReducer::new(OutputFormat::Text)?,
         )
     }
 

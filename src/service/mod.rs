@@ -8,11 +8,18 @@ use crate::pipeline::files::Target;
 use crate::pipeline::timed;
 
 pub(crate) mod format;
+mod json;
 pub(crate) mod lint;
 mod output;
 
 use output::DiagnosticCounts;
 pub(crate) use output::RunSummary;
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum OutputFormat {
+    Text,
+    Json,
+}
 
 enum FileStatus {
     Unchanged,

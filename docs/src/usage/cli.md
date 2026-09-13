@@ -28,9 +28,9 @@ Source read this way cannot use `embed!` because it has no directory.
 
 Global options must come before the source file:
 
-| Option | Effect |
-| --- | --- |
-| `--colors auto|always|never` | choose colored output |
+| Option          | Effect                                 |
+| --------------- | -------------------------------------- |
+| `--colors auto  | always                                 | never` | choose colored output |
 | `--config PATH` | load settings from another `whim.toml` |
 
 Use `--` before a source path that starts with `-`.
@@ -113,6 +113,7 @@ optimization.
 ```console
 whim lint
 whim lint src/ tests/
+whim lint --json src/ > lint.json
 ```
 
 With no paths, `whim lint` finds the nearest `whim.toml` and checks that project.
@@ -123,7 +124,9 @@ explicit files bypass file filters. Per-rule exclusions still apply.
 All 15 rules start enabled. The command prints source diagnostics and leaves
 files unchanged. Error-level findings, syntax errors, and file errors return a
 nonzero status. Lower levels still print; set `lint.minimum_fail_level` to make
-them fail the command too. See [Linting](linting.md) for rules and settings.
+them fail the command too. `--json` writes diagnostics as a JSON array to standard
+output; logs stay on standard error. See [Linting](linting.md) for the JSON fields,
+rules, and settings.
 
 ## Language server
 

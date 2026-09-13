@@ -8,6 +8,9 @@ use std::process::id;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 
+use serde_json::Value;
+use serde_json::json;
+
 struct Project(PathBuf);
 
 impl Project {
@@ -154,6 +157,102 @@ fn syntax_errors_fail_and_valid_files_still_get_linted() {
 }
 
 #[test]
+fn json_reports_locations_and_annotations_without_color_or_logs() {
+    let project = Project::new("");
+    let name = "src/é\"source.whim";
+    let source = "// TODO: track this\r\n'🙂'; $password = 'secret';\r\n";
+    project.write(name, source);
+    let output = Command::new(env!("CARGO_BIN_EXE_whim"))
+        .current_dir(&project.0)
+        .env("WHIM_LOG", "whim=trace")
+        .args(["--colors", "always", "lint", "--json", name])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let diagnostics: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(diagnostics.len(), 2);
+    let diagnostic = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic["code"] == "no-literal-password")
+        .unwrap();
+    assert_eq!(diagnostic["path"], name);
+    assert_eq!(diagnostic["level"], "error");
+    let start = source.find("'secret'").unwrap();
+    assert_eq!(
+        diagnostic["span"],
+        json!({"start": {"offset": start}, "end": {"offset": start + "'secret'".len()}})
+    );
+    let rendered = diagnostic["rendered"].as_str().unwrap();
+    assert!(rendered.contains(diagnostic["message"].as_str().unwrap()));
+    assert!(rendered.contains("literal value stored in source code"));
+    assert!(rendered.contains("this name suggests sensitive data"));
+    assert!(rendered.contains("help: Load the value from an environment variable"));
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic["rendered"].as_str().unwrap().contains('\u{1b}'))
+    );
+    let logs = String::from_utf8(output.stderr).unwrap();
+    assert!(logs.contains("finished processing files"));
+    assert_eq!(project.lint(&["--json", name]).stdout, output.stdout);
+    assert_eq!(fs::read_to_string(project.0.join(name)).unwrap(), source);
+}
+
+#[test]
+fn json_includes_file_and_syntax_errors_when_logs_are_disabled() {
+    let project = Project::new("");
+    fs::write(project.0.join("a-encoding.whim"), [0xff]).unwrap();
+    project.write("b-syntax.whim", "$x =");
+    project.write("c-clean.whim", "write_line!('clean');\n");
+    project.write("d-warning.whim", "// TODO: track this\n");
+    let output = Command::new(env!("CARGO_BIN_EXE_whim"))
+        .current_dir(&project.0)
+        .env("WHIM_LOG", "off")
+        .args(["lint", "--json"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stderr.is_empty());
+    let diagnostics: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(diagnostics.len(), 3);
+    assert_eq!(diagnostics[0]["code"], "read");
+    assert_eq!(diagnostics[0]["level"], "error");
+    assert!(diagnostics[0]["span"].is_null());
+    assert!(diagnostics[0]["rendered"].is_null());
+    assert!(
+        diagnostics[0]["path"]
+            .as_str()
+            .unwrap()
+            .ends_with("a-encoding.whim")
+    );
+    assert_eq!(diagnostics[1]["code"], "syntax");
+    assert_eq!(diagnostics[1]["level"], "error");
+    assert_eq!(
+        diagnostics[1]["span"],
+        json!({"start": {"offset": 4}, "end": {"offset": 4}})
+    );
+    assert!(
+        diagnostics[1]["message"]
+            .as_str()
+            .unwrap()
+            .contains("unexpected end of file")
+    );
+    assert_eq!(diagnostics[2]["code"], "tagged-todo");
+}
+
+#[test]
+fn json_returns_an_empty_array_for_empty_and_clean_projects() {
+    let project = Project::new("");
+    let empty = project.lint(&["--json"]);
+    assert!(empty.status.success());
+    assert_eq!(empty.stdout, b"[]\n");
+    project.write("clean.whim", "write_line!('clean');\n");
+    let clean = project.lint(&["--json"]);
+    assert!(clean.status.success());
+    assert_eq!(clean.stdout, b"[]\n");
+}
+
+#[test]
 fn diagnostic_levels_respect_failure_thresholds() {
     for (level, threshold, success) in [
         ("error", "info", false),
@@ -185,6 +284,11 @@ fn diagnostic_levels_respect_failure_thresholds() {
                 .unwrap()
                 .contains(&format!("{level}[tagged-todo]"))
         );
+        let output = project.lint(&["--json"]);
+        assert_eq!(output.status.success(), success, "{output:?}");
+        let diagnostics: Vec<Value> = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0]["level"], level);
     }
 }
 
@@ -277,7 +381,11 @@ fn diagnostics_keep_paths_and_rule_exclusions_from_a_nested_directory() {
 fn file_commands_check_buffered_output_errors_and_closed_pipes() {
     let project = Project::new("");
     project.write("source.whim", "$password='secret';\n");
-    for args in [&["lint"][..], &["fmt", "--check"][..]] {
+    for args in [
+        &["lint"][..],
+        &["lint", "--json"][..],
+        &["fmt", "--check"][..],
+    ] {
         let mut command = Command::new(env!("CARGO_BIN_EXE_whim"));
         command
             .current_dir(&project.0)
@@ -331,6 +439,14 @@ fn parallel_batches_keep_diagnostic_order_and_explain_skipped_paths() {
         .collect();
     assert!(offsets.windows(2).all(|pair| pair[0] < pair[1]));
     assert_eq!(diagnostics.matches("warning[tagged-todo]").count(), 70);
+    let output_json = project.lint(&["--json", "src", "src"]);
+    assert!(output_json.status.success());
+    let diagnostics: Vec<Value> = serde_json::from_slice(&output_json.stdout).unwrap();
+    assert_eq!(diagnostics.len(), 70);
+    for (index, diagnostic) in diagnostics.iter().enumerate() {
+        assert_eq!(diagnostic["path"], format!("src/{index:02}.whim"));
+        assert_eq!(diagnostic["code"], "tagged-todo");
+    }
     let logs = String::from_utf8(output.stderr).unwrap();
     for field in [
         "duplicates=70",

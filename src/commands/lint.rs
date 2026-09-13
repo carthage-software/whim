@@ -9,10 +9,15 @@ use crate::color::should_use_colors;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::pipeline::files::Selection;
+use crate::service::OutputFormat;
 use crate::service::lint::LintService;
 
 #[derive(Args)]
 pub(super) struct Arguments {
+    /// Write diagnostics as a JSON array to standard output.
+    #[arg(long)]
+    json: bool,
+
     /// Files and directories to lint. Omit to lint the project.
     #[arg(value_name = "PATH")]
     paths: Vec<PathBuf>,
@@ -49,6 +54,11 @@ pub(super) fn execute(
         lint.minimum_fail_level.clone(),
         selection.root,
         should_use_colors(colors),
+        if arguments.json {
+            OutputFormat::Json
+        } else {
+            OutputFormat::Text
+        },
     );
 
     Ok(linter.run(&selection.targets)?.report(start.elapsed()))

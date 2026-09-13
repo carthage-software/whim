@@ -17,25 +17,54 @@ configuration, discovery, and full counts; `WHIM_LOG=whim=trace` adds file and p
 timings. `WHIM_LOG=error` hides progress logs while keeping lint diagnostics.
 See [Log output](cli.md#log-output) for details.
 
+## JSON output
+
+Use `--json` to write one JSON array to standard output:
+
+```console
+whim lint --json
+whim lint --json src/ > lint.json
+```
+
+Each entry contains:
+
+| Field      | Value                                                                              |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `path`     | Source path, using the same spelling as text output                                |
+| `code`     | Rule code, or `syntax` or `read` for a file error                                  |
+| `level`    | `error`, `warning`, `info`, `note`, or `help`                                      |
+| `message`  | Diagnostic message                                                                 |
+| `span`     | `start` and `end` objects, each with a byte `offset`; `null` for read errors       |
+| `rendered` | Full plain-text diagnostic, including annotations and help; `null` for read errors |
+
+Offsets start at zero, and the end offset is exclusive. They count UTF-8 bytes,
+not characters. The array follows file discovery order and is empty (`[]`) when
+there are no findings. Whim writes it in batches as files finish, so it does not
+hold the whole report in memory.
+
+JSON output has no ANSI color codes, even with `--colors always`. Logs and setup
+errors, such as an invalid config or a missing target path, stay on standard
+error. `--json` does not change file selection, rule settings, or exit status.
+
 ## Rules
 
-| Rule | Default level | Checks |
-| --- | --- | --- |
-| `tagged-todo` | warning | TODO comments without an owner or issue tag |
-| `tagged-fixme` | warning | FIXME comments without an owner or issue tag |
-| `loop-does-not-iterate` | warning | Loops with an unconditional break or return |
-| `yoda-conditions` | help | Comparisons with a variable before a literal or constant |
-| `use-compound-assignment` | help | Assignments such as `$x = $x + 1` |
-| `no-assign-in-argument` | warning | Assignments used directly as call arguments |
-| `no-assign-in-condition` | warning | Assignments used directly as if or while conditions |
-| `no-dead-store` | warning | Local assignments overwritten before a read |
-| `excessive-nesting` | warning | Block depth above the set limit |
-| `no-redundant-static` | help | `static` references where a final class makes `self` sufficient |
-| `no-redundant-final` | help | Final methods in final classes or enums |
-| `no-redundant-else` | help | Else branches after a branch that always exits |
-| `no-literal-password` | error | Literal passwords, tokens, secrets, and API keys |
-| `no-insecure-comparison` | error | Direct comparisons of password or token values |
-| `no-redundant-continue` | help | A continue at the end of a loop body |
+| Rule                      | Default level | Checks                                                          |
+| ------------------------- | ------------- | --------------------------------------------------------------- |
+| `tagged-todo`             | warning       | TODO comments without an owner or issue tag                     |
+| `tagged-fixme`            | warning       | FIXME comments without an owner or issue tag                    |
+| `loop-does-not-iterate`   | warning       | Loops with an unconditional break or return                     |
+| `yoda-conditions`         | help          | Comparisons with a variable before a literal or constant        |
+| `use-compound-assignment` | help          | Assignments such as `$x = $x + 1`                               |
+| `no-assign-in-argument`   | warning       | Assignments used directly as call arguments                     |
+| `no-assign-in-condition`  | warning       | Assignments used directly as if or while conditions             |
+| `no-dead-store`           | warning       | Local assignments overwritten before a read                     |
+| `excessive-nesting`       | warning       | Block depth above the set limit                                 |
+| `no-redundant-static`     | help          | `static` references where a final class makes `self` sufficient |
+| `no-redundant-final`      | help          | Final methods in final classes or enums                         |
+| `no-redundant-else`       | help          | Else branches after a branch that always exits                  |
+| `no-literal-password`     | error         | Literal passwords, tokens, secrets, and API keys                |
+| `no-insecure-comparison`  | error         | Direct comparisons of password or token values                  |
+| `no-redundant-continue`   | help          | A continue at the end of a loop body                            |
 
 Use a tag such as `TODO(#123)`, `TODO(@owner)`, or `FIXME(owner)`.
 
