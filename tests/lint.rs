@@ -216,7 +216,7 @@ fn logs_count_findings_and_failures_and_keep_worker_context() {
     let logs = String::from_utf8(output.stderr).unwrap();
     let summary = logs
         .lines()
-        .find(|line| line.contains("finished processing files"))
+        .find(|line| line.contains("file processing totals"))
         .unwrap();
     for field in [
         "processed=8",
@@ -235,7 +235,7 @@ fn logs_count_findings_and_failures_and_keep_worker_context() {
         assert!(
             logs.lines()
                 .any(|line| line.contains(&format!("phase=\"{phase}\""))
-                    && line.contains("lint{")
+                    && line.contains("lint:")
                     && line.contains("pipeline{")
                     && line.contains("file{path=")),
             "{logs}"

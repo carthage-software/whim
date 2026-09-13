@@ -68,7 +68,7 @@ impl RunSummary {
             return ExitCode::SUCCESS;
         }
 
-        tracing::info!(
+        tracing::debug!(
             processed = self.processed,
             clean = self.clean,
             changed = self.changed,
@@ -80,6 +80,20 @@ impl RunSummary {
             help = self.diagnostics.help,
             failed = self.failed,
             ?elapsed,
+            "file processing totals",
+        );
+
+        let issues = self.diagnostics.errors
+            + self.diagnostics.warnings
+            + self.diagnostics.info
+            + self.diagnostics.notes
+            + self.diagnostics.help;
+        tracing::info!(
+            files = self.processed,
+            issues = (issues > 0).then_some(issues),
+            changed = (self.changed > 0).then_some(self.changed),
+            file_errors = (self.file_errors > 0).then_some(self.file_errors),
+            elapsed = %format_args!("{elapsed:.0?}"),
             "finished processing files",
         );
 

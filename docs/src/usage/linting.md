@@ -13,7 +13,7 @@ The first form requires a `whim.toml` and checks its project directory. Both
 forms skip `vendor/` and `.git/` during directory walks.
 
 The command logs a run summary to standard error. `WHIM_LOG=whim=debug` shows
-configuration and discovery details; `WHIM_LOG=whim=trace` adds file and phase
+configuration, discovery, and full counts; `WHIM_LOG=whim=trace` adds file and phase
 timings. `WHIM_LOG=error` hides progress logs while keeping lint diagnostics.
 See [Log output](cli.md#log-output) for details.
 

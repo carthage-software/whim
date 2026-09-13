@@ -18,13 +18,7 @@ pub(super) struct Arguments {
     paths: Vec<PathBuf>,
 }
 
-#[tracing::instrument(
-    name = "lint",
-    level = "info",
-    skip_all,
-    fields(root = %configuration.root().display(), targets = arguments.paths.len()),
-    err(level = "debug"),
-)]
+#[tracing::instrument(name = "lint", level = "info", skip_all, err(level = "debug"))]
 pub(super) fn execute(
     arguments: &Arguments,
     configuration: &Configuration,
@@ -33,7 +27,7 @@ pub(super) fn execute(
     let start = Instant::now();
     let lint = configuration.lint();
     let registry = lint.registry()?;
-    tracing::debug!(rules = registry.len(), minimum_fail_level = ?lint.minimum_fail_level, "resolved lint settings");
+    tracing::debug!(root = %configuration.root().display(), targets = arguments.paths.len(), rules = registry.len(), minimum_fail_level = ?lint.minimum_fail_level, "resolved lint settings");
     for rule in registry.rules() {
         tracing::trace!(rule = rule.code(), "enabled lint rule");
     }

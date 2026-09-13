@@ -58,13 +58,7 @@ impl From<EndOfLineArgument> for EndOfLine {
     }
 }
 
-#[tracing::instrument(
-    name = "fmt",
-    level = "info",
-    skip_all,
-    fields(root = %configuration.root().display(), check = arguments.check, targets = arguments.paths.len()),
-    err(level = "debug"),
-)]
+#[tracing::instrument(name = "fmt", level = "info", skip_all, err(level = "debug"))]
 pub(super) fn execute(
     arguments: &Arguments,
     configuration: &Configuration,
@@ -72,7 +66,7 @@ pub(super) fn execute(
 ) -> Result<ExitCode, Error> {
     let start = Instant::now();
     let settings = resolve(arguments, configuration)?;
-    tracing::debug!(?settings, "resolved format settings");
+    tracing::debug!(root = %configuration.root().display(), check = arguments.check, targets = arguments.paths.len(), ?settings, "resolved format settings");
     let patterns = configuration.format().patterns()?;
     let selection = Selection::new(&arguments.paths, configuration, &patterns)?;
     tracing::info!(files = selection.targets.len(), "formatting source files");
