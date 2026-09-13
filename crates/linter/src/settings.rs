@@ -32,6 +32,8 @@ pub mod level {
             "error"
         } else if *level == Level::WARNING {
             "warning"
+        } else if *level == Level::INFO {
+            "info"
         } else if *level == Level::HELP {
             "help"
         } else if *level == Level::NOTE {
@@ -50,11 +52,12 @@ pub mod level {
         match name.as_str() {
             "error" | "Error" | "err" => Ok(Level::ERROR),
             "warning" | "Warning" | "warn" => Ok(Level::WARNING),
+            "info" | "Info" => Ok(Level::INFO),
             "help" | "Help" => Ok(Level::HELP),
             "note" | "Note" => Ok(Level::NOTE),
             _ => Err(D::Error::unknown_variant(
                 &name,
-                &["error", "warning", "help", "note"],
+                &["error", "warning", "info", "help", "note"],
             )),
         }
     }
