@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -127,10 +128,11 @@ impl LintRule for NoRedundantElseRule {
         ctx.report(
             self.meta,
             self.cfg.level(),
-            otherwise.r#else.span(),
-            "The if branch always terminates; the trailing branches can be extracted.",
+            (otherwise.r#else.span(), "this `else` adds needless nesting"),
+            "Redundant `else` after a branch that always exits.",
+            [AnnotationKind::Context.span(last.span().into()).label("the `if` branch always exits here")],
             [Level::HELP
-                .message("Move the else body after the if; turn an else if into a separate if.")
+                .message("Move the `else` body after the `if`. For `else if`, remove `else` to start a separate `if`.")
                 .into()],
         );
     }

@@ -3,6 +3,7 @@ use indoc::indoc;
 use regex::Regex;
 
 use std::sync::LazyLock;
+use whim_span::Span;
 use whim_syn::arena::Arena;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::node::NodeKind;
@@ -100,15 +101,23 @@ impl LintRule for TaggedFixmeRule {
             .iter()
             .filter(|trivia| trivia.kind.is_comment())
         {
-            for line in comment_lines(trivia) {
+            for (span, line) in comment_lines(trivia) {
                 let text = line.trim_start().to_ascii_lowercase();
                 if !text.starts_with("fixme") || TAGGED_FIXME_REGEX.is_match(&text) {
                     continue;
                 }
 
-                ctx.report(self.meta, self.cfg.level(), trivia.span,
-                    "FIXME should be tagged with (@username) or (#issue).",
-                    [Level::HELP.message("Add a user tag or issue reference, such as FIXME(@name) or FIXME(#123).").into()]);
+                ctx.report(
+                    self.meta,
+                    self.cfg.level(),
+                    (Span::new(span.start, span.start + 5), "missing an owner or issue reference"),
+                    "Untagged FIXME comment.",
+                    [],
+                    [
+                        Level::NOTE.message("A tag links this bug to someone responsible for it or to a tracked issue.").into(),
+                        Level::HELP.message("Add a tag such as `FIXME(@name)`, `FIXME(name)`, or `FIXME(#123)`.").into(),
+                    ],
+                );
 
                 break;
             }

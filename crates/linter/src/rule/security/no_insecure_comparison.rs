@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -104,18 +105,28 @@ impl LintRule for NoInsecureComparisonRule {
             return;
         }
 
-        let left = get_password(binary.lhs).is_some();
-        let right = get_password(binary.rhs).is_some();
-        if !left && !right
-            || left && is_simple_literal(binary.rhs)
-            || right && is_simple_literal(binary.lhs)
+        let left = get_password(binary.lhs);
+        let right = get_password(binary.rhs);
+        if left.is_none() && right.is_none()
+            || left.is_some() && is_simple_literal(binary.rhs)
+            || right.is_some() && is_simple_literal(binary.lhs)
         {
             return;
         }
 
-        ctx.report(self.meta, self.cfg.level(), binary.operator.span(), "Insecure comparison of sensitive data.",
-            [Level::NOTE.message("Equality comparisons can reveal secret data through their timing.").into(),
-                Level::HELP.message("Use Whim\\Hash\\equals() for secrets or Whim\\Password\\verify() for password hashes.").into()]);
+        ctx.report(
+            self.meta,
+            self.cfg.level(),
+            (binary.operator.span(), "no constant-time guarantee for strings"),
+            "Possible timing leak when comparing sensitive data.",
+            left.into_iter().chain(right).map(|span| {
+                AnnotationKind::Context.span(span.into()).label("this name suggests sensitive data")
+            }),
+            [
+                Level::NOTE.message("String equality may stop at the first difference, revealing information through its runtime.").into(),
+                Level::HELP.message("Use `Whim\\Hash\\equals($known, $supplied)` for secret strings, or `Whim\\Password\\verify($password, $hash)` to check a password hash.").into(),
+            ],
+        );
     }
 }
 

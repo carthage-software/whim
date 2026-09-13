@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -100,11 +101,11 @@ impl LintRule for LoopDoesNotIterateRule {
         ctx: &mut LintContext<'_, 'arena, A>,
         node: Node<'_, 'arena>,
     ) {
-        let body = match node {
-            Node::For(statement) => &statement.body,
-            Node::Foreach(statement) => &statement.body,
-            Node::While(statement) => &statement.body,
-            Node::DoWhile(statement) => &statement.body,
+        let (keyword, body) = match node {
+            Node::For(statement) => (statement.r#for.span(), &statement.body),
+            Node::Foreach(statement) => (statement.foreach.span(), &statement.body),
+            Node::While(statement) => (statement.r#while.span(), &statement.body),
+            Node::DoWhile(statement) => (statement.r#do.span(), &statement.body),
             _ => return,
         };
 
@@ -119,24 +120,27 @@ impl LintRule for LoopDoesNotIterateRule {
                 continue;
             };
 
-            let terminates = match statement.expression {
-                Expression::Return(_) => true,
-                Expression::Break(exit) => exit.level.as_ref().is_none_or(|level| level.value == 1),
-                _ => false,
+            let exit = match statement.expression {
+                Expression::Return(_) => "this `return` exits before a second iteration",
+                Expression::Break(exit)
+                    if exit.level.as_ref().is_none_or(|level| level.value == 1) =>
+                {
+                    "this `break` exits before a second iteration"
+                }
+                _ => continue,
             };
 
-            if terminates {
-                ctx.report(
-                    self.meta,
-                    self.cfg.level(),
-                    node.span(),
-                    "Loop is unconditionally terminated and will not iterate.",
-                    [Level::HELP
-                        .message("Check the unconditional exit; an if statement may be clearer.")
-                        .into()],
-                );
-                return;
-            }
+            ctx.report(
+                self.meta,
+                self.cfg.level(),
+                (keyword, "this loop runs at most once"),
+                "Loop cannot reach a second iteration.",
+                [AnnotationKind::Context.span(statement.span().into()).label(exit)],
+                [Level::HELP
+                    .message("Make the exit conditional if the loop should repeat. If one pass is intended, use a conditional or straight-line code.")
+                    .into()],
+            );
+            return;
         }
     }
 }

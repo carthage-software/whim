@@ -58,6 +58,15 @@ fn lint_reports_without_rewriting_and_uses_mago_severities() {
     assert!(text.contains("error[no-literal-password]"), "{text}");
     assert!(text.contains("warning[tagged-todo]"), "{text}");
     assert!(text.contains("source.whim:2:"), "{text}");
+    assert!(
+        text.contains("literal value stored in source code"),
+        "{text}"
+    );
+    assert!(text.contains("this name suggests sensitive data"), "{text}");
+    assert!(
+        text.contains("help: Load the value from an environment variable"),
+        "{text}"
+    );
     assert_eq!(
         fs::read_to_string(project.0.join("source.whim")).unwrap(),
         source

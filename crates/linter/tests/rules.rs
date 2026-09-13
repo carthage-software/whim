@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::slice::from_ref;
 
 use annotate_snippets::Renderer;
 use whim_linter::Linter;
@@ -24,6 +25,11 @@ fn spans(source: &str, code: &str, settings: &Settings) -> Vec<Span> {
         Some(&mut callback),
     );
     assert_eq!(diagnostics.len(), spans.len());
+    for diagnostic in &diagnostics {
+        let rendered = Renderer::plain().render(from_ref(diagnostic));
+        assert!(rendered.contains(" = help:"), "{rendered}");
+        Renderer::styled().render(from_ref(diagnostic));
+    }
     for span in &spans {
         assert!(
             source
@@ -226,7 +232,72 @@ fn diagnostics_render_directly_with_annotate_snippets_and_obey_exclusions() {
     let diagnostics = linter.lint("src/file.whim", program);
     let rendered = Renderer::plain().render(&diagnostics);
     assert!(rendered.contains("warning[tagged-todo]"), "{rendered}");
-    assert!(rendered.contains("src/file.whim:1:1"), "{rendered}");
+    assert!(rendered.contains("src/file.whim:1:4"), "{rendered}");
+    assert!(
+        rendered.contains("^^^^ missing an owner or issue reference"),
+        "{rendered}"
+    );
+    assert!(
+        rendered.contains("help: Add a tag such as `TODO(@name)`"),
+        "{rendered}"
+    );
+}
+
+#[test]
+fn comment_highlights_follow_the_marker_in_multiline_comments() {
+    for (source, code, marker) in [
+        (
+            "'🙂'; /** a comment\r\n * TODO: work\r\n */",
+            "tagged-todo",
+            "TODO",
+        ),
+        (
+            "/*\n * café\n *   FIXME: work\n */",
+            "tagged-fixme",
+            "FIXME",
+        ),
+    ] {
+        let reported = spans(source, code, &Settings::default());
+        assert_eq!(reported.len(), 1);
+        let start = source.find(marker).unwrap();
+        assert_eq!(reported[0].start.offset as usize, start);
+        assert_eq!(reported[0].end.offset as usize, start + marker.len());
+    }
+}
+
+#[test]
+fn dead_store_reports_point_to_the_assignment_that_overwrites_each_value() {
+    let arena = LocalArena::new();
+    let source = "function f() {\n    $x = 1;\n    $x = 2;\n    $x = 3;\n    return $x;\n}";
+    let program = parse(&arena, source).unwrap();
+    let linter = Linter::new(
+        &arena,
+        &Settings::default(),
+        Some(&["no-dead-store".to_owned()]),
+        false,
+    )
+    .unwrap();
+    let reports = linter.lint("test.whim", program);
+    assert_eq!(reports.len(), 2);
+    for (report, (earlier, later)) in reports.iter().zip([(2, 3), (3, 4)]) {
+        let rendered = Renderer::plain().render(from_ref(report));
+        assert!(
+            rendered.contains(&format!("test.whim:{earlier}:5")),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains(&format!("{later} |     $x =")),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("^^ this value is never read"),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("-- this assignment overwrites it"),
+            "{rendered}"
+        );
+    }
 }
 
 #[test]

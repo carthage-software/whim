@@ -1,4 +1,5 @@
 use std::sync::LazyLock;
+use whim_span::Span;
 
 use annotate_snippets::Level;
 use indoc::indoc;
@@ -101,7 +102,7 @@ impl LintRule for TaggedTodoRule {
             .iter()
             .filter(|trivia| trivia.kind.is_comment())
         {
-            for line in comment_lines(trivia) {
+            for (span, line) in comment_lines(trivia) {
                 let text = line.trim_start().to_ascii_lowercase();
                 if !text.starts_with("todo") || TAGGED_TODO_REGEX.is_match(&text) {
                     continue;
@@ -110,13 +111,13 @@ impl LintRule for TaggedTodoRule {
                 ctx.report(
                     self.meta,
                     self.cfg.level(),
-                    trivia.span,
-                    "TODO should be tagged with (@username) or (#issue).",
-                    [Level::HELP
-                        .message(
-                            "Add a user tag or issue reference, such as TODO(@name) or TODO(#123).",
-                        )
-                        .into()],
+                    (Span::new(span.start, span.start + 4), "missing an owner or issue reference"),
+                    "Untagged TODO comment.",
+                    [],
+                    [
+                        Level::NOTE.message("A tag links this task to someone responsible for it or to a tracked issue.").into(),
+                        Level::HELP.message("Add a tag such as `TODO(@name)`, `TODO(name)`, or `TODO(#123)`.").into(),
+                    ],
                 );
 
                 break;

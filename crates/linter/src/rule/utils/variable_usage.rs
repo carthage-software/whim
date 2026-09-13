@@ -18,7 +18,7 @@ use whim_syn::cst::operation::UnaryPrefixOperator;
 pub(crate) struct DeadStoreVarInfo {
     do_not_flag: bool,
     pending: Vec<(Span, Box<[u32]>)>,
-    pub(crate) dead_stores: Vec<Span>,
+    pub(crate) dead_stores: Vec<(Span, Span)>,
 }
 
 #[derive(Default)]
@@ -47,7 +47,7 @@ impl<'arena> DeadStoreRecorder<'arena> {
             if info.pending[index].1.starts_with(&path) {
                 let (span, _) = info.pending.swap_remove(index);
                 if !info.do_not_flag {
-                    info.dead_stores.push(span);
+                    info.dead_stores.push((span, variable.span));
                 }
             } else {
                 index += 1;

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use annotate_snippets::Annotation;
 use annotate_snippets::AnnotationKind;
 use annotate_snippets::Element;
 use annotate_snippets::Group;
@@ -55,8 +56,9 @@ impl<'ctx, 'arena, A: Arena> LintContext<'ctx, 'arena, A> {
         &mut self,
         meta: &RuleMeta,
         level: Level<'static>,
-        span: Span,
+        (span, label): (Span, impl Into<Cow<'arena, str>>),
         message: impl Into<Cow<'arena, str>>,
+        annotations: impl IntoIterator<Item = Annotation<'arena>>,
         details: impl IntoIterator<Item = Element<'arena>>,
     ) {
         let message = message.into();
@@ -64,16 +66,22 @@ impl<'ctx, 'arena, A: Arena> LintContext<'ctx, 'arena, A> {
             callback(span, meta.code, &level, &message);
         }
 
+        let annotation = Snippet::source(self.source)
+            .path(self.path)
+            .fold(true)
+            .annotation(
+                AnnotationKind::Primary
+                    .span(span.into())
+                    .label(label.into())
+                    .highlight_source(true),
+            )
+            .annotations(annotations);
+
         self.diagnostics.push(
             level
                 .primary_title(message)
                 .id(meta.code)
-                .element(
-                    Snippet::source(self.source)
-                        .path(self.path)
-                        .fold(true)
-                        .annotation(AnnotationKind::Primary.span(span.into())),
-                )
+                .element(annotation)
                 .elements(details),
         );
     }

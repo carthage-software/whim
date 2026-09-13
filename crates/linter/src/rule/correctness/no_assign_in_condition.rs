@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -105,13 +106,24 @@ impl LintRule for NoAssignInConditionRule {
         ctx.report(
             self.meta,
             self.cfg.level(),
-            assignment.span(),
+            (assignment.operator.span(), "this operator assigns a value"),
             "Avoid assignments in conditions.",
+            [AnnotationKind::Context
+                .span(condition.span().into())
+                .label("the condition tests the assigned value")],
             [Level::HELP
-                .message(
-                    "Assign the variable before the condition, or use == if you meant to compare.",
-                )
-                .into()],
+                .message(if matches!(node, Node::If(_)) {
+                    "Assign before the `if`, then test the result."
+                } else {
+                    "Separate the assignment from the test, keeping it on each iteration."
+                })
+                .into()]
+            .into_iter()
+            .chain(assignment.operator.is_assign().then(|| {
+                Level::HELP
+                    .message("Use `==` instead of `=` if you meant to compare values.")
+                    .into()
+            })),
         );
     }
 }

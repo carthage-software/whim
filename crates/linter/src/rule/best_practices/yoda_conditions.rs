@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -119,13 +120,15 @@ impl LintRule for YodaConditionsRule {
         ) {
             return;
         }
-        let (message, help) = match self.cfg.mode {
+        let (message, left, right, help) = match self.cfg.mode {
             YodaConditionsMode::Require
                 if is_writable_variable(binary.lhs) && is_constant_like(binary.rhs) =>
             {
                 (
-                    "Use Yoda condition style for safer comparisons.",
-                    "Move the constant or literal to the left: 5 == $count.",
+                    "Use Yoda condition style.",
+                    "move this variable to the right",
+                    "move this value to the left",
+                    "Put the value on the left and the variable on the right of the comparison.",
                 )
             }
             YodaConditionsMode::Deny
@@ -133,7 +136,9 @@ impl LintRule for YodaConditionsRule {
             {
                 (
                     "Avoid Yoda condition style.",
-                    "Move the variable to the left: $count == 5.",
+                    "move this value to the right",
+                    "move this variable to the left",
+                    "Put the variable on the left and the value on the right of the comparison.",
                 )
             }
             _ => return,
@@ -141,8 +146,19 @@ impl LintRule for YodaConditionsRule {
         ctx.report(
             self.meta,
             self.cfg.level(),
-            binary.operator.span(),
+            (
+                binary.operator.span(),
+                "swap the operands of this comparison",
+            ),
             message,
+            [
+                AnnotationKind::Context
+                    .span(binary.lhs.span().into())
+                    .label(left),
+                AnnotationKind::Context
+                    .span(binary.rhs.span().into())
+                    .label(right),
+            ],
             [Level::HELP.message(help).into()],
         );
     }

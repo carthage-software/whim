@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -112,11 +113,14 @@ impl LintRule for UseCompoundAssignmentRule {
         ctx.report(
             self.meta,
             self.cfg.level(),
-            assignment.span(),
-            "Use a compound assignment for clarity and performance.",
+            (binary.lhs.span(), "this repeats the assignment target"),
+            "Use a compound assignment.",
+            [AnnotationKind::Context
+                .span(assignment.target.span().into())
+                .label("the same target is assigned here")],
             [Level::HELP
                 .message(format!(
-                    "Use {operator} instead of repeating the assignment target."
+                    "Use `{operator}` instead of `=` and the repeated target."
                 ))
                 .into()],
         );

@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -119,10 +120,16 @@ impl LintRule for NoRedundantContinueRule {
         ctx.report(
             self.meta,
             self.cfg.level(),
-            statement.span(),
-            "Redundant continue statement in loop body.",
+            (
+                statement.span(),
+                "nothing follows this `continue` in the loop body",
+            ),
+            "Redundant `continue` at the end of a loop.",
+            [AnnotationKind::Context
+                .span(body.right_brace.into())
+                .label("reaching this point also advances the loop")],
             [Level::HELP
-                .message("Remove the continue; it is the last statement in the loop body.")
+                .message("Remove this `continue`; the loop proceeds the same way without it.")
                 .into()],
         );
     }

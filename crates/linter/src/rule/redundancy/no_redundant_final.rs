@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -89,9 +90,23 @@ impl LintRule for NoRedundantFinalRule {
         ctx: &mut LintContext<'_, 'arena, A>,
         node: Node<'_, 'arena>,
     ) {
-        let members = match node {
-            Node::Class(class) if class.is_final() => class.members,
-            Node::Enum(enumeration) => enumeration.members,
+        let (members, declaration, reason) = match node {
+            Node::Class(class) => {
+                let Some(modifier) = class.modifiers.iter().find(|modifier| modifier.is_final())
+                else {
+                    return;
+                };
+                (
+                    class.members,
+                    modifier.span(),
+                    "this class is already final",
+                )
+            }
+            Node::Enum(enumeration) => (
+                enumeration.members,
+                enumeration.r#enum.span(),
+                "enums cannot be extended",
+            ),
             _ => return,
         };
 
@@ -105,9 +120,21 @@ impl LintRule for NoRedundantFinalRule {
                 continue;
             };
 
-            ctx.report(self.meta, self.cfg.level(), modifier.span(),
-                format!("The final modifier on method {} is redundant because this type cannot be extended.", method.name.value),
-                [Level::HELP.message("Remove the final modifier from the method.").into()]);
+            ctx.report(
+                self.meta,
+                self.cfg.level(),
+                (modifier.span(), "this method already cannot be overridden"),
+                format!(
+                    "Redundant `final` modifier on method `{}`.",
+                    method.name.value
+                ),
+                [AnnotationKind::Context
+                    .span(declaration.into())
+                    .label(reason)],
+                [Level::HELP
+                    .message("Remove the `final` modifier from the method.")
+                    .into()],
+            );
         }
     }
 }

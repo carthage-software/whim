@@ -270,7 +270,8 @@ mod tests {
                 diagnostic.code == Some(NumberOrString::String("no-literal-password".to_owned()))
             })
             .unwrap();
-        assert_eq!(issue.range.start, Position::new(0, 6));
+        assert_eq!(issue.range.start, Position::new(0, 18));
+        assert_eq!(issue.range.end, Position::new(0, 26));
         assert_eq!(issue.severity, Some(DiagnosticSeverity::ERROR));
         assert_eq!(
             server.document_diagnostics(&uri).unwrap(),

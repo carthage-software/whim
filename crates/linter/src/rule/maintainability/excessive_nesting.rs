@@ -1,7 +1,6 @@
 use annotate_snippets::Level;
 use indoc::indoc;
 
-use whim_span::HasSpan;
 use whim_syn::arena::Arena;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::node::NodeKind;
@@ -169,14 +168,12 @@ impl<A: Arena> Visitor<'_, '_> for NestingWalker<'_, '_, '_, A> {
                     self.ctx.report(
                         self.meta,
                         self.cfg.level(),
-                        block.span(),
+                        (block.left_brace, format!("nesting depth {} exceeds the {scope} limit of {}", self.level, self.threshold)),
                         "Excessive block nesting.",
+                        [],
                         [
                             Level::NOTE
-                                .message(format!(
-                                    "This block has depth {}, above the {scope} threshold of {}.",
-                                    self.level, self.threshold
-                                ))
+                                .message("Deeply nested blocks make it harder to follow which conditions must hold.")
                                 .into(),
                             Level::HELP
                                 .message(

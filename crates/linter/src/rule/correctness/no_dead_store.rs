@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -102,19 +103,25 @@ impl LintRule for NoDeadStoreRule {
             .info
             .iter()
             .filter(|(name, _)| !variable_usage::is_silenced_name(name))
-            .flat_map(|(name, info)| info.dead_stores.iter().map(move |span| (*span, *name)))
+            .flat_map(|(name, info)| {
+                info.dead_stores
+                    .iter()
+                    .map(move |(span, overwrite)| (*span, *overwrite, *name))
+            })
             .collect();
 
-        stores.sort_unstable_by_key(|(span, _)| *span);
-        for (span, name) in stores {
+        stores.sort_unstable_by_key(|(span, _, _)| *span);
+        for (span, overwrite, name) in stores {
             ctx.report(
                 self.meta,
                 self.cfg.level(),
-                span,
-                format!("Variable {name} is overwritten before its value is read."),
-                [Level::HELP
-                    .message("Remove this assignment, or use the value before the next assignment.")
-                    .into()],
+                (span, "this value is never read"),
+                format!("Variable `{name}` is overwritten before its value is read."),
+                [AnnotationKind::Context.span(overwrite.into()).label("this assignment overwrites it")],
+                [
+                    Level::NOTE.message("Keep any side effects of the assigned expression, such as a function call.").into(),
+                    Level::HELP.message("Remove the earlier assignment, or use its value before overwriting it.").into(),
+                ],
             );
         }
     }

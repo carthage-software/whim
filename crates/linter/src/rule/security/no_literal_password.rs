@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -159,11 +160,13 @@ impl NoLiteralPasswordRule {
         ctx.report(
             self.meta,
             self.cfg.level(),
-            name,
-            "Literal passwords or sensitive data should not be stored in code.",
-            [Level::HELP
-                .message("Use environment variables or secure configuration instead.")
-                .into()],
+            (value.span(), "literal value stored in source code"),
+            "Possible secret stored as a literal.",
+            [AnnotationKind::Context.span(name.into()).label("this name suggests sensitive data")],
+            [
+                Level::NOTE.message("Secrets in source code can leak through version control or shared copies of the file.").into(),
+                Level::HELP.message("Load the value from an environment variable or secure configuration at runtime.").into(),
+            ],
         );
     }
 }

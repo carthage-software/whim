@@ -1,3 +1,4 @@
+use annotate_snippets::AnnotationKind;
 use annotate_snippets::Level;
 use indoc::indoc;
 
@@ -113,10 +114,13 @@ impl NoAssignInArgumentRule {
             ctx.report(
                 self.meta,
                 self.cfg.level(),
-                assignment.span(),
+                (assignment.operator.span(), "this operator assigns a value"),
                 "Avoid assignments in function call arguments.",
+                [AnnotationKind::Context
+                    .span(expression.span().into())
+                    .label("assignment used as a call argument")],
                 [Level::HELP
-                    .message("Assign the variable before the function call.")
+                    .message("Assign first, then pass the result. Keep the order in which the arguments are evaluated.")
                     .into()],
             );
         }
