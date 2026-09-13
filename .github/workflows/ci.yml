@@ -43,6 +43,16 @@ jobs:
       - run: cargo build --locked --release --bin whim
       - run: target/release/whim tests/run.whim '' 2
 
+  whim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked --bin whim
+      - run: target/debug/whim fmt --check
+      - run: target/debug/whim lint
+
   rust-windows:
     runs-on: windows-latest
     steps:
