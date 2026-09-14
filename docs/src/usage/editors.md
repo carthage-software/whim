@@ -65,7 +65,7 @@ Install the full highlighting query from Tree-sitter Whim:
 ```console
 mkdir -p ~/.config/helix/runtime/queries/whim
 curl --fail --location \
-  https://raw.githubusercontent.com/carthage-software/tree-sitter-whim/99e550efd095bf0b0f782e096b0ed6136bebaf47/queries/highlights.scm \
+  https://raw.githubusercontent.com/carthage-software/tree-sitter-whim/80d6e34e1f9b0c8cb1c23377cc276cf82e62f3d3/queries/highlights.scm \
   --output ~/.config/helix/runtime/queries/whim/highlights.scm
 ```
 
