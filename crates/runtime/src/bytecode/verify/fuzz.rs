@@ -192,6 +192,7 @@ fn execute(chunk: Chunk) {
     let mut engine = Engine::new(EngineConfiguration::default());
     let unit = Rc::new(CompiledUnit {
         path: engine.heap.intern(b"/fuzz/main.whim"),
+        files: Vec::new(),
         main: chunk,
         functions: Vec::new(),
         classes: Vec::new(),
@@ -199,6 +200,7 @@ fn execute(chunk: Chunk) {
         type_aliases: Vec::new(),
         newtypes: Vec::new(),
     });
+
     let _ = engine.run_unit(&unit);
 }
 

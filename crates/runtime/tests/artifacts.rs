@@ -38,6 +38,59 @@ fn artifacts_load_in_order_and_execute_their_top_level_code() {
 }
 
 #[test]
+fn artifact_file_reflection_preserves_each_source_file() {
+    for optimize in [false, true] {
+        let mut compiler = Engine::new(EngineConfiguration::default());
+        let artifact = compiler
+            .compile_artifact(
+                "/reflection/bundle.whim",
+                &[
+                    SourceFile::new(
+                        "/reflection/declarations.whim",
+                        "namespace ArtifactFile; function value(): int { return 42; }",
+                    ),
+                    SourceFile::new("/reflection/empty.whim", ""),
+                    SourceFile::new(
+                        "/reflection/unreachable.whim",
+                        "if (false) { write_line!('unreachable'); }",
+                    ),
+                    SourceFile::new(
+                        "/reflection/entry.whim",
+                        r"
+use Whim\Reflection;
+$file = Reflection\reflect_file('/reflection/declarations.whim');
+assert!($file->getPath() == '/reflection/declarations.whim');
+assert!($file->getOrigin() == Reflection\DeclarationOrigin::Extension);
+assert!(!$file->hasTopLevelCode());
+assert!(length!($file->getSymbols()) == 1);
+assert!($file->getSymbols()[0]->getName() == 'ArtifactFile\\value');
+assert!($file->getSymbols()[0]->getFile()->getPath() == $file->getPath());
+assert!($file->getSymbols()[0]->getFile()->getOrigin() == $file->getOrigin());
+assert!(Reflection\reflect_file('/reflection/empty.whim')->getSymbols() == vec[]);
+assert!(!Reflection\reflect_file('/reflection/empty.whim')->hasTopLevelCode());
+assert!(Reflection\reflect_file('/reflection/unreachable.whim')->hasTopLevelCode());
+assert!(Reflection\reflect_file('/reflection/entry.whim')->hasTopLevelCode());
+assert!(Reflection\reflect_file('/reflection/entry.whim')->getSymbols() == vec[]);
+assert!(Reflection\reflect_file('/reflection/bundle.whim') == null);
+assert!(length!(Reflection\get_loaded_files()) == 4);
+",
+                    ),
+                ],
+                ArtifactConfiguration {
+                    optimize,
+                    ..ArtifactConfiguration::default()
+                },
+            )
+            .expect("the artifact compiles")
+            .into_bytes();
+        let mut engine = Engine::new(EngineConfiguration::default());
+        engine
+            .load_artifact(&artifact)
+            .expect("file reflection works in the loaded artifact");
+    }
+}
+
+#[test]
 fn artifact_atoms_outlive_the_encoded_input() {
     let mut declarations = compile(
         "function artifact_owned_string(): string { return \"retained\\x00artifact\\xffbytes\"; }",

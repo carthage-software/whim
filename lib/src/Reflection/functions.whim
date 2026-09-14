@@ -17,6 +17,16 @@ use Whim\Reflection\Type\TypeReflection;
 use Whim\Symbol\SymbolKind;
 use Whim\Type\TypeId;
 
+/** Returns loaded source files, sorted by path. Never loads a file. */
+#[Stub]
+#[MustUse]
+function get_loaded_files(): vec<FileReflection> {}
+
+/** Reflects a loaded file by its recorded source path. Never loads a file. */
+#[Stub]
+#[MustUse]
+function reflect_file(string $path): null|FileReflection {}
+
 /**
  * Returns loaded symbols, optionally restricted to one kind. Never autoloads.
  */

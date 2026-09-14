@@ -102,6 +102,10 @@ pub(crate) struct SourceLocationData {
 #[derive(Clone)]
 pub(crate) enum ReflectionData {
     SourceLocation(SourceLocationData),
+    File {
+        unit: Rc<UnitContext>,
+        position: usize,
+    },
     Symbol(Atom),
     Member(MemberKey),
     Parameter {

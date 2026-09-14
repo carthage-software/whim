@@ -11,6 +11,7 @@ use whim_syn::cst::Program;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::unit::CompiledBuiltInFunction;
+use crate::bytecode::unit::CompiledFile;
 use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::optimize_unit;
@@ -155,6 +156,7 @@ impl<'compilation, 'arena> Compilation<'compilation, 'arena> {
 pub(crate) fn new_unit(runtime_path: &[u8], heap: &Heap) -> CompiledUnit {
     CompiledUnit {
         path: heap.intern(runtime_path),
+        files: Vec::new(),
         main: Chunk::new(),
         functions: Vec::new(),
         classes: Vec::new(),
@@ -186,6 +188,16 @@ pub(crate) fn compile_program_into_unit<'arena>(
     compilation: &mut Compilation<'_, 'arena>,
 ) -> Result<Chunk, CompileError> {
     let regions = declarations::collect(heap, program, path, unit, compilation)?;
+    unit.files.push(CompiledFile {
+        path: (!path.runtime.is_empty() && path.runtime != b"-").then(|| heap.intern(path.runtime)),
+        span: program.span(),
+        has_top_level_code: regions.iter().any(|region| {
+            region
+                .main_statements
+                .iter()
+                .any(|(statement, _)| !statement.is_noop())
+        }),
+    });
 
     let mut compiler = BodyCompiler::new(
         heap,

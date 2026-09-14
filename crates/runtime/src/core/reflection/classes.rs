@@ -154,6 +154,7 @@ macro_rules! reflection_class_methods {
                 get_short_name: "getShortName(): string" => ShortName;
                 get_namespace_name: "getNamespaceName(): string" => NamespaceName;
                 get_kind: "getKind(): Whim\\Symbol\\SymbolKind" => SymbolKind;
+                get_file: "getFile(): null|Whim\\Reflection\\FileReflection" => File;
             ];
             groups = [$($rest),*];
         }
@@ -323,6 +324,15 @@ reflection_class! {
         get_start_column: "getStartColumn(): (1..)" => StartColumn;
         get_end_line: "getEndLine(): (1..)" => EndLine;
         get_end_column: "getEndColumn(): (1..)" => EndColumn;
+    }
+}
+
+reflection_class! {
+    FileReflection = "Whim\\Reflection\\FileReflection" {
+        get_path: "getPath(): null|string" => Path;
+        get_origin: "getOrigin(): Whim\\Reflection\\DeclarationOrigin" => Origin;
+        get_symbols: "getSymbols(null|Whim\\Symbol\\SymbolKind $kind = null): vec<Whim\\Reflection\\Symbol\\SymbolReflection>" => Symbols;
+        has_top_level_code: "hasTopLevelCode(): bool" => HasTopLevelCode;
     }
 }
 
@@ -890,6 +900,7 @@ pub(crate) fn state(value: &Value) -> Option<&ReflectionState> {
 
     find!(
         SourceLocation,
+        FileReflection,
         ClassReflection,
         InterfaceReflection,
         EnumReflection,

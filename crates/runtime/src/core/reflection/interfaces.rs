@@ -99,6 +99,7 @@ reflection_interface! {
         get_short_name: "getShortName(): string" => ShortName;
         get_namespace_name: "getNamespaceName(): string" => NamespaceName;
         get_kind: "getKind(): Whim\\Symbol\\SymbolKind" => SymbolKind;
+        get_file: "getFile(): null|Whim\\Reflection\\FileReflection" => File;
     }
 }
 

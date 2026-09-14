@@ -109,6 +109,7 @@ fn class_name(
 ) -> Result<&'static str, Throw> {
     Ok(match data {
         ReflectionData::SourceLocation(_) => "Whim\\Reflection\\SourceLocation",
+        ReflectionData::File { .. } => "Whim\\Reflection\\FileReflection",
         ReflectionData::Symbol(name) => {
             let Some(entry) = context.vm.engine.tables.symbols.get(name) else {
                 return Err(context.type_error("the reflected symbol is no longer loaded"));

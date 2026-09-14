@@ -215,6 +215,42 @@ assert!($location->getStartColumn() > 0);
 assert!($location->getEndColumn() > 0);
 assert!($parameter->getLocation() != null);
 
+$file = Reflection\reflect_file($location->getFile());
+assert!($file is Reflection\FileReflection);
+assert!($file->getPath() == $location->getFile());
+assert!($box->getFile()->getPath() == $file->getPath());
+assert!($file->getOrigin() == DeclarationOrigin::User);
+assert!($core->getFile() == null);
+assert!($extension->getFile()->getOrigin() == DeclarationOrigin::Extension);
+assert!($file->hasTopLevelCode());
+assert!(
+  $file->getSymbols(SymbolKind::Interface)[0]->getName()
+  == 'ReflectionTest\\Provider',
+);
+
+$fileFunctions = $file->getSymbols(SymbolKind::Function);
+$foundIdentity = false;
+foreach ($fileFunctions as $function) {
+  if ($function->getName() == 'ReflectionTest\\identity') {
+    $foundIdentity = true;
+  }
+}
+
+assert!($foundIdentity);
+$libraryFile = Reflection\reflect_file('<std>/Reflection/functions.whim');
+assert!($libraryFile != null);
+assert!($libraryFile->getOrigin() == DeclarationOrigin::Extension);
+assert!(!$libraryFile->hasTopLevelCode());
+assert!($libraryFile->getSymbols() == vec[]);
+$foundFile = false;
+foreach (Reflection\get_loaded_files() as $loadedFile) {
+  if ($loadedFile->getPath() == $file->getPath()) {
+    $foundFile = true;
+  }
+}
+
+assert!($foundFile);
+
 // Symbol and class-like declarations.
 assert!(
   Reflection\reflect_symbol(

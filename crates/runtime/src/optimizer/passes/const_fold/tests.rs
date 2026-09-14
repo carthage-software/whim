@@ -60,6 +60,7 @@ fn fold(heap: &Heap, chunk: Chunk) -> (Chunk, OptimizationStatistics) {
     verify(&chunk).expect("the assertion fixture verifies");
     let mut unit = CompiledUnit {
         path: heap.intern(b"/optimizer/assertion-progress.whim"),
+        files: Vec::new(),
         main: chunk,
         functions: Vec::new(),
         classes: Vec::new(),

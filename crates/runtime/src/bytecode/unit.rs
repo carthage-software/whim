@@ -496,9 +496,19 @@ pub(crate) struct CompiledBuiltInFunction {
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
+pub(crate) struct CompiledFile {
+    pub path: Option<Atom>,
+    #[seeded(with(serde_seeded::unseeded))]
+    pub span: Span,
+    pub has_top_level_code: bool,
+}
+
+#[derive(Debug, Clone, Serialize, DeserializeSeeded)]
+#[seeded(de(seed(Heap)))]
 pub(crate) struct CompiledUnit {
     /// Absolute path of the compiled file.
     pub path: Atom,
+    pub files: Vec<CompiledFile>,
     pub main: Chunk,
     /// Including synthesized closure prototypes.
     pub functions: Vec<CompiledFunction>,

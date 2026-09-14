@@ -64,6 +64,7 @@ pub(crate) fn optimize_method(
 fn context_unit(owner: &CompiledUnit) -> CompiledUnit {
     CompiledUnit {
         path: owner.path.clone(),
+        files: Vec::new(),
         main: Chunk::new(),
         functions: Vec::new(),
         classes: Vec::<CompiledClassLike>::new(),

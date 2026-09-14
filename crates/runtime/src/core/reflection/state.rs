@@ -9,6 +9,7 @@ use crate::core::reflection::Operation;
 use crate::core::reflection::attributes;
 use crate::core::reflection::classes;
 use crate::core::reflection::declarations;
+use crate::core::reflection::files;
 use crate::core::reflection::metadata;
 use crate::core::reflection::model::DeclarationKey;
 use crate::core::reflection::model::ReflectionData;
@@ -62,6 +63,9 @@ pub(crate) fn dispatch(
     match data {
         ReflectionData::SourceLocation(location) => {
             metadata::source_location_dispatch(context, operation, &location)
+        }
+        ReflectionData::File { unit, position } => {
+            files::dispatch(context, arguments, operation, &unit, position)
         }
         ReflectionData::Symbol(name) => {
             let declaration = DeclarationKey::Symbol(name.clone());

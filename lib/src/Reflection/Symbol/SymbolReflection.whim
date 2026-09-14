@@ -3,6 +3,7 @@ namespace Whim\Reflection\Symbol;
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Reflection\DeclarationReflection;
+use Whim\Reflection\FileReflection;
 use Whim\Symbol\SymbolKind;
 
 /** Describes one named symbol in the engine's symbol table. */
@@ -34,4 +35,8 @@ interface SymbolReflection extends
   /** Returns the symbol kind. */
   #[MustUse]
   public function getKind(): SymbolKind;
+
+  /** Returns the source file, or null for a symbol defined in Rust. */
+  #[MustUse]
+  public function getFile(): null|FileReflection;
 }

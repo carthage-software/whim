@@ -4,6 +4,7 @@ use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\FileReflection;
 use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Type\SymbolTypeReflection;
 use Whim\Reflection\Type\TypeReflection;
@@ -17,6 +18,10 @@ final class ConstantReflection implements SymbolReflection {
   /** Returns where this constant was defined. */
   #[MustUse]
   public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns the source file, or null for a symbol defined in Rust. */
+  #[MustUse]
+  public function getFile(): null|FileReflection {}
 
   /** Returns this constant's source span, when defined by user code. */
   #[MustUse]

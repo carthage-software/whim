@@ -116,6 +116,7 @@ fn assert_exit(engine: &mut Engine, mut chunk: Chunk, expected: u8) {
     chunk.refresh_runtime_metadata();
     let unit = Rc::new(CompiledUnit {
         path: engine.heap.intern(b"/optimizer/string-chain.whim"),
+        files: Vec::new(),
         main: chunk,
         functions: Vec::new(),
         classes: Vec::new(),

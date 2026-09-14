@@ -41,6 +41,8 @@ pub(crate) mod unwind;
 
 whim_core! {
     functions: [
+        reflection::functions::get_loaded_files,
+        reflection::functions::reflect_file,
         reflection::functions::get_loaded_symbols,
         reflection::functions::reflect_symbol,
         reflection::functions::reflect_class_like,
@@ -450,6 +452,7 @@ whim_core! {
         private::tls::TlsServerConfiguration,
         private::tls::TlsConnection,
         reflection::SourceLocation,
+        reflection::FileReflection,
         reflection::ClassReflection,
         reflection::InterfaceReflection,
         reflection::EnumReflection,

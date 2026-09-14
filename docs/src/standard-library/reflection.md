@@ -1,7 +1,60 @@
 # Reflection
 
-`Whim\Reflection` gives read-only access to loaded declarations, types, and
-values.
+`Whim\Reflection` gives read-only access to loaded files, declarations, types,
+and values.
+
+## Files
+
+`get_loaded_files()` returns loaded `FileReflection` values, sorted by path
+with anonymous inputs first. `reflect_file($path)` finds a loaded file or
+returns `null`. Both functions read loaded metadata without loading or
+executing a file.
+
+A file reflection provides:
+
+- `getPath()`: the recorded source path, or `null` for an anonymous input such
+  as standard input.
+- `getOrigin()`: the file's `DeclarationOrigin`, matching its symbols' origin.
+- `getSymbols($kind = null)`: the file's named symbols, sorted by fully
+  qualified name. Pass a `Whim\Symbol\SymbolKind` to select one kind.
+- `hasTopLevelCode()`: whether the source contains executable statements
+  outside function and method bodies, including statements inside namespaces.
+
+```whim
+use Whim\Reflection;
+use Whim\Symbol\SymbolKind;
+
+foreach (Reflection\get_loaded_files() as $file) {
+  write_line!($file->getPath() ?? '<anonymous>');
+  foreach ($file->getSymbols(SymbolKind::Function) as $function) {
+    write_line!('  ' . $function->getName());
+  }
+}
+```
+
+Lookup matches the recorded path exactly, including its bytes. Use a path from
+`getPath()` or `SourceLocation::getFile()`. Artifacts keep their individual
+source files; the artifact container itself is not an extra source file. If a
+path has been loaded more than once, lookup and listing use its latest load.
+Anonymous inputs remain separate entries even when they share a diagnostic
+label.
+
+Every symbol reflection has `getFile()`, which returns its defining
+`FileReflection` or `null` for a symbol defined in Rust. This works for classes,
+interfaces, enums, functions, constants, type aliases, and newtypes, including
+symbols from anonymous inputs. A symbol keeps its defining file even when the
+same path is loaded again later.
+
+Symbols include declarations across all namespaces in the file. Methods,
+closures, imports, and stub declarations backed by another definition are not
+separate symbols in this list. Files without named symbols still appear in
+`get_loaded_files()`.
+
+The compiler records `hasTopLevelCode()` before optimization. Unreachable
+statements still count, even if optimization removes them. Imports,
+declarations, and empty statements do not count. Initializers within
+declarations do not count either, so this flag does not guarantee that loading
+the file has no side effects.
 
 ## Find declarations
 

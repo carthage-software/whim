@@ -27,7 +27,11 @@ fn source_paths_preserve_non_utf8_bytes_for_embedding() {
 
     let mut engine = Engine::new(EngineConfiguration::default());
     let outcome = engine.run_source(
-        "assert!(embed!('payload.txt') == 'embedded');",
+        r"
+assert!(embed!('payload.txt') == 'embedded');
+$path = Whim\Reflection\get_loaded_files()[0]->getPath();
+assert!(Whim\Reflection\reflect_file($path)->getPath() == $path);
+",
         &source_path,
     );
 

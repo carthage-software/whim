@@ -1,7 +1,9 @@
 //! Public reflection entry points.
 
 use core::str;
+use std::rc::Rc;
 
+use hashbrown::HashSet;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
@@ -21,6 +23,79 @@ use crate::value::atom::Atom;
 use crate::value::object::TypeEnvironmentId;
 
 #[whim_function(
+    "Whim\\Reflection\\get_loaded_files(): vec<Whim\\Reflection\\FileReflection>",
+    must_use
+)]
+pub(crate) fn get_loaded_files(
+    context: &mut Context<'_, '_, '_>,
+    _arguments: Arguments<'_>,
+) -> Result<Value, Throw> {
+    let mut seen = HashSet::new();
+    let mut files = Vec::new();
+    for unit in context.vm.engine.units.iter().rev() {
+        for (position, file) in unit.unit.files.iter().enumerate().rev() {
+            if file
+                .path
+                .as_ref()
+                .is_some_and(|path| !seen.insert(path.clone()))
+            {
+                continue;
+            }
+
+            files.push((file.path.clone(), Rc::clone(unit), position));
+        }
+    }
+
+    files.sort_by(|left, right| {
+        left.0
+            .as_ref()
+            .map(Atom::as_bytes)
+            .cmp(&right.0.as_ref().map(Atom::as_bytes))
+    });
+
+    let mut reflections = Vec::with_capacity(files.len());
+    for (_, unit, position) in files {
+        reflections.push(objects::build(
+            context,
+            ReflectionData::File { unit, position },
+            Vec::new(),
+        )?);
+    }
+
+    Ok(context.vec(reflections))
+}
+
+#[whim_function(
+    "Whim\\Reflection\\reflect_file(string $path): null|Whim\\Reflection\\FileReflection",
+    must_use
+)]
+pub(crate) fn reflect_file(
+    context: &mut Context<'_, '_, '_>,
+    arguments: Arguments<'_>,
+) -> Result<Value, Throw> {
+    let path = arguments.bytes(0);
+    let found = context.vm.engine.units.iter().rev().find_map(|unit| {
+        unit.unit
+            .files
+            .iter()
+            .rposition(|file| {
+                file.path
+                    .as_ref()
+                    .is_some_and(|file_path| file_path.as_bytes() == path)
+            })
+            .map(|position| ReflectionData::File {
+                unit: Rc::clone(unit),
+                position,
+            })
+    });
+
+    found.map_or_else(
+        || Ok(Value::null()),
+        |file| objects::build(context, file, Vec::new()),
+    )
+}
+
+#[whim_function(
     "Whim\\Reflection\\get_loaded_symbols(null|Whim\\Symbol\\SymbolKind $kind = null): vec<Whim\\Reflection\\Symbol\\SymbolReflection>",
     must_use
 )]
@@ -33,6 +108,7 @@ pub(crate) fn get_loaded_symbols(
         .filter(|value| !value.is_null() && !value.is_uninitialized())
         .map(|value| symbol_kind_argument(context, value))
         .transpose()?;
+
     let mut names = context
         .vm
         .engine
@@ -42,8 +118,8 @@ pub(crate) fn get_loaded_symbols(
         .filter(|(_, entry)| kind.is_none_or(|kind| entry.kind == kind))
         .map(|(name, _)| name.clone())
         .collect::<Vec<_>>();
-    names.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
 
+    names.sort_unstable_by(|left, right| left.as_bytes().cmp(right.as_bytes()));
     let mut reflected = Vec::with_capacity(names.len());
     for name in names {
         reflected.push(objects::symbol(context, name)?);
@@ -320,7 +396,7 @@ fn symbol_name(context: &mut Context<'_, '_, '_>, bytes: &[u8]) -> Result<Atom, 
     Ok(strip_leading_backslash(context.vm.heap(), name))
 }
 
-fn symbol_kind_argument(
+pub(super) fn symbol_kind_argument(
     context: &mut Context<'_, '_, '_>,
     value: &Value,
 ) -> Result<SymbolKind, Throw> {

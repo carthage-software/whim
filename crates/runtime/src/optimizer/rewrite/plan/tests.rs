@@ -39,6 +39,7 @@ fn string_table(heap: &Heap, target: i32, default: i32) -> SwitchTable {
 fn unit(heap: &Heap, main: Chunk) -> CompiledUnit {
     CompiledUnit {
         path: heap.intern(b"/switch-table-rewrite.whim"),
+        files: Vec::new(),
         main,
         functions: Vec::new(),
         classes: Vec::new(),

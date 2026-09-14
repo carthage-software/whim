@@ -5,6 +5,7 @@ mod attributes;
 mod classes;
 mod declarations;
 mod enums;
+mod files;
 pub(crate) mod functions;
 mod interfaces;
 mod metadata;
@@ -79,6 +80,7 @@ pub(crate) enum Operation {
     Equals,
     File,
     HasDefaultValue,
+    HasTopLevelCode,
     InnerType,
     InterfaceTypes,
     IsAbstract,
@@ -118,6 +120,7 @@ pub(crate) enum Operation {
     Parameters,
     ParentType,
     ParentTypes,
+    Path,
     PermittedSubtypeNames,
     Position,
     PromotedProperty,
@@ -140,6 +143,7 @@ pub(crate) enum Operation {
     StartOffset,
     StaticValue,
     SymbolKind,
+    Symbols,
     Target,
     Targets,
     ToString,

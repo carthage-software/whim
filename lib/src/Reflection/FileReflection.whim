@@ -1,0 +1,30 @@
+namespace Whim\Reflection;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Symbol\SymbolReflection;
+use Whim\Symbol\SymbolKind;
+
+/** Describes one loaded source file. */
+#[Stub]
+final class FileReflection {
+  private function __construct() {}
+
+  /** Returns the recorded source path, or null for an anonymous input. */
+  #[MustUse]
+  public function getPath(): null|string {}
+
+  /** Returns where this file was loaded from. */
+  #[MustUse]
+  public function getOrigin(): DeclarationOrigin {}
+
+  /** Returns symbols defined in this file, sorted by name. */
+  #[MustUse]
+  public function getSymbols(
+    null|SymbolKind $kind = null,
+  ): vec<SymbolReflection> {}
+
+  /** Reports whether the source contains executable top-level statements. */
+  #[MustUse]
+  public function hasTopLevelCode(): bool {}
+}

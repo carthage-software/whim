@@ -25,6 +25,7 @@ pub(crate) fn declaration_dispatch(
 ) -> Option<Result<Value, Throw>> {
     let result = match operation {
         Operation::Origin => origin(context, declaration),
+        Operation::File => file(context, declaration),
         Operation::Location => location(context, declaration),
         Operation::Documentation => Ok(documentation(context, declaration)),
         Operation::Attributes | Operation::AttributesByName => {
@@ -78,13 +79,35 @@ pub(crate) fn reflect_location(
 
 fn origin(context: &mut Context<'_, '_, '_>, declaration: &DeclarationKey) -> Result<Value, Throw> {
     let metadata = support::declaration_metadata(context.vm, declaration);
-    let case = match metadata.unit.as_deref().map(|unit| unit.origin) {
+    reflect_origin(context, metadata.unit.as_deref().map(|unit| unit.origin))
+}
+
+pub(crate) fn reflect_origin(
+    context: &mut Context<'_, '_, '_>,
+    origin: Option<UnitOrigin>,
+) -> Result<Value, Throw> {
+    let case = match origin {
         None => b"Core".as_slice(),
         Some(UnitOrigin::Extension) => b"Extension".as_slice(),
         Some(UnitOrigin::User) => b"User".as_slice(),
     };
 
     objects::enum_case(context, b"Whim\\Reflection\\DeclarationOrigin", case)
+}
+
+fn file(context: &mut Context<'_, '_, '_>, declaration: &DeclarationKey) -> Result<Value, Throw> {
+    let metadata = support::declaration_metadata(context.vm, declaration);
+    let (Some(unit), Some(span)) = (metadata.unit, metadata.span) else {
+        return Ok(Value::null());
+    };
+
+    let Some(position) = unit.unit.files.iter().position(|file| {
+        span.start.offset >= file.span.start.offset && span.start.offset < file.span.end.offset
+    }) else {
+        return Ok(Value::null());
+    };
+
+    objects::build(context, ReflectionData::File { unit, position }, Vec::new())
 }
 
 fn location(
