@@ -255,6 +255,7 @@ where
             [b':', b':', ..] => (TokenKind::ColonColon, 2),
             [b'#', b'{', ..] => (TokenKind::HashLeftBrace, 2),
             [b'#', b'[', ..] => (TokenKind::HashLeftBracket, 2),
+            [b'#', b'!', b'[', ..] => (TokenKind::HashBangLeftBracket, 3),
             [b'.', b'.', ..] => (TokenKind::DotDot, 2),
             [b'=', ..] => (TokenKind::Equal, 1),
             [b'!', ..] => (TokenKind::Bang, 1),
@@ -311,9 +312,11 @@ where
 
                         return Err(SyntaxError::UnclosedStringLiteral(start));
                     };
+
                     self.mode = LexerMode::BracedInterpolationStart {
                         end: self.input.current_offset() + after_interpolation - 1,
                     };
+
                     break;
                 }
                 b'"' => {
@@ -589,6 +592,7 @@ mod tests {
             ("..=", TokenKind::DotDotEqual),
             ("...", TokenKind::DotDotDot),
             ("#[", TokenKind::HashLeftBracket),
+            ("#![", TokenKind::HashBangLeftBracket),
             ("#{", TokenKind::HashLeftBrace),
             ("?", TokenKind::Question),
             (":", TokenKind::Colon),
@@ -840,6 +844,25 @@ mod tests {
                 TokenKind::HashLeftBracket,
                 TokenKind::Identifier,
                 TokenKind::RightBracket
+            ],
+        );
+    }
+
+    #[test]
+    fn file_attribute_open_after_shebang() {
+        assert_eq!(
+            kinds("#!/usr/bin/env whim\n#![FileTag] #[SymbolTag] class C {}"),
+            vec![
+                TokenKind::HashBangLeftBracket,
+                TokenKind::Identifier,
+                TokenKind::RightBracket,
+                TokenKind::HashLeftBracket,
+                TokenKind::Identifier,
+                TokenKind::RightBracket,
+                TokenKind::Class,
+                TokenKind::Identifier,
+                TokenKind::LeftBrace,
+                TokenKind::RightBrace,
             ],
         );
     }

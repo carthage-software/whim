@@ -245,6 +245,7 @@ pub(in crate::compiler::declarations) fn compile_class<'arena>(
         generics,
         embedded_files,
         trusted_returns,
+        ..
     } = array;
     rules::check_class(class)?;
     let name = resolver.qualify(class.name.value);
@@ -362,6 +363,7 @@ pub(in crate::compiler::declarations) fn compile_interface<'arena>(
         generics,
         embedded_files,
         trusted_returns,
+        ..
     } = array;
     let name = resolver.qualify(interface.name.value);
     let mut output = class_like(heap, &name, ClassLikeKind::Interface, interface.span());
@@ -452,6 +454,7 @@ pub(in crate::compiler::declarations) fn compile_enum<'arena>(
         generics,
         embedded_files,
         trusted_returns,
+        ..
     } = array;
     rules::check_enum(declaration)?;
     let name = resolver.qualify(declaration.name.value);

@@ -186,6 +186,13 @@ pub struct AttributeList<'arena> {
     pub right_bracket: Span,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct FileAttributeList<'arena> {
+    pub hash_bang_left_bracket: Span,
+    pub attributes: TokenSeparatedSequence<'arena, Attribute<'arena>>,
+    pub right_bracket: Span,
+}
+
 /// A single attribute.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct Attribute<'arena> {
@@ -196,6 +203,12 @@ pub struct Attribute<'arena> {
 impl HasSpan for AttributeList<'_> {
     fn span(&self) -> Span {
         self.hash_left_bracket.join(self.right_bracket)
+    }
+}
+
+impl HasSpan for FileAttributeList<'_> {
+    fn span(&self) -> Span {
+        self.hash_bang_left_bracket.join(self.right_bracket)
     }
 }
 

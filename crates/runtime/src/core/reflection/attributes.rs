@@ -30,6 +30,7 @@ const REPEATABLE: i64 = 64;
 const TARGET_TYPE_ALIAS: i64 = 128;
 const TARGET_NEWTYPE: i64 = 256;
 const TARGET_CONSTANT: i64 = 512;
+const TARGET_FILE: i64 = 1024;
 
 pub(crate) fn declaration_attributes(
     context: &mut Context<'_, '_, '_>,
@@ -174,6 +175,7 @@ fn targets(context: &mut Context<'_, '_, '_>, flags: i64) -> Result<Value, Throw
         (TARGET_TYPE_ALIAS, b"TypeAlias".as_slice()),
         (TARGET_NEWTYPE, b"Newtype".as_slice()),
         (TARGET_CONSTANT, b"Constant".as_slice()),
+        (TARGET_FILE, b"File".as_slice()),
     ] {
         if flags & flag != 0 {
             targets.push(objects::enum_case(

@@ -64,6 +64,7 @@ impl Node<'_, '_> {
                 }
             }
             Node::Statement(node) => match node {
+                Statement::FileAttributeList(inner) => f(Node::FileAttributeList(inner)),
                 Statement::Namespace(inner) => f(Node::Namespace(inner)),
                 Statement::Use(inner) => f(Node::Use(inner)),
                 Statement::Class(inner) => f(Node::Class(inner)),
@@ -186,6 +187,11 @@ impl Node<'_, '_> {
                 f(Node::Type(node.backing));
             }
             Node::AttributeList(node) => {
+                for attribute in &node.attributes {
+                    f(Node::Attribute(attribute));
+                }
+            }
+            Node::FileAttributeList(node) => {
                 for attribute in &node.attributes {
                     f(Node::Attribute(attribute));
                 }

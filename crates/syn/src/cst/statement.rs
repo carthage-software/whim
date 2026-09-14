@@ -16,6 +16,7 @@ use crate::cst::control_flow::If;
 use crate::cst::control_flow::Try;
 use crate::cst::control_flow::While;
 use crate::cst::declaration::Constant;
+use crate::cst::declaration::FileAttributeList;
 use crate::cst::declaration::Namespace;
 use crate::cst::declaration::Use;
 use crate::cst::expression::Expression;
@@ -62,6 +63,7 @@ pub struct Using<'arena> {
 /// An Whim statement.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Statement<'arena> {
+    FileAttributeList(FileAttributeList<'arena>),
     Namespace(Namespace<'arena>),
     Use(Use<'arena>),
     Class(Class<'arena>),
@@ -118,6 +120,7 @@ impl HasSpan for Using<'_> {
 impl HasSpan for Statement<'_> {
     fn span(&self) -> Span {
         match self {
+            Statement::FileAttributeList(statement) => statement.span(),
             Statement::Namespace(statement) => statement.span(),
             Statement::Use(statement) => statement.span(),
             Statement::Class(statement) => statement.span(),

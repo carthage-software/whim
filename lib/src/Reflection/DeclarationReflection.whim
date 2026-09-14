@@ -6,6 +6,7 @@ use Whim\Marker\Stub;
 /** Describes one declaration that may carry attributes and source metadata. */
 #[Stub]
 interface DeclarationReflection for
+  FileReflection,
   Symbol\SymbolReflection,
   Symbol\ClassLikeReflection,
   Generic\GenericDeclarationReflection,

@@ -35,8 +35,12 @@ pub(crate) struct MemberKey {
     pub(crate) kind: MemberKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub(crate) enum DeclarationKey {
+    File {
+        unit: Rc<UnitContext>,
+        position: usize,
+    },
     Symbol(Atom),
     Member(MemberKey),
     Parameter {

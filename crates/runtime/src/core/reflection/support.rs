@@ -207,6 +207,14 @@ pub(crate) fn declaration_metadata(
     declaration: &DeclarationKey,
 ) -> DeclarationMetadata {
     match declaration {
+        DeclarationKey::File { unit, position } => {
+            let file = &unit.unit.files[*position];
+            DeclarationMetadata {
+                unit: Some(Rc::clone(unit)),
+                span: file.path.as_ref().map(|_| file.span),
+                attributes: file.attributes.clone(),
+            }
+        }
         DeclarationKey::Symbol(name) => symbol_metadata(vm, name),
         DeclarationKey::Member(member) => member_metadata(vm, member),
         DeclarationKey::Parameter { callable, position } => {

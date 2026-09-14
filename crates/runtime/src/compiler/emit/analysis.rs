@@ -87,7 +87,10 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for AssignedNames<'_, 'arena> {
                 self.names.insert(variable.name);
                 Flow::Skip
             }
-            Node::AssignmentTarget(_) | Node::BindingTarget(_) | Node::Closure(_) => Flow::Skip,
+            Node::AssignmentTarget(_)
+            | Node::BindingTarget(_)
+            | Node::Closure(_)
+            | Node::FileAttributeList(_) => Flow::Skip,
             _ => Flow::Descend,
         }
     }
@@ -198,7 +201,9 @@ fn collect_scoped_bindings(node: Node<'_, '_>, bindings: &mut Vec<(String, Span)
                         .push((variable.name.to_string(), variable.span));
                     Flow::Skip
                 }
-                Node::BindingTarget(_) | Node::Closure(_) => Flow::Skip,
+                Node::BindingTarget(_) | Node::Closure(_) | Node::FileAttributeList(_) => {
+                    Flow::Skip
+                }
                 _ => Flow::Descend,
             }
         }
@@ -270,7 +275,8 @@ fn collect_local_names<'arena>(node: Node<'_, 'arena>, names: &mut Names<'arena>
                     self.names.insert(variable.name);
                     Flow::Skip
                 }
-                Node::Closure(_)
+                Node::FileAttributeList(_)
+                | Node::Closure(_)
                 | Node::Function(_)
                 | Node::Class(_)
                 | Node::Interface(_)
@@ -466,7 +472,8 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for ReferencedNames<'_, 'arena> {
 
                 Flow::Skip
             }
-            Node::Pattern(Pattern::Variable(_))
+            Node::FileAttributeList(_)
+            | Node::Pattern(Pattern::Variable(_))
             | Node::ObjectPatternEntry(ObjectPatternEntry::Shorthand(_))
             | Node::BindingTarget(_)
             | Node::Function(_)

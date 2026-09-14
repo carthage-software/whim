@@ -1,6 +1,6 @@
 # Attributes
 
-An attribute adds typed data to a declaration or parameter. Whim checks the
+An attribute adds typed data to a file, declaration, or parameter. Whim checks the
 attribute class, its target, its arguments, and whether it may repeat.
 
 ## Defining an attribute
@@ -19,9 +19,9 @@ final readonly class Table {
 final class User {}
 ```
 
-Applying `#[Table('users')]` creates a `Table` value. The arguments follow the
-same count and type rules as a normal constructor call. Attribute arguments may
-not read local variables.
+Applying `#[Table('users')]` stores the class and arguments. Reflection's
+`newInstance()` creates a `Table` value. The arguments follow the same count
+and type rules as a normal constructor call and may not read local variables.
 
 An attribute class may have no constructor. Apply it without parentheses:
 
@@ -41,19 +41,20 @@ function home(): string {
 
 Pass one or more target flags to `#[Attribute]`:
 
-| Flag | Target |
-| --- | --- |
-| `TARGET_CLASS` | class, interface, or enum |
-| `TARGET_FUNCTION` | named function or closure |
-| `TARGET_METHOD` | method |
-| `TARGET_PROPERTY` | property |
-| `TARGET_CLASS_CONSTANT` | class-like constant or enum case |
-| `TARGET_PARAMETER` | function, method, or closure parameter |
-| `TARGET_TYPE_ALIAS` | type alias |
-| `TARGET_NEWTYPE` | newtype |
-| `TARGET_CONSTANT` | namespace constant |
-| `TARGET_SYMBOL` | any named symbol |
-| `TARGET_ALL` | every supported target |
+| Flag                    | Target                                 |
+| ----------------------- | -------------------------------------- |
+| `TARGET_CLASS`          | class, interface, or enum              |
+| `TARGET_FUNCTION`       | named function or closure              |
+| `TARGET_METHOD`         | method                                 |
+| `TARGET_PROPERTY`       | property                               |
+| `TARGET_CLASS_CONSTANT` | class-like constant or enum case       |
+| `TARGET_PARAMETER`      | function, method, or closure parameter |
+| `TARGET_TYPE_ALIAS`     | type alias                             |
+| `TARGET_NEWTYPE`        | newtype                                |
+| `TARGET_CONSTANT`       | namespace constant                     |
+| `TARGET_FILE`           | source file                            |
+| `TARGET_SYMBOL`         | any named symbol                       |
+| `TARGET_ALL`            | every supported target                 |
 
 Join flags with `|`:
 
@@ -85,6 +86,62 @@ final class Handler {}
 ```
 
 Each use stores its own arguments. Source order stays intact.
+
+## File attributes
+
+Use `#![...]` to attach attributes to the whole file. The opening `#![` is one
+token. A file attribute list is a statement and needs no semicolon.
+
+```whim
+namespace App;
+
+use Whim\Attribute\Attribute;
+use Whim\Reflection;
+
+#[Attribute(Attribute::TARGET_FILE | Attribute::IS_REPEATABLE)]
+final readonly class Tag {
+  public function __construct(public string $name) {}
+}
+
+#![Tag(name: 'http')]
+
+function home(): string {
+  return '/';
+}
+
+$file = Reflection\reflect_function('App\\home')->getFile();
+foreach ($file->getAttributes::<Tag>() as $attribute) {
+  write_line!($attribute->newInstance()->name);
+}
+```
+
+Put file attributes wherever you can write a statement, including inside a
+function, method, closure, or conditional. The compiler collects every file
+attribute before execution and optimization. This attribute applies even when
+the condition is false:
+
+```whim
+use Whim\Attribute\Attribute;
+
+#[Attribute(Attribute::TARGET_FILE)]
+final readonly class Tag {
+  public function __construct(public string $name) {}
+}
+
+if (false) {
+  #![Tag('http')]
+}
+```
+
+Names follow the namespace and imports at the attribute's location. Arguments
+follow the same constant-expression rules as other attributes and cannot read
+local variables. All file attribute lists share one target, including lists in
+different namespaces. Repeating an attribute anywhere in the file requires
+`IS_REPEATABLE`. Reflection returns them in source order.
+
+File attributes belong to the file, so a symbol's `getAttributes()` does not
+include them. Use the symbol's `getFile()` to read them. A file that contains
+only declarations, imports, and file attributes has no top-level code.
 
 ## Reading attributes
 
@@ -124,6 +181,6 @@ declarations and members return `null`.
 
 See [Reflection](../standard-library/reflection.md) for the complete API.
 
-Attributes are values, not comments. The compiler rejects a bad target, a bad
-argument, a missing attribute class, or an illegal repeat before the program
-runs.
+Whim rejects non-constant arguments, missing attribute classes, invalid
+targets, and illegal repeats before top-level code runs. `newInstance()` checks
+argument values against the constructor's parameter types.

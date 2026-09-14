@@ -19,6 +19,7 @@ use whim_syn::cst::class::Property;
 use whim_syn::cst::declaration::Attribute;
 use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::declaration::Constant;
+use whim_syn::cst::declaration::FileAttributeList;
 use whim_syn::cst::declaration::Namespace;
 use whim_syn::cst::declaration::NamespaceBody;
 use whim_syn::cst::declaration::Use;
@@ -305,6 +306,16 @@ where
             }
             None => f.text(self.name.value()),
         }
+    }
+}
+
+impl<'arena, A> Format<'arena, A> for FileAttributeList<'arena>
+where
+    A: Arena,
+{
+    fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
+        let attributes = f.inline_token_sequence(&self.attributes);
+        f.concat([f.text("#!["), attributes, f.text("]")])
     }
 }
 

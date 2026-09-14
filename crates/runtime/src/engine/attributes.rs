@@ -23,7 +23,7 @@ use crate::engine::SymbolKind;
 use crate::engine::UnitContext;
 use crate::engine::VirtualMachineControl;
 
-const TARGET_ALL: i64 = 959;
+const TARGET_ALL: i64 = 1983;
 const IS_REPEATABLE: i64 = 64;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -37,6 +37,7 @@ pub(crate) enum AttributeTarget {
     TypeAlias,
     Newtype,
     Constant,
+    File,
 }
 
 impl AttributeTarget {
@@ -51,6 +52,7 @@ impl AttributeTarget {
             Self::TypeAlias => 128,
             Self::Newtype => 256,
             Self::Constant => 512,
+            Self::File => 1024,
         }
     }
 
@@ -65,6 +67,7 @@ impl AttributeTarget {
             Self::TypeAlias => "type aliases",
             Self::Newtype => "newtypes",
             Self::Constant => "constants",
+            Self::File => "files",
         }
     }
 }
@@ -74,6 +77,16 @@ impl Engine {
         &mut self,
         unit: &Rc<CompiledUnit>,
     ) -> Result<(), VirtualMachineControl> {
+        for file in &unit.files {
+            let path = file.path.as_ref().unwrap_or(&unit.path);
+            self.validate_attribute_applications(
+                &file.attributes,
+                &path.to_string_lossy(),
+                AttributeTarget::File,
+                &unit.path,
+            )?;
+        }
+
         for class in &unit.classes {
             self.validate_class_attributes(class, &unit.path)?;
         }

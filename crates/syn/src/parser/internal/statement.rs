@@ -47,6 +47,9 @@ where
                 ));
             }
             TokenKind::HashLeftBracket => return self.parse_attributed_statement(),
+            TokenKind::HashBangLeftBracket => {
+                Statement::FileAttributeList(self.parse_file_attribute_list()?)
+            }
             TokenKind::Namespace if self.at_namespace_declaration()? => {
                 Statement::Namespace(self.parse_namespace()?)
             }

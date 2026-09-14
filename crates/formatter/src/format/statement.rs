@@ -62,6 +62,7 @@ where
 {
     fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
         match self {
+            Statement::FileAttributeList(node) => node.format(f),
             Statement::Namespace(node) => node.format(f),
             Statement::Use(node) => node.format(f),
             Statement::Class(node) => node.format(f),

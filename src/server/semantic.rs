@@ -287,7 +287,7 @@ fn lexical_role(kind: TokenKind) -> Option<u32> {
         TokenKind::Variable => Some(VARIABLE),
         TokenKind::LiteralString | TokenKind::StringPart => Some(STRING),
         TokenKind::LiteralInteger | TokenKind::LiteralFloat => Some(NUMBER),
-        TokenKind::HashLeftBracket => Some(DECORATOR),
+        TokenKind::HashLeftBracket | TokenKind::HashBangLeftBracket => Some(DECORATOR),
         TokenKind::Bool
         | TokenKind::Int
         | TokenKind::Float

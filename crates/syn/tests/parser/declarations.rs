@@ -16,6 +16,30 @@ use crate::program;
 use crate::statement;
 
 #[test]
+fn file_attribute_lists_are_statements_with_their_own_delimiters() {
+    let arena = LocalArena::new();
+    let parsed = program(
+        &arena,
+        "#![A, B(value: 'file'),]\n#[C] function f() { #![D] }",
+    );
+    let Statement::FileAttributeList(list) = &parsed.statements[0] else {
+        panic!("expected file attributes");
+    };
+    assert_eq!(list.hash_bang_left_bracket.start.offset, 0);
+    assert_eq!(list.hash_bang_left_bracket.end.offset, 3);
+    assert_eq!(list.attributes.len(), 2);
+    assert_eq!(list.attributes.as_slice()[1].name.value(), "B");
+    let Statement::Function(function) = &parsed.statements[1] else {
+        panic!("expected a function");
+    };
+    assert_eq!(function.attribute_lists.len(), 1);
+    assert!(matches!(
+        function.body.statements[0],
+        Statement::FileAttributeList(_)
+    ));
+}
+
+#[test]
 fn function_declaration_with_typed_params_and_return_type() {
     let arena = LocalArena::new();
     let Statement::Function(function) = statement(

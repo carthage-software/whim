@@ -118,7 +118,7 @@ foreach (files_with_suffix($root . '/lib/src', '.whim') as $file) {
 
 $missing = vec[];
 foreach ($namespaces as $namespace) {
-  if (!Str\contains($index, '| `' . $namespace . '` |')) {
+  if (!Str\contains($index, '| `' . $namespace . '`')) {
     $missing[] = $namespace;
   }
 }

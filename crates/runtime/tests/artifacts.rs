@@ -114,6 +114,70 @@ fn artifact_atoms_outlive_the_encoded_input() {
 }
 
 #[test]
+fn artifact_file_attributes_remain_separate_and_keep_initializer_thunks() {
+    for optimize in [false, true] {
+        let mut compiler = Engine::new(EngineConfiguration::default());
+        let artifact = compiler
+            .compile_artifact(
+                "/attributes/bundle.whim",
+                &[
+                    SourceFile::new(
+                        "/attributes/first.whim",
+                        r"
+namespace Metadata;
+use Whim\Attribute\Attribute;
+#[Attribute(Attribute::TARGET_FILE)]
+class Tag { public function __construct(public string $name, public mixed $value = null) {} }
+#![Tag('first', fn(): int => 42)]
+",
+                    ),
+                    SourceFile::new(
+                        "/attributes/second.whim",
+                        r"
+use Metadata\Tag as Label;
+#![Label(name: 'second' . ' file', value: vec[1, 2])]
+",
+                    ),
+                    SourceFile::new(
+                        "/attributes/check.whim",
+                        r"
+use Whim\Reflection;
+$first = Reflection\reflect_class('Metadata\\Tag')->getFile();
+$second = Reflection\reflect_file('/attributes/second.whim');
+assert!(!$first->hasTopLevelCode());
+assert!(!$second->hasTopLevelCode());
+assert!($first->getOrigin() == Reflection\DeclarationOrigin::Extension);
+assert!($first->getLocation() == null);
+assert!(length!($first->getAttributes()) == 1);
+assert!(length!($second->getAttributes()) == 1);
+$firstAttribute = $first->getAttributes()[0];
+assert!($firstAttribute->newInstance()->name == 'first');
+$callback = $firstAttribute->newInstance()->value;
+assert!($callback() == 42);
+assert!($firstAttribute->getTarget()->getPath() == '/attributes/first.whim');
+assert!($firstAttribute->getLocation() == null);
+$secondAttribute = $second->getAttributes()[0];
+assert!($secondAttribute->newInstance()->name == 'second file');
+assert!($secondAttribute->newInstance()->value == vec[1, 2]);
+assert!($secondAttribute->getTarget()->getPath() == '/attributes/second.whim');
+",
+                    ),
+                ],
+                ArtifactConfiguration {
+                    optimize,
+                    ..ArtifactConfiguration::default()
+                },
+            )
+            .expect("file attributes compile into the artifact")
+            .into_bytes();
+        let mut engine = Engine::new(EngineConfiguration::default());
+        engine
+            .load_artifact(&artifact)
+            .expect("file attributes reflect from the artifact");
+    }
+}
+
+#[test]
 fn artifact_loading_rejects_trailing_bytes() {
     let mut artifact = compile("", "/artifact/empty.whim");
     artifact.push(0);

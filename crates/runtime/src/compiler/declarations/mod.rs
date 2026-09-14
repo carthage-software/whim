@@ -21,6 +21,7 @@ use whim_syn::cst::r#type::TypeAlias;
 
 use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
+use crate::bytecode::unit::CompiledAttribute;
 use crate::bytecode::unit::CompiledConstant;
 use crate::bytecode::unit::CompiledNewtype;
 use crate::bytecode::unit::CompiledTypeAlias;
@@ -46,6 +47,7 @@ use crate::compiler::types::rendering::render_type;
 use crate::value::heap::Heap;
 
 pub(in crate::compiler) mod class_likes;
+mod file_attributes;
 pub(in crate::compiler) mod functions;
 pub(in crate::compiler) mod generics;
 mod members;
@@ -67,6 +69,7 @@ pub(in crate::compiler) struct Region<'source, 'arena> {
     pub(in crate::compiler) resolver: Resolver,
     pub(in crate::compiler) declared_names: HashSet<String>,
     pub(in crate::compiler) main_statements: Vec<(&'source Statement<'arena>, Resolver)>,
+    pub(in crate::compiler) file_attributes: Vec<CompiledAttribute>,
 }
 
 #[derive(Clone, Copy)]
@@ -79,6 +82,7 @@ pub(in crate::compiler::declarations) struct Array<'compilation, 'arena> {
     generics: &'compilation GenericTable<'arena>,
     embedded_files: &'compilation EmbeddedFiles,
     trusted_returns: bool,
+    has_file_attributes: bool,
 }
 
 pub(in crate::compiler) fn collect<'source, 'arena>(
@@ -97,6 +101,9 @@ pub(in crate::compiler) fn collect<'source, 'arena>(
         generics: compilation.generics,
         embedded_files: compilation.embedded_files,
         trusted_returns: compilation.trusted_return_types,
+        has_file_attributes: program.source_text
+            [program.span.start.offset as usize..program.span.end.offset as usize]
+            .contains("#!["),
     };
     let mut regions = Vec::new();
     collect_statements(
@@ -122,10 +129,16 @@ fn collect_statements<'source, 'arena>(
         resolver,
         declared_names: HashSet::new(),
         main_statements: Vec::new(),
+        file_attributes: Vec::new(),
     };
 
     for statement in statements {
+        if context.has_file_attributes && !matches!(statement, Statement::Namespace(_)) {
+            file_attributes::collect(context, statement, &mut region, unit)?;
+        }
+
         match statement {
+            Statement::FileAttributeList(_) => {}
             Statement::Namespace(namespace) => {
                 collect_namespace(context, namespace, &mut region, aliases, unit, regions)?;
             }
@@ -566,6 +579,7 @@ fn collect_namespace<'source, 'arena>(
         resolver: region.resolver.clone(),
         declared_names: region.declared_names.clone(),
         main_statements: Vec::new(),
+        file_attributes: Vec::new(),
     };
     regions.push(mem::replace(region, resumed));
     collect_statements(

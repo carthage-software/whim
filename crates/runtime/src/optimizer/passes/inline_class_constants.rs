@@ -53,6 +53,10 @@ pub(in crate::optimizer) fn optimize_unit(
     }
 
     optimize_chunk(&mut unit.main, &constants, statistics);
+    for file in &mut unit.files {
+        optimize_attributes(&mut file.attributes, &constants, statistics);
+    }
+
     let function_floor = configuration.function_floor(unit.functions.len());
     for function in &mut unit.functions[function_floor..] {
         optimize_attributes(&mut function.attributes, &constants, statistics);

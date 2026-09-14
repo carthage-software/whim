@@ -6,6 +6,7 @@ use whim_span::Span;
 use whim_syn::cst::atom::Literal;
 use whim_syn::cst::call::Argument;
 use whim_syn::cst::construct::Construct;
+use whim_syn::cst::declaration::Attribute;
 use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::function::Function;
@@ -546,48 +547,59 @@ pub(in crate::compiler) fn compile_attributes(
                 attribute.span(),
             )?;
 
-            let mut arguments = Vec::new();
-            let mut named_arguments = Vec::new();
-            if let Some(argument_list) = &attribute.argument_list {
-                for argument in &argument_list.arguments {
-                    match argument {
-                        Argument::Positional(positional) => {
-                            rules::check_constant_expression(positional.value)?;
-                            arguments.push(compile_initializer(
-                                heap,
-                                scope,
-                                positional.value,
-                                path,
-                                source_text,
-                                context,
-                            )?);
-                        }
-                        Argument::Named(named) => {
-                            rules::check_constant_expression(named.value)?;
-                            named_arguments.push((
-                                heap.intern(named.name.value.as_bytes()),
-                                compile_initializer(
-                                    heap,
-                                    scope,
-                                    named.value,
-                                    path,
-                                    source_text,
-                                    context,
-                                )?,
-                            ));
-                        }
-                    }
-                }
-            }
-
-            attributes.push(CompiledAttribute {
-                class: scope.resolver.resolve(heap, &attribute.name),
-                span: attribute.span(),
-                arguments,
-                named_arguments,
-            });
+            attributes.push(compile_attribute(
+                heap,
+                scope,
+                attribute,
+                path,
+                source_text,
+                context,
+            )?);
         }
     }
 
     Ok(attributes)
+}
+
+pub(in crate::compiler) fn compile_attribute(
+    heap: &Heap,
+    scope: &Scope<'_>,
+    attribute: &Attribute<'_>,
+    path: &str,
+    source_text: &str,
+    context: &mut DeclarationContext<'_>,
+) -> Result<CompiledAttribute, CompileError> {
+    let mut arguments = Vec::new();
+    let mut named_arguments = Vec::new();
+    if let Some(argument_list) = &attribute.argument_list {
+        for argument in &argument_list.arguments {
+            match argument {
+                Argument::Positional(positional) => {
+                    rules::check_constant_expression(positional.value)?;
+                    arguments.push(compile_initializer(
+                        heap,
+                        scope,
+                        positional.value,
+                        path,
+                        source_text,
+                        context,
+                    )?);
+                }
+                Argument::Named(named) => {
+                    rules::check_constant_expression(named.value)?;
+                    named_arguments.push((
+                        heap.intern(named.name.value.as_bytes()),
+                        compile_initializer(heap, scope, named.value, path, source_text, context)?,
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(CompiledAttribute {
+        class: scope.resolver.resolve(heap, &attribute.name),
+        span: attribute.span(),
+        arguments,
+        named_arguments,
+    })
 }

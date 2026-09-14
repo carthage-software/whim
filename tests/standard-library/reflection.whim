@@ -415,7 +415,7 @@ $definition = Reflection\reflect_class(
 assert!($definition != null);
 assert!($definition->getClass()->getName() == 'ReflectionTest\\Tag');
 assert!($definition->isRepeatable());
-assert!(length!($definition->getTargets()) == 9);
+assert!(length!($definition->getTargets()) == 10);
 assert!($definition->getTargets()[0] == Target::Class);
 
 // Callable declarations, parameters, and literal defaults.

@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
@@ -5,6 +7,7 @@ use crate::bytecode::unit::is_external;
 use crate::core::reflection::Operation;
 use crate::core::reflection::functions::symbol_kind_argument;
 use crate::core::reflection::metadata;
+use crate::core::reflection::model::DeclarationKey;
 use crate::core::reflection::objects;
 use crate::symbols::UnitContext;
 use crate::value::Value;
@@ -13,16 +16,26 @@ pub(crate) fn dispatch(
     context: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
     operation: Operation,
-    unit: &UnitContext,
+    unit: &Rc<UnitContext>,
     position: usize,
 ) -> Result<Value, Throw> {
+    let declaration = DeclarationKey::File {
+        unit: Rc::clone(unit),
+        position,
+    };
+
+    if let Some(result) =
+        metadata::declaration_dispatch(context, arguments, operation, &declaration)
+    {
+        return result;
+    }
+
     let file = &unit.unit.files[position];
     match operation {
         Operation::Path => Ok(file
             .path
             .as_ref()
             .map_or_else(Value::null, |path| Value::string(path.to_handle()))),
-        Operation::Origin => metadata::reflect_origin(context, Some(unit.origin)),
         Operation::HasTopLevelCode => Ok(Value::bool(file.has_top_level_code)),
         Operation::Symbols => symbols(context, arguments, unit, position),
         _ => Err(context.type_error("the operation is not valid for a reflected file")),

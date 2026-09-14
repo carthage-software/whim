@@ -12,7 +12,7 @@ pub(crate) const TARGET_CLASS: i64 = 1;
 pub(crate) const TARGET_CALLABLE: i64 = 6;
 pub(crate) const TARGET_PARAMETER: i64 = 32;
 pub(crate) const TARGET_SYMBOL: i64 = 899;
-pub(crate) const TARGET_ALL: i64 = 959;
+pub(crate) const TARGET_ALL: i64 = 1983;
 
 #[whim_class("Whim\\Attribute\\Attribute", final, attribute = 1)]
 #[whim_property("public readonly int $flags")]
@@ -26,8 +26,9 @@ pub(crate) const TARGET_ALL: i64 = 959;
 #[whim_class_like_constant("TARGET_TYPE_ALIAS", "int", visibility = "public", literal = 128)]
 #[whim_class_like_constant("TARGET_NEWTYPE", "int", visibility = "public", literal = 256)]
 #[whim_class_like_constant("TARGET_CONSTANT", "int", visibility = "public", literal = 512)]
+#[whim_class_like_constant("TARGET_FILE", "int", visibility = "public", literal = 1024)]
 #[whim_class_like_constant("TARGET_SYMBOL", "int", visibility = "public", literal = 899)]
-#[whim_class_like_constant("TARGET_ALL", "int", visibility = "public", literal = 959)]
+#[whim_class_like_constant("TARGET_ALL", "int", visibility = "public", literal = 1983)]
 struct Attribute;
 
 #[whim_methods]

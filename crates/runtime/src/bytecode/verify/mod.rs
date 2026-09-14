@@ -285,6 +285,18 @@ fn verify_catch_table(chunk: &Chunk) -> Result<(), VerifyError> {
 }
 
 pub(crate) fn verify_unit(unit: &CompiledUnit) -> Result<(), VerifyError> {
+    for file in &unit.files {
+        for attribute in &file.attributes {
+            for argument in &attribute.arguments {
+                verify_initializer(argument)?;
+            }
+
+            for (_, argument) in &attribute.named_arguments {
+                verify_initializer(argument)?;
+            }
+        }
+    }
+
     verify(&unit.main)?;
     for function in &unit.functions {
         verify_function(function)?;

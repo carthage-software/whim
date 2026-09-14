@@ -1,0 +1,133 @@
+namespace FileMetadata {
+  use Whim\Attribute\Attribute;
+
+  #[Attribute(Attribute::TARGET_FILE | Attribute::IS_REPEATABLE)]
+  final class Tag {
+    public static int $instances = 0;
+
+    public function __construct(
+      public string $name,
+      public mixed $value = null,
+    ) {
+      self::$instances++;
+    }
+  }
+
+  #[Attribute]
+  final class Everywhere {}
+}
+
+#![FileMetadata\Tag('root', 2 + 3), FileMetadata\Everywhere]
+
+namespace FileMetadata\App {
+  use FileMetadata\Tag as Label;
+  use Whim\Reflection;
+
+  const NAME = 'namespace';
+
+  #![Label(
+    value: vec[1, 2],
+    name: NAME,
+  )]
+
+  function uncalled(): void {
+    #![Label('function')]
+    if (false) {
+      #![Label('nested')]
+    }
+  }
+
+  class Host {
+    public function uncalled(): void {
+      #![Label('method')]
+    }
+  }
+
+  const CALLBACK = fn(): int {
+    #![Label('constant closure')]
+    return 7;
+  };
+
+  function with_default(fn(): int $callback = fn(): int {
+    #![Label('default closure')]
+    return 8;
+  }): int {
+    return $callback();
+  }
+
+  $closure = fn(): int {
+    #![Label('closure')]
+    return 9;
+  };
+
+  if (false) {
+    #![Label('false branch')]
+  }
+
+  #![Label('closure argument', fn(): int {
+    #![Label('inside argument')]
+    return 10;
+  })]
+
+  $function = Reflection\reflect_function('FileMetadata\\App\\uncalled');
+  $file = $function->getFile();
+  assert!($file is Reflection\DeclarationReflection);
+  assert!($function->getAttributes() == vec[]);
+  assert!($file->getOrigin() == Reflection\DeclarationOrigin::User);
+  assert!($file->getLocation()->getFile() == $file->getPath());
+  assert!($file->getDocumentation() == null);
+  $attributes = $file->getAttributes::<Label>();
+  assert!(Label::$instances == 0);
+  assert!(length!($file->getAttributes()) == length!($attributes) + 1);
+  assert!(
+    length!($file->getAttributesByName('FileMetadata\\Tag'))
+    == length!($attributes),
+  );
+
+  assert!($file->getAttributesByName('Missing') == vec[]);
+  $names = vec[];
+  foreach ($attributes as $attribute) {
+    $names[] = $attribute->newInstance()->name;
+    assert!($attribute->getTarget() is Reflection\FileReflection);
+    assert!($attribute->getTarget()->getPath() == $file->getPath());
+    assert!($attribute->getLocation()->getFile() == $file->getPath());
+  }
+
+  assert!(
+    $names == vec[
+      'root',
+      'namespace',
+      'function',
+      'nested',
+      'method',
+      'constant closure',
+      'default closure',
+      'closure',
+      'false branch',
+      'closure argument',
+      'inside argument',
+    ],
+  );
+
+  assert!(Label::$instances == length!($attributes));
+  assert!($attributes[0]->getArguments() == vec['root', 5]);
+  assert!($attributes[1]->getArguments() == vec[]);
+  assert!(
+    $attributes[1]->getNamedArguments() == dict[
+      'value' => vec[1, 2],
+      'name' => 'namespace',
+    ],
+  );
+
+  $callback = $attributes[9]->newInstance()->value;
+  assert!($callback() == 10);
+  assert!((CALLBACK)() == 7);
+  assert!(with_default() == 8);
+  assert!($closure() == 9);
+  assert!(length!($file->getAttributes::<Label>()) == length!($attributes));
+  $definition = Reflection\reflect_class(
+    'FileMetadata\\Tag',
+  )->getAttributeDefinition();
+
+  assert!($definition->getTargets() == vec[Reflection\Attribute\Target::File]);
+}

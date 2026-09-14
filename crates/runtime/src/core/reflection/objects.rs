@@ -60,6 +60,9 @@ pub(crate) fn declaration(
     declaration: DeclarationKey,
 ) -> Result<Value, Throw> {
     match declaration {
+        DeclarationKey::File { unit, position } => {
+            build(context, ReflectionData::File { unit, position }, Vec::new())
+        }
         DeclarationKey::Symbol(name) => symbol(context, name),
         DeclarationKey::Member(member) => {
             build(context, ReflectionData::Member(member), Vec::new())

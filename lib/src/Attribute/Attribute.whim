@@ -17,8 +17,9 @@ final class Attribute {
   public const int TARGET_TYPE_ALIAS = 128;
   public const int TARGET_NEWTYPE = 256;
   public const int TARGET_CONSTANT = 512;
+  public const int TARGET_FILE = 1024;
   public const int TARGET_SYMBOL = 899;
-  public const int TARGET_ALL = 959;
+  public const int TARGET_ALL = 1983;
 
   public readonly int $flags;
 

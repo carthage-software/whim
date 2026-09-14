@@ -14,6 +14,8 @@ The notation uses:
 ```text
 attributes      := attribute-list+
 attribute-list  := "#[" attribute ("," attribute)* ","? "]"
+file-attribute-list
+                := "#![" attribute ("," attribute)* ","? "]"
 attribute       := qualified-name call-arguments?
 
 qualified-name  := "\\"? identifier ("\\" identifier)*
@@ -197,6 +199,7 @@ See [Aliases and Newtypes](../core-library/functions-and-constants.md).
 
 ```text
 statement       := ";"
+                 | file-attribute-list
                  | expression ";"
                  | if-statement
                  | while-statement

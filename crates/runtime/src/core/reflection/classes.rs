@@ -328,9 +328,10 @@ reflection_class! {
 }
 
 reflection_class! {
-    FileReflection = "Whim\\Reflection\\FileReflection" {
+    FileReflection = "Whim\\Reflection\\FileReflection"
+    implements ["Whim\\Reflection\\DeclarationReflection"]
+    with [declaration] {
         get_path: "getPath(): null|string" => Path;
-        get_origin: "getOrigin(): Whim\\Reflection\\DeclarationOrigin" => Origin;
         get_symbols: "getSymbols(null|Whim\\Symbol\\SymbolKind $kind = null): vec<Whim\\Reflection\\Symbol\\SymbolReflection>" => Symbols;
         has_top_level_code: "hasTopLevelCode(): bool" => HasTopLevelCode;
     }

@@ -123,6 +123,10 @@ fn location(
 }
 
 fn documentation(context: &Context<'_, '_, '_>, declaration: &DeclarationKey) -> Value {
+    if matches!(declaration, DeclarationKey::File { .. }) {
+        return Value::null();
+    }
+
     let metadata = support::declaration_metadata(context.vm, declaration);
     let (Some(unit), Some(span)) = (metadata.unit.as_deref(), metadata.span) else {
         return Value::null();

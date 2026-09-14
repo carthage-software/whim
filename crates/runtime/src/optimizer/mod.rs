@@ -471,6 +471,10 @@ fn optimize_declarations(
 ) {
     optimize_chunk(&mut unit.main, allocator, configuration, statistics);
 
+    for file in &mut unit.files {
+        optimize_attributes(&mut file.attributes, allocator, configuration, statistics);
+    }
+
     let function_floor = configuration.function_floor(unit.functions.len());
     for function in &mut unit.functions[function_floor..] {
         optimize_function(

@@ -22,7 +22,8 @@ assert!(Attribute::TARGET_PROPERTY == 8);
 assert!(Attribute::TARGET_CLASS_CONSTANT == 16);
 assert!(Attribute::TARGET_PARAMETER == 32);
 assert!(Attribute::TARGET_TYPE_ALIAS == 128);
-assert!(Attribute::TARGET_ALL == 959);
+assert!(Attribute::TARGET_FILE == 1024);
+assert!(Attribute::TARGET_ALL == 1983);
 assert!(Attribute::IS_REPEATABLE == 64);
 
 $assertion_value_27 = fn(): void {
@@ -142,7 +143,7 @@ foreach (vec[
   $definition = Reflection\reflect_class($control)?->getAttributeDefinition();
   assert!($definition != null);
   assert!($definition->isRepeatable());
-  assert!(length!($definition->getTargets()) == 9);
+  assert!(length!($definition->getTargets()) == 10);
 }
 
 class LintAttributeParameters {

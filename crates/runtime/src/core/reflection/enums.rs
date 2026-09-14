@@ -32,6 +32,8 @@ pub(crate) enum AttributeTarget {
     Newtype,
     #[whim_case("Constant")]
     Constant,
+    #[whim_case("File")]
+    File,
 }
 
 #[whim_enum("Whim\\Reflection\\Callable\\CallableKind")]

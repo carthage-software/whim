@@ -125,6 +125,7 @@ use crate::cst::control_flow::While;
 use crate::cst::declaration::Attribute;
 use crate::cst::declaration::AttributeList;
 use crate::cst::declaration::Constant;
+use crate::cst::declaration::FileAttributeList;
 use crate::cst::declaration::Namespace;
 use crate::cst::declaration::NamespaceBody;
 use crate::cst::declaration::NamespaceImplicitBody;
@@ -289,6 +290,7 @@ define_nodes! {
     TypeAlias(TypeAlias<'arena>),
     Newtype(Newtype<'arena>),
     AttributeList(AttributeList<'arena>),
+    FileAttributeList(FileAttributeList<'arena>),
     Attribute(Attribute<'arena>),
     Class(Class<'arena>),
     Interface(Interface<'arena>),

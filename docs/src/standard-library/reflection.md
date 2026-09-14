@@ -15,6 +15,11 @@ A file reflection provides:
 - `getPath()`: the recorded source path, or `null` for an anonymous input such
   as standard input.
 - `getOrigin()`: the file's `DeclarationOrigin`, matching its symbols' origin.
+- `getLocation()`: the whole source span for a user file with a path, or `null`
+  otherwise.
+- `getAttributes::<T>()` and `getAttributesByName($class)`: file attributes in
+  source order. Each attribute's `getTarget()` returns its `FileReflection`.
+- `getDocumentation()`: `null`; files have no declaration documentation.
 - `getSymbols($kind = null)`: the file's named symbols, sorted by fully
   qualified name. Pass a `Whim\Symbol\SymbolKind` to select one kind.
 - `hasTopLevelCode()`: whether the source contains executable statements
@@ -52,9 +57,13 @@ separate symbols in this list. Files without named symbols still appear in
 
 The compiler records `hasTopLevelCode()` before optimization. Unreachable
 statements still count, even if optimization removes them. Imports,
-declarations, and empty statements do not count. Initializers within
-declarations do not count either, so this flag does not guarantee that loading
-the file has no side effects.
+declarations, file attributes, and empty statements do not count. Initializers
+within declarations do not count either, so this flag does not guarantee that
+loading the file has no side effects.
+
+`FileReflection` implements `DeclarationReflection`. The
+[attribute syntax](../language/attributes.md#file-attributes) for files is
+`#![...]`; the target flag is `Attribute::TARGET_FILE`.
 
 ## Find declarations
 

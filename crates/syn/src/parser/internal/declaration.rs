@@ -9,6 +9,7 @@ use crate::cst::atom::Identifier;
 use crate::cst::declaration::Attribute;
 use crate::cst::declaration::AttributeList;
 use crate::cst::declaration::Constant;
+use crate::cst::declaration::FileAttributeList;
 use crate::cst::declaration::Namespace;
 use crate::cst::declaration::NamespaceBody;
 use crate::cst::declaration::NamespaceImplicitBody;
@@ -251,6 +252,21 @@ where
 
         Ok(AttributeList {
             hash_left_bracket,
+            attributes,
+            right_bracket,
+        })
+    }
+
+    pub(crate) fn parse_file_attribute_list(
+        &mut self,
+    ) -> Result<FileAttributeList<'arena>, ParseError> {
+        let hash_bang_left_bracket = self.expect_span(TokenKind::HashBangLeftBracket)?;
+        let attributes =
+            self.parse_comma_separated_until(TokenKind::RightBracket, Self::parse_attribute)?;
+        let right_bracket = self.expect_span(TokenKind::RightBracket)?;
+
+        Ok(FileAttributeList {
+            hash_bang_left_bracket,
             attributes,
             right_bracket,
         })

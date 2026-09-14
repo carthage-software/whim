@@ -34,6 +34,7 @@ macro_rules! reflection_interface {
 
 reflection_interface! {
     #[whim_permits(
+        "Whim\\Reflection\\FileReflection",
         "Whim\\Reflection\\Symbol\\SymbolReflection",
         "Whim\\Reflection\\Symbol\\ClassLikeReflection",
         "Whim\\Reflection\\Generic\\GenericDeclarationReflection",

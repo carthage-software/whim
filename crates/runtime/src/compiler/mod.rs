@@ -187,10 +187,27 @@ pub(crate) fn compile_program_into_unit<'arena>(
     unit: &mut CompiledUnit,
     compilation: &mut Compilation<'_, 'arena>,
 ) -> Result<Chunk, CompileError> {
-    let regions = declarations::collect(heap, program, path, unit, compilation)?;
+    let mut regions = declarations::collect(heap, program, path, unit, compilation)?;
+    let mut attributes = Vec::new();
+    for region in &mut regions {
+        attributes.append(&mut region.file_attributes);
+    }
+
+    attributes.sort_unstable_by_key(|attribute| attribute.span.start.offset);
+    limits::check_count(
+        error::CompileErrorKind::TooManyAttributes,
+        "one file may carry",
+        "attributes",
+        attributes.len(),
+        attributes
+            .last()
+            .map_or_else(|| program.span(), |attribute| attribute.span),
+    )?;
+
     unit.files.push(CompiledFile {
         path: (!path.runtime.is_empty() && path.runtime != b"-").then(|| heap.intern(path.runtime)),
         span: program.span(),
+        attributes,
         has_top_level_code: regions.iter().any(|region| {
             region
                 .main_statements

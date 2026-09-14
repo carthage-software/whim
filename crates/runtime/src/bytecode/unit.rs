@@ -501,6 +501,7 @@ pub(crate) struct CompiledFile {
     #[seeded(with(serde_seeded::unseeded))]
     pub span: Span,
     pub has_top_level_code: bool,
+    pub attributes: Vec<CompiledAttribute>,
 }
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]

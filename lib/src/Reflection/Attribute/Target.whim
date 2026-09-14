@@ -15,4 +15,5 @@ enum Target implements UnitEnum {
   case TypeAlias;
   case Newtype;
   case Constant;
+  case File;
 }
