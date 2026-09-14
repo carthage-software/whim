@@ -28,21 +28,6 @@ Install **Whim Language Support** (`whim-lang`) from Zed's Extensions page:
 
 The extension's source is available in the [Whim Zed repository](https://github.com/carthage-software/whim-zed).
 
-If you use version 0.1.0, add this to Zed's settings for full highlighting:
-
-```json
-{
-  "languages": {
-    "Whim": {
-      "semantic_tokens": "full"
-    }
-  }
-}
-```
-
-Later versions use the full Tree-sitter Whim grammar and do not need this
-setting.
-
 ## Helix
 
 Add this to `~/.config/helix/languages.toml`:
@@ -70,7 +55,7 @@ args = ["language-server"]
 
 [[grammar]]
 name = "whim"
-source = { git = "https://github.com/carthage-software/tree-sitter-whim", rev = "99e550efd095bf0b0f782e096b0ed6136bebaf47" }
+source = { git = "https://github.com/carthage-software/tree-sitter-whim", rev = "80d6e34e1f9b0c8cb1c23377cc276cf82e62f3d3" }
 ```
 
 `use-grammars` keeps the grammar commands limited to Whim. If the file already sets it, add `"whim"` to its existing list instead.
