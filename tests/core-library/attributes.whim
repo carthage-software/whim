@@ -4,6 +4,15 @@ use Whim\Reflection;
 use Whim\Unwind\ArgumentCountError;
 use Whim\Unwind\Error;
 
+#![Allow('no-debug-symbols')]
+#![Warn(
+  rule: 'no-redundant-variable',
+  reason: 'Test fixture',
+)]
+
+#![Deny('no-self-assignment')]
+#![Forbid('no-multi-assignments')]
+
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_FUNCTION)]
 final class Deprecated {
   public function __construct(public readonly string $reason = '') {}
@@ -88,6 +97,25 @@ function lint_attributes(): string {
 assert!(lint_attributes() == 'checked');
 $linted = Reflection\reflect_function('lint_attributes');
 assert!($linted != null);
+$file = $linted->getFile();
+assert!(
+  $file->getAttributes::<Allow>()[0]->newInstance()->rule == 'no-debug-symbols',
+);
+
+assert!(
+  $file->getAttributes::<Warn>()[0]->newInstance()->reason == 'Test fixture',
+);
+
+assert!(
+  $file->getAttributes::<Deny>()[0]->newInstance()->rule
+  == 'no-self-assignment',
+);
+
+assert!(
+  $file->getAttributes::<Forbid>()[0]->newInstance()->rule
+  == 'no-multi-assignments',
+);
+
 $allowed = $linted->getAttributes::<Allow>();
 assert!(length!($allowed) == 2);
 assert!($allowed[0]->newInstance()->rule == 'no-debug-symbols');

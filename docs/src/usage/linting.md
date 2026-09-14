@@ -28,14 +28,14 @@ whim lint --json src/ > lint.json
 
 Each entry contains:
 
-| Field      | Value                                                                              |
-| ---------- | ---------------------------------------------------------------------------------- |
-| `path`     | Source path, using the same spelling as text output                                |
+| Field      | Value                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------- |
+| `path`     | Source path, using the same spelling as text output                                               |
 | `code`     | Rule code, `lint-attribute` for an invalid lint attribute, or `syntax` or `read` for a file error |
-| `level`    | `error`, `warning`, `info`, `note`, or `help`                                      |
-| `message`  | Diagnostic message                                                                 |
-| `span`     | `start` and `end` objects, each with a byte `offset`; `null` for read errors       |
-| `rendered` | Full plain-text diagnostic, including annotations and help; `null` for read errors |
+| `level`    | `error`, `warning`, `info`, `note`, or `help`                                                     |
+| `message`  | Diagnostic message                                                                                |
+| `span`     | `start` and `end` objects, each with a byte `offset`; `null` for read errors                      |
+| `rendered` | Full plain-text diagnostic, including annotations and help; `null` for read errors                |
 
 Offsets start at zero, and the end offset is exclusive. They count UTF-8 bytes,
 not characters. The array follows file discovery order and is empty (`[]`) when
@@ -146,9 +146,31 @@ scope, not calls or inheritance.
 
 All four attributes are repeatable. They support classes, interfaces, enums,
 functions, methods, closures, parameters, properties, constants, enum cases,
-type aliases, and newtypes. Each takes a required `string $rule` and an optional
-`null|string $reason = null`, both exposed as public properties. Use one
-attribute per rule. File-level attributes are not yet supported.
+type aliases, newtypes, and files. Each takes a required `string $rule` and an
+optional `null|string $reason = null`, both exposed as public properties.
+Use one attribute per rule.
+
+Use `#![...]` to set a rule's level for the whole file:
+
+```whim
+namespace App;
+
+use Whim\Lint\Allow;
+
+#![Allow(
+  rule: 'no-debug-symbols',
+  reason: 'This script inspects runtime values',
+)]
+
+debug!(vec[1, 2, 3]);
+```
+
+File settings cover all code and comments in the file, including code before
+the attribute and code in other namespaces. File attributes follow source
+order, and each name uses the namespace and imports at its location.
+Declaration attributes override file `Allow`, `Warn`, or `Deny` settings,
+even when the file attribute appears later. A file `Forbid` prevents any
+declaration or later file attribute from lowering the level.
 
 Arguments may use positions or names. Named arguments can appear in either
 order, and a positional rule can be followed by `reason: ...`. The reason
@@ -174,9 +196,10 @@ error. These errors cannot be suppressed or lowered by another attribute or
 by rule settings.
 
 Project settings supply the starting policy. `Warn`, `Deny`, or `Forbid` can
-enable a disabled rule within a declaration. File and per-rule exclusions still
-apply. The CLI and language server use the same attribute rules, and
-`minimum_fail_level` still determines whether a warning fails the command.
+enable a disabled rule within a declaration or file. File and per-rule
+exclusions still apply. The CLI and language server use the same attribute
+rules, and `minimum_fail_level` still determines whether a warning fails the
+command.
 
 ## Settings
 

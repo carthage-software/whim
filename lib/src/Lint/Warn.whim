@@ -2,7 +2,7 @@ namespace Whim\Lint;
 
 use Whim\Attribute\Attribute;
 
-/** Reports one lint rule as a warning within the declaration. */
+/** Reports one lint rule as a warning within the target file or declaration. */
 #[Attribute(Attribute::TARGET_ALL | Attribute::IS_REPEATABLE)]
 final class Warn {
   public function __construct(

@@ -318,13 +318,15 @@ function warned(): void { debug!(2); }
 function denied(): void { debug!(3); }
 #[Whim\Lint\Allow(reason: 'Test fixture', rule: UNKNOWN)]
 function broken(): void {}
+debug!(4);
+#![Whim\Lint\Warn('no-debug-symbols')]
 ";
     fixture.write("source.whim", source);
     let (server, _connection, _client) = start(json!({"rootUri": fixture.uri("")}), None);
     let diagnostics = server
         .document_diagnostics(&fixture.uri("source.whim"))
         .unwrap();
-    assert_eq!(diagnostics.len(), 3);
+    assert_eq!(diagnostics.len(), 4);
     assert_eq!(
         diagnostics[0].code,
         Some(lsp_types::NumberOrString::String("lint-attribute".into()))
@@ -337,4 +339,5 @@ function broken(): void {}
     );
     assert_eq!(diagnostics[1].severity, Some(DiagnosticSeverity::WARNING));
     assert_eq!(diagnostics[2].severity, Some(DiagnosticSeverity::ERROR));
+    assert_eq!(diagnostics[3].severity, Some(DiagnosticSeverity::WARNING));
 }

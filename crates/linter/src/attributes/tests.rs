@@ -13,6 +13,7 @@ use crate::rule::NoInsecureComparisonRule;
 use crate::rule::NoLiteralPasswordRule;
 use crate::rule::NoRedundantReadonlyRule;
 use crate::rule::SensitiveParameterRule;
+use crate::rule::TaggedTodoRule;
 use crate::settings::Settings;
 use crate::test_lint_failure;
 use crate::test_lint_success;
@@ -288,21 +289,127 @@ test_lint_success! {
     code = r"#[Whim\Lint\Allow('sensitive-parameter')] function f(string $token): void {}",
 }
 
+test_lint_success! {
+    name = file_allow_covers_earlier_code_and_other_namespaces,
+    rule = NoDebugSymbolsRule,
+    code = r"debug!(1); namespace A { function f(): void { debug!(2); } } namespace B; use Whim\Lint as L; #![L\Allow(reason: null, rule: ('no-' . 'debug-symbols'))] debug!(3);",
+}
+
+test_lint_success! {
+    name = file_allow_covers_comments_outside_declarations,
+    rule = TaggedTodoRule,
+    code = r"// TODO: first
+#[Whim\Lint\Allow('no-debug-symbols')] function f(): void {}
+// TODO: between declarations
+#![Whim\Lint\Allow('tagged-todo')]
+// TODO: last
+",
+}
+
+test_lint_failure! {
+    name = file_warn_overrides_a_rule_error_level,
+    rule = NoLiteralPasswordRule,
+    count = 2,
+    diagnostic = ("no-literal-password", Level::WARNING),
+    code = r"const PASSWORD = 'first'; #![\Whim\Lint\Warn(rule: 'no-literal-password', reason: 'Test fixture')] const SECRET = 'second';",
+}
+
+test_lint_failure! {
+    name = file_deny_is_restored_after_a_declaration_allow,
+    rule = NoDebugSymbolsRule,
+    count = 2,
+    diagnostic = ("no-debug-symbols", Level::ERROR),
+    code = r"use Whim\Lint\{Allow, Deny}; debug!(1); #[Allow('no-debug-symbols')] function f(): void { debug!(2); } debug!(3); #![Deny('no-debug-symbols')]",
+}
+
+test_lint_failure! {
+    name = file_forbid_reports_errors_throughout_the_file,
+    rule = NoDebugSymbolsRule,
+    count = 2,
+    diagnostic = ("no-debug-symbols", Level::ERROR),
+    code = r"debug!(1); #![Whim\Lint\Forbid('no-debug-symbols')] function f(): void { debug!(2); }",
+}
+
+test_lint_failure! {
+    name = later_file_forbid_rejects_an_earlier_declaration_allow,
+    rule = NoDebugSymbolsRule,
+    count = 1,
+    diagnostic = ("lint-attribute", Level::ERROR),
+    code = r"use Whim\Lint\{Allow, Forbid}; #[Allow('no-debug-symbols')] function f(): void {} #![Forbid('no-debug-symbols')]",
+}
+
+test_lint_failure! {
+    name = file_forbid_survives_a_nested_deny,
+    rule = NoDebugSymbolsRule,
+    count = 1,
+    diagnostic = ("lint-attribute", Level::ERROR),
+    code = r"use Whim\Lint\{Allow, Deny, Forbid}; #![Forbid('no-debug-symbols')] #[Deny('no-debug-symbols')] class C { #[Allow('no-debug-symbols')] public function f(): void {} }",
+}
+
+test_lint_failure! {
+    name = file_allow_is_restored_after_a_declaration_warn,
+    rule = NoDebugSymbolsRule,
+    count = 1,
+    diagnostic = ("no-debug-symbols", Level::WARNING),
+    code = r"use Whim\Lint\{Allow, Warn}; debug!(1); #[Warn('no-debug-symbols')] function f(): void { debug!(2); } debug!(3); #![Allow('no-debug-symbols')]",
+}
+
+test_lint_failure! {
+    name = file_controls_follow_source_order_across_namespaces,
+    rule = NoDebugSymbolsRule,
+    count = 2,
+    diagnostic = ("no-debug-symbols", Level::WARNING),
+    code = r"namespace A { use Whim\Lint\Deny; #![Deny('no-debug-symbols')] debug!(1); } namespace B { use Whim\Lint\{Allow, Warn}; #![Allow('no-debug-symbols')] #![Warn('no-debug-symbols')] debug!(2); }",
+}
+
+test_lint_failure! {
+    name = file_forbid_rejects_a_later_file_warn,
+    rule = NoDebugSymbolsRule,
+    count = 1,
+    diagnostic = ("lint-attribute", Level::ERROR),
+    code = r"namespace A { use Whim\Lint\Forbid; #![Forbid('no-debug-symbols')] } namespace B { use Whim\Lint\{Deny, Warn}; #![Deny('no-debug-symbols'), Warn('no-debug-symbols')] }",
+}
+
+test_lint_failure! {
+    name = file_attribute_names_use_only_imports_in_scope_at_their_location,
+    rule = NoDebugSymbolsRule,
+    count = 2,
+    code = r"#![Allow('no-debug-symbols')] use Whim\Lint\Allow; debug!(1); namespace A { use Whim\Lint\Allow; } namespace B { #![Allow('no-debug-symbols')] debug!(2); }",
+}
+
+test_lint_failure! {
+    name = file_allow_does_not_suppress_invalid_file_attributes,
+    rule = NoDebugSymbolsRule,
+    count = 3,
+    diagnostic = ("lint-attribute", Level::ERROR),
+    code = r"use Whim\Lint\{Allow, Deny, Warn}; #![Allow('no-debug-symbols'), Deny(rule: UNKNOWN), Warn('missing-rule'), Allow(reason: 'Test fixture')]",
+}
+
 #[test]
 fn controls_enable_disabled_rules_only_in_their_scope() {
     let arena = LocalArena::new();
-    let source = r"use Whim\Lint\Deny; #[Deny('no-debug-symbols')] function f(): void { debug!(1); } function g(): void { debug!(2); }";
-    let program = parse(&arena, source).unwrap();
     let mut settings = Settings::default();
     settings.rules.no_debug_symbols.enabled = false;
     let linter = Linter::new(&arena, &settings, None, false).unwrap();
-    let diagnostics = linter.lint("test.whim", program);
-    assert_eq!(diagnostics.len(), 1);
-    assert!(
-        Renderer::plain()
-            .render(&diagnostics)
-            .contains("error[no-debug-symbols]")
-    );
+    for (source, count) in [
+        (
+            r"use Whim\Lint\Deny; #[Deny('no-debug-symbols')] function f(): void { debug!(1); } function g(): void { debug!(2); }",
+            1,
+        ),
+        (
+            r"function f(): void { debug!(1); } #![Whim\Lint\Deny('no-debug-symbols')] function g(): void { debug!(2); }",
+            2,
+        ),
+    ] {
+        let program = parse(&arena, source).unwrap();
+        let diagnostics = linter.lint("test.whim", program);
+        assert_eq!(diagnostics.len(), count);
+        assert!(
+            Renderer::plain()
+                .render(&diagnostics)
+                .contains("error[no-debug-symbols]")
+        );
+    }
 }
 
 #[test]

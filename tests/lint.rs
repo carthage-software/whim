@@ -96,6 +96,7 @@ function allowed(): void { debug!(1); }
 #[Warn(reason: 'Test fixture', rule: 'no-debug-symbols')]
 function warned(): void { debug!(2); }
 function disabled(): void { debug!(3); }
+#![Allow('no-debug-symbols')]
 ",
     );
     let output = project.lint(&["--json"]);
@@ -114,7 +115,7 @@ function disabled(): void { debug!(3); }
 
     project.write(
         "denied.whim",
-        r"#[Whim\Lint\Deny('no-debug-symbols', reason: 'Test fixture')] function denied(): void { debug!(4); }",
+        r"function denied(): void { debug!(4); } #![Whim\Lint\Deny('no-debug-symbols', reason: 'Test fixture')]",
     );
     let output = project.lint(&["--json"]);
     assert_eq!(output.status.code(), Some(1));
@@ -129,7 +130,7 @@ fn invalid_lint_attributes_fail_even_when_the_rule_is_disabled_and_excluded() {
     let project = Project::new(
         "[lint]\nminimum_fail_level = 'error'\n[lint.rules.no-debug-symbols]\nenabled = false\nexclude = ['**']\n",
     );
-    let source = r"#[Whim\Lint\Allow('no-debug-symbols')] #[Whim\Lint\Warn(reason: 'Test fixture', rule: rule_name())] function example(): void {}";
+    let source = r"#![Whim\Lint\Allow('no-debug-symbols')] #![Whim\Lint\Warn(reason: 'Test fixture', rule: rule_name())] function example(): void {}";
     project.write("source.whim", source);
     let output = project.lint(&["--json"]);
     assert_eq!(output.status.code(), Some(1));

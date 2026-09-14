@@ -2,7 +2,7 @@ namespace Whim\Lint;
 
 use Whim\Attribute\Attribute;
 
-/** Suppresses one lint rule within the declaration. */
+/** Suppresses one lint rule within the target file or declaration. */
 #[Attribute(Attribute::TARGET_ALL | Attribute::IS_REPEATABLE)]
 final class Allow {
   public function __construct(

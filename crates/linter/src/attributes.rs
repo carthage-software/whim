@@ -14,6 +14,7 @@ use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::operation::BinaryOperator;
+use whim_syn::cst::statement::TopLevelStatement;
 
 use crate::context::LintContext;
 use crate::rule::AnyRule;
@@ -57,6 +58,24 @@ pub(crate) struct AttributeScopes {
 impl AttributeScopes {
     pub(crate) fn collect<A: Arena>(ctx: &mut LintContext<'_, '_, A>) -> Self {
         let mut scopes = Self::default();
+        if ctx.source.contains("#![") {
+            let mut settings = Vec::new();
+            scopes.collect_file_attributes(
+                ctx,
+                ctx.program.statements,
+                Resolver::default(),
+                &mut settings,
+            );
+
+            if !settings.is_empty() {
+                scopes.scopes.push(AttributeScope {
+                    span: ctx.program.span(),
+                    parent: None,
+                    settings,
+                });
+            }
+        }
+
         if !ctx.source.contains("#[") {
             return scopes;
         }
@@ -68,7 +87,7 @@ impl AttributeScopes {
         }
 
         let mut resolver = Resolver::default();
-        let mut parent = None;
+        let mut parent = scopes.scopes.len().checked_sub(1);
         let mut stack = ArenaVec::with_capacity_in(64, ctx.arena);
         stack.push(Step::Enter(Node::Program(ctx.program)));
         while let Some(step) = stack.pop() {
@@ -90,44 +109,13 @@ impl AttributeScopes {
                     let mut settings: Vec<Setting> = Vec::new();
                     for list in attribute_lists(node) {
                         for attribute in &list.attributes {
-                            let control = match resolver.resolve(&attribute.name).as_str() {
-                                "Whim\\Lint\\Allow" => Control::Allow,
-                                "Whim\\Lint\\Warn" => Control::Warn,
-                                "Whim\\Lint\\Deny" => Control::Deny,
-                                "Whim\\Lint\\Forbid" => Control::Forbid,
-                                _ => continue,
-                            };
-
-                            let Some(code) = rule_name(ctx, attribute) else {
-                                continue;
-                            };
-
-                            let previous = settings
-                                .iter()
-                                .rev()
-                                .find(|entry| entry.code == code)
-                                .or_else(|| scopes.setting(code, parent));
-                            if let Some(previous) = previous
-                                && previous.control == Control::Forbid
-                            {
-                                if matches!(control, Control::Allow | Control::Warn) {
-                                    ctx.attribute_error(
-                                        attribute.span(),
-                                        format!("Cannot lower the level of forbidden lint `{code}`."),
-                                        [AnnotationKind::Context.span(previous.span.into())
-                                            .label("this attribute forbids the lint")],
-                                        "Remove the attribute that lowers the level, or change the enclosing `Forbid`.",
-                                    );
-                                }
-
-                                continue;
-                            }
-
-                            settings.push(Setting {
-                                code,
-                                control,
-                                span: attribute.span(),
-                            });
+                            scopes.collect_attribute(
+                                ctx,
+                                &resolver,
+                                attribute,
+                                parent,
+                                &mut settings,
+                            );
                         }
                     }
 
@@ -195,6 +183,82 @@ impl AttributeScopes {
         }
 
         None
+    }
+
+    fn collect_file_attributes<A: Arena>(
+        &self,
+        ctx: &mut LintContext<'_, '_, A>,
+        statements: &[TopLevelStatement<'_>],
+        mut resolver: Resolver,
+        settings: &mut Vec<Setting>,
+    ) {
+        for statement in statements {
+            match statement {
+                TopLevelStatement::FileAttributeList(list) => {
+                    for attribute in &list.attributes {
+                        self.collect_attribute(ctx, &resolver, attribute, None, settings);
+                    }
+                }
+                TopLevelStatement::Namespace(namespace) => self.collect_file_attributes(
+                    ctx,
+                    namespace.statements(),
+                    Resolver::for_namespace(namespace.name.value()),
+                    settings,
+                ),
+                TopLevelStatement::Use(declaration) => resolver.collect_use(declaration),
+                _ => {}
+            }
+        }
+    }
+
+    fn collect_attribute<A: Arena>(
+        &self,
+        ctx: &mut LintContext<'_, '_, A>,
+        resolver: &Resolver,
+        attribute: &Attribute<'_>,
+        parent: Option<usize>,
+        settings: &mut Vec<Setting>,
+    ) {
+        let control = match resolver.resolve(&attribute.name).as_str() {
+            "Whim\\Lint\\Allow" => Control::Allow,
+            "Whim\\Lint\\Warn" => Control::Warn,
+            "Whim\\Lint\\Deny" => Control::Deny,
+            "Whim\\Lint\\Forbid" => Control::Forbid,
+            _ => return,
+        };
+
+        let Some(code) = rule_name(ctx, attribute) else {
+            return;
+        };
+
+        let previous = settings
+            .iter()
+            .rev()
+            .find(|entry| entry.code == code)
+            .or_else(|| self.setting(code, parent));
+
+        if let Some(previous) = previous
+            && previous.control == Control::Forbid
+        {
+            if matches!(control, Control::Allow | Control::Warn) {
+                ctx.attribute_error(
+                    attribute.span(),
+                    format!("Cannot lower the level of forbidden lint `{code}`."),
+                    [AnnotationKind::Context
+                        .span(previous.span.into())
+                        .label("this attribute forbids the lint")],
+                    "Remove the attribute that lowers the level, or change the enclosing `Forbid`.",
+                );
+            }
+
+            return;
+        }
+
+        settings.push(Setting {
+            code,
+            control,
+            span: attribute.span(),
+        });
     }
 }
 
