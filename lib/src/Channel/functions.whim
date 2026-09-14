@@ -1,7 +1,6 @@
 namespace Whim\Channel;
 
 use Whim\Marker\TrackCaller;
-use Whim\Channel\_Private;
 use Whim\Refine\PositiveInt;
 
 /** Creates a channel with bounded buffering. */

@@ -191,7 +191,7 @@ final class H2Connection implements MultiplexedConnection {
           $window = $this->protocol->availableSendWindow($streamId);
         }
 
-        $maximum = 16384;
+        $maximum = 16_384;
         if ($window < $maximum) {
           $maximum = $window;
         }
@@ -421,7 +421,7 @@ final class H2Connection implements MultiplexedConnection {
     try {
       while (true) {
         $cancellation->throwIfCancellationRequested();
-        $bytes = $this->stream->read(16384, $cancellation);
+        $bytes = $this->stream->read(16_384, $cancellation);
         if ('' == $bytes && $this->stream->reachedEndOfDataSource()) {
           throw new ProtocolException(
             'the HTTP/2 transport closed unexpectedly',

@@ -1,13 +1,5 @@
 namespace Whim\HTTP\_Private;
 
-use Whim\HTTP\_Private\Event;
-use Whim\HTTP\_Private\ErrorCode;
-use Whim\HTTP\_Private\Frame;
-use Whim\HTTP\_Private\FlowControlException;
-use Whim\HTTP\_Private\ProtocolException;
-use Whim\HTTP\_Private\StreamException;
-use Whim\HTTP\_Private\StreamState;
-
 function receive_priority(
   State $state,
   Frame\PriorityFrame $frame,

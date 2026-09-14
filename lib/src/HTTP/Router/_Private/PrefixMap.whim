@@ -190,8 +190,8 @@ final readonly class PrefixMap {
     }
 
     $prefixes = dict[];
-    foreach ($groups as $prefix => $entries) {
-      $prefixes[$prefix] = PrefixMap::fromEntries($entries);
+    foreach ($groups as $prefix => $group_entries) {
+      $prefixes[$prefix] = PrefixMap::fromEntries($group_entries);
     }
 
     return ($prefixes, $prefixLength as NonNegativeInt);

@@ -3,7 +3,6 @@ namespace Whim\IO;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Async\CancellationToken;
-use Whim\IO\_Private;
 use Whim;
 use Whim\Unwind\InvalidArgumentException;
 

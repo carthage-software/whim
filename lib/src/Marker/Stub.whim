@@ -1,7 +1,6 @@
 namespace Whim\Marker;
 
 use Whim\Attribute\Attribute;
-use Whim\Marker\TrackCaller;
 
 /** Declares the shape of a symbol whose definition lives elsewhere. */
 #[Stub]

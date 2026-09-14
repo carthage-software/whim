@@ -17,7 +17,8 @@ final class MersenneTwisterSequence implements WordSequence {
     while ($index < 624) {
       $previous = $state[$index - 1];
       $state[$index] =
-        (1812433253 * ($previous ^ ($previous >> 30)) + $index) & 0xffffffff;
+        (1_812_433_253 * ($previous ^ ($previous >> 30)) + $index)
+        & 0xff_ff_ff_ff;
 
       $index++;
     }
@@ -28,7 +29,7 @@ final class MersenneTwisterSequence implements WordSequence {
   /** Creates a mersenne twister sequence with a secure random seed. */
   #[TrackCaller]
   public static function fromSecureSeed(): self {
-    return new MersenneTwisterSequence(SecureRandom\int(0, 0xffffffff));
+    return new MersenneTwisterSequence(SecureRandom\int(0, 0xff_ff_ff_ff));
   }
 
   /** Return the next value in the sequence. */
@@ -67,10 +68,10 @@ final class MersenneTwisterSequence implements WordSequence {
 
     $value = $this->state[$this->index];
     $this->index++;
-    $value ^= ($value >> 11) & 0x001fffff;
-    $value ^= ($value << 7) & 0x9d2c5680;
-    $value ^= ($value << 15) & 0xefc60000;
-    $value ^= ($value >> 18) & 0x00003fff;
+    $value ^= ($value >> 11) & 0x00_1f_ff_ff;
+    $value ^= ($value << 7) & 0x9d_2c_56_80;
+    $value ^= ($value << 15) & 0xef_c6_00_00;
+    $value ^= ($value >> 18) & 0x00_00_3f_ff;
     return $value;
   }
 
@@ -79,8 +80,8 @@ final class MersenneTwisterSequence implements WordSequence {
     $parity = $lower & 1;
     return (
       $middle
-      ^ ((($upper & 0x80000000) | ($lower & 0x7fffffff)) >> 1)
-      ^ (0x9908b0df * $parity)
+      ^ ((($upper & 0x80_00_00_00) | ($lower & 0x7f_ff_ff_ff)) >> 1)
+      ^ (0x99_08_b0_df * $parity)
     );
   }
 }

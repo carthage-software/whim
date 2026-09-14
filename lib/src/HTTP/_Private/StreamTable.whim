@@ -1,11 +1,6 @@
 namespace Whim\HTTP\_Private;
 
 use Whim;
-use Whim\HTTP\_Private\ErrorCode;
-use Whim\HTTP\_Private\FlowControlException;
-use Whim\HTTP\_Private\StreamException;
-use Whim\HTTP\_Private\StreamId;
-use Whim\HTTP\_Private\StreamState;
 use Whim\Refine\NonNegativeInt;
 
 /** Tracks stream state, windows, and concurrency. */

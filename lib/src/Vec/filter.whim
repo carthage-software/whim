@@ -3,7 +3,6 @@ namespace Whim\Vec;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\MustUse;
 use Whim\Option\Option;
-use Whim\Refine\ArrayKey;
 use Whim\Refine\Iterable;
 use Whim\Refine\Predicate;
 use Whim\Refine\Transform;
@@ -31,9 +30,11 @@ function filter_with_key<K, T>(
 ): vec<T> {
   $result = vec[];
   foreach ($values as $key => $value) {
-    if ($predicate($key, $value)) {
-      $result[] = $value;
+    if (!$predicate($key, $value)) {
+      continue;
     }
+
+    $result[] = $value;
   }
 
   return $result;
@@ -48,9 +49,11 @@ function filter_keys<K, T>(
 ): vec<T> {
   $result = vec[];
   foreach ($values as $key => $value) {
-    if ($predicate($key)) {
-      $result[] = $value;
+    if (!$predicate($key)) {
+      continue;
     }
+
+    $result[] = $value;
   }
 
   return $result;
@@ -62,9 +65,11 @@ function filter_keys<K, T>(
 function filter_nulls<T>(Iterable<_, null|T> $values): vec<T> {
   $result = vec[];
   foreach ($values as $value) {
-    if (!($value is null)) {
-      $result[] = $value;
+    if ($value is null) {
+      continue;
     }
+
+    $result[] = $value;
   }
 
   return $result;
@@ -79,9 +84,11 @@ function filter_nonnull_by<T, U>(
 ): vec<T> {
   $result = vec[];
   foreach ($values as $value) {
-    if ($function($value)->isSome()) {
-      $result[] = $value;
+    if (!$function($value)->isSome()) {
+      continue;
     }
+
+    $result[] = $value;
   }
 
   return $result;

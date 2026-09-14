@@ -108,7 +108,7 @@ function parse_server_first(
 
   $iterationText = $attributes['i'];
   $iterations = parse_decimal($iterationText);
-  if (null == $iterations || $iterations < 1 || $iterations > 1000000) {
+  if (null == $iterations || $iterations < 1 || $iterations > 1_000_000) {
     throw new AuthenticationException('the SCRAM iteration count is invalid');
   }
 

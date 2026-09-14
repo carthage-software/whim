@@ -7,19 +7,13 @@ use Whim\Command\AttachedInput;
 use Whim\Command\AttachedOutput;
 use Whim\Command\Child;
 use Whim\Command\Command as Definition;
-use Whim\Command\Discarded;
 use Whim\Command\Exited;
 use Whim\Command\ExitStatus;
-use Whim\Command\Inherited;
 use Whim\Command\Output;
-use Whim\Command\OutputStream;
-use Whim\Command\Piped;
 use Whim\Command\Signalled;
 use Whim\Command\StartFailedException;
-use Whim\Command\InputStream;
 use Whim\Command\Stream;
 use Whim\Command\StreamUnavailableException;
-use Whim\Command\Terminal;
 use Whim\Command\UnsupportedSignalException;
 use Whim\Dict;
 use Whim\Env;
@@ -305,11 +299,9 @@ final class ChildImpl implements Child {
       $deferred->complete($status);
     });
 
-    $future = $deferred->getFuture()->always(fn(): void {
+    return $deferred->getFuture()->always(fn(): void {
       Whim\_Private\cancel_task($task);
     });
-
-    return $future;
   }
 
   #[MustUse]

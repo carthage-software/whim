@@ -2,7 +2,6 @@ namespace Whim\Filesystem;
 
 use Whim;
 use Whim\File;
-use Whim\Filesystem\_Private;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
@@ -61,7 +60,7 @@ function copy_file(
     $writer = File\open_write_only($to, $mode),
   ) {
     while (true) {
-      $chunk = match ($reader->read(65536)) {
+      $chunk = match ($reader->read(65_536)) {
         '' => break,
         $chunk => $chunk,
       };

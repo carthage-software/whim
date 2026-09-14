@@ -18,7 +18,7 @@ interface ExitStatus for Exited, Signalled {
 /** A child that returned a status code of its own accord. */
 final readonly class Exited implements ExitStatus {
   #[AlwaysInline]
-  public function __construct(public readonly Uint8 $code) {}
+  public function __construct(public Uint8 $code) {}
 
   #[AlwaysInline]
   #[MustUse]
@@ -31,8 +31,8 @@ final readonly class Exited implements ExitStatus {
 final readonly class Signalled implements ExitStatus {
   #[AlwaysInline]
   public function __construct(
-    public readonly Signal $signal,
-    public readonly bool $dumpedCore = false,
+    public Signal $signal,
+    public bool $dumpedCore = false,
   ) {}
 
   #[Frameless]

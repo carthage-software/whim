@@ -131,7 +131,7 @@ function transmit<TEndpoint: Endpoint>(
 ): void {
   while (true) {
     try {
-      $bytes = $connection->transmitCiphertext(65536);
+      $bytes = $connection->transmitCiphertext(65_536);
     } catch (Whim\_Private\TlsError $error) {
       failure($error);
     }
@@ -158,7 +158,7 @@ function handshake<TEndpoint: Endpoint>(
       break;
     }
 
-    $bytes = $stream->read(65536, $cancellation);
+    $bytes = $stream->read(65_536, $cancellation);
     if ('' == $bytes && $stream->reachedEndOfDataSource()) {
       throw new HandshakeException(
         'the transport ended during the TLS handshake',

@@ -2,13 +2,6 @@ namespace Whim\HTTP\_Private;
 
 use Whim;
 use Whim\HTTP\_Private as H2;
-use Whim\HTTP\_Private\ErrorCodeValue;
-use Whim\HTTP\_Private\Event;
-use Whim\HTTP\_Private\FlowControlException;
-use Whim\HTTP\_Private\Frame;
-use Whim\HTTP\_Private\FrameDecodingException;
-use Whim\HTTP\_Private\ProtocolException;
-use Whim\HTTP\_Private\StreamException;
 use Whim\Str;
 
 function receive(State $state, string $bytes): vec<Event\WeakendEvent> {

@@ -95,8 +95,8 @@ function alpn_protocols(vec<ProtocolVersion> $versions): vec<string> {
 function h2_configuration(Configuration $configuration): H2\Configuration {
   $settings = $configuration->h2->settings;
   $limit = $configuration->maximumResponseHeaderSize;
-  if ($limit > 4294967295) {
-    $limit = 4294967295;
+  if ($limit > 4_294_967_295) {
+    $limit = 4_294_967_295;
   }
 
   $setting = H2\Setting::MaxHeaderListSize->value;

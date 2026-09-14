@@ -52,8 +52,8 @@ function parse_headers(
     }
 
     $encodedDependency = Binary\decode_u32(Str\slice($payload, 0, 4));
-    $exclusive = ($encodedDependency & 0x80000000) != 0;
-    $dependency = $encodedDependency & 0x7fffffff;
+    $exclusive = ($encodedDependency & 0x80_00_00_00) != 0;
+    $dependency = $encodedDependency & 0x7f_ff_ff_ff;
     $weight = Str\ord($payload[4]) + 1;
     $payload = Str\slice($payload, 5);
   }
@@ -86,9 +86,9 @@ function parse_priority(int $stream, string $payload): Frame\PriorityFrame {
   return (
     2,
     $stream,
-    $dependency & 0x7fffffff,
+    $dependency & 0x7f_ff_ff_ff,
     Str\ord($payload[4]) + 1,
-    ($dependency & 0x80000000) != 0,
+    ($dependency & 0x80_00_00_00) != 0,
   );
 }
 
@@ -144,7 +144,7 @@ function parse_push_promise(
   }
 
   ($payload, $padding) = unpad($flags, $payload, 4);
-  $promised = Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7fffffff;
+  $promised = Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7f_ff_ff_ff;
   require_stream($promised, 'PUSH_PROMISE');
 
   return (
@@ -174,7 +174,7 @@ function parse_go_away(int $stream, string $payload): Frame\GoAwayFrame {
 
   return (
     7,
-    Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7fffffff,
+    Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7f_ff_ff_ff,
     Binary\decode_u32(Str\slice($payload, 4, 4)),
     Str\slice($payload, 8),
   );
@@ -188,7 +188,7 @@ function parse_window_update(
     frame_size_error('`WINDOW_UPDATE` requires exactly 4 payload bytes');
   }
 
-  $increment = Binary\decode_u32($payload) & 0x7fffffff;
+  $increment = Binary\decode_u32($payload) & 0x7f_ff_ff_ff;
   if (0 == $increment) {
     if (0 != $stream) {
       throw new StreamException(
@@ -244,7 +244,7 @@ function encode_headers(Frame\HeadersFrame $frame): (int, int, int, string) {
     $flags |= 0x20;
     $dependency = $frame[5];
     if ($frame[7]) {
-      $dependency |= 0x80000000;
+      $dependency |= 0x80_00_00_00;
     }
 
     $payload =
@@ -264,7 +264,7 @@ function encode_headers(Frame\HeadersFrame $frame): (int, int, int, string) {
 function encode_priority(Frame\PriorityFrame $frame): (int, int, int, string) {
   $dependency = $frame[2];
   if ($frame[4]) {
-    $dependency |= 0x80000000;
+    $dependency |= 0x80_00_00_00;
   }
 
   return (

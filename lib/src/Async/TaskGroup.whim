@@ -2,7 +2,6 @@ namespace Whim\Async;
 
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Async\_Private;
 use Whim\Unwind\Throwable;
 use Whim;
 

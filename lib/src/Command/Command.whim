@@ -7,7 +7,6 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Time\Duration;
 use Whim\Vec;
 
 /**
@@ -23,15 +22,15 @@ use Whim\Vec;
 final readonly class Command {
   #[AlwaysInline]
   private function __construct(
-    public readonly NonEmptyString $program,
-    public readonly vec<string> $arguments,
-    public readonly dict<NonEmptyString, string> $environment,
-    public readonly bool $inheritsEnvironment,
-    public readonly null|NonEmptyString $directory,
-    public readonly InputStream $standardInput,
-    public readonly OutputStream $standardOutput,
-    public readonly OutputStream $standardError,
-    public readonly bool $ownsProcessGroup,
+    public NonEmptyString $program,
+    public vec<string> $arguments,
+    public dict<NonEmptyString, string> $environment,
+    public bool $inheritsEnvironment,
+    public null|NonEmptyString $directory,
+    public InputStream $standardInput,
+    public OutputStream $standardOutput,
+    public OutputStream $standardError,
+    public bool $ownsProcessGroup,
   ) {}
 
   /**

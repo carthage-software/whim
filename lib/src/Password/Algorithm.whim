@@ -15,28 +15,28 @@ final readonly class Bcrypt implements Algorithm {
 
 /** Hashes passwords with argon2i. */
 final readonly class Argon2i implements Algorithm {
-  public const 8192..=4294967295 DEFAULT_MEMORY_COST = 65536;
-  public const 1..=4294967295 DEFAULT_TIME_COST = 4;
+  public const 8192..=4_294_967_295 DEFAULT_MEMORY_COST = 65_536;
+  public const 1..=4_294_967_295 DEFAULT_TIME_COST = 4;
   public const 1..=255 DEFAULT_PARALLELISM = 1;
 
   #[AlwaysInline]
   public function __construct(
-    public 8192..=4294967295 $memoryCost = self::DEFAULT_MEMORY_COST,
-    public 1..=4294967295 $timeCost = self::DEFAULT_TIME_COST,
+    public 8192..=4_294_967_295 $memoryCost = self::DEFAULT_MEMORY_COST,
+    public 1..=4_294_967_295 $timeCost = self::DEFAULT_TIME_COST,
     public 1..=255 $parallelism = self::DEFAULT_PARALLELISM,
   ) {}
 }
 
 /** Hashes passwords with argon2id. */
 final readonly class Argon2id implements Algorithm {
-  public const 8192..=4294967295 DEFAULT_MEMORY_COST = 65536;
-  public const 1..=4294967295 DEFAULT_TIME_COST = 4;
+  public const 8192..=4_294_967_295 DEFAULT_MEMORY_COST = 65_536;
+  public const 1..=4_294_967_295 DEFAULT_TIME_COST = 4;
   public const 1..=255 DEFAULT_PARALLELISM = 1;
 
   #[AlwaysInline]
   public function __construct(
-    public 8192..=4294967295 $memoryCost = self::DEFAULT_MEMORY_COST,
-    public 1..=4294967295 $timeCost = self::DEFAULT_TIME_COST,
+    public 8192..=4_294_967_295 $memoryCost = self::DEFAULT_MEMORY_COST,
+    public 1..=4_294_967_295 $timeCost = self::DEFAULT_TIME_COST,
     public 1..=255 $parallelism = self::DEFAULT_PARALLELISM,
   ) {}
 }

@@ -1,13 +1,5 @@
 namespace Whim\HTTP\_Private;
 
-use Whim\HTTP\_Private as H2;
-use Whim\HTTP\_Private\Event;
-use Whim\HTTP\_Private\Frame;
-use Whim\HTTP\_Private\ProtocolException;
-use Whim\HTTP\_Private\Role;
-use Whim\HTTP\_Private\Setting;
-use Whim\HTTP\_Private\StreamState;
-
 function receive_headers(
   State $state,
   Frame\HeadersFrame $frame,
@@ -21,11 +13,11 @@ function receive_headers(
   }
 
   if (null == $entry) {
-    $entry = open_peer_stream($state, $frame[1]);
+    open_peer_stream($state, $frame[1]);
   } else if (StreamState::ReservedRemote == $entry->state) {
     $state->streams->activatePeer($frame[1], $entry);
   } else {
-    $entry = receive_entry($state, $frame[1]);
+    receive_entry($state, $frame[1]);
   }
 
   if (null != $frame[5] && $frame[5] == $frame[1]) {
@@ -63,7 +55,7 @@ function receive_push_promise(
   }
 
   receive_entry($state, $frame[1]);
-  $promised = reserve_peer_stream($state, $frame[2]);
+  reserve_peer_stream($state, $frame[2]);
   $completed =
     $state->headerBlocks->pushPromise(
       $frame[1],

@@ -132,7 +132,7 @@ final class State {
   #[TraceBoundary]
   public function tryRead(null|int $maxBytes): string {
     $this->ensureOpen();
-    $maximum = $maxBytes ?? 65536;
+    $maximum = $maxBytes ?? 65_536;
     if ($maximum < 0) {
       throw new InvalidArgumentException(
         'the maximum byte count must be non-negative',

@@ -3,7 +3,6 @@ namespace Whim\PseudoRandom;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Math;
-use Whim\PseudoRandom\_Private;
 
 /** Generates a pseudo-random floating-point value in the unit interval. */
 #[NeverInline]

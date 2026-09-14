@@ -3,7 +3,6 @@ namespace Whim\Async;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Async\_Private;
 use Whim\Refine\Transform;
 use Whim\Refine\NonNegativeInt;
 use Whim\Refine\PositiveInt;

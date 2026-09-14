@@ -4,7 +4,6 @@ use Whim\Comparison\Equal;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\MustUse;
 use Whim\PseudoRandom;
-use Whim\Refine\ArrayKey;
 use Whim\Refine\Comparator;
 use Whim\Refine\Transform;
 use Whim\Refine\Iterable;

@@ -1,6 +1,5 @@
 namespace Whim\Marker;
 
-use Whim\Marker\TrackCaller;
 use Whim\Attribute\Attribute;
 
 /** Requires callers to consume a callable's result or discard it explicitly. */

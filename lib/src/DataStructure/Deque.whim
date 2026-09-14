@@ -1,6 +1,5 @@
 namespace Whim\DataStructure;
 
-use Whim\DataStructure\_Private;
 use Whim\Iterate\ToIterator;
 use Whim\Iterate\ArrayIterator;
 use Whim\Marker\AlwaysInline;

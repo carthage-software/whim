@@ -1,6 +1,5 @@
 namespace Whim\IO\_Private;
 
-use Whim;
 use Whim\Async\CancellationToken;
 use Whim\IO\TransportException;
 use Whim\Marker\NeverInline;
@@ -21,7 +20,7 @@ use Whim\_Private\watch_writable;
 /**
  * Converts a raw descriptor failure into the public IO exception family.
  *
- * @throws Whim\IO\TransportException always, carrying the errno as the code.
+ * @throws \Whim\IO\TransportException always, carrying the errno as the code.
  */
 #[NeverInline]
 #[TrackCaller]

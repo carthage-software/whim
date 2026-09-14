@@ -1,11 +1,6 @@
 namespace Whim\HTTP\_Private;
 
 use Whim\HTTP\_Private as H2;
-use Whim\HTTP\_Private\Event;
-use Whim\HTTP\_Private\Header;
-use Whim\HTTP\_Private\Role;
-use Whim\HTTP\_Private\SettingId;
-use Whim\HTTP\_Private\SettingValue;
 
 /** Seeds stream one for an HTTP/1.1 to HTTP/2 upgrade. */
 function accept_upgrade_request(

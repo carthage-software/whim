@@ -3,7 +3,6 @@ namespace Whim\Math;
 use Whim\Comparison\Ordering;
 use Whim\Marker\TrackCaller;
 use Whim\Float;
-use Whim\Math\_Private;
 use Whim\Option\None;
 use Whim\Option\Option;
 use Whim\Option\Some;

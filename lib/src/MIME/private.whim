@@ -1,11 +1,8 @@
 namespace Whim\MIME\_Private;
 
-use Whim;
-use Whim\MIME\Header;
 use Whim\MIME\Parameter;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
-use Whim\Refine\NonEmptyString;
 use Whim\SecureRandom;
 use Whim\Str;
 

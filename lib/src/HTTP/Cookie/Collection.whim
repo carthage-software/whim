@@ -1,7 +1,6 @@
 namespace Whim\HTTP\Cookie;
 
 use Whim\Convert\ToString;
-use Whim\HTTP\Cookie\_Private;
 use Whim\HTTP\Message\FieldMap;
 use Whim\Iterate\ArrayIterator;
 use Whim\Iterate\ToIterator;

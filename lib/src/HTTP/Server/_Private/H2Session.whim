@@ -1,6 +1,5 @@
 namespace Whim\HTTP\Server\_Private;
 
-use Whim\Async;
 use Whim\Async\CancellationToken;
 use Whim\Async\CancelledException;
 use Whim\Async\Deferred;
@@ -18,7 +17,6 @@ use Whim\HTTP\Message\ProtocolVersion;
 use Whim\HTTP\Message\Request;
 use Whim\HTTP\Message\Response;
 use Whim\HTTP\Server\Configuration;
-use Whim\HTTP\Server\Context\Context;
 use Whim\HTTP\Server\Context\Security;
 use Whim\HTTP\Server\Handler\Handler;
 use Whim\HTTP\Server\HTTPException;

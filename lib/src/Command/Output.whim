@@ -7,9 +7,9 @@ use Whim\Marker\MustUse;
 final readonly class Output {
   #[AlwaysInline]
   public function __construct(
-    public readonly ExitStatus $status,
-    public readonly string $standardOutput,
-    public readonly string $standardError,
+    public ExitStatus $status,
+    public string $standardOutput,
+    public string $standardError,
   ) {}
 
   /** Whether the child ended the way a successful program does. */

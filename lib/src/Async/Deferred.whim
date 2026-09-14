@@ -1,6 +1,5 @@
 namespace Whim\Async;
 
-use Whim\Async\_Private;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;

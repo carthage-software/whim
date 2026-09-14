@@ -54,7 +54,7 @@ final class ReadHandleImpl implements ReadHandle, FileDescriptorHandle {
   #[TrackCaller]
   #[TraceBoundary]
   public function tryRead(null|int $maxBytes = null): string {
-    $maximum = $maxBytes ?? 65536;
+    $maximum = $maxBytes ?? 65_536;
     if ($maximum <= 0) {
       return '';
     }

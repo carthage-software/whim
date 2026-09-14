@@ -1,10 +1,6 @@
 namespace Whim\HTTP\_Private;
 
 use Whim;
-use Whim\HTTP\_Private\Header;
-use Whim\HTTP\_Private\Role;
-use Whim\HTTP\_Private\StreamException;
-use Whim\HTTP\_Private\StreamId;
 use Whim\Str;
 
 /** Validates one decoded HTTP/2 field section. */
@@ -429,8 +425,8 @@ function parse_length(StreamId $streamId, string $value): int {
 
     $digit -= 48;
     if (
-      $length > 922337203685477580
-      || (922337203685477580 == $length && $digit > 7)
+      $length > 922_337_203_685_477_580
+      || (922_337_203_685_477_580 == $length && $digit > 7)
     ) {
       fail($streamId, 'the HTTP/2 content-length field is too large');
     }

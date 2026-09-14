@@ -1,7 +1,6 @@
 namespace Whim\File;
 
 use Whim\Async\CancellationToken;
-use Whim\File\_Private;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;

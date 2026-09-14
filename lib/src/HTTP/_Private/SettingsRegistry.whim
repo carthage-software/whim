@@ -1,9 +1,6 @@
 namespace Whim\HTTP\_Private;
 
 use Whim\HTTP\_Private as H2;
-use Whim\HTTP\_Private\Setting;
-use Whim\HTTP\_Private\SettingId;
-use Whim\HTTP\_Private\SettingValue;
 
 /** Stores local and peer HTTP/2 settings. */
 final class SettingsRegistry {
@@ -70,10 +67,10 @@ function default_settings(): dict<SettingId, SettingValue> {
   return dict[
     Setting::HeaderTableSize->value => H2\DEFAULT_HEADER_TABLE_SIZE,
     Setting::EnablePush->value => 1,
-    Setting::MaxConcurrentStreams->value => 2147483647,
+    Setting::MaxConcurrentStreams->value => 2_147_483_647,
     Setting::InitialWindowSize->value => H2\DEFAULT_INITIAL_WINDOW_SIZE,
     Setting::MaxFrameSize->value => H2\DEFAULT_MAX_FRAME_SIZE,
-    Setting::MaxHeaderListSize->value => 2147483647,
+    Setting::MaxHeaderListSize->value => 2_147_483_647,
     Setting::EnableConnectProtocol->value => 0,
   ];
 }

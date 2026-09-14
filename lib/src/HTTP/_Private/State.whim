@@ -4,10 +4,6 @@ use Whim;
 use Whim\_Private\H2FrameDecoder;
 use Whim\_Private\HpackDecoder;
 use Whim\_Private\HpackEncoder;
-use Whim\HTTP\_Private\Configuration;
-use Whim\HTTP\_Private\ConnectionStreamId;
-use Whim\HTTP\_Private\Role;
-use Whim\HTTP\_Private\StreamId;
 use Whim\Refine\NonNegativeInt;
 
 /** Mutable state shared by the sans-I/O protocol operations. */
@@ -95,7 +91,7 @@ final class State {
       );
     }
 
-    if ($this->nextLocalStreamId > 2147483647) {
+    if ($this->nextLocalStreamId > 2_147_483_647) {
       throw new Whim\HTTP\_Private\ProtocolException(
         'the HTTP/2 stream identifier space is exhausted',
       );

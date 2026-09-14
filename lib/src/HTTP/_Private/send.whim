@@ -1,16 +1,6 @@
 namespace Whim\HTTP\_Private;
 
-use Whim;
 use Whim\HTTP\_Private as H2;
-use Whim\HTTP\_Private\ConnectionStreamId;
-use Whim\HTTP\_Private\ErrorCodeValue;
-use Whim\HTTP\_Private\Frame;
-use Whim\HTTP\_Private\ProtocolException;
-use Whim\HTTP\_Private\Role;
-use Whim\HTTP\_Private\Setting;
-use Whim\HTTP\_Private\StreamId;
-use Whim\HTTP\_Private\StreamState;
-use Whim\HTTP\_Private\Header;
 use Whim\Str;
 
 function send_headers(

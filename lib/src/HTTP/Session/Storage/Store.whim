@@ -2,7 +2,6 @@ namespace Whim\HTTP\Session\Storage;
 
 use Whim\Async\CancellationToken;
 use Whim\HTTP\Session\Data;
-use Whim\HTTP\Session\ConflictException;
 use Whim\Marker\MustUse;
 use Whim\Refine\NonEmptyString;
 use Whim\Refine\NonNegativeInt;
@@ -28,7 +27,7 @@ interface Store {
   /**
    * Replaces a record only when its revision still matches.
    *
-   * @throws ConflictException when the record is missing or has changed.
+   * @throws \Whim\HTTP\Session\ConflictException when the record is missing or has changed.
    */
   public function replace(
     NonEmptyString $identifier,

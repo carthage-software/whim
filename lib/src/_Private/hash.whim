@@ -119,7 +119,7 @@ function hash_hmac(
 function pbkdf2_sha256(
   #[SensitiveParameter] string $password,
   string $salt,
-  1..=1000000 $iterations,
+  1..=1_000_000 $iterations,
 ): string[32] {}
 
 /** Begins an incremental digest. */

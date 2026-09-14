@@ -1,6 +1,5 @@
 namespace Whim\Iterate;
 
-use Whim\Iterate\Iterator;
 use Whim\Marker\AlwaysInline;
 use Whim\_Private;
 

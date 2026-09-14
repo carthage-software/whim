@@ -2,7 +2,6 @@ namespace Whim\HTTP\Cookie;
 
 use Whim\Convert\ToString;
 use Whim\DateTime\ZonedDateTime;
-use Whim\HTTP\Cookie\_Private;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;

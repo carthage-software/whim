@@ -19,16 +19,16 @@ type Minute = 0..=59;
 type Second = 0..=59;
 
 /** A fractional second measured in nanoseconds. */
-type Nanosecond = 0..=999999999;
+type Nanosecond = 0..=999_999_999;
 
 /** A one-based day within a year. */
 type DayOfYear = 1..=366;
 
 /** A one-based year within an era. */
-type YearOfEra = 1..=10000;
+type YearOfEra = 1..=10_000;
 
 /** The number of days in a Gregorian month. */
 type DaysInMonth = 28..=31;
 
 /** A UTC offset measured in seconds. */
-type OffsetSeconds = -93599..=93599;
+type OffsetSeconds = -93_599..=93_599;

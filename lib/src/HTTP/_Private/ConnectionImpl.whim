@@ -1,15 +1,6 @@
 namespace Whim\HTTP\_Private;
 
-use Whim\HTTP\_Private\Configuration;
-use Whim\HTTP\_Private\ConnectionStreamId;
-use Whim\HTTP\_Private\ErrorCode;
-use Whim\HTTP\_Private\ErrorCodeValue;
 use Whim\HTTP\_Private\Event\WeakendEvent;
-use Whim\HTTP\_Private\Header;
-use Whim\HTTP\_Private\Role;
-use Whim\HTTP\_Private\Setting;
-use Whim\HTTP\_Private\StreamId;
-use Whim\HTTP\_Private\StreamState;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonNegativeInt;

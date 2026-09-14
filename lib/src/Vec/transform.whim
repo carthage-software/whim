@@ -3,7 +3,6 @@ namespace Whim\Vec;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\MustUse;
 use Whim\Option\Option;
-use Whim\Refine\ArrayKey;
 use Whim\Refine\Iterable;
 use Whim\Refine\Reducer;
 use Whim\Refine\Transform;

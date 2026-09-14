@@ -1,7 +1,6 @@
 namespace Whim\DataStructure;
 
 use Whim\Comparison\Ordering;
-use Whim\DataStructure\_Private;
 use Whim\Iterate\ToIterator;
 use Whim\Iterate\ArrayIterator;
 use Whim\Marker\AlwaysInline;

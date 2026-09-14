@@ -1,6 +1,5 @@
 namespace Whim\Str\_Private;
 
-use Whim;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\AlwaysInline;

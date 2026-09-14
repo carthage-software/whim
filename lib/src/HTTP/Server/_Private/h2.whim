@@ -1,6 +1,5 @@
 namespace Whim\HTTP\Server\_Private;
 
-use Whim;
 use Whim\Async\CancellationToken;
 use Whim\Async\Future;
 use Whim\Async\TimeoutCancellationToken;
@@ -40,8 +39,8 @@ function h2_configuration(Configuration $configuration): H2\Configuration {
   $settings = $configuration->h2->settings;
 
   $headerLimit = $configuration->maximumHeaderSize;
-  if ($headerLimit > 4294967295) {
-    $headerLimit = 4294967295;
+  if ($headerLimit > 4_294_967_295) {
+    $headerLimit = 4_294_967_295;
   }
 
   $headerSetting = H2\Setting::MaxHeaderListSize->value;
@@ -53,8 +52,8 @@ function h2_configuration(Configuration $configuration): H2\Configuration {
   }
 
   $streamLimit = $configuration->maximumConcurrentRequests;
-  if ($streamLimit > 4294967295) {
-    $streamLimit = 4294967295;
+  if ($streamLimit > 4_294_967_295) {
+    $streamLimit = 4_294_967_295;
   }
 
   $streamSetting = H2\Setting::MaxConcurrentStreams->value;
@@ -187,7 +186,7 @@ function h2_push_headers(Request $request): null|vec<Header> {
 /** Converts an HTTP/1.1 upgrade request into stream-one fields. */
 function h2_upgrade_headers(Request $request): vec<Header> {
   $url = $request->url;
-  $scheme = $url?->scheme ?? 'http';
+  $scheme = $url->scheme ?? 'http';
   $authority =
     $url?->authority?->toString() ?? ($request->headers->get('host') ?? '');
 

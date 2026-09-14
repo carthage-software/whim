@@ -1,6 +1,5 @@
 namespace Whim\Marker;
 
-use Whim\Marker\TrackCaller;
 use Whim\Attribute\Attribute;
 
 /** Marks a symbol as deprecated. */

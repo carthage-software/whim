@@ -104,9 +104,11 @@ final readonly class AddressList implements
       $group = $address as Group;
       $mailboxes = vec[];
       foreach ($group->mailboxes as $candidate) {
-        if (Str\lowercase($candidate->address) != $excluded) {
-          $mailboxes[] = $candidate;
+        if (!Str\lowercase($candidate->address) != $excluded) {
+          continue;
         }
+
+        $mailboxes[] = $candidate;
       }
 
       if (vec[] != $mailboxes) {

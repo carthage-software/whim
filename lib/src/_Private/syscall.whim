@@ -513,7 +513,7 @@ function check_access(
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function create_directory((string&!'') $path, 0..=4294967295 $mode): void {}
+function create_directory((string&!'') $path, 0..=4_294_967_295 $mode): void {}
 
 /** Removes one empty directory. */
 #[Stub]
@@ -561,13 +561,13 @@ function resolve_path((string&!'') $path): (string&!'') {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function create_named_pipe((string&!'') $path, 0..=4294967295 $mode): void {}
+function create_named_pipe((string&!'') $path, 0..=4_294_967_295 $mode): void {}
 
 /** Sets a path's permission bits. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function set_path_mode((string&!'') $path, 0..=4294967295 $mode): void {}
+function set_path_mode((string&!'') $path, 0..=4_294_967_295 $mode): void {}
 
 /** Sets a path's owner and group; `-1` leaves either unchanged. */
 #[Stub]
@@ -630,7 +630,7 @@ function temporary_directory(): (string&!'') {}
 function create_temporary_file(
   (string&!'') $directory,
   string $prefix,
-  0..=4294967295 $mode,
+  0..=429_4967_295 $mode,
 ): (FileDescriptor, (string&!'')) {}
 
 /** Creates a new directory with a generated name and returns its path. */

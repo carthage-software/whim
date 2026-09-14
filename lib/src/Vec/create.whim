@@ -6,7 +6,6 @@ use Whim\Marker\MustUse;
 use Whim\Refine\Transform;
 use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\LogicException;
-use Whim\Vec\_Private;
 
 /** Creates a vec containing repeated copies of a value. */
 #[MustUse]

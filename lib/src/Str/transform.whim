@@ -7,7 +7,6 @@ use Whim\Refine\Iterable;
 use Whim\Refine\NonEmptyString;
 use Whim\Refine\NonNegativeInt;
 use Whim\Refine\PositiveInt;
-use Whim\Str\_Private;
 use Whim\Vec;
 use Whim;
 

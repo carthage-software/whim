@@ -83,16 +83,16 @@ type Uint8 = 0..=255;
 type Int8 = -128..=127;
 
 /** An unsigned 16-bit integer. */
-type Uint16 = 0..=65535;
+type Uint16 = 0..=65_535;
 
 /** A signed 16-bit integer. */
-type Int16 = -32768..=32767;
+type Int16 = -32_768..=32_767;
 
 /** An unsigned 32-bit integer. */
-type Uint32 = 0..=4294967295;
+type Uint32 = 0..=4_294_967_295;
 
 /** A signed 32-bit integer. */
-type Int32 = -2147483648..=2147483647;
+type Int32 = -2_147_483_648..=2_147_483_647;
 
 /** An unsigned 64-bit integer. */
 type Uint64 = 0..;

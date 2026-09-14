@@ -1,8 +1,6 @@
 namespace Whim\HTTP\_Private;
 
 use Whim;
-use Whim\HTTP\_Private\Frame;
-use Whim\HTTP\_Private\ProtocolException;
 
 function queue_frame(State $state, Frame\WeakendFrame $frame): void {
   queue_bytes($state, Frame\encode($frame));

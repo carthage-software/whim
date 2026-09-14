@@ -1,14 +1,5 @@
 namespace Whim\HTTP\_Private;
 
-use Whim;
-use Whim\HTTP\_Private\ErrorCode;
-use Whim\HTTP\_Private\ErrorCodeValue;
-use Whim\HTTP\_Private\ProtocolException;
-use Whim\HTTP\_Private\Role;
-use Whim\HTTP\_Private\StreamException;
-use Whim\HTTP\_Private\StreamId;
-use Whim\HTTP\_Private\StreamState;
-
 function open_local_stream(State $state, StreamId $streamId): StreamEntry {
   accept_local_stream_id($state, $streamId);
   return $state->streams->openLocal($streamId);

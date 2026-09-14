@@ -1,7 +1,6 @@
 namespace Whim\Hash;
 
 use Whim;
-use Whim\Hash\_Private;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\SensitiveParameter;

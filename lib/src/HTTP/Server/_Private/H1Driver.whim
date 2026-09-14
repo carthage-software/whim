@@ -1,6 +1,5 @@
 namespace Whim\HTTP\Server\_Private;
 
-use Whim;
 use Whim\Async\CancellationToken;
 use Whim\Async\CancelledException;
 use Whim\Async\LinkedCancellationToken;

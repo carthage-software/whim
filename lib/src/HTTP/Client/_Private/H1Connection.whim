@@ -1,6 +1,5 @@
 namespace Whim\HTTP\Client\_Private;
 
-use Whim;
 use Whim\Async\CancellationToken;
 use Whim\Async\Deferred;
 use Whim\HTTP\Client\Configuration;
@@ -15,7 +14,6 @@ use Whim\HTTP\Message\Request;
 use Whim\HTTP\Message\Response;
 use Whim\HTTP\Message\Transaction;
 use Whim\IO\CloseHandle;
-use Whim\IO\MemoryHandle;
 use Whim\IO\ReadHandle;
 use Whim\IO\Reader;
 use Whim\IO\WriteHandle;

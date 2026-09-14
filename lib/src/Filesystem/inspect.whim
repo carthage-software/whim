@@ -1,7 +1,6 @@
 namespace Whim\Filesystem;
 
 use Whim;
-use Whim\Filesystem\_Private;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
@@ -34,7 +33,7 @@ function exists(NonEmptyString $path): bool {
 function is_file(NonEmptyString $path): bool {
   try {
     $metadata = _Private\metadata_values($path, true);
-  } catch (Whim\_Private\SystemError $error) {
+  } catch (Whim\_Private\SystemError $_) {
     return false;
   }
 
@@ -48,7 +47,7 @@ function is_file(NonEmptyString $path): bool {
 function is_directory(NonEmptyString $path): bool {
   try {
     $metadata = _Private\metadata_values($path, true);
-  } catch (Whim\_Private\SystemError $error) {
+  } catch (Whim\_Private\SystemError $_) {
     return false;
   }
 
@@ -62,7 +61,7 @@ function is_directory(NonEmptyString $path): bool {
 function is_symbolic_link(NonEmptyString $path): bool {
   try {
     $metadata = _Private\metadata_values($path, false);
-  } catch (Whim\_Private\SystemError $error) {
+  } catch (Whim\_Private\SystemError $_) {
     return false;
   }
 

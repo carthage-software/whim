@@ -73,7 +73,7 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
       return;
     }
 
-    $plaintext = $this->readPlaintext(65536);
+    $plaintext = $this->readPlaintext(65_536);
     if (null == $plaintext) {
       $this->reachedEnd = true;
       return;
@@ -91,13 +91,13 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
   #[TrackCaller]
   #[TraceBoundary]
   public function tryRead(null|int $maxBytes = null): string {
-    $maximum = $maxBytes ?? 65536;
+    $maximum = $maxBytes ?? 65_536;
     if ($maximum <= 0) {
       return '';
     }
 
-    if ($maximum > 65536) {
-      $maximum = 65536;
+    if ($maximum > 65_536) {
+      $maximum = 65_536;
     }
 
     if ($this->reachedEnd) {
@@ -127,7 +127,7 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
         return $plaintext;
       }
 
-      $ciphertext = $this->stream->tryRead(65536);
+      $ciphertext = $this->stream->tryRead(65_536);
       if ('' == $ciphertext) {
         if ($this->stream->reachedEndOfDataSource()) {
           $this->receiveEnd();
@@ -283,7 +283,7 @@ class StreamImpl<TEndpoint: Endpoint> implements Stream<TEndpoint> {
   #[TraceBoundary]
   private function nextCiphertext(): string {
     try {
-      return $this->connection->transmitCiphertext(65536);
+      return $this->connection->transmitCiphertext(65_536);
     } catch (Whim\_Private\TlsError $error) {
       failure($error);
     }

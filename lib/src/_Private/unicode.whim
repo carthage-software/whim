@@ -15,14 +15,14 @@ function unicode_case_fold(string $value): null|string {}
 function unicode_code_point_at(
   string $bytes,
   int $offset,
-): null|(0..=0xd7ff)|(0xe000..=0x10ffff) {}
+): null|(0..=0xd7_ff)|(0xe000..=0x10_ff_ff) {}
 
 /** Decodes the scalar value before a byte offset. */
 #[Stub]
 function unicode_code_point_before(
   string $bytes,
   int $offset,
-): null|(0..=0xd7ff)|(0xe000..=0x10ffff) {}
+): null|(0..=0xd7_ff)|(0xe000..=0x10_ff_ff) {}
 
 /** Encodes a scalar value as UTF-8. */
 #[Stub]

@@ -7,8 +7,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
 use Whim\Network\ConnectionException;
 use Whim\Network\InternetEndpoint;
-use Whim\Network\Port;
-use Whim\OS\FileDescriptor;
 use Whim\Unwind\Throwable;
 
 /** Connects one descriptor to a concrete endpoint. */

@@ -24,7 +24,7 @@ final readonly class TransportConfiguration implements Default {
     public NonEmptyString $localHostname = 'localhost',
     public bool $pipelining = true,
     public bool $chunking = true,
-    public PositiveInt $chunkSize = 65536,
+    public PositiveInt $chunkSize = 65_536,
     public bool $allowPartialSuccess = false,
     public NonNegativeInt $maximumIdleConnections = 1,
     public Duration $idleConnectionTimeout = Duration::fromMinutes(5),

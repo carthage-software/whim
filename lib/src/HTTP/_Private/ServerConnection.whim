@@ -2,8 +2,6 @@ namespace Whim\HTTP\_Private;
 
 use Whim;
 use Whim\HTTP\_Private\Event\WeakendEvent;
-use Whim\HTTP\_Private\SettingId;
-use Whim\HTTP\_Private\SettingValue;
 use Whim\Marker\TrackCaller;
 
 /** A server-side sans-I/O HTTP/2 connection. */

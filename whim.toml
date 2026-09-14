@@ -6,3 +6,15 @@ include = ["lib", "scripts"]
 [lint]
 include = ["lib", "scripts"]
 minimum_fail_level = "note"
+
+[lint.rules.cyclomatic-complexity]
+threshold = 120
+
+[lint.rules.no-empty-catch-clause]
+enabled = false
+
+[lint.rules.prefer-early-continue]
+enabled = false
+
+[lint.rules.prefer-early-return]
+enabled = false

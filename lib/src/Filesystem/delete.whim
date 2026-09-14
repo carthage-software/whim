@@ -1,7 +1,6 @@
 namespace Whim\Filesystem;
 
 use Whim;
-use Whim\Filesystem\_Private;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;

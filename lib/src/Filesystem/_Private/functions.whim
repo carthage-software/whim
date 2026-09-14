@@ -180,7 +180,7 @@ function parent_directory(NonEmptyString $path): null|NonEmptyString {
 function is_existing_directory(NonEmptyString $path, bool $follow): bool {
   try {
     $metadata = metadata_values($path, $follow);
-  } catch (Whim\_Private\SystemError $error) {
+  } catch (Whim\_Private\SystemError $_) {
     return false;
   }
 

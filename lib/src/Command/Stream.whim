@@ -67,9 +67,7 @@ final readonly class Discarded implements InputStream, OutputStream {
 /** Connects a child's input to a readable handle the caller already holds. */
 final readonly class AttachedInput implements InputStream {
   #[AlwaysInline]
-  public function __construct(
-    public readonly FileDescriptorHandle&ReadHandle $handle,
-  ) {}
+  public function __construct(public FileDescriptorHandle&ReadHandle $handle) {}
 
   /** The engine disposition this stream resolves to. */
   #[AlwaysInline]
@@ -83,7 +81,7 @@ final readonly class AttachedInput implements InputStream {
 final readonly class AttachedOutput implements OutputStream {
   #[AlwaysInline]
   public function __construct(
-    public readonly FileDescriptorHandle&WriteHandle $handle,
+    public FileDescriptorHandle&WriteHandle $handle,
   ) {}
 
   /** The engine disposition this stream resolves to. */

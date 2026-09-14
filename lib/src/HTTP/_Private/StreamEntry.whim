@@ -1,7 +1,5 @@
 namespace Whim\HTTP\_Private;
 
-use Whim\HTTP\_Private\StreamState;
-
 /** Mutable state owned by one HTTP/2 stream. */
 final class StreamEntry {
   public StreamState $state = StreamState::Idle;

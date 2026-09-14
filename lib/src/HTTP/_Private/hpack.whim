@@ -1,8 +1,5 @@
 namespace Whim\HTTP\_Private;
 
-use Whim\HTTP\_Private\ErrorCode;
-use Whim\HTTP\_Private\Header;
-use Whim\HTTP\_Private\ProtocolException;
 use Whim\Unwind\Throwable;
 
 function decode_headers(State $state, string $bytes): vec<Header> {
@@ -16,7 +13,7 @@ function decode_headers(State $state, string $bytes): vec<Header> {
   }
 
   $size = 0;
-  foreach ($decoded as ($name, $value, $sensitive)) {
+  foreach ($decoded as ($name, $value, $_)) {
     if ('' == $name) {
       throw new ProtocolException(
         'field names must not be empty',

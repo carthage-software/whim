@@ -6,7 +6,6 @@ use Whim\HTTP\Client\Configuration;
 use Whim\HTTP\Client\Connection;
 use Whim\HTTP\Client\Handler;
 use Whim\HTTP\Client\Middleware as ClientMiddleware;
-use Whim\HTTP\Client\Middleware\_Private;
 use Whim\HTTP\Client\Middleware\_Private\StoredCookie;
 use Whim\HTTP\Cookie\Collection;
 use Whim\HTTP\Cookie\SetCookie;

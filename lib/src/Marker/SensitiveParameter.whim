@@ -1,6 +1,5 @@
 namespace Whim\Marker;
 
-use Whim\Marker\TrackCaller;
 use Whim\Attribute\Attribute;
 
 /** Redacts a parameter value from diagnostic traces. */
