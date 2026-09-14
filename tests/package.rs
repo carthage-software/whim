@@ -1412,7 +1412,7 @@ fn install_rejects_a_stale_lock() {
     assert_success(&fixture.run(&["install"]));
     fs::write(
         fixture.application.join("whim.toml"),
-        "manifest-version = 1\n\n[requirements]\nwhim = \"^0.8\"\n",
+        "manifest-version = 1\n\n[requirements]\nwhim = \"*\"\n",
     )
     .expect("the manifest is writable");
 
