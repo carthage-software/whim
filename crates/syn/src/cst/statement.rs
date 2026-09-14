@@ -25,6 +25,36 @@ use crate::cst::sequence::TokenSeparatedSequence;
 use crate::cst::r#type::Newtype;
 use crate::cst::r#type::TypeAlias;
 
+/// A top-level Whim statement.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum TopLevelStatement<'arena> {
+    FileAttributeList(FileAttributeList<'arena>),
+    Namespace(Namespace<'arena>),
+    Use(Use<'arena>),
+    Class(Class<'arena>),
+    Interface(Interface<'arena>),
+    Enum(Enum<'arena>),
+    Function(Function<'arena>),
+    Constant(Constant<'arena>),
+    TypeAlias(TypeAlias<'arena>),
+    Newtype(Newtype<'arena>),
+    Statement(Statement<'arena>),
+}
+
+/// A Whim statement.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum Statement<'arena> {
+    If(If<'arena>),
+    While(While<'arena>),
+    DoWhile(DoWhile<'arena>),
+    For(For<'arena>),
+    Foreach(Foreach<'arena>),
+    Try(Try<'arena>),
+    Using(Using<'arena>),
+    FinalLocal(FinalLocal<'arena>),
+    Expression(ExpressionStatement<'arena>),
+}
+
 /// An expression in statement position, terminated by a semicolon.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ExpressionStatement<'arena> {
@@ -60,39 +90,6 @@ pub struct Using<'arena> {
     pub body: Block<'arena>,
 }
 
-/// An Whim statement.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum Statement<'arena> {
-    FileAttributeList(FileAttributeList<'arena>),
-    Namespace(Namespace<'arena>),
-    Use(Use<'arena>),
-    Class(Class<'arena>),
-    Interface(Interface<'arena>),
-    Enum(Enum<'arena>),
-    Function(Function<'arena>),
-    Constant(Constant<'arena>),
-    TypeAlias(TypeAlias<'arena>),
-    Newtype(Newtype<'arena>),
-    If(If<'arena>),
-    While(While<'arena>),
-    DoWhile(DoWhile<'arena>),
-    For(For<'arena>),
-    Foreach(Foreach<'arena>),
-    Try(Try<'arena>),
-    Using(Using<'arena>),
-    FinalLocal(FinalLocal<'arena>),
-    Expression(ExpressionStatement<'arena>),
-    Noop(Span),
-}
-
-impl Statement<'_> {
-    #[inline]
-    #[must_use]
-    pub const fn is_noop(&self) -> bool {
-        matches!(self, Statement::Noop(_))
-    }
-}
-
 impl HasSpan for ExpressionStatement<'_> {
     fn span(&self) -> Span {
         self.expression.span().join(self.semicolon)
@@ -117,19 +114,27 @@ impl HasSpan for Using<'_> {
     }
 }
 
+impl HasSpan for TopLevelStatement<'_> {
+    fn span(&self) -> Span {
+        match self {
+            TopLevelStatement::FileAttributeList(statement) => statement.span(),
+            TopLevelStatement::Namespace(statement) => statement.span(),
+            TopLevelStatement::Use(statement) => statement.span(),
+            TopLevelStatement::Class(statement) => statement.span(),
+            TopLevelStatement::Interface(statement) => statement.span(),
+            TopLevelStatement::Enum(statement) => statement.span(),
+            TopLevelStatement::Function(statement) => statement.span(),
+            TopLevelStatement::Constant(statement) => statement.span(),
+            TopLevelStatement::TypeAlias(statement) => statement.span(),
+            TopLevelStatement::Newtype(statement) => statement.span(),
+            TopLevelStatement::Statement(statement) => statement.span(),
+        }
+    }
+}
+
 impl HasSpan for Statement<'_> {
     fn span(&self) -> Span {
         match self {
-            Statement::FileAttributeList(statement) => statement.span(),
-            Statement::Namespace(statement) => statement.span(),
-            Statement::Use(statement) => statement.span(),
-            Statement::Class(statement) => statement.span(),
-            Statement::Interface(statement) => statement.span(),
-            Statement::Enum(statement) => statement.span(),
-            Statement::Function(statement) => statement.span(),
-            Statement::Constant(statement) => statement.span(),
-            Statement::TypeAlias(statement) => statement.span(),
-            Statement::Newtype(statement) => statement.span(),
             Statement::If(statement) => statement.span(),
             Statement::While(statement) => statement.span(),
             Statement::DoWhile(statement) => statement.span(),
@@ -139,7 +144,6 @@ impl HasSpan for Statement<'_> {
             Statement::Using(statement) => statement.span(),
             Statement::FinalLocal(statement) => statement.span(),
             Statement::Expression(statement) => statement.span(),
-            Statement::Noop(span) => *span,
         }
     }
 }

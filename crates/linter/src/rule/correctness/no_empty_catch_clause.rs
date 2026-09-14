@@ -4,7 +4,6 @@ use whim_span::HasSpan;
 use whim_syn::arena::Arena;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::node::NodeKind;
-use whim_syn::cst::statement::Statement;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -87,7 +86,7 @@ impl LintRule for NoEmptyCatchClauseRule {
         for clause in statement
             .catch_clauses
             .iter()
-            .filter(|clause| clause.block.statements.iter().all(Statement::is_noop))
+            .filter(|clause| clause.block.statements.is_empty())
         {
             ctx.report(
                 self.meta,

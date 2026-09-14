@@ -15,13 +15,14 @@ use whim_syn::arena::LocalArena;
 use whim_syn::cst::Program;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Type;
 use whim_syn::error::ParseError;
 use whim_syn::parser::parse;
 
 fn aliased_type<'a>(arena: &'a LocalArena, source: &str) -> &'a Type<'a> {
     let program = program(arena, &format!("type Alias = {source};"));
-    let Statement::TypeAlias(alias) = &program.statements[0] else {
+    let TopLevelStatement::TypeAlias(alias) = &program.statements[0] else {
         panic!("expected a type alias");
     };
 
@@ -32,7 +33,7 @@ fn program<'a>(arena: &'a LocalArena, source: &str) -> &'a Program<'a> {
     parse(arena, source).expect("expected parsing to succeed")
 }
 
-fn statement<'a>(arena: &'a LocalArena, source: &str) -> &'a Statement<'a> {
+fn top_level_statement<'a>(arena: &'a LocalArena, source: &str) -> &'a TopLevelStatement<'a> {
     let program = program(arena, source);
     assert_eq!(
         program.statements.len(),
@@ -43,15 +44,16 @@ fn statement<'a>(arena: &'a LocalArena, source: &str) -> &'a Statement<'a> {
     &program.statements[0]
 }
 
-fn expression<'a>(arena: &'a LocalArena, source: &str) -> &'a Expression<'a> {
-    let program = program(arena, source);
-    assert_eq!(
-        program.statements.len(),
-        1,
-        "expected exactly one statement"
-    );
+fn statement<'a>(arena: &'a LocalArena, source: &str) -> &'a Statement<'a> {
+    let TopLevelStatement::Statement(statement) = top_level_statement(arena, source) else {
+        panic!("expected an executable statement");
+    };
 
-    match &program.statements[0] {
+    statement
+}
+
+fn expression<'a>(arena: &'a LocalArena, source: &str) -> &'a Expression<'a> {
+    match statement(arena, source) {
         Statement::Expression(statement) => statement.expression,
         other => panic!("expected an expression statement, got {other:?}"),
     }

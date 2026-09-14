@@ -335,6 +335,7 @@ mod tests {
 
     use crate::arena::LocalArena;
     use crate::cst::statement::Statement;
+    use crate::cst::statement::TopLevelStatement;
     use crate::parser::parse;
     use crate::unreachable_invariant;
 
@@ -348,7 +349,9 @@ mod tests {
             Err(_) => unsafe { unreachable_invariant("fixture source parses") },
         };
 
-        let Some(Statement::Expression(statement)) = program.statements.first() else {
+        let Some(TopLevelStatement::Statement(Statement::Expression(statement))) =
+            program.statements.first()
+        else {
             // SAFETY: the fixture has one expression statement.
             unsafe { unreachable_invariant("fixture is a single expression statement") }
         };

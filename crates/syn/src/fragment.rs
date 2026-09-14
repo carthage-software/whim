@@ -5,7 +5,7 @@ use crate::arena::Arena;
 use crate::cst::class::ClassLikeMember;
 use crate::cst::class::Property;
 use crate::cst::function::Function;
-use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 use crate::cst::r#type::Type;
 use crate::cst::r#type::TypeAlias;
 use crate::cst::r#type::TypeParameterList;
@@ -74,7 +74,7 @@ where
     let program = parser::parse(arena, &wrapped)?;
 
     match program.statements {
-        [Statement::TypeAlias(alias)] => Ok(alias.aliased),
+        [TopLevelStatement::TypeAlias(alias)] => Ok(alias.aliased),
         _ => Err(FragmentError::new("expected a single type")),
     }
 }
@@ -97,7 +97,7 @@ where
     let program = parser::parse(arena, &wrapped)?;
 
     match program.statements {
-        [Statement::Function(function)] => Ok(function),
+        [TopLevelStatement::Function(function)] => Ok(function),
         _ => Err(FragmentError::new("expected a function signature")),
     }
 }
@@ -118,7 +118,7 @@ where
     let program = parser::parse(arena, &wrapped)?;
 
     match program.statements {
-        [Statement::TypeAlias(alias)] => Ok(alias),
+        [TopLevelStatement::TypeAlias(alias)] => Ok(alias),
         _ => Err(FragmentError::new("expected a type alias")),
     }
 }
@@ -140,7 +140,7 @@ where
     let program = parser::parse(arena, &wrapped)?;
 
     match program.statements {
-        [Statement::TypeAlias(alias)] => alias
+        [TopLevelStatement::TypeAlias(alias)] => alias
             .type_parameters
             .as_ref()
             .ok_or_else(|| FragmentError::new("expected a type-parameter list")),
@@ -165,7 +165,7 @@ where
     let program = parser::parse(arena, &wrapped)?;
 
     match program.statements {
-        [Statement::Class(class)] => match class.members {
+        [TopLevelStatement::Class(class)] => match class.members {
             [ClassLikeMember::Property(property)] => Ok(property),
             _ => Err(FragmentError::new("expected a single property declaration")),
         },

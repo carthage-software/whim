@@ -6,6 +6,11 @@ Blocks group statements as the bodies of declarations and control-flow
 constructs, such as functions, `if`, loops, `try`, and `using`. Standalone
 `{ ... }` and `{}` blocks are syntax errors, including inside another body.
 
+Named functions, classes, interfaces, enums, global constants, type aliases,
+newtypes, imports, and file attributes belong at the top level of a file or
+namespace. They cannot appear inside function bodies or control-flow blocks.
+Use a closure when you need a function value inside a body.
+
 ## Expression statements
 
 Any expression may form a statement when followed by `;`:
@@ -19,7 +24,7 @@ write_line!($value);
 Discarding a value marked `#[MustUse]` raises an error. Use its result or pass
 it to `discard!` to state that you meant to ignore it.
 
-An empty statement is one semicolon. It does nothing.
+Every expression statement needs an expression; `;` alone is a syntax error.
 
 ## Final locals
 

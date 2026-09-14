@@ -30,14 +30,9 @@ pub(crate) fn check_early_exit<A: Arena>(
         return;
     }
 
-    let body: Vec<_> = statement
-        .body
-        .statements
-        .iter()
-        .filter(|statement| !statement.is_noop())
-        .collect();
-
-    if body.len() <= max_allowed_statements || (body.len() == 1 && is_early_exit_statement(body[0]))
+    let body = statement.body.statements;
+    if body.len() <= max_allowed_statements
+        || (body.len() == 1 && is_early_exit_statement(&body[0]))
     {
         return;
     }
@@ -60,12 +55,11 @@ pub(crate) fn check_early_exit<A: Arena>(
 }
 
 pub(crate) fn extract_single_if<'a>(statements: &'a [Statement<'a>]) -> Option<&'a If<'a>> {
-    let mut statements = statements.iter().filter(|statement| !statement.is_noop());
-    let Statement::If(statement) = statements.next()? else {
+    let [Statement::If(statement)] = statements else {
         return None;
     };
 
-    statements.next().is_none().then_some(statement)
+    Some(statement)
 }
 
 fn is_early_exit_statement(statement: &Statement<'_>) -> bool {

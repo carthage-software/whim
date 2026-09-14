@@ -6,7 +6,7 @@ use whim_syn::cst::Program;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::class::ClassLikeMember;
 use whim_syn::cst::node::Node;
-use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeParameterList;
 use whim_syn::cst::r#type::TypeVariance;
@@ -47,20 +47,20 @@ pub(crate) fn extend_generics<'arena>(program: &Program<'arena>, table: &mut Gen
 }
 
 fn collect_generic_statements<'arena>(
-    statements: &'arena [Statement<'arena>],
+    statements: &'arena [TopLevelStatement<'arena>],
     namespace: &str,
     table: &mut GenericTable<'arena>,
 ) {
     for statement in statements {
         match statement {
-            Statement::Namespace(namespace_declaration) => {
+            TopLevelStatement::Namespace(namespace_declaration) => {
                 collect_generic_statements(
                     namespace_declaration.statements(),
                     &namespace_name(namespace_declaration),
                     table,
                 );
             }
-            Statement::Function(function) => {
+            TopLevelStatement::Function(function) => {
                 record_declaration(
                     table,
                     namespace,
@@ -69,7 +69,7 @@ fn collect_generic_statements<'arena>(
                     DeclaredTypeKind::Function,
                 );
             }
-            Statement::Constant(constant) => {
+            TopLevelStatement::Constant(constant) => {
                 record_declaration(
                     table,
                     namespace,
@@ -78,7 +78,7 @@ fn collect_generic_statements<'arena>(
                     DeclaredTypeKind::Constant,
                 );
             }
-            Statement::Class(class) => {
+            TopLevelStatement::Class(class) => {
                 record_declaration(
                     table,
                     namespace,
@@ -89,7 +89,7 @@ fn collect_generic_statements<'arena>(
 
                 record_member_arities(table, namespace, class.name.value, class.members);
             }
-            Statement::Interface(interface) => {
+            TopLevelStatement::Interface(interface) => {
                 record_declaration(
                     table,
                     namespace,
@@ -100,7 +100,7 @@ fn collect_generic_statements<'arena>(
 
                 record_member_arities(table, namespace, interface.name.value, interface.members);
             }
-            Statement::Enum(declaration) => {
+            TopLevelStatement::Enum(declaration) => {
                 record_declaration(
                     table,
                     namespace,
@@ -115,7 +115,7 @@ fn collect_generic_statements<'arena>(
                     declaration.members,
                 );
             }
-            Statement::TypeAlias(alias) => {
+            TopLevelStatement::TypeAlias(alias) => {
                 let (required, total) = alias.type_parameters.as_ref().map_or((0, 0), binder_arity);
                 let expansion = AliasExpansion {
                     type_parameters: alias.type_parameters.as_ref(),
@@ -135,7 +135,7 @@ fn collect_generic_statements<'arena>(
                     },
                 );
             }
-            Statement::Newtype(newtype) => {
+            TopLevelStatement::Newtype(newtype) => {
                 record_declaration(
                     table,
                     namespace,

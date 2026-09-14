@@ -34,7 +34,8 @@ The grammar reserves `_` even where this guide says `identifier`.
 ```text
 source-file     := shebang? source-item*
 
-source-item     := namespace-declaration
+source-item     := file-attribute-list
+                 | namespace-declaration
                  | use-declaration
                  | function-declaration
                  | class-declaration
@@ -47,7 +48,8 @@ source-item     := namespace-declaration
 ```
 
 A file may mix declarations and statements. A namespace declaration can apply
-to the rest of the file or hold a braced source body.
+to the rest of the file or hold a braced source body. Declarations, imports,
+and file attributes belong at the top level of a file or namespace.
 
 ```text
 namespace-declaration
@@ -198,9 +200,7 @@ See [Aliases and Newtypes](../core-library/functions-and-constants.md).
 ## Statements
 
 ```text
-statement       := ";"
-                 | file-attribute-list
-                 | expression ";"
+statement       := expression ";"
                  | if-statement
                  | while-statement
                  | do-while-statement

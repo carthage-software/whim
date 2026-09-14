@@ -10,6 +10,7 @@ use whim_syn::cst::node::NodeKind;
 use whim_syn::cst::operation::AssignmentOperator;
 use whim_syn::cst::operation::AssignmentTarget;
 use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -72,6 +73,7 @@ impl LintRule for InlineVariableReturnRule {
             NodeKind::Program,
             NodeKind::Block,
             NodeKind::NamespaceImplicitBody,
+            NodeKind::NamespaceBraceDelimitedBody,
         ]
     }
 
@@ -89,62 +91,93 @@ impl LintRule for InlineVariableReturnRule {
     ) {
         let statements = match node {
             Node::Program(program) => program.statements,
-            Node::Block(block) => block.statements,
+            Node::Block(block) => {
+                for pair in block.statements.windows(2) {
+                    self.check_pair(ctx, &pair[0], &pair[1]);
+                }
+
+                return;
+            }
             Node::NamespaceImplicitBody(body) => body.statements,
+            Node::NamespaceBraceDelimitedBody(body) => body.statements,
             _ => return,
         };
 
         for pair in statements.windows(2) {
-            let (
-                Statement::Expression(assignment_statement),
-                Statement::Expression(return_statement),
-            ) = (&pair[0], &pair[1])
-            else {
-                continue;
-            };
-            let Expression::Assignment(assignment) =
-                assignment_statement.expression.unparenthesized()
-            else {
-                continue;
-            };
-            let (AssignmentOperator::Assign(_), AssignmentTarget::Variable(variable)) =
-                (assignment.operator, &assignment.target)
-            else {
-                continue;
-            };
-            let Expression::Return(return_expression) =
-                return_statement.expression.unparenthesized()
-            else {
-                continue;
-            };
-            let Some(value) = return_expression.value else {
-                continue;
-            };
-            let Expression::Variable(returned) = value.unparenthesized() else {
-                continue;
-            };
-            if returned.name != variable.name || finally_mentions(ctx, variable.name) {
-                continue;
+            if let [
+                TopLevelStatement::Statement(left),
+                TopLevelStatement::Statement(right),
+            ] = pair
+            {
+                self.check_pair(ctx, left, right);
             }
-
-            ctx.report(
-                self.meta,
-                self.cfg.level(),
-                (variable.span, "temporary assigned here"),
-                format!("Variable `{}` can be returned directly.", variable.name),
-                [AnnotationKind::Context
-                    .span(return_expression.span().into())
-                    .label("returned without any intervening use")],
-                [
-                    Level::NOTE
-                        .message("Whim collections have value semantics, so this does not change aliasing.")
-                        .into(),
-                    Level::HELP
-                        .message(format!("Return `{}` directly.", ctx.source_for(assignment.value.span())))
-                        .into(),
-                ],
-            );
         }
+    }
+}
+
+impl InlineVariableReturnRule {
+    fn check_pair<A: Arena>(
+        &self,
+        ctx: &mut LintContext<'_, '_, A>,
+        left: &Statement<'_>,
+        right: &Statement<'_>,
+    ) {
+        let (Statement::Expression(assignment_statement), Statement::Expression(return_statement)) =
+            (left, right)
+        else {
+            return;
+        };
+
+        let Expression::Assignment(assignment) = assignment_statement.expression.unparenthesized()
+        else {
+            return;
+        };
+
+        let (AssignmentOperator::Assign(_), AssignmentTarget::Variable(variable)) =
+            (assignment.operator, &assignment.target)
+        else {
+            return;
+        };
+
+        let Expression::Return(return_expression) = return_statement.expression.unparenthesized()
+        else {
+            return;
+        };
+
+        let Some(value) = return_expression.value else {
+            return;
+        };
+
+        let Expression::Variable(returned) = value.unparenthesized() else {
+            return;
+        };
+
+        if returned.name != variable.name || finally_mentions(ctx, variable.name) {
+            return;
+        }
+
+        ctx.report(
+            self.meta,
+            self.cfg.level(),
+            (variable.span, "temporary assigned here"),
+            format!("Variable `{}` can be returned directly.", variable.name),
+            [AnnotationKind::Context
+                .span(return_expression.span().into())
+                .label("returned without any intervening use")],
+            [
+                Level::NOTE
+                    .message(
+                        "Whim collections have value semantics, so this does not change aliasing.",
+                    )
+                    .into(),
+                Level::HELP
+                    .message(format!(
+                        "Return `{}` directly.",
+                        ctx.source_for(assignment.value.span())
+                    ))
+                    .into(),
+            ],
+        );
     }
 }
 

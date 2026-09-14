@@ -12,9 +12,11 @@ use whim_syn::cst::class::Class;
 use whim_syn::cst::class::Enum;
 use whim_syn::cst::class::Interface;
 use whim_syn::cst::declaration::Constant;
+use whim_syn::cst::declaration::FileAttributeList;
 use whim_syn::cst::declaration::Namespace;
 use whim_syn::cst::function::Function;
 use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Newtype;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeAlias;
@@ -47,7 +49,6 @@ use crate::compiler::types::rendering::render_type;
 use crate::value::heap::Heap;
 
 pub(in crate::compiler) mod class_likes;
-mod file_attributes;
 pub(in crate::compiler) mod functions;
 pub(in crate::compiler) mod generics;
 mod members;
@@ -58,6 +59,7 @@ use crate::compiler::declarations::class_likes::compile_enum;
 use crate::compiler::declarations::class_likes::compile_interface;
 use crate::compiler::declarations::class_likes::validate_variance_use;
 use crate::compiler::declarations::functions::DeclarationContext;
+use crate::compiler::declarations::functions::compile_attribute;
 use crate::compiler::declarations::functions::compile_attributes;
 use crate::compiler::declarations::functions::compile_function_declaration;
 use crate::compiler::declarations::functions::compile_initializer;
@@ -82,7 +84,6 @@ pub(in crate::compiler::declarations) struct Array<'compilation, 'arena> {
     generics: &'compilation GenericTable<'arena>,
     embedded_files: &'compilation EmbeddedFiles,
     trusted_returns: bool,
-    has_file_attributes: bool,
 }
 
 pub(in crate::compiler) fn collect<'source, 'arena>(
@@ -101,9 +102,6 @@ pub(in crate::compiler) fn collect<'source, 'arena>(
         generics: compilation.generics,
         embedded_files: compilation.embedded_files,
         trusted_returns: compilation.trusted_return_types,
-        has_file_attributes: program.source_text
-            [program.span.start.offset as usize..program.span.end.offset as usize]
-            .contains("#!["),
     };
     let mut regions = Vec::new();
     collect_statements(
@@ -119,7 +117,7 @@ pub(in crate::compiler) fn collect<'source, 'arena>(
 
 fn collect_statements<'source, 'arena>(
     context: &Array<'_, 'arena>,
-    statements: &'source [Statement<'arena>],
+    statements: &'source [TopLevelStatement<'arena>],
     resolver: Resolver,
     aliases: &mut AliasGraph,
     unit: &mut CompiledUnit,
@@ -133,44 +131,75 @@ fn collect_statements<'source, 'arena>(
     };
 
     for statement in statements {
-        if context.has_file_attributes && !matches!(statement, Statement::Namespace(_)) {
-            file_attributes::collect(context, statement, &mut region, unit)?;
-        }
-
         match statement {
-            Statement::FileAttributeList(_) => {}
-            Statement::Namespace(namespace) => {
+            TopLevelStatement::FileAttributeList(list) => {
+                collect_file_attributes(context, list, &mut region, unit)?;
+            }
+            TopLevelStatement::Namespace(namespace) => {
                 collect_namespace(context, namespace, &mut region, aliases, unit, regions)?;
             }
-            Statement::Use(declaration) => region
+            TopLevelStatement::Use(declaration) => region
                 .resolver
                 .collect_use(declaration, &region.declared_names)?,
-            Statement::Function(function) => {
+            TopLevelStatement::Function(function) => {
                 collect_function(context, &mut region, function, unit)?;
             }
-            Statement::Class(class) => collect_class(context, &mut region, class, unit)?,
-            Statement::Interface(interface) => {
+            TopLevelStatement::Class(class) => collect_class(context, &mut region, class, unit)?,
+            TopLevelStatement::Interface(interface) => {
                 collect_interface(context, &mut region, interface, unit)?;
             }
-            Statement::Enum(declaration) => {
+            TopLevelStatement::Enum(declaration) => {
                 collect_enum(context, &mut region, declaration, unit)?;
             }
-            Statement::Constant(constant) => {
+            TopLevelStatement::Constant(constant) => {
                 collect_constant(context, &mut region, constant, unit)?;
             }
-            Statement::TypeAlias(alias) => {
+            TopLevelStatement::TypeAlias(alias) => {
                 collect_type_alias(context, &mut region, alias, aliases, unit)?;
             }
-            Statement::Newtype(newtype) => {
+            TopLevelStatement::Newtype(newtype) => {
                 collect_newtype(context, &mut region, newtype, unit)?;
             }
-            other => region
+            TopLevelStatement::Statement(statement) => region
                 .main_statements
-                .push((other, region.resolver.clone())),
+                .push((statement, region.resolver.clone())),
         }
     }
 
     regions.push(region);
+    Ok(())
+}
+
+fn collect_file_attributes(
+    context: &Array<'_, '_>,
+    list: &FileAttributeList<'_>,
+    region: &mut Region<'_, '_>,
+    unit: &mut CompiledUnit,
+) -> Result<(), CompileError> {
+    let scope = Scope {
+        heap: context.heap,
+        runtime_path: context.runtime_path,
+        line_starts: context.line_starts,
+        resolver: &region.resolver,
+        class: None,
+        binders: Vec::new(),
+        forbidden_binders: Vec::new(),
+        generics: context.generics,
+        embedded_files: context.embedded_files,
+        trusted_returns: context.trusted_returns,
+    };
+
+    for attribute in &list.attributes {
+        region.file_attributes.push(compile_attribute(
+            context.heap,
+            &scope,
+            attribute,
+            context.path,
+            context.source_text,
+            &mut DeclarationContext::for_unit(unit),
+        )?);
+    }
+
     Ok(())
 }
 

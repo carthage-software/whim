@@ -87,7 +87,7 @@ where
                 }
             }
 
-            statements.push(self.parse_statement()?);
+            statements.push(self.parse_top_level_statement()?);
         }
 
         let span = self.stream.input_span();

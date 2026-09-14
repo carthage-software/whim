@@ -33,6 +33,7 @@ use crate::cst::pattern::DictPatternKey;
 use crate::cst::pattern::ObjectPatternEntry;
 use crate::cst::pattern::Pattern;
 use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 use crate::cst::r#type::IntegerRangeBound;
 use crate::cst::r#type::NegativeLiteralType;
 use crate::cst::r#type::StringLength;
@@ -58,22 +59,25 @@ impl Node<'_, '_> {
                         f(Node::Trivia(&node.trivia[trivia]));
                         trivia += 1;
                     } else {
-                        f(Node::Statement(&node.statements[statements]));
+                        f(Node::TopLevelStatement(&node.statements[statements]));
                         statements += 1;
                     }
                 }
             }
+            Node::TopLevelStatement(node) => match node {
+                TopLevelStatement::FileAttributeList(inner) => f(Node::FileAttributeList(inner)),
+                TopLevelStatement::Namespace(inner) => f(Node::Namespace(inner)),
+                TopLevelStatement::Use(inner) => f(Node::Use(inner)),
+                TopLevelStatement::Class(inner) => f(Node::Class(inner)),
+                TopLevelStatement::Interface(inner) => f(Node::Interface(inner)),
+                TopLevelStatement::Enum(inner) => f(Node::Enum(inner)),
+                TopLevelStatement::Function(inner) => f(Node::Function(inner)),
+                TopLevelStatement::Constant(inner) => f(Node::Constant(inner)),
+                TopLevelStatement::TypeAlias(inner) => f(Node::TypeAlias(inner)),
+                TopLevelStatement::Newtype(inner) => f(Node::Newtype(inner)),
+                TopLevelStatement::Statement(inner) => f(Node::Statement(inner)),
+            },
             Node::Statement(node) => match node {
-                Statement::FileAttributeList(inner) => f(Node::FileAttributeList(inner)),
-                Statement::Namespace(inner) => f(Node::Namespace(inner)),
-                Statement::Use(inner) => f(Node::Use(inner)),
-                Statement::Class(inner) => f(Node::Class(inner)),
-                Statement::Interface(inner) => f(Node::Interface(inner)),
-                Statement::Enum(inner) => f(Node::Enum(inner)),
-                Statement::Function(inner) => f(Node::Function(inner)),
-                Statement::Constant(inner) => f(Node::Constant(inner)),
-                Statement::TypeAlias(inner) => f(Node::TypeAlias(inner)),
-                Statement::Newtype(inner) => f(Node::Newtype(inner)),
                 Statement::If(inner) => f(Node::If(inner)),
                 Statement::While(inner) => f(Node::While(inner)),
                 Statement::DoWhile(inner) => f(Node::DoWhile(inner)),
@@ -83,7 +87,6 @@ impl Node<'_, '_> {
                 Statement::Using(inner) => f(Node::Using(inner)),
                 Statement::FinalLocal(inner) => f(Node::FinalLocal(inner)),
                 Statement::Expression(inner) => f(Node::ExpressionStatement(inner)),
-                Statement::Noop(_) => {}
             },
             Node::ExpressionStatement(node) => f(Node::Expression(node.expression)),
             Node::FinalLocal(node) => {
@@ -120,11 +123,16 @@ impl Node<'_, '_> {
             }
             Node::NamespaceBody(node) => match node {
                 NamespaceBody::Implicit(inner) => f(Node::NamespaceImplicitBody(inner)),
-                NamespaceBody::BraceDelimited(inner) => f(Node::Block(inner)),
+                NamespaceBody::BraceDelimited(inner) => f(Node::NamespaceBraceDelimitedBody(inner)),
             },
+            Node::NamespaceBraceDelimitedBody(node) => {
+                for statement in node.statements {
+                    f(Node::TopLevelStatement(statement));
+                }
+            }
             Node::NamespaceImplicitBody(node) => {
                 for statement in node.statements {
-                    f(Node::Statement(statement));
+                    f(Node::TopLevelStatement(statement));
                 }
             }
             Node::Use(node) => {

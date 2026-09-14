@@ -10,8 +10,7 @@ use crate::cst::atom::LocalIdentifier;
 use crate::cst::call::ArgumentList;
 use crate::cst::expression::Expression;
 use crate::cst::sequence::TokenSeparatedSequence;
-use crate::cst::statement::Block;
-use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 
 /// A namespace declaration.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -25,7 +24,7 @@ pub struct Namespace<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum NamespaceBody<'arena> {
     Implicit(NamespaceImplicitBody<'arena>),
-    BraceDelimited(Block<'arena>),
+    BraceDelimited(NamespaceBraceDelimitedBody<'arena>),
 }
 
 /// An implicit namespace body: a semicolon followed by every statement up
@@ -33,13 +32,21 @@ pub enum NamespaceBody<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct NamespaceImplicitBody<'arena> {
     pub semicolon: Span,
-    pub statements: &'arena [Statement<'arena>],
+    pub statements: &'arena [TopLevelStatement<'arena>],
+}
+
+/// A brace-delimited block of statements.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct NamespaceBraceDelimitedBody<'arena> {
+    pub left_brace: Span,
+    pub statements: &'arena [TopLevelStatement<'arena>],
+    pub right_brace: Span,
 }
 
 impl<'arena> Namespace<'arena> {
     #[inline]
     #[must_use]
-    pub const fn statements(&self) -> &'arena [Statement<'arena>] {
+    pub const fn statements(&self) -> &'arena [TopLevelStatement<'arena>] {
         match &self.body {
             NamespaceBody::Implicit(body) => body.statements,
             NamespaceBody::BraceDelimited(body) => body.statements,
@@ -67,6 +74,12 @@ impl HasSpan for NamespaceImplicitBody<'_> {
         self.statements
             .last()
             .map_or(self.semicolon, |last| self.semicolon.join(last.span()))
+    }
+}
+
+impl HasSpan for NamespaceBraceDelimitedBody<'_> {
+    fn span(&self) -> Span {
+        self.left_brace.join(self.right_brace)
     }
 }
 

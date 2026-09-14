@@ -12,7 +12,7 @@ fn loaded_files_retain_source_metadata_across_optimization() {
         });
         for (path, source) in [
             ("/reflection/empty.whim", ""),
-            ("/reflection/noop.whim", ";;; namespace Empty {}"),
+            ("/reflection/namespace.whim", "namespace Empty {}"),
             (
                 "/reflection/code.whim",
                 "namespace Executable; if (false) { write_line!('unreachable'); }",
@@ -64,13 +64,13 @@ assert!(Reflection\reflect_file('/reflection/code.whim')->hasTopLevelCode());
 assert!(Reflection\reflect_file('/reflection/code.whim')->getSymbols() == vec[]);
 assert!(!Reflection\reflect_file('/reflection/empty.whim')->hasTopLevelCode());
 assert!(Reflection\reflect_file('/reflection/empty.whim')->getSymbols() == vec[]);
-assert!(!Reflection\reflect_file('/reflection/noop.whim')->hasTopLevelCode());
+assert!(!Reflection\reflect_file('/reflection/namespace.whim')->hasTopLevelCode());
 assert!(Reflection\reflect_file('/reflection/missing.whim') == null);
 $paths = vec[];
 foreach (Reflection\get_loaded_files() as $loaded) { $paths[] = $loaded->getPath(); }
 assert!($paths == vec[
     '/reflection/check.whim', '/reflection/code.whim',
-    '/reflection/declarations.whim', '/reflection/empty.whim', '/reflection/noop.whim',
+    '/reflection/declarations.whim', '/reflection/empty.whim', '/reflection/namespace.whim',
 ]);
 ",
             Path::new("/reflection/check.whim"),

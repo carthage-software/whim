@@ -3,7 +3,7 @@ use whim_syn::cst::atom::Literal;
 
 use whim_syn::cst::call::Call;
 use whim_syn::cst::expression::Expression;
-use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::IntegerRangeBound;
 use whim_syn::cst::r#type::IntegerRangeOperator;
 use whim_syn::cst::r#type::IntegerRangeType;
@@ -16,7 +16,7 @@ use whim_syn::token::kind::TokenKind;
 use crate::aliased_type;
 use crate::error;
 use crate::expression;
-use crate::statement;
+use crate::top_level_statement;
 
 #[test]
 fn dictionary_shapes_accept_boolean_keys() {
@@ -78,7 +78,8 @@ fn bare_function_type() {
 #[test]
 fn bare_function_type_as_a_parameter_type() {
     let arena = LocalArena::new();
-    let Statement::Function(function) = statement(&arena, "function f(fn $callback): void {}")
+    let TopLevelStatement::Function(function) =
+        top_level_statement(&arena, "function f(fn $callback): void {}")
     else {
         panic!("expected a function declaration");
     };
@@ -223,12 +224,13 @@ fn nested_classname_types_split_the_shift_token() {
 fn classname_and_typename_are_usable_as_names() {
     let arena = LocalArena::new();
 
-    let Statement::Function(_) = statement(&arena, "function classname(): int { return 1; }")
+    let TopLevelStatement::Function(_) =
+        top_level_statement(&arena, "function classname(): int { return 1; }")
     else {
         panic!("expected a function declaration named `classname`");
     };
 
-    let Statement::Constant(_) = statement(&arena, "const typename = 1;") else {
+    let TopLevelStatement::Constant(_) = top_level_statement(&arena, "const typename = 1;") else {
         panic!("expected a constant declaration named `typename`");
     };
 

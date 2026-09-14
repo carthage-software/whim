@@ -193,7 +193,6 @@ pub(crate) fn compile_program_into_unit<'arena>(
         attributes.append(&mut region.file_attributes);
     }
 
-    attributes.sort_unstable_by_key(|attribute| attribute.span.start.offset);
     limits::check_count(
         error::CompileErrorKind::TooManyAttributes,
         "one file may carry",
@@ -208,12 +207,9 @@ pub(crate) fn compile_program_into_unit<'arena>(
         path: (!path.runtime.is_empty() && path.runtime != b"-").then(|| heap.intern(path.runtime)),
         span: program.span(),
         attributes,
-        has_top_level_code: regions.iter().any(|region| {
-            region
-                .main_statements
-                .iter()
-                .any(|(statement, _)| !statement.is_noop())
-        }),
+        has_top_level_code: regions
+            .iter()
+            .any(|region| !region.main_statements.is_empty()),
     });
 
     let mut compiler = BodyCompiler::new(

@@ -15,62 +15,57 @@ fn control_flow_statements() {
     let arena = LocalArena::new();
 
     assert!(matches!(
-        &program(&arena, "if ($c) { return 1; } else { return 2; }").statements[0],
+        statement(&arena, "if ($c) { return 1; } else { return 2; }"),
         Statement::If(_)
     ));
     assert!(matches!(
-        &program(&arena, "if ($a) { } else if ($b) { } else { }").statements[0],
+        statement(&arena, "if ($a) { } else if ($b) { } else { }"),
         Statement::If(_)
     ));
     assert!(matches!(
-        &program(&arena, "while ($c) { $i = $i + 1; }").statements[0],
+        statement(&arena, "while ($c) { $i = $i + 1; }"),
         Statement::While(_)
     ));
     assert!(matches!(
-        &program(&arena, "do { $x; } while ($c);").statements[0],
+        statement(&arena, "do { $x; } while ($c);"),
         Statement::DoWhile(_)
     ));
     assert!(matches!(
-        &program(&arena, "for ($i = 0; $i < 10; $i++) { }").statements[0],
+        statement(&arena, "for ($i = 0; $i < 10; $i++) { }"),
         Statement::For(_)
     ));
     assert!(matches!(
-        &program(&arena, "foreach ($items as $item) { }").statements[0],
+        statement(&arena, "foreach ($items as $item) { }"),
         Statement::Foreach(_)
     ));
     assert!(matches!(
-        &program(&arena, "foreach ($map as $k => $v) { }").statements[0],
+        statement(&arena, "foreach ($map as $k => $v) { }"),
         Statement::Foreach(_)
     ));
     assert!(matches!(
-        &program(&arena, "foreach ($pairs as ($a, $b)) { }").statements[0],
+        statement(&arena, "foreach ($pairs as ($a, $b)) { }"),
         Statement::Foreach(_)
     ));
     assert!(matches!(
-        &program(&arena, "try { $a; } catch (Error $e) { } finally { }").statements[0],
+        statement(&arena, "try { $a; } catch (Error $e) { } finally { }"),
         Statement::Try(_)
     ));
-    let Statement::Using(using) = &program(
+    let Statement::Using(using) = statement(
         &arena,
         "using ($resource = open(), ($a, $b) = pair(),) { use($resource); }",
-    )
-    .statements[0] else {
+    ) else {
         panic!("expected a using statement");
     };
     assert_eq!(using.bindings.len(), 2);
-    let Statement::Expression(statement) = &program(&arena, "return;").statements[0] else {
+    let Statement::Expression(return_statement) = statement(&arena, "return;") else {
         panic!("expected an expression statement");
     };
 
-    assert!(matches!(statement.expression, Expression::Return(_)));
-    let Statement::Expression(statement) = &program(&arena, "break 2;").statements[0] else {
+    assert!(matches!(return_statement.expression, Expression::Return(_)));
+    let Statement::Expression(break_statement) = statement(&arena, "break 2;") else {
         panic!("expected an expression statement");
     };
-    assert!(matches!(statement.expression, Expression::Break(_)));
-    assert!(matches!(
-        &program(&arena, ";").statements[0],
-        Statement::Noop(_)
-    ));
+    assert!(matches!(break_statement.expression, Expression::Break(_)));
 }
 
 #[test]

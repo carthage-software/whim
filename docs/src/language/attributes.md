@@ -90,7 +90,7 @@ Each use stores its own arguments. Source order stays intact.
 ## File attributes
 
 Use `#![...]` to attach attributes to the whole file. The opening `#![` is one
-token. A file attribute list is a statement and needs no semicolon.
+token. A file attribute list is a top-level statement and needs no semicolon.
 
 ```whim
 namespace App;
@@ -115,23 +115,11 @@ foreach ($file->getAttributes::<Tag>() as $attribute) {
 }
 ```
 
-Put file attributes wherever you can write a statement, including inside a
-function, method, closure, or conditional. The compiler collects every file
-attribute before execution and optimization. This attribute applies even when
-the condition is false:
-
-```whim
-use Whim\Attribute\Attribute;
-
-#[Attribute(Attribute::TARGET_FILE)]
-final readonly class Tag {
-  public function __construct(public string $name) {}
-}
-
-if (false) {
-  #![Tag('http')]
-}
-```
+Put file attributes at the top level of a file or namespace, including after
+imports or executable statements. They apply to the whole file. The compiler
+collects them before execution and optimization. Function bodies and
+control-flow blocks contain only executable statements, so they cannot contain
+file attributes.
 
 Names follow the namespace and imports at the attribute's location. Arguments
 follow the same constant-expression rules as other attributes and cannot read

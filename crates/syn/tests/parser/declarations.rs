@@ -8,41 +8,53 @@ use whim_syn::cst::declaration::UseItems;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::function::ClosureBody;
 use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::error::ParseError;
 
 use crate::error;
 use crate::expression;
 use crate::program;
 use crate::statement;
+use crate::top_level_statement;
 
 #[test]
-fn file_attribute_lists_are_statements_with_their_own_delimiters() {
+fn file_attribute_lists_are_top_level_statements_with_their_own_delimiters() {
     let arena = LocalArena::new();
     let parsed = program(
         &arena,
-        "#![A, B(value: 'file'),]\n#[C] function f() { #![D] }",
+        "#![A, B(value: 'file'),]\n#[C] function f() { return; }\nnamespace App { use D as E; #![E] }",
     );
-    let Statement::FileAttributeList(list) = &parsed.statements[0] else {
+    let TopLevelStatement::FileAttributeList(list) = &parsed.statements[0] else {
         panic!("expected file attributes");
     };
     assert_eq!(list.hash_bang_left_bracket.start.offset, 0);
     assert_eq!(list.hash_bang_left_bracket.end.offset, 3);
     assert_eq!(list.attributes.len(), 2);
     assert_eq!(list.attributes.as_slice()[1].name.value(), "B");
-    let Statement::Function(function) = &parsed.statements[1] else {
+    let TopLevelStatement::Function(function) = &parsed.statements[1] else {
         panic!("expected a function");
     };
     assert_eq!(function.attribute_lists.len(), 1);
     assert!(matches!(
         function.body.statements[0],
-        Statement::FileAttributeList(_)
+        Statement::Expression(_)
+    ));
+    let TopLevelStatement::Namespace(namespace) = &parsed.statements[2] else {
+        panic!("expected a namespace");
+    };
+    assert!(matches!(
+        namespace.statements(),
+        [
+            TopLevelStatement::Use(_),
+            TopLevelStatement::FileAttributeList(_)
+        ]
     ));
 }
 
 #[test]
 fn function_declaration_with_typed_params_and_return_type() {
     let arena = LocalArena::new();
-    let Statement::Function(function) = statement(
+    let TopLevelStatement::Function(function) = top_level_statement(
         &arena,
         "function add(int $a, int $b): int { return $a + $b; }",
     ) else {
@@ -85,8 +97,8 @@ fn underscore_is_reserved_for_every_declaration_name() {
 #[test]
 fn function_with_default_parameters() {
     let arena = LocalArena::new();
-    let Statement::Function(function) =
-        statement(&arena, "function f(string $name, int $count = 0) { }")
+    let TopLevelStatement::Function(function) =
+        top_level_statement(&arena, "function f(string $name, int $count = 0) { }")
     else {
         panic!("expected a function declaration");
     };
@@ -140,7 +152,7 @@ fn class_with_method_typed_property_and_constant() {
         private int $x = 0;
         public function moveBy(int $dx): void { }
     }";
-    let Statement::Class(class) = statement(&arena, source) else {
+    let TopLevelStatement::Class(class) = top_level_statement(&arena, source) else {
         panic!("expected a class declaration");
     };
 
@@ -166,7 +178,7 @@ fn constructor_property_promotion() {
     let source = "class Point {
         public function __construct(private int $x, private int $y) { }
     }";
-    let Statement::Class(class) = statement(&arena, source) else {
+    let TopLevelStatement::Class(class) = top_level_statement(&arena, source) else {
         panic!("expected a class declaration");
     };
 
@@ -184,7 +196,7 @@ fn interface_with_abstract_method() {
     let source = "interface Comparable extends Stringable {
         public function compareTo(self $other): int;
     }";
-    let Statement::Interface(interface) = statement(&arena, source) else {
+    let TopLevelStatement::Interface(interface) = top_level_statement(&arena, source) else {
         panic!("expected an interface declaration");
     };
 
@@ -200,7 +212,7 @@ fn interface_with_abstract_method() {
 fn sealed_interface_permissions_follow_extends() {
     let arena = LocalArena::new();
     let source = "interface Narrow extends Result for Success, App\\Failure {}";
-    let Statement::Interface(interface) = statement(&arena, source) else {
+    let TopLevelStatement::Interface(interface) = top_level_statement(&arena, source) else {
         panic!("expected an interface declaration");
     };
 
@@ -216,7 +228,7 @@ fn backed_enum_with_cases() {
         case Hearts = 'H';
         case Spades = 'S';
     }";
-    let Statement::Enum(r#enum) = statement(&arena, source) else {
+    let TopLevelStatement::Enum(r#enum) = top_level_statement(&arena, source) else {
         panic!("expected an enum declaration");
     };
 
@@ -233,7 +245,7 @@ fn backed_enum_with_cases() {
 fn unbacked_enum_with_cases() {
     let arena = LocalArena::new();
     let source = "enum Direction { case Up; case Down; }";
-    let Statement::Enum(r#enum) = statement(&arena, source) else {
+    let TopLevelStatement::Enum(r#enum) = top_level_statement(&arena, source) else {
         panic!("expected an enum declaration");
     };
 
@@ -279,7 +291,7 @@ fn block_bodied_closure() {
 fn attribute_on_a_class() {
     let arena = LocalArena::new();
     let source = "#[Entity, Table('users')] final class User { }";
-    let Statement::Class(class) = statement(&arena, source) else {
+    let TopLevelStatement::Class(class) = top_level_statement(&arena, source) else {
         panic!("expected a class declaration");
     };
 
@@ -295,8 +307,8 @@ fn attribute_on_a_class() {
 fn attributed_function_and_closure() {
     let arena = LocalArena::new();
     assert!(matches!(
-        statement(&arena, "#[Pure] function f(): int { return 1; }"),
-        Statement::Function(_)
+        top_level_statement(&arena, "#[Pure] function f(): int { return 1; }"),
+        TopLevelStatement::Function(_)
     ));
     let Statement::Expression(statement) = statement(&arena, "#[A] fn () => 1;") else {
         panic!("expected an expression statement");
@@ -308,7 +320,7 @@ fn attributed_function_and_closure() {
 fn namespace_both_forms() {
     let arena = LocalArena::new();
 
-    let Statement::Namespace(implicit) = statement(
+    let TopLevelStatement::Namespace(implicit) = top_level_statement(
         &arena,
         "namespace App\\Service;\nconst VERSION = 1;\nfn () => 1;",
     ) else {
@@ -320,7 +332,9 @@ fn namespace_both_forms() {
     };
     assert_eq!(body.statements.len(), 2);
 
-    let Statement::Namespace(braced) = statement(&arena, "namespace App { const X = 1; }") else {
+    let TopLevelStatement::Namespace(braced) =
+        top_level_statement(&arena, "namespace App { const X = 1; }")
+    else {
         panic!("expected a namespace declaration");
     };
     assert!(matches!(braced.body, NamespaceBody::BraceDelimited(_)));
@@ -349,8 +363,8 @@ fn namespace_is_usable_as_an_ordinary_identifier() {
     let arena = LocalArena::new();
 
     assert!(matches!(
-        statement(&arena, "function namespace(): int { return 1; }"),
-        Statement::Function(_)
+        top_level_statement(&arena, "function namespace(): int { return 1; }"),
+        TopLevelStatement::Function(_)
     ));
     assert!(matches!(
         statement(&arena, "namespace();"),
@@ -361,7 +375,7 @@ fn namespace_is_usable_as_an_ordinary_identifier() {
         &arena,
         "namespace App;\nfunction namespace(): int { return 1; }\nnamespace();\n$x = 1;",
     );
-    let Statement::Namespace(namespace) = &program.statements[0] else {
+    let TopLevelStatement::Namespace(namespace) = &program.statements[0] else {
         panic!("expected a namespace declaration");
     };
     let NamespaceBody::Implicit(body) = &namespace.body else {
@@ -374,12 +388,15 @@ fn namespace_is_usable_as_an_ordinary_identifier() {
 fn use_statements() {
     let arena = LocalArena::new();
 
-    let Statement::Use(simple) = statement(&arena, "use App\\Service\\Mailer;") else {
+    let TopLevelStatement::Use(simple) = top_level_statement(&arena, "use App\\Service\\Mailer;")
+    else {
         panic!("expected a use statement");
     };
     assert!(matches!(simple.items, UseItems::Sequence(_)));
 
-    let Statement::Use(aliased) = statement(&arena, "use App\\Service\\Mailer as Postman;") else {
+    let TopLevelStatement::Use(aliased) =
+        top_level_statement(&arena, "use App\\Service\\Mailer as Postman;")
+    else {
         panic!("expected a use statement");
     };
     let UseItems::Sequence(sequence) = &aliased.items else {
@@ -387,7 +404,8 @@ fn use_statements() {
     };
     assert!(sequence.items.first().expect("an item").alias.is_some());
 
-    let Statement::Use(grouped) = statement(&arena, "use App\\Service\\{Mailer, Logger as Log};")
+    let TopLevelStatement::Use(grouped) =
+        top_level_statement(&arena, "use App\\Service\\{Mailer, Logger as Log};")
     else {
         panic!("expected a use statement");
     };
@@ -396,7 +414,9 @@ fn use_statements() {
     };
     assert_eq!(list.items.len(), 2);
 
-    let Statement::Use(sequence) = statement(&arena, "use App\\Mailer, App\\Logger as Log;") else {
+    let TopLevelStatement::Use(sequence) =
+        top_level_statement(&arena, "use App\\Mailer, App\\Logger as Log;")
+    else {
         panic!("expected a use statement");
     };
     assert!(matches!(sequence.items, UseItems::Sequence(_)));
@@ -421,7 +441,9 @@ fn use_is_kind_agnostic() {
 #[test]
 fn top_level_constant() {
     let arena = LocalArena::new();
-    let Statement::Constant(constant) = statement(&arena, "const MAX_RETRIES = 3;") else {
+    let TopLevelStatement::Constant(constant) =
+        top_level_statement(&arena, "const MAX_RETRIES = 3;")
+    else {
         panic!("expected a constant declaration");
     };
     assert_eq!(constant.name.value, "MAX_RETRIES");
@@ -430,7 +452,8 @@ fn top_level_constant() {
 #[test]
 fn type_alias() {
     let arena = LocalArena::new();
-    let Statement::TypeAlias(alias) = statement(&arena, "type Scalar = int|float|string|bool;")
+    let TopLevelStatement::TypeAlias(alias) =
+        top_level_statement(&arena, "type Scalar = int|float|string|bool;")
     else {
         panic!("expected a type alias");
     };
@@ -441,8 +464,8 @@ fn type_alias() {
 #[test]
 fn generic_newtype() {
     let arena = LocalArena::new();
-    let Statement::Newtype(newtype) =
-        statement(&arena, "newtype Identifier<out T: int|string = int> = T;")
+    let TopLevelStatement::Newtype(newtype) =
+        top_level_statement(&arena, "newtype Identifier<out T: int|string = int> = T;")
     else {
         panic!("expected a newtype declaration");
     };
@@ -463,7 +486,7 @@ fn class_constant_with_and_without_type() {
         const int TYPED = 1;
         const UNTYPED = 2;
     }";
-    let Statement::Class(class) = statement(&arena, source) else {
+    let TopLevelStatement::Class(class) = top_level_statement(&arena, source) else {
         panic!("expected a class declaration");
     };
 
@@ -536,14 +559,14 @@ function main(): int {
     let program = program(&arena, source);
 
     assert_eq!(program.statements.len(), 1);
-    let Statement::Namespace(namespace) = &program.statements[0] else {
+    let TopLevelStatement::Namespace(namespace) = &program.statements[0] else {
         panic!("expected a namespace");
     };
 
     let body = namespace.statements();
     assert_eq!(body.len(), 8);
-    assert!(matches!(body[4], Statement::Class(_)));
-    assert!(matches!(body[5], Statement::Interface(_)));
-    assert!(matches!(body[6], Statement::Enum(_)));
-    assert!(matches!(body[7], Statement::Function(_)));
+    assert!(matches!(body[4], TopLevelStatement::Class(_)));
+    assert!(matches!(body[5], TopLevelStatement::Interface(_)));
+    assert!(matches!(body[6], TopLevelStatement::Enum(_)));
+    assert!(matches!(body[7], TopLevelStatement::Function(_)));
 }

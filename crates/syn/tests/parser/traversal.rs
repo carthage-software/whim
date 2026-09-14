@@ -43,6 +43,33 @@ fn walks_a_whole_program() {
 }
 
 #[test]
+fn namespaces_visit_top_level_items_and_executable_bodies() {
+    let ks = kinds(
+        "#![A] namespace App { use Tags\\B; #![B] function f() { return 1; } } namespace Other; #![C] work();",
+    );
+
+    for kind in [
+        NodeKind::TopLevelStatement,
+        NodeKind::NamespaceBraceDelimitedBody,
+        NodeKind::NamespaceImplicitBody,
+        NodeKind::Use,
+        NodeKind::Function,
+        NodeKind::Block,
+        NodeKind::Statement,
+        NodeKind::Return,
+        NodeKind::FunctionCall,
+    ] {
+        assert!(ks.contains(&kind), "missing {kind:?}");
+    }
+    assert_eq!(
+        ks.iter()
+            .filter(|kind| **kind == NodeKind::FileAttributeList)
+            .count(),
+        3
+    );
+}
+
+#[test]
 fn descends_into_nested_expressions() {
     let ks = kinds("$x = foo($a->b, dict[1 => $c], vec[2, 3]);");
     assert!(ks.contains(&NodeKind::Call));
@@ -137,7 +164,7 @@ fn children_matches_visit_children() {
     let root = Node::Program(program);
     let children = root.children();
     assert_eq!(children.len(), 5);
-    assert_eq!(children[0].kind(), NodeKind::Statement);
+    assert_eq!(children[0].kind(), NodeKind::TopLevelStatement);
     assert!(
         children[1..]
             .iter()

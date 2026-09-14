@@ -38,7 +38,6 @@ pub(crate) enum CompileErrorKind {
     InvalidIncrementTarget,
     InvalidCompoundAssignmentTarget,
     AppendTargetUsedAsValue,
-    NestedDeclaration,
     ClassConstantTypeMismatch,
     InvalidEnumBacking,
     EnumCaseValueMismatch,

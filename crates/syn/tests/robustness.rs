@@ -3,7 +3,7 @@ use std::thread::Builder;
 use whim_span::HasSpan;
 use whim_syn::arena::LocalArena;
 use whim_syn::cst::node::Node;
-use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::walker::deepest_path;
 use whim_syn::error::ParseError;
 use whim_syn::error::SyntaxError;
@@ -215,7 +215,7 @@ fn the_deepest_admissible_composition_chain_is_spanned_iteratively() {
             let arena = LocalArena::new();
             let program = parse(&arena, &source).expect("a composition chain parses");
             let statement = program.statements.first().expect("one statement");
-            let Statement::TypeAlias(alias) = statement else {
+            let TopLevelStatement::TypeAlias(alias) = statement else {
                 panic!("the statement is a type alias");
             };
 
@@ -297,7 +297,7 @@ fn deeply_nested_expressions_hit_the_recursion_guard_not_the_stack() {
 }
 
 fn plus_chain(links: usize) -> String {
-    let mut source = String::from("$x = 0");
+    let mut source = String::from("const VALUE = 0");
     for _ in 0..links {
         source.push_str(" + 1");
     }

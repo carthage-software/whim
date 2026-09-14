@@ -12,6 +12,7 @@ use crate::cst::declaration::Constant;
 use crate::cst::declaration::FileAttributeList;
 use crate::cst::declaration::Namespace;
 use crate::cst::declaration::NamespaceBody;
+use crate::cst::declaration::NamespaceBraceDelimitedBody;
 use crate::cst::declaration::NamespaceImplicitBody;
 use crate::cst::declaration::Use;
 use crate::cst::declaration::UseItem;
@@ -23,6 +24,7 @@ use crate::cst::expression::Expression;
 use crate::cst::sequence::TokenSeparatedSequence;
 use crate::cst::statement::ExpressionStatement;
 use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 use crate::cst::r#type::Newtype;
 use crate::cst::r#type::TypeAlias;
 use crate::error::Expected;
@@ -43,7 +45,18 @@ where
         }
 
         let body = if self.is_at(TokenKind::LeftBrace)? {
-            NamespaceBody::BraceDelimited(self.parse_block()?)
+            let left_brace = self.expect_span(TokenKind::LeftBrace)?;
+            let mut statements = Vec::new_in(self.arena);
+            while !self.is_at(TokenKind::RightBrace)? {
+                statements.push(self.parse_top_level_statement()?);
+            }
+            let right_brace = self.expect_span(TokenKind::RightBrace)?;
+
+            NamespaceBody::BraceDelimited(NamespaceBraceDelimitedBody {
+                left_brace,
+                statements: statements.leak(),
+                right_brace,
+            })
         } else {
             let semicolon = self.expect_span(TokenKind::Semicolon)?;
 
@@ -51,7 +64,7 @@ where
             while !self.stream.has_reached_eof()?
                 && !(self.is_at(TokenKind::Namespace)? && self.at_namespace_declaration()?)
             {
-                statements.push(self.parse_statement()?);
+                statements.push(self.parse_top_level_statement()?);
             }
 
             NamespaceBody::Implicit(NamespaceImplicitBody {
@@ -286,7 +299,9 @@ where
         })
     }
 
-    pub(crate) fn parse_attributed_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(crate) fn parse_attributed_statement(
+        &mut self,
+    ) -> Result<TopLevelStatement<'arena>, ParseError> {
         let attribute_lists = self.parse_attribute_lists()?;
 
         let Some(kind) = self.peek_kind()? else {
@@ -302,7 +317,7 @@ where
             | TokenKind::Class
             | TokenKind::Interface
             | TokenKind::Enum => self.parse_class_like(attribute_lists),
-            TokenKind::Const => Ok(Statement::Constant(
+            TokenKind::Const => Ok(TopLevelStatement::Constant(
                 self.parse_constant_with(attribute_lists)?,
             )),
             TokenKind::Type
@@ -311,14 +326,14 @@ where
                     Some(TokenKind::Identifier)
                 ) =>
             {
-                Ok(Statement::TypeAlias(
+                Ok(TopLevelStatement::TypeAlias(
                     self.parse_type_alias_with(attribute_lists)?,
                 ))
             }
-            TokenKind::Newtype => Ok(Statement::Newtype(
+            TokenKind::Newtype => Ok(TopLevelStatement::Newtype(
                 self.parse_newtype_with(attribute_lists)?,
             )),
-            TokenKind::Function => Ok(Statement::Function(
+            TokenKind::Function => Ok(TopLevelStatement::Function(
                 self.parse_function_with(attribute_lists)?,
             )),
             TokenKind::Fn => {
@@ -326,10 +341,12 @@ where
                 let expression = self.arena.alloc(expression);
                 let semicolon = self.expect_span(TokenKind::Semicolon)?;
 
-                Ok(Statement::Expression(ExpressionStatement {
-                    expression,
-                    semicolon,
-                }))
+                Ok(TopLevelStatement::Statement(Statement::Expression(
+                    ExpressionStatement {
+                        expression,
+                        semicolon,
+                    },
+                )))
             }
             _ => Err(self.unexpected(Expected::Description(
                 "a declaration after an attribute list",

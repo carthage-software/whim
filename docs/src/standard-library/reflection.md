@@ -57,7 +57,7 @@ separate symbols in this list. Files without named symbols still appear in
 
 The compiler records `hasTopLevelCode()` before optimization. Unreachable
 statements still count, even if optimization removes them. Imports,
-declarations, file attributes, and empty statements do not count. Initializers
+declarations, and file attributes do not count. Initializers
 within declarations do not count either, so this flag does not guarantee that
 loading the file has no side effects.
 

@@ -128,6 +128,7 @@ use crate::cst::declaration::Constant;
 use crate::cst::declaration::FileAttributeList;
 use crate::cst::declaration::Namespace;
 use crate::cst::declaration::NamespaceBody;
+use crate::cst::declaration::NamespaceBraceDelimitedBody;
 use crate::cst::declaration::NamespaceImplicitBody;
 use crate::cst::declaration::Use;
 use crate::cst::declaration::UseItem;
@@ -188,6 +189,7 @@ use crate::cst::statement::Block;
 use crate::cst::statement::ExpressionStatement;
 use crate::cst::statement::FinalLocal;
 use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 use crate::cst::statement::Using;
 use crate::cst::statement::UsingBinding;
 use crate::cst::trivia::Trivia;
@@ -270,6 +272,7 @@ macro_rules! define_nodes {
 define_nodes! {
     Program(Program<'arena>),
     Trivia(Trivia<'arena>),
+    TopLevelStatement(TopLevelStatement<'arena>),
     Statement(Statement<'arena>),
     ExpressionStatement(ExpressionStatement<'arena>),
     FinalLocal(FinalLocal<'arena>),
@@ -279,6 +282,7 @@ define_nodes! {
     Return(Return<'arena>),
     Namespace(Namespace<'arena>),
     NamespaceBody(NamespaceBody<'arena>),
+    NamespaceBraceDelimitedBody(NamespaceBraceDelimitedBody<'arena>),
     NamespaceImplicitBody(NamespaceImplicitBody<'arena>),
     Use(Use<'arena>),
     UseItems(UseItems<'arena>),

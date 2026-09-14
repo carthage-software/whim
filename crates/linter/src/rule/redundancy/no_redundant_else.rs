@@ -111,13 +111,7 @@ impl LintRule for NoRedundantElseRule {
             return;
         };
 
-        let Some(Statement::Expression(last)) = statement
-            .body
-            .statements
-            .iter()
-            .rev()
-            .find(|statement| !statement.is_noop())
-        else {
+        let Some(Statement::Expression(last)) = statement.body.statements.last() else {
             return;
         };
 

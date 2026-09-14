@@ -122,7 +122,6 @@ impl<'arena> BodyCompiler<'_, 'arena> {
                 self.registers.release_temporaries();
                 Ok(())
             }
-            Statement::Noop(_) | Statement::FileAttributeList(_) => Ok(()),
             Statement::If(if_statement) => self.if_statement(scope, if_statement),
             Statement::While(loop_statement) => self.while_statement(scope, loop_statement),
             Statement::DoWhile(loop_statement) => self.do_while_statement(scope, loop_statement),
@@ -130,19 +129,6 @@ impl<'arena> BodyCompiler<'_, 'arena> {
             Statement::Foreach(loop_statement) => self.foreach_statement(scope, loop_statement),
             Statement::Try(try_statement) => self.try_statement(scope, try_statement),
             Statement::Using(using) => self.using_statement(scope, using),
-            Statement::Namespace(_)
-            | Statement::Use(_)
-            | Statement::Class(_)
-            | Statement::Interface(_)
-            | Statement::Enum(_)
-            | Statement::Function(_)
-            | Statement::Constant(_)
-            | Statement::TypeAlias(_)
-            | Statement::Newtype(_) => Err(CompileError::new(
-                CompileErrorKind::NestedDeclaration,
-                "a declaration is only valid at the top level of a file or namespace",
-                statement.span(),
-            )),
         }
     }
 

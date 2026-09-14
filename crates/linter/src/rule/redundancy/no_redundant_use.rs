@@ -7,7 +7,7 @@ use whim_syn::arena::Arena;
 use whim_syn::cst::Program;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::node::NodeKind;
-use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -99,7 +99,7 @@ impl LintRule for NoRedundantUseRule {
 
         self.check_region(ctx, "", global_statements(program));
         for statement in program.statements {
-            if let Statement::Namespace(namespace) = statement {
+            if let TopLevelStatement::Namespace(namespace) = statement {
                 self.check_region(ctx, namespace.name.value(), namespace.statements());
             }
         }
@@ -111,7 +111,7 @@ impl NoRedundantUseRule {
         &self,
         ctx: &mut LintContext<'_, 'arena, A>,
         namespace: &str,
-        statements: impl IntoIterator<Item = &'ast Statement<'arena>>,
+        statements: impl IntoIterator<Item = &'ast TopLevelStatement<'arena>>,
     ) where
         'arena: 'ast,
     {
@@ -122,7 +122,7 @@ impl NoRedundantUseRule {
         let mut type_parameters = HashMap::new();
 
         for statement in statements {
-            if let Statement::Use(declaration) = statement {
+            if let TopLevelStatement::Use(declaration) = statement {
                 names::for_each_use_item(declaration, |item, target, alias| {
                     let final_name = target.rsplit('\\').next().unwrap_or(&target);
                     let parent = target
@@ -146,7 +146,7 @@ impl NoRedundantUseRule {
                 continue;
             }
 
-            let mut stack = vec![UseStep::Visit(Node::Statement(statement))];
+            let mut stack = vec![UseStep::Visit(Node::TopLevelStatement(statement))];
             while let Some(step) = stack.pop() {
                 match step {
                     UseStep::ExitTypeParameters(names) => {
@@ -255,11 +255,11 @@ enum UseStep<'ast, 'arena> {
 
 fn global_statements<'ast, 'arena>(
     program: &'ast Program<'arena>,
-) -> impl Iterator<Item = &'ast Statement<'arena>> {
+) -> impl Iterator<Item = &'ast TopLevelStatement<'arena>> {
     program
         .statements
         .iter()
-        .filter(|statement| !matches!(statement, Statement::Namespace(_)))
+        .filter(|statement| !matches!(statement, TopLevelStatement::Namespace(_)))
 }
 
 #[cfg(test)]

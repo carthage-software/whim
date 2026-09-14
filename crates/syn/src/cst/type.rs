@@ -747,7 +747,7 @@ mod tests {
     use whim_span::HasSpan;
 
     use crate::arena::LocalArena;
-    use crate::cst::statement::Statement;
+    use crate::cst::statement::TopLevelStatement;
     use crate::parser::parse;
     use crate::unreachable_invariant;
 
@@ -761,7 +761,7 @@ mod tests {
             Err(_) => unsafe { unreachable_invariant("fixture source parses") },
         };
 
-        let Some(Statement::TypeAlias(alias)) = program.statements.first() else {
+        let Some(TopLevelStatement::TypeAlias(alias)) = program.statements.first() else {
             // SAFETY: the fixture has one type alias.
             unsafe { unreachable_invariant("fixture is a single type alias") }
         };

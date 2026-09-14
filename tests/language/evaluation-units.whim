@@ -10,20 +10,6 @@ $work = Filesystem\create_temporary_directory(null, 'whim-test-');
 
 rejects(
   $work,
-  'declaration-inside-a-block',
-  'if (true) {' . "\n" . '    function nested(): void {}' . "\n" . '}' . "\n",
-  'a declaration is only valid at the top level of a file or namespace',
-);
-
-rejects(
-  $work,
-  'declaration-inside-a-function-body',
-  'function outer(): void {' . "\n" . '    class Inner {}' . "\n" . '}' . "\n",
-  'a declaration is only valid at the top level of a file or namespace',
-);
-
-rejects(
-  $work,
   'top-level-return-is-rejected',
   'return 5;' . "\n",
   '`return` may only be used inside a function, method, or closure',

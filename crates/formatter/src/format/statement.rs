@@ -19,6 +19,7 @@ use whim_syn::cst::statement::Block;
 use whim_syn::cst::statement::ExpressionStatement;
 use whim_syn::cst::statement::FinalLocal;
 use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::statement::Using;
 use whim_syn::cst::statement::UsingBinding;
 
@@ -56,22 +57,38 @@ where
     }
 }
 
+impl<'arena, A> Format<'arena, A> for TopLevelStatement<'arena>
+where
+    A: Arena,
+{
+    fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
+        match self {
+            TopLevelStatement::FileAttributeList(node) => node.format(f),
+            TopLevelStatement::Namespace(node) => node.format(f),
+            TopLevelStatement::Use(node) => node.format(f),
+            TopLevelStatement::Class(node) => node.format(f),
+            TopLevelStatement::Interface(node) => node.format(f),
+            TopLevelStatement::Enum(node) => node.format(f),
+            TopLevelStatement::Function(node) => node.format(f),
+            TopLevelStatement::Constant(node) => node.format(f),
+            TopLevelStatement::TypeAlias(node) => node.format(f),
+            TopLevelStatement::Newtype(node) => node.format(f),
+            TopLevelStatement::Statement(node) => node.format(f),
+        }
+    }
+
+    #[inline]
+    fn blank_line_after_if_multiline(&self) -> bool {
+        true
+    }
+}
+
 impl<'arena, A> Format<'arena, A> for Statement<'arena>
 where
     A: Arena,
 {
     fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
         match self {
-            Statement::FileAttributeList(node) => node.format(f),
-            Statement::Namespace(node) => node.format(f),
-            Statement::Use(node) => node.format(f),
-            Statement::Class(node) => node.format(f),
-            Statement::Interface(node) => node.format(f),
-            Statement::Enum(node) => node.format(f),
-            Statement::Function(node) => node.format(f),
-            Statement::Constant(node) => node.format(f),
-            Statement::TypeAlias(node) => node.format(f),
-            Statement::Newtype(node) => node.format(f),
             Statement::If(node) => node.format(f),
             Statement::While(node) => node.format(f),
             Statement::DoWhile(node) => node.format(f),
@@ -81,13 +98,7 @@ where
             Statement::Using(node) => node.format(f),
             Statement::FinalLocal(node) => node.format(f),
             Statement::Expression(node) => node.format(f),
-            Statement::Noop(_) => f.empty(),
         }
-    }
-
-    #[inline]
-    fn should_skip(&self) -> bool {
-        self.is_noop()
     }
 
     #[inline]

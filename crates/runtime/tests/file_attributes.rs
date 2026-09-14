@@ -25,11 +25,11 @@ fn file_attributes_enforce_targets_repetition_and_arguments_before_execution() {
     for (declaration, application, expected) in [
         (
             "#[Whim\\Attribute\\Attribute(1)] class Tag {}",
-            "if (false) { #![Tag] }",
+            "#![Tag]",
             "does not target files",
         ),
         ("class Tag {}", "#![Tag]", "does not carry"),
-        ("", "function uncalled() { #![Missing] }", "is not defined"),
+        ("", "#![Missing]", "is not defined"),
         (
             "#[Whim\\Attribute\\Attribute(1024)] class Tag {}",
             "#![Tag] namespace Another { #![\\Tag] }",
@@ -52,12 +52,12 @@ fn file_attributes_enforce_targets_repetition_and_arguments_before_execution() {
         ),
         (
             "#[Whim\\Attribute\\Attribute(1024)] class Tag { public function __construct(string $name) {} }",
-            "function uncalled(string $name) { #![Tag($name)] }",
+            "#![Tag($name)]",
             "an attribute argument is a constant expression",
         ),
         (
             "#[Whim\\Attribute\\Attribute(1024)] class Tag { public function __construct(fn(): int $value) {} }",
-            "if (false) { #![Tag(fn(): int => $outside)] }",
+            "#![Tag(fn(): int => $outside)]",
             "a closure with captures",
         ),
     ] {

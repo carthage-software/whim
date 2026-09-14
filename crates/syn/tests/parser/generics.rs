@@ -3,7 +3,7 @@ use whim_syn::arena::LocalArena;
 use whim_syn::cst::access::ClassReference;
 use whim_syn::cst::call::Call;
 use whim_syn::cst::expression::Expression;
-use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeVariance;
 use whim_syn::error::ParseError;
@@ -11,12 +11,12 @@ use whim_syn::error::ParseError;
 use crate::aliased_type;
 use crate::error;
 use crate::expression;
-use crate::statement;
+use crate::top_level_statement;
 
 #[test]
 fn class_with_type_parameters() {
     let arena = LocalArena::new();
-    let Statement::Class(class) = statement(
+    let TopLevelStatement::Class(class) = top_level_statement(
         &arena,
         "class Box<in T: object = mixed, out U> extends Base<T> {}",
     ) else {
@@ -42,7 +42,8 @@ fn class_with_type_parameters() {
 #[test]
 fn a_type_parameter_may_have_multiple_bounds() {
     let arena = LocalArena::new();
-    let Statement::Function(function) = statement(&arena, "function f<T: A + B + C>(): void { }")
+    let TopLevelStatement::Function(function) =
+        top_level_statement(&arena, "function f<T: A + B + C>(): void { }")
     else {
         panic!("expected a function");
     };
@@ -63,7 +64,8 @@ fn an_enum_parses_type_parameters_for_a_precise_diagnostic() {
     // a generic enum with a precise message and span, rather than a bare
     // syntax error.
     let arena = LocalArena::new();
-    let Statement::Enum(declaration) = statement(&arena, "enum E<T> { case A; }") else {
+    let TopLevelStatement::Enum(declaration) = top_level_statement(&arena, "enum E<T> { case A; }")
+    else {
         panic!("expected an enum");
     };
     assert_eq!(
@@ -79,7 +81,9 @@ fn an_enum_parses_type_parameters_for_a_precise_diagnostic() {
 #[test]
 fn generic_type_alias() {
     let arena = LocalArena::new();
-    let Statement::TypeAlias(alias) = statement(&arena, "type Pair<A, B> = (A, B);") else {
+    let TopLevelStatement::TypeAlias(alias) =
+        top_level_statement(&arena, "type Pair<A, B> = (A, B);")
+    else {
         panic!("expected a type alias");
     };
     assert_eq!(alias.name.value, "Pair");
@@ -96,8 +100,8 @@ fn generic_type_alias() {
 #[test]
 fn function_with_type_parameters() {
     let arena = LocalArena::new();
-    let Statement::Function(function) =
-        statement(&arena, "function map<T, U>(fn(T): U $f): U { return $f; }")
+    let TopLevelStatement::Function(function) =
+        top_level_statement(&arena, "function map<T, U>(fn(T): U $f): U { return $f; }")
     else {
         panic!("expected a function");
     };

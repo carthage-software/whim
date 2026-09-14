@@ -2,19 +2,19 @@ use whim_syn::arena::LocalArena;
 
 use whim_syn::cst::call::Call;
 use whim_syn::cst::expression::Expression;
-use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::error::ParseError;
 
 use crate::error;
 use crate::expression;
 use crate::program;
-use crate::statement;
+use crate::top_level_statement;
 
 #[test]
 fn contextual_keywords_are_usable_as_names() {
     let arena = LocalArena::new();
 
-    let Statement::Constant(_) = statement(&arena, "const enum = 'x';") else {
+    let TopLevelStatement::Constant(_) = top_level_statement(&arena, "const enum = 'x';") else {
         panic!("expected a constant declaration named `enum`");
     };
     assert!(matches!(
@@ -26,7 +26,7 @@ fn contextual_keywords_are_usable_as_names() {
         Expression::Assignment(_)
     ));
 
-    let Statement::Function(_) = statement(&arena, "function vec() {}") else {
+    let TopLevelStatement::Function(_) = top_level_statement(&arena, "function vec() {}") else {
         panic!("expected a function declaration named `vec`");
     };
     assert!(matches!(
@@ -34,7 +34,7 @@ fn contextual_keywords_are_usable_as_names() {
         Expression::Call(_)
     ));
 
-    let Statement::Function(_) = statement(&arena, "function f(): int {}") else {
+    let TopLevelStatement::Function(_) = top_level_statement(&arena, "function f(): int {}") else {
         panic!("expected a function returning `int`");
     };
 }

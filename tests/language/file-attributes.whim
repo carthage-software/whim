@@ -1,3 +1,5 @@
+#![FileMetadata\Tag('before namespace')]
+
 namespace FileMetadata {
   use Whim\Attribute\Attribute;
 
@@ -30,42 +32,9 @@ namespace FileMetadata\App {
     name: NAME,
   )]
 
-  function uncalled(): void {
-    #![Label('function')]
-    if (false) {
-      #![Label('nested')]
-    }
-  }
-
-  class Host {
-    public function uncalled(): void {
-      #![Label('method')]
-    }
-  }
-
-  const CALLBACK = fn(): int {
-    #![Label('constant closure')]
-    return 7;
-  };
-
-  function with_default(fn(): int $callback = fn(): int {
-    #![Label('default closure')]
-    return 8;
-  }): int {
-    return $callback();
-  }
-
-  $closure = fn(): int {
-    #![Label('closure')]
-    return 9;
-  };
-
-  if (false) {
-    #![Label('false branch')]
-  }
+  function uncalled(): void {}
 
   #![Label('closure argument', fn(): int {
-    #![Label('inside argument')]
     return 10;
   })]
 
@@ -95,35 +64,27 @@ namespace FileMetadata\App {
 
   assert!(
     $names == vec[
+      'before namespace',
       'root',
       'namespace',
-      'function',
-      'nested',
-      'method',
-      'constant closure',
-      'default closure',
-      'closure',
-      'false branch',
       'closure argument',
-      'inside argument',
+      'after namespace',
+      'implicit namespace',
     ],
   );
 
   assert!(Label::$instances == length!($attributes));
-  assert!($attributes[0]->getArguments() == vec['root', 5]);
-  assert!($attributes[1]->getArguments() == vec[]);
+  assert!($attributes[1]->getArguments() == vec['root', 5]);
+  assert!($attributes[2]->getArguments() == vec[]);
   assert!(
-    $attributes[1]->getNamedArguments() == dict[
+    $attributes[2]->getNamedArguments() == dict[
       'value' => vec[1, 2],
       'name' => 'namespace',
     ],
   );
 
-  $callback = $attributes[9]->newInstance()->value;
+  $callback = $attributes[3]->newInstance()->value;
   assert!($callback() == 10);
-  assert!((CALLBACK)() == 7);
-  assert!(with_default() == 8);
-  assert!($closure() == 9);
   assert!(length!($file->getAttributes::<Label>()) == length!($attributes));
   $definition = Reflection\reflect_class(
     'FileMetadata\\Tag',
@@ -131,3 +92,11 @@ namespace FileMetadata\App {
 
   assert!($definition->getTargets() == vec[Reflection\Attribute\Target::File]);
 }
+
+#![FileMetadata\Tag('after namespace')]
+
+namespace FileMetadata\Other;
+
+use FileMetadata\Tag as Label;
+
+#![Label('implicit namespace')]

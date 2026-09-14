@@ -53,11 +53,6 @@ where
 {
     fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A>;
 
-    #[inline]
-    fn should_skip(&self) -> bool {
-        false
-    }
-
     /// Whether a multiline rendering of this node must be followed by an
     /// empty line when another sibling follows it.
     #[inline]
@@ -688,13 +683,7 @@ where
         let mut previous_separation = SequenceSeparation::Preserve;
 
         for (index, node) in nodes.iter().enumerate() {
-            if node.should_skip() {
-                continue;
-            }
-
-            let next = nodes[index + 1..]
-                .iter()
-                .find(|candidate| !candidate.should_skip());
+            let next = nodes.get(index + 1);
             let separation = match next {
                 Some(next) if node.blank_line_before(next) => SequenceSeparation::Always,
                 Some(_) if node.blank_line_after_if_multiline() => SequenceSeparation::IfMultiline,

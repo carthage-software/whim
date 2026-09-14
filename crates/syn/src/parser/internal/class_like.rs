@@ -21,7 +21,7 @@ use crate::cst::class::PropertyDefault;
 use crate::cst::class::SealedPermissions;
 use crate::cst::declaration::AttributeList;
 use crate::cst::sequence::TokenSeparatedSequence;
-use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 use crate::cst::r#type::NamedType;
 use crate::error::Expected;
 use crate::error::ParseError;
@@ -33,7 +33,9 @@ impl<'input, 'arena, A> Parser<'input, 'arena, A>
 where
     A: Arena,
 {
-    pub(crate) fn parse_class_like_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+    pub(crate) fn parse_class_like_statement(
+        &mut self,
+    ) -> Result<TopLevelStatement<'arena>, ParseError> {
         let attribute_lists = self.empty_slice();
 
         self.parse_class_like(attribute_lists)
@@ -42,22 +44,24 @@ where
     pub(crate) fn parse_class_like(
         &mut self,
         attribute_lists: &'arena [AttributeList<'arena>],
-    ) -> Result<Statement<'arena>, ParseError> {
+    ) -> Result<TopLevelStatement<'arena>, ParseError> {
         let modifiers = self.parse_modifiers()?;
 
         match self.peek_kind()? {
-            Some(TokenKind::Class) => Ok(Statement::Class(
+            Some(TokenKind::Class) => Ok(TopLevelStatement::Class(
                 self.parse_class(attribute_lists, modifiers)?,
             )),
             Some(TokenKind::Interface) => {
                 self.reject_leading_modifiers(modifiers)?;
 
-                Ok(Statement::Interface(self.parse_interface(attribute_lists)?))
+                Ok(TopLevelStatement::Interface(
+                    self.parse_interface(attribute_lists)?,
+                ))
             }
             Some(TokenKind::Enum) => {
                 self.reject_leading_modifiers(modifiers)?;
 
-                Ok(Statement::Enum(self.parse_enum(attribute_lists)?))
+                Ok(TopLevelStatement::Enum(self.parse_enum(attribute_lists)?))
             }
             _ => Err(self.unexpected(Expected::OneOf(&[
                 TokenKind::Class,

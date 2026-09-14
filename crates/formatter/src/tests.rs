@@ -751,10 +751,10 @@ fn attributes_with_arguments() {
 fn file_attributes_preserve_placement_and_comments() {
     assert_formats("#![A,B(value:'file')]", "#![A, B(value: 'file')]\n");
     assert_formats(
-        "#!/usr/bin/env whim\n#![Tag('file')]\n\nnamespace App;\n\nuse Tags\\Label;\n\n#![Label('app')]\n\nif(false){#![Label('branch')]}\n",
-        "#!/usr/bin/env whim\n#![Tag('file')]\n\nnamespace App;\n\nuse Tags\\Label;\n\n#![Label('app')]\n\nif (false) {\n  #![Label('branch')]\n}\n",
+        "#!/usr/bin/env whim\n#![Tag('file')]\n\nnamespace App;\n\nuse Tags\\Label;\n\n#![Label('app')]\n\nfunction f(){}\n",
+        "#!/usr/bin/env whim\n#![Tag('file')]\n\nnamespace App;\n\nuse Tags\\Label;\n\n#![Label('app')]\n\nfunction f() {}\n",
     );
-    let source = "// file\n#![Tag(\n// reason\nname: 'a long file attribute argument that needs to span more than one line when formatted',\n)] // after\nfunction f() { #![Other] }";
+    let source = "// file\n#![Tag(\n// reason\nname: 'a long file attribute argument that needs to span more than one line when formatted',\n)] // after\nnamespace App { #![Other] function f() {} }";
     assert_idempotent(source);
     let formatted = format(source);
     for comment in ["// file", "// reason", "// after"] {

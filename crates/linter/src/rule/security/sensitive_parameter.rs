@@ -7,7 +7,7 @@ use whim_syn::cst::atom::Literal;
 use whim_syn::cst::function::Parameter;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::node::NodeKind;
-use whim_syn::cst::statement::Statement;
+use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Type;
 
 use crate::category::Category;
@@ -97,7 +97,7 @@ impl LintRule for SensitiveParameterRule {
 
         self.check_region(ctx, "", global_statements(program));
         for statement in program.statements {
-            if let Statement::Namespace(namespace) = statement {
+            if let TopLevelStatement::Namespace(namespace) = statement {
                 self.check_region(ctx, namespace.name.value(), namespace.statements().iter());
             }
         }
@@ -109,17 +109,18 @@ impl SensitiveParameterRule {
         &self,
         ctx: &mut LintContext<'_, 'arena, A>,
         namespace: &str,
-        statements: impl IntoIterator<Item = &'ast Statement<'arena>>,
+        statements: impl IntoIterator<Item = &'ast TopLevelStatement<'arena>>,
     ) where
         'arena: 'ast,
     {
         let mut resolver = Resolver::for_namespace(namespace);
         for statement in statements {
-            if let Statement::Use(declaration) = statement {
+            if let TopLevelStatement::Use(declaration) = statement {
                 resolver.collect_use(declaration);
                 continue;
             }
-            let mut stack = vec![Node::Statement(statement)];
+
+            let mut stack = vec![Node::TopLevelStatement(statement)];
             while let Some(node) = stack.pop() {
                 if let Node::Parameter(parameter) = node {
                     self.check_parameter(ctx, parameter, &resolver);
@@ -176,11 +177,11 @@ fn has_sensitive_marker(parameter: &Parameter<'_>, resolver: &Resolver) -> bool 
 
 fn global_statements<'ast, 'arena>(
     program: &'ast Program<'arena>,
-) -> impl Iterator<Item = &'ast Statement<'arena>> {
+) -> impl Iterator<Item = &'ast TopLevelStatement<'arena>> {
     program
         .statements
         .iter()
-        .filter(|statement| !matches!(statement, Statement::Namespace(_)))
+        .filter(|statement| !matches!(statement, TopLevelStatement::Namespace(_)))
 }
 
 fn boolean_only(r#type: &Type<'_>) -> bool {

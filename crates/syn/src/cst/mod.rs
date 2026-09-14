@@ -23,7 +23,7 @@ pub mod walker;
 use whim_span::HasSpan;
 use whim_span::Span;
 
-use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 use crate::cst::trivia::Trivia;
 
 /// A fully parsed Whim source file.
@@ -32,7 +32,7 @@ pub struct Program<'arena> {
     pub source_text: &'arena str,
     pub span: Span,
     pub trivia: &'arena [Trivia<'arena>],
-    pub statements: &'arena [Statement<'arena>],
+    pub statements: &'arena [TopLevelStatement<'arena>],
 }
 
 impl HasSpan for Program<'_> {

@@ -8,6 +8,7 @@ use crate::cst::statement::Block;
 use crate::cst::statement::ExpressionStatement;
 use crate::cst::statement::FinalLocal;
 use crate::cst::statement::Statement;
+use crate::cst::statement::TopLevelStatement;
 use crate::cst::statement::Using;
 use crate::cst::statement::UsingBinding;
 use crate::error::Expected;
@@ -26,6 +27,60 @@ impl<'arena, A> Parser<'_, 'arena, A>
 where
     A: Arena,
 {
+    pub(crate) fn parse_top_level_statement(
+        &mut self,
+    ) -> Result<TopLevelStatement<'arena>, ParseError> {
+        self.enter()?;
+        let result = self.parse_top_level_statement_inner();
+        self.leave();
+
+        result
+    }
+
+    fn parse_top_level_statement_inner(&mut self) -> Result<TopLevelStatement<'arena>, ParseError> {
+        let Some(kind) = self.peek_kind()? else {
+            return Err(self.unexpected(Expected::Description("a statement")));
+        };
+
+        let statement = match kind {
+            TokenKind::HashLeftBracket => return self.parse_attributed_statement(),
+            TokenKind::HashBangLeftBracket => {
+                TopLevelStatement::FileAttributeList(self.parse_file_attribute_list()?)
+            }
+            TokenKind::Namespace if self.at_namespace_declaration()? => {
+                TopLevelStatement::Namespace(self.parse_namespace()?)
+            }
+            TokenKind::Use if self.at_use_declaration()? => {
+                TopLevelStatement::Use(self.parse_use()?)
+            }
+            TokenKind::Const if self.at_constant_declaration()? => {
+                TopLevelStatement::Constant(self.parse_constant()?)
+            }
+            kind if (kind.is_modifier()
+                || matches!(
+                    kind,
+                    TokenKind::Class | TokenKind::Interface | TokenKind::Enum
+                ))
+                && self.at_class_like_declaration()? =>
+            {
+                return self.parse_class_like_statement();
+            }
+            TokenKind::Function => TopLevelStatement::Function(self.parse_function()?),
+            TokenKind::Type
+                if matches!(
+                    self.lookahead(1)?.map(|token| token.kind),
+                    Some(TokenKind::Identifier)
+                ) =>
+            {
+                TopLevelStatement::TypeAlias(self.parse_type_alias()?)
+            }
+            TokenKind::Newtype => TopLevelStatement::Newtype(self.parse_newtype()?),
+            _ => TopLevelStatement::Statement(self.parse_statement_inner()?),
+        };
+
+        Ok(statement)
+    }
+
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         self.enter()?;
         let result = self.parse_statement_inner();
@@ -40,42 +95,11 @@ where
         };
 
         let statement = match kind {
-            TokenKind::Semicolon => Statement::Noop(self.expect_span(TokenKind::Semicolon)?),
             TokenKind::LeftBrace => {
                 return Err(ParseError::StandaloneBlock(
                     self.expect_span(TokenKind::LeftBrace)?,
                 ));
             }
-            TokenKind::HashLeftBracket => return self.parse_attributed_statement(),
-            TokenKind::HashBangLeftBracket => {
-                Statement::FileAttributeList(self.parse_file_attribute_list()?)
-            }
-            TokenKind::Namespace if self.at_namespace_declaration()? => {
-                Statement::Namespace(self.parse_namespace()?)
-            }
-            TokenKind::Use if self.at_use_declaration()? => Statement::Use(self.parse_use()?),
-            TokenKind::Const if self.at_constant_declaration()? => {
-                Statement::Constant(self.parse_constant()?)
-            }
-            kind if (kind.is_modifier()
-                || matches!(
-                    kind,
-                    TokenKind::Class | TokenKind::Interface | TokenKind::Enum
-                ))
-                && self.at_class_like_declaration()? =>
-            {
-                return self.parse_class_like_statement();
-            }
-            TokenKind::Function => Statement::Function(self.parse_function()?),
-            TokenKind::Type
-                if matches!(
-                    self.lookahead(1)?.map(|token| token.kind),
-                    Some(TokenKind::Identifier)
-                ) =>
-            {
-                Statement::TypeAlias(self.parse_type_alias()?)
-            }
-            TokenKind::Newtype => Statement::Newtype(self.parse_newtype()?),
             TokenKind::If => Statement::If(self.parse_if()?),
             TokenKind::While => Statement::While(self.parse_while()?),
             TokenKind::Do => Statement::DoWhile(self.parse_do_while()?),
