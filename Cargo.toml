@@ -66,7 +66,7 @@ bson = { version = "3.1.0", features = ["serde"] }
 bytes = "1"
 caseless = "0.2.2"
 clap = { version = "4.6", features = ["derive"] }
-constant_time_eq = "0.5.0"
+constant_time_eq = "0.6.0"
 corosensei = "0.3"
 crc32c = "0.6.8"
 crc32fast = "1.5.0"
