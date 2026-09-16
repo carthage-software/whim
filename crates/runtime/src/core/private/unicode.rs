@@ -60,7 +60,8 @@ pub(crate) fn case_fold(context: &Context<'_, '_, '_>, arguments: Arguments<'_>)
 }
 
 #[whim_function(
-    "Whim\\_Private\\unicode_code_point_at(string $bytes, int $offset): null|(0..=0xd7ff)|(0xe000..=0x10ffff)"
+    "Whim\\Unicode\\code_point_at(string $bytes, (0..) $offset): null|(0..=0xd7ff)|(0xe000..=0x10ffff)",
+    must_use
 )]
 pub(crate) fn code_point_at(arguments: Arguments<'_>) -> Value {
     let bytes = arguments.bytes(0);
@@ -80,7 +81,8 @@ pub(crate) fn code_point_at(arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\unicode_code_point_before(string $bytes, int $offset): null|(0..=0xd7ff)|(0xe000..=0x10ffff)"
+    "Whim\\Unicode\\code_point_before(string $bytes, (0..) $offset): null|(0..=0xd7ff)|(0xe000..=0x10ffff)",
+    must_use
 )]
 pub(crate) fn code_point_before(arguments: Arguments<'_>) -> Value {
     let bytes = arguments.bytes(0);
@@ -104,7 +106,10 @@ pub(crate) fn code_point_before(arguments: Arguments<'_>) -> Value {
     Value::int(i64::from(code_point))
 }
 
-#[whim_function("Whim\\_Private\\unicode_from_code_point(int $codePoint): string[1..=4]")]
+#[whim_function(
+    "Whim\\Str\\from_code_point((0..=0xd7ff)|(0xe000..=0x10ffff) $codePoint): string[1..=4]",
+    must_use
+)]
 pub(crate) fn from_code_point(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let code_point = u32::try_from(arguments.int(0))
         .ok()

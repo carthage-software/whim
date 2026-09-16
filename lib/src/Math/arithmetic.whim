@@ -1,11 +1,9 @@
 namespace Whim\Math;
 
 use Whim;
-use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\OverflowException;
 
 /**
@@ -25,7 +23,5 @@ function div(int $numerator, int $denominator): int {
 }
 
 /** Formats a non-negative integer in the given base. */
-#[AlwaysInline]
-function to_base(NonNegativeInt $number, 2..=36 $base): NonEmptyString {
-  return Whim\_Private\math_to_base($number, $base);
-}
+#[Stub]
+function to_base((0..) $number, 2..=36 $base): string[1..] {}

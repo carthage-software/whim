@@ -3,16 +3,14 @@ namespace Whim\Float;
 use Whim\Binary\Endianness;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
 use Whim\Math;
 use Whim;
-use Whim\_Private\float_try_parse;
 
 /** Parses a complete float string, or returns null. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function try_parse(string $value): null|float {
-  return float_try_parse($value);
-}
+function try_parse(string $value): null|float {}
 
 /** Returns whether a float is not a number. */
 #[AlwaysInline]
@@ -36,18 +34,14 @@ function is_infinite(float $value): bool {
 }
 
 /** Reinterprets an IEEE 754 bit pattern as a float. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function from_bits(int $bits): float {
-  return Whim\_Private\bits_to_float($bits);
-}
+function from_bits(int $bits): float {}
 
 /** Returns the exact IEEE 754 representation as a signed integer. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function to_bits(float $value): int {
-  return Whim\_Private\float_to_bits($value);
-}
+function to_bits(float $value): int {}
 
 /** Reinterprets eight bytes in the selected byte order as a float. */
 #[AlwaysInline]

@@ -1,6 +1,7 @@
 namespace Whim\Async;
 
 use Whim\Marker\NeverInline;
+use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\MustUse;
 use Whim\Refine\ArrayKey;
@@ -87,10 +88,9 @@ function sleep(
 }
 
 /** Runs scheduled tasks until no work remains. */
+#[Stub]
 #[TrackCaller]
-function drain(): void {
-  Whim\_Private\drain();
-}
+function drain(): void {}
 
 /**
  * Awaits every future and preserves its key.

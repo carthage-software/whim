@@ -108,8 +108,7 @@ pub(crate) fn encode(
 }
 
 #[whim_function(
-    "Whim\\_Private\\bson_decode(string $bytes): mixed",
-    no_track_caller,
+    "Whim\\BSON\\decode(string $bytes): Whim\\BSON\\Document",
     no_trace_boundary,
     must_use
 )]

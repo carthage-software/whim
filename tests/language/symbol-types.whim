@@ -191,7 +191,7 @@ $integerIdentity = identity::<int>(...);
 $stringIdentity = identity::<string>(...);
 $add = add(...);
 $partialAdd = add(20, ?);
-$builtinParse = Whim\_Private\int_try_parse(...);
+$builtinParse = Whim\Int\try_parse(...);
 $builtinDuplicate = Whim\OS\FileDescriptor::duplicate(...);
 
 assert!($identity is identity);
@@ -200,7 +200,7 @@ assert!($integerIdentity is identity<int>);
 assert!(!($stringIdentity is identity<int>));
 assert!($add is add);
 assert!(!($partialAdd is add));
-assert!($builtinParse is Whim\_Private\int_try_parse);
+assert!($builtinParse is Whim\Int\try_parse);
 assert!($builtinDuplicate is Whim\OS\FileDescriptor::duplicate);
 
 assert!(call_identity($integerIdentity) == 42);

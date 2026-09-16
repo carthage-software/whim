@@ -23,16 +23,14 @@ function sqrt(float $number): float {
 }
 
 /** Raises Euler’s number to the given power. */
+#[Stub]
 #[TrackCaller]
-function exp(float $number): float {
-  return _Private\math_exp($number);
-}
+function exp(float $number): float {}
 
 /** Computes a natural logarithm. */
+#[Stub]
 #[TrackCaller]
-function ln(float $number): float {
-  return _Private\math_ln($number);
-}
+function ln(float $number): float {}
 
 /**
  * Computes a logarithm in an explicit base.
@@ -66,7 +64,7 @@ function log(float $number, null|float $base = null): float {
   }
 
   if (null == $base) {
-    return _Private\math_ln($number);
+    return ln($number);
   }
 
   if ($base <= 0.0 || 1.0 == $base) {
@@ -77,22 +75,19 @@ function log(float $number, null|float $base = null): float {
 }
 
 /** Rounds a number down to an integral value. */
+#[Stub]
 #[TrackCaller]
-function floor(float $number): float {
-  return _Private\math_floor($number);
-}
+function floor(float $number): float {}
 
 /** Rounds a number up to an integral value. */
+#[Stub]
 #[TrackCaller]
-function ceil(float $number): float {
-  return _Private\math_ceil($number);
-}
+function ceil(float $number): float {}
 
 /** Rounds a number to the requested precision. */
+#[Stub]
 #[TrackCaller]
-function round(float $number, int $precision = 0): float {
-  return _Private\math_round($number, $precision);
-}
+function round(float $number, int $precision = 0): float {}
 
 /** Computes an absolute value. */
 #[TrackCaller]
@@ -105,46 +100,39 @@ function abs(Numeric $number): Numeric {
 }
 
 /** Computes a sine. */
+#[Stub]
 #[TrackCaller]
-function sin(float $number): float {
-  return _Private\math_sin($number);
-}
+function sin(float $number): float {}
 
 /** Computes a cosine. */
+#[Stub]
 #[TrackCaller]
-function cos(float $number): float {
-  return _Private\math_cos($number);
-}
+function cos(float $number): float {}
 
 /** Computes a tangent. */
+#[Stub]
 #[TrackCaller]
-function tan(float $number): float {
-  return _Private\math_tan($number);
-}
+function tan(float $number): float {}
 
 /** Computes an inverse sine. */
+#[Stub]
 #[TrackCaller]
-function asin(float $number): float {
-  return _Private\math_asin($number);
-}
+function asin(float $number): float {}
 
 /** Computes an inverse cosine. */
+#[Stub]
 #[TrackCaller]
-function acos(float $number): float {
-  return _Private\math_acos($number);
-}
+function acos(float $number): float {}
 
 /** Computes an inverse tangent. */
+#[Stub]
 #[TrackCaller]
-function atan(float $number): float {
-  return _Private\math_atan($number);
-}
+function atan(float $number): float {}
 
 /** Computes the angle of a Cartesian coordinate. */
+#[Stub]
 #[TrackCaller]
-function atan2(float $y, float $x): float {
-  return _Private\math_atan2($y, $x);
-}
+function atan2(float $y, float $x): float {}
 
 /**
  * Parses a non-negative integer in the given base.

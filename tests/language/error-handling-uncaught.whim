@@ -79,13 +79,13 @@ assert!(
 assert!(
   Whim\Str\contains(
     $assertion_value_9,
-    'note: raised inside Whim\Math\div (<std>/Math/arithmetic.whim:21)',
+    'note: raised inside Whim\Math\div (<std>/Math/arithmetic.whim:19)',
   ),
 );
 
 assert!(Whim\Str\contains($assertion_value_9, 'Stack backtrace:'));
 assert!(Whim\Str\contains($assertion_value_9, 'Whim\Math\div'));
-assert!(Whim\Str\contains($assertion_value_9, '<std>/Math/arithmetic.whim:21'));
+assert!(Whim\Str\contains($assertion_value_9, '<std>/Math/arithmetic.whim:19'));
 assert!(Whim\Str\contains($assertion_value_9, 'overflow'));
 assert!(Whim\Str\contains($assertion_value_9, '{main}'));
 

@@ -207,7 +207,7 @@ impl Regex {
     }
 }
 
-#[whim_function("Whim\\_Private\\regex_escape(string $literal): string", must_use)]
+#[whim_function("Whim\\Regex\\escape(string $literal): string", must_use)]
 pub(crate) fn escape(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let literal = arguments.bytes(0);
     if let Ok(literal) = from_utf8(literal) {

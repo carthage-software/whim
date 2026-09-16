@@ -2,6 +2,7 @@ namespace Whim\Password;
 
 use Whim\_Private;
 use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\SensitiveParameter;
@@ -61,14 +62,12 @@ function hash(
 }
 
 /** Checks a password against a stored hash; a foreign hash is false. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
 function verify(
   #[SensitiveParameter] string $password,
   #[SensitiveParameter] string $hash,
-): bool {
-  return _Private\password_verify($password, $hash);
-}
+): bool {}
 
 /** Whether a stored hash no longer matches the algorithm and its costs. */
 #[AlwaysInline]

@@ -2,6 +2,7 @@ namespace Whim\Str;
 
 use Whim\Dict;
 use Whim\Marker\TrackCaller;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Refine\Iterable;
 use Whim\Refine\NonEmptyString;
@@ -11,18 +12,16 @@ use Whim\Vec;
 use Whim;
 
 /** Converts ASCII letters to lowercase. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function lowercase(string $string): string {
-  return Whim\_Private\string_lowercase($string);
-}
+function lowercase(string $string): string {}
 
 /** Converts ASCII letters to uppercase. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function uppercase(string $string): string {
-  return Whim\_Private\string_uppercase($string);
-}
+function uppercase(string $string): string {}
 
 /** Capitalizes the first ASCII letter. */
 #[MustUse]
@@ -36,21 +35,19 @@ function capitalize(string $string): string {
 }
 
 /** Capitalizes words separated by the requested delimiters. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
 function capitalize_words(
   string $string,
   string $delimiters = " \t\r\n\f\v",
-): string {
-  return Whim\_Private\string_capitalize_words($string, $delimiters);
-}
+): string {}
 
 /** Reverses the bytes in a string. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function reverse(string $string): string {
-  return Whim\_Private\string_reverse($string);
-}
+function reverse(string $string): string {}
 
 /** Repeats a string the requested number of times. */
 #[MustUse]
@@ -73,11 +70,10 @@ function repeat(string $string, NonNegativeInt $times): string {
 }
 
 /** Applies the ROT13 substitution to ASCII letters. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function rot13(string $string): string {
-  return Whim\_Private\string_rot13($string);
-}
+function rot13(string $string): string {}
 
 /** Replaces occurrences of a substring. */
 #[MustUse]
@@ -258,8 +254,8 @@ function trim(string $string, null|string $characterMask = null): string {
 #[MustUse]
 #[TrackCaller]
 function shuffle(string $string): string {
-  $bytes = Vec\shuffle::<int>(Whim\_Private\string_to_bytes($string));
-  return Whim\_Private\string_from_bytes($bytes);
+  $bytes = Vec\shuffle::<int>(to_bytes($string));
+  return from_bytes($bytes);
 }
 
 /** Splits a string into words. */

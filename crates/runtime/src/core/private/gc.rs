@@ -7,7 +7,7 @@ use crate::unwrap_result_invariant;
 use crate::value::Value;
 
 /// Runs one cycle collection and returns the number of reclaimed values.
-#[whim_function("Whim\\_Private\\collect_cycles(): int")]
+#[whim_function("Whim\\GC\\collect_cycles(): int")]
 fn collect_cycles(context: &Context<'_, '_, '_>) -> Value {
     let collected = context.vm.engine.heap.collect_cycles();
     // SAFETY: the surrounding invariant proves this result is successful.

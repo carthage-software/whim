@@ -1,4 +1,4 @@
-//! Unstable process primitives exposed to the Whim standard library.
+//! Process identifiers.
 
 use std::process;
 
@@ -7,7 +7,7 @@ use whim_macros::whim_function;
 use crate::value::Value;
 
 #[whim_function(
-    "Whim\\_Private\\getmypid(): (1..)",
+    "Whim\\Process\\get_id(): (1..)",
     no_track_caller,
     no_trace_boundary,
     must_use

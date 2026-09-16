@@ -1,4 +1,4 @@
-//! Unstable byte primitives exposed to the Whim standard library.
+//! Byte string functions.
 
 use memchr::memchr as find_byte;
 use memchr::memmem::find as find_bytes;
@@ -20,7 +20,7 @@ use crate::value::string::ByteStringObject;
 use crate::value::string::FlatStringSlices;
 use crate::value::string::short::ShortString;
 
-#[whim_function("Whim\\_Private\\string_to_bytes(string $value): vec<0..=255>")]
+#[whim_function("Whim\\Str\\to_bytes(string $string): vec<0..=255>", must_use)]
 pub(crate) fn string_to_bytes<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -29,7 +29,7 @@ pub(crate) fn string_to_bytes<'call>(
     context.vec(value.iter().map(|byte| Value::int(i64::from(*byte))))
 }
 
-#[whim_function("Whim\\_Private\\string_from_bytes(vec<0..=255> $bytes): string")]
+#[whim_function("Whim\\Str\\from_bytes(vec<0..=255> $bytes): string", must_use)]
 pub(crate) fn string_from_bytes<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -107,7 +107,7 @@ pub(crate) fn string_slice<'call>(
     )))
 }
 
-#[whim_function("Whim\\_Private\\string_byte_at(string $string, (0..) $offset): 0..=255")]
+#[whim_function("Whim\\Str\\byte_at(string $string, (0..) $offset): 0..=255", must_use)]
 pub(crate) fn string_byte_at<'call>(
     context: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -358,7 +358,7 @@ pub(crate) fn string_replace<'call>(
     context.owned_string(result)
 }
 
-#[whim_function("Whim\\_Private\\string_ord(string[1] $character): 0..=255")]
+#[whim_function("Whim\\Str\\ord(string[1] $character): 0..=255", must_use)]
 pub(crate) fn string_ord(arguments: Arguments<'_>) -> Value {
     let value = arguments.bytes(0);
     // SAFETY: the surrounding invariant proves this option contains a value.
@@ -372,7 +372,7 @@ pub(crate) fn string_ord(arguments: Arguments<'_>) -> Value {
     Value::int(i64::from(*byte))
 }
 
-#[whim_function("Whim\\_Private\\string_chr(0..=255 $byte): string[1]")]
+#[whim_function("Whim\\Str\\chr(0..=255 $ascii): string[1]", must_use)]
 pub(crate) fn string_chr<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -448,7 +448,7 @@ pub(crate) fn string_pad<'call>(
     context.owned_string(result)
 }
 
-#[whim_function("Whim\\_Private\\string_lowercase(string $string): string")]
+#[whim_function("Whim\\Str\\lowercase(string $string): string", must_use)]
 pub(crate) fn string_lowercase<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -462,7 +462,7 @@ pub(crate) fn string_lowercase<'call>(
     context.owned_string(bytes.to_ascii_lowercase())
 }
 
-#[whim_function("Whim\\_Private\\string_uppercase(string $string): string")]
+#[whim_function("Whim\\Str\\uppercase(string $string): string", must_use)]
 pub(crate) fn string_uppercase<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -477,14 +477,18 @@ pub(crate) fn string_uppercase<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\string_capitalize_words(string $string, string $delimiters): string"
+    "Whim\\Str\\capitalize_words(string $string, string $delimiters = \" \\t\\r\\n\\f\\v\"): string",
+    must_use
 )]
 pub(crate) fn string_capitalize_words<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
     let bytes = arguments.bytes(0);
-    let delimiters = arguments.bytes(1);
+    let delimiters = arguments
+        .get(1)
+        .and_then(Value::as_string_bytes)
+        .unwrap_or(b" \t\r\n\x0c\x0b");
     let mut delimiter_table = [false; 256];
     for delimiter in delimiters {
         delimiter_table[usize::from(*delimiter)] = true;
@@ -504,7 +508,7 @@ pub(crate) fn string_capitalize_words<'call>(
     Value::from_string_vec(context.vm.heap(), result)
 }
 
-#[whim_function("Whim\\_Private\\string_reverse(string $string): string")]
+#[whim_function("Whim\\Str\\reverse(string $string): string", must_use)]
 pub(crate) fn string_reverse<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -515,7 +519,7 @@ pub(crate) fn string_reverse<'call>(
     Value::from_string_vec(context.vm.heap(), result)
 }
 
-#[whim_function("Whim\\_Private\\string_rot13(string $string): string")]
+#[whim_function("Whim\\Str\\rot13(string $string): string", must_use)]
 pub(crate) fn string_rot13<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,

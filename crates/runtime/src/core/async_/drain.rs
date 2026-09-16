@@ -6,7 +6,7 @@ use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::value::Value;
 
-#[whim_function("Whim\\_Private\\drain(): void")]
+#[whim_function("Whim\\Async\\drain(): void")]
 fn drain(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     cx.vm.drain_event_loop()
 }

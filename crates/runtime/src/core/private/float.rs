@@ -1,4 +1,4 @@
-//! Unstable float representation primitives used by `Whim\Float`.
+//! Float representation primitives.
 
 use whim_macros::whim_function;
 
@@ -7,12 +7,12 @@ use crate::builtin::arguments::Arguments;
 use crate::unwrap_result_invariant;
 use crate::value::Value;
 
-#[whim_function("Whim\\_Private\\float_to_bits(float $value): int")]
+#[whim_function("Whim\\Float\\to_bits(float $value): int", must_use)]
 fn to_bits(arguments: Arguments<'_>) -> Value {
     Value::int(i64::from_ne_bytes(arguments.float(0).to_ne_bytes()))
 }
 
-#[whim_function("Whim\\_Private\\bits_to_float(int $bits): float")]
+#[whim_function("Whim\\Float\\from_bits(int $bits): float", must_use)]
 fn from_bits(arguments: Arguments<'_>) -> Value {
     Value::float(f64::from_ne_bytes(arguments.int(0).to_ne_bytes()))
 }

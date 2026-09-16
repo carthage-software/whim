@@ -1,36 +1,46 @@
 namespace Whim\Math;
 
-use Whim\_Private;
+use Whim\Marker\Stub;
 
 /** The int max numeric constant. */
-const INT_MAX = _Private\MATH_INT_MAX;
+#[Stub]
+const INT_MAX = INT_MAX;
 
 /** The int min numeric constant. */
-const INT_MIN = _Private\MATH_INT_MIN;
+#[Stub]
+const INT_MIN = INT_MIN;
 
 /** The float max numeric constant. */
-const FLOAT_MAX = _Private\MATH_FLOAT_MAX;
+#[Stub]
+const FLOAT_MAX = FLOAT_MAX;
 
 /** The float min numeric constant. */
-const FLOAT_MIN = _Private\MATH_FLOAT_MIN;
+#[Stub]
+const FLOAT_MIN = FLOAT_MIN;
 
 /** The float epsilon numeric constant. */
-const FLOAT_EPSILON = _Private\MATH_FLOAT_EPSILON;
+#[Stub]
+const FLOAT_EPSILON = FLOAT_EPSILON;
 
 /** The nan numeric constant. */
-const NAN = _Private\MATH_NAN;
+#[Stub]
+const NAN = NAN;
 
 /** The inf numeric constant. */
-const INF = _Private\MATH_INFINITY;
+#[Stub]
+const INF = INF;
 
 /** The infinity numeric constant. */
-const INFINITY = _Private\MATH_INFINITY;
+#[Stub]
+const INFINITY = INFINITY;
 
 /** The e numeric constant. */
-const E = _Private\MATH_E;
+#[Stub]
+const E = E;
 
 /** The pi numeric constant. */
-const PI = _Private\MATH_PI;
+#[Stub]
+const PI = PI;
 
 /** The int64 max numeric constant. */
 const INT64_MAX = INT_MAX;
@@ -72,10 +82,12 @@ const UINT16_MAX = 65_535;
 const UINT8_MAX = 255;
 
 /** The float32 max numeric constant. */
-const FLOAT32_MAX = _Private\MATH_FLOAT32_MAX;
+#[Stub]
+const FLOAT32_MAX = FLOAT32_MAX;
 
 /** The float32 min numeric constant. */
-const FLOAT32_MIN = _Private\MATH_FLOAT32_MIN;
+#[Stub]
+const FLOAT32_MIN = FLOAT32_MIN;
 
 /** The float64 max numeric constant. */
 const FLOAT64_MAX = FLOAT_MAX;

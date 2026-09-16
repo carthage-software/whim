@@ -2,17 +2,15 @@ namespace Whim\Encoding\Url;
 
 use Whim;
 use Whim\Encoding\DecodingException;
-use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 
 /** Percent-encodes bytes for a URL component, sparing RFC 3986 unreserved bytes. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function encode(string $bytes): string {
-  return Whim\_Private\url_encode($bytes);
-}
+function encode(string $bytes): string {}
 
 /**
  * Decodes a percent-encoded URL component back into bytes.
@@ -34,11 +32,9 @@ function decode(string $encoded): string {
 }
 
 /** Percent-encodes bytes as a form field, writing a space as `+`. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function encode_form(string $bytes): string {
-  return Whim\_Private\url_encode_form($bytes);
-}
+function encode_form(string $bytes): string {}
 
 /**
  * Decodes a form field, reading `+` as a space.

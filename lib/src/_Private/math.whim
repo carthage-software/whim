@@ -22,12 +22,6 @@ function math_sum_ints(vec<int> $numbers): int {}
 #[TraceBoundary]
 function math_sum_floats(vec<float> $numbers): float {}
 
-/** Formats a non-negative integer using a base from 2 through 36. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_to_base(int $number, int $base): string&!'' {}
-
 /** Compares two numeric values. */
 #[Stub]
 #[TrackCaller]
@@ -40,80 +34,8 @@ function math_compare(int|float $left, int|float $right): int {}
 #[TraceBoundary]
 function math_sqrt(float $number): float {}
 
-/** Computes the exponential of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_exp(float $number): float {}
-
-/** Computes the natural logarithm of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_ln(float $number): float {}
-
-/** Rounds a float down to an integral float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_floor(float $number): float {}
-
-/** Rounds a float up to an integral float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_ceil(float $number): float {}
-
-/** Computes the sine of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_sin(float $number): float {}
-
-/** Computes the cosine of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_cos(float $number): float {}
-
-/** Computes the tangent of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_tan(float $number): float {}
-
-/** Computes the inverse sine of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_asin(float $number): float {}
-
-/** Computes the inverse cosine of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_acos(float $number): float {}
-
-/** Computes the inverse tangent of a float. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_atan(float $number): float {}
-
 /** Computes a logarithm using an explicit base. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
 function math_log_base(float $number, float $base): float {}
-
-/** Computes the four-quadrant inverse tangent. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_atan2(float $y, float $x): float {}
-
-/** Rounds a float to a decimal precision. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function math_round(float $number, int $precision): float {}

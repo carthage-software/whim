@@ -186,5 +186,5 @@ function decode_f64(
   )
     as int;
 
-  return Whim\_Private\bits_to_float($bits);
+  return Whim\Float\from_bits($bits);
 }

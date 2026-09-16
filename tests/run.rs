@@ -252,7 +252,7 @@ fn disassemble_optimizes_against_the_loaded_standard_library() {
         &["disassemble"],
     );
     let printed = stdout_of(&output);
-    assert!(printed.contains("Whim\\_Private\\float_to_bits"));
+    assert!(printed.contains("Whim\\Float\\to_bits"));
     assert_eq!(stderr_of(&output), "");
     assert_eq!(code_of(&output), 0);
 }

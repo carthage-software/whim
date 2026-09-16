@@ -14,7 +14,7 @@ use crate::builtin::arguments::Arguments;
 use crate::value::Value;
 
 #[whim_function(
-    "Whim\\_Private\\html_escape_text(string $text): string",
+    "Whim\\HTML\\escape_text(string $text): string",
     no_track_caller,
     no_trace_boundary,
     must_use
@@ -26,7 +26,7 @@ fn escape_text(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value
 }
 
 #[whim_function(
-    "Whim\\_Private\\html_escape_attribute(string $text): string",
+    "Whim\\HTML\\escape_attribute(string $text): string",
     no_track_caller,
     no_trace_boundary,
     must_use
@@ -38,7 +38,7 @@ fn escape_attribute(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> 
 }
 
 #[whim_function(
-    "Whim\\_Private\\html_decode(string $html): string",
+    "Whim\\HTML\\decode(string $html): string",
     no_track_caller,
     no_trace_boundary,
     must_use
@@ -50,7 +50,7 @@ fn decode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\html_decode_attribute(string $html): string",
+    "Whim\\HTML\\decode_attribute(string $html): string",
     no_track_caller,
     no_trace_boundary,
     must_use
@@ -62,7 +62,7 @@ fn decode_attribute(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> 
 }
 
 #[whim_function(
-    "Whim\\_Private\\html_entity(string $name): null|(string&!'')",
+    "Whim\\HTML\\entity(string $name): null|string[1..]",
     no_track_caller,
     no_trace_boundary,
     must_use

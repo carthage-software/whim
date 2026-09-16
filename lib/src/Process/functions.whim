@@ -3,6 +3,7 @@ namespace Whim\Process;
 use Whim;
 use Whim\Env;
 use Whim\Filesystem;
+use Whim\Marker\Stub;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
@@ -16,18 +17,14 @@ use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\RuntimeException;
 
 /** Returns the current process identifier. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function get_id(): PositiveInt {
-  return Whim\_Private\getmypid();
-}
+function get_id(): (1..) {}
 
 /** Returns the parent process identifier. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function get_parent_id(): NonNegativeInt {
-  return Whim\_Private\parent_process_id();
-}
+function get_parent_id(): (0..) {}
 
 /** Returns CPU time consumed by this process and its waited-for children. */
 #[MustUse]
@@ -274,11 +271,10 @@ function set_resource_limit(Resource $resource, ResourceLimit $limit): void {
 }
 
 /** Reports whether a process identifier names a live process. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function exists(PositiveInt $process): bool {
-  return Whim\_Private\process_exists($process);
-}
+function exists((1..) $process): bool {}
 
 /** Sends a signal to one process. */
 #[NeverInline]

@@ -854,7 +854,7 @@ impl RuntimeFunction {
         else {
             return None;
         };
-        (name.as_bytes() == b"Whim\\_Private\\string_byte_at")
+        (name.as_bytes() == b"Whim\\Str\\byte_at")
             .then_some((u8::try_from(string).ok()?, u8::try_from(offset).ok()?))
     }
 

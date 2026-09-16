@@ -56,7 +56,7 @@ assert!(Whim\_Private\read_descriptor($right, 6) == 'socket');
 $left->close();
 $right->close();
 
-assert!(Whim\_Private\parent_process_id() > 0);
+assert!(Whim\Process\get_parent_id() > 0);
 assert!(Whim\_Private\process_user() is (int, int));
 assert!(Whim\_Private\process_group() is (int, int));
 assert!(Whim\_Private\process_supplementary_groups() is vec<int>);

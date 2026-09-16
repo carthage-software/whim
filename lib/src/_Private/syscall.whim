@@ -642,12 +642,6 @@ function create_temporary_directory(
   string $prefix,
 ): (string&!'') {}
 
-/** The parent process identifier. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function parent_process_id(): (0..) {}
-
 /** The real and effective user identifiers. */
 #[Stub]
 #[TrackCaller]
@@ -738,12 +732,6 @@ function resource_limit(int $resource): (int, int) {}
 #[TraceBoundary]
 function set_resource_limit(int $resource, int $soft, int $hard): void {}
 
-/** The file-creation mask, replacing it with `$mask`. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function exchange_file_mode_mask(0..=511 $mask): 0..=511 {}
-
 /**
  * Processor time used, as
  * `(userSeconds, systemSeconds, childUserSeconds, childSystemSeconds)`
@@ -778,13 +766,6 @@ function replace_process(
 #[TrackCaller]
 #[TraceBoundary]
 function send_signal(int $process, (0..) $signal): void {}
-
-/** Reports whether a process identifier names a live process. */
-#[Stub]
-#[MustUse]
-#[TrackCaller]
-#[TraceBoundary]
-function process_exists((1..) $process): bool {}
 
 /**
  * Calls `$callback` each time a signal arrives.

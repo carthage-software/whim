@@ -74,6 +74,11 @@ for ($byte = 0; $byte < 256; $byte += 1) {
 assert!(Str\uppercase($all_bytes) == $uppercase_bytes);
 assert!(Str\capitalize('hello') == 'Hello');
 assert!(Str\capitalize_words('hello world') == 'Hello World');
+assert!(
+  Str\capitalize_words(string: "one\ttwo\rthree\nfour\ffive\vsix")
+  == "One\tTwo\rThree\nFour\fFive\vSix",
+);
+
 assert!(Str\capitalize_words('one-two_three', '-_') == 'One-Two_Three');
 assert!(Str\capitalize_words("a\x00b", "\x00") == "A\x00B");
 
@@ -88,11 +93,13 @@ assert!(Str\pad_left('long', 2, '0') == 'long');
 
 assert!(Str\ord('A') == 65);
 assert!(Str\chr(66) == 'B');
+assert!(Str\chr(ascii: 255) == "\xff");
 assert!(Str\byte_at("A\x00\xff", 0) == 65);
 assert!(Str\byte_at("A\x00\xff", 1) == 0);
 assert!(Str\byte_at("A\x00\xff", 2) == 255);
 assert!(Str\byte_at('☕', 0) == 226);
 assert!(Str\to_bytes("A\x00\xff") == vec[65, 0, 255]);
+assert!(Str\to_bytes(string: "\x00\xff") == vec[0, 255]);
 assert!(Str\from_bytes(vec[65, 0, 255]) == "A\x00\xff");
 assert!(Str\repeat('ab', 3) == 'ababab');
 assert!(Str\repeat('ab', 0) == '');

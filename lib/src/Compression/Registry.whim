@@ -8,7 +8,7 @@ use Whim\Refine\Iterable;
 use Whim\Refine\NonEmptyString;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\_Private\http_valid_token;
-use Whim\_Private\string_lowercase;
+use Whim\Str\lowercase;
 
 /** Stores codecs by their case-insensitive content-coding names. */
 final readonly class Registry {
@@ -22,7 +22,7 @@ final readonly class Registry {
     $indexed = dict[];
     $codings = vec[];
     foreach ($codecs as $codec) {
-      $coding = string_lowercase($codec->coding());
+      $coding = lowercase($codec->coding());
       if (
         !http_valid_token($coding)
         || 'identity' == $coding
@@ -51,7 +51,7 @@ final readonly class Registry {
   #[AlwaysInline]
   #[MustUse]
   public function contains(string $coding): bool {
-    return contains_key!($this->codecs, string_lowercase($coding));
+    return contains_key!($this->codecs, lowercase($coding));
   }
 
   /** Returns the codec for a content coding. */
@@ -59,7 +59,7 @@ final readonly class Registry {
   #[NeverInline]
   #[TrackCaller]
   public function get(string $coding): Codec {
-    $coding = string_lowercase($coding);
+    $coding = lowercase($coding);
     if (!contains_key!($this->codecs, $coding)) {
       throw new InvalidArgumentException(
         'unsupported compression content coding: `' . $coding . '`',

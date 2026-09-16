@@ -1,41 +1,29 @@
 namespace Whim\HTML;
 
-use Whim;
-use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
-use Whim\Refine\NonEmptyString;
 
 /** Escapes text for an HTML text node. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function escape_text(string $text): string {
-  return Whim\_Private\html_escape_text($text);
-}
+function escape_text(string $text): string {}
 
 /** Escapes text for a double-quoted HTML attribute. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function escape_attribute(string $text): string {
-  return Whim\_Private\html_escape_attribute($text);
-}
+function escape_attribute(string $text): string {}
 
 /** Decodes WHATWG character references in HTML text. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function decode(string $html): string {
-  return Whim\_Private\html_decode($html);
-}
+function decode(string $html): string {}
 
 /** Decodes WHATWG character references in an HTML attribute. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function decode_attribute(string $html): string {
-  return Whim\_Private\html_decode_attribute($html);
-}
+function decode_attribute(string $html): string {}
 
 /** Returns the expansion of a WHATWG named character reference. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function entity(string $name): null|NonEmptyString {
-  return Whim\_Private\html_entity($name);
-}
+function entity(string $name): null|string[1..] {}

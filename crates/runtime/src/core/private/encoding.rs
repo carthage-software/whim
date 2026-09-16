@@ -32,7 +32,7 @@ enum PercentDecodeMode {
 }
 
 #[whim_function(
-    "Whim\\_Private\\utf8_lossy(string $bytes): string",
+    "Whim\\Encoding\\UTF8\\lossy(string $bytes): string",
     no_track_caller,
     no_trace_boundary,
     must_use
@@ -44,7 +44,7 @@ fn utf8_lossy(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value 
 }
 
 #[whim_function(
-    "Whim\\_Private\\mime_encoded_word_encode(string $value): string",
+    "Whim\\Encoding\\EncodedWord\\encode(string $value): string",
     no_track_caller,
     no_trace_boundary,
     must_use
@@ -57,7 +57,7 @@ fn mime_encoded_word_encode(context: &Context<'_, '_, '_>, arguments: Arguments<
 }
 
 #[whim_function(
-    "Whim\\_Private\\mime_encoded_word_decode(string $value): string",
+    "Whim\\Encoding\\EncodedWord\\decode(string $value): string",
     no_track_caller,
     no_trace_boundary,
     must_use
@@ -69,14 +69,14 @@ fn mime_encoded_word_decode(context: &Context<'_, '_, '_>, arguments: Arguments<
 }
 
 #[whim_function(
-    "Whim\\_Private\\mime_quoted_printable_encode(string $bytes, bool $binary): string",
+    "Whim\\Encoding\\QuotedPrintable\\encode(string $bytes, bool $binary = false): string",
     no_track_caller,
     no_trace_boundary,
     must_use
 )]
 fn mime_quoted_printable_encode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let bytes = arguments.bytes(0);
-    let binary = arguments.bool(1);
+    let binary = arguments.get(1).and_then(Value::as_bool).unwrap_or(false);
     let encoded = if binary {
         quoted_printable::encode_binary(bytes)
     } else {
@@ -454,7 +454,7 @@ fn base32_decode_hex(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) ->
     decoded.map_or_else(Value::null, |bytes| context.owned_string(bytes))
 }
 
-#[whim_function("Whim\\_Private\\hex_encode(string $bytes): string")]
+#[whim_function("Whim\\Encoding\\Hex\\encode(string $bytes): string", must_use)]
 fn hex_encode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let bytes = arguments.bytes(0);
     let encoded = lower::encode_string(bytes);
@@ -467,7 +467,7 @@ fn hex_decode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value 
         .map_or_else(|_| Value::null(), |bytes| context.owned_string(bytes))
 }
 
-#[whim_function("Whim\\_Private\\url_encode(string $bytes): string")]
+#[whim_function("Whim\\Encoding\\Url\\encode(string $bytes): string", must_use)]
 fn url_encode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let bytes = arguments.bytes(0);
     let encoded = percent_encode(bytes, &RESERVED).to_string();
@@ -480,7 +480,7 @@ fn url_decode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value 
         .map_or_else(Value::null, |bytes| context.owned_string(bytes))
 }
 
-#[whim_function("Whim\\_Private\\uri_encode(string $bytes): string")]
+#[whim_function("Whim\\Encoding\\URI\\encode(string $bytes): string", must_use)]
 fn uri_encode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     context.owned_string(uri_percent_encode(arguments.bytes(0)))
 }
@@ -491,7 +491,7 @@ fn uri_decode(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value 
         .map_or_else(Value::null, |bytes| context.owned_string(bytes))
 }
 
-#[whim_function("Whim\\_Private\\url_encode_form(string $bytes): string")]
+#[whim_function("Whim\\Encoding\\Url\\encode_form(string $bytes): string", must_use)]
 fn url_encode_form(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let bytes = arguments.bytes(0);
     let mut encoded = String::with_capacity(bytes.len());

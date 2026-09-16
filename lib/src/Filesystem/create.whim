@@ -1,7 +1,7 @@
 namespace Whim\Filesystem;
 
 use Whim;
-use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
@@ -16,11 +16,9 @@ use Whim\Unwind\InvalidArgumentException;
  * The mask affects every task and blocking worker. Applications should
  * normally set it once during startup, not use it as temporary scoped state.
  */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function exchange_creation_mask(0..=0o777 $mask): 0..=0o777 {
-  return Whim\_Private\exchange_file_mode_mask($mask);
-}
+function exchange_creation_mask(0..=0o777 $mask): 0..=0o777 {}
 
 /**
  * Creates a directory; permissions default to `0o755` before the umask applies.

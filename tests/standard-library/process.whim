@@ -32,7 +32,6 @@ function expect_process_failure(fn(): void $operation): RuntimeException {
 $id = Whim\Process\get_id();
 
 assert!($id > 0);
-assert!($id == Whim\_Private\getmypid());
 assert!(Process\get_parent_id() >= 0);
 assert!(Process\exists($id));
 assert!(!(Process\exists(2_147_483_647)));
@@ -226,7 +225,7 @@ Process\signal_group($group->getId() as 1.., Signal::Terminate);
 assert!($group->wait() is Signalled);
 
 $assertion_value_12 = fn(): void {
-  Whim\_Private\getmypid();
+  Process\get_id();
 };
 
 $assertion_error_12 = null;

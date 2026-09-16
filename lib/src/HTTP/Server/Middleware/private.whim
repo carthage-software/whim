@@ -9,13 +9,13 @@ use Whim\Str\ord;
 use Whim\Str\split;
 use Whim\Str\trim;
 use Whim\_Private\http_valid_token;
-use Whim\_Private\string_lowercase;
+use Whim\Str\lowercase;
 
 /** Parses a Content-Encoding field in application order. */
 function content_codings(vec<string> $values): null|vec<NonEmptyString> {
   $codings = vec[];
   foreach (split(join(',', $values), ',') as $part) {
-    $coding = string_lowercase(trim($part));
+    $coding = lowercase(trim($part));
     if ('' == $coding || !http_valid_token($coding)) {
       return null;
     }
@@ -80,7 +80,7 @@ function select_response_codec(
 function vary_by_accept_encoding(FieldMap $headers): FieldMap {
   foreach ($headers->getAll('Vary') as $field) {
     foreach (split($field, ',') as $name) {
-      $name = string_lowercase(trim($name));
+      $name = lowercase(trim($name));
       if ('*' == $name || 'accept-encoding' == $name) {
         return $headers;
       }
@@ -94,7 +94,7 @@ function vary_by_accept_encoding(FieldMap $headers): FieldMap {
 function forbids_transformation(FieldMap $headers): bool {
   foreach ($headers->getAll('Cache-Control') as $field) {
     foreach (split($field, ',') as $directive) {
-      if (string_lowercase(trim($directive)) == 'no-transform') {
+      if (lowercase(trim($directive)) == 'no-transform') {
         return true;
       }
     }
@@ -106,7 +106,7 @@ function forbids_transformation(FieldMap $headers): bool {
 /** Parses one weighted Accept-Encoding item. */
 function weighted_coding(string $part): null|(string, int) {
   $segments = split($part, ';');
-  $coding = string_lowercase(trim($segments[0]));
+  $coding = lowercase(trim($segments[0]));
   if ('' == $coding || ('*' != $coding && !http_valid_token($coding))) {
     return null;
   }
@@ -115,10 +115,7 @@ function weighted_coding(string $part): null|(string, int) {
   $index = 1;
   while ($index < length!($segments)) {
     $parameter = split(trim($segments[$index]), '=', 2);
-    if (
-      length!($parameter) == 2
-      && string_lowercase(trim($parameter[0])) == 'q'
-    ) {
+    if (length!($parameter) == 2 && lowercase(trim($parameter[0])) == 'q') {
       $parsed = quality(trim($parameter[1]));
       $quality = $parsed ?? 0;
       break;

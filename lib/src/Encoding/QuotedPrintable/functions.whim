@@ -2,17 +2,15 @@ namespace Whim\Encoding\QuotedPrintable;
 
 use Whim;
 use Whim\Encoding\DecodingException;
-use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 
 /** Encodes bytes with quoted-printable transfer encoding. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function encode(string $bytes, bool $binary = false): string {
-  return Whim\_Private\mime_quoted_printable_encode($bytes, $binary);
-}
+function encode(string $bytes, bool $binary = false): string {}
 
 /**
  * Decodes quoted-printable transfer encoding.

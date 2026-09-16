@@ -1,12 +1,11 @@
 namespace Whim\Str;
 
 use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Iterable;
-use Whim\Refine\Uint8;
-use Whim\Unicode\ScalarValue;
 use Whim;
 use Whim\Comparison\Ordering;
 use Whim\Vec;
@@ -19,46 +18,39 @@ function length(string $string): NonNegativeInt {
 }
 
 /** Returns the byte value of a one-byte string. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function ord(string[1] $character): Uint8 {
-  return Whim\_Private\string_ord($character);
-}
+function ord(string[1] $character): 0..=255 {}
 
 /** Creates a one-byte string from a byte value. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function chr(Uint8 $ascii): string[1] {
-  return Whim\_Private\string_chr($ascii);
-}
+function chr(0..=255 $ascii): string[1] {}
 
 /** Encodes a Unicode scalar value as UTF-8. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function from_code_point(ScalarValue $codePoint): string[1..=4] {
-  return Whim\_Private\unicode_from_code_point($codePoint);
-}
+function from_code_point(
+  (0..=0xd7_ff)|(0xe000..=0x10_ff_ff) $codePoint,
+): string[1..=4] {}
 
 /** Returns the byte at an offset. */
+#[Stub]
 #[MustUse]
 #[TrackCaller]
-function byte_at(string $string, NonNegativeInt $offset): Uint8 {
-  return Whim\_Private\string_byte_at($string, $offset);
-}
+function byte_at(string $string, (0..) $offset): 0..=255 {}
 
 /** Returns the byte values in a string. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function to_bytes(string $string): vec<Uint8> {
-  return Whim\_Private\string_to_bytes($string);
-}
+function to_bytes(string $string): vec<0..=255> {}
 
 /** Builds a string from byte values. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function from_bytes(vec<Uint8> $bytes): string {
-  return Whim\_Private\string_from_bytes($bytes);
-}
+function from_bytes(vec<0..=255> $bytes): string {}
 
 /** Reports whether a one-byte string is ASCII whitespace. */
 #[AlwaysInline]

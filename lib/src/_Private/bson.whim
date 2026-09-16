@@ -4,6 +4,3 @@ use Whim\Marker\Stub;
 
 #[Stub]
 function bson_encode(mixed $document): string {}
-
-#[Stub]
-function bson_decode(string $bytes): mixed {}

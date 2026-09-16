@@ -56,12 +56,6 @@ final readonly class TaskId {
   private function __construct(int $id) {}
 }
 
-/** Drains the event loop; unreferenced tasks do not keep it alive. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function drain(): void {}
-
 /** Creates a typed suspension for the current task. */
 #[Stub]
 #[TrackCaller]

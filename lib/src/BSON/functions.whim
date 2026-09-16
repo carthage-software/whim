@@ -2,6 +2,7 @@ namespace Whim\BSON;
 
 use Whim\_Private;
 use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
@@ -20,11 +21,9 @@ function encode(Document|ToBson $value): NonEmptyString {
 
 /** Decodes exactly one BSON document. */
 #[MustUse]
-#[NeverInline]
+#[Stub]
 #[TrackCaller]
-function decode(string $bytes): Document {
-  return _Private\bson_decode($bytes);
-}
+function decode(string $bytes): Document {}
 
 /** Decodes a BSON document into a type that knows its shape. */
 #[MustUse]

@@ -121,6 +121,15 @@ assert!(
 
 $quoted = QuotedPrintable\encode("hello\x00world", true);
 assert!(QuotedPrintable\decode($quoted) == "hello\x00world");
+assert!(QuotedPrintable\encode(bytes: "hello\r\nworld") == "hello\r\nworld");
+assert!(
+  QuotedPrintable\encode(
+    binary: true,
+    bytes: "hello\r\nworld",
+  )
+  == 'hello=0D=0Aworld',
+);
+
 assert!(TransferEncoding::detect('plain ASCII') == TransferEncoding::SevenBit);
 
 $text = new Text('hello', 'plain', 'utf-8', TransferEncoding::SevenBit);

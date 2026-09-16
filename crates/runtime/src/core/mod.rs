@@ -539,6 +539,7 @@ whim_core! {
         private::math::FLOAT_MIN,
         private::math::FLOAT_EPSILON,
         private::math::NAN,
+        private::math::INF,
         private::math::INFINITY,
         private::math::E,
         private::math::PI,

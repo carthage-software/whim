@@ -1,12 +1,9 @@
 namespace Whim\Encoding\UTF8;
 
-use Whim;
-use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 
 /** Replaces malformed UTF-8 sequences with the replacement character. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function lossy(string $bytes): string {
-  return Whim\_Private\utf8_lossy($bytes);
-}
+function lossy(string $bytes): string {}

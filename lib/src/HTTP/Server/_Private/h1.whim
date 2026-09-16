@@ -27,8 +27,6 @@ use Whim\URL\Authority;
 use Whim\URL\URL;
 use Whim\_Private\http1_parse_request_head;
 use Whim\_Private\uri_parse_reference;
-use Whim\_Private\string_lowercase;
-use Whim\_Private\string_ord;
 use Whim\_Private\string_split;
 use Whim\_Private\string_trim;
 
@@ -126,7 +124,7 @@ function h1_read_request_head(
 function h1_field_tokens(string $field): vec<string> {
   $tokens = vec[];
   foreach (string_split($field, ',', 0) as $token) {
-    $token = string_lowercase(string_trim($token, " \t", 1));
+    $token = Str\lowercase(string_trim($token, " \t", 1));
 
     if ('' != $token) {
       $tokens[] = $token;
@@ -195,7 +193,7 @@ function h1_decimal(string $value): int {
 
   $index = 0;
   while ($index < length!($value)) {
-    if (!(string_ord($value[$index]) is 48..=57)) {
+    if (!(Str\ord($value[$index]) is 48..=57)) {
       throw new HTTPException(400, 'the request content length is invalid');
     }
 

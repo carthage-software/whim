@@ -1,6 +1,7 @@
 namespace Whim\Binary;
 
 use Whim\_Private;
+use Whim\Float;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Refine\Int16;
@@ -107,7 +108,7 @@ function encode_f64(
   Endianness $endianness = Endianness::Big,
 ): string[8] {
   return _Private\binary_encode(
-    _Private\float_to_bits($value),
+    Float\to_bits($value),
     8,
     Endianness::Little == $endianness,
   );

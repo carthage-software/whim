@@ -43,10 +43,3 @@ final class Regex {
   #[TraceBoundary]
   public function split(string $subject): vec<string> {}
 }
-
-/** Escapes bytes for literal use in a regular expression. */
-#[MustUse]
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function regex_escape(string $literal): string {}

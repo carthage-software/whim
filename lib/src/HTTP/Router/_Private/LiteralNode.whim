@@ -3,7 +3,7 @@ namespace Whim\HTTP\Router\_Private;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Refine\NonEmptyString;
-use Whim\_Private\regex_escape;
+use Whim\Regex\escape;
 
 /** A literal route-pattern component. */
 final readonly class LiteralNode implements Node {
@@ -13,7 +13,7 @@ final readonly class LiteralNode implements Node {
   #[AlwaysInline]
   #[MustUse]
   public function expression(): string {
-    return regex_escape($this->text);
+    return escape($this->text);
   }
 
   #[AlwaysInline]

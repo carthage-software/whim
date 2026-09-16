@@ -2,17 +2,15 @@ namespace Whim\Encoding\URI;
 
 use Whim;
 use Whim\Encoding\DecodingException;
-use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 
 /** Percent-encodes bytes while preserving URI syntax and valid escapes. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
-function encode(string $bytes): string {
-  return Whim\_Private\uri_encode($bytes);
-}
+function encode(string $bytes): string {}
 
 /**
  * Decodes non-reserved percent escapes without changing URI structure.

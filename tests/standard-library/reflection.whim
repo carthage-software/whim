@@ -445,6 +445,15 @@ assert!($autoload->isOptional());
 assert!($autoload->hasDefaultValue());
 assert!($autoload->getDefaultValue() == true);
 
+$round = Reflection\reflect_function('Whim\\Math\\round');
+assert!($round != null);
+assert!($round->getOrigin() == DeclarationOrigin::Core);
+assert!($round->getParameter('precision')?->getDefaultValue() == 0);
+$pi = Reflection\reflect_constant('Whim\\Math\\PI');
+assert!($pi != null);
+assert!($pi->getOrigin() == DeclarationOrigin::Core);
+assert!($pi->getValue() == \Whim\Math\PI);
+
 // Live objects preserve exact generic bindings and initialization state.
 $environment = $object->getTypeEnvironment();
 $bindings = $environment->getBindings();

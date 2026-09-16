@@ -20,7 +20,7 @@ use Whim\Str\join;
 use Whim\Str\split;
 use Whim\Str\trim;
 use Whim\_Private\http_valid_token;
-use Whim\_Private\string_lowercase;
+use Whim\Str\lowercase;
 
 /** Applies Cross-Origin Resource Sharing policy to HTTP requests. */
 final readonly class CORS implements Middleware {
@@ -181,10 +181,10 @@ final readonly class CORS implements Middleware {
     }
 
     foreach ($requested as $header) {
-      $normalized = string_lowercase($header);
+      $normalized = lowercase($header);
       $allowed = false;
       foreach ($this->allowedHeaders as $candidate) {
-        if (string_lowercase($candidate) == $normalized) {
+        if (lowercase($candidate) == $normalized) {
           $allowed = true;
           break;
         }
@@ -200,10 +200,10 @@ final readonly class CORS implements Middleware {
 
   /** Adds one Vary field unless it is already covered. */
   private function vary(FieldMap $headers, FieldName $name): FieldMap {
-    $normalized = string_lowercase($name);
+    $normalized = lowercase($name);
     foreach ($headers->getAll('Vary') as $field) {
       foreach (split($field, ',') as $candidate) {
-        $candidate = string_lowercase(trim($candidate));
+        $candidate = lowercase(trim($candidate));
         if ('*' == $candidate || $candidate == $normalized) {
           return $headers;
         }

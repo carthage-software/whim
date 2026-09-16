@@ -1,6 +1,5 @@
 namespace Whim\CIDR;
 
-use Whim;
 use Whim\Comparison\Equal;
 use Whim\Convert\ToString;
 use Whim\IP\Address;
@@ -199,12 +198,12 @@ final readonly class Block implements Equal<Block>, ToString {
       $index++;
     }
 
-    $networkBytes = Whim\_Private\string_from_bytes($networkOctets);
+    $networkBytes = Str\from_bytes($networkOctets);
     if ($networkBytes != $input) {
       return null;
     }
 
-    $lastBytes = Whim\_Private\string_from_bytes($lastOctets);
+    $lastBytes = Str\from_bytes($lastOctets);
     return new Block(
       Address::fromBytes($networkBytes),
       $prefixLength as 0..=128,

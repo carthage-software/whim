@@ -2,10 +2,10 @@ namespace Whim\Unicode;
 
 use Whim\Encoding\EncodingException;
 use Whim\Marker\AlwaysInline;
+use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim;
 
 /**
@@ -26,24 +26,20 @@ function case_fold(string $value): string {
 }
 
 /** Returns the scalar value at a byte offset, or null at the end. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
 function code_point_at(
   string $bytes,
-  NonNegativeInt $offset,
-): null|ScalarValue {
-  return Whim\_Private\unicode_code_point_at($bytes, $offset);
-}
+  (0..) $offset,
+): null|(0..=0xd7_ff)|(0xe000..=0x10_ff_ff) {}
 
 /** Returns the scalar value before a byte offset, or null at the start. */
-#[AlwaysInline]
+#[Stub]
 #[MustUse]
 function code_point_before(
   string $bytes,
-  NonNegativeInt $offset,
-): null|ScalarValue {
-  return Whim\_Private\unicode_code_point_before($bytes, $offset);
-}
+  (0..) $offset,
+): null|(0..=0xd7_ff)|(0xe000..=0x10_ff_ff) {}
 
 /** Reports whether an integer is a Unicode scalar value. */
 #[AlwaysInline]

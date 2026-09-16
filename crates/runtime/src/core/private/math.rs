@@ -1,4 +1,4 @@
-//! Host numeric primitives used by the Whim-written `Whim\Math` namespace.
+//! Math functions and constants.
 
 #![expect(
     clippy::inline_always,
@@ -92,7 +92,7 @@ fn div<'call>(
         .map_or_else(Value::null, Value::int))
 }
 
-#[whim_function("Whim\\_Private\\math_to_base(int $number, int $base): string&!''")]
+#[whim_function("Whim\\Math\\to_base((0..) $number, 2..=36 $base): string[1..]")]
 #[inline(always)]
 fn to_base<'call>(
     context: &mut Context<'call, '_, '_>,
@@ -529,52 +529,16 @@ unary_float!(
     "Whim\\_Private\\math_sqrt(float $number): float",
     f64::sqrt
 );
-unary_float!(
-    exp,
-    "Whim\\_Private\\math_exp(float $number): float",
-    f64::exp
-);
-unary_float!(ln, "Whim\\_Private\\math_ln(float $number): float", f64::ln);
-unary_float!(
-    floor,
-    "Whim\\_Private\\math_floor(float $number): float",
-    f64::floor
-);
-unary_float!(
-    ceil,
-    "Whim\\_Private\\math_ceil(float $number): float",
-    f64::ceil
-);
-unary_float!(
-    sin,
-    "Whim\\_Private\\math_sin(float $number): float",
-    f64::sin
-);
-unary_float!(
-    cos,
-    "Whim\\_Private\\math_cos(float $number): float",
-    f64::cos
-);
-unary_float!(
-    tan,
-    "Whim\\_Private\\math_tan(float $number): float",
-    f64::tan
-);
-unary_float!(
-    asin,
-    "Whim\\_Private\\math_asin(float $number): float",
-    f64::asin
-);
-unary_float!(
-    acos,
-    "Whim\\_Private\\math_acos(float $number): float",
-    f64::acos
-);
-unary_float!(
-    atan,
-    "Whim\\_Private\\math_atan(float $number): float",
-    f64::atan
-);
+unary_float!(exp, "Whim\\Math\\exp(float $number): float", f64::exp);
+unary_float!(ln, "Whim\\Math\\ln(float $number): float", f64::ln);
+unary_float!(floor, "Whim\\Math\\floor(float $number): float", f64::floor);
+unary_float!(ceil, "Whim\\Math\\ceil(float $number): float", f64::ceil);
+unary_float!(sin, "Whim\\Math\\sin(float $number): float", f64::sin);
+unary_float!(cos, "Whim\\Math\\cos(float $number): float", f64::cos);
+unary_float!(tan, "Whim\\Math\\tan(float $number): float", f64::tan);
+unary_float!(asin, "Whim\\Math\\asin(float $number): float", f64::asin);
+unary_float!(acos, "Whim\\Math\\acos(float $number): float", f64::acos);
+unary_float!(atan, "Whim\\Math\\atan(float $number): float", f64::atan);
 
 #[whim_function("Whim\\_Private\\math_log_base(float $number, float $base): float")]
 fn log_base(arguments: Arguments<'_>) -> Value {
@@ -583,17 +547,17 @@ fn log_base(arguments: Arguments<'_>) -> Value {
     Value::float(number.log(base))
 }
 
-#[whim_function("Whim\\_Private\\math_atan2(float $y, float $x): float")]
+#[whim_function("Whim\\Math\\atan2(float $y, float $x): float")]
 fn atan2(arguments: Arguments<'_>) -> Value {
     let y = arguments.float(0);
     let x = arguments.float(1);
     Value::float(y.atan2(x))
 }
 
-#[whim_function("Whim\\_Private\\math_round(float $number, int $precision): float")]
+#[whim_function("Whim\\Math\\round(float $number, int $precision = 0): float")]
 fn round(arguments: Arguments<'_>) -> Value {
     let number = arguments.float(0);
-    let precision = arguments.int(1);
+    let precision = arguments.optional_int(1).unwrap_or(0);
     if !number.is_finite() {
         return Value::float(number);
     }
@@ -621,35 +585,38 @@ fn round(arguments: Arguments<'_>) -> Value {
     Value::float(scaled.round() / factor)
 }
 
-#[whim_constant("Whim\\_Private\\MATH_INT_MAX", "int")]
+#[whim_constant("Whim\\Math\\INT_MAX", "int")]
 const INT_MAX: i64 = i64::MAX;
 
-#[whim_constant("Whim\\_Private\\MATH_INT_MIN", "int")]
+#[whim_constant("Whim\\Math\\INT_MIN", "int")]
 const INT_MIN: i64 = i64::MIN;
 
-#[whim_constant("Whim\\_Private\\MATH_FLOAT_MAX", "float")]
+#[whim_constant("Whim\\Math\\FLOAT_MAX", "float")]
 const FLOAT_MAX: f64 = f64::MAX;
 
-#[whim_constant("Whim\\_Private\\MATH_FLOAT_MIN", "float")]
+#[whim_constant("Whim\\Math\\FLOAT_MIN", "float")]
 const FLOAT_MIN: f64 = f64::MIN;
 
-#[whim_constant("Whim\\_Private\\MATH_FLOAT_EPSILON", "float")]
+#[whim_constant("Whim\\Math\\FLOAT_EPSILON", "float")]
 const FLOAT_EPSILON: f64 = f64::EPSILON;
 
-#[whim_constant("Whim\\_Private\\MATH_NAN", "float")]
+#[whim_constant("Whim\\Math\\NAN", "float")]
 const NAN: f64 = f64::NAN;
 
-#[whim_constant("Whim\\_Private\\MATH_INFINITY", "float")]
+#[whim_constant("Whim\\Math\\INF", "float")]
+const INF: f64 = f64::INFINITY;
+
+#[whim_constant("Whim\\Math\\INFINITY", "float")]
 const INFINITY: f64 = f64::INFINITY;
 
-#[whim_constant("Whim\\_Private\\MATH_E", "float")]
+#[whim_constant("Whim\\Math\\E", "float")]
 const E: f64 = f64::consts::E;
 
-#[whim_constant("Whim\\_Private\\MATH_PI", "float")]
+#[whim_constant("Whim\\Math\\PI", "float")]
 const PI: f64 = f64::consts::PI;
 
-#[whim_constant("Whim\\_Private\\MATH_FLOAT32_MAX", "float")]
+#[whim_constant("Whim\\Math\\FLOAT32_MAX", "float")]
 const FLOAT32_MAX: f64 = f32::MAX as f64;
 
-#[whim_constant("Whim\\_Private\\MATH_FLOAT32_MIN", "float")]
+#[whim_constant("Whim\\Math\\FLOAT32_MIN", "float")]
 const FLOAT32_MIN: f64 = -(f32::MAX as f64);

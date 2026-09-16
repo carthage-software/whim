@@ -42,12 +42,12 @@ The optional `reason` says why the symbol is a stub. The optional `issue`
 records the tracked speed work for a temporary built-in implementation.
 
 ```whim,norun
-namespace Whim\_Private;
+namespace Whim\Process;
 
 use Whim\Marker\Stub;
 
 #[Stub]
-function getmypid(): (1..) {}
+function get_id(): (1..) {}
 ```
 
 Only the standard library should declare stubs. A normal package must provide

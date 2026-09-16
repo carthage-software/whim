@@ -124,7 +124,7 @@ fn clear_errno() {
     unsafe { *libc::__error() = 0 };
 }
 
-#[whim_function("Whim\\_Private\\parent_process_id(): (0..)")]
+#[whim_function("Whim\\Process\\get_parent_id(): (0..)", must_use)]
 pub(crate) fn parent_process_id() -> Value {
     // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
     Value::int(i64::from(unsafe { libc::getppid() }.max(0)))
@@ -376,7 +376,10 @@ pub(crate) fn set_resource_limit<'call>(
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\exchange_file_mode_mask(0..=511 $mask): 0..=511")]
+#[whim_function(
+    "Whim\\Filesystem\\exchange_creation_mask(0..=511 $mask): 0..=511",
+    must_use
+)]
 pub(crate) fn exchange_file_mode_mask<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
@@ -543,7 +546,7 @@ pub(crate) fn send_signal<'call>(
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\process_exists((1..) $process): bool", must_use)]
+#[whim_function("Whim\\Process\\exists((1..) $process): bool", must_use)]
 pub(crate) fn process_exists<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,

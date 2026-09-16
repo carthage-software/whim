@@ -4,18 +4,6 @@ use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
 
-/** Returns the exact IEEE 754 representation of a float as a signed integer. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function float_to_bits(float $value): int {}
-
-/** Reinterprets a signed integer as an IEEE 754 float representation. */
-#[Stub]
-#[TrackCaller]
-#[TraceBoundary]
-function bits_to_float(int $bits): float {}
-
 /** Narrows a double to single precision and returns its 32 bits. */
 #[Stub]
 #[TrackCaller]

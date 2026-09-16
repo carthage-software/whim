@@ -112,7 +112,8 @@ fn password_hash_argon2id(context: &Context<'_, '_, '_>, arguments: Arguments<'_
 }
 
 #[whim_function(
-    "Whim\\_Private\\password_verify(#[SensitiveParameter] string $password, #[SensitiveParameter] string $hash): bool"
+    "Whim\\Password\\verify(#[SensitiveParameter] string $password, #[SensitiveParameter] string $hash): bool",
+    must_use
 )]
 fn password_verify(arguments: Arguments<'_>) -> Value {
     let password = arguments.bytes(0);

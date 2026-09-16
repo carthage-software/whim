@@ -3470,27 +3470,28 @@ fn byte_wrappers_keep_bounds_and_error_frames() {
 #[Whim\Marker\NeverInline]
 #[Whim\Marker\TrackCaller]
 function byte_value(string $text, 0.. $offset): 0..=255 {
-    return Whim\_Private\string_byte_at($text, $offset);
+    return Whim\Str\byte_at($text, $offset);
 }
 #[Whim\Marker\NeverInline]
 function reversed_byte(0.. $offset, string $text): 0..=255 {
-    return Whim\_Private\string_byte_at($text, $offset);
+    return Whim\Str\byte_at($text, $offset);
 }
 #[Whim\Marker\NeverInline]
 function restricted_byte(string $text, 0.. $offset): 0..=127 {
-    return Whim\_Private\string_byte_at($text, $offset);
+    return Whim\Str\byte_at($text, $offset);
 }
 for ($round = 0; $round < 4; $round++) {
     foreach (vec['a', 'a long string', "\0\xff\x80\x7f"] as $text) {
         for ($offset = 0; $offset < length!($text); $offset++) {
-            $expected = Whim\_Private\string_byte_at($text, $offset);
+            $expected = Whim\Str\byte_at($text, $offset);
             assert!(byte_value($text, $offset) == $expected);
             assert!(reversed_byte($offset, $text) == $expected);
         }
         $caught = false;
         try { byte_value($text, length!($text)); }
         catch (Whim\Unwind\OutOfBoundsError $error) {
-            assert!($error->getTrace()[0]->function == 'byte_value');
+            assert!($error->getTrace()[0]->function == 'Whim\Str\byte_at');
+            assert!($error->getTrace()[1]->function == 'byte_value');
             $caught = true;
         }
         assert!($caught);

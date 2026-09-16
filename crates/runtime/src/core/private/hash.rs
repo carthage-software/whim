@@ -416,7 +416,8 @@ fn hash_hmac(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Res
 }
 
 #[whim_function(
-    "Whim\\_Private\\pbkdf2_sha256(#[SensitiveParameter] string $password, string $salt, 1..=1000000 $iterations): string[32]"
+    "Whim\\Hash\\pbkdf2_sha256(#[SensitiveParameter] string $password, string $salt, 1..=1000000 $iterations): string[32]",
+    must_use
 )]
 fn pbkdf2_sha256(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let password = arguments.bytes(0);
@@ -521,7 +522,8 @@ fn finish_hash_state(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) ->
 }
 
 #[whim_function(
-    "Whim\\_Private\\constant_time_string_equals(#[SensitiveParameter] string $known, #[SensitiveParameter] string $given): bool"
+    "Whim\\Hash\\equals(#[SensitiveParameter] string $known, #[SensitiveParameter] string $given): bool",
+    must_use
 )]
 fn constant_time_string_equals(arguments: Arguments<'_>) -> Value {
     let known = arguments.bytes(0);
