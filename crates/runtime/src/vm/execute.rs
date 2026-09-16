@@ -5607,7 +5607,7 @@ impl VirtualMachine<'_> {
                                 let cursor_index =
                                     self.current_base() + iterator.index() as usize;
                                 self.sync_ip(ip - 1);
-                                match self.push_object_iterator_frame(
+                                match self.push_object_iterator_frame::<false>(
                                     function,
                                     instance,
                                     scope,

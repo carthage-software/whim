@@ -27,10 +27,20 @@ function sqrt(float $number): float {
 #[TrackCaller]
 function exp(float $number): float {}
 
+/** Computes Euler's number raised to a power, minus one, with accuracy near zero. */
+#[Stub]
+#[TrackCaller]
+function expm1(float $number): float {}
+
 /** Computes a natural logarithm. */
 #[Stub]
 #[TrackCaller]
 function ln(float $number): float {}
+
+/** Computes the natural logarithm of one plus a number, with accuracy near zero. */
+#[Stub]
+#[TrackCaller]
+function log1p(float $number): float {}
 
 /**
  * Computes a logarithm in an explicit base.
@@ -113,6 +123,11 @@ function cos(float $number): float {}
 #[Stub]
 #[TrackCaller]
 function tan(float $number): float {}
+
+/** Computes the hyperbolic tangent of a number. */
+#[Stub]
+#[TrackCaller]
+function tanh(float $number): float {}
 
 /** Computes an inverse sine. */
 #[Stub]

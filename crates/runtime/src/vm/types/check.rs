@@ -2836,7 +2836,14 @@ impl VirtualMachine<'_> {
             TypeDescriptor::Array(Some((key_type, value_type))) => {
                 let check_key = !matches!(key_type.as_ref(), TypeDescriptor::Wildcard);
                 let check_value = !matches!(value_type.as_ref(), TypeDescriptor::Wildcard);
+                let cache_id = array_id.or_else(|| self.array_type_check_id(descriptor));
                 if let Some(vector) = value.as_vec() {
+                    if let Some(cache_id) = cache_id
+                        && vector.type_check(cache_id) == ArrayTypeCheck::Clean(cache_id)
+                    {
+                        return Ok(true);
+                    }
+
                     let mut all = true;
                     for (index, value) in vector.iter().enumerate() {
                         if check_key
@@ -2860,6 +2867,11 @@ impl VirtualMachine<'_> {
                             break;
                         }
                     }
+
+                    if all && let Some(cache_id) = cache_id {
+                        vector.mark_type_checked(cache_id);
+                    }
+
                     all
                 } else if let Some(dictionary) = value.as_dict() {
                     self.check_dictionary_elements(
@@ -2868,9 +2880,14 @@ impl VirtualMachine<'_> {
                         dictionary,
                         called,
                         environment,
-                        array_id,
+                        cache_id,
                     )?
                 } else if let Some(tuple) = value.as_tuple() {
+                    if let Some(cache_id) = cache_id
+                        && tuple.type_check(cache_id) == ArrayTypeCheck::Clean(cache_id)
+                    {
+                        return Ok(true);
+                    }
                     let mut all = true;
                     for (index, value) in tuple.iter().enumerate() {
                         if check_key
@@ -2894,6 +2911,11 @@ impl VirtualMachine<'_> {
                             break;
                         }
                     }
+
+                    if all && let Some(cache_id) = cache_id {
+                        tuple.mark_type_checked(cache_id);
+                    }
+
                     all
                 } else {
                     false

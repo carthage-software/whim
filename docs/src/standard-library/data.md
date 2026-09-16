@@ -73,6 +73,17 @@ use an explicit `Binary\Endianness`.
 `Whim\Math` provides checked integer division, absolute value, clamp, square
 root, exponent, logarithms, floor, ceiling, round, and trigonometry.
 
+`expm1(x)` computes `exp(x) - 1`, and `log1p(x)` computes `ln(1 + x)`.
+Both keep accuracy when `x` is close to zero. `log1p(-1.0)` returns negative
+infinity, and inputs below `-1.0` return `NAN`. `tanh` computes the hyperbolic
+tangent. All three use native floating-point operations and preserve signed zero.
+
+`dot` multiplies pairs of floats and adds the products in iteration order.
+It accepts vectors, tuples, dictionaries, and objects that implement `Iterator`
+or `ToIterator`. Dictionary keys do not affect the pairs. Both inputs must have
+the same length, or it throws `Whim\Unwind\LengthException`. Empty inputs return
+`0.0`.
+
 `sum` and `sum_floats` accept iterables. `min`, `max`, `min_by`, and `max_by`
 return `null` for no input. `mean` and `median` accept arrays because they need
 their size or more than one pass.

@@ -95,7 +95,7 @@ impl VirtualMachine<'_> {
     }
 
     /// Pushes a checked object-iterator frame without general dispatch.
-    pub(in crate::vm) fn push_object_iterator_frame(
+    pub(in crate::vm) fn push_object_iterator_frame<const RETURN_TO_HOST: bool>(
         &mut self,
         function: FuncId,
         receiver: NonNull<HeapBox<InstanceObject>>,
@@ -130,7 +130,7 @@ impl VirtualMachine<'_> {
                 Some(receiver_class),
                 type_environment,
                 false,
-                false,
+                RETURN_TO_HOST,
             );
         }
 
@@ -171,7 +171,11 @@ impl VirtualMachine<'_> {
                 stack_floor_offset: 0,
                 reference_register_mask,
                 return_register,
-                flags: FrameFlags::new(true, true, false).with_iterator_step(),
+                flags: if RETURN_TO_HOST {
+                    FrameFlags::new(true, true, false)
+                } else {
+                    FrameFlags::new(true, true, false).with_iterator_step()
+                },
                 type_environment,
             });
         }

@@ -262,7 +262,7 @@ impl VirtualMachine<'_> {
     /// cursor itself (reference semantics; the copy-on-iteration behavior of
     /// collection subjects does not apply), and a `ToIterator` produces one
     /// fresh iterator through `toIterator()`.
-    pub(in crate::vm) fn object_cursor(
+    pub(crate) fn object_cursor(
         &mut self,
         instance: ManagedRef<InstanceObject>,
     ) -> Result<Value, VirtualMachineControl> {
@@ -359,6 +359,38 @@ impl VirtualMachine<'_> {
                 self.value_type_name(&Value::object(instance.clone()))
             ),
         ))
+    }
+
+    pub(crate) fn advance_object_cursor(
+        &mut self,
+        cursor: &IteratorObject,
+    ) -> Result<Option<(Value, Value)>, VirtualMachineControl> {
+        let Some((function, scope)) = cursor.next_method() else {
+            return self.advance_built_in_object_cursor(cursor.instance());
+        };
+
+        let floor = self.frames.len();
+        let stack_start = self.stack.len();
+        let outcome = self.push_object_iterator_frame::<true>(
+            function,
+            cursor.instance().raw_box(),
+            scope,
+            cursor.next_environment(),
+            0,
+        );
+
+        let produced = match outcome {
+            Ok(()) if self.frames.len() == floor => Ok(self.stack.pop().unwrap_or_else(|| {
+                // SAFETY: a frameless host call leaves its literal result on the stack.
+                unsafe { unreachable_invariant("a frameless iterator call leaves its result") }
+            })),
+            Ok(()) => self.run(floor),
+            Err(control) => Err(control),
+        };
+
+        self.truncate_stack(stack_start);
+        let produced = produced?;
+        self.decode_object_cursor_result(&produced)
     }
 
     /// Advances an object cursor implemented by a built-in `next()` method.

@@ -20,6 +20,28 @@ final class MathTestIterator<T> implements Whim\Iterate\Iterator<int, T> {
   }
 }
 
+final class MathTestIterable<T> implements Whim\Iterate\ToIterator<int, T> {
+  public function __construct(private vec<T> $values) {}
+
+  public function toIterator(): Whim\Iterate\Iterator<int, T> {
+    return new MathTestIterator::<T>($this->values);
+  }
+}
+
+final class MathCallbackIterator implements Whim\Iterate\Iterator<int, float> {
+  public function __construct(private fn(): null|(int, float) $callback) {}
+
+  public function next(): null|(int, float) {
+    return ($this->callback)();
+  }
+}
+
+final class MathEmptyIterator implements Whim\Iterate\Iterator<int, float> {
+  public function next(): null {
+    return null;
+  }
+}
+
 assert!(Whim\Math\abs(-4) == 4);
 assert!(Whim\Math\clamp(9, 0, 5) == 5);
 assert!(Whim\Math\div(7, 2) == 3);
@@ -53,6 +75,123 @@ assert!(Whim\Math\sum_floats(dict['one' => 1.0, 'two' => 2.0]) == 3.0);
 assert!(
   Whim\Math\sum_floats(new MathTestIterator::<float>(vec[1.0, 2.0])) == 3.0,
 );
+
+assert!(Whim\Math\dot(vec[], vec[]) == 0.0);
+assert!(Whim\Math\dot(new MathEmptyIterator(), vec[]) == 0.0);
+assert!(
+  Whim\Math\dot(
+    left: vec[2.0, -3.0],
+    right: vec[4.0, 5.0],
+  )
+  == -7.0,
+);
+
+foreach (vec[
+  vec[1.0, 2.0, 3.0],
+  (1.0, 2.0, 3.0),
+  dict[0 => 1.0, 1 => 2.0, 2 => 3.0],
+  dict['c' => 1.0, 'a' => 2.0, 'b' => 3.0],
+  dict[true => 1.0, false => 2.0, 'third' => 3.0],
+  new MathTestIterable::<float>(vec[1.0, 2.0, 3.0]),
+] as $left) {
+  foreach (vec[
+    vec[4.0, 5.0, 6.0],
+    (4.0, 5.0, 6.0),
+    dict['b' => 4.0, 'c' => 5.0, 'a' => 6.0],
+    new MathTestIterator::<float>(vec[4.0, 5.0, 6.0]),
+    new MathTestIterable::<float>(vec[4.0, 5.0, 6.0]),
+  ] as $right) {
+    assert!(Whim\Math\dot($left, $right) == 32.0);
+  }
+}
+
+$sparse = dict['a' => 1.0, 'deleted' => 100.0, 'b' => 2.0];
+remove!($sparse, 'deleted');
+assert!(Whim\Math\dot($sparse, vec[3.0, 4.0]) == 11.0);
+assert!(
+  Whim\Math\dot(vec[1.0e16, 1.0, -1.0e16, 1.0], vec[1.0, 1.0, 1.0, 1.0]) == 1.0,
+);
+
+assert!(
+  Whim\Math\dot(
+    vec[-1.0, 1.000_000_007_450_580_6],
+    vec[1.0, 0.999_999_992_549_419_4],
+  )
+  == 0.0,
+);
+
+assert!(Whim\Float\is_nan(Whim\Math\dot(vec[Whim\Math\NAN], vec[1.0])));
+assert!(Whim\Math\dot(vec[Whim\Math\INF], vec[-1.0]) == -Whim\Math\INF);
+assert!(Whim\Float\to_bits(Whim\Math\dot(vec[-0.0], vec[1.0])) == 0);
+
+$shared = new MathTestIterator::<float>(vec[1.0, 2.0]);
+foreach (vec[
+  (vec[], vec[1.0]),
+  ((1.0, 2.0), dict['only' => 1.0]),
+  ($shared, $shared),
+] as ($left, $right)) {
+  $lengthError = null;
+  try {
+    Whim\Math\dot($left, $right);
+  } catch (Whim\Unwind\LengthException $error) {
+    $lengthError = $error;
+  }
+
+  assert!($lengthError is Whim\Unwind\LengthException);
+  assert!(
+    $lengthError->getMessage()
+    == '$left and $right must contain the same number of values',
+  );
+}
+
+assert!($shared->next() == null);
+
+$visited = new Whim\Reference\Strong::<vec<float>>(vec[]);
+$suspending = new MathCallbackIterator(fn(): null|(int, float) {
+  Whim\Async\later();
+  Whim\GC\collect_cycles();
+  if (length!($visited->value) == 3) {
+    return null;
+  }
+
+  $visited->value[] = 2.0;
+  return (length!($visited->value), 2.0);
+});
+
+assert!(Whim\Math\dot(vec[1.0, 2.0, 3.0], $suspending) == 12.0);
+assert!($visited->value == vec[2.0, 2.0, 2.0]);
+
+$iteratorFailure = new Whim\Unwind\RuntimeException('iterator failure');
+$throwing = new MathCallbackIterator(fn(): never => throw $iteratorFailure);
+$caughtIteratorFailure = null;
+try {
+  Whim\Math\dot($throwing, vec[]);
+} catch (Whim\Unwind\RuntimeException $error) {
+  $caughtIteratorFailure = $error;
+}
+
+assert!($caughtIteratorFailure == $iteratorFailure);
+
+$dot = Whim\Math\dot(...);
+foreach (vec[vec[1.0, 2.0], (1.0, 2.0)] as $values) {
+  assert!($dot($values, $values) == 5.0);
+  assert!(!($values is array<0, float>));
+  assert!(!($values is array<_, int>));
+}
+
+$changed = vec[1.0];
+assert!($dot($changed, vec[2.0]) == 2.0);
+$changed[0] = 1;
+foreach (vec[$changed, dict['x' => 1], (1, 2)] as $integers) {
+  $typeError = null;
+  try {
+    $dot($integers, vec[1.0]);
+  } catch (Whim\Unwind\TypeError $error) {
+    $typeError = $error;
+  }
+
+  assert!($typeError is Whim\Unwind\TypeError);
+}
 
 assert!(Whim\Math\min(vec[3, 1, 2]) == 1);
 assert!(Whim\Math\min(dict['three' => 3, 'one' => 1, 'two' => 2]) == 1);
@@ -196,6 +335,46 @@ assert!(
 
 assert!(Whim\Math\sqrt(9.0) == 3.0);
 assert!(Whim\Math\ln(Whim\Math\E) == 1.0);
+assert!(Whim\Math\abs(Whim\Math\expm1(1.0) - 1.718_281_828_459_045) < 1.0e-15);
+assert!(
+  Whim\Math\abs(Whim\Math\log1p(1.0) - 0.693_147_180_559_945_3) < 1.0e-15,
+);
+
+assert!(Whim\Math\abs(Whim\Math\tanh(1.0) - 0.761_594_155_955_764_9) < 1.0e-15);
+assert!(Whim\Math\tanh(-1.0) == -Whim\Math\tanh(1.0));
+assert!(Whim\Math\expm1(Whim\Math\INF) == Whim\Math\INF);
+assert!(Whim\Math\expm1(-Whim\Math\INF) == -1.0);
+assert!(Whim\Math\log1p(Whim\Math\INF) == Whim\Math\INF);
+assert!(Whim\Math\log1p(-1.0) == -Whim\Math\INF);
+assert!(Whim\Float\is_nan(Whim\Math\log1p(-2.0)));
+assert!(Whim\Float\is_nan(Whim\Math\log1p(-Whim\Math\INF)));
+assert!(Whim\Math\tanh(Whim\Math\INF) == 1.0);
+assert!(Whim\Math\tanh(-Whim\Math\INF) == -1.0);
+assert!(Whim\Math\tanh(Whim\Math\FLOAT_MAX) == 1.0);
+assert!(
+  Whim\Math\abs(
+    Whim\Math\log1p(Whim\Math\FLOAT_MAX) - Whim\Math\ln(Whim\Math\FLOAT_MAX),
+  )
+  < 1.0e-12,
+);
+
+foreach (vec[
+  Whim\Math\expm1(...),
+  Whim\Math\log1p(...),
+  Whim\Math\tanh(...),
+] as $operation) {
+  assert!(Whim\Float\is_nan($operation(Whim\Math\NAN)));
+  foreach (vec[
+    0.0,
+    -0.0,
+    1.0e-20,
+    -1.0e-20,
+    Whim\Float\from_bits(1),
+  ] as $tiny) {
+    assert!(Whim\Float\to_bits($operation($tiny)) == Whim\Float\to_bits($tiny));
+  }
+}
+
 assert!(Whim\Math\log_base(8.0, 2.0) == 3.0);
 assert!(Whim\Math\from_base('ff', 16) == 255);
 assert!(Whim\Math\from_base('FF', 16) == 255);

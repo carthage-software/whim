@@ -7,6 +7,8 @@
 
 use std::cmp::Ordering;
 use std::f64;
+use std::slice;
+use std::vec;
 
 use num_bigint::BigUint;
 use whim_macros::whim_constant;
@@ -19,6 +21,8 @@ use crate::core::classes::names;
 use crate::unwrap_option_invariant;
 use crate::unwrap_result_invariant;
 use crate::value::Value;
+use crate::value::ValueView;
+use crate::value::dict::DictIter;
 use crate::value::ops::compare_int_float;
 use crate::value::string::short::ShortString;
 
@@ -73,6 +77,123 @@ fn sum_floats(arguments: Arguments<'_>) -> Value {
             })
             .sum(),
     )
+}
+
+#[whim_function(
+    "Whim\\Math\\dot(array<_, float>|Whim\\Iterate\\Iterator<_, float>|Whim\\Iterate\\ToIterator<_, float> $left, array<_, float>|Whim\\Iterate\\Iterator<_, float>|Whim\\Iterate\\ToIterator<_, float> $right): float"
+)]
+#[expect(
+    clippy::suboptimal_flops,
+    reason = "dot rounds each product before adding it in input order"
+)]
+fn dot<'call>(
+    context: &mut Context<'call, '_, '_>,
+    arguments: Arguments<'call>,
+) -> Result<Value, Throw> {
+    let left = arguments.local(0);
+    let right = arguments.local(1);
+    let left = float_values(context, &left)?;
+    let right = float_values(context, &right)?;
+    if left.len() != right.len() {
+        let class = context.vm.intern(b"Whim\\Unwind\\LengthException");
+        return Err(context.vm.throw(
+            class,
+            "$left and $right must contain the same number of values",
+            0,
+        ));
+    }
+
+    let result = match (left, right) {
+        (FloatValues::Slice(left), FloatValues::Slice(right)) => {
+            left.zip(right).fold(0.0, |sum, (left, right)| {
+                sum + validated_float(left) * validated_float(right)
+            })
+        }
+        (left, right) => left
+            .zip(right)
+            .fold(0.0, |sum, (left, right)| sum + left * right),
+    };
+
+    Ok(Value::float(result))
+}
+
+enum FloatValues<'value> {
+    Slice(slice::Iter<'value, Value>),
+    Dict(DictIter<'value>, usize),
+    Owned(vec::IntoIter<f64>),
+}
+
+impl Iterator for FloatValues<'_> {
+    type Item = f64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Slice(values) => values.next().map(validated_float),
+            Self::Dict(values, remaining) => {
+                let (_, value) = values.next()?;
+                *remaining -= 1;
+                Some(validated_float(value))
+            }
+            Self::Owned(values) => values.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let length = match self {
+            Self::Slice(values) => values.len(),
+            Self::Dict(_, remaining) => *remaining,
+            Self::Owned(values) => values.len(),
+        };
+
+        (length, Some(length))
+    }
+}
+
+impl ExactSizeIterator for FloatValues<'_> {}
+
+fn validated_float(value: &Value) -> f64 {
+    // SAFETY: dot's built-in declaration requires every array value to be a float.
+    unsafe { value.as_float_unchecked() }
+}
+
+fn float_values<'value>(
+    context: &mut Context<'_, '_, '_>,
+    value: &'value Value,
+) -> Result<FloatValues<'value>, Throw> {
+    match value.transparent() {
+        ValueView::Vec(values) => Ok(FloatValues::Slice(values.iter())),
+        ValueView::Tuple(values) => Ok(FloatValues::Slice(values.iter())),
+        ValueView::Dict(values) => Ok(FloatValues::Dict(values.iter(), values.len())),
+        ValueView::Object(instance) => {
+            let cursor = context
+                .vm
+                .object_cursor(instance.clone())
+                .map_err(|control| context.vm.control_to_throw(control))?;
+
+            // SAFETY: object_cursor returns an iterator on success.
+            let cursor = unsafe {
+                unwrap_option_invariant(cursor.as_iterator(), "an object cursor is an iterator")
+            };
+
+            let mut values = Vec::new();
+            while let Some((_, value)) = context
+                .vm
+                .advance_object_cursor(cursor)
+                .map_err(|control| context.vm.control_to_throw(control))?
+            {
+                let Some(value) = value.as_float() else {
+                    return Err(
+                        context.type_error("dot() requires every iterator value to be a float")
+                    );
+                };
+
+                values.push(value);
+            }
+
+            Ok(FloatValues::Owned(values.into_iter()))
+        }
+        _ => Err(context.type_error("dot() requires an iterable of floats")),
+    }
 }
 
 #[whim_function("Whim\\_Private\\math_div(int $numerator, int $denominator): null|int")]
@@ -530,12 +651,19 @@ unary_float!(
     f64::sqrt
 );
 unary_float!(exp, "Whim\\Math\\exp(float $number): float", f64::exp);
+unary_float!(
+    expm1,
+    "Whim\\Math\\expm1(float $number): float",
+    f64::exp_m1
+);
 unary_float!(ln, "Whim\\Math\\ln(float $number): float", f64::ln);
+unary_float!(log1p, "Whim\\Math\\log1p(float $number): float", f64::ln_1p);
 unary_float!(floor, "Whim\\Math\\floor(float $number): float", f64::floor);
 unary_float!(ceil, "Whim\\Math\\ceil(float $number): float", f64::ceil);
 unary_float!(sin, "Whim\\Math\\sin(float $number): float", f64::sin);
 unary_float!(cos, "Whim\\Math\\cos(float $number): float", f64::cos);
 unary_float!(tan, "Whim\\Math\\tan(float $number): float", f64::tan);
+unary_float!(tanh, "Whim\\Math\\tanh(float $number): float", f64::tanh);
 unary_float!(asin, "Whim\\Math\\asin(float $number): float", f64::asin);
 unary_float!(acos, "Whim\\Math\\acos(float $number): float", f64::acos);
 unary_float!(atan, "Whim\\Math\\atan(float $number): float", f64::atan);
