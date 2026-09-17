@@ -7,14 +7,14 @@ editor's `PATH` so the editor can run:
 whim language-server
 ```
 
-The language server provides highlighting, basic completion, snippets, formatting,
-folding, selection ranges, occurrence highlighting, and lint and syntax diagnostics.
+The language server provides basic completion, snippets, formatting, folding,
+selection ranges, and lint and syntax diagnostics.
 It loads `whim.toml` from each workspace folder or its nearest parent, using the
 same format and [lint settings](linting.md) as the CLI. Format and lint filters
 also apply to files you open in the editor.
 
 If Whim cannot find a manifest, it shows an error and checks only open files.
-Highlighting, formatting, and diagnostics still work for those files. Run
+Formatting and diagnostics still work for those files. Run
 `whim init` to create a manifest, then restart the language server to enable
 workspace checks. Restart it after changing the config too.
 

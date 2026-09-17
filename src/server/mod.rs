@@ -3,12 +3,10 @@ mod completion;
 mod diagnostics;
 mod error;
 mod folding;
-mod highlight;
 mod project;
 #[cfg(test)]
 mod project_tests;
 mod selection;
-mod semantic;
 mod text;
 
 use std::collections::HashMap;
@@ -32,7 +30,6 @@ use lsp_types::DidChangeTextDocumentParams;
 use lsp_types::DocumentDiagnosticReport;
 use lsp_types::DocumentDiagnosticReportResult;
 use lsp_types::DocumentFormattingParams;
-use lsp_types::DocumentHighlightParams;
 use lsp_types::FoldingRangeParams;
 use lsp_types::FoldingRangeProviderCapability;
 use lsp_types::FullDocumentDiagnosticReport;
@@ -43,10 +40,6 @@ use lsp_types::PositionEncodingKind;
 use lsp_types::PublishDiagnosticsParams;
 use lsp_types::RelatedFullDocumentDiagnosticReport;
 use lsp_types::SelectionRangeParams;
-use lsp_types::SemanticTokensFullOptions;
-use lsp_types::SemanticTokensOptions;
-use lsp_types::SemanticTokensParams;
-use lsp_types::SemanticTokensResult;
 use lsp_types::ServerCapabilities;
 use lsp_types::ServerInfo;
 use lsp_types::ShowMessageParams;
@@ -54,7 +47,6 @@ use lsp_types::TextDocumentSyncCapability;
 use lsp_types::TextDocumentSyncKind;
 use lsp_types::TextEdit;
 use lsp_types::Uri;
-use lsp_types::WorkDoneProgressOptions;
 use lsp_types::notification::DidChangeTextDocument;
 use lsp_types::notification::DidCloseTextDocument;
 use lsp_types::notification::DidOpenTextDocument;
@@ -63,12 +55,10 @@ use lsp_types::notification::PublishDiagnostics;
 use lsp_types::notification::ShowMessage;
 use lsp_types::request::Completion;
 use lsp_types::request::DocumentDiagnosticRequest;
-use lsp_types::request::DocumentHighlightRequest;
 use lsp_types::request::FoldingRangeRequest;
 use lsp_types::request::Formatting;
 use lsp_types::request::Request as LspRequest;
 use lsp_types::request::SelectionRangeRequest;
-use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use serde::de::DeserializeOwned;
 use whim_syn::arena::LocalArena;
@@ -201,11 +191,6 @@ impl Server {
             Completion::METHOD => {
                 respond::<Completion>(connection, request, |params| self.complete(&params))
             }
-            DocumentHighlightRequest::METHOD => {
-                respond::<DocumentHighlightRequest>(connection, request, |params| {
-                    self.highlight(&params)
-                })
-            }
             FoldingRangeRequest::METHOD => {
                 respond::<FoldingRangeRequest>(connection, request, |params| self.fold(&params))
             }
@@ -214,11 +199,6 @@ impl Server {
             }
             SelectionRangeRequest::METHOD => {
                 respond::<SelectionRangeRequest>(connection, request, |params| self.select(&params))
-            }
-            SemanticTokensFullRequest::METHOD => {
-                respond::<SemanticTokensFullRequest>(connection, request, |params| {
-                    self.semantic_tokens(&params)
-                })
             }
             _ => send_error(
                 connection,
@@ -335,17 +315,6 @@ impl Server {
         ))))
     }
 
-    fn highlight(
-        &self,
-        params: &DocumentHighlightParams,
-    ) -> Result<Option<Vec<lsp_types::DocumentHighlight>>, RequestError> {
-        let position = params.text_document_position_params.position;
-        let document = &params.text_document_position_params.text_document.uri;
-        let analysis = Analysis::new(self.document(document)?);
-
-        Ok(Some(highlight::occurrences(&analysis, position)))
-    }
-
     fn fold(
         &self,
         params: &FoldingRangeParams,
@@ -394,17 +363,6 @@ impl Server {
         let analysis = Analysis::new(self.document(&params.text_document.uri)?);
 
         Ok(Some(selection::ranges(&analysis, &params.positions)))
-    }
-
-    fn semantic_tokens(
-        &self,
-        params: &SemanticTokensParams,
-    ) -> Result<Option<SemanticTokensResult>, RequestError> {
-        let analysis = Analysis::new(self.document(&params.text_document.uri)?);
-
-        Ok(Some(SemanticTokensResult::Tokens(semantic::tokens(
-            &analysis,
-        ))))
     }
 
     fn document(&self, uri: &Uri) -> Result<&str, RequestError> {
@@ -520,19 +478,9 @@ fn capabilities() -> ServerCapabilities {
         position_encoding: Some(PositionEncodingKind::UTF16),
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         completion_provider: Some(CompletionOptions::default()),
-        document_highlight_provider: Some(OneOf::Left(true)),
         document_formatting_provider: Some(OneOf::Left(true)),
         folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
         selection_range_provider: Some(true.into()),
-        semantic_tokens_provider: Some(
-            SemanticTokensOptions {
-                work_done_progress_options: WorkDoneProgressOptions::default(),
-                legend: semantic::legend(),
-                range: None,
-                full: Some(SemanticTokensFullOptions::Bool(true)),
-            }
-            .into(),
-        ),
         ..ServerCapabilities::default()
     }
 }
@@ -646,10 +594,8 @@ mod tests {
         assert!(capabilities.completion_provider.is_some());
         assert!(capabilities.diagnostic_provider.is_some());
         assert!(capabilities.document_formatting_provider.is_some());
-        assert!(capabilities.document_highlight_provider.is_some());
         assert!(capabilities.folding_range_provider.is_some());
         assert!(capabilities.selection_range_provider.is_some());
-        assert!(capabilities.semantic_tokens_provider.is_some());
         assert!(capabilities.definition_provider.is_none());
         assert!(capabilities.hover_provider.is_none());
         assert!(capabilities.references_provider.is_none());

@@ -135,12 +135,12 @@ whim language-server
 ```
 
 The language server speaks LSP over standard input and output. It provides
-keyword completion, snippets, formatting, keyword colors, folding, selection
-ranges, occurrence highlights, and lint and syntax diagnostics. It publishes
-diagnostics as open documents change and supports document and workspace
-diagnostic requests. Workspace checks use open buffers for unsaved files and
-read other files from disk. The server reads lint settings at startup; restart
-it after changing `whim.toml`. It does not provide symbol navigation.
+keyword completion, snippets, formatting, folding, selection ranges, and lint
+and syntax diagnostics. It publishes diagnostics as open documents change and
+supports document and workspace diagnostic requests. Workspace checks use open
+buffers for unsaved files and read other files from disk. The server reads lint
+settings at startup; restart it after changing `whim.toml`. It does not provide
+symbol navigation.
 
 ## Project commands
 

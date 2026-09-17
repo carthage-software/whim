@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use whim_span::HasSpan;
 use whim_syn::arena::LocalArena;
 use whim_syn::cst::node::Node;
@@ -20,7 +18,6 @@ pub(super) struct Element {
     pub(super) kind: NodeKind,
     pub(super) start: usize,
     pub(super) end: usize,
-    pub(super) depth: usize,
 }
 
 impl Element {
@@ -34,7 +31,6 @@ impl Element {
 }
 
 pub(super) struct Analysis<'source> {
-    source: &'source str,
     lines: LineIndex<'source>,
     elements: Vec<Element>,
     tokens: Vec<Token<'source>>,
@@ -47,23 +43,16 @@ impl<'source> Analysis<'source> {
         if let Ok(program) = parser::parse(&arena, source) {
             let mut collector = Collector {
                 elements: &mut elements,
-                depth: 0,
             };
 
             walk(Node::Program(program), &mut collector);
-            elements.sort_by_key(|element| (element.start, element.depth));
         }
 
         Self {
-            source,
             lines: LineIndex::new(source),
             elements,
             tokens: tokenize(source),
         }
-    }
-
-    pub(super) const fn source(&self) -> &'source str {
-        self.source
     }
 
     pub(super) const fn lines(&self) -> &LineIndex<'source> {
@@ -78,17 +67,6 @@ impl<'source> Analysis<'source> {
         &self.tokens
     }
 
-    pub(super) fn token_at(&self, offset: usize) -> Option<&Token<'source>> {
-        let after = self
-            .tokens
-            .partition_point(|token| token.start.offset as usize <= offset);
-        let index = after.checked_sub(1)?;
-        let token = &self.tokens[index];
-        let start = token.start.offset as usize;
-
-        (offset < start + token.value.len()).then_some(token)
-    }
-
     pub(super) fn enclosing(&self, offset: usize) -> Vec<Element> {
         let mut found: Vec<Element> = self
             .elements
@@ -99,37 +77,10 @@ impl<'source> Analysis<'source> {
         found.sort_by_key(|element| element.width());
         found
     }
-
-    pub(super) fn enclosing_scope(&self, offset: usize) -> Range<usize> {
-        self.enclosing(offset)
-            .into_iter()
-            .find(|element| is_scope(element.kind))
-            .map_or(0..self.source.len(), |element| element.start..element.end)
-    }
-
-    pub(super) fn follows_member_operator(&self, offset: usize) -> bool {
-        let after = self
-            .tokens
-            .partition_point(|token| token.start.offset as usize <= offset);
-        self.tokens[..after.saturating_sub(1)]
-            .iter()
-            .rev()
-            .find(|token| !token.kind.is_comment())
-            .is_some_and(|token| {
-                matches!(
-                    token.kind,
-                    TokenKind::MinusGreaterThan
-                        | TokenKind::QuestionMinusGreaterThan
-                        | TokenKind::ColonColon
-                        | TokenKind::ColonColonLessThan
-                )
-            })
-    }
 }
 
 struct Collector<'elements> {
     elements: &'elements mut Vec<Element>,
-    depth: usize,
 }
 
 impl<'ast, 'arena> Visitor<'ast, 'arena> for Collector<'_> {
@@ -139,14 +90,8 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for Collector<'_> {
             kind: node.kind(),
             start: span.start.offset as usize,
             end: span.end.offset as usize,
-            depth: self.depth,
         });
-        self.depth += 1;
         Flow::Descend
-    }
-
-    fn leave(&mut self, _node: Node<'ast, 'arena>) {
-        self.depth -= 1;
     }
 }
 
@@ -161,32 +106,6 @@ fn tokenize(source: &str) -> Vec<Token<'_>> {
     }
 
     tokens
-}
-
-pub(super) const fn is_identifier(kind: NodeKind) -> bool {
-    matches!(
-        kind,
-        NodeKind::Identifier
-            | NodeKind::LocalIdentifier
-            | NodeKind::QualifiedIdentifier
-            | NodeKind::FullyQualifiedIdentifier
-    )
-}
-
-pub(super) const fn is_name_token(kind: TokenKind) -> bool {
-    matches!(
-        kind,
-        TokenKind::Identifier
-            | TokenKind::QualifiedIdentifier
-            | TokenKind::FullyQualifiedIdentifier
-    )
-}
-
-const fn is_scope(kind: NodeKind) -> bool {
-    matches!(
-        kind,
-        NodeKind::Function | NodeKind::Method | NodeKind::Closure
-    )
 }
 
 #[cfg(test)]
@@ -230,21 +149,11 @@ final class Holder {
     }
 
     #[test]
-    fn variables_use_the_enclosing_function_as_their_scope() {
-        let analysis = Analysis::new(SOURCE);
-        let offset = SOURCE.find("$total").expect("the local variable");
-        let scope = analysis.enclosing_scope(offset);
-        assert!(scope.start > 0);
-        assert!(scope.end < SOURCE.len());
-    }
-
-    #[test]
     fn syntax_element_ends_are_exclusive() {
         let element = Element {
             kind: NodeKind::Program,
             start: 2,
             end: 5,
-            depth: 0,
         };
 
         assert!(element.contains(2));

@@ -10,7 +10,6 @@ use lsp_server::Message;
 use lsp_server::Notification;
 use lsp_server::Request;
 use lsp_types::DiagnosticSeverity;
-use lsp_types::SemanticTokensResult;
 use lsp_types::TextEdit;
 use lsp_types::Uri;
 use lsp_types::WorkspaceDiagnosticReportResult;
@@ -140,13 +139,6 @@ fn missing_manifest_reports_an_error_and_keeps_open_file_features() {
             .new_text
             .contains("\n  return 1;\n")
     );
-    let Some(SemanticTokensResult::Tokens(tokens)) = server
-        .semantic_tokens(&serde_json::from_value(json!({"textDocument": {"uri": uri}})).unwrap())
-        .unwrap()
-    else {
-        panic!("expected semantic tokens");
-    };
-    assert!(!tokens.data.is_empty());
     assert!(
         server
             .document_diagnostics(&fixture.uri("closed.whim"))
@@ -292,14 +284,6 @@ fn invalid_configs_report_errors_without_using_default_filters() {
         panic!("expected a workspace report");
     };
     assert_eq!(report.items.len(), 1);
-    assert!(
-        server
-            .semantic_tokens(
-                &serde_json::from_value(json!({"textDocument": {"uri": uri}})).unwrap()
-            )
-            .unwrap()
-            .is_some()
-    );
 }
 
 #[test]
