@@ -173,6 +173,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
             forbidden_binders: self.scope.binders.clone(),
             generics: self.scope.generics,
             embedded_files: self.scope.embedded_files,
+            target: self.scope.target,
             trusted_returns: self.scope.trusted_returns,
         }
     }
@@ -355,6 +356,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
             forbidden_binders,
             generics: self.scope.generics,
             embedded_files: self.scope.embedded_files,
+            target: self.scope.target,
             trusted_returns: self.scope.trusted_returns,
         }
     }

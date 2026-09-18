@@ -156,8 +156,9 @@ caller may handle. Use `panic!` only when continuing would be wrong.
 
 ## Platform information
 
-These constructs take no arguments and return strings describing the platform
-running the compiler. The compiler stores their values as string constants.
+These constructs take no arguments and return strings describing the compilation
+target. This defaults to the platform running Whim.The compiler stores these
+values as string constants.
 
 | Construct | Value | Examples |
 | --- | --- | --- |

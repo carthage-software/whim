@@ -26,6 +26,7 @@ mod limits;
 mod names;
 mod registers;
 mod rules;
+pub mod target;
 mod types;
 
 use crate::compiler::declarations::generics::collect_generics;
@@ -39,6 +40,7 @@ use crate::compiler::emit::Scope;
 use crate::compiler::emit::analysis::collect_scoped_bindings_in_statement;
 use crate::compiler::emit::analysis::collect_variables_in_statement;
 pub(crate) use crate::compiler::error::CompileError;
+pub(crate) use crate::compiler::target::Target;
 use crate::compiler::types::bounds::validate_static_type_argument_bounds;
 
 pub(crate) use crate::compiler::types::AliasGraph;
@@ -99,6 +101,7 @@ pub(crate) fn compile_with_path_bytes_configuration_and_built_in_functions(
         &generics,
         &mut aliases,
         &embedded_files,
+        &Target::NATIVE,
         &line_starts,
         configuration.trusted_return_types,
     );
@@ -131,6 +134,7 @@ pub(crate) struct Compilation<'compilation, 'arena> {
     generics: &'compilation GenericTable<'arena>,
     aliases: &'compilation mut AliasGraph,
     embedded_files: &'compilation EmbeddedFiles,
+    target: &'compilation Target,
     line_starts: &'compilation [u32],
     trusted_return_types: bool,
 }
@@ -140,6 +144,7 @@ impl<'compilation, 'arena> Compilation<'compilation, 'arena> {
         generics: &'compilation GenericTable<'arena>,
         aliases: &'compilation mut AliasGraph,
         embedded_files: &'compilation EmbeddedFiles,
+        target: &'compilation Target,
         line_starts: &'compilation [u32],
         trusted_return_types: bool,
     ) -> Self {
@@ -147,6 +152,7 @@ impl<'compilation, 'arena> Compilation<'compilation, 'arena> {
             generics,
             aliases,
             embedded_files,
+            target,
             line_starts,
             trusted_return_types,
         }
@@ -253,6 +259,7 @@ pub(crate) fn compile_program_into_unit<'arena>(
                 forbidden_binders: Vec::new(),
                 generics: compilation.generics,
                 embedded_files: compilation.embedded_files,
+                target: compilation.target,
                 trusted_returns: compilation.trusted_return_types,
             };
 

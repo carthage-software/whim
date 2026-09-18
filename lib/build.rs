@@ -2,9 +2,12 @@ use std::env;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
+use std::process::Stdio;
 
 use whim_runtime::artifact::ArtifactConfiguration;
 use whim_runtime::artifact::SourceFile;
+use whim_runtime::compiler::target::Target;
 use whim_runtime::engine::Engine;
 use whim_runtime::engine::EngineConfiguration;
 
@@ -70,6 +73,11 @@ fn artifact_path(root: &Path, path: &Path) -> String {
 }
 
 fn main() {
+    let target =
+        env::var("TARGET").unwrap_or_else(|_| panic!("the Cargo build did not provide `TARGET`"));
+    let host =
+        env::var("HOST").unwrap_or_else(|_| panic!("the Cargo build did not provide `HOST`"));
+    let cross_compile = target != host;
     let manifest = PathBuf::from(
         env::var_os("CARGO_MANIFEST_DIR")
             .unwrap_or_else(|| panic!("the Cargo build did not provide `CARGO_MANIFEST_DIR`")),
@@ -108,15 +116,18 @@ fn main() {
             ArtifactConfiguration {
                 optimize: true,
                 trusted_return_types: true,
+                target: cross_compile.then(|| compilation_target(&target)),
             },
         )
         .unwrap_or_else(|error| panic!("failed to compile the standard library:\n{error}"));
     let bytes = artifact.into_bytes();
 
-    let mut validator = Engine::new(EngineConfiguration::default());
-    validator
-        .load_artifact(&bytes)
-        .unwrap_or_else(|error| panic!("failed to validate the standard library:\n{error}"));
+    if !cross_compile {
+        let mut validator = Engine::new(EngineConfiguration::default());
+        validator
+            .load_artifact(&bytes)
+            .unwrap_or_else(|error| panic!("failed to validate the standard library:\n{error}"));
+    }
 
     let output = output_directory.join("lib.whia");
     fs::write(&output, bytes).unwrap_or_else(|error| {
@@ -125,4 +136,51 @@ fn main() {
             output.display()
         )
     });
+}
+
+fn compilation_target(triple: &str) -> Target {
+    let arch = env::var("CARGO_CFG_TARGET_ARCH").expect("Cargo provides the target architecture");
+    let os = env::var("CARGO_CFG_TARGET_OS").expect("Cargo provides the target operating system");
+    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap_or_default();
+    let executable = target_file_name(triple, "bin");
+    let library = target_file_name(triple, "cdylib");
+    let exe_suffix = executable.strip_prefix("whim_target").unwrap_or("");
+    let (dll_prefix, dll_suffix) = library.split_once("whim_target").unwrap_or(("", ""));
+    Target {
+        arch: arch.into(),
+        os: os.into(),
+        family: family.split(',').next().unwrap_or("").to_string().into(),
+        dll_prefix: dll_prefix.to_string().into(),
+        dll_suffix: dll_suffix.to_string().into(),
+        dll_extension: dll_suffix.trim_start_matches('.').to_string().into(),
+        exe_suffix: exe_suffix.to_string().into(),
+        exe_extension: exe_suffix.trim_start_matches('.').to_string().into(),
+    }
+}
+
+fn target_file_name(triple: &str, crate_type: &str) -> String {
+    let output = Command::new(env::var_os("RUSTC").expect("Cargo provides the Rust compiler"))
+        .args([
+            "--print",
+            "file-names",
+            "--crate-name",
+            "whim_target",
+            "--crate-type",
+            crate_type,
+            "--target",
+            triple,
+            "-",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .expect("the Rust compiler reports target file names");
+    assert!(
+        output.status.success(),
+        "failed to query target {triple}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("Rust target file names are UTF-8")
+        .trim()
+        .to_string()
 }

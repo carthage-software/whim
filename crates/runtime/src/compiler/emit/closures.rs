@@ -381,6 +381,7 @@ impl BodyCompiler<'_, '_> {
             forbidden_binders: scope.forbidden_binders.clone(),
             generics: scope.generics,
             embedded_files: scope.embedded_files,
+            target: scope.target,
             trusted_returns: scope.trusted_returns,
         };
 

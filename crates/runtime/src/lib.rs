@@ -1,6 +1,7 @@
 //! Whim's compiler and runtime.
 
 pub mod artifact;
+pub mod compiler;
 pub mod disassembly;
 pub mod engine;
 pub mod path;
@@ -9,7 +10,6 @@ pub(crate) mod blocking;
 pub(crate) mod builtin;
 pub(crate) mod bytecode;
 pub(crate) mod classes;
-pub(crate) mod compiler;
 pub(crate) mod core;
 pub(crate) mod limits;
 pub(crate) mod linker;

@@ -29,6 +29,7 @@ use crate::compiler::compile_program_into_unit;
 use crate::compiler::extend_generics;
 use crate::compiler::finish_unit;
 use crate::compiler::new_unit;
+use crate::compiler::target::Target;
 use crate::engine::Engine;
 use crate::optimizer::OptimizationConfiguration;
 use crate::symbols::SourceText;
@@ -58,12 +59,15 @@ impl<'source> SourceFile<'source> {
 }
 
 /// Options controlling artifact compilation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactConfiguration {
     /// Whether bytecode optimization is enabled.
     pub optimize: bool,
     /// Whether written return types are trusted and need no runtime check.
     pub trusted_return_types: bool,
+    /// Platform values, or `None` for the native platform. An explicit target
+    /// defers native stub validation until the artifact loads.
+    pub target: Option<Target>,
 }
 
 impl Default for ArtifactConfiguration {
@@ -71,6 +75,7 @@ impl Default for ArtifactConfiguration {
         Self {
             optimize: true,
             trusted_return_types: false,
+            target: None,
         }
     }
 }
@@ -131,12 +136,18 @@ impl Engine {
     ///
     /// Returns an error when parsing, compilation, linking, verification, or
     /// encoding fails.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "artifact compilation keeps its stages together"
+    )]
     pub fn compile_artifact(
         &mut self,
         path: &str,
         sources: &[SourceFile<'_>],
         configuration: ArtifactConfiguration,
     ) -> Result<Artifact, ArtifactError> {
+        let cross_compile = configuration.target.is_some();
+        let target = configuration.target.unwrap_or(Target::NATIVE);
         let (source, source_files) = join_sources(sources)?;
         let line_starts = line_starts_of(&source);
 
@@ -169,6 +180,7 @@ impl Engine {
             &generics,
             &mut aliases,
             &embedded_files,
+            &target,
             &line_starts,
             configuration.trusted_return_types,
         );
@@ -216,6 +228,10 @@ impl Engine {
         let aliases = unit.type_aliases.clone();
         expand_unit_declarations(&mut unit, &aliases);
         verify_artifact_unit(&unit, "compiled")?;
+
+        if cross_compile {
+            return encode(&unit, &source, &line_starts, &source_files);
+        }
 
         let retained_source = Rc::<str>::from(source.as_str());
         let retained_files = retain_source_files(&self.heap, &source_files);

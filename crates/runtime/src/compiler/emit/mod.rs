@@ -63,6 +63,7 @@ use crate::bytecode::rewrite::compact;
 use crate::bytecode::rewrite::control_flow_targets;
 use crate::bytecode::unit::CompiledFunction;
 use crate::bytecode::unit::CompiledTypeAlias;
+use crate::compiler::Target;
 use crate::compiler::embed::EmbeddedFiles;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
@@ -108,6 +109,7 @@ pub(in crate::compiler) struct Scope<'compilation> {
     pub(in crate::compiler) generics: &'compilation GenericTable<'compilation>,
     /// Files read by `embed!` during this compilation.
     pub(in crate::compiler) embedded_files: &'compilation EmbeddedFiles,
+    pub(in crate::compiler) target: &'compilation Target,
     /// Whether the enclosing compilation is trusted code whose written return
     /// types are guaranteed by review, so returns compile unchecked.
     pub(in crate::compiler) trusted_returns: bool,

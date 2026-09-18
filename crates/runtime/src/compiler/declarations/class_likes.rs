@@ -281,6 +281,7 @@ pub(in crate::compiler::declarations) fn compile_class<'arena>(
         forbidden_binders: Vec::new(),
         generics,
         embedded_files,
+        target: array.target,
         trusted_returns,
     };
 
@@ -385,6 +386,7 @@ pub(in crate::compiler::declarations) fn compile_interface<'arena>(
         forbidden_binders: Vec::new(),
         generics,
         embedded_files,
+        target: array.target,
         trusted_returns,
     };
     rules::check_interface(interface)?;
@@ -508,6 +510,7 @@ pub(in crate::compiler::declarations) fn compile_enum<'arena>(
         forbidden_binders: Vec::new(),
         generics,
         embedded_files,
+        target: array.target,
         trusted_returns,
     };
 

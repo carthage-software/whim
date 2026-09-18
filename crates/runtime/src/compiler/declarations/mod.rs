@@ -32,6 +32,7 @@ use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::STUB_ATTRIBUTE_NAME;
 use crate::compiler::Compilation;
 use crate::compiler::CompilePath;
+use crate::compiler::Target;
 use crate::compiler::embed::EmbeddedFiles;
 use crate::compiler::emit::Scope;
 use crate::compiler::error::CompileError;
@@ -83,6 +84,7 @@ pub(in crate::compiler::declarations) struct Array<'compilation, 'arena> {
     line_starts: &'compilation [u32],
     generics: &'compilation GenericTable<'arena>,
     embedded_files: &'compilation EmbeddedFiles,
+    target: &'compilation Target,
     trusted_returns: bool,
 }
 
@@ -101,6 +103,7 @@ pub(in crate::compiler) fn collect<'source, 'arena>(
         line_starts: compilation.line_starts,
         generics: compilation.generics,
         embedded_files: compilation.embedded_files,
+        target: compilation.target,
         trusted_returns: compilation.trusted_return_types,
     };
     let mut regions = Vec::new();
@@ -186,6 +189,7 @@ fn collect_file_attributes(
         forbidden_binders: Vec::new(),
         generics: context.generics,
         embedded_files: context.embedded_files,
+        target: context.target,
         trusted_returns: context.trusted_returns,
     };
 
@@ -220,6 +224,7 @@ fn collect_function(
         forbidden_binders: Vec::new(),
         generics: context.generics,
         embedded_files: context.embedded_files,
+        target: context.target,
         trusted_returns: context.trusted_returns,
     };
     let compiled = compile_function_declaration(
@@ -287,6 +292,7 @@ fn collect_constant(
         forbidden_binders: Vec::new(),
         generics: context.generics,
         embedded_files: context.embedded_files,
+        target: context.target,
         trusted_returns: context.trusted_returns,
     };
     let attributes = compile_attributes(
@@ -340,6 +346,7 @@ fn collect_type_alias(
         forbidden_binders: Vec::new(),
         generics: context.generics,
         embedded_files: context.embedded_files,
+        target: context.target,
         trusted_returns: context.trusted_returns,
     };
     if has_attribute(&scope, alias.attribute_lists, STUB_ATTRIBUTE_NAME) {
@@ -490,6 +497,7 @@ fn collect_newtype(
         forbidden_binders: Vec::new(),
         generics: context.generics,
         embedded_files: context.embedded_files,
+        target: context.target,
         trusted_returns: context.trusted_returns,
     };
     if has_attribute(&scope, newtype.attribute_lists, STUB_ATTRIBUTE_NAME) {

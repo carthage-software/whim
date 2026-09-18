@@ -1,7 +1,5 @@
 //! The language constructs.
 
-use std::env;
-
 use whim_syn::cst::construct::AssertConstruct;
 use whim_syn::cst::construct::CloneConstruct;
 use whim_syn::cst::construct::DropConstruct;
@@ -112,6 +110,7 @@ impl WriteTarget {
 }
 
 impl BodyCompiler<'_, '_> {
+    #[expect(clippy::too_many_lines, reason = "one dispatch covers all constructs")]
     pub(in crate::compiler::emit) fn construct(
         &mut self,
         scope: &Scope<'_>,
@@ -216,40 +215,40 @@ impl BodyCompiler<'_, '_> {
             Construct::Directory(directory) => self.directory_construct(directory.span()),
             Construct::Embed(embed) => self.embed_construct(scope, embed),
             Construct::CPUArchitecture(cpuarchitecture_construct) => self.target_construct(
-                env::consts::ARCH.as_bytes(),
+                scope.target.arch.as_bytes(),
                 cpuarchitecture_construct.span(),
             ),
             Construct::OperatingSystemFamily(operating_system_family_construct) => self
                 .target_construct(
-                    env::consts::FAMILY.as_bytes(),
+                    scope.target.family.as_bytes(),
                     operating_system_family_construct.span(),
                 ),
             Construct::OperatingSystem(operating_system_construct) => self.target_construct(
-                env::consts::OS.as_bytes(),
+                scope.target.os.as_bytes(),
                 operating_system_construct.span(),
             ),
             Construct::SharedLibraryPrefix(shared_library_prefix_construct) => self
                 .target_construct(
-                    env::consts::DLL_PREFIX.as_bytes(),
+                    scope.target.dll_prefix.as_bytes(),
                     shared_library_prefix_construct.span(),
                 ),
             Construct::SharedLibrarySuffix(shared_library_suffix_construct) => self
                 .target_construct(
-                    env::consts::DLL_SUFFIX.as_bytes(),
+                    scope.target.dll_suffix.as_bytes(),
                     shared_library_suffix_construct.span(),
                 ),
             Construct::SharedLibraryExtension(shared_library_extension_construct) => self
                 .target_construct(
-                    env::consts::DLL_EXTENSION.as_bytes(),
+                    scope.target.dll_extension.as_bytes(),
                     shared_library_extension_construct.span(),
                 ),
             Construct::ExecutableSuffix(executable_suffix_construct) => self.target_construct(
-                env::consts::EXE_SUFFIX.as_bytes(),
+                scope.target.exe_suffix.as_bytes(),
                 executable_suffix_construct.span(),
             ),
             Construct::ExecutableExtension(executable_extension_construct) => self
                 .target_construct(
-                    env::consts::EXE_EXTENSION.as_bytes(),
+                    scope.target.exe_extension.as_bytes(),
                     executable_extension_construct.span(),
                 ),
         }
@@ -608,11 +607,7 @@ impl BodyCompiler<'_, '_> {
         Ok(destination)
     }
 
-    fn target_construct(
-        &mut self,
-        bytes: &'static [u8],
-        span: Span,
-    ) -> Result<Register, CompileError> {
+    fn target_construct(&mut self, bytes: &[u8], span: Span) -> Result<Register, CompileError> {
         let constant = self.string_constant(bytes, span)?;
         let destination = self.allocate(span)?;
         self.chunk.emit(
