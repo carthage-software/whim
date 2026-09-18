@@ -145,18 +145,25 @@ case "$operating_system" in
         ;;
     esac
 
-    glibc=0
+    libc=""
     if command -v getconf > /dev/null && getconf GNU_LIBC_VERSION > /dev/null 2>&1; then
-      glibc=1
-    elif command -v ldd > /dev/null && ldd --version 2>&1 | grep -Eiq 'glibc|gnu libc'; then
-      glibc=1
+      libc="gnu"
+    elif command -v ldd > /dev/null; then
+      case "$(ldd --version 2>&1 || true)" in
+        *musl*) libc="musl" ;;
+        *GLIBC* | *glibc* | *"GNU libc"*) libc="gnu" ;;
+      esac
     fi
 
-    if [ "$glibc" -ne 1 ]; then
-      fail "Whim release builds require a glibc-based Linux system."
+    if [ -z "$libc" ]; then
+      fail "Could not detect glibc or musl. Download a release archive for your system manually."
     fi
 
-    target="${architecture}-unknown-linux-gnu"
+    if [ "$libc" = "musl" ] && [ "$architecture" = "riscv64gc" ]; then
+      fail "Whim does not provide a musl Linux build for ${architecture}."
+    fi
+
+    target="${architecture}-unknown-linux-${libc}"
     ;;
   *)
     fail "Unsupported operating system: ${operating_system}."

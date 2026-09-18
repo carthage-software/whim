@@ -52,8 +52,8 @@ whim --version
 
 The container image is available at `ghcr.io/carthage-software/whim`.
 
-Whim supports macOS on x86-64 and Arm64, and glibc-based Linux on x86-64,
-Arm64, and RISC-V 64.
+Whim supports macOS on x86-64 and Arm64, Linux with glibc on x86-64, Arm64,
+and RISC-V 64, and Linux with musl on x86-64 and Arm64.
 
 To build Whim from source, install Rust 1.98 or later and run:
 

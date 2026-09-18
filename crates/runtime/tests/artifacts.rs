@@ -5,6 +5,7 @@ use std::process;
 
 use whim_runtime::artifact::ArtifactConfiguration;
 use whim_runtime::artifact::SourceFile;
+use whim_runtime::compiler::target::Target;
 use whim_runtime::engine::Engine;
 use whim_runtime::engine::EngineConfiguration;
 
@@ -255,6 +256,50 @@ fn artifact_compilation_validates_stub_declarations() {
         panic!("a missing stub provider is rejected");
     };
     assert!(error.to_string().contains("Example\\missing"));
+}
+
+#[test]
+fn artifact_stubs_preserve_core_reflection_when_cross_compiling() {
+    for target in [None, Some(Target::NATIVE)] {
+        let mut compiler = Engine::new(EngineConfiguration::default());
+        let artifact = compiler
+            .compile_artifact(
+                "/artifact/core-stubs.whim",
+                &[SourceFile::new(
+                    "/artifact/core-stubs.whim",
+                    r"
+namespace Whim\Type;
+use Whim\Marker\Stub;
+#[Stub]
+newtype TypeId = 0..;
+namespace Whim\Math;
+use Whim\Marker\Stub;
+use Whim\Reflection;
+#[Stub]
+const PI = PI;
+foreach (vec[
+    Reflection\reflect_newtype('Whim\\Type\\TypeId'),
+    Reflection\reflect_constant('Whim\\Math\\PI'),
+] as $symbol) {
+    assert!($symbol->getOrigin() == Reflection\DeclarationOrigin::Core);
+    assert!($symbol->getLocation() == null);
+    assert!($symbol->getFile() == null);
+    assert!($symbol->getAttributes() == vec[]);
+}
+",
+                )],
+                ArtifactConfiguration {
+                    target,
+                    ..ArtifactConfiguration::default()
+                },
+            )
+            .expect("the native stubs compile")
+            .into_bytes();
+        let mut engine = Engine::new(EngineConfiguration::default());
+        engine
+            .load_artifact(&artifact)
+            .expect("core metadata survives the artifact");
+    }
 }
 
 #[test]

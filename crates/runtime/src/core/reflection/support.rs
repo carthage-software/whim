@@ -17,6 +17,7 @@ use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::MUST_USE_ATTRIBUTE;
 use crate::bytecode::unit::TRACE_BOUNDARY_ATTRIBUTE;
 use crate::bytecode::unit::TRACK_CALLER_ATTRIBUTE;
+use crate::bytecode::unit::is_external;
 use crate::bytecode::unit::literal_value;
 use crate::classes::MethodBodyKind;
 use crate::core::reflection::model::CallableKey;
@@ -281,7 +282,11 @@ fn symbol_metadata(vm: &VirtualMachine<'_>, name: &Atom) -> DeclarationMetadata 
             }),
         SymbolKind::Constant => {
             for unit in vm.engine.units.iter().rev() {
-                if let Some(constant) = unit.unit.constants.iter().find(|value| value.name == *name)
+                if let Some(constant) = unit
+                    .unit
+                    .constants
+                    .iter()
+                    .find(|value| value.name == *name && !is_external(&value.attributes))
                 {
                     return DeclarationMetadata {
                         unit: Some(Rc::clone(unit)),
@@ -352,8 +357,12 @@ fn metadata_from_units(
         unit.unit
             .type_aliases
             .iter()
-            .any(|value| value.name == *name)
-            || unit.unit.newtypes.iter().any(|value| value.name == *name)
+            .any(|value| value.name == *name && !is_external(&value.attributes))
+            || unit
+                .unit
+                .newtypes
+                .iter()
+                .any(|value| value.name == *name && !is_external(&value.attributes))
     });
     DeclarationMetadata {
         unit: unit.cloned(),

@@ -58,10 +58,10 @@ type InitialGroup = libc::c_int;
 #[cfg(target_os = "linux")]
 type InitialGroup = libc::gid_t;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 type Resource = libc::__rlimit_resource_t;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_env = "musl"))]
 type Resource = libc::c_int;
 
 #[cfg(target_os = "macos")]

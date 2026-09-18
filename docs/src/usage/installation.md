@@ -1,7 +1,7 @@
 # Installation
 
-Whim supports macOS on x86-64 and Arm64. It also supports glibc-based Linux on
-x86-64, Arm64, and RISC-V 64. Run it through the `whim` command.
+Whim supports macOS on x86-64 and Arm64, Linux with glibc on x86-64, Arm64, and
+RISC-V 64, and Linux with musl on x86-64 and Arm64. Run it through the `whim` command.
 
 ## Shell installer
 
@@ -9,6 +9,12 @@ Install the latest release on macOS or Linux:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://whim.sh/install.sh | bash
+```
+
+On Alpine Linux, install the tools needed by the installer first:
+
+```sh
+apk add bash curl ca-certificates
 ```
 
 Pass a version to install a specific release:
@@ -19,6 +25,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://whim.sh/install.sh | bash -s -- --v
 
 The installer verifies build attestations when a compatible
 [GitHub CLI](https://cli.github.com/) is available.
+
+On Linux, it detects glibc or musl and downloads the matching build.
 
 > Note: Release `0.1.0` has no attestation.
 

@@ -43,6 +43,36 @@ jobs:
       - run: cargo build --locked --release --bin whim
       - run: target/release/whim tests/run.whim '' 2
 
+  rust-musl:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-24.04
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+      CC_x86_64_unknown_linux_musl: musl-gcc
+      CC_aarch64_unknown_linux_musl: musl-gcc
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo clippy --locked --workspace --all-targets --all-features --target ${{ matrix.target }}
+      - run: cargo test --locked --workspace --all-features --target ${{ matrix.target }}
+      - run: cargo build --locked --release --target ${{ matrix.target }} --bin whim
+      - run: target/${{ matrix.target }}/release/whim tests/run.whim '' 2
+
   whim:
     runs-on: ubuntu-latest
     steps:

@@ -167,6 +167,8 @@ fn target_file_name(triple: &str, crate_type: &str) -> String {
             "whim_target",
             "--crate-type",
             crate_type,
+            "-C",
+            "target-feature=-crt-static",
             "--target",
             triple,
             "-",
