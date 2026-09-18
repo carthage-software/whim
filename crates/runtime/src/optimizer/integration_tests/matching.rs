@@ -124,6 +124,10 @@ function choose(bool $flag): int {
     if (operating_system!() == operating_system!() && $flag) { return 1; }
     return 2;
 }
+#[Whim\Marker\AlwaysInline]
+function incomplete(string $value): int {
+    return match ($value) { 'linux' => 1, 'macos' => 2 };
+}
 assert!(choose(true) == 1);
 assert!(choose(false) == 2);
 $seen = vec[];
@@ -153,6 +157,14 @@ assert!($caught);
 $caught = false;
 try { $_ = match ('linux') { 'macos' => 1 }; }
 catch (Whim\Unwind\UnhandledMatchError $_) { $caught = true; }
+assert!($caught);
+$caught = false;
+try { $_ = incomplete('other'); }
+catch (Whim\Unwind\UnhandledMatchError $_) { $caught = true; }
+assert!($caught);
+$caught = false;
+try { $_ = incomplete(null); }
+catch (Whim\Unwind\TypeError $_) { $caught = true; }
 assert!($caught);
 ";
     for optimize in [false, true] {

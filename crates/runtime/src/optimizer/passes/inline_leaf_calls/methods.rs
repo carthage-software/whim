@@ -329,13 +329,10 @@ pub(super) fn unchecked_terminal(chunk: &Chunk) -> Option<usize> {
     .then_some(terminal)
 }
 
-/// Whether a method body may be spliced: bounded, table-free apart from
-/// class-relative property slots, with no writes to the receiver window.
 pub(super) fn method_body_inlinable(chunk: &Chunk, parameters: u16, force: bool) -> bool {
     if chunk.code.is_empty()
         || (!force && chunk.code.len() > CALLEE_INSTRUCTION_LIMIT)
         || !chunk.catch_table.is_empty()
-        || !chunk.switch_tables.is_empty()
     {
         return false;
     }
@@ -358,8 +355,9 @@ pub(super) fn method_body_inlinable(chunk: &Chunk, parameters: u16, force: bool)
                     | Instruction::ReturnUnchecked { .. }
                     | Instruction::ReturnIntUnchecked { .. }
                     | Instruction::ReturnNullUnchecked
+                    | Instruction::ThrowUnhandledMatch { .. }
             )
-            || body_jump_targets_are_forward(instruction, index, terminal);
+            || body_jump_targets_are_forward(chunk, instruction, index, terminal);
 
         if !allowed {
             return false;
@@ -412,7 +410,7 @@ pub(super) fn generic_body_inlinable(chunk: &Chunk, parameters: u16, force: bool
                 Instruction::CallMethodUnchecked { first_argument, .. }
                     if first_argument.index() >= parameters
             )
-            || body_jump_targets_are_forward(instruction, index, terminal);
+            || body_jump_targets_are_forward(chunk, instruction, index, terminal);
         if !allowed {
             return false;
         }

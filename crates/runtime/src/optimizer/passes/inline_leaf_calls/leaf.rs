@@ -5,6 +5,7 @@ use hashbrown::HashSet;
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
+use crate::bytecode::instruction::operands::Count;
 use crate::optimizer::cfg::branches_or_terminates;
 use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::register_is_dead_after;
@@ -102,12 +103,11 @@ pub(super) fn leaf_callee(function: &CompiledFunction) -> Option<LeafCallee> {
     })
 }
 
-/// Whether an instruction may appear in an inlined body: pure straight-line
-/// data flow with no jumps, calls, caches, or heap-shape side effects.
 pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
     matches!(
         instruction,
         Instruction::Move { .. }
+            | Instruction::MoveOwned { .. }
             | Instruction::LoadConstant { .. }
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
@@ -165,6 +165,10 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::DictIndexGetIntKeyOrNull { .. }
             | Instruction::DictIndexGetStringKeyOrNull { .. }
             | Instruction::StringIndexGetOrNull { .. }
+            | Instruction::Write { .. }
+            | Instruction::WriteLine { .. }
+            | Instruction::WriteError { .. }
+            | Instruction::WriteErrorLine { .. }
     )
 }
 
@@ -322,11 +326,8 @@ fn inline_into_chunk_from(
             continue;
         }
         let Some(callee) = callee else {
-            // Branching bodies still inline through the jump-rebasing
-            // builder when the arguments arrive in a register window.
-            let Some((first_argument, count)) = arguments else {
-                continue;
-            };
+            let (first_argument, count) =
+                arguments.unwrap_or((Register::new(chunk.register_count), 1));
             let Ok(parameters) = u16::try_from(callee_function.parameters.len()) else {
                 continue;
             };
@@ -349,7 +350,7 @@ fn inline_into_chunk_from(
             let Some(terminal) = unchecked_terminal(&snapshot) else {
                 continue;
             };
-            if let Some(replacement) = build_jumping_replacement_capped(
+            if let Some(mut replacement) = build_jumping_replacement_capped(
                 chunk,
                 &snapshot,
                 terminal,
@@ -366,6 +367,18 @@ fn inline_into_chunk_from(
                     parameters,
                 ),
             ) {
+                if let Some(constant) = constant_argument {
+                    replacement.insert(
+                        0,
+                        (
+                            Instruction::LoadConstant {
+                                destination: first_argument,
+                                constant,
+                            },
+                            chunk.spans[index],
+                        ),
+                    );
+                }
                 projected_length += replacement.len() - 1;
                 replacements.push((index, replacement));
                 statistics.calls_inlined += 1;
@@ -661,20 +674,17 @@ pub(super) fn remap_instruction(
             cache,
             argument_count,
         } => {
-            let first = remap(*first_argument);
-            if !(0..u16::from(argument_count.value())).all(|offset| {
-                remap(Register::new(first_argument.index() + offset)).index()
-                    == first.index() + offset
-            }) {
-                return None;
-            }
             *destination = remap(*destination);
-            *first_argument = first;
+            *first_argument = remap_window(*first_argument, *argument_count, remap)?;
             *cache = chunk
                 .add_ic_descriptor(callee_chunk.ic_descriptors[usize::from(cache.index())].clone())
                 .ok()?;
         }
         Instruction::Move {
+            destination,
+            source,
+        }
+        | Instruction::MoveOwned {
             destination,
             source,
         }
@@ -939,8 +949,47 @@ pub(super) fn remap_instruction(
         Instruction::JumpIfNull { subject, .. }
         | Instruction::JumpIfNotNull { subject, .. }
         | Instruction::BoolPatternBranch { subject, .. }
-        | Instruction::CheckDefined { subject, .. } => {
+        | Instruction::CheckDefined { subject, .. }
+        | Instruction::ThrowUnhandledMatch { subject } => {
             *subject = remap(*subject);
+        }
+        Instruction::SwitchInt { subject, table }
+        | Instruction::SwitchString { subject, table }
+        | Instruction::SwitchBool { subject, table }
+        | Instruction::SwitchFloat { subject, table }
+        | Instruction::SwitchPattern { subject, table } => {
+            *subject = remap(*subject);
+            *table = chunk
+                .add_switch_table(callee_chunk.switch_tables[usize::from(table.index())].clone())
+                .ok()?;
+        }
+        Instruction::SwitchTuplePattern {
+            first_element,
+            element_count,
+            table,
+        } => {
+            *first_element = remap_window(*first_element, *element_count, remap)?;
+            *table = chunk
+                .add_switch_table(callee_chunk.switch_tables[usize::from(table.index())].clone())
+                .ok()?;
+        }
+        Instruction::Write {
+            value_count,
+            first_value,
+        }
+        | Instruction::WriteLine {
+            value_count,
+            first_value,
+        }
+        | Instruction::WriteError {
+            value_count,
+            first_value,
+        }
+        | Instruction::WriteErrorLine {
+            value_count,
+            first_value,
+        } => {
+            *first_value = remap_window(*first_value, *value_count, remap)?;
         }
         Instruction::JumpUnless { left, right, .. }
         | Instruction::IntJumpUnless { left, right, .. }
@@ -959,6 +1008,12 @@ pub(super) fn remap_instruction(
         }
         Instruction::IntJumpUnlessImmediate { source, .. } => {
             *source = remap(*source);
+        }
+        Instruction::JumpUnlessConstant {
+            source, constant, ..
+        } => {
+            *source = remap(*source);
+            *constant = remap_constant(chunk, *constant)?;
         }
         Instruction::IntRangeJumpIf {
             subject,
@@ -1012,4 +1067,17 @@ pub(super) fn remap_instruction(
     }
 
     Some(instruction)
+}
+
+fn remap_window(
+    first: Register,
+    count: Count,
+    remap: &impl Fn(Register) -> Register,
+) -> Option<Register> {
+    let mapped = remap(first);
+    (0..u16::from(count.value()))
+        .all(|offset| {
+            remap(Register::new(first.index() + offset)).index() == mapped.index() + offset
+        })
+        .then_some(mapped)
 }

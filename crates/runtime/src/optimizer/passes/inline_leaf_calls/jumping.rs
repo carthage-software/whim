@@ -1,5 +1,7 @@
 //! Self-inlining of recursive bodies and the jumping replacement builder.
 
+use crate::bytecode::rewrite::rebase_targets;
+use crate::optimizer::cfg::successors;
 use crate::optimizer::passes::inline_leaf_calls::Atom;
 use crate::optimizer::passes::inline_leaf_calls::CALLEE_INSTRUCTION_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
@@ -87,7 +89,7 @@ pub(super) fn self_inline_function(
                     | Instruction::ReturnIntUnchecked { .. }
                     | Instruction::ReturnNullUnchecked
             )
-            || body_jump_targets_are_forward(instruction, index, terminal);
+            || body_jump_targets_are_forward(&snapshot, instruction, index, terminal);
 
         if !allowed {
             return false;
@@ -162,6 +164,7 @@ pub(super) fn body_jump_target(instruction: Instruction, index: usize) -> Option
         | Instruction::StringByteJumpUnlessEqual { offset, .. }
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
         | Instruction::IntJumpUnlessImmediate { offset, .. }
+        | Instruction::JumpUnlessConstant { offset, .. }
         | Instruction::IntRangeJumpIf { offset, .. }
         | Instruction::IntRangeJumpUnless { offset, .. } => i32::from(offset.offset()),
         _ => return None,
@@ -171,10 +174,27 @@ pub(super) fn body_jump_target(instruction: Instruction, index: usize) -> Option
 }
 
 pub(super) fn body_jump_targets_are_forward(
+    chunk: &Chunk,
     instruction: Instruction,
     index: usize,
     terminal: usize,
 ) -> bool {
+    if matches!(
+        instruction,
+        Instruction::SwitchInt { .. }
+            | Instruction::SwitchString { .. }
+            | Instruction::SwitchBool { .. }
+            | Instruction::SwitchFloat { .. }
+            | Instruction::SwitchPattern { .. }
+            | Instruction::SwitchTuplePattern { .. }
+    ) {
+        let mut targets = Vec::new();
+        successors(chunk, index, &mut targets);
+        return targets
+            .into_iter()
+            .all(|target| target <= terminal && target > index);
+    }
+
     if let Instruction::BoolPatternBranch {
         false_offset,
         default_offset,
@@ -350,7 +370,7 @@ pub(super) fn build_jumping_replacement_bound(
             continue;
         }
 
-        let remapped = match instruction {
+        let mut remapped = match instruction {
             Instruction::PropertySetUnchecked {
                 object,
                 value,
@@ -394,6 +414,14 @@ pub(super) fn build_jumping_replacement_bound(
             },
             other => remap_instruction(chunk, snapshot, other, &remap)?,
         };
+
+        rebase_targets(
+            chunk,
+            &mut remapped,
+            index,
+            new_positions[index],
+            &new_positions,
+        );
 
         replacement.push((remapped, span));
     }
@@ -467,6 +495,7 @@ fn rebase_body_jump(instruction: Instruction, relative: i64) -> Option<Instructi
         | Instruction::StringByteJumpUnlessEqual { offset, .. }
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
         | Instruction::IntJumpUnlessImmediate { offset, .. }
+        | Instruction::JumpUnlessConstant { offset, .. }
         | Instruction::IntRangeJumpIf { offset, .. }
         | Instruction::IntRangeJumpUnless { offset, .. } => {
             *offset = ShortJumpOffset::new(i16::try_from(relative).ok()?);
