@@ -89,6 +89,26 @@ raises(
 );
 
 raises(
+  '_declarations-inheritance/static-property-cannot-become-instance.whim',
+  'ChildValue::$value cannot redeclare static inherited property ParentValue::$value as non-static',
+);
+
+raises(
+  '_declarations-inheritance/instance-property-cannot-become-static.whim',
+  'ChildValue::$value cannot redeclare non-static inherited property ParentValue::$value as static',
+);
+
+raises(
+  '_declarations-inheritance/inherited-static-property-cannot-become-promoted.whim',
+  'ChildValue::$value cannot redeclare static inherited property ParentValue::$value as non-static',
+);
+
+raises(
+  '_declarations-inheritance/inherited-instance-property-cannot-become-static.whim',
+  'ChildValue::$value cannot redeclare non-static inherited property ParentValue::$value as static',
+);
+
+raises(
   '_declarations-inheritance/constant-over-inherited-method.whim',
   'declares the constant value, but already has a method of that name',
 );
@@ -291,6 +311,39 @@ assert!($shadowProperty->value() == 10);
 $shadowProperty->value = 'updated';
 assert!($shadowProperty->value == 'updated');
 assert!($shadowProperty->value() == 10);
+
+class PrivatePropertyBase {
+  private static string $staticValue = 'parent static';
+  private string $instanceValue = 'parent instance';
+
+  public function values(): (string, string) {
+    return (self::$staticValue, $this->instanceValue);
+  }
+}
+
+class PrivatePropertyChild extends PrivatePropertyBase {
+  public string $staticValue = 'child instance';
+  public static string $instanceValue = 'child static';
+}
+
+$privateProperties = new PrivatePropertyChild();
+assert!($privateProperties->values() == ('parent static', 'parent instance'));
+assert!($privateProperties->staticValue == 'child instance');
+assert!(PrivatePropertyChild::$instanceValue == 'child static');
+
+class StaticPropertyBase {
+  public static string $value = 'parent';
+}
+
+class StaticPropertyChild extends StaticPropertyBase {
+  public static string $value = 'child';
+}
+
+class StaticPropertyGrandchild extends StaticPropertyChild {}
+
+assert!(StaticPropertyBase::$value == 'parent');
+assert!(StaticPropertyChild::$value == 'child');
+assert!(StaticPropertyGrandchild::$value == 'child');
 
 class RedeclaredBase {
   public readonly int $id;

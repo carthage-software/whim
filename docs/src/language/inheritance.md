@@ -103,7 +103,9 @@ an inherited abstract method open. A concrete child may not.
 
 Property types are invariant. A child that redeclares an inherited public or
 protected property must use the same type. It must also keep the property
-readonly or writable as declared.
+readonly or writable as declared. It may not change a static property to an
+instance property or an instance property to static. These rules also apply
+to properties declared through constructor promotion.
 
 A child may redeclare a compatible inherited property. The object still has
 one slot for that inherited property.

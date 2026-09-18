@@ -1,0 +1,7 @@
+class ParentValue {
+  public string $value = 'hello';
+}
+
+class ChildValue extends ParentValue {
+  public static string $value = 'bye';
+}

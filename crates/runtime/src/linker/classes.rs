@@ -647,11 +647,61 @@ impl Engine {
         link: &ClassLink<'_>,
     ) -> Result<(), VirtualMachineControl> {
         for (position, property) in link.compiled.properties.iter().enumerate() {
+            self.check_property_staticness(link, property)?;
+
             if property.is_static {
                 Self::link_static_property(class, link, property);
             } else {
                 self.link_instance_property(class, link, property, position)?;
             }
+        }
+
+        Ok(())
+    }
+
+    fn check_property_staticness(
+        &mut self,
+        link: &ClassLink<'_>,
+        property: &CompiledProperty,
+    ) -> Result<(), VirtualMachineControl> {
+        let mut ancestor = link.parent;
+        while let Some(id) = ancestor {
+            let parent = &self.tables.classes[id.0 as usize];
+            let inherited = if property.is_static {
+                parent
+                    .slot_names
+                    .get(&property.name)
+                    .map(|slot| &parent.slots[*slot as usize])
+            } else {
+                parent
+                    .static_names
+                    .get(&property.name)
+                    .map(|slot| &parent.statics_info[*slot as usize])
+            };
+
+            if let Some(inherited) = inherited
+                && inherited.visibility != Visibility::Private
+            {
+                let declaring_name =
+                    &self.tables.classes[inherited.declaring_class.0 as usize].name;
+                let (inherited_kind, replacement_kind) = if property.is_static {
+                    ("non-static", "static")
+                } else {
+                    ("static", "non-static")
+                };
+
+                return Err(self.linker_error_at(
+                    &link.unit.path,
+                    property.span,
+                    format!(
+                        "{}::${} cannot redeclare {inherited_kind} inherited property \
+                         {declaring_name}::${} as {replacement_kind}",
+                        link.name, property.name, property.name
+                    ),
+                ));
+            }
+
+            ancestor = parent.parent;
         }
 
         Ok(())

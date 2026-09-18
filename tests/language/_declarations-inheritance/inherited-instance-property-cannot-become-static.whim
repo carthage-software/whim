@@ -1,0 +1,9 @@
+class ParentValue {
+  protected string $value = 'hello';
+}
+
+class IntermediateValue extends ParentValue {}
+
+class ChildValue extends IntermediateValue {
+  private static string $value = 'bye';
+}
