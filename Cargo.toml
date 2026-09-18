@@ -50,7 +50,7 @@ unnecessary_self_imports = { level = "deny" }
 wildcard_imports = { level = "deny" }
 
 [workspace.dependencies]
-allocator-api2 = "0.2"
+allocator-api2 = "0.4"
 annotate-snippets = "0.12"
 argon2 = "0.5.3"
 base16ct = { version = "1.0.0", features = ["alloc"] }
