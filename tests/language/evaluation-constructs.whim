@@ -626,6 +626,28 @@ try {
 
 assert!($assertion_error_70 is OutOfBoundsError);
 
+const CPU_ARCHITECTURE = cpu_architecture!();
+const OPERATING_SYSTEM = operating_system!();
+const OPERATING_SYSTEM_FAMILY = operating_system_family!();
+const SHARED_LIBRARY_PREFIX = shared_library_prefix!();
+const SHARED_LIBRARY_SUFFIX = shared_library_suffix!();
+const SHARED_LIBRARY_EXTENSION = shared_library_extension!();
+const EXECUTABLE_SUFFIX = executable_suffix!();
+const EXECUTABLE_EXTENSION = executable_extension!();
+const SOURCE_FILE = file!();
+const SOURCE_DIRECTORY = directory!();
+
+assert!(CPU_ARCHITECTURE == cpu_architecture!());
+assert!(OPERATING_SYSTEM == operating_system!());
+assert!(OPERATING_SYSTEM_FAMILY == operating_system_family!());
+assert!(SHARED_LIBRARY_PREFIX == shared_library_prefix!());
+assert!(SHARED_LIBRARY_SUFFIX == shared_library_suffix!());
+assert!(SHARED_LIBRARY_EXTENSION == shared_library_extension!());
+assert!(EXECUTABLE_SUFFIX == executable_suffix!());
+assert!(EXECUTABLE_EXTENSION == executable_extension!());
+assert!(SOURCE_FILE == file!());
+assert!(SOURCE_DIRECTORY == directory!());
+
 assert!(length!(file!()) > length!(directory!()));
 assert!(
   file!() == directory!() . Path\SEPARATOR . 'evaluation-constructs.whim',

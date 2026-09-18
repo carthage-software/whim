@@ -154,6 +154,31 @@ Panic traces hide `TraceBoundary` frames unless full traces are on. They also
 hide parameters marked `SensitiveParameter`. Use `throw` for errors that a
 caller may handle. Use `panic!` only when continuing would be wrong.
 
+## Platform information
+
+These constructs take no arguments and return strings describing the platform
+running the compiler. The compiler stores their values as string constants.
+
+| Construct | Value | Examples |
+| --- | --- | --- |
+| `cpu_architecture!()` | CPU architecture | `'x86_64'`, `'aarch64'`, `'riscv64'` |
+| `operating_system!()` | Operating system | `'linux'`, `'macos'` |
+| `operating_system_family!()` | Operating system family | `'unix'` |
+| `shared_library_prefix!()` | Shared library filename prefix | `'lib'` |
+| `shared_library_suffix!()` | Shared library filename suffix, including the dot | `'.so'`, `'.dylib'` |
+| `shared_library_extension!()` | Shared library extension without the dot | `'so'`, `'dylib'` |
+| `executable_suffix!()` | Executable filename suffix, including a dot if present | `''` |
+| `executable_extension!()` | Executable extension without the dot | `''` |
+
+You can use them in [constant expressions](constant-expressions.md), including
+constant declarations, parameter defaults, property defaults, and attributes:
+
+```whim
+const PLATFORM = operating_system!() . '/' . cpu_architecture!();
+
+write_line!(PLATFORM);
+```
+
 ## Source paths and loading
 
 - `file!()` returns the current source file path.
@@ -161,6 +186,16 @@ caller may handle. Use `panic!` only when continuing would be wrong.
 - `embed!('./file')` reads a file while compiling.
 - `require!($path)` loads and runs a source file.
 - `require_once!($path)` does that at most once per resolved path.
+
+`file!()` and `directory!()` also work in constant expressions:
+
+```whim
+const SOURCE_FILE = file!();
+const SOURCE_DIRECTORY = directory!();
+
+assert!(SOURCE_FILE == file!());
+assert!(SOURCE_DIRECTORY == directory!());
+```
 
 See [Loading Files](loading.md) for load and error rules.
 

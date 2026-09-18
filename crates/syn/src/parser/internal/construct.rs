@@ -1,5 +1,13 @@
 //! The language-construct parser.
 
+use crate::cst::construct::CPUArchitectureConstruct;
+use crate::cst::construct::ExecutableExtensionConstruct;
+use crate::cst::construct::ExecutableSuffixConstruct;
+use crate::cst::construct::OperatingSystemConstruct;
+use crate::cst::construct::OperatingSystemFamilyConstruct;
+use crate::cst::construct::SharedLibraryExtensionConstruct;
+use crate::cst::construct::SharedLibraryPrefixConstruct;
+use crate::cst::construct::SharedLibrarySuffixConstruct;
 use crate::unreachable_invariant;
 
 use crate::arena::Arena;
@@ -79,6 +87,30 @@ where
             "file" => Construct::File(self.parse_file_construct()?),
             "directory" => Construct::Directory(self.parse_directory_construct()?),
             "embed" => Construct::Embed(self.parse_embed_construct()?),
+            "cpu_architecture" => {
+                Construct::CPUArchitecture(self.parse_cpu_architecture_construct()?)
+            }
+            "operating_system" => {
+                Construct::OperatingSystem(self.parse_operating_system_construct()?)
+            }
+            "operating_system_family" => {
+                Construct::OperatingSystemFamily(self.parse_operating_system_family_construct()?)
+            }
+            "shared_library_prefix" => {
+                Construct::SharedLibraryPrefix(self.parse_shared_library_prefix_construct()?)
+            }
+            "shared_library_suffix" => {
+                Construct::SharedLibrarySuffix(self.parse_shared_library_suffix_construct()?)
+            }
+            "shared_library_extension" => {
+                Construct::SharedLibraryExtension(self.parse_shared_library_extension_construct()?)
+            }
+            "executable_suffix" => {
+                Construct::ExecutableSuffix(self.parse_executable_suffix_construct()?)
+            }
+            "executable_extension" => {
+                Construct::ExecutableExtension(self.parse_executable_extension_construct()?)
+            }
             _ => {
                 return Err(ParseError::UnexpectedToken(
                     Expected::Description("a known language construct"),
@@ -543,6 +575,118 @@ where
         let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
 
         Ok(DirectoryConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_cpu_architecture_construct(
+        &mut self,
+    ) -> Result<CPUArchitectureConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(CPUArchitectureConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_operating_system_family_construct(
+        &mut self,
+    ) -> Result<OperatingSystemFamilyConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(OperatingSystemFamilyConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_operating_system_construct(
+        &mut self,
+    ) -> Result<OperatingSystemConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(OperatingSystemConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_shared_library_prefix_construct(
+        &mut self,
+    ) -> Result<SharedLibraryPrefixConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(SharedLibraryPrefixConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_shared_library_suffix_construct(
+        &mut self,
+    ) -> Result<SharedLibrarySuffixConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(SharedLibrarySuffixConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_shared_library_extension_construct(
+        &mut self,
+    ) -> Result<SharedLibraryExtensionConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(SharedLibraryExtensionConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_executable_suffix_construct(
+        &mut self,
+    ) -> Result<ExecutableSuffixConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(ExecutableSuffixConstruct {
+            name,
+            bang,
+            left_parenthesis,
+            right_parenthesis,
+        })
+    }
+
+    fn parse_executable_extension_construct(
+        &mut self,
+    ) -> Result<ExecutableExtensionConstruct<'arena>, ParseError> {
+        let (name, bang, left_parenthesis) = self.open_construct()?;
+        let right_parenthesis = self.expect_span(TokenKind::RightParenthesis)?;
+
+        Ok(ExecutableExtensionConstruct {
             name,
             bang,
             left_parenthesis,

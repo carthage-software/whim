@@ -739,6 +739,24 @@ impl Node<'_, '_> {
                 Construct::File(inner) => f(Node::FileConstruct(inner)),
                 Construct::Directory(inner) => f(Node::DirectoryConstruct(inner)),
                 Construct::Embed(inner) => f(Node::EmbedConstruct(inner)),
+                Construct::CPUArchitecture(inner) => f(Node::CPUArchitectureConstruct(inner)),
+                Construct::OperatingSystemFamily(inner) => {
+                    f(Node::OperatingSystemFamilyConstruct(inner))
+                }
+                Construct::OperatingSystem(inner) => f(Node::OperatingSystemConstruct(inner)),
+                Construct::SharedLibraryPrefix(inner) => {
+                    f(Node::SharedLibraryPrefixConstruct(inner))
+                }
+                Construct::SharedLibrarySuffix(inner) => {
+                    f(Node::SharedLibrarySuffixConstruct(inner))
+                }
+                Construct::SharedLibraryExtension(inner) => {
+                    f(Node::SharedLibraryExtensionConstruct(inner))
+                }
+                Construct::ExecutableSuffix(inner) => f(Node::ExecutableSuffixConstruct(inner)),
+                Construct::ExecutableExtension(inner) => {
+                    f(Node::ExecutableExtensionConstruct(inner))
+                }
             },
             Node::RequireConstruct(node) => {
                 f(Node::LocalIdentifier(&node.name));
@@ -861,6 +879,14 @@ impl Node<'_, '_> {
                 f(Node::LocalIdentifier(&node.name));
                 f(Node::LiteralString(&node.path));
             }
+            Node::CPUArchitectureConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::OperatingSystemFamilyConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::OperatingSystemConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::SharedLibraryPrefixConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::SharedLibrarySuffixConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::SharedLibraryExtensionConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::ExecutableSuffixConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::ExecutableExtensionConstruct(node) => f(Node::LocalIdentifier(&node.name)),
             Node::ConstructArgument(node) => f(Node::Expression(node.value)),
             Node::Instantiation(node) => {
                 f(Node::Keyword(&node.new));

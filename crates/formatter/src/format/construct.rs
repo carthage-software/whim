@@ -154,6 +154,30 @@ where
             Construct::Embed(c) => {
                 format_literal_construct(f, c.name.value, &c.path, c.right_parenthesis)
             }
+            Construct::CPUArchitecture(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
+            Construct::OperatingSystemFamily(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
+            Construct::OperatingSystem(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
+            Construct::SharedLibraryPrefix(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
+            Construct::SharedLibrarySuffix(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
+            Construct::SharedLibraryExtension(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
+            Construct::ExecutableSuffix(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
+            Construct::ExecutableExtension(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
         }
     }
 }

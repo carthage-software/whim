@@ -18,6 +18,8 @@ Constants, attribute arguments, parameter defaults, and property defaults use
 constant expressions. Such an expression may use:
 
 - scalar literals and existing constants;
+- `file!()` and `directory!()`;
+- the [platform information constructs](constructs.md#platform-information);
 - `embed!` with a literal relative path;
 - unary and binary operators;
 - tuple, vec, and dict literals, including vec and dict spreads;
@@ -74,8 +76,8 @@ A constant expression cannot use:
 - assignment, indexing, or a property read;
 - interpolation;
 - a closure with captures;
-- `match`, `throw`, a partial call, or a language construct other than
-  `embed!`;
+- `match`, `throw`, or a partial call;
+- language constructs other than those listed above;
 - `vec[$value; $size]`;
 - a class name held in an expression.
 

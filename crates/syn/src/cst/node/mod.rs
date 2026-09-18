@@ -79,6 +79,7 @@ use crate::cst::class::PropertyDefault;
 use crate::cst::class::SealedPermissions;
 use crate::cst::construct::AssertConstruct;
 use crate::cst::construct::AssertMessage;
+use crate::cst::construct::CPUArchitectureConstruct;
 use crate::cst::construct::CloneConstruct;
 use crate::cst::construct::CloneField;
 use crate::cst::construct::Construct;
@@ -90,9 +91,13 @@ use crate::cst::construct::DirectoryConstruct;
 use crate::cst::construct::DiscardConstruct;
 use crate::cst::construct::DropConstruct;
 use crate::cst::construct::EmbedConstruct;
+use crate::cst::construct::ExecutableExtensionConstruct;
+use crate::cst::construct::ExecutableSuffixConstruct;
 use crate::cst::construct::ExitConstruct;
 use crate::cst::construct::FileConstruct;
 use crate::cst::construct::LengthConstruct;
+use crate::cst::construct::OperatingSystemConstruct;
+use crate::cst::construct::OperatingSystemFamilyConstruct;
 use crate::cst::construct::PanicConstruct;
 use crate::cst::construct::RemoveConstruct;
 use crate::cst::construct::RemoveFirstConstruct;
@@ -100,6 +105,9 @@ use crate::cst::construct::RemoveLastConstruct;
 use crate::cst::construct::RequireConstruct;
 use crate::cst::construct::RequireOnceConstruct;
 use crate::cst::construct::SequenceConstruct;
+use crate::cst::construct::SharedLibraryExtensionConstruct;
+use crate::cst::construct::SharedLibraryPrefixConstruct;
+use crate::cst::construct::SharedLibrarySuffixConstruct;
 use crate::cst::construct::SwapRemoveConstruct;
 use crate::cst::construct::WriteConstruct;
 use crate::cst::construct::WriteErrorConstruct;
@@ -395,6 +403,14 @@ define_nodes! {
     FileConstruct(FileConstruct<'arena>),
     DirectoryConstruct(DirectoryConstruct<'arena>),
     EmbedConstruct(EmbedConstruct<'arena>),
+    CPUArchitectureConstruct(CPUArchitectureConstruct<'arena>),
+    OperatingSystemFamilyConstruct(OperatingSystemFamilyConstruct<'arena>),
+    OperatingSystemConstruct(OperatingSystemConstruct<'arena>),
+    SharedLibraryPrefixConstruct(SharedLibraryPrefixConstruct<'arena>),
+    SharedLibrarySuffixConstruct(SharedLibrarySuffixConstruct<'arena>),
+    SharedLibraryExtensionConstruct(SharedLibraryExtensionConstruct<'arena>),
+    ExecutableSuffixConstruct(ExecutableSuffixConstruct<'arena>),
+    ExecutableExtensionConstruct(ExecutableExtensionConstruct<'arena>),
     ConstructArgument(ConstructArgument<'arena>),
     Instantiation(Instantiation<'arena>),
     Binary(Binary<'arena>),

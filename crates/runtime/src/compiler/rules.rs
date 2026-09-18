@@ -890,7 +890,19 @@ fn check_constant_expression_at(
     match expression {
         Expression::Literal(_)
         | Expression::Access(Access::Constant(_) | Access::ClassConstant(_))
-        | Expression::Construct(Construct::Embed(_)) => Ok(()),
+        | Expression::Construct(
+            Construct::Embed(_)
+            | Construct::File(_)
+            | Construct::Directory(_)
+            | Construct::CPUArchitecture(_)
+            | Construct::OperatingSystem(_)
+            | Construct::OperatingSystemFamily(_)
+            | Construct::SharedLibraryPrefix(_)
+            | Construct::SharedLibrarySuffix(_)
+            | Construct::SharedLibraryExtension(_)
+            | Construct::ExecutableSuffix(_)
+            | Construct::ExecutableExtension(_),
+        ) => Ok(()),
         Expression::Parenthesized(parenthesized) => {
             check_constant_expression_at(parenthesized.expression, position)
         }

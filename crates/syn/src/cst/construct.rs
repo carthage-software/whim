@@ -33,6 +33,14 @@ pub enum Construct<'arena> {
     File(FileConstruct<'arena>),
     Directory(DirectoryConstruct<'arena>),
     Embed(EmbedConstruct<'arena>),
+    CPUArchitecture(CPUArchitectureConstruct<'arena>),
+    OperatingSystemFamily(OperatingSystemFamilyConstruct<'arena>),
+    OperatingSystem(OperatingSystemConstruct<'arena>),
+    SharedLibraryPrefix(SharedLibraryPrefixConstruct<'arena>),
+    SharedLibrarySuffix(SharedLibrarySuffixConstruct<'arena>),
+    SharedLibraryExtension(SharedLibraryExtensionConstruct<'arena>),
+    ExecutableSuffix(ExecutableSuffixConstruct<'arena>),
+    ExecutableExtension(ExecutableExtensionConstruct<'arena>),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -288,6 +296,76 @@ pub struct EmbedConstruct<'arena> {
     pub right_parenthesis: Span,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct CPUArchitectureConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+impl HasSpan for CPUArchitectureConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct OperatingSystemFamilyConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct OperatingSystemConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct SharedLibraryPrefixConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct SharedLibrarySuffixConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct SharedLibraryExtensionConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ExecutableSuffixConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ExecutableExtensionConstruct<'arena> {
+    pub name: LocalIdentifier<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ConstructArgument<'arena> {
     pub value: &'arena Expression<'arena>,
@@ -320,6 +398,14 @@ impl HasSpan for Construct<'_> {
             Construct::File(construct) => construct.span(),
             Construct::Directory(construct) => construct.span(),
             Construct::Embed(construct) => construct.span(),
+            Construct::CPUArchitecture(construct) => construct.span(),
+            Construct::OperatingSystemFamily(construct) => construct.span(),
+            Construct::OperatingSystem(construct) => construct.span(),
+            Construct::SharedLibraryPrefix(construct) => construct.span(),
+            Construct::SharedLibrarySuffix(construct) => construct.span(),
+            Construct::SharedLibraryExtension(construct) => construct.span(),
+            Construct::ExecutableSuffix(construct) => construct.span(),
+            Construct::ExecutableExtension(construct) => construct.span(),
         }
     }
 }
@@ -463,6 +549,48 @@ impl HasSpan for DirectoryConstruct<'_> {
 }
 
 impl HasSpan for EmbedConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for OperatingSystemFamilyConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for OperatingSystemConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for SharedLibraryPrefixConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for SharedLibrarySuffixConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for SharedLibraryExtensionConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for ExecutableSuffixConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
+}
+
+impl HasSpan for ExecutableExtensionConstruct<'_> {
     fn span(&self) -> Span {
         self.name.span().join(self.right_parenthesis)
     }

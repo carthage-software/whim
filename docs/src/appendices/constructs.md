@@ -10,15 +10,20 @@ This table lists every construct.
 | `clone!($object, ...)` | object | clones an object and may replace fields |
 | `contains!($array, $value)` | `bool` | checks array values with strict equality |
 | `contains_key!($array, $key)` | `bool` | checks an array key or index |
+| `cpu_architecture!()` | `string` | returns the platform's CPU architecture |
 | `debug!(...)` | `null` | prints source sites and bounded value details |
 | `directory!()` | `string` | returns the current source directory |
 | `discard!($value)` | `void` | marks a discarded result as deliberate |
 | `drop!($local, ...)` | `void` | releases locals that hold the last strong references |
 | `embed!('./file')` | `string` | embeds a file's exact bytes while compiling |
+| `executable_extension!()` | `string` | returns the executable extension without a dot |
+| `executable_suffix!()` | `string` | returns the executable suffix, including a dot if present |
 | `exit!()` | `never` | exits with status zero |
 | `exit!($status)` | `never` | exits with the low eight bits of an int |
 | `file!()` | `string` | returns the current source file |
 | `length!($value)` | `int` | counts string bytes or array items |
+| `operating_system!()` | `string` | returns the platform's operating system |
+| `operating_system_family!()` | `string` | returns the platform's operating system family |
 | `panic!($message)` | `never` | requires a string, prints a trace, and exits with status 255 |
 | `remove!($array, $key)` | value | removes and returns one entry |
 | `swap_remove!($vec, $index)` | value | removes a vec item without keeping order |
@@ -27,6 +32,9 @@ This table lists every construct.
 | `require!($path)` | `null` | loads and runs a source file |
 | `require_once!($path)` | `null` | loads a resolved path at most once |
 | `sequence!($first, ..., $last)` | last expression's type | evaluates one or more expressions in order and produces the last value |
+| `shared_library_extension!()` | `string` | returns the shared library extension without a dot |
+| `shared_library_prefix!()` | `string` | returns the shared library filename prefix |
+| `shared_library_suffix!()` | `string` | returns the shared library suffix, including the dot |
 | `write!(...)` | `void` | writes to standard output |
 | `write_line!(...)` | `void` | writes to standard output, then ends the line |
 | `write_error!(...)` | `void` | writes to standard error |
@@ -113,6 +121,7 @@ parameter markers apply. Both exit forms run shutdown destructors.
 
 `file!()` and `directory!()` take no arguments. Their values belong to the
 source file that contains the construct, not the process entry file.
+Both are valid in [constant expressions](../language/constant-expressions.md).
 
 `embed!` takes one literal relative path. It resolves from that same source
 directory and reads the file while compiling. It accepts any bytes and performs
