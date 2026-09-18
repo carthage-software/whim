@@ -21,6 +21,7 @@ use crate::optimizer::analysis::Analysis;
 use crate::optimizer::analysis::AnalyzedChunk;
 use crate::optimizer::passes::FunctionLocation;
 use crate::optimizer::passes::chunk_mut;
+use crate::optimizer::passes::prune_unreachable;
 use crate::unreachable_invariant;
 
 struct ChunkRewrite {
@@ -183,10 +184,12 @@ impl RewritePlan {
             }
 
             let mut removals = rewrite.removals;
+            let mut branches_folded = false;
             for (index, removed) in removals.iter_mut().enumerate().take(chunk.code.len()) {
                 if *removed {
                     result.removals += 1;
                 } else if let Some(replacement) = rewrite.replacements[index] {
+                    branches_folded |= matches!(replacement, Instruction::Jump { .. });
                     chunk.code[index] = replacement;
                     result.replacements += 1;
                 }
@@ -195,7 +198,14 @@ impl RewritePlan {
             if removals.iter().any(|removed| *removed) {
                 compact(chunk, &removals);
             }
-            if added_switch_tables {
+
+            if branches_folded {
+                let previous = chunk.code.len();
+                prune_unreachable::optimize_chunk(chunk);
+                result.removals += previous - chunk.code.len();
+            }
+
+            if added_switch_tables || branches_folded {
                 compact_switch_tables(chunk);
             }
         }

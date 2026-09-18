@@ -1,6 +1,8 @@
+use std::env::consts;
 use std::path::Path;
 
 use super::compile;
+use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::verify::verify_unit;
 use crate::engine::Engine;
@@ -26,6 +28,142 @@ function incomplete(mixed $value): 1..=3 {
     return match ($value) { 'foo' => 1, 'bar' => 2, string => 3 };
 }
 ";
+
+#[test]
+fn constant_conditions_and_matches_keep_only_the_selected_arm() {
+    let mut bodies = vec![
+        "if ('linux' == 'linux') { return 'chosen'; } else { return 'discarded'; }".to_string(),
+        "if ('linux' != 'linux') { return 'discarded'; } return 'chosen';".to_string(),
+        "if (false) { return 'discarded'; } if (true) { return 'chosen'; } return 'discarded';".to_string(),
+        "if (1 == 1.0) { return 'discarded'; } return 'chosen';".to_string(),
+        "if (9007199254740993 > 9007199254740992.0) { return 'chosen'; } return 'discarded';".to_string(),
+        "return match ('linux') { 'macos' => 'discarded', 'linux' => 'chosen', 'linux' => 'discarded', _ => 'discarded' };".to_string(),
+        "return match ('b') { 'a' => 'discarded', 'b' => 'chosen', 'c' => 'discarded', _ => 'discarded' };".to_string(),
+        "return match (2) { 1 => 'discarded', 2 => 'chosen', 3 => 'discarded', _ => 'discarded' };".to_string(),
+        "return match (-0.0) { 0.0 => 'chosen', 1.5 => 'discarded', _ => 'discarded' };".to_string(),
+        "return match (false) { true => 'discarded', false => 'chosen' };".to_string(),
+        "return match ('other') { 'linux' => 'discarded', 'macos' => 'discarded', _ => 'chosen' };".to_string(),
+        format!("if (operating_system!() == '{}') {{ return 'chosen'; }} return 'discarded';", consts::OS),
+        format!("return match (shared_library_suffix!()) {{ '{}' => 'chosen', _ => 'discarded' }};", consts::DLL_SUFFIX),
+        format!("return match (operating_system!() . '/' . cpu_architecture!()) {{ '{}/{}' => 'chosen', _ => 'discarded' }};", consts::OS, consts::ARCH),
+        "return match (operating_system!()) { $os @ string => match ($os == operating_system!()) { true => 'chosen', _ => 'discarded' } };".to_string(),
+        "if ((('li' . 'nux') == 'linux' && length!(operating_system!()) > 0) || false) { return 'chosen'; } return 'discarded';".to_string(),
+        "$value = match (operating_system!() == operating_system!()) { true => 'linux', _ => 'macos' }; return match ($value) { 'linux' => 'chosen', _ => 'discarded' };".to_string(),
+        format!("return match ((operating_system!(), cpu_architecture!())) {{ ('{}', '{}') => 'chosen', _ => 'discarded' }};", consts::OS, consts::ARCH),
+        "return match ((1, 'linux')) { (2, string) => 'discarded', (1..=3, ...string) => 'chosen', _ => 'discarded' };".to_string(),
+        "return match (length!(operating_system!())) { 0 => 'discarded', 1.. => 'chosen', _ => 'discarded' };".to_string(),
+        "return match (null) { true => 'discarded', false => 'discarded', _ => 'chosen' };".to_string(),
+    ];
+    for (construct, expected) in [
+        ("cpu_architecture", consts::ARCH),
+        ("operating_system", consts::OS),
+        ("operating_system_family", consts::FAMILY),
+        ("shared_library_prefix", consts::DLL_PREFIX),
+        ("shared_library_suffix", consts::DLL_SUFFIX),
+        ("shared_library_extension", consts::DLL_EXTENSION),
+        ("executable_suffix", consts::EXE_SUFFIX),
+        ("executable_extension", consts::EXE_EXTENSION),
+    ] {
+        bodies.push(format!(
+            "if ({construct}!() == '{expected}') {{ return 'chosen'; }} return 'discarded';"
+        ));
+        bodies.push(format!(
+            "return match ({construct}!()) {{ '{expected}' => 'chosen', _ => 'discarded' }};"
+        ));
+    }
+    for body in bodies {
+        let source =
+            format!("function folded(): string {{ {body} }} assert!(folded() == 'chosen');");
+        let unit = compile(&source, OptimizationConfiguration::default());
+        verify_unit(&unit).expect("folded branches verify");
+        let chunk = &unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == b"folded")
+            .unwrap()
+            .chunk;
+        assert!(chunk.switch_tables.is_empty(), "{body}: {:?}", chunk.code);
+        let mut loaded = Vec::new();
+        for instruction in &chunk.code {
+            match instruction {
+                Instruction::LoadConstant { constant, .. } => {
+                    let Literal::String(value) = &chunk.constants[usize::from(constant.index())]
+                    else {
+                        panic!("{body}: {instruction:?}")
+                    };
+                    loaded.push(value.as_bytes());
+                }
+                Instruction::ReturnReferenceUnchecked { .. }
+                | Instruction::ReturnUnchecked { .. }
+                | Instruction::ReturnNull => {}
+                _ => panic!("{body}: {:?}", chunk.code),
+            }
+        }
+        assert_eq!(loaded, [b"chosen".as_slice()], "{body}: {:?}", chunk.code);
+        for optimize in [false, true] {
+            let mut engine = Engine::new(EngineConfiguration {
+                optimize,
+                ..EngineConfiguration::default()
+            });
+            let outcome = engine.run_source(&source, Path::new("/constant-branches.whim"));
+            assert_eq!(
+                outcome.exit_code(),
+                0,
+                "{body}, optimize={optimize}: {outcome:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn folded_branches_preserve_effects_dynamic_choices_and_errors() {
+    let source = r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function choose(bool $flag): int {
+    if (operating_system!() == operating_system!() && $flag) { return 1; }
+    return 2;
+}
+assert!(choose(true) == 1);
+assert!(choose(false) == 2);
+$seen = vec[];
+if (($seen[] = 'linux') == 'linux') { $seen[] = 'chosen'; }
+else { $seen[] = 'discarded'; }
+assert!($seen == vec['linux', 'chosen']);
+if (false && sequence!($seen[] = 'discarded', true)) { $seen[] = 'discarded'; }
+if (true || sequence!($seen[] = 'discarded', false)) { $seen[] = 'short-circuit'; }
+assert!($seen == vec['linux', 'chosen', 'short-circuit']);
+foreach (vec[1, 2, 3] as $number) {
+    if (false) { $seen[] = 'discarded'; }
+}
+assert!($seen == vec['linux', 'chosen', 'short-circuit']);
+try {
+    if ('linux' == 'linux') { $seen[] = 'try'; }
+    else { panic!('discarded'); }
+} finally { $seen[] = 'finally'; }
+assert!($seen == vec['linux', 'chosen', 'short-circuit', 'try', 'finally']);
+$caught = false;
+try { if ('linux') { panic!('unreachable'); } }
+catch (Whim\Unwind\TypeError $_) { $caught = true; }
+assert!($caught);
+$caught = false;
+try { if ('linux' < 1) { panic!('unreachable'); } }
+catch (Whim\Unwind\TypeError $_) { $caught = true; }
+assert!($caught);
+$caught = false;
+try { $_ = match ('linux') { 'macos' => 1 }; }
+catch (Whim\Unwind\UnhandledMatchError $_) { $caught = true; }
+assert!($caught);
+";
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        let outcome = engine.run_source(source, Path::new("/constant-branch-effects.whim"));
+        assert_eq!(outcome.exit_code(), 0, "optimize={optimize}: {outcome:?}");
+    }
+}
 
 #[test]
 fn equivalent_string_dispatches_have_unchecked_literal_returns() {

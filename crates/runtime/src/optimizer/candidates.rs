@@ -311,6 +311,22 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::SubtractImmediate { .. }
             | Instruction::IntMultiplyImmediate { .. }
             | Instruction::IntModuloImmediate { .. }
+            | Instruction::JumpIfFalse { .. }
+            | Instruction::JumpIfTrue { .. }
+            | Instruction::JumpIfNull { .. }
+            | Instruction::JumpIfNotNull { .. }
+            | Instruction::JumpUnless { .. }
+            | Instruction::IntJumpUnless { .. }
+            | Instruction::StringJumpUnless { .. }
+            | Instruction::JumpUnlessConstant { .. }
+            | Instruction::IntJumpUnlessImmediate { .. }
+            | Instruction::BoolPatternBranch { .. }
+            | Instruction::SwitchInt { .. }
+            | Instruction::SwitchString { .. }
+            | Instruction::SwitchBool { .. }
+            | Instruction::SwitchFloat { .. }
+            | Instruction::SwitchPattern { .. }
+            | Instruction::SwitchTuplePattern { .. }
     )
 }
 

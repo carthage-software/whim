@@ -5,6 +5,7 @@ use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::ConstantIndex;
 use crate::bytecode::instruction::operands::ImmediateInt;
+use crate::bytecode::instruction::operands::JumpOffset;
 use crate::bytecode::instruction::operands::Register;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
@@ -19,6 +20,7 @@ use crate::optimizer::liveness::register_is_dead_after_removals_with_scratch;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::dead_store::PreviousValueSafety;
 use crate::optimizer::passes::dead_store::scalar_write_is_unobservable;
+use crate::optimizer::passes::prune_unreachable;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::TypeFlow;
@@ -47,9 +49,25 @@ pub(in crate::optimizer) fn optimize_unit(
             if !plan.is_available(analyzed, index) || !foldable(instruction) {
                 continue;
             }
+
+            if let Some(offset) = analyzed.flow.constant_branch_offset(index) {
+                if analyzed.write(
+                    plan,
+                    index,
+                    Instruction::Jump {
+                        offset: JumpOffset::new(offset),
+                    },
+                ) {
+                    statistics.constants_folded += 1;
+                }
+
+                continue;
+            }
+
             let Some((destination, value)) = analyzed.flow.constant_result(index) else {
                 continue;
             };
+
             let Some(replacement) = constant_instruction(destination, value, |literal| {
                 plan.intern_constant(analyzed, literal)
             }) else {
@@ -202,8 +220,12 @@ pub(in crate::optimizer::passes) fn optimize_chunk(
     prepare_chunk(chunk, configuration, statistics);
 
     let mut folds = vec![];
+    let mut branches = Vec::new();
     let flow = TypeFlow::analyze(chunk, &[], false, None, &[], allocator);
     for index in 0..chunk.code.len() {
+        if let Some(offset) = flow.constant_branch_offset(index) {
+            branches.push((index, offset));
+        }
         folds.push(if foldable(chunk.code[index]) {
             flow.constant_result(index)
         } else {
@@ -224,6 +246,18 @@ pub(in crate::optimizer::passes) fn optimize_chunk(
 
         chunk.code[index] = replacement;
         statistics.constants_folded += 1;
+    }
+
+    if !branches.is_empty() {
+        for (index, offset) in branches {
+            chunk.code[index] = Instruction::Jump {
+                offset: JumpOffset::new(offset),
+            };
+
+            statistics.constants_folded += 1;
+        }
+
+        prune_unreachable::optimize_chunk(chunk);
     }
 
     loop {

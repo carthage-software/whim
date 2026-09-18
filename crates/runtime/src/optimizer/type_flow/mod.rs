@@ -43,6 +43,7 @@ use crate::value::ValueView;
 use crate::value::atom::Atom;
 use crate::value::heap::Heap;
 
+mod branches;
 mod constants;
 mod descriptors;
 mod proofs;

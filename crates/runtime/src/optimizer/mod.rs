@@ -289,12 +289,6 @@ fn specialize_against_one_analysis(
             SpecializationRound::Repeat(plan) => {
                 plan.apply(unit);
             }
-            SpecializationRound::ConstantsRemoved(plan) => {
-                plan.apply(unit);
-                if statistics.specialized_total() == before {
-                    break;
-                }
-            }
             SpecializationRound::Complete {
                 plan,
                 dead_stores_removed,
@@ -312,7 +306,6 @@ fn specialize_against_one_analysis(
 
 enum SpecializationRound {
     Repeat(RewritePlan),
-    ConstantsRemoved(RewritePlan),
     Complete {
         plan: RewritePlan,
         dead_stores_removed: bool,
@@ -364,7 +357,7 @@ fn plan_specialization_round(
         passes::const_fold::remove_unit(&analysis, &mut plan, configuration, statistics);
     if constants_removed {
         passes::dead_store::optimize_unit(&analysis, &mut plan, configuration, statistics);
-        return SpecializationRound::ConstantsRemoved(plan);
+        return SpecializationRound::Repeat(plan);
     }
 
     let discarded_removed = passes::elide_discarded_checks::optimize_unit(

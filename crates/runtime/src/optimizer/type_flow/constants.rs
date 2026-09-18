@@ -3,6 +3,7 @@
 use hashbrown::HashSet;
 
 use crate::limits::MAX_TYPE_DEPTH;
+use crate::optimizer::type_flow::BytecodeComparison;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::Fact;
 use crate::optimizer::type_flow::Heap;
@@ -851,6 +852,33 @@ pub(in crate::optimizer) fn constant_equals(left: &ConstantValue, right: &Consta
         }
         _ => false,
     }
+}
+
+pub(super) fn constant_comparison(
+    comparison: BytecodeComparison,
+    left: &ConstantValue,
+    right: &ConstantValue,
+) -> Option<bool> {
+    Some(match comparison {
+        BytecodeComparison::Equal => constant_equals(left, right),
+        BytecodeComparison::NotEqual => !constant_equals(left, right),
+        ordered => matches!(
+            (ordered, constant_compare(left, right)?),
+            (
+                BytecodeComparison::LessThan,
+                ConstantOrdering::Ordered(Ordering::Less)
+            ) | (
+                BytecodeComparison::LessThanOrEqual,
+                ConstantOrdering::Ordered(Ordering::Less | Ordering::Equal),
+            ) | (
+                BytecodeComparison::GreaterThan,
+                ConstantOrdering::Ordered(Ordering::Greater)
+            ) | (
+                BytecodeComparison::GreaterThanOrEqual,
+                ConstantOrdering::Ordered(Ordering::Greater | Ordering::Equal),
+            )
+        ),
+    })
 }
 
 fn constant_compare(left: &ConstantValue, right: &ConstantValue) -> Option<ConstantOrdering> {
