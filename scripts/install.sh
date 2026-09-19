@@ -136,6 +136,16 @@ case "$operating_system" in
         ;;
     esac
     ;;
+  freebsd)
+    case "$architecture" in
+      x86_64 | aarch64)
+        target="${architecture}-unknown-freebsd"
+        ;;
+      *)
+        fail "Whim does not provide a FreeBSD build for ${architecture}."
+        ;;
+    esac
+    ;;
   linux)
     case "$architecture" in
       x86_64 | aarch64 | riscv64gc)

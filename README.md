@@ -38,7 +38,7 @@ We also maintain [Trifle packages on Codeberg](https://codeberg.org/trifle).
 
 ## Install
 
-Install the latest release on macOS or Linux:
+Install the latest release on macOS, Linux, or FreeBSD:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://whim.sh/install.sh | bash
@@ -52,8 +52,11 @@ whim --version
 
 The container image is available at `ghcr.io/carthage-software/whim`.
 
-Whim supports macOS on x86-64 and Arm64, Linux with glibc on x86-64, Arm64,
-and RISC-V 64, and Linux with musl on x86-64 and Arm64.
+Whim supports macOS and FreeBSD on x86-64 and Arm64, Linux with glibc on
+x86-64, Arm64, and RISC-V 64, and Linux with musl on x86-64 and Arm64.
+
+On FreeBSD, install `bash`, `curl`, and `postgresql18-client` before using the
+installer. Release builds target FreeBSD 14.4 or later.
 
 To build Whim from source, install Rust 1.98 or later and run:
 

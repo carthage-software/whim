@@ -49,7 +49,7 @@ pub(crate) enum StandardStream {
     Error,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 unsafe extern "C" {
     static mut __stdinp: *mut libc::FILE;
     static mut __stdoutp: *mut libc::FILE;
@@ -65,7 +65,7 @@ unsafe extern "C" {
 
 impl StandardStream {
     pub(crate) fn file(self) -> *mut libc::FILE {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "freebsd"))]
         // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
         unsafe {
             match self {

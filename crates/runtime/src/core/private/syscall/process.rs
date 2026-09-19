@@ -46,7 +46,7 @@ use crate::value::dict::DictObject;
 use crate::value::heap::handle::ManagedRef;
 use crate::value::vec::VecObject;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 type GroupCount = libc::c_int;
 
 #[cfg(target_os = "linux")]
@@ -55,19 +55,19 @@ type GroupCount = libc::size_t;
 #[cfg(target_os = "macos")]
 type InitialGroup = libc::c_int;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 type InitialGroup = libc::gid_t;
 
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 type Resource = libc::__rlimit_resource_t;
 
-#[cfg(any(target_os = "macos", target_env = "musl"))]
+#[cfg(any(target_os = "macos", target_os = "freebsd", target_env = "musl"))]
 type Resource = libc::c_int;
 
 #[cfg(target_os = "macos")]
 const CLOCK_ERROR: libc::clock_t = libc::clock_t::MAX;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 const CLOCK_ERROR: libc::clock_t = -1;
 
 fn c_string(
@@ -118,7 +118,7 @@ fn clear_errno() {
     unsafe { *libc::__errno_location() = 0 };
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 fn clear_errno() {
     // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
     unsafe { *libc::__error() = 0 };
@@ -292,7 +292,9 @@ pub(crate) fn process_priority<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
-    let process = libc::id_t::try_from(arguments.int(0))
+    let process = arguments
+        .int(0)
+        .try_into()
         .map_err(|_| system_error(cx, "getpriority", libc::EINVAL))?;
     clear_errno();
     // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
@@ -309,7 +311,9 @@ pub(crate) fn set_process_priority<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
-    let process = libc::id_t::try_from(arguments.int(0))
+    let process = arguments
+        .int(0)
+        .try_into()
         .map_err(|_| system_error(cx, "setpriority", libc::EINVAL))?;
     let priority = i32::try_from(arguments.int(1))
         .map_err(|_| system_error(cx, "setpriority", libc::EINVAL))?;
@@ -324,7 +328,7 @@ fn limit_to_int(limit: libc::rlim_t) -> i64 {
     if limit == libc::RLIM_INFINITY {
         -1
     } else {
-        i64::try_from(limit).unwrap_or(i64::MAX)
+        i64::try_from(i128::from(limit)).unwrap_or(i64::MAX)
     }
 }
 
@@ -369,6 +373,9 @@ pub(crate) fn set_resource_limit<'call>(
         rlim_cur: int_to_limit(cx, arguments.int(1), "setrlimit")?,
         rlim_max: int_to_limit(cx, arguments.int(2), "setrlimit")?,
     };
+    if limit.rlim_cur > limit.rlim_max {
+        return Err(system_error(cx, "setrlimit", libc::EINVAL));
+    }
     // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
     if unsafe { libc::setrlimit(resource, &raw const limit) } < 0 {
         return Err(last_system_error(cx, "setrlimit"));

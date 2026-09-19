@@ -41,7 +41,7 @@ run blocking SQLite, file, and operating-system work.
 
 ## Does Whim support Windows?
 
-No. Whim supports macOS on x86-64 and Arm64, Linux with glibc on x86-64,
+No. Whim supports macOS and FreeBSD on x86-64 and Arm64, Linux with glibc on x86-64,
 Arm64, and RISC-V 64, and Linux with musl on x86-64 and Arm64.
 
 ## Where is the package registry?

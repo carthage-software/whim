@@ -17,11 +17,13 @@ workspace = true
 
 [dependencies]
 itoa = { workspace = true }
-# Enables static OpenSSL linkage for bundled libpq.
-openssl-sys = { workspace = true }
 pq-sys = { workspace = true }
 ryu = { workspace = true }
 whim-loop = { workspace = true }
+
+[target.'cfg(not(target_os = "freebsd"))'.dependencies]
+openssl-sys = { workspace = true }
+pq-sys = { workspace = true, features = ["bundled"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { workspace = true }

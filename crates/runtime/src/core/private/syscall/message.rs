@@ -18,6 +18,8 @@ use crate::builtin::throw::Throw;
 use crate::core::private::syscall::descriptor_of;
 use crate::core::private::syscall::last_errno;
 use crate::core::private::syscall::socket::address;
+#[cfg(target_os = "freebsd")]
+use crate::core::private::syscall::socket::bind_socket_raw;
 use crate::core::private::syscall::socket::decoded_address;
 use crate::core::private::syscall::socket::socket_address_raw;
 use crate::core::private::syscall::socket::socket_family;
@@ -62,7 +64,13 @@ fn set_option(fd: RawFd, level: i32, option: i32) -> Result<(), i32> {
 fn enable_metadata(fd: RawFd, family: i32) -> Result<(), i32> {
     match family {
         libc::AF_INET => {
+            #[cfg(not(target_os = "freebsd"))]
             set_option(fd, libc::IPPROTO_IP, libc::IP_PKTINFO)?;
+            #[cfg(target_os = "freebsd")]
+            {
+                set_option(fd, libc::IPPROTO_IP, libc::IP_RECVDSTADDR)?;
+                set_option(fd, libc::IPPROTO_IP, libc::IP_RECVIF)?;
+            }
             set_option(fd, libc::IPPROTO_IP, libc::IP_RECVTOS)
         }
         libc::AF_INET6 => {
@@ -96,6 +104,7 @@ fn congestion_bits(header: &libc::cmsghdr) -> Option<i64> {
     Some(value & 0b11)
 }
 
+#[cfg(not(target_os = "freebsd"))]
 fn local_ipv4(header: &libc::cmsghdr) -> Option<(Vec<u8>, i64)> {
     let information = read_control::<libc::in_pktinfo>(header)?;
     Some((
@@ -103,6 +112,17 @@ fn local_ipv4(header: &libc::cmsghdr) -> Option<(Vec<u8>, i64)> {
             .to_string()
             .into_bytes(),
         i64::from(information.ipi_ifindex),
+    ))
+}
+
+#[cfg(target_os = "freebsd")]
+fn local_ipv4(header: &libc::cmsghdr) -> Option<(Vec<u8>, i64)> {
+    let address = read_control::<libc::in_addr>(header)?;
+    Some((
+        Ipv4Addr::from(address.s_addr.to_ne_bytes())
+            .to_string()
+            .into_bytes(),
+        0,
     ))
 }
 
@@ -150,6 +170,7 @@ fn append_control<T: Copy>(
 }
 
 fn append_source_metadata(
+    #[cfg(target_os = "freebsd")] fd: RawFd,
     control: &mut [usize; CONTROL_WORDS],
     used: &mut usize,
     source: SourceAddress,
@@ -160,6 +181,7 @@ fn append_source_metadata(
         SourceAddress::V4(source) => {
             #[cfg(target_os = "linux")]
             let interface_index = i32::try_from(interface_index).map_err(|_| libc::EOVERFLOW)?;
+            #[cfg(not(target_os = "freebsd"))]
             let information = libc::in_pktinfo {
                 ipi_ifindex: interface_index,
                 ipi_spec_dst: libc::in_addr {
@@ -167,6 +189,7 @@ fn append_source_metadata(
                 },
                 ipi_addr: libc::in_addr { s_addr: 0 },
             };
+            #[cfg(not(target_os = "freebsd"))]
             append_control(
                 control,
                 used,
@@ -174,6 +197,32 @@ fn append_source_metadata(
                 libc::IP_PKTINFO,
                 information,
             )?;
+            #[cfg(target_os = "freebsd")]
+            {
+                if interface_index != 0 {
+                    return Err(libc::EOPNOTSUPP);
+                }
+                if !source.is_unspecified() {
+                    let (host, port) = socket_address_raw(fd, false)?;
+                    if host != source.to_string().as_bytes() {
+                        if port == 0 {
+                            bind_socket_raw(fd, &address(libc::AF_INET, b"0.0.0.0", 0)?)?;
+                        }
+                        append_control(
+                            control,
+                            used,
+                            libc::IPPROTO_IP,
+                            libc::IP_SENDSRCADDR,
+                            libc::in_addr {
+                                s_addr: u32::from_ne_bytes(source.octets()),
+                            },
+                        )?;
+                    }
+                }
+            }
+            #[cfg(target_os = "freebsd")]
+            let explicit_congestion =
+                u8::try_from(explicit_congestion).map_err(|_| libc::EINVAL)?;
             append_control(
                 control,
                 used,
@@ -265,6 +314,8 @@ pub(crate) fn receive_message<'call>(
     }
 
     let mut local = None;
+    #[cfg(target_os = "freebsd")]
+    let mut ipv4_interface_index = 0_i64;
     let mut explicit_congestion = 0_i64;
     // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
     let mut header = unsafe { libc::CMSG_FIRSTHDR(&raw const message) };
@@ -272,7 +323,18 @@ pub(crate) fn receive_message<'call>(
         // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
         let control = unsafe { &*header };
         match (control.cmsg_level, control.cmsg_type) {
+            #[cfg(not(target_os = "freebsd"))]
             (libc::IPPROTO_IP, libc::IP_PKTINFO) => local = local_ipv4(control),
+            #[cfg(target_os = "freebsd")]
+            (libc::IPPROTO_IP, libc::IP_RECVDSTADDR) => local = local_ipv4(control),
+            #[cfg(target_os = "freebsd")]
+            (libc::IPPROTO_IP, libc::IP_RECVIF) => {
+                const OFFSET: usize = std::mem::offset_of!(libc::sockaddr_dl, sdl_index);
+                if let Some(bytes) = read_control::<[u8; OFFSET + size_of::<u16>()]>(control) {
+                    ipv4_interface_index =
+                        i64::from(u16::from_ne_bytes([bytes[OFFSET], bytes[OFFSET + 1]]));
+                }
+            }
             (libc::IPPROTO_IPV6, libc::IPV6_PKTINFO) => local = local_ipv6(control),
             (libc::IPPROTO_IP, libc::IP_TOS | libc::IP_RECVTOS)
             | (libc::IPPROTO_IPV6, libc::IPV6_TCLASS | libc::IPV6_RECVTCLASS) => {
@@ -292,6 +354,8 @@ pub(crate) fn receive_message<'call>(
             .0;
         (host, 0)
     };
+    #[cfg(target_os = "freebsd")]
+    let interface_index = interface_index.max(ipv4_interface_index);
     let (peer_host, peer_port) =
         decoded_address(&source).map_err(|errno| system_error(cx, "recvmsg", errno))?;
     let bytes = cx.string(&bytes[..count.cast_unsigned()]);
@@ -353,6 +417,8 @@ pub(crate) fn send_message<'call>(
     let mut control = [0_usize; CONTROL_WORDS];
     let mut control_length = 0;
     append_source_metadata(
+        #[cfg(target_os = "freebsd")]
+        fd,
         &mut control,
         &mut control_length,
         source,

@@ -31,7 +31,7 @@ const MAXIMUM_GROUP_COUNT: usize = 1_048_576;
 #[cfg(target_os = "macos")]
 type GroupListId = libc::c_int;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 type GroupListId = libc::gid_t;
 
 struct OperationError {
@@ -386,7 +386,7 @@ fn lookup_groups_for_user(
 ) -> Result<Vec<GroupRecord>, OperationError> {
     #[cfg(target_os = "macos")]
     let primary = group_list_id(primary_group)?;
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     let primary = primary_group;
 
     let mut groups = vec![GroupListId::default(); INITIAL_GROUP_CAPACITY];
@@ -426,7 +426,7 @@ fn lookup_groups_for_user(
     for group in groups {
         #[cfg(target_os = "macos")]
         let id = group_id(group)?;
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         let id = group;
 
         if !seen.insert(id) {

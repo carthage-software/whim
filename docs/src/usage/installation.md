@@ -1,11 +1,12 @@
 # Installation
 
-Whim supports macOS on x86-64 and Arm64, Linux with glibc on x86-64, Arm64, and
-RISC-V 64, and Linux with musl on x86-64 and Arm64. Run it through the `whim` command.
+Whim supports macOS and FreeBSD on x86-64 and Arm64, Linux with glibc on
+x86-64, Arm64, and RISC-V 64, and Linux with musl on x86-64 and Arm64.
+Run it through the `whim` command.
 
 ## Shell installer
 
-Install the latest release on macOS or Linux:
+Install the latest release on macOS, Linux, or FreeBSD:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://whim.sh/install.sh | bash
@@ -16,6 +17,15 @@ On Alpine Linux, install the tools needed by the installer first:
 ```sh
 apk add bash curl ca-certificates
 ```
+
+On FreeBSD 14.4 or later, install the tools and PostgreSQL client library first:
+
+```sh
+pkg install bash curl postgresql18-client
+```
+
+FreeBSD builds use the system PostgreSQL client library, including when the
+script does not use PostgreSQL.
 
 Pass a version to install a specific release:
 
@@ -59,6 +69,13 @@ cargo build --locked --release
 ```
 
 The build produces the `whim` executable at `target/release/whim`.
+
+On FreeBSD, use the `latest` package repository for Rust 1.98 or later, then
+install the build tools and PostgreSQL client library:
+
+```sh
+pkg install rust cmake git pkgconf postgresql18-client
+```
 
 ## Source files
 

@@ -72,7 +72,7 @@ pub(crate) fn address(family: i32, host: &[u8], port: i64) -> Result<Address, i3
                 (*target).sin_family = family;
                 (*target).sin_port = port.to_be();
                 (*target).sin_addr.s_addr = u32::from_ne_bytes(host.octets());
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", target_os = "freebsd"))]
                 {
                     (*target).sin_len =
                         u8::try_from(size_of::<libc::sockaddr_in>()).map_err(|_| libc::EINVAL)?;
@@ -95,7 +95,7 @@ pub(crate) fn address(family: i32, host: &[u8], port: i64) -> Result<Address, i3
                 (*target).sin6_family = family;
                 (*target).sin6_port = port.to_be();
                 (*target).sin6_addr.s6_addr = host.octets();
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", target_os = "freebsd"))]
                 {
                     (*target).sin6_len =
                         u8::try_from(size_of::<libc::sockaddr_in6>()).map_err(|_| libc::EINVAL)?;
@@ -127,7 +127,7 @@ pub(crate) fn address(family: i32, host: &[u8], port: i64) -> Result<Address, i3
                 );
             }
             let length = std::mem::offset_of!(libc::sockaddr_un, sun_path) + host.len() + 1;
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", target_os = "freebsd"))]
             // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
             unsafe {
                 (*target).sun_len = u8::try_from(length).map_err(|_| libc::EINVAL)?;
@@ -194,6 +194,14 @@ pub(crate) fn socket_address_raw(fd: RawFd, peer: bool) -> Result<(Vec<u8>, i64)
     decoded_address(&storage)
 }
 
+pub(crate) fn bind_socket_raw(fd: RawFd, address: &Address) -> Result<(), i32> {
+    // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
+    if unsafe { libc::bind(fd, (&raw const address.storage).cast(), address.length) } < 0 {
+        return Err(last_errno());
+    }
+    Ok(())
+}
+
 #[whim_function("Whim\\_Private\\create_socket(int $family, int $kind): Whim\\OS\\FileDescriptor")]
 pub(crate) fn create_socket<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -238,10 +246,7 @@ pub(crate) fn bind_socket<'call>(
     let socket = arguments.local(0);
     let fd = descriptor_of(cx, &socket, "bind")?;
     let address = address_argument(cx, &arguments, fd, "bind")?;
-    // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
-    if unsafe { libc::bind(fd, (&raw const address.storage).cast(), address.length) } < 0 {
-        return Err(last_system_error(cx, "bind"));
-    }
+    bind_socket_raw(fd, &address).map_err(|errno| system_error(cx, "bind", errno))?;
     Ok(Value::null())
 }
 

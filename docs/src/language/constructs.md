@@ -163,7 +163,7 @@ values as string constants.
 | Construct | Value | Examples |
 | --- | --- | --- |
 | `cpu_architecture!()` | CPU architecture | `'x86_64'`, `'aarch64'`, `'riscv64'` |
-| `operating_system!()` | Operating system | `'linux'`, `'macos'` |
+| `operating_system!()` | Operating system | `'linux'`, `'macos'`, `'freebsd'` |
 | `operating_system_family!()` | Operating system family | `'unix'` |
 | `shared_library_prefix!()` | Shared library filename prefix | `'lib'` |
 | `shared_library_suffix!()` | Shared library filename suffix, including the dot | `'.so'`, `'.dylib'` |

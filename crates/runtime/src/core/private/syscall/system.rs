@@ -1,16 +1,16 @@
 //! Unix system-information primitives.
 
 use std::ffi::CStr;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 use std::mem::size_of;
 use std::mem::zeroed;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 use std::ptr::null_mut;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 use std::time::Duration;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 use std::time::SystemTime;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 use std::time::UNIX_EPOCH;
 
 use whim_macros::whim_function;
@@ -62,7 +62,7 @@ fn uptime_milliseconds() -> Result<u64, i32> {
     Ok(seconds.saturating_mul(1000) + nanoseconds / 1_000_000)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 fn uptime_milliseconds() -> Result<u64, i32> {
     // SAFETY: zero is valid for this C output type.
     let mut boot = unsafe { zeroed::<libc::timeval>() };
@@ -88,7 +88,7 @@ fn uptime_milliseconds() -> Result<u64, i32> {
         .map_err(|_| libc::EIO)?;
     let boot = Duration::new(
         boot.tv_sec.max(0).cast_unsigned(),
-        boot.tv_usec.max(0).cast_unsigned() * 1000,
+        u32::try_from(boot.tv_usec.max(0)).map_err(|_| libc::EIO)? * 1000,
     );
     Ok(u64::try_from(now.saturating_sub(boot).as_millis()).unwrap_or(u64::MAX))
 }
@@ -132,10 +132,10 @@ fn memory_bytes() -> Result<(u64, u64), i32> {
     ))
 }
 
-#[cfg(target_os = "macos")]
-fn sysctl_u64(name: &'static [u8]) -> Result<u64, i32> {
-    let mut value = 0_u64;
-    let mut length = size_of::<u64>();
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
+fn sysctl_value<T: Default>(name: &'static [u8]) -> Result<T, i32> {
+    let mut value = T::default();
+    let mut length = size_of::<T>();
     // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
     if unsafe {
         libc::sysctlbyname(
@@ -149,23 +149,34 @@ fn sysctl_u64(name: &'static [u8]) -> Result<u64, i32> {
     {
         return Err(last_errno());
     }
+    if length != size_of::<T>() {
+        return Err(libc::EIO);
+    }
     Ok(value)
 }
 
 #[cfg(target_os = "macos")]
 fn memory_bytes() -> Result<(u64, u64), i32> {
-    let total = sysctl_u64(b"hw.memsize\0")?;
+    let total = sysctl_value::<u64>(b"hw.memsize\0")?;
     // SAFETY: the arguments follow the platform ABI; pointers and descriptors stay valid.
     let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
     if page_size <= 0 {
         return Err(last_errno());
     }
-    let free = sysctl_u64(b"vm.page_free_count\0").unwrap_or(0);
-    let inactive = sysctl_u64(b"vm.page_inactive_count\0").unwrap_or(0);
-    let available = free
-        .saturating_add(inactive)
-        .saturating_mul(page_size.cast_unsigned());
+    let free = sysctl_value::<u32>(b"vm.page_free_count\0").unwrap_or(0);
+    let inactive = sysctl_value::<u32>(b"vm.page_inactive_count\0").unwrap_or(0);
+    let available = (u64::from(free) + u64::from(inactive)) * page_size.cast_unsigned();
     Ok((total, available))
+}
+
+#[cfg(target_os = "freebsd")]
+fn memory_bytes() -> Result<(u64, u64), i32> {
+    let total = sysctl_value::<u64>(b"hw.physmem\0")?;
+    let page_size = sysctl_value::<u32>(b"vm.stats.vm.v_page_size\0")?;
+    let free = sysctl_value::<u32>(b"vm.stats.vm.v_free_count\0")?;
+    let inactive = sysctl_value::<u32>(b"vm.stats.vm.v_inactive_count\0")?;
+    let available = (u64::from(free) + u64::from(inactive)) * u64::from(page_size);
+    Ok((total, available.min(total)))
 }
 
 #[whim_function("Whim\\_Private\\memory_information(): ((0..), (0..))")]

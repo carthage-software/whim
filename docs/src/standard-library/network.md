@@ -79,6 +79,12 @@ not create a byte stream. Connected sends still preserve datagram boundaries.
 Bind configuration controls reuse, broadcast, IPv6-only mode, and socket buffer
 sizes.
 
+On FreeBSD, IPv4 send metadata supports source addresses and congestion bits,
+but not an explicit outgoing interface. Leave `interfaceIndex` in `SendMetadata`
+at `0` for IPv4; a nonzero value throws `NetworkException`. Received datagrams
+still report their interface index, and IPv6 supports selecting an interface.
+A socket bound to a specific IPv4 address must use that source address.
+
 ## Unix sockets
 
 `Unix\connect` and `Unix\listen` use local socket paths. `Unix\pair()` returns

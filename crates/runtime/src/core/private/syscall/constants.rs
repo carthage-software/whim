@@ -186,7 +186,7 @@ pub(crate) const SIGNAL_BAD_SYSTEM_CALL: i64 = libc::SIGSYS as i64;
 #[whim_constant("Whim\\_Private\\SIGNAL_STACK_FAULT", "int")]
 pub(crate) const SIGNAL_STACK_FAULT: i64 = libc::SIGSTKFLT as i64;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 #[whim_constant("Whim\\_Private\\SIGNAL_STACK_FAULT", "int")]
 pub(crate) const SIGNAL_STACK_FAULT: i64 = -1;
 
@@ -194,7 +194,7 @@ pub(crate) const SIGNAL_STACK_FAULT: i64 = -1;
 #[whim_constant("Whim\\_Private\\SIGNAL_POWER_FAILURE", "int")]
 pub(crate) const SIGNAL_POWER_FAILURE: i64 = libc::SIGPWR as i64;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
 #[whim_constant("Whim\\_Private\\SIGNAL_POWER_FAILURE", "int")]
 pub(crate) const SIGNAL_POWER_FAILURE: i64 = -2;
 

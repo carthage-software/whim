@@ -90,14 +90,24 @@ jobs:
           - target: aarch64-unknown-linux-musl
             os: ubuntu-24.04-arm
             builder: cargo
+          - target: x86_64-unknown-freebsd
+            os: ubuntu-24.04
+            builder: freebsd
+            arch: x86_64
+          - target: aarch64-unknown-freebsd
+            os: macos-15
+            builder: freebsd
+            arch: aarch64
     steps:
       - uses: actions/checkout@v7
       - if: endsWith(matrix.target, '-musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - uses: dtolnay/rust-toolchain@1.98.0
+      - if: matrix.builder != 'freebsd'
+        uses: dtolnay/rust-toolchain@1.98.0
         with:
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2
+      - if: matrix.builder != 'freebsd'
+        uses: Swatinem/rust-cache@v2
         with:
           key: release-${{ matrix.target }}
           cache-on-failure: true
@@ -106,8 +116,28 @@ jobs:
         with:
           tool: cross@0.2.5
       - name: Build
+        if: matrix.builder != 'freebsd'
         shell: bash
         run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim
+      - name: Build and test FreeBSD
+        if: matrix.builder == 'freebsd'
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.4'
+          arch: ${{ matrix.arch }}
+          mem: 5120
+          cpu: 2
+          cache-after-prepare: true
+          prepare: |
+            set -eu
+            mkdir -p /usr/local/etc/pkg/repos
+            echo 'FreeBSD: { url: "pkg+https://pkg.FreeBSD.org/${ABI}/latest" }' > /usr/local/etc/pkg/repos/FreeBSD.conf
+            pkg install -y ca_root_nss cmake curl git pkgconf postgresql18-client rust
+          run: |
+            set -eu
+            export CARGO_BUILD_JOBS=2
+            cargo build --locked --release --target ${{ matrix.target }} --bin whim
+            target/${{ matrix.target }}/release/whim tests/run.whim '' 2
       - name: Test musl build
         if: endsWith(matrix.target, '-musl')
         run: target/${{ matrix.target }}/release/whim tests/run.whim '' 2

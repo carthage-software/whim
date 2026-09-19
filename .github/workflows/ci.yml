@@ -73,6 +73,40 @@ jobs:
       - run: cargo build --locked --release --target ${{ matrix.target }} --bin whim
       - run: target/${{ matrix.target }}/release/whim tests/run.whim '' 2
 
+  rust-freebsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            os: ubuntu-24.04
+          - arch: aarch64
+            os: macos-15
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          release: '14.4'
+          arch: ${{ matrix.arch }}
+          mem: 5120
+          cpu: 2
+          envs: RUSTFLAGS CARGO_TERM_COLOR
+          copyback: false
+          cache-after-prepare: true
+          prepare: |
+            set -eu
+            mkdir -p /usr/local/etc/pkg/repos
+            echo 'FreeBSD: { url: "pkg+https://pkg.FreeBSD.org/${ABI}/latest" }' > /usr/local/etc/pkg/repos/FreeBSD.conf
+            pkg install -y ca_root_nss cmake curl git pkgconf postgresql18-client rust
+          run: |
+            set -eu
+            export CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+            cargo clippy --locked --workspace --all-targets --all-features
+            cargo test --locked --workspace --all-features
+            cargo build --locked --release --bin whim
+            target/release/whim tests/run.whim '' 2
+
   whim:
     runs-on: ubuntu-latest
     steps:
