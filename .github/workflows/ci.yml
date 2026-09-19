@@ -85,6 +85,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+      - if: runner.os == 'macOS'
+        run: brew install rsync
       - uses: vmactions/freebsd-vm@v1
         with:
           release: '14.4'

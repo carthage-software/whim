@@ -119,6 +119,8 @@ jobs:
         if: matrix.builder != 'freebsd'
         shell: bash
         run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim
+      - if: matrix.builder == 'freebsd' && runner.os == 'macOS'
+        run: brew install rsync
       - name: Build and test FreeBSD
         if: matrix.builder == 'freebsd'
         uses: vmactions/freebsd-vm@v1
