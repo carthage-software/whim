@@ -532,6 +532,57 @@ fn dictionary_lengths_keep_checks_for_unknown_keys() {
 }
 
 #[test]
+fn repeated_tuple_reads_reuse_matching_elements() {
+    let source = r"
+    function repeated((int, int) $pair): int { return $pair[0] + $pair[0]; }
+    function interleaved((int, int) $pair): int { return $pair[0] + $pair[1] + $pair[0]; }
+    function looped((int, int) $pair, int $count): int {
+        $result = 0;
+        for ($index = 0; $index < $count; $index++) { $result += $pair[0] + $pair[0]; }
+        return $result;
+    }
+    function distinct((int, int) $left, (int, int) $right): int { return $left[0] + $right[0]; }
+    function reassigned((int, int) $pair, (int, int) $other): int {
+        $first = $pair[0];
+        $pair = $other;
+        return $first + $pair[0];
+    }
+    ";
+    for cse in [false, true] {
+        let unit = compile(
+            source,
+            OptimizationConfiguration {
+                cse,
+                ..OptimizationConfiguration::default()
+            },
+        );
+        for (name, expected) in [
+            ("repeated", if cse { 1 } else { 2 }),
+            ("interleaved", if cse { 2 } else { 3 }),
+            ("looped", if cse { 1 } else { 2 }),
+            ("distinct", 2),
+            ("reassigned", 2),
+        ] {
+            let code = &unit
+                .functions
+                .iter()
+                .find(|function| function.name.as_bytes() == name.as_bytes())
+                .unwrap()
+                .chunk
+                .code;
+            assert_eq!(
+                code.iter()
+                    .filter(|instruction| matches!(instruction, Instruction::ElementGet { .. }))
+                    .count(),
+                expected,
+                "{name}: {code:?}"
+            );
+        }
+        verify_unit(&unit).unwrap();
+    }
+}
+
+#[test]
 fn tuple_index_specialization_requires_proven_bounds() {
     let unit = compile(
         r"

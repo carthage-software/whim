@@ -121,6 +121,7 @@ enum ReadKey {
     Property(Register, Atom),
     PropertySlot(Register, u16),
     Index(u8, Register, Register),
+    Element(Register, i16),
 }
 
 fn read_key(chunk: &Chunk, instruction: Instruction) -> Option<ReadKey> {
@@ -151,6 +152,9 @@ fn read_key(chunk: &Chunk, instruction: Instruction) -> Option<ReadKey> {
         Instruction::StringIndexGet {
             container, index, ..
         } => Some(ReadKey::Index(4, container, index)),
+        Instruction::ElementGet { subject, index, .. } => {
+            Some(ReadKey::Element(subject, index.value()))
+        }
         _ => None,
     }
 }
@@ -165,6 +169,11 @@ fn pure_read(instruction: Instruction) -> Option<PureRead> {
         | Instruction::PropertyGetUnchecked {
             destination,
             object,
+            ..
+        }
+        | Instruction::ElementGet {
+            destination,
+            subject: object,
             ..
         } if destination != object => Some(PureRead {
             destination,
@@ -312,6 +321,18 @@ fn same_read(chunk: &Chunk, left: Instruction, right: Instruction) -> bool {
                 ..
             },
         ) => left_container == right_container && left_index == right_index,
+        (
+            Instruction::ElementGet {
+                subject: left_subject,
+                index: left_index,
+                ..
+            },
+            Instruction::ElementGet {
+                subject: right_subject,
+                index: right_index,
+                ..
+            },
+        ) => left_subject == right_subject && left_index == right_index,
         _ => false,
     }
 }
@@ -343,6 +364,11 @@ fn propagate_available_value(
         }
 
         let instruction = chunk.code[index];
+        if changes_value(chunk, instruction, available)
+            || changes_value(chunk, instruction, replaced)
+        {
+            return false;
+        }
         let replaced_effect = effect_on(chunk, instruction, replaced);
         let available_effect = effect_on(chunk, instruction, available);
         if available_effect.writes() {
@@ -359,6 +385,9 @@ fn propagate_available_value(
             let Some(replacement) = replace_read_register(instruction, replaced, available) else {
                 return false;
             };
+            if effect_on(chunk, replacement, available).writes() {
+                return false;
+            }
             replacements.push((index, replacement));
         }
         if replaced_effect.writes() {
@@ -384,6 +413,34 @@ fn propagate_available_value(
         chunk.code[index] = replacement;
     }
     true
+}
+
+fn changes_value(chunk: &Chunk, instruction: Instruction, register: Register) -> bool {
+    match instruction {
+        Instruction::IndexSet { container, .. }
+        | Instruction::VecIndexSet { container, .. }
+        | Instruction::DictIndexSetIntKey { container, .. }
+        | Instruction::DictIndexSetStringKey { container, .. }
+        | Instruction::DictIndexSet { container, .. }
+        | Instruction::IndexAddAssign { container, .. }
+        | Instruction::Append { container, .. }
+        | Instruction::VecAppend { container, .. }
+        | Instruction::Spread { container, .. }
+        | Instruction::Remove { container, .. }
+        | Instruction::SwapRemove { container, .. }
+        | Instruction::RemoveFirst { container, .. }
+        | Instruction::RemoveLast { container, .. }
+        | Instruction::ReserveArray { container, .. } => container == register,
+        Instruction::PropertySetUnchecked {
+            value, value_mode, ..
+        } => value == register && value_mode.moves(),
+        Instruction::InitializeProperties { descriptor, .. } => chunk
+            .property_initialization_descriptor(descriptor)
+            .entries
+            .iter()
+            .any(|entry| entry.value == register && entry.value_mode.moves()),
+        _ => false,
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -506,6 +563,7 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::JumpUnlessConstant { .. }
             | Instruction::PropertyGet { .. }
             | Instruction::PropertyGetUnchecked { .. }
+            | Instruction::ElementGet { .. }
             | Instruction::Return { .. }
             | Instruction::ReturnUnchecked { .. }
             | Instruction::ReturnReferenceUnchecked { .. }
@@ -537,6 +595,40 @@ mod tests {
 
     fn emit(chunk: &mut Chunk, instruction: Instruction) {
         chunk.emit(instruction, Span::zero());
+    }
+
+    #[test]
+    fn repeated_tuple_reads_keep_moved_values_independent() {
+        let mut chunk = Chunk::new();
+        for instruction in [
+            Instruction::ElementGet {
+                destination: Register::new(1),
+                subject: Register::new(0),
+                index: ImmediateInt::new(0),
+            },
+            Instruction::ElementGet {
+                destination: Register::new(2),
+                subject: Register::new(0),
+                index: ImmediateInt::new(0),
+            },
+            Instruction::MoveOwned {
+                destination: Register::new(3),
+                source: Register::new(2),
+            },
+            Instruction::ReturnPairUnchecked {
+                first: Register::new(1),
+                second: Register::new(3),
+            },
+        ] {
+            emit(&mut chunk, instruction);
+        }
+        let before = chunk.code.clone();
+        optimize_chunk(
+            &mut chunk,
+            OptimizationConfiguration::default(),
+            &mut OptimizationStatistics::default(),
+        );
+        assert_eq!(chunk.code, before);
     }
 
     #[test]

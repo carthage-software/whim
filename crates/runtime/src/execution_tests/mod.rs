@@ -22,6 +22,53 @@ fn run_both_modes(source: &str, path: &str) {
 }
 
 #[test]
+fn repeated_tuple_reads_preserve_reassignment_and_copy_on_write() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function repeated((int, int) $pair, int $count): int {
+    $result = 0;
+    for ($index = 0; $index < $count; $index++) {
+        $result += $pair[0] + $pair[1] + $pair[0];
+    }
+    return $result;
+}
+#[NeverInline]
+function reassigned((int, int) $pair, (int, int) $other, bool $replace): int {
+    $first = $pair[0];
+    if ($replace) { $pair = $other; }
+    return $first + $pair[0];
+}
+#[NeverInline]
+function copied((vec<int>, int) $pair, bool $change_first): int {
+    $first = $pair[0];
+    $second = $pair[0];
+    if ($change_first) { $first[] = 3; } else { $second[] = 3; }
+    return length!($first) * 100 + length!($second);
+}
+#[NeverInline]
+function reused((vec<int>, int) $pair): int {
+    $first = $pair[0];
+    $size = length!($first);
+    $first = $pair[0];
+    $first[] = 3;
+    return $size * 100 + length!($first);
+}
+assert!(repeated((3, 4), 100) == 1000);
+assert!(reassigned((3, 4), (5, 6), false) == 6);
+assert!(reassigned((3, 4), (5, 6), true) == 8);
+$pair = (vec[1, 2], 0);
+assert!(copied($pair, false) == 203);
+assert!(copied($pair, true) == 302);
+assert!(reused($pair) == 203);
+assert!($pair == (vec[1, 2], 0));
+",
+        "/tuple-reads.whim",
+    );
+}
+
+#[test]
 fn bounded_comparisons_preserve_integer_edges() {
     run_both_modes(
         include_str!("../../../../tests/_fixtures/comparison-ranges.whim"),
