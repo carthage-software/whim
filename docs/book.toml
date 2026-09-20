@@ -1,6 +1,6 @@
 [book]
 title = "The Whim Programming Language"
-description = "A guide to the Whim programming language."
+description = "An experimental programming language inspired by PHP and Hack."
 authors = ["Seifeddine Gmati"]
 language = "en"
 src = "src"

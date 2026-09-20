@@ -1,10 +1,12 @@
 # Whim
 
-Whim is an experimental programming language built for exploration.
+Whim is an experimental programming language inspired by PHP and Hack. As a
+research project, it explores language ideas by putting them into practice,
+with the hope that useful ones can contribute to PHP’s future.
 
 > [!WARNING]
-> Whim is a toy. Do not use it in production. Every release may add, remove,
-> or redesign any part of the language. Whim has no compatibility promise,
+> Do not use Whim in production. Every release may add, remove, or redesign
+> any part of the language. Whim has no compatibility promise,
 > release schedule, or production support.
 
 Whim checks types and keeps generic type arguments at run time. It has

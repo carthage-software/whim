@@ -1,7 +1,7 @@
 # Security Policy
 
-Whim is a toy programming language. Do not use it in production or for work
-that needs a security guarantee.
+Whim is an experimental programming language and a research project. Do not
+use it in production or for work that needs a security guarantee.
 
 ## Supported versions
 

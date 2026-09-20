@@ -30,10 +30,13 @@ use crate::config::Configuration;
 use crate::error::Error;
 use crate::logger;
 
-const ABOUT: &str = "An experimental programming language built for exploration.";
+const ABOUT: &str = "An experimental programming language inspired by PHP and Hack.";
 const LONG_ABOUT: &str = indoc::indoc! {"
-    Whim is an experimental programming language built for exploration. Every
-    release may add, remove, or redesign any part of the language. It has no
+    Whim is an experimental programming language inspired by PHP and Hack. As a
+    research project, it explores language ideas by putting them into practice,
+    with the hope that useful ones can contribute to PHP’s future.
+
+    Every release may add, remove, or redesign any part of the language. Whim has no
     compatibility promise, release schedule, or production-support commitment.\
 "};
 

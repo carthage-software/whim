@@ -1,6 +1,6 @@
 [package]
 name = "whim"
-description = "An experimental programming language built for exploration."
+description = "An experimental programming language inspired by PHP and Hack."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

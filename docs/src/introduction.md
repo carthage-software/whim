@@ -1,9 +1,10 @@
 # The Whim Programming Language
 
-> Whim is a toy programming language. Do not use it in production.
+Whim is an experimental programming language inspired by PHP and Hack. As a
+research project, it explores language ideas by putting them into practice,
+with the hope that useful ones can contribute to PHP’s future.
 
-Whim is a small language with strict runtime types. Its syntax will feel
-familiar if you know PHP or Hack, but Whim follows its own rules.
+> Do not use Whim in production.
 
 ```whim
 function greet(string $name): string {

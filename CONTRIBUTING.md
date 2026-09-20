@@ -15,7 +15,7 @@ You may open an issue for a bug or an idea. Before you do:
 - Show what you expected and what happened.
 
 An issue does not create a promise to reply or make a change. Whim is an
-experimental project with no support plan or fixed priorities. An issue may
-wait for months, receive no work, or close without a change.
+experimental research project with no support plan or fixed priorities. An
+issue may wait for months, receive no work, or close without a change.
 
 Use the process in [SECURITY.md](SECURITY.md) for a security report.

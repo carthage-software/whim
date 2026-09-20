@@ -1,5 +1,11 @@
 # Appendix F: Frequently Asked Questions
 
+## Why does Whim exist?
+
+Whim is an experimental programming language inspired by PHP and Hack. As a
+research project, it explores language ideas by putting them into practice,
+with the hope that useful ones can contribute to PHP’s future.
+
 ## Is Whim related to PHP?
 
 Whim uses syntax from the PHP family. It is not a PHP implementation. It has
@@ -55,8 +61,5 @@ No. Any release may add, change, or remove language rules and library APIs.
 
 ## Should I use Whim in production?
 
-No. Whim is a toy for experiments.
-
-## What would make Whim a production project?
-
-<iframe src="https://giphy.com/embed/13B1WmJg7HwjGU" width="100%" height="auto" />
+No. Whim is an experimental research project. It makes no production support
+or security guarantees.
