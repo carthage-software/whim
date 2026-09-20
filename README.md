@@ -38,6 +38,26 @@ WebSockets, SQLite, PostgreSQL, dates, encodings, and common data formats.
 
 We also maintain [Trifle packages on Codeberg](https://codeberg.org/trifle).
 
+## Platform support
+
+Release builds (✅ available, ❌ unavailable):
+
+| Architecture | macOS | Linux (glibc) | Linux (musl) | FreeBSD | Windows (MSVC) |
+| ------------ | ----- | ------------- | ------------ | ------- | -------------- |
+| x86_64       | ✅ *  | ✅            | ✅ *         | ✅ *    | ✅             |
+| x86          | ❌    | ❌            | ❌           | ❌      | ❌             |
+| AArch64      | ✅    | ✅ *          | ✅ *         | ✅ *    | ❌             |
+| ARM          | ❌    | ❌            | ❌           | ❌      | ❌             |
+| RISC-V       | ❌    | ✅ *          | ❌           | ❌      | ❌             |
+| LoongArch64  | ❌    | ❌            | ❌           | ❌      | ❌             |
+| PowerPC64    | ❌    | ❌            | ❌           | ❌      | ❌             |
+
+`*` marks builds that are not tested in CI. RISC-V builds target 64-bit systems.
+
+CI runs the Rust and Whim test suites on pushes to `main` and pull requests.
+FreeBSD and Linux musl builds run only in the release workflow, without running
+tests.
+
 ## Install
 
 Install the latest release on macOS, Linux, or FreeBSD:
@@ -53,10 +73,6 @@ whim --version
 ```
 
 The container image is available at `ghcr.io/carthage-software/whim`.
-
-Whim supports macOS and FreeBSD on x86-64 and Arm64, Linux with glibc on
-x86-64, Arm64, and RISC-V 64, Linux with musl on x86-64 and Arm64, and
-Windows on x86-64.
 
 On Windows, download the `x86_64-pc-windows-msvc` ZIP archive from
 [GitHub Releases], extract `whim.exe`, and add its directory to your `PATH`.

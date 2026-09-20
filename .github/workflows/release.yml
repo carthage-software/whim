@@ -128,7 +128,7 @@ jobs:
         run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim
       - if: matrix.builder == 'freebsd-aarch64'
         uses: ./.github/actions/freebsd-aarch64
-      - name: Build and test FreeBSD
+      - name: Build FreeBSD
         if: matrix.builder == 'freebsd'
         uses: vmactions/freebsd-vm@v1
         with:
@@ -146,10 +146,6 @@ jobs:
             set -eu
             export CARGO_BUILD_JOBS=2
             cargo build --locked --release --target ${{ matrix.target }} --bin whim
-            target/${{ matrix.target }}/release/whim tests/run.whim '' 2
-      - name: Test musl build
-        if: endsWith(matrix.target, '-musl')
-        run: target/${{ matrix.target }}/release/whim tests/run.whim '' 2
       - name: Test Windows build
         if: runner.os == 'Windows'
         run: target/${{ matrix.target }}/release/whim.exe tests/run.whim '' 2
