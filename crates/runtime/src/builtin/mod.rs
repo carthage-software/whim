@@ -23,16 +23,17 @@ pub(crate) mod throw;
 
 mod context;
 
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::function::CallTarget;
+use whim_value::function::FunctionObject;
+use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
+
 use crate::builtin::convert::state_ref;
 use crate::builtin::convert::wrong_built_in_state;
 use crate::builtin::spec::FunctionSpec;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::function::CallTarget;
-use crate::value::function::FunctionObject;
-use crate::value::object::ClassId;
-use crate::value::object::TypeEnvironmentId;
 use crate::vm::VirtualMachine;
 
 #[inline(always)]

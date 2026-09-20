@@ -5,6 +5,10 @@ use std::rc::Rc;
 
 use hashbrown::HashSet;
 use whim_macros::whim_function;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::atom::Atom;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -17,10 +21,6 @@ use crate::core::symbols::CHECKED_KIND_ORDER;
 use crate::core::symbols::CLASS_LIKE_KIND_ORDER;
 use crate::core::symbols::strip_leading_backslash;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::atom::Atom;
-use crate::value::object::TypeEnvironmentId;
 
 #[whim_function(
     "Whim\\Reflection\\get_loaded_files(): vec<Whim\\Reflection\\FileReflection>",

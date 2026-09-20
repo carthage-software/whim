@@ -1,8 +1,9 @@
 //! Self-inlining of recursive bodies and the jumping replacement builder.
 
+use whim_value::atom::Atom;
+
 use crate::bytecode::rewrite::rebase_targets;
 use crate::optimizer::cfg::successors;
-use crate::optimizer::passes::inline_leaf_calls::Atom;
 use crate::optimizer::passes::inline_leaf_calls::CALLEE_INSTRUCTION_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::Chunk;

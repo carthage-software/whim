@@ -2,6 +2,9 @@
 
 use std::collections::VecDeque;
 
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -19,8 +22,6 @@ use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::TypeFlowOptions;
 use crate::optimizer::type_flow::World;
 use crate::optimizer::type_flow::descriptor_options_equal;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 /// One chunk of the imaged unit, with the facts that hold before each of its
 /// instructions.

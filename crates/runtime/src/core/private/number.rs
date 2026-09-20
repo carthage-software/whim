@@ -1,9 +1,9 @@
 //! Number parsing primitives.
 
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function("Whim\\Float\\try_parse(string $value): null|float", must_use)]
 pub(crate) fn try_parse_float(arguments: Arguments<'_>) -> Value {

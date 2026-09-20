@@ -8,15 +8,14 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use hashbrown::HashMap;
-
 use whim_span::Span;
 use whim_syn::cst::atom::LiteralString;
 use whim_sys::path::path_from_bytes;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 #[derive(Default)]
 pub(crate) struct EmbeddedFiles {
@@ -100,9 +99,9 @@ mod tests {
     use whim_syn::cst::atom::LiteralString;
     use whim_syn::cst::atom::LiteralStringKind;
     use whim_sys::path::path_bytes;
+    use whim_value::heap::Heap;
 
     use super::EmbeddedFiles;
-    use crate::value::heap::Heap;
 
     #[test]
     fn one_compilation_reads_each_embedded_file_once() {

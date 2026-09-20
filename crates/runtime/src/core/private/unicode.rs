@@ -5,13 +5,12 @@ use std::str::from_utf8;
 use caseless::Caseless;
 use unicode_general_category::GeneralCategory;
 use unicode_general_category::get_general_category;
-
 use whim_base::unreachable_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 const REPLACEMENT_CHARACTER: u32 = 0xfffd;
 

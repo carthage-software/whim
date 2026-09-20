@@ -7,12 +7,11 @@ use argon2::PasswordHash;
 use argon2::PasswordHasher;
 use argon2::PasswordVerifier;
 use argon2::password_hash::SaltString;
-
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 const BCRYPT_SALT_LENGTH: usize = 16;
 

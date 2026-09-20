@@ -4,14 +4,14 @@ use core::str;
 
 use whim_macros::whim_constant;
 use whim_macros::whim_function;
+use whim_value::Value;
+use whim_value::atom::Atom;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::core::symbols::strip_leading_backslash;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::atom::Atom;
 
 #[whim_constant("Whim\\_Private\\SYMBOL_KIND_CLASS", "int")]
 pub(crate) const SYMBOL_KIND_CLASS: i64 = SymbolKind::Class as i64;

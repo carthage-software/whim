@@ -3,11 +3,11 @@
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 #[whim_function(
     "Whim\\_Private\\binary_decode(string $bytes, int $offset, int $width, bool $signed, bool $little): null|int"

@@ -6,17 +6,17 @@ use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
+use whim_value::Value;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::heap::metadata::TeardownMode;
+use whim_value::heap::metadata::TraceVisitor;
+use whim_value::heap::queue::DropQueue;
+use whim_value::weak::WeakMapObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::BuiltInChildren;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::queue::DropQueue;
-use crate::value::weak::WeakMapObject;
 
 #[whim_class("Whim\\Reference\\WeakMap<K: object, V>", final, traced)]
 #[derive(Default)]

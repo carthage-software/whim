@@ -4,18 +4,17 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 use hashbrown::HashSet;
-
 use whim_base::unreachable_invariant;
 use whim_span::HasSpan;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::declaration::Use;
 use whim_syn::cst::declaration::UseItem;
 use whim_syn::cst::declaration::UseItems;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 #[derive(Default, Clone)]
 pub(in crate::compiler) struct Resolver {

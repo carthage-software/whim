@@ -3,6 +3,7 @@ use std::ptr;
 
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::compiler::CompileConfiguration;
@@ -11,7 +12,6 @@ use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
 use crate::optimizer::type_flow::IndexedUnit;
 use crate::optimizer::type_flow::World;
-use crate::value::heap::Heap;
 
 #[test]
 fn power_facts_preserve_negative_exponent_result_types_and_consumers() {

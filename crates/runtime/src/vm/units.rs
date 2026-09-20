@@ -8,6 +8,9 @@ use whim_syn::arena::LocalArena;
 use whim_syn::parser;
 use whim_sys::path::path_bytes;
 use whim_sys::path::path_from_bytes;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::bytecode::unit::CompiledUnit;
 use crate::compiler;
@@ -19,7 +22,6 @@ use crate::engine::diagnostics::DiagnosticLabels;
 use crate::engine::diagnostics::DiagnosticOrigin;
 use crate::optimizer::OptimizationConfiguration;
 use crate::symbols::line_starts_of;
-use crate::vm::Atom;
 use crate::vm::Frame;
 use crate::vm::FrameFlags;
 use crate::vm::NonNull;
@@ -28,9 +30,7 @@ use crate::vm::OptionalFuncId;
 use crate::vm::Rc;
 use crate::vm::SymbolKind;
 use crate::vm::Throw;
-use crate::vm::TypeEnvironmentId;
 use crate::vm::UnitContext;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 

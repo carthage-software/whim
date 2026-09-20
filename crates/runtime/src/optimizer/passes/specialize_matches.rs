@@ -1,4 +1,5 @@
 use hashbrown::HashSet;
+use whim_value::atom::Atom;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
@@ -22,7 +23,6 @@ use crate::optimizer::passes::dead_store;
 use crate::optimizer::passes::for_each_mutable_chunk;
 use crate::optimizer::passes::prune_unreachable;
 use crate::optimizer::rewrite::plan::RewritePlan;
-use crate::value::atom::Atom;
 
 pub(in crate::optimizer) fn optimize_unit(
     analysis: &Analysis<'_>,

@@ -3,8 +3,8 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
-
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_value::atom::Atom;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledBaseReference;
@@ -14,7 +14,6 @@ use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::unit::is_external;
-use crate::value::atom::Atom;
 
 pub(crate) trait TypeAliasLookup {
     fn find_alias(&self, name: &Atom) -> Option<&CompiledTypeAlias>;
@@ -300,16 +299,15 @@ mod tests {
     use std::slice;
 
     use whim_span::Span;
-
-    use crate::bytecode::chunk::descriptors::ShapeKey;
-    use crate::bytecode::unit::CompiledTypeParameter;
-    use crate::bytecode::unit::Variance;
-    use crate::value::heap::Heap;
+    use whim_value::heap::Heap;
 
     use crate::bytecode::aliases::expand_aliases;
     use crate::bytecode::aliases::expand_unit_declarations;
+    use crate::bytecode::chunk::descriptors::ShapeKey;
     use crate::bytecode::chunk::descriptors::TypeDescriptor;
     use crate::bytecode::unit::CompiledTypeAlias;
+    use crate::bytecode::unit::CompiledTypeParameter;
+    use crate::bytecode::unit::Variance;
     use crate::compiler::new_unit;
 
     #[test]

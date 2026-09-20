@@ -3,8 +3,15 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
-
 use whim_base::unwrap_result_invariant;
+use whim_value::atom::Atom;
+use whim_value::function::BuiltInId;
+use whim_value::heap::Heap;
+use whim_value::newtype::NewtypeId;
+use whim_value::newtype::NewtypeValueDescriptor;
+use whim_value::newtype::NewtypeValueId;
+use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledBuiltInFunction;
@@ -22,14 +29,6 @@ use crate::engine::declare::ConstantSlot;
 use crate::symbols::RuntimeFunction;
 use crate::symbols::RuntimeTypeEnvironment;
 use crate::symbols::SymbolEntry;
-use crate::value::atom::Atom;
-use crate::value::function::BuiltInId;
-use crate::value::heap::Heap;
-use crate::value::newtype::NewtypeId;
-use crate::value::newtype::NewtypeValueDescriptor;
-use crate::value::newtype::NewtypeValueId;
-use crate::value::object::ClassId;
-use crate::value::object::TypeEnvironmentId;
 
 pub(crate) struct RuntimeTables {
     pub(crate) symbols: HashMap<Atom, SymbolEntry>,

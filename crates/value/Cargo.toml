@@ -1,0 +1,24 @@
+[package]
+name = "whim-value"
+description = "Values, heap allocation, and garbage collection for Whim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hashbrown = { workspace = true }
+itoa = { workspace = true }
+ryu = { workspace = true }
+serde = { workspace = true }
+serde-seeded = { workspace = true }
+whim-base = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }

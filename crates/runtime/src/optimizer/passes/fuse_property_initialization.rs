@@ -2,6 +2,7 @@
 
 use hashbrown::HashMap;
 use hashbrown::HashSet;
+use whim_value::atom::Atom;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::IcDescriptor;
@@ -19,7 +20,6 @@ use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::for_each_mutable_chunk;
-use crate::value::atom::Atom;
 
 struct Candidate {
     allocation: Option<usize>,

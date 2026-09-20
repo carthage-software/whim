@@ -1,8 +1,8 @@
 //! Owned result construction and storage lifetime regressions.
 
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::heap::Heap;
+use crate::Value;
+use crate::ValueView;
+use crate::heap::Heap;
 
 #[test]
 fn owned_string_buffers_preserve_binary_bytes_and_storage_boundaries() {
@@ -30,10 +30,10 @@ fn owned_string_buffers_preserve_binary_bytes_and_storage_boundaries() {
 
 #[test]
 fn cloning_preserves_tags_and_owns_one_reference() {
-    use crate::value::dict::DictObject;
-    use crate::value::newtype::NewtypeValueId;
-    use crate::value::tuple::TupleObject;
-    use crate::value::vec::VecObject;
+    use crate::dict::DictObject;
+    use crate::newtype::NewtypeValueId;
+    use crate::tuple::TupleObject;
+    use crate::vec::VecObject;
 
     let heap = Heap::new();
     for value in [

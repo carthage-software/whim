@@ -4,19 +4,19 @@ use std::iter;
 
 use whim_base::unwrap_option_invariant;
 use whim_macros::whim_closure;
+use whim_value::Value;
+use whim_value::function::CallTarget;
+use whim_value::function::FunctionObject;
+use whim_value::heap::FinalizerOrigin;
+use whim_value::heap::PendingFinalizer;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::classes::MethodBodyKind;
 use crate::engine::builtins::BuiltInCallable;
-use crate::value::Value;
-use crate::value::function::CallTarget;
-use crate::value::function::FunctionObject;
-use crate::value::heap::FinalizerOrigin;
-use crate::value::heap::PendingFinalizer;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::object::InstanceObject;
-use crate::value::object::TypeEnvironmentId;
 use crate::vm::MethodContext;
 use crate::vm::UserCallContext;
 use crate::vm::VirtualMachine;

@@ -2,6 +2,10 @@
 
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
+use whim_value::Value;
+use whim_value::heap::metadata::TeardownMode;
+use whim_value::heap::metadata::TraceVisitor;
+use whim_value::heap::queue::DropQueue;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -11,10 +15,6 @@ use crate::builtin::throw::Throw;
 use crate::core::reflection::Operation;
 use crate::core::reflection::dispatch;
 use crate::core::reflection::state::ReflectionState;
-use crate::value::Value;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::queue::DropQueue;
 use crate::vm::VirtualMachine;
 
 macro_rules! reflection_class {

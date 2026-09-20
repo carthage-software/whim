@@ -5,6 +5,8 @@ use std::cmp::Reverse;
 use std::ptr::from_ref;
 
 use hashbrown::HashMap;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::bytecode::rewrite::compact;
 use crate::bytecode::unit::CompiledMethod;
@@ -12,13 +14,11 @@ use crate::bytecode::unit::must_use_note;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::passes::fuse_coalescing::normalize_chunk;
 use crate::optimizer::passes::fuse_coalescing::normalized_chunk;
-use crate::optimizer::passes::inline_leaf_calls::Atom;
 use crate::optimizer::passes::inline_leaf_calls::CALLEE_INSTRUCTION_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::Chunk;
 use crate::optimizer::passes::inline_leaf_calls::CompiledParameter;
 use crate::optimizer::passes::inline_leaf_calls::CompiledTypeParameter;
 use crate::optimizer::passes::inline_leaf_calls::CompiledUnit;
-use crate::optimizer::passes::inline_leaf_calls::Heap;
 use crate::optimizer::passes::inline_leaf_calls::Instruction;
 use crate::optimizer::passes::inline_leaf_calls::Location;
 use crate::optimizer::passes::inline_leaf_calls::MethodSite;

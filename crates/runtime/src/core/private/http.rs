@@ -9,18 +9,17 @@ use httparse::Response as HttpResponse;
 use httparse::Status as HttpParseStatus;
 use memchr::memchr_iter;
 use memchr::memmem::find;
-
 use whim_base::unwrap_option_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
+use whim_value::dict::DictObject;
+use whim_value::dict::keys::Key;
+use whim_value::dict::keys::KeyRef;
+use whim_value::vec::VecObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::core::private::url::is_valid_http_authority;
-use crate::value::Value;
-use crate::value::dict::DictObject;
-use crate::value::dict::keys::Key;
-use crate::value::dict::keys::KeyRef;
-use crate::value::vec::VecObject;
 
 const COMMON_HTTP_HEADER_CAPACITY: usize = 32;
 
@@ -660,7 +659,7 @@ fn serialized_fields_len(fields: &VecObject) -> usize {
 }
 
 fn append_fields(output: &mut Vec<u8>, fields: &VecObject) {
-    for field in fields.iter() {
+    for field in fields {
         // SAFETY: the surrounding invariant proves this option contains a value.
         let pair = unsafe { unwrap_option_invariant(field.as_tuple(), "an HTTP field is a pair") };
         let [name, value] = pair.as_slice() else {

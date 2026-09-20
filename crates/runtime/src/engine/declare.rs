@@ -3,11 +3,19 @@
 use std::iter;
 
 use hashbrown::HashSet;
-
 use whim_base::u32_index;
 use whim_base::unreachable_invariant;
 use whim_span::Position;
 use whim_span::Span;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::function::BuiltInId;
+use whim_value::function::FuncId;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+use whim_value::string::ByteStringObject;
+use whim_value::vec::VecObject;
 
 use crate::bytecode::aliases::expand_unit_declarations;
 use crate::bytecode::chunk::Chunk;
@@ -15,27 +23,20 @@ use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::is_external;
-use crate::engine::Atom;
-use crate::engine::ClassId;
 use crate::engine::CompiledUnit;
 use crate::engine::ConstantInitializer;
 use crate::engine::Engine;
 use crate::engine::ExecutionOutcome;
-use crate::engine::FuncId;
 use crate::engine::FunctionLocator;
 use crate::engine::FunctionTable;
 use crate::engine::GenericValidationJournalEntry;
 use crate::engine::HashMap;
 use crate::engine::InlineCache;
-use crate::engine::InstanceObject;
-use crate::engine::ManagedRef;
 use crate::engine::NonNull;
 use crate::engine::Rc;
 use crate::engine::SymbolKind;
 use crate::engine::UnitContext;
 use crate::engine::UnitGenericValidation;
-use crate::engine::Value;
-use crate::engine::VecObject;
 use crate::engine::VirtualMachine;
 use crate::engine::VirtualMachineControl;
 use crate::engine::builtins::BuiltInCallable;
@@ -52,8 +53,6 @@ use crate::symbols::SourceText;
 use crate::symbols::SymbolEntry;
 use crate::symbols::UnitOrigin;
 use crate::symbols::UnitSourceFile;
-use crate::value::function::BuiltInId;
-use crate::value::string::ByteStringObject;
 
 pub(crate) enum ConstantSlot {
     Pending {

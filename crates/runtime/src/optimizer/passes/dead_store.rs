@@ -1,6 +1,8 @@
 //! Removal of side-effect-free writes whose produced value is never read.
 
 use hashbrown::HashSet;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::Chunk;
@@ -20,8 +22,6 @@ use crate::optimizer::operands::for_each_write_register;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::TypeFlow;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 pub(in crate::optimizer) fn optimize_unit(
     analysis: &Analysis<'_>,

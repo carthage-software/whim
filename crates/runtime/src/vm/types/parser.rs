@@ -3,10 +3,10 @@
 use std::str;
 
 use whim_base::unwrap_option_invariant;
+use whim_value::heap::Heap;
 
 use crate::vm::types::FunctionTypeDescriptor;
 use crate::vm::types::FunctionTypeParameterDescriptor;
-use crate::vm::types::Heap;
 use crate::vm::types::TypeDescriptor;
 use crate::vm::types::environment::descriptor_same;
 

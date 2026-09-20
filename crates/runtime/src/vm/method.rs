@@ -2,13 +2,19 @@
 
 use std::mem;
 
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
+
 use crate::bytecode::instruction::operands::PropertyReadMode;
 use crate::classes::MethodEntry;
 use crate::engine::builtins;
 use crate::engine::builtins::BuiltInCallable;
 use crate::symbols::CachedExactMethodFrame;
 use crate::symbols::GuardedMethodWays;
-use crate::vm::Atom;
 use crate::vm::CacheEntry;
 use crate::vm::CachedExactMethod;
 use crate::vm::CachedGuardedMethod;
@@ -16,19 +22,14 @@ use crate::vm::CachedMethodArguments;
 use crate::vm::CachedMethodFastPath;
 use crate::vm::CachedTurbofishEnvironment;
 use crate::vm::Chunk;
-use crate::vm::ClassId;
 use crate::vm::ExactFunctionEntry;
 use crate::vm::ExactMethodEntry;
 use crate::vm::ExactMethodWays;
 use crate::vm::InlineCache;
-use crate::vm::InstanceObject;
 use crate::vm::Instruction;
-use crate::vm::ManagedRef;
 use crate::vm::MethodBodyKind;
 use crate::vm::MethodContext;
 use crate::vm::NonNull;
-use crate::vm::TypeEnvironmentId;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::call::guard_allows;

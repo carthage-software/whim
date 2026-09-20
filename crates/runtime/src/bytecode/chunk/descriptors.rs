@@ -4,21 +4,21 @@
 use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
+use whim_base::unreachable_invariant;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::dict::keys::KeyRef;
+use whim_value::heap::Heap;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::string::ByteStringObject;
 use xxhash_rust::xxh3::xxh3_64;
 
-use whim_base::unreachable_invariant;
-
-use crate::bytecode::chunk::Atom;
 use crate::bytecode::chunk::Comparison;
 use crate::bytecode::chunk::ConstantIndex;
 use crate::bytecode::chunk::DescriptorIndex;
 use crate::bytecode::chunk::Register;
 use crate::bytecode::instruction::operands::PropertySlot;
 use crate::bytecode::instruction::operands::PropertyValueMode;
-use crate::value::Value;
-use crate::value::dict::keys::KeyRef;
-use crate::value::heap::Heap;
-use crate::value::string::ByteStringObject;
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
@@ -611,7 +611,7 @@ pub(crate) fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Valu
                 .as_vec()
                 .map(|value| value.is_empty())
                 .or_else(|| value.as_dict().map(|value| value.is_empty()))
-                .or_else(|| value.as_tuple().map(|value| value.len() == 0));
+                .or_else(|| value.as_tuple().map(ManagedRef::is_empty));
             return match empty {
                 Some(true) => Some(true),
                 Some(false) => None,
@@ -920,4 +920,48 @@ pub(crate) struct PropertyInitializationEntry {
     pub value: Register,
     pub slot: PropertySlot,
     pub value_mode: PropertyValueMode,
+}
+
+#[cfg(test)]
+mod tests {
+    use whim_value::Value;
+    use whim_value::heap::Heap;
+    use whim_value::string::ByteStringObject;
+
+    use super::TypeDescriptor;
+    use super::check_trivial_descriptor;
+
+    #[test]
+    fn length_and_literal_mismatches_keep_rope_storage() {
+        let heap = Heap::new();
+        let part = ByteStringObject::from_bytes(&heap, &[b'a'; 32]);
+        let rope = ByteStringObject::concat(&heap, &part, &part);
+        let value = Value::string(rope.clone());
+        assert_eq!(value.as_string_len(), Some(64));
+        for (descriptor, expected) in [
+            (
+                TypeDescriptor::StringLength {
+                    min: 64,
+                    max: Some(64),
+                },
+                true,
+            ),
+            (
+                TypeDescriptor::StringLength {
+                    min: 1,
+                    max: Some(63),
+                },
+                false,
+            ),
+            (TypeDescriptor::StringLiteral(heap.intern(b"")), false),
+        ] {
+            assert_eq!(
+                check_trivial_descriptor(&descriptor, &value),
+                Some(expected)
+            );
+            assert!(!rope.is_flat());
+        }
+        let matching = TypeDescriptor::StringLiteral(heap.intern(&[b'a'; 64]));
+        assert_eq!(check_trivial_descriptor(&matching, &value), Some(true));
+    }
 }

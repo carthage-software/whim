@@ -1,6 +1,9 @@
 //! Construction and checked projection of reflection objects.
 
 use whim_base::unreachable_invariant;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
@@ -12,9 +15,6 @@ use crate::core::reflection::model::ReflectedType;
 use crate::core::reflection::model::ReflectionData;
 use crate::core::type_;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::object::TypeEnvironmentId;
 
 pub(crate) fn build(
     context: &mut Context<'_, '_, '_>,

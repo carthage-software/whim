@@ -1,11 +1,12 @@
 //! Same-unit validation of sealed class and interface permissions.
 
+use whim_value::atom::Atom;
+
 use crate::bytecode::unit::ClassLikeKind;
 use crate::bytecode::unit::CompiledClassLike;
 use crate::bytecode::unit::CompiledUnit;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
-use crate::value::atom::Atom;
 
 /// Rejects declarations in this unit that provably violate a sealed parent
 /// or interface. Permission is checked per direct edge: a declaration must

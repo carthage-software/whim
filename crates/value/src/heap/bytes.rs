@@ -4,10 +4,10 @@ use std::mem::ManuallyDrop;
 use std::ptr::NonNull;
 use std::slice;
 
-use crate::value::heap::allocate_bytes;
-use crate::value::heap::deallocate_bytes;
+use crate::heap::allocate_bytes;
+use crate::heap::deallocate_bytes;
 
-pub(in crate::value) enum HeapBytes {
+pub(crate) enum HeapBytes {
     Inline {
         len: u8,
         bytes: [u8; Self::INLINE_CAPACITY],
@@ -28,14 +28,14 @@ impl HeapBytes {
     const INLINE_CAPACITY: usize = 23;
     const MINIMUM_GROWTH_CAPACITY: usize = 32;
 
-    pub(in crate::value) const fn empty() -> Self {
+    pub(crate) const fn empty() -> Self {
         Self::Inline {
             len: 0,
             bytes: [0; Self::INLINE_CAPACITY],
         }
     }
 
-    pub(in crate::value) fn from_slice(bytes: &[u8]) -> Self {
+    pub(crate) fn from_slice(bytes: &[u8]) -> Self {
         if bytes.len() <= Self::INLINE_CAPACITY {
             let mut inline = [0; Self::INLINE_CAPACITY];
             inline[..bytes.len()].copy_from_slice(bytes);
@@ -58,7 +58,7 @@ impl HeapBytes {
         }
     }
 
-    pub(in crate::value) fn from_vec(mut bytes: Vec<u8>) -> Self {
+    pub(crate) fn from_vec(mut bytes: Vec<u8>) -> Self {
         if bytes.len() <= Self::INLINE_CAPACITY {
             let mut inline = [0; Self::INLINE_CAPACITY];
             inline[..bytes.len()].copy_from_slice(&bytes);
@@ -95,7 +95,7 @@ impl HeapBytes {
         clippy::option_if_let_else,
         reason = "the explicit match mirrors the allocated and inline representations"
     )]
-    pub(in crate::value) unsafe fn from_fragments<'a>(
+    pub(crate) unsafe fn from_fragments<'a>(
         len: usize,
         fragments: impl Iterator<Item = &'a [u8]>,
     ) -> Self {
@@ -151,7 +151,7 @@ impl HeapBytes {
     }
 
     /// Appends bytes, growing the allocation when needed.
-    pub(in crate::value) fn append(&mut self, extra: &[u8]) {
+    pub(crate) fn append(&mut self, extra: &[u8]) {
         if extra.is_empty() {
             return;
         }
@@ -227,7 +227,7 @@ impl HeapBytes {
     }
 
     /// Frees an allocated buffer.
-    pub(in crate::value) fn release(self) {
+    pub(crate) fn release(self) {
         if let Self::Allocated {
             pointer, capacity, ..
         } = self

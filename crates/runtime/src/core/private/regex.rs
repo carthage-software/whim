@@ -7,17 +7,16 @@ use std::str::from_utf8;
 use regex::bytes::CaptureLocations;
 use regex::bytes::NoExpand;
 use regex::bytes::Regex as BytesRegex;
-
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_function;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 const REGEX: &str = "Whim\\_Private\\Regex";
 const HEX: &[u8; 16] = b"0123456789abcdef";

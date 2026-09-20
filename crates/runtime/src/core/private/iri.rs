@@ -12,6 +12,7 @@ use iri_string::types::IriAbsoluteStr;
 use iri_string::types::IriReferenceStr;
 use iri_string::types::UriReferenceStr;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -21,7 +22,6 @@ use crate::core::private::uri_common::optional_string;
 use crate::core::private::uri_common::optional_utf8;
 use crate::core::private::uri_common::required_utf8;
 use crate::core::private::uri_common::uri_reference_builtins;
-use crate::value::Value;
 
 uri_reference_builtins!(
     IriReferenceStr,

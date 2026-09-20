@@ -9,6 +9,11 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::ptr;
 
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
@@ -38,10 +43,6 @@ use crate::optimizer::type_flow::descriptors::descriptor_mask;
 use crate::optimizer::type_flow::descriptors::descriptor_may_release_observably;
 use crate::optimizer::type_flow::transfer::numeric_result;
 use crate::optimizer::type_flow::transfer::transfer;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 mod branches;
 mod constants;

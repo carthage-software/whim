@@ -4,6 +4,8 @@ use std::mem;
 
 use hashbrown::HashMap;
 use whim_span::Span;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::bytecode::aliases::alias_bindings;
 use crate::bytecode::aliases::substitute;
@@ -41,8 +43,6 @@ use crate::optimizer::rewrite::splice::splice_replace_many;
 use crate::optimizer::type_flow::IndexedUnit;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::World;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 pub(super) mod generic;
 pub(in crate::optimizer) mod leaf;

@@ -1,4 +1,5 @@
 use whim_span::Span;
+use whim_value::heap::Heap;
 
 use super::ChunkRewrite;
 use super::RewritePlan;
@@ -14,7 +15,6 @@ use crate::bytecode::instruction::operands::SwitchTableIndex;
 use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::verify::verify;
 use crate::optimizer::passes::FunctionLocation;
-use crate::value::heap::Heap;
 
 const SUBJECT: Register = Register::new(0);
 

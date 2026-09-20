@@ -2,25 +2,26 @@
 
 use std::mem;
 
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::function::FuncId;
+use whim_value::newtype::NewtypeId;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::literal_value;
 use crate::core::symbols::CHECKED_KIND_ORDER;
 use crate::core::symbols::CLASS_LIKE_KIND_ORDER;
 use crate::engine::declare::ConstantSlot;
-use crate::value::newtype::NewtypeId;
-use crate::vm::Atom;
 use crate::vm::CacheEntry;
 use crate::vm::Chunk;
-use crate::vm::ClassId;
-use crate::vm::FuncId;
 use crate::vm::FunctionTable;
 use crate::vm::IcDescriptor;
-use crate::vm::InstanceObject;
 use crate::vm::NonNull;
 use crate::vm::SymbolEntry;
 use crate::vm::SymbolKind;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::unreachable_invariant;

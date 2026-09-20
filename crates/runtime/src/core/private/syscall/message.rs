@@ -1,10 +1,11 @@
+use whim_macros::whim_function;
+use whim_sys::message;
+use whim_value::Value;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::core::private::syscall::{system_error, with_descriptor};
-use crate::value::Value;
-use whim_macros::whim_function;
-use whim_sys::message;
 
 #[whim_function("Whim\\_Private\\enable_message_metadata(Whim\\OS\\FileDescriptor $socket): void")]
 pub(crate) fn enable_message_metadata<'call>(

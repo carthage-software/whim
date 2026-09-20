@@ -10,19 +10,18 @@ use serde::ser::SerializeSeq;
 use sonic_rs::JsonContainerTrait;
 use sonic_rs::JsonType;
 use sonic_rs::JsonValueTrait;
-
 use whim_base::unwrap_option_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_function;
 use whim_macros::whim_methods;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::keys::KeyRef;
+use whim_value::string::ByteStringObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::dict::keys::KeyRef;
-use crate::value::string::ByteStringObject;
 
 const JSON_ERROR: &str = "Whim\\_Private\\JsonError";
 const DEPTH_LIMIT: usize = 512;

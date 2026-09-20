@@ -5,6 +5,9 @@ use std::str;
 
 use whim_base::u32_index;
 use whim_base::unwrap_result_invariant;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+use whim_value::object::ClassId;
 
 use crate::builtin::spec::BaseSpec;
 use crate::builtin::spec::ClassConstantSpec;
@@ -39,9 +42,6 @@ use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolEntry;
 use crate::symbols::SymbolKind;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
-use crate::value::object::ClassId;
 
 pub(in crate::engine::builtins) fn intersect_permissions(
     current: &mut Option<Vec<Atom>>,

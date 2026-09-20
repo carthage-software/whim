@@ -1,3 +1,6 @@
+use whim_value::Value;
+use whim_value::tuple::TupleObject;
+
 use crate::bytecode::chunk::descriptors::SwitchTable;
 use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
 use crate::bytecode::chunk::descriptors::string_switch_lookup;
@@ -10,8 +13,6 @@ use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::constants::constant_comparison;
 use crate::optimizer::type_flow::constants::constant_from_literal;
 use crate::optimizer::type_flow::instruction_index;
-use crate::value::Value;
-use crate::value::tuple::TupleObject;
 
 impl TypeFlow<'_> {
     pub(in crate::optimizer) fn constant_branch_offset(&self, index: usize) -> Option<i32> {

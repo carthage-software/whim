@@ -16,18 +16,18 @@ use whim_pgsql::Progress;
 use whim_pgsql::ResultSet as DriverResult;
 use whim_pgsql::Statement as DriverStatement;
 use whim_pgsql::Value as DriverValue;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::newtype::NewtypeId;
+use whim_value::object::TypeEnvironmentId;
+use whim_value::vec::VecObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::newtype::NewtypeId;
-use crate::value::object::TypeEnvironmentId;
-use crate::value::vec::VecObject;
 
 const PGSQL_CONNECTION: &str = "Whim\\_Private\\PostgreSQLConnection";
 const PGSQL_OPERATION: &str = "Whim\\_Private\\PostgreSQLOperation";

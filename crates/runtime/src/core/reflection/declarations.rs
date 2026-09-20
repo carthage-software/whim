@@ -1,5 +1,10 @@
 //! Symbol, member, callable, and generic declaration reflection.
 
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::function::FuncId;
+use whim_value::object::ClassId;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
@@ -30,10 +35,6 @@ use crate::core::reflection::objects;
 use crate::core::reflection::support;
 use crate::core::reflection::types;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::function::FuncId;
-use crate::value::object::ClassId;
 use crate::vm::VirtualMachine;
 
 #[expect(clippy::too_many_lines, reason = "symbol reflection dispatch")]

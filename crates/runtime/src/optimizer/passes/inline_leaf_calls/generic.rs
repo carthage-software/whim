@@ -2,17 +2,18 @@
 
 use std::cmp::Reverse;
 
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::passes::fuse_coalescing::normalize_chunk;
-use crate::optimizer::passes::inline_leaf_calls::Atom;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::Chunk;
 use crate::optimizer::passes::inline_leaf_calls::CompiledFunction;
 use crate::optimizer::passes::inline_leaf_calls::CompiledParameter;
 use crate::optimizer::passes::inline_leaf_calls::CompiledTypeParameter;
 use crate::optimizer::passes::inline_leaf_calls::CompiledUnit;
-use crate::optimizer::passes::inline_leaf_calls::Heap;
 use crate::optimizer::passes::inline_leaf_calls::IcDescriptor;
 use crate::optimizer::passes::inline_leaf_calls::InlineCandidates;
 use crate::optimizer::passes::inline_leaf_calls::Instruction;

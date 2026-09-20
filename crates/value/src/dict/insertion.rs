@@ -3,18 +3,17 @@
 use std::mem;
 
 use hashbrown::hash_table::Entry;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
 
-use crate::value::Value;
-use crate::value::dict::DictObject;
-use crate::value::dict::IndexEntry;
-use crate::value::dict::keys::Key;
-use crate::value::dict::slots::Slot;
-use crate::value::dict::slots::slot_hash;
-use crate::value::dict::slots::slot_matches_short_string;
-use crate::value::string::short::ShortString;
+use crate::Value;
+use crate::dict::DictObject;
+use crate::dict::IndexEntry;
+use crate::dict::keys::Key;
+use crate::dict::slots::Slot;
+use crate::dict::slots::slot_hash;
+use crate::dict::slots::slot_matches_short_string;
+use crate::string::short::ShortString;
 
 #[expect(
     clippy::inline_always,
@@ -22,7 +21,7 @@ use crate::value::string::short::ShortString;
 )]
 impl DictObject {
     #[inline(always)]
-    pub(crate) fn insert_short_string(&mut self, key: ShortString, value: Value) -> Option<Value> {
+    pub fn insert_short_string(&mut self, key: ShortString, value: Value) -> Option<Value> {
         self.materialize_index();
         let hash_state = self.hash_state;
         // SAFETY: the heap-owned hash state outlives the dict.

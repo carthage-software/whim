@@ -10,10 +10,10 @@ use std::str::from_utf8;
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 const MAX_ADDRESS_LENGTH: usize = 39;
 

@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
+use whim_value::heap::Heap;
 
 use super::CompileErrorKind;
 use crate::bytecode::chunk::Chunk;
@@ -13,7 +14,6 @@ use crate::bytecode::verify::verify_unit;
 use crate::compiler::CompileConfiguration;
 use crate::compiler::compile_with_configuration;
 use crate::optimizer::OptimizationConfiguration;
-use crate::value::heap::Heap;
 
 struct Compiled {
     unit: CompiledUnit,

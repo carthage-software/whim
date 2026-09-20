@@ -2,13 +2,14 @@
 
 use std::cmp::Ordering;
 
-use crate::value::ValueView;
-use crate::value::atom::Atom;
-use crate::vm::ByteStringObject;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+use whim_value::ops;
+use whim_value::string::ByteStringObject;
+
 use crate::vm::Fault;
-use crate::vm::Heap;
-use crate::vm::Value;
-use crate::vm::ops;
 
 fn narrow(value: i128) -> Result<Value, Fault> {
     if value > i128::from(i64::MAX) {

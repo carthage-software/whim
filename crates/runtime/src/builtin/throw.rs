@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::value::Value;
+use whim_value::Value;
 
 pub(crate) struct Throw(pub Value);
 

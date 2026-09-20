@@ -4,12 +4,11 @@ use std::rc::Rc;
 
 use whim_span::Span;
 use whim_syn::diagnostic;
-
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::object::InstanceObject;
-use crate::value::weak::WeakReference;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::InstanceObject;
+use whim_value::weak::WeakReference;
 
 use crate::engine::Engine;
 

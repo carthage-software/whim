@@ -11,8 +11,12 @@ use hashbrown::HashMap;
 use imbl::HashMap as PersistentHashMap;
 use imbl::HashSet as PersistentHashSet;
 use imbl::Vector as PersistentVector;
-
 use whim_base::u32_index;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::function::FuncId;
+use whim_value::object::BuiltInHooks;
+use whim_value::object::ClassId;
 
 use crate::builtin::spec::BuiltInHandler;
 use crate::builtin::spec::BuiltInInitializer;
@@ -27,11 +31,6 @@ use crate::bytecode::unit::CompiledAttribute;
 use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::Visibility;
 use crate::symbols::UnitContext;
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::function::FuncId;
-use crate::value::object::BuiltInHooks;
-use crate::value::object::ClassId;
 
 #[derive(Clone, Copy)]
 pub(crate) enum MethodBodyKind {

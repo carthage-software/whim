@@ -3,12 +3,11 @@
 use file_format::FileFormat;
 use sonic_rs::Value as JsonValue;
 use sonic_rs::from_slice;
-
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function(
     "Whim\\_Private\\mime_sniff(string $bytes): string",

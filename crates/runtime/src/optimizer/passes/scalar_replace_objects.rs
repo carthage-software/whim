@@ -1,6 +1,7 @@
 //! Scalar replacement of non-escaping fresh objects.
 
 use hashbrown::HashSet;
+use whim_value::atom::Atom;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::IcDescriptor;
@@ -22,7 +23,6 @@ use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::for_each_mutable_chunk;
-use crate::value::atom::Atom;
 
 pub(in crate::optimizer) fn optimize_unit(
     unit: &mut CompiledUnit,

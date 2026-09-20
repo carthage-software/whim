@@ -22,37 +22,37 @@ use hashbrown::HashTable;
 
 use whim_base::unreachable_invariant;
 
-use crate::value::Value;
-use crate::value::atom::AtomBox;
-use crate::value::dict::DictObject;
-use crate::value::function::FunctionObject;
-use crate::value::gc;
-use crate::value::hash::HashState;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::Color;
-use crate::value::heap::metadata::Header;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
-use crate::value::heap::queue::Erased;
-use crate::value::iterator::IteratorObject;
-use crate::value::object::BuiltInHooks;
-use crate::value::object::BuiltInState;
-use crate::value::object::InstanceObject;
-use crate::value::string::ByteStringObject;
-use crate::value::tuple::TupleObject;
-use crate::value::tuple::tuple_layout;
-use crate::value::vec::VecObject;
-use crate::value::weak::WeakMapObject;
-use crate::value::weak::WeakReference;
+use crate::Value;
+use crate::atom::AtomBox;
+use crate::dict::DictObject;
+use crate::function::FunctionObject;
+use crate::gc;
+use crate::hash::HashState;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::Color;
+use crate::heap::metadata::Header;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TraceVisitor;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
+use crate::heap::queue::Erased;
+use crate::iterator::IteratorObject;
+use crate::object::BuiltInHooks;
+use crate::object::BuiltInState;
+use crate::object::InstanceObject;
+use crate::string::ByteStringObject;
+use crate::tuple::TupleObject;
+use crate::tuple::tuple_layout;
+use crate::vec::VecObject;
+use crate::weak::WeakMapObject;
+use crate::weak::WeakReference;
 
-pub(in crate::value) mod bytes;
-pub(crate) mod handle;
-pub(crate) mod metadata;
-pub(crate) mod queue;
+pub(crate) mod bytes;
+pub mod handle;
+pub mod metadata;
+pub mod queue;
 
 const TYPE_TAG_MASK: u32 = 0b1111;
 const IMMORTAL_BIT: u32 = 1 << 4;
@@ -70,7 +70,7 @@ const TUPLE_LENGTH_MASK: u32 = 0b1111 << TUPLE_LENGTH_SHIFT;
 const _: () = assert!(size_of::<Header>() == 16);
 
 /// An object's payload, built-in state, and property layout.
-pub(in crate::value::heap) struct ObjectLayout {
+pub(in crate::heap) struct ObjectLayout {
     layout: Layout,
     slots_offset: usize,
 }
@@ -86,7 +86,7 @@ fn extend_built_in_layout(layout: Layout, hooks: &BuiltInHooks) -> Layout {
         .0
 }
 
-pub(in crate::value::heap) fn object_layout(
+pub(in crate::heap) fn object_layout(
     slot_count: usize,
     built_in_hooks: &[&BuiltInHooks],
 ) -> ObjectLayout {
@@ -130,7 +130,7 @@ fn object_layout_from_state_chain(
 const _: () = assert!(size_of::<ManagedRef<ByteStringObject>>() == 8);
 const _: () = assert!(size_of::<Option<ManagedRef<ByteStringObject>>>() == 8);
 
-pub(in crate::value::heap) fn allocate_box<T>() -> NonNull<HeapBox<T>> {
+pub(in crate::heap) fn allocate_box<T>() -> NonNull<HeapBox<T>> {
     let layout = Layout::new::<HeapBox<T>>();
     // SAFETY: this layout matches the allocation.
     let pointer = unsafe { alloc(layout) };
@@ -153,7 +153,7 @@ unsafe fn deallocate_box<T>(box_pointer: NonNull<HeapBox<T>>) {
     }
 }
 
-pub(in crate::value::heap) fn allocate_bytes(len: usize) -> NonNull<u8> {
+pub(in crate::heap) fn allocate_bytes(len: usize) -> NonNull<u8> {
     let Ok(layout) = Layout::array::<u8>(len) else {
         allocation_failure(len)
     };
@@ -166,7 +166,7 @@ pub(in crate::value::heap) fn allocate_bytes(len: usize) -> NonNull<u8> {
 ///
 /// `pointer` must come from [`allocate_bytes`] with the same `len` and must not
 /// be used again.
-pub(in crate::value::heap) unsafe fn deallocate_bytes(pointer: NonNull<u8>, len: usize) {
+pub(in crate::heap) unsafe fn deallocate_bytes(pointer: NonNull<u8>, len: usize) {
     let Ok(layout) = Layout::array::<u8>(len) else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a buffer's layout was valid when it was allocated") }
@@ -190,10 +190,10 @@ const ROOT_BUFFER_RETAIN_LIMIT: usize = 1_024;
 const OBJECT_POOL_CLASSES: usize = 16;
 const OBJECT_POOL_BYTE_LIMIT: usize = 16 * 1024 * 1024;
 
-pub(in crate::value) type Roots = Vec<NonNull<HeapBox<()>>>;
+pub(crate) type Roots = Vec<NonNull<HeapBox<()>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum FinalizerOrigin {
+pub enum FinalizerOrigin {
     ReferenceCount,
     /// Found in an unreachable cycle.
     Cycle,
@@ -201,9 +201,9 @@ pub(crate) enum FinalizerOrigin {
     Shutdown,
 }
 
-pub(crate) struct PendingFinalizer {
-    pub(crate) object: ManagedRef<InstanceObject>,
-    pub(crate) origin: FinalizerOrigin,
+pub struct PendingFinalizer {
+    pub object: ManagedRef<InstanceObject>,
+    pub origin: FinalizerOrigin,
 }
 
 type WeakRegistry = HashMap<usize, Vec<NonNull<HeapBox<()>>>, DefaultHashBuilder>;
@@ -213,7 +213,8 @@ type Interner = HashTable<AtomBox>;
 
 type FreeVecBox = Box<MaybeUninit<HeapBox<VecObject>>>;
 
-pub(crate) struct Heap {
+/// Owns value storage. It must outlive every value and handle allocated in it.
+pub struct Heap {
     hash_state: HashState,
     byte_strings: RefCell<[Option<ManagedRef<ByteStringObject>>; 256]>,
     /// A weak table of interned strings.
@@ -241,7 +242,7 @@ pub(crate) struct Heap {
 
 impl Heap {
     #[must_use]
-    pub(crate) fn new() -> Rc<Self> {
+    pub fn new() -> Rc<Self> {
         Rc::new(Self {
             hash_state: HashState::new(),
             byte_strings: RefCell::new(array::from_fn(|_| None)),
@@ -265,7 +266,7 @@ impl Heap {
         })
     }
 
-    pub(in crate::value) fn register_finalizable(&self, object: NonNull<HeapBox<InstanceObject>>) {
+    pub(crate) fn register_finalizable(&self, object: NonNull<HeapBox<InstanceObject>>) {
         let sequence = self.finalizable_sequence.get();
         self.finalizable_sequence.set(sequence.wrapping_add(1));
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
@@ -274,7 +275,7 @@ impl Heap {
     }
 
     /// Returns a live finalizer's allocation order.
-    pub(in crate::value) fn finalizer_sequence(
+    pub(crate) fn finalizer_sequence(
         &self,
         object: NonNull<HeapBox<InstanceObject>>,
     ) -> Option<u64> {
@@ -284,7 +285,7 @@ impl Heap {
             .copied()
     }
 
-    pub(in crate::value) fn schedule_finalizer(
+    pub(crate) fn schedule_finalizer(
         &self,
         object: NonNull<HeapBox<InstanceObject>>,
         origin: FinalizerOrigin,
@@ -306,7 +307,7 @@ impl Heap {
     }
 
     /// Queues all remaining destructors for shutdown.
-    pub(crate) fn schedule_shutdown_finalizers(&self) {
+    pub fn schedule_shutdown_finalizers(&self) {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         let objects = mem::take(unsafe { &mut *self.finalizable_objects.get() });
         let mut objects = objects.into_iter().collect::<Vec<_>>();
@@ -331,13 +332,13 @@ impl Heap {
         }
     }
 
-    pub(crate) fn take_pending_finalizers(&self) -> Vec<PendingFinalizer> {
+    pub fn take_pending_finalizers(&self) -> Vec<PendingFinalizer> {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         mem::take(unsafe { &mut *self.pending_finalizers.get() })
     }
 
     /// Restores finalizers after a destructor throws.
-    pub(crate) fn return_pending_finalizers(
+    pub fn return_pending_finalizers(
         &self,
         finalizers: impl IntoIterator<Item = PendingFinalizer>,
     ) {
@@ -346,18 +347,18 @@ impl Heap {
     }
 
     #[must_use]
-    pub(crate) fn has_pending_finalizers(&self) -> bool {
+    pub fn has_pending_finalizers(&self) -> bool {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         !unsafe { &*self.pending_finalizers.get() }.is_empty()
     }
 
     #[must_use]
-    pub(crate) fn has_finalizable_objects(&self) -> bool {
+    pub fn has_finalizable_objects(&self) -> bool {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         !unsafe { &*self.finalizable_objects.get() }.is_empty()
     }
 
-    pub(crate) fn abandon_finalizers(&self) {
+    pub fn abandon_finalizers(&self) {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         let objects = mem::take(unsafe { &mut *self.finalizable_objects.get() });
         for (object, _) in objects {
@@ -370,41 +371,41 @@ impl Heap {
     }
 
     #[must_use]
-    pub(crate) fn byte_string(&self, byte: u8) -> ManagedRef<ByteStringObject> {
+    pub fn byte_string(&self, byte: u8) -> ManagedRef<ByteStringObject> {
         let mut strings = self.byte_strings.borrow_mut();
         strings[usize::from(byte)]
             .get_or_insert_with(|| ByteStringObject::from_bytes(self, &[byte]))
             .clone()
     }
 
-    pub(in crate::value) const fn hash_state(&self) -> &HashState {
+    pub(crate) const fn hash_state(&self) -> &HashState {
         &self.hash_state
     }
 
-    pub(in crate::value) const fn interner(&self) -> &RefCell<Interner> {
+    pub(crate) const fn interner(&self) -> &RefCell<Interner> {
         &self.interner
     }
 
-    pub(in crate::value) const fn empty_interner() -> Interner {
+    pub(crate) const fn empty_interner() -> Interner {
         HashTable::new()
     }
 
-    pub(crate) fn configure_cycle_threshold(&self, threshold: Option<usize>) {
+    pub fn configure_cycle_threshold(&self, threshold: Option<usize>) {
         self.cycle_threshold
             .set(threshold.unwrap_or(DEFAULT_CYCLE_THRESHOLD));
     }
 
-    pub(crate) fn enter_coroutine(&self) {
+    pub fn enter_coroutine(&self) {
         self.coroutine_depth.set(self.coroutine_depth.get() + 1);
     }
 
-    pub(crate) fn leave_coroutine(&self) {
+    pub fn leave_coroutine(&self) {
         let depth = self.coroutine_depth.get();
         debug_assert!(depth != 0);
         self.coroutine_depth.set(depth - 1);
     }
 
-    pub(in crate::value) const fn cycle_finalizer_origin(&self) -> FinalizerOrigin {
+    pub(crate) const fn cycle_finalizer_origin(&self) -> FinalizerOrigin {
         if self.coroutine_depth.get() == 0 {
             FinalizerOrigin::Cycle
         } else {
@@ -413,7 +414,7 @@ impl Heap {
     }
 
     /// Collects cycles and returns the number of freed boxes.
-    pub(crate) fn collect_cycles(&self) -> usize {
+    pub fn collect_cycles(&self) -> usize {
         gc::collect(self)
     }
 
@@ -434,13 +435,13 @@ impl Heap {
         self.cycle_threshold.set(threshold);
     }
 
-    pub(in crate::value) fn take_roots(&self) -> Roots {
+    pub(crate) fn take_roots(&self) -> Roots {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         mem::take(unsafe { &mut *self.roots.get() })
     }
 
     /// Reuses the collector's emptied root storage after it clears buffered flags.
-    pub(in crate::value) fn recycle_roots(&self, mut roots: Roots) {
+    pub(crate) fn recycle_roots(&self, mut roots: Roots) {
         debug_assert!(self.is_collecting());
         roots.clear();
         trim_empty_roots(&mut roots);
@@ -451,15 +452,15 @@ impl Heap {
         *buffer = roots;
     }
 
-    pub(in crate::value) const fn is_collecting(&self) -> bool {
+    pub(crate) const fn is_collecting(&self) -> bool {
         self.collecting.get()
     }
 
-    pub(in crate::value) fn set_collecting(&self, collecting: bool) {
+    pub(crate) fn set_collecting(&self, collecting: bool) {
         self.collecting.set(collecting);
     }
 
-    pub(in crate::value) fn allocate_vec_box(&self) -> NonNull<HeapBox<VecObject>> {
+    pub(crate) fn allocate_vec_box(&self) -> NonNull<HeapBox<VecObject>> {
         if let Some(allocation) = self.vec_box_cache.take() {
             // SAFETY: Box supplies a non-null allocation with exactly this size and alignment.
             return unsafe { NonNull::new_unchecked(Box::into_raw(allocation).cast()) };
@@ -471,7 +472,7 @@ impl Heap {
     /// # Safety
     ///
     /// The allocation must belong to this heap and its payload must be fully destroyed.
-    pub(in crate::value) unsafe fn recycle_vec_box(&self, allocation: NonNull<HeapBox<VecObject>>) {
+    pub(crate) unsafe fn recycle_vec_box(&self, allocation: NonNull<HeapBox<VecObject>>) {
         // SAFETY: the global allocation has the matching layout. MaybeUninit owns only its
         // storage and cannot drop the former header, values, or element buffer again.
         let allocation = unsafe {
@@ -484,7 +485,7 @@ impl Heap {
         drop(self.vec_box_cache.replace(Some(allocation)));
     }
 
-    pub(in crate::value) fn allocate_tuple_box(&self, len: usize) -> NonNull<HeapBox<TupleObject>> {
+    pub(crate) fn allocate_tuple_box(&self, len: usize) -> NonNull<HeapBox<TupleObject>> {
         let layout = tuple_layout(len);
         // SAFETY: this layout matches the allocation.
         let allocation = unsafe { alloc(layout) };
@@ -553,7 +554,7 @@ impl Heap {
         NonNull::new(allocation).unwrap_or_else(|| handle_alloc_error(object_layout.layout))
     }
 
-    pub(in crate::value) fn release_erased(&self, box_pointer: NonNull<HeapBox<()>>) {
+    pub(crate) fn release_erased(&self, box_pointer: NonNull<HeapBox<()>>) {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         let header = unsafe { &box_pointer.as_ref().header };
         if header.is_immortal() {
@@ -640,7 +641,7 @@ impl Heap {
     }
 
     /// Decrements a box and returns it when teardown must begin.
-    pub(in crate::value::heap) fn release_reference(
+    pub(in crate::heap) fn release_reference(
         &self,
         box_pointer: NonNull<HeapBox<()>>,
     ) -> Option<Erased> {
@@ -782,7 +783,7 @@ impl Heap {
     }
 
     /// Drains teardown and runs a collection deferred during it.
-    pub(in crate::value) fn drain_pending(&self) {
+    pub(crate) fn drain_pending(&self) {
         if self.draining.replace(true) {
             return;
         }
@@ -810,7 +811,7 @@ impl Heap {
     ///
     /// `box_pointer` must be an unreferenced live box owned by this heap with
     /// the given `tag`.
-    pub(in crate::value) unsafe fn teardown_in_mode(
+    pub(crate) unsafe fn teardown_in_mode(
         &self,
         box_pointer: NonNull<HeapBox<()>>,
         tag: TypeTag,
@@ -863,7 +864,7 @@ impl Heap {
         }
     }
 
-    pub(in crate::value) fn register_weak_dependent(
+    pub(crate) fn register_weak_dependent(
         &self,
         target_address: usize,
         dependent: NonNull<HeapBox<()>>,
@@ -877,7 +878,7 @@ impl Heap {
     }
 
     /// Removes a dependent that may already have died with its target.
-    pub(in crate::value) fn deregister_weak_dependent(
+    pub(crate) fn deregister_weak_dependent(
         &self,
         target_address: usize,
         dependent: NonNull<HeapBox<()>>,
@@ -1043,10 +1044,8 @@ fn trim_empty_roots(roots: &mut Roots) {
     clippy::inline_always,
     reason = "edge traversal is the collector's innermost operation"
 )]
-pub(in crate::value) unsafe fn visit_children_erased<F>(
-    box_pointer: NonNull<HeapBox<()>>,
-    visit: &mut F,
-) where
+pub(crate) unsafe fn visit_children_erased<F>(box_pointer: NonNull<HeapBox<()>>, visit: &mut F)
+where
     F: FnMut(NonNull<HeapBox<()>>),
 {
     let mut visitor = TraceVisitor::new(visit);
@@ -1135,12 +1134,12 @@ mod tests {
     use super::ROOT_BUFFER_RETAIN_LIMIT;
     use super::TeardownMode;
     use super::TypeTag;
-    use crate::value::Value;
-    use crate::value::array::ArrayTypeCheck;
-    use crate::value::array::ArrayTypeCheckId;
-    use crate::value::object::ClassId;
-    use crate::value::object::InstanceObject;
-    use crate::value::vec::VecObject;
+    use crate::Value;
+    use crate::array::ArrayTypeCheck;
+    use crate::array::ArrayTypeCheckId;
+    use crate::object::ClassId;
+    use crate::object::InstanceObject;
+    use crate::vec::VecObject;
 
     fn root_buffer_state(heap: &Heap) -> (usize, usize) {
         // SAFETY: these single-threaded tests inspect the buffer between heap operations.

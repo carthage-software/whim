@@ -3,6 +3,9 @@
 use std::rc::Rc;
 use std::slice;
 
+use whim_value::Value;
+use whim_value::object::ClassId;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::spec::TypeSpec;
@@ -17,8 +20,6 @@ use crate::core::reflection::objects;
 use crate::core::reflection::support;
 use crate::core::symbols::strip_leading_backslash;
 use crate::symbols::UnitContext;
-use crate::value::Value;
-use crate::value::object::ClassId;
 
 const TARGET_CLASS: i64 = 1;
 const TARGET_FUNCTION: i64 = 2;

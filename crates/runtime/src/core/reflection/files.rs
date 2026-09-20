@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use whim_value::Value;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
@@ -10,7 +12,6 @@ use crate::core::reflection::metadata;
 use crate::core::reflection::model::DeclarationKey;
 use crate::core::reflection::objects;
 use crate::symbols::UnitContext;
-use crate::value::Value;
 
 pub(crate) fn dispatch(
     context: &mut Context<'_, '_, '_>,

@@ -2,11 +2,11 @@
 
 use std::hint;
 
-use crate::value::hash::HashState;
+use crate::hash::HashState;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
-pub(crate) struct ShortString {
+pub struct ShortString {
     bytes: [u8; Self::CAPACITY],
     len: u8,
 }
@@ -16,7 +16,7 @@ pub(crate) struct ShortString {
     reason = "short strings are an inline value representation"
 )]
 impl ShortString {
-    pub(crate) const CAPACITY: usize = 7;
+    pub const CAPACITY: usize = 7;
 
     #[must_use]
     #[expect(
@@ -24,7 +24,7 @@ impl ShortString {
         reason = "the preceding capacity check bounds the length to seven"
     )]
     #[inline(always)]
-    pub(crate) fn from_bytes(bytes: &[u8]) -> Option<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes.len() > Self::CAPACITY {
             return None;
         }
@@ -62,7 +62,7 @@ impl ShortString {
     /// `len` must not exceed [`Self::CAPACITY`], and bytes above it must be zero.
     #[must_use]
     #[inline(always)]
-    pub(crate) unsafe fn from_packed_unchecked(packed: u64, len: u8) -> Self {
+    pub unsafe fn from_packed_unchecked(packed: u64, len: u8) -> Self {
         if usize::from(len) > Self::CAPACITY {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
@@ -77,7 +77,7 @@ impl ShortString {
     }
 
     #[must_use]
-    pub(crate) fn as_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         // SAFETY: the surrounding invariant keeps this index in bounds.
         unsafe { self.bytes.get_unchecked(..usize::from(self.len)) }
     }

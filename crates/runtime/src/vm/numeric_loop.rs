@@ -3,6 +3,11 @@
 use std::mem::MaybeUninit;
 use std::ptr;
 
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::keys::Key;
+use whim_value::string::ByteStringObject;
+
 use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
 use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
 use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
@@ -11,10 +16,7 @@ use crate::bytecode::instruction::operands::ArrayValueMode;
 use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
 use crate::bytecode::unit::literal_value;
 use crate::optimizer::relative_target;
-use crate::value::ValueView;
-use crate::value::dict::keys::Key;
 use crate::vm::ArrayFault;
-use crate::vm::ByteStringObject;
 use crate::vm::Chunk;
 use crate::vm::Fault;
 use crate::vm::Instruction;
@@ -22,15 +24,12 @@ use crate::vm::InstructionKind;
 use crate::vm::InstructionWord;
 use crate::vm::Literal;
 use crate::vm::Register;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::int_position;
 use crate::vm::integer_add;
 use crate::vm::integer_modulo;
 use crate::vm::integer_multiply;
 use crate::vm::integer_subtract;
-use crate::vm::unreachable_invariant;
-
 use crate::vm::numeric_loop::arithmetic::add;
 use crate::vm::numeric_loop::arithmetic::comparison_matches_numeric;
 use crate::vm::numeric_loop::arithmetic::equals_numeric;
@@ -41,6 +40,7 @@ use crate::vm::numeric_loop::arithmetic::multiply;
 use crate::vm::numeric_loop::arithmetic::step_counter;
 use crate::vm::numeric_loop::arithmetic::stepped_loop_iterations;
 use crate::vm::numeric_loop::arithmetic::subtract;
+use crate::vm::unreachable_invariant;
 
 mod arithmetic;
 

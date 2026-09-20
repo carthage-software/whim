@@ -1,6 +1,7 @@
 //! Descriptor-level subtyping, equality, and substitution helpers.
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_value::atom::Atom;
 
 use crate::bytecode::aliases::TypeAliasLookup;
 use crate::bytecode::chunk::descriptors::ShapeKey;
@@ -22,7 +23,6 @@ use crate::optimizer::type_flow::TypeDescriptor;
 use crate::optimizer::type_flow::VECTOR;
 use crate::optimizer::type_flow::same_atom;
 use crate::optimizer::type_flow::string_lengths::string_lengths_prove;
-use crate::value::atom::Atom;
 
 pub(in crate::optimizer) fn substitute_parameters(
     descriptor: &TypeDescriptor,

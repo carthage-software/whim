@@ -3,9 +3,10 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
-
 use whim_base::unreachable_invariant;
 use whim_span::Span;
+use whim_value::atom::Atom;
+use whim_value::object::ClassId;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::ClassLikeKind;
@@ -27,8 +28,6 @@ use crate::symbols::FunctionTable;
 use crate::symbols::SymbolEntry;
 use crate::symbols::SymbolKind;
 use crate::symbols::UnitContext;
-use crate::value::atom::Atom;
-use crate::value::object::ClassId;
 use crate::vm::VirtualMachineControl;
 
 struct FunctionShape {

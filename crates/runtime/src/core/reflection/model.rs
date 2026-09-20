@@ -3,15 +3,15 @@
 use std::rc::Rc;
 
 use whim_span::Span;
+use whim_value::atom::Atom;
+use whim_value::function::FuncId;
+use whim_value::newtype::NewtypeValueId;
+use whim_value::object::ClassId;
 
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledAttribute;
 use crate::symbols::UnitContext;
-use crate::value::atom::Atom;
-use crate::value::function::FuncId;
-use crate::value::newtype::NewtypeValueId;
-use crate::value::object::ClassId;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum CallableKey {

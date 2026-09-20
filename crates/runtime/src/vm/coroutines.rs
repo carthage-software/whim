@@ -7,6 +7,7 @@ use std::rc::Rc;
 use whim_loop::Coroutine;
 use whim_loop::Resumption;
 use whim_loop::Stack;
+use whim_value::Value;
 
 use crate::core::coroutine::COROUTINE_STACK_BYTES;
 use crate::core::coroutine::COROUTINE_STACK_POOL_CAP;
@@ -17,7 +18,6 @@ use crate::core::coroutine::CoroutineState;
 use crate::core::coroutine::CoroutineTermination;
 use crate::vm::NonNull;
 use crate::vm::Throw;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::unreachable_invariant;

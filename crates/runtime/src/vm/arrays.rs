@@ -1,16 +1,16 @@
 //! Indexing, updating, and iterating vecs and dicts.
 
 use whim_base::unwrap_result_invariant;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::keys::Key;
+use whim_value::dict::keys::KeyRef;
+use whim_value::heap::Heap;
+use whim_value::ops;
 
 use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::value::ValueView;
-use crate::value::ops;
 use crate::vm::ArrayFault;
 use crate::vm::Fault;
-use crate::vm::Heap;
-use crate::vm::Key;
-use crate::vm::KeyRef;
-use crate::vm::Value;
 use crate::vm::arithmetic_add;
 use crate::vm::debug_render;
 use crate::vm::integer_add;

@@ -6,12 +6,11 @@ use htmlize::ENTITY_MAX_LENGTH;
 use htmlize::escape_attribute_bytes;
 use htmlize::escape_text_bytes;
 use htmlize::unescape_bytes_in;
-
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function(
     "Whim\\HTML\\escape_text(string $text): string",

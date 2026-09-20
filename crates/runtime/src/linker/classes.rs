@@ -7,9 +7,16 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 use hashbrown::hash_map::Entry;
-
 use whim_base::u32_index;
 use whim_base::unwrap_option_invariant;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::atom::Atom;
+use whim_value::dict::DictObject;
+use whim_value::function::FuncId;
+use whim_value::heap::Heap;
+use whim_value::object::ClassId;
+use whim_value::vec::VecObject;
 
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::instruction::Instruction;
@@ -52,14 +59,6 @@ use crate::symbols::FunctionTable;
 use crate::symbols::SymbolEntry;
 use crate::symbols::SymbolKind;
 use crate::symbols::UnitContext;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::atom::Atom;
-use crate::value::dict::DictObject;
-use crate::value::function::FuncId;
-use crate::value::heap::Heap;
-use crate::value::object::ClassId;
-use crate::value::vec::VecObject;
 use crate::vm::VirtualMachineControl;
 
 struct ClassLink<'a> {

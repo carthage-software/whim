@@ -1,13 +1,14 @@
 //! The surface built-in handlers and the core library reach the engine
 //! through.
 
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+
 use crate::core::symbols::strip_leading_backslash;
-use crate::vm::Atom;
-use crate::vm::ClassId;
-use crate::vm::InstanceObject;
-use crate::vm::ManagedRef;
 use crate::vm::Throw;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 
 impl VirtualMachine<'_> {

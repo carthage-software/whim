@@ -3,41 +3,41 @@
 use std::mem;
 use std::ptr::NonNull;
 
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
-use crate::value::object::ClassId;
-use crate::value::object::InstanceObject;
-use crate::value::object::TypeEnvironmentId;
+use crate::Value;
+use crate::atom::Atom;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TraceVisitor;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
+use crate::object::ClassId;
+use crate::object::InstanceObject;
+use crate::object::TypeEnvironmentId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub(crate) struct FuncId(pub u32);
+pub struct FuncId(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub(crate) struct BuiltInId(pub u32);
+pub struct BuiltInId(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CallTarget {
+pub enum CallTarget {
     User(FuncId),
     BuiltIn(BuiltInId),
 }
 
 #[derive(Clone)]
-pub(crate) enum PresetArg {
+pub enum PresetArg {
     Given(Value),
     Hole(u32),
 }
 
-pub(crate) struct FunctionObject {
+pub struct FunctionObject {
     target: CallTarget,
     this: Option<ManagedRef<InstanceObject>>,
     captures: Vec<Value>,
@@ -53,7 +53,7 @@ pub(crate) struct FunctionObject {
 
 impl FunctionObject {
     #[must_use]
-    pub(crate) fn closure(
+    pub fn closure(
         heap: &Heap,
         target: CallTarget,
         captures: impl IntoIterator<Item = Value>,
@@ -83,7 +83,7 @@ impl FunctionObject {
         clippy::too_many_arguments,
         reason = "a callable preserves every independent part of its call shape"
     )]
-    pub(crate) fn partial(
+    pub fn partial(
         heap: &Heap,
         target: CallTarget,
         this: Option<ManagedRef<InstanceObject>>,
@@ -114,47 +114,47 @@ impl FunctionObject {
     }
 
     #[must_use]
-    pub(crate) const fn scope(&self) -> Option<ClassId> {
+    pub const fn scope(&self) -> Option<ClassId> {
         self.scope
     }
 
     #[must_use]
-    pub(crate) const fn called(&self) -> Option<ClassId> {
+    pub const fn called(&self) -> Option<ClassId> {
         self.called
     }
 
     #[must_use]
-    pub(crate) const fn target(&self) -> CallTarget {
+    pub const fn target(&self) -> CallTarget {
         self.target
     }
 
     #[must_use]
-    pub(crate) const fn this(&self) -> Option<&ManagedRef<InstanceObject>> {
+    pub const fn this(&self) -> Option<&ManagedRef<InstanceObject>> {
         self.this.as_ref()
     }
 
     #[must_use]
-    pub(crate) fn captures(&self) -> &[Value] {
+    pub fn captures(&self) -> &[Value] {
         &self.captures
     }
 
     #[must_use]
-    pub(crate) fn presets(&self) -> &[PresetArg] {
+    pub fn presets(&self) -> &[PresetArg] {
         &self.presets
     }
 
     #[must_use]
-    pub(crate) const fn signature(&self) -> &Atom {
+    pub const fn signature(&self) -> &Atom {
         &self.signature
     }
 
     #[must_use]
-    pub(crate) const fn type_environment(&self) -> TypeEnvironmentId {
+    pub const fn type_environment(&self) -> TypeEnvironmentId {
         self.type_environment
     }
 
     #[must_use]
-    pub(crate) const fn type_arguments_bound(&self) -> bool {
+    pub const fn type_arguments_bound(&self) -> bool {
         self.type_arguments_bound
     }
 }

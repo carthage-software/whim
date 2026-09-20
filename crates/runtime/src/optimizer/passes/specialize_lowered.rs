@@ -1,5 +1,7 @@
 //! Cheap specialization from exact kinds visible in freshly lowered bytecode.
 
+use whim_value::atom::Atom;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -14,7 +16,6 @@ use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::candidates::CandidateSet;
 use crate::optimizer::cfg::for_each_control_flow_target;
 use crate::optimizer::operands::for_each_write_register;
-use crate::value::atom::Atom;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum KnownKind {

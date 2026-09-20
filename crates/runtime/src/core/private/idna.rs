@@ -5,10 +5,10 @@ use idna::uts46::DnsLength;
 use idna::uts46::Hyphens;
 use idna::uts46::Uts46;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function("Whim\\_Private\\idna_to_ascii(string $domain): null|string")]
 pub(crate) fn to_ascii(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {

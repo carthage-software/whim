@@ -7,25 +7,25 @@ use std::ptr::NonNull;
 
 use hashbrown::HashMap;
 
-use crate::value::Value;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
-use crate::value::object::InstanceObject;
+use crate::Value;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TraceVisitor;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
+use crate::object::InstanceObject;
 
-pub(crate) struct WeakReference {
+pub struct WeakReference {
     target: Cell<Option<NonNull<HeapBox<InstanceObject>>>>,
 }
 
 impl WeakReference {
     /// Allocates a weak reference on its target's heap.
     #[must_use]
-    pub(crate) fn new(target: &ManagedRef<InstanceObject>) -> ManagedRef<Self> {
+    pub fn new(target: &ManagedRef<InstanceObject>) -> ManagedRef<Self> {
         let heap = target.heap_ref();
         let weak = ManagedRef::new_in(
             heap,
@@ -38,7 +38,7 @@ impl WeakReference {
     }
 
     #[must_use]
-    pub(crate) fn upgrade(&self) -> Option<ManagedRef<InstanceObject>> {
+    pub fn upgrade(&self) -> Option<ManagedRef<InstanceObject>> {
         let target = self.target.get()?;
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe { target.as_ref() }.header_ref().increment();
@@ -46,11 +46,11 @@ impl WeakReference {
         Some(unsafe { ManagedRef::from_raw(target) })
     }
 
-    pub(in crate::value) fn clear_target(&self) {
+    pub(crate) fn clear_target(&self) {
         self.target.set(None);
     }
 
-    pub(in crate::value) fn target_address(&self) -> Option<usize> {
+    pub(crate) fn target_address(&self) -> Option<usize> {
         self.target.get().map(|target| target.addr().get())
     }
 }
@@ -70,13 +70,13 @@ impl Trace for WeakReference {
 }
 
 /// Weak-keyed values owned by the single-threaded VM.
-pub(crate) struct WeakMapObject {
+pub struct WeakMapObject {
     entries: UnsafeCell<HashMap<usize, Value>>,
 }
 
 impl WeakMapObject {
     #[must_use]
-    pub(crate) fn new(heap: &Heap) -> ManagedRef<Self> {
+    pub fn new(heap: &Heap) -> ManagedRef<Self> {
         ManagedRef::new_in(
             heap,
             Self {
@@ -85,7 +85,8 @@ impl WeakMapObject {
         )
     }
 
-    pub(crate) fn set(
+    #[must_use]
+    pub fn set(
         this: &ManagedRef<Self>,
         key: &ManagedRef<InstanceObject>,
         value: Value,
@@ -102,10 +103,8 @@ impl WeakMapObject {
         None
     }
 
-    pub(crate) fn remove(
-        this: &ManagedRef<Self>,
-        key: &ManagedRef<InstanceObject>,
-    ) -> Option<Value> {
+    #[must_use]
+    pub fn remove(this: &ManagedRef<Self>, key: &ManagedRef<InstanceObject>) -> Option<Value> {
         let address = key.raw_box().addr().get();
         let value = this.remove_entry_by_address(address)?;
         this.heap_ref()
@@ -114,7 +113,7 @@ impl WeakMapObject {
     }
 
     #[must_use]
-    pub(crate) fn get(&self, key: &ManagedRef<InstanceObject>) -> Option<Value> {
+    pub fn get(&self, key: &ManagedRef<InstanceObject>) -> Option<Value> {
         let address = key.raw_box().addr().get();
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let entries = unsafe { &*self.entries.get() };
@@ -122,7 +121,7 @@ impl WeakMapObject {
     }
 
     #[must_use]
-    pub(crate) fn has(&self, key: &ManagedRef<InstanceObject>) -> bool {
+    pub fn has(&self, key: &ManagedRef<InstanceObject>) -> bool {
         let address = key.raw_box().addr().get();
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let entries = unsafe { &*self.entries.get() };
@@ -130,18 +129,23 @@ impl WeakMapObject {
     }
 
     #[must_use]
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe { &*self.entries.get() }.len()
     }
 
-    pub(in crate::value) fn remove_entry_by_address(&self, address: usize) -> Option<Value> {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub(crate) fn remove_entry_by_address(&self, address: usize) -> Option<Value> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let entries = unsafe { &mut *self.entries.get() };
         entries.remove(&address)
     }
 
-    pub(in crate::value) fn key_addresses(&self) -> Vec<usize> {
+    pub(crate) fn key_addresses(&self) -> Vec<usize> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let entries = unsafe { &*self.entries.get() };
         entries.keys().copied().collect()

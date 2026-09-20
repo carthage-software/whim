@@ -4,10 +4,11 @@ use std::cell::Cell;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub(crate) struct ArrayTypeCheckId(u32);
+pub struct ArrayTypeCheckId(u32);
 
 impl ArrayTypeCheckId {
-    pub(crate) const fn new(value: u32) -> Self {
+    #[must_use]
+    pub const fn new(value: u32) -> Self {
         Self(value)
     }
 
@@ -18,7 +19,7 @@ impl ArrayTypeCheckId {
 
 /// The result of one cached structural type check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ArrayTypeCheck {
+pub enum ArrayTypeCheck {
     Unknown,
     Clean(ArrayTypeCheckId),
     Dirty { id: ArrayTypeCheckId, slot: u32 },
@@ -157,9 +158,9 @@ impl Clone for ArrayTypeCheckCache {
 mod tests {
     use std::mem::size_of;
 
-    use crate::value::array::ArrayTypeCheck;
-    use crate::value::array::ArrayTypeCheckCache;
-    use crate::value::array::ArrayTypeCheckId;
+    use crate::array::ArrayTypeCheck;
+    use crate::array::ArrayTypeCheckCache;
+    use crate::array::ArrayTypeCheckId;
 
     #[test]
     fn two_entries_fit_in_sixteen_bytes() {

@@ -9,9 +9,8 @@ use quote::quote;
 use syn::ItemStruct;
 use syn::LitStr;
 use whim_syn::arena;
-use whim_syn::fragment;
-
 use whim_syn::cst::atom::Modifier;
+use whim_syn::fragment;
 
 use crate::built_in::attribute_name;
 use crate::built_in::attributes::AttributeArguments;
@@ -231,8 +230,8 @@ fn emit(
                     #[doc(hidden)]
                     unsafe fn #enqueue_fn(
                         __whim_data: ::core::ptr::NonNull<()>,
-                        __whim_queue: &crate::value::heap::queue::DropQueue,
-                        __whim_mode: crate::value::heap::metadata::TeardownMode,
+                        __whim_queue: &whim_value::heap::queue::DropQueue,
+                        __whim_mode: whim_value::heap::metadata::TeardownMode,
                     ) {
                         let __whim_state = unsafe { &mut *__whim_data.cast::<#representation>().as_ptr() };
                         crate::builtin::convert::BuiltInChildren::enqueue_built_in_children(
@@ -243,7 +242,7 @@ fn emit(
                     #[doc(hidden)]
                     unsafe fn #visit_fn(
                         __whim_data: ::core::ptr::NonNull<()>,
-                        __whim_visitor: &mut crate::value::heap::metadata::TraceVisitor<'_>,
+                        __whim_visitor: &mut whim_value::heap::metadata::TraceVisitor<'_>,
                     ) {
                         let __whim_state = unsafe { &*__whim_data.cast::<#representation>().as_ptr() };
                         crate::builtin::convert::BuiltInChildren::visit_built_in_children(
@@ -275,12 +274,12 @@ fn emit(
                 #traced_hooks
 
                 #[doc(hidden)]
-                fn #hooks_fn() -> &'static crate::value::object::BuiltInHooks {
+                fn #hooks_fn() -> &'static whim_value::object::BuiltInHooks {
                     &const {
-                        crate::value::object::BuiltInHooks {
+                        whim_value::object::BuiltInHooks {
                             state_type: ::core::any::TypeId::of::<#representation>(),
                             layout: ::core::alloc::Layout::new::<#representation>(),
-                            drop_in_place: crate::value::object::drop_built_in_state::<#representation>,
+                            drop_in_place: whim_value::object::drop_built_in_state::<#representation>,
                             enqueue_children: #enqueue_children,
                             visit_children: #visit_children,
                         }

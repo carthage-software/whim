@@ -1,4 +1,4 @@
-//! Runtime values for the Whim virtual machine.
+//! Values, heap allocation, and garbage collection for Whim.
 
 #![deny(clippy::nursery, clippy::pedantic)]
 #![expect(
@@ -11,7 +11,7 @@
 )]
 #![expect(
     clippy::redundant_pub_crate,
-    reason = "the VM and compiler share the internal value representation"
+    reason = "heap and hash internals stay private to the value crate"
 )]
 
 use std::hint;
@@ -19,34 +19,34 @@ use std::mem::ManuallyDrop;
 use std::ptr;
 use std::ptr::NonNull;
 
-use crate::value::dict::DictObject;
-use crate::value::function::FunctionObject;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::iterator::IteratorObject;
-use crate::value::newtype::NewtypeValueId;
-use crate::value::object::InstanceObject;
-use crate::value::string::ByteStringObject;
-use crate::value::string::short::ShortString;
-use crate::value::tuple::TupleObject;
-use crate::value::vec::VecObject;
+use crate::dict::DictObject;
+use crate::function::FunctionObject;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::HeapBox;
+use crate::iterator::IteratorObject;
+use crate::newtype::NewtypeValueId;
+use crate::object::InstanceObject;
+use crate::string::ByteStringObject;
+use crate::string::short::ShortString;
+use crate::tuple::TupleObject;
+use crate::vec::VecObject;
 
-pub(crate) mod array;
-pub(crate) mod atom;
-pub(crate) mod dict;
-pub(crate) mod function;
+pub mod array;
+pub mod atom;
+pub mod dict;
+pub mod function;
 mod gc;
 mod hash;
-pub(crate) mod heap;
-pub(crate) mod iterator;
-pub(crate) mod newtype;
-pub(crate) mod object;
-pub(crate) mod ops;
-pub(crate) mod string;
-pub(crate) mod tuple;
-pub(crate) mod vec;
-pub(crate) mod weak;
+pub mod heap;
+pub mod iterator;
+pub mod newtype;
+pub mod object;
+pub mod ops;
+pub mod string;
+pub mod tuple;
+pub mod vec;
+pub mod weak;
 
 #[cfg(test)]
 mod tests;
@@ -55,7 +55,7 @@ const NO_NEWTYPE: u32 = u32::MAX;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
-pub(crate) enum ValueKind {
+pub enum ValueKind {
     Uninitialized,
     Null,
     Bool,
@@ -88,7 +88,7 @@ union ValuePayload {
 }
 
 #[repr(C)]
-pub(crate) struct Value {
+pub struct Value {
     payload: ValuePayload,
     kind: ValueKind,
     newtype: u32,
@@ -97,7 +97,7 @@ pub(crate) struct Value {
 const _: () = assert!(size_of::<Value>() == 16);
 
 #[derive(Clone, Copy)]
-pub(crate) enum ValueView<'a> {
+pub enum ValueView<'a> {
     Uninitialized,
     Null,
     Bool(&'a bool),
@@ -116,13 +116,13 @@ pub(crate) enum ValueView<'a> {
 impl ValueView<'_> {
     #[must_use]
     #[inline(always)]
-    pub(crate) const fn is_string(&self) -> bool {
+    pub const fn is_string(&self) -> bool {
         matches!(self, Self::String(_) | Self::ShortString(_))
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_string_bytes(&self) -> Option<&[u8]> {
+    pub fn as_string_bytes(&self) -> Option<&[u8]> {
         match self {
             Self::String(value) => Some(ByteStringObject::handle_bytes(value)),
             Self::ShortString(value) => Some(value.as_bytes()),
@@ -131,7 +131,7 @@ impl ValueView<'_> {
     }
 
     #[must_use]
-    pub(crate) const fn kind_name(&self) -> &'static str {
+    pub const fn kind_name(&self) -> &'static str {
         match self {
             Self::Uninitialized => "uninitialized",
             Self::Null => "null",
@@ -183,7 +183,7 @@ impl Drop for Value {
 impl Value {
     #[must_use]
     #[inline(always)]
-    pub(crate) fn clone_inline_scalar(&self) -> Self {
+    pub fn clone_inline_scalar(&self) -> Self {
         if self.is_reference_counted() {
             self.clone()
         } else {
@@ -193,7 +193,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn uninitialized() -> Self {
+    pub const fn uninitialized() -> Self {
         Self {
             payload: ValuePayload { raw: 0 },
             kind: ValueKind::Uninitialized,
@@ -202,7 +202,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn null() -> Self {
+    pub const fn null() -> Self {
         Self {
             payload: ValuePayload { raw: 0 },
             kind: ValueKind::Null,
@@ -211,7 +211,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn bool(value: bool) -> Self {
+    pub const fn bool(value: bool) -> Self {
         Self {
             payload: ValuePayload { boolean: value },
             kind: ValueKind::Bool,
@@ -220,7 +220,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn int(value: i64) -> Self {
+    pub const fn int(value: i64) -> Self {
         Self {
             payload: ValuePayload { integer: value },
             kind: ValueKind::Int,
@@ -229,7 +229,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn float(value: f64) -> Self {
+    pub const fn float(value: f64) -> Self {
         Self {
             payload: ValuePayload { float: value },
             kind: ValueKind::Float,
@@ -238,7 +238,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn string(value: ManagedRef<ByteStringObject>) -> Self {
+    pub const fn string(value: ManagedRef<ByteStringObject>) -> Self {
         Self {
             payload: ValuePayload {
                 string: ManuallyDrop::new(value),
@@ -249,7 +249,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn short_string(value: ShortString) -> Self {
+    pub const fn short_string(value: ShortString) -> Self {
         Self {
             payload: ValuePayload {
                 short_string: value,
@@ -261,7 +261,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn from_string_bytes(heap: &Heap, bytes: &[u8]) -> Self {
+    pub fn from_string_bytes(heap: &Heap, bytes: &[u8]) -> Self {
         match ShortString::from_bytes(bytes) {
             Some(string) => Self::short_string(string),
             None => Self::string(ByteStringObject::from_bytes(heap, bytes)),
@@ -270,7 +270,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn from_string_vec(heap: &Heap, bytes: Vec<u8>) -> Self {
+    pub fn from_string_vec(heap: &Heap, bytes: Vec<u8>) -> Self {
         match ShortString::from_bytes(&bytes) {
             Some(string) => Self::short_string(string),
             None => Self::string(ByteStringObject::from_vec(heap, bytes)),
@@ -278,7 +278,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn vec(value: ManagedRef<VecObject>) -> Self {
+    pub const fn vec(value: ManagedRef<VecObject>) -> Self {
         Self {
             payload: ValuePayload {
                 vec: ManuallyDrop::new(value),
@@ -289,7 +289,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn vec_cursor(value: ManagedRef<VecObject>) -> Self {
+    pub const fn vec_cursor(value: ManagedRef<VecObject>) -> Self {
         Self {
             payload: ValuePayload {
                 vec: ManuallyDrop::new(value),
@@ -300,7 +300,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn dict(value: ManagedRef<DictObject>) -> Self {
+    pub const fn dict(value: ManagedRef<DictObject>) -> Self {
         Self {
             payload: ValuePayload {
                 dict: ManuallyDrop::new(value),
@@ -311,7 +311,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn dict_cursor(value: ManagedRef<DictObject>) -> Self {
+    pub const fn dict_cursor(value: ManagedRef<DictObject>) -> Self {
         Self {
             payload: ValuePayload {
                 dict: ManuallyDrop::new(value),
@@ -322,7 +322,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn tuple(value: ManagedRef<TupleObject>) -> Self {
+    pub const fn tuple(value: ManagedRef<TupleObject>) -> Self {
         Self {
             payload: ValuePayload {
                 tuple: ManuallyDrop::new(value),
@@ -333,7 +333,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn tuple_cursor(value: ManagedRef<TupleObject>) -> Self {
+    pub const fn tuple_cursor(value: ManagedRef<TupleObject>) -> Self {
         Self {
             payload: ValuePayload {
                 tuple: ManuallyDrop::new(value),
@@ -344,7 +344,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn function(value: ManagedRef<FunctionObject>) -> Self {
+    pub const fn function(value: ManagedRef<FunctionObject>) -> Self {
         Self {
             payload: ValuePayload {
                 function: ManuallyDrop::new(value),
@@ -355,7 +355,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) const fn object(value: ManagedRef<InstanceObject>) -> Self {
+    pub const fn object(value: ManagedRef<InstanceObject>) -> Self {
         Self {
             payload: ValuePayload {
                 object: ManuallyDrop::new(value),
@@ -366,12 +366,12 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) fn newtype(value: Self, id: NewtypeValueId) -> Self {
+    pub fn newtype(value: Self, id: NewtypeValueId) -> Self {
         value.with_newtype(Some(id))
     }
 
     #[must_use]
-    pub(crate) const fn iterator(value: ManagedRef<IteratorObject>) -> Self {
+    pub const fn iterator(value: ManagedRef<IteratorObject>) -> Self {
         Self {
             payload: ValuePayload {
                 iterator: ManuallyDrop::new(value),
@@ -383,7 +383,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn transparent_view(&self) -> ValueView<'_> {
+    pub fn transparent_view(&self) -> ValueView<'_> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe {
             match self.kind {
@@ -406,95 +406,95 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn transparent(&self) -> ValueView<'_> {
+    pub fn transparent(&self) -> ValueView<'_> {
         self.transparent_view()
     }
 
     #[must_use]
-    pub(crate) fn with_newtype(mut self, id: Option<NewtypeValueId>) -> Self {
+    pub fn with_newtype(mut self, id: Option<NewtypeValueId>) -> Self {
         self.newtype = id.map_or(NO_NEWTYPE, |id| id.0);
         self
     }
 
     #[must_use]
-    pub(crate) fn clone_with_newtype(&self, id: Option<NewtypeValueId>) -> Self {
+    pub fn clone_with_newtype(&self, id: Option<NewtypeValueId>) -> Self {
         self.clone().with_newtype(id)
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn newtype_id(&self) -> Option<NewtypeValueId> {
+    pub fn newtype_id(&self) -> Option<NewtypeValueId> {
         (self.newtype != NO_NEWTYPE).then_some(NewtypeValueId(self.newtype))
     }
 
     #[must_use]
-    pub(crate) fn is_uninitialized(&self) -> bool {
+    pub fn is_uninitialized(&self) -> bool {
         self.kind == ValueKind::Uninitialized
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_null(&self) -> bool {
+    pub fn is_null(&self) -> bool {
         self.kind == ValueKind::Null
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_bool(&self) -> bool {
+    pub fn is_bool(&self) -> bool {
         self.kind == ValueKind::Bool
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_int(&self) -> bool {
+    pub fn is_int(&self) -> bool {
         self.kind == ValueKind::Int
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_float(&self) -> bool {
+    pub fn is_float(&self) -> bool {
         self.kind == ValueKind::Float
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) const fn is_string(&self) -> bool {
+    pub const fn is_string(&self) -> bool {
         matches!(self.kind, ValueKind::String | ValueKind::ShortString)
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_vec(&self) -> bool {
+    pub fn is_vec(&self) -> bool {
         self.kind == ValueKind::Vec
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_dict(&self) -> bool {
+    pub fn is_dict(&self) -> bool {
         self.kind == ValueKind::Dict
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_tuple(&self) -> bool {
+    pub fn is_tuple(&self) -> bool {
         self.kind == ValueKind::Tuple
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_function(&self) -> bool {
+    pub fn is_function(&self) -> bool {
         self.kind == ValueKind::Function
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn is_object(&self) -> bool {
+    pub fn is_object(&self) -> bool {
         self.kind == ValueKind::Object
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) const fn is_reference_counted(&self) -> bool {
+    pub const fn is_reference_counted(&self) -> bool {
         matches!(
             self.kind,
             ValueKind::String
@@ -509,12 +509,12 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) const fn kind_bit(&self) -> u16 {
+    pub const fn kind_bit(&self) -> u16 {
         1 << self.kind as u16
     }
 
     #[must_use]
-    pub(crate) fn has_other_strong_references(&self) -> bool {
+    pub fn has_other_strong_references(&self) -> bool {
         match self.transparent_view() {
             ValueView::String(value) => value.has_other_strong_references(),
             ValueView::Vec(value) => value.has_other_strong_references(),
@@ -534,7 +534,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_bool(&self) -> Option<bool> {
+    pub fn as_bool(&self) -> Option<bool> {
         if self.kind == ValueKind::Bool {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             Some(unsafe { self.payload.boolean })
@@ -545,7 +545,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_bool_mut(&mut self) -> Option<&mut bool> {
+    pub fn as_bool_mut(&mut self) -> Option<&mut bool> {
         if self.kind == ValueKind::Bool {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             Some(unsafe { &mut self.payload.boolean })
@@ -556,7 +556,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_int(&self) -> Option<i64> {
+    pub fn as_int(&self) -> Option<i64> {
         if self.kind == ValueKind::Int {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             Some(unsafe { self.payload.integer })
@@ -567,7 +567,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_int_mut(&mut self) -> Option<&mut i64> {
+    pub fn as_int_mut(&mut self) -> Option<&mut i64> {
         if self.kind == ValueKind::Int {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             Some(unsafe { &mut self.payload.integer })
@@ -583,7 +583,7 @@ impl Value {
     /// This value must be an integer.
     #[must_use]
     #[inline(always)]
-    pub(crate) unsafe fn as_int_unchecked(&self) -> i64 {
+    pub unsafe fn as_int_unchecked(&self) -> i64 {
         if self.kind != ValueKind::Int {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
@@ -595,7 +595,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_float(&self) -> Option<f64> {
+    pub fn as_float(&self) -> Option<f64> {
         if self.kind == ValueKind::Float {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             Some(unsafe { self.payload.float })
@@ -606,7 +606,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_float_mut(&mut self) -> Option<&mut f64> {
+    pub fn as_float_mut(&mut self) -> Option<&mut f64> {
         if self.kind == ValueKind::Float {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             Some(unsafe { &mut self.payload.float })
@@ -622,7 +622,7 @@ impl Value {
     /// This value must be a float.
     #[must_use]
     #[inline(always)]
-    pub(crate) unsafe fn as_float_unchecked(&self) -> f64 {
+    pub unsafe fn as_float_unchecked(&self) -> f64 {
         if self.kind != ValueKind::Float {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
@@ -634,7 +634,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_string_len(&self) -> Option<usize> {
+    pub fn as_string_len(&self) -> Option<usize> {
         match self.transparent_view() {
             ValueView::String(value) => Some(value.len()),
             ValueView::ShortString(value) => Some(value.as_bytes().len()),
@@ -644,7 +644,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_string_bytes(&self) -> Option<&[u8]> {
+    pub fn as_string_bytes(&self) -> Option<&[u8]> {
         match self.transparent_view() {
             ValueView::String(value) => Some(ByteStringObject::handle_bytes(value)),
             ValueView::ShortString(value) => Some(value.as_bytes()),
@@ -654,7 +654,7 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_short_string(&self) -> Option<ShortString> {
+    pub fn as_short_string(&self) -> Option<ShortString> {
         if self.kind == ValueKind::ShortString {
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             Some(unsafe { self.payload.short_string })
@@ -670,7 +670,7 @@ impl Value {
     /// This value must hold a heap string.
     #[must_use]
     #[inline(always)]
-    pub(crate) unsafe fn into_string_unchecked(mut self) -> ManagedRef<ByteStringObject> {
+    pub unsafe fn into_string_unchecked(mut self) -> ManagedRef<ByteStringObject> {
         if self.kind != ValueKind::String {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
@@ -683,21 +683,21 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_vec(&self) -> Option<&ManagedRef<VecObject>> {
+    pub fn as_vec(&self) -> Option<&ManagedRef<VecObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Vec).then(|| unsafe { &*self.payload.vec })
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_vec_mut(&mut self) -> Option<&mut ManagedRef<VecObject>> {
+    pub fn as_vec_mut(&mut self) -> Option<&mut ManagedRef<VecObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Vec).then(|| unsafe { &mut *self.payload.vec })
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_vec_cursor_mut(&mut self) -> Option<(&ManagedRef<VecObject>, &mut u32)> {
+    pub fn as_vec_cursor_mut(&mut self) -> Option<(&ManagedRef<VecObject>, &mut u32)> {
         (self.kind == ValueKind::Vec && self.newtype != NO_NEWTYPE)
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             .then(|| unsafe { (&*self.payload.vec, &mut self.newtype) })
@@ -705,21 +705,21 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_dict(&self) -> Option<&ManagedRef<DictObject>> {
+    pub fn as_dict(&self) -> Option<&ManagedRef<DictObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Dict).then(|| unsafe { &*self.payload.dict })
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_dict_mut(&mut self) -> Option<&mut ManagedRef<DictObject>> {
+    pub fn as_dict_mut(&mut self) -> Option<&mut ManagedRef<DictObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Dict).then(|| unsafe { &mut *self.payload.dict })
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_dict_cursor_mut(&mut self) -> Option<(&ManagedRef<DictObject>, &mut u32)> {
+    pub fn as_dict_cursor_mut(&mut self) -> Option<(&ManagedRef<DictObject>, &mut u32)> {
         (self.kind == ValueKind::Dict && self.newtype != NO_NEWTYPE)
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             .then(|| unsafe { (&*self.payload.dict, &mut self.newtype) })
@@ -727,14 +727,14 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_tuple(&self) -> Option<&ManagedRef<TupleObject>> {
+    pub fn as_tuple(&self) -> Option<&ManagedRef<TupleObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Tuple).then(|| unsafe { &*self.payload.tuple })
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_tuple_cursor_mut(&mut self) -> Option<(&ManagedRef<TupleObject>, &mut u32)> {
+    pub fn as_tuple_cursor_mut(&mut self) -> Option<(&ManagedRef<TupleObject>, &mut u32)> {
         (self.kind == ValueKind::Tuple && self.newtype != NO_NEWTYPE)
             // SAFETY: the tag and managed handle prove the payload type and lifetime.
             .then(|| unsafe { (&*self.payload.tuple, &mut self.newtype) })
@@ -742,14 +742,14 @@ impl Value {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_function(&self) -> Option<&ManagedRef<FunctionObject>> {
+    pub fn as_function(&self) -> Option<&ManagedRef<FunctionObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Function).then(|| unsafe { &*self.payload.function })
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn as_object(&self) -> Option<&ManagedRef<InstanceObject>> {
+    pub fn as_object(&self) -> Option<&ManagedRef<InstanceObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Object).then(|| unsafe { &*self.payload.object })
     }
@@ -760,7 +760,7 @@ impl Value {
     ///
     /// This value must be an object.
     #[must_use]
-    pub(crate) unsafe fn as_object_unchecked(&self) -> &ManagedRef<InstanceObject> {
+    pub unsafe fn as_object_unchecked(&self) -> &ManagedRef<InstanceObject> {
         if self.kind != ValueKind::Object {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
@@ -776,7 +776,7 @@ impl Value {
     ///
     /// This value must be an object.
     #[must_use]
-    pub(crate) unsafe fn into_object_unchecked(mut self) -> ManagedRef<InstanceObject> {
+    pub unsafe fn into_object_unchecked(mut self) -> ManagedRef<InstanceObject> {
         if self.kind != ValueKind::Object {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
@@ -788,13 +788,13 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) fn as_iterator(&self) -> Option<&ManagedRef<IteratorObject>> {
+    pub fn as_iterator(&self) -> Option<&ManagedRef<IteratorObject>> {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         (self.kind == ValueKind::Iter).then(|| unsafe { &*self.payload.iterator })
     }
 
     #[must_use]
-    pub(crate) fn collectable_box(&self) -> Option<NonNull<HeapBox<()>>> {
+    pub fn collectable_box(&self) -> Option<NonNull<HeapBox<()>>> {
         match self.transparent_view() {
             ValueView::Vec(vec) => Some(vec.erased()),
             ValueView::Dict(dict) => Some(dict.erased()),
@@ -813,7 +813,7 @@ impl Value {
     }
 
     #[must_use]
-    pub(crate) fn kind_name(&self) -> &'static str {
+    pub fn kind_name(&self) -> &'static str {
         if self.newtype_id().is_some() {
             return "newtype";
         }

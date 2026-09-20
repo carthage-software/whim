@@ -14,21 +14,20 @@ use flate2::Status;
 use flate2::write::GzEncoder;
 use flate2::write::MultiGzDecoder;
 use flate2::write::ZlibEncoder;
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
+use whim_macros::whim_class;
+use whim_macros::whim_methods;
+use whim_value::Value;
 use zstd::stream::raw::DParameter;
 use zstd::stream::raw::Decoder as RawZstdDecoder;
 use zstd::stream::raw::Operation;
 use zstd::stream::write::Encoder as ZstdEncoder;
 
-use whim_base::unwrap_option_invariant;
-use whim_base::unwrap_result_invariant;
-use whim_macros::whim_class;
-use whim_macros::whim_methods;
-
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 const ENCODER: &str = "Whim\\_Private\\CompressionEncoder";
 const DECODER: &str = "Whim\\_Private\\CompressionDecoder";

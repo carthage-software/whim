@@ -4,8 +4,8 @@ use std::rc::Rc;
 use std::slice;
 
 use hashbrown::HashMap;
-
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_value::atom::Atom;
 
 use crate::bytecode::aliases::TypeAliasLookup;
 use crate::bytecode::aliases::expand_aliases_using;
@@ -29,7 +29,6 @@ use crate::optimizer::type_flow::OBJECT;
 use crate::optimizer::type_flow::STRING;
 use crate::optimizer::type_flow::descriptors;
 use crate::optimizer::type_flow::same_atom;
-use crate::value::atom::Atom;
 
 /// A unit with indexes over its declarations.
 pub(crate) struct IndexedUnit<'a> {

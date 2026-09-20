@@ -8,16 +8,15 @@
 use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
-
 use whim_span::Span;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::instruction::Instruction;
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 pub(crate) const STUB_ATTRIBUTE_NAME: &str = "Whim\\Marker\\Stub";
 pub(crate) const STUB_ATTRIBUTE: &[u8] = b"Whim\\Marker\\Stub";

@@ -1,5 +1,8 @@
 //! Semantics-preserving optimization of compiled bytecode.
 
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::unit::CompiledAttribute;
 use crate::bytecode::unit::CompiledBuiltInFunction;
@@ -12,8 +15,6 @@ use crate::optimizer::passes::inline_leaf_calls::InlineChanges;
 use crate::optimizer::passes::specialize_comparison;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::IndexedUnit;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 mod analysis;
 mod callable;

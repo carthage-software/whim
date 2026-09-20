@@ -2,6 +2,7 @@
 
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -11,7 +12,6 @@ use crate::core::attribute::marker::TARGET_CALLABLE;
 use crate::core::attribute::marker::TARGET_CLASS;
 use crate::core::attribute::marker::TARGET_PARAMETER;
 use crate::core::attribute::marker::TARGET_SYMBOL;
-use crate::value::Value;
 
 #[whim_class("Whim\\Marker\\Stub", final, attribute = TARGET_SYMBOL)]
 #[whim_property("public readonly string $reason")]

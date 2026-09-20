@@ -10,6 +10,7 @@ use whim_macros::whim_methods;
 use whim_sys::constants;
 use whim_sys::dns::{self, Family};
 use whim_sys::operation::Operation;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -17,7 +18,6 @@ use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
 use crate::core::private::syscall::io_error;
 use crate::core::private::syscall::system_error;
-use crate::value::Value;
 
 const HOST_RESOLUTION_OPERATION: &str = "Whim\\_Private\\HostResolutionOperation";
 

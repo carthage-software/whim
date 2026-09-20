@@ -4,7 +4,6 @@ use std::mem;
 
 use hashbrown::HashMap;
 use hashbrown::HashSet;
-
 use whim_base::unreachable_invariant;
 use whim_span::HasSpan;
 use whim_span::Span;
@@ -34,6 +33,7 @@ use whim_syn::cst::operation::AssignmentTarget;
 use whim_syn::cst::operation::DestructureTarget;
 use whim_syn::cst::statement::Block;
 use whim_syn::cst::statement::Statement;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::SIDE_TABLE_CAPACITY;
@@ -83,8 +83,6 @@ use crate::compiler::types::lowering::lower_pattern_type;
 use crate::compiler::types::lowering::lower_type;
 use crate::compiler::types::rendering::check_call_type_argument_arity;
 use crate::compiler::types::rendering::check_type_argument_arity;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 pub(in crate::compiler) struct Scope<'compilation> {
     /// The engine heap names are interned in.

@@ -17,18 +17,18 @@ use whim_sqlite::Operation as DriverOperation;
 use whim_sqlite::ResultSet as DriverResult;
 use whim_sqlite::Value as DriverValue;
 use whim_sys::path::path_from_bytes;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::newtype::NewtypeId;
+use whim_value::object::TypeEnvironmentId;
+use whim_value::vec::VecObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::newtype::NewtypeId;
-use crate::value::object::TypeEnvironmentId;
-use crate::value::vec::VecObject;
 
 const SQLITE_CONNECTION: &str = "Whim\\_Private\\SQLiteConnection";
 const SQLITE_OPERATION: &str = "Whim\\_Private\\SQLiteOperation";

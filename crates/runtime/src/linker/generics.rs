@@ -3,6 +3,8 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
+use whim_value::atom::Atom;
+use whim_value::object::ClassId;
 
 use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
 use crate::bytecode::chunk::Chunk;
@@ -18,8 +20,6 @@ use crate::engine::builtins::built_in_type_parameters;
 use crate::linker::descriptors::substitute_symbolic;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolKind;
-use crate::value::atom::Atom;
-use crate::value::object::ClassId;
 use crate::vm::VirtualMachineControl;
 
 impl Engine {

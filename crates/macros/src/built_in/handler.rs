@@ -152,7 +152,7 @@ impl Outcome {
             Self::Infallible => quote!(::core::result::Result::Ok(#call)),
             Self::Void => quote! {{
                 #call;
-                ::core::result::Result::Ok(crate::value::Value::null())
+                ::core::result::Result::Ok(whim_value::Value::null())
             }},
         }
     }

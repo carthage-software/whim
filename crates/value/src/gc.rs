@@ -5,15 +5,15 @@ use std::ptr::NonNull;
 
 use whim_base::unwrap_option_invariant;
 
-use crate::value::heap::Heap;
-use crate::value::heap::Roots;
-use crate::value::heap::metadata::Color;
-use crate::value::heap::metadata::Header;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::visit_children_erased;
-use crate::value::object::InstanceObject;
+use crate::heap::Heap;
+use crate::heap::Roots;
+use crate::heap::metadata::Color;
+use crate::heap::metadata::Header;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::TypeTag;
+use crate::heap::visit_children_erased;
+use crate::object::InstanceObject;
 
 type ErasedBox = NonNull<HeapBox<()>>;
 
@@ -26,7 +26,7 @@ const unsafe fn header(box_pointer: ErasedBox) -> &'static Header {
     unsafe { box_pointer.as_ref() }.header_ref()
 }
 
-pub(in crate::value) fn collect(heap: &Heap) -> usize {
+pub(crate) fn collect(heap: &Heap) -> usize {
     if heap.is_collecting() {
         return 0;
     }

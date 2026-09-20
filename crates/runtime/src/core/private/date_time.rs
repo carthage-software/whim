@@ -19,12 +19,12 @@ use jiff::tz::TimeZone;
 use whim_macros::whim_class;
 use whim_macros::whim_function;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 const DATE_TIME_ZONE: &str = "Whim\\_Private\\DateTimeZone";
 const DATE_TIME_FORMATTER: &str = "Whim\\_Private\\DateTimeFormatter";

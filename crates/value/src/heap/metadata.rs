@@ -6,25 +6,25 @@ use std::ptr::NonNull;
 
 use whim_base::unreachable_invariant;
 
-use crate::value::heap::BUFFERED_BIT;
-use crate::value::heap::COLOR_MASK;
-use crate::value::heap::COLOR_SHIFT;
-use crate::value::heap::Heap;
-use crate::value::heap::IMMORTAL_BIT;
-use crate::value::heap::INTERNED_BIT;
-use crate::value::heap::ROOT_INDEX_MASK;
-use crate::value::heap::ROOT_INDEX_MAX;
-use crate::value::heap::ROOT_INDEX_SHIFT;
-use crate::value::heap::TUPLE_LENGTH_MASK;
-use crate::value::heap::TUPLE_LENGTH_SHIFT;
-use crate::value::heap::TYPE_TAG_MASK;
-use crate::value::heap::allocate_box;
-use crate::value::heap::deallocate_box;
-use crate::value::heap::queue::DropQueue;
+use crate::heap::BUFFERED_BIT;
+use crate::heap::COLOR_MASK;
+use crate::heap::COLOR_SHIFT;
+use crate::heap::Heap;
+use crate::heap::IMMORTAL_BIT;
+use crate::heap::INTERNED_BIT;
+use crate::heap::ROOT_INDEX_MASK;
+use crate::heap::ROOT_INDEX_MAX;
+use crate::heap::ROOT_INDEX_SHIFT;
+use crate::heap::TUPLE_LENGTH_MASK;
+use crate::heap::TUPLE_LENGTH_SHIFT;
+use crate::heap::TYPE_TAG_MASK;
+use crate::heap::allocate_box;
+use crate::heap::deallocate_box;
+use crate::heap::queue::DropQueue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
-pub(crate) enum TypeTag {
+pub enum TypeTag {
     ByteString = 0,
     Vec = 1,
     Dict = 2,
@@ -99,7 +99,7 @@ pub(crate) struct Header {
     rc: Cell<u32>,
     info: Cell<u32>,
     /// The type-erased back-pointer to the owning
-    /// [`Heap`](crate::value::heap::Heap), or a dangling sentinel for immortal
+    /// [`Heap`](crate::heap::Heap), or a dangling sentinel for immortal
     /// boxes, which never reach the heap.
     heap: Cell<NonNull<()>>,
 }
@@ -107,7 +107,7 @@ pub(crate) struct Header {
 impl Header {
     /// Creates a mortal header with one reference.
     #[must_use]
-    pub(in crate::value::heap) const fn new(tag: TypeTag, heap: NonNull<()>) -> Self {
+    pub(in crate::heap) const fn new(tag: TypeTag, heap: NonNull<()>) -> Self {
         Self {
             rc: Cell::new(1),
             info: Cell::new(tag as u32),
@@ -120,7 +120,7 @@ impl Header {
         clippy::cast_possible_truncation,
         reason = "tuple lengths are limited to twelve elements"
     )]
-    pub(in crate::value::heap) fn new_tuple(length: usize, heap: NonNull<()>) -> Self {
+    pub(in crate::heap) fn new_tuple(length: usize, heap: NonNull<()>) -> Self {
         debug_assert!(length <= 12);
         Self {
             rc: Cell::new(1),
@@ -140,7 +140,7 @@ impl Header {
     }
 
     /// Replaces the runtime category while preserving every other header bit.
-    pub(in crate::value::heap) fn set_type_tag(&self, tag: TypeTag) {
+    pub(in crate::heap) fn set_type_tag(&self, tag: TypeTag) {
         let info = self.info.get() & !TYPE_TAG_MASK;
         self.info.set(info | tag as u32);
     }
@@ -227,13 +227,13 @@ impl Header {
 }
 
 #[repr(C)]
-pub(crate) struct HeapBox<T> {
-    pub(in crate::value::heap) header: Header,
-    pub(in crate::value::heap) payload: T,
+pub struct HeapBox<T> {
+    pub(in crate::heap) header: Header,
+    pub(in crate::heap) payload: T,
 }
 
 impl<T> HeapBox<T> {
-    pub(crate) const fn state_ref(&self) -> &T {
+    pub const fn state_ref(&self) -> &T {
         &self.payload
     }
 
@@ -243,14 +243,14 @@ impl<T> HeapBox<T> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TeardownMode {
+pub enum TeardownMode {
     Full,
     /// A cycle whose collectable children were already decremented.
     CycleMember,
 }
 
 /// A type-erased cycle-collector edge visitor without trait-object dispatch.
-pub(crate) struct TraceVisitor<'visit> {
+pub struct TraceVisitor<'visit> {
     state: NonNull<()>,
     visit: unsafe fn(NonNull<()>, NonNull<HeapBox<()>>),
     lifetime: PhantomData<&'visit mut ()>,
@@ -283,13 +283,13 @@ impl<'visit> TraceVisitor<'visit> {
         clippy::inline_always,
         reason = "edge visits are the collector's innermost callback"
     )]
-    pub(crate) fn visit(&mut self, child: NonNull<HeapBox<()>>) {
+    pub fn visit(&mut self, child: NonNull<HeapBox<()>>) {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         unsafe { (self.visit)(self.state, child) };
     }
 }
 
-pub(crate) trait Trace {
+pub trait Trace: private::Sealed {
     /// Allocates storage whose header and payload will both be initialized by the handle.
     #[inline]
     fn allocate_box(_heap: &Heap) -> NonNull<HeapBox<Self>>
@@ -328,6 +328,31 @@ pub(crate) trait Trace {
 }
 
 /// A shallow clone for copy-on-write mutation.
-pub(crate) trait CowClone {
+pub trait CowClone {
+    #[must_use]
     fn cow_clone(&self) -> Self;
+}
+
+mod private {
+    use crate::dict::DictObject;
+    use crate::function::FunctionObject;
+    use crate::iterator::IteratorObject;
+    use crate::object::InstanceObject;
+    use crate::string::ByteStringObject;
+    use crate::tuple::TupleObject;
+    use crate::vec::VecObject;
+    use crate::weak::WeakMapObject;
+    use crate::weak::WeakReference;
+
+    pub trait Sealed {}
+
+    impl Sealed for DictObject {}
+    impl Sealed for FunctionObject {}
+    impl Sealed for IteratorObject {}
+    impl Sealed for InstanceObject {}
+    impl Sealed for ByteStringObject {}
+    impl Sealed for TupleObject {}
+    impl Sealed for VecObject {}
+    impl Sealed for WeakMapObject {}
+    impl Sealed for WeakReference {}
 }

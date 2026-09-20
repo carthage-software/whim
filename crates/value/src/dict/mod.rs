@@ -8,41 +8,40 @@ use std::vec::Vec;
 
 use hashbrown::HashTable;
 use hashbrown::hash_table::Entry;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
 
-use crate::value::Value;
-use crate::value::array::ArrayTypeCheck;
-use crate::value::array::ArrayTypeCheckCache;
-use crate::value::array::ArrayTypeCheckId;
-use crate::value::hash::HashState;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::CowClone;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
-use crate::value::string::ByteStringObject;
-use crate::value::string::short::ShortString;
+use crate::Value;
+use crate::array::ArrayTypeCheck;
+use crate::array::ArrayTypeCheckCache;
+use crate::array::ArrayTypeCheckId;
+use crate::hash::HashState;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::CowClone;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TraceVisitor;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
+use crate::string::ByteStringObject;
+use crate::string::short::ShortString;
 
 mod insertion;
-pub(crate) mod keys;
+pub mod keys;
 mod slots;
 
-use crate::value::dict::keys::Key;
-use crate::value::dict::keys::KeyRef;
-use crate::value::dict::slots::Slot;
-use crate::value::dict::slots::slot_hash;
-use crate::value::dict::slots::slot_matches;
-use crate::value::dict::slots::slot_matches_ref;
-use crate::value::dict::slots::slot_matches_short_string;
-use crate::value::dict::slots::slot_matches_string;
+use crate::dict::keys::Key;
+use crate::dict::keys::KeyRef;
+use crate::dict::slots::Slot;
+use crate::dict::slots::slot_hash;
+use crate::dict::slots::slot_matches;
+use crate::dict::slots::slot_matches_ref;
+use crate::dict::slots::slot_matches_short_string;
+use crate::dict::slots::slot_matches_string;
 
-pub(crate) struct DictObject {
+pub struct DictObject {
     hash_state: NonNull<HashState>,
     packed: Option<Vec<Value>>,
     entries: Vec<Slot>,
@@ -89,7 +88,7 @@ impl IndexEntry {
 }
 
 /// An insertion-order iterator over packed or indexed dict storage.
-pub(crate) struct DictIter<'a> {
+pub struct DictIter<'a> {
     inner: DictIterInner<'a>,
 }
 
@@ -133,7 +132,7 @@ impl<'a> Iterator for DictIter<'a> {
 )]
 impl DictObject {
     #[must_use]
-    pub(crate) fn new(heap: &Heap) -> ManagedRef<Self> {
+    pub fn new(heap: &Heap) -> ManagedRef<Self> {
         ManagedRef::new_in(
             heap,
             Self {
@@ -148,7 +147,7 @@ impl DictObject {
     }
 
     #[must_use]
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.packed.as_ref().map_or(self.live, Vec::len)
     }
 
@@ -160,14 +159,14 @@ impl DictObject {
     }
 
     #[must_use]
-    pub(crate) fn packed_values(&self) -> Option<&[Value]> {
+    pub fn packed_values(&self) -> Option<&[Value]> {
         self.packed.as_deref()
     }
 
     /// The mutable packed storage for a pinned writer. Pin writes bypass
     /// per-slot mutation notes, so the structural type-check cache is
     /// conservatively invalidated up front.
-    pub(crate) fn packed_values_for_pin(&mut self) -> Option<&mut [Value]> {
+    pub fn packed_values_for_pin(&mut self) -> Option<&mut [Value]> {
         self.packed.as_ref()?;
         self.type_check.invalidate();
         self.packed.as_deref_mut()
@@ -175,7 +174,7 @@ impl DictObject {
 
     /// Reserves capacity for `additional` upcoming keyed inserts, leaving
     /// the packed representation only when the dict is empty.
-    pub(crate) fn reserve_for_build(&mut self, additional: usize) {
+    pub fn reserve_for_build(&mut self, additional: usize) {
         if matches!(self.packed.as_deref(), Some([])) {
             self.materialize_index();
         }
@@ -195,7 +194,7 @@ impl DictObject {
         }
     }
 
-    pub(crate) fn reserve_hint(&mut self, additional: usize) {
+    pub fn reserve_hint(&mut self, additional: usize) {
         if let Some(values) = &mut self.packed {
             values.reserve(additional);
             return;
@@ -216,18 +215,18 @@ impl DictObject {
     }
 
     #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[must_use]
-    pub(crate) fn get(&self, key: &Key) -> Option<&Value> {
+    pub fn get(&self, key: &Key) -> Option<&Value> {
         self.get_ref(KeyRef::from(key))
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn get_int(&self, key: i64) -> Option<&Value> {
+    pub fn get_int(&self, key: i64) -> Option<&Value> {
         if let Some(values) = &self.packed {
             return values.get(usize::try_from(key).ok()?);
         }
@@ -254,7 +253,7 @@ impl DictObject {
     }
 
     #[must_use]
-    pub(crate) fn get_ref(&self, key: KeyRef<'_>) -> Option<&Value> {
+    pub fn get_ref(&self, key: KeyRef<'_>) -> Option<&Value> {
         if let Some(values) = &self.packed {
             let KeyRef::Int(position) = key else {
                 return None;
@@ -284,7 +283,7 @@ impl DictObject {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn get_string(&self, key: &ManagedRef<ByteStringObject>) -> Option<&Value> {
+    pub fn get_string(&self, key: &ManagedRef<ByteStringObject>) -> Option<&Value> {
         if self.packed.is_some() {
             return None;
         }
@@ -309,7 +308,7 @@ impl DictObject {
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn get_short_string(&self, key: ShortString) -> Option<&Value> {
+    pub fn get_short_string(&self, key: ShortString) -> Option<&Value> {
         if self.packed.is_some() {
             return None;
         }
@@ -332,7 +331,7 @@ impl DictObject {
         }
     }
 
-    pub(crate) fn get_mut_ref(&mut self, key: KeyRef<'_>) -> Option<&mut Value> {
+    pub fn get_mut_ref(&mut self, key: KeyRef<'_>) -> Option<&mut Value> {
         if self.packed.is_some() {
             let KeyRef::Int(position) = key else {
                 return None;
@@ -368,10 +367,7 @@ impl DictObject {
     }
 
     #[inline(always)]
-    pub(crate) fn get_int_mut_string(
-        &mut self,
-        key: &ManagedRef<ByteStringObject>,
-    ) -> Option<&mut i64> {
+    pub fn get_int_mut_string(&mut self, key: &ManagedRef<ByteStringObject>) -> Option<&mut i64> {
         if self.packed.is_some() {
             return None;
         }
@@ -395,7 +391,7 @@ impl DictObject {
     }
 
     #[inline(always)]
-    pub(crate) fn get_int_mut_short_string(&mut self, key: ShortString) -> Option<&mut i64> {
+    pub fn get_int_mut_short_string(&mut self, key: ShortString) -> Option<&mut i64> {
         if self.packed.is_some() {
             return None;
         }
@@ -418,7 +414,7 @@ impl DictObject {
         }
     }
 
-    pub(crate) fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
+    pub fn insert(&mut self, key: Key, value: Value) -> Option<Value> {
         match key {
             Key::Int(key) => self.insert_int(key, value),
             key => self.insert_indexed(key, value),
@@ -428,7 +424,7 @@ impl DictObject {
     /// Inserts an optimizer-proven integer without constructing and matching
     /// the polymorphic owned-key representation on the packed hot path.
     #[inline(always)]
-    pub(crate) fn insert_int(&mut self, key: i64, value: Value) -> Option<Value> {
+    pub fn insert_int(&mut self, key: i64, value: Value) -> Option<Value> {
         if let Some(values) = &mut self.packed
             && let Ok(position) = usize::try_from(key)
         {
@@ -511,7 +507,7 @@ impl DictObject {
         }
     }
 
-    pub(crate) fn remove(&mut self, key: &Key) -> Option<Value> {
+    pub fn remove(&mut self, key: &Key) -> Option<Value> {
         if let Some(values) = &mut self.packed {
             let Key::Int(key) = key else {
                 return None;
@@ -557,7 +553,7 @@ impl DictObject {
         clippy::option_if_let_else,
         reason = "the storage variants are clearer as an explicit match"
     )]
-    pub(crate) fn iter(&self) -> DictIter<'_> {
+    pub fn iter(&self) -> DictIter<'_> {
         let inner = match &self.packed {
             Some(values) => DictIterInner::Packed(values.iter().enumerate()),
             None => DictIterInner::Indexed(self.entries.iter()),
@@ -570,11 +566,7 @@ impl DictObject {
         clippy::cast_possible_wrap,
         reason = "dictionary storage is capped at u32 slots"
     )]
-    #[expect(
-        clippy::option_option,
-        reason = "the outer option marks bounds and the inner option marks a vacant slot"
-    )]
-    pub(crate) fn entry_at_slot(&self, slot: usize) -> Option<Option<(KeyRef<'_>, &Value)>> {
+    pub fn entry_at_slot(&self, slot: usize) -> Option<Option<(KeyRef<'_>, &Value)>> {
         if let Some(values) = &self.packed {
             return values
                 .get(slot)
@@ -589,11 +581,11 @@ impl DictObject {
 
     /// The cached check state for `id`; a different descriptor has no cache.
     #[must_use]
-    pub(crate) const fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
+    pub const fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
         self.type_check.get(id)
     }
 
-    pub(crate) fn mark_type_checked(&self, id: ArrayTypeCheckId) {
+    pub fn mark_type_checked(&self, id: ArrayTypeCheckId) {
         self.type_check.mark_checked(id);
     }
 
@@ -679,6 +671,15 @@ impl DictObject {
     }
 }
 
+impl<'a> IntoIterator for &'a DictObject {
+    type Item = (KeyRef<'a>, &'a Value);
+    type IntoIter = DictIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl CowClone for DictObject {
     fn cow_clone(&self) -> Self {
         Self {
@@ -743,11 +744,11 @@ impl Trace for DictObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::value::Value;
-    use crate::value::dict::DictObject;
-    use crate::value::dict::keys::Key;
-    use crate::value::heap::Heap;
-    use crate::value::heap::handle::ManagedRef;
+    use crate::Value;
+    use crate::dict::DictObject;
+    use crate::dict::keys::Key;
+    use crate::heap::Heap;
+    use crate::heap::handle::ManagedRef;
 
     fn packed_dict(heap: &Heap) -> ManagedRef<DictObject> {
         let mut dict = DictObject::new(heap);

@@ -3,11 +3,11 @@
 use whim_macros::whim_class;
 use whim_macros::whim_interface;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 #[whim_interface("Whim\\Unwind\\Throwable")]
 #[whim_permits("Whim\\Unwind\\Error", "Whim\\Unwind\\Exception")]

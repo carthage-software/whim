@@ -2,6 +2,12 @@
 
 use whim_base::u32_index;
 use whim_base::unwrap_result_invariant;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::atom::Atom;
+use whim_value::function::BuiltInId;
+use whim_value::heap::Heap;
+use whim_value::object::ClassId;
 
 use crate::builtin::spec::ConstantValue;
 use crate::builtin::spec::CoreDeclarations;
@@ -20,27 +26,21 @@ use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::frameless_literal;
 use crate::classes::BuiltInMethodBody;
-use crate::engine::Atom;
-use crate::engine::ClassId;
 use crate::engine::CompiledParameter;
 use crate::engine::Engine;
 use crate::engine::FunctionLocator;
 use crate::engine::FunctionTable;
-use crate::engine::Heap;
 use crate::engine::InlineCache;
 use crate::engine::NonNull;
 use crate::engine::Rc;
 use crate::engine::SymbolKind;
 use crate::engine::UnitContext;
-use crate::engine::Value;
 use crate::engine::declare::ConstantSlot;
 use crate::engine::descriptor_from_built_in_spec;
 use crate::engine::tables::RuntimeTables;
 use crate::symbols::CallableOptimization;
 use crate::symbols::RuntimeFunction;
 use crate::symbols::SymbolEntry;
-use crate::value::ValueView;
-use crate::value::function::BuiltInId;
 
 mod declarations;
 

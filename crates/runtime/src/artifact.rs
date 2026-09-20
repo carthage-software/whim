@@ -15,6 +15,7 @@ use whim_span::Position;
 use whim_syn::arena::Arena;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser;
+use whim_value::heap::Heap;
 
 use crate::bytecode::aliases::expand_unit_declarations;
 use crate::bytecode::decode::compiled_unit;
@@ -35,7 +36,6 @@ use crate::optimizer::OptimizationConfiguration;
 use crate::symbols::SourceText;
 use crate::symbols::UnitSourceFile;
 use crate::symbols::line_starts_of;
-use crate::value::heap::Heap;
 use crate::vm::VirtualMachineControl;
 
 const MAGIC: &[u8; 8] = b"WHIM\0\0\0\0";

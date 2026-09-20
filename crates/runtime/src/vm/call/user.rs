@@ -2,25 +2,26 @@
 
 use std::ptr;
 
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::function::CallTarget;
+use whim_value::function::FuncId;
+use whim_value::function::FunctionObject;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
+
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::vm::call::Atom;
 use crate::vm::call::BuiltInCallable;
-use crate::vm::call::CallTarget;
-use crate::vm::call::ClassId;
 use crate::vm::call::Frame;
 use crate::vm::call::FrameFlags;
-use crate::vm::call::FuncId;
-use crate::vm::call::FunctionObject;
-use crate::vm::call::InstanceObject;
-use crate::vm::call::ManagedRef;
 use crate::vm::call::MethodBodyKind;
 use crate::vm::call::MethodContext;
 use crate::vm::call::NonNull;
 use crate::vm::call::OptionalClassId;
 use crate::vm::call::OptionalFuncId;
-use crate::vm::call::TypeEnvironmentId;
 use crate::vm::call::UserCallContext;
-use crate::vm::call::Value;
 use crate::vm::call::VirtualMachine;
 use crate::vm::call::VirtualMachineControl;
 use crate::vm::call::check_trivial_descriptor;

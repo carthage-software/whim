@@ -13,6 +13,7 @@ use whim_syn::cst::r#type::TypeVariance;
 use whim_syn::cst::walker::Flow;
 use whim_syn::cst::walker::Visitor;
 use whim_syn::cst::walker::walk;
+use whim_value::heap::Heap;
 
 use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::CompiledTypeParameter;
@@ -30,7 +31,6 @@ use crate::compiler::types::GenericTable;
 use crate::compiler::types::TypeScope;
 use crate::compiler::types::rendering::binder_arity;
 use crate::compiler::types::rendering::render_annotation;
-use crate::value::heap::Heap;
 
 /// Records each local generic arity before types are lowered. An arity of zero
 /// rejects type arguments on local non-generic names.

@@ -2,12 +2,12 @@
 
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::r#type::TypeArgumentList;
+use whim_value::atom::Atom;
 
 use crate::compiler::emit::Access;
 use crate::compiler::emit::Argument;
 use crate::compiler::emit::ArgumentList;
 use crate::compiler::emit::ArrayAccess;
-use crate::compiler::emit::Atom;
 use crate::compiler::emit::BodyCompiler;
 use crate::compiler::emit::Call;
 use crate::compiler::emit::CallDescriptor;

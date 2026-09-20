@@ -63,9 +63,9 @@ pub(super) fn expand(attribute: TokenStream, item: TokenStream) -> syn::Result<T
 
         fn #handler_identifier<'call>(
             __whim_scope: &mut crate::builtin::Context<'call, '_, '_>,
-            __whim_window: &'call [crate::value::Value],
+            __whim_window: &'call [whim_value::Value],
         ) -> ::core::result::Result<
-            crate::value::Value,
+            whim_value::Value,
             crate::builtin::throw::Throw,
         > {
             #body
@@ -73,9 +73,9 @@ pub(super) fn expand(attribute: TokenStream, item: TokenStream) -> syn::Result<T
 
         fn #direct_handler_identifier(
             __whim_vm: &mut crate::vm::VirtualMachine<'_>,
-            __whim_values: &[crate::value::Value],
+            __whim_values: &[whim_value::Value],
         ) -> ::core::result::Result<
-            crate::value::Value,
+            whim_value::Value,
             crate::builtin::throw::Throw,
         > {
             crate::builtin::invoke_direct_built_in(

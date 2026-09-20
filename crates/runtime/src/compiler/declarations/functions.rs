@@ -17,6 +17,7 @@ use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeParameter;
 use whim_syn::cst::r#type::TypeParameterList;
 use whim_syn::cst::r#type::TypeVariance;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
@@ -46,7 +47,6 @@ use crate::compiler::types::TypeScope;
 use crate::compiler::types::lowering::lower_type;
 use crate::compiler::types::rendering::render_annotation;
 use crate::compiler::types::rendering::render_type;
-use crate::value::heap::Heap;
 
 /// State shared by declaration metadata and initializer thunks.
 pub(in crate::compiler) struct DeclarationContext<'compilation> {

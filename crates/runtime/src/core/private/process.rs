@@ -3,8 +3,7 @@
 use std::process;
 
 use whim_macros::whim_function;
-
-use crate::value::Value;
+use whim_value::Value;
 
 #[whim_function(
     "Whim\\Process\\get_id(): (1..)",

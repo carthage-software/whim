@@ -4,19 +4,18 @@ use std::str;
 
 use bson::oid::ObjectId as RawObjectId;
 use uuid::Uuid as RawUuid;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_enum;
 use whim_macros::whim_methods;
+use whim_value::Value;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::InstanceObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::object::InstanceObject;
 
 const BINARY_CLASS: &str = "Whim\\BSON\\Binary";
 const DECIMAL128_CLASS: &str = "Whim\\BSON\\Decimal128";

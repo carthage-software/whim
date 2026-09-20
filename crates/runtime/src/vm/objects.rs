@@ -3,29 +3,30 @@
 use std::ptr::NonNull;
 use std::rc::Rc;
 
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::iterator::IteratorObject;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
+
 use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
 use crate::bytecode::unit::ClassLikeKind;
 use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::literal_value;
 use crate::classes::PropertyDefault;
 use crate::engine::builtins::BuiltInCallable;
-use crate::value::ValueView;
 use crate::vm::CachedInstantiationEnvironment;
 use crate::vm::Chunk;
-use crate::vm::ClassId;
 use crate::vm::IcDescriptor;
-use crate::vm::InstanceObject;
 use crate::vm::InstantiationWays;
-use crate::vm::IteratorObject;
-use crate::vm::ManagedRef;
 use crate::vm::MethodBodyKind;
 use crate::vm::MethodContext;
 use crate::vm::SymbolKind;
 use crate::vm::Throw;
 use crate::vm::TypeDescriptor;
-use crate::vm::TypeEnvironmentId;
 use crate::vm::UserCallContext;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::is_instance_of;

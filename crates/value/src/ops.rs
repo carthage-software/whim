@@ -11,22 +11,22 @@ use std::hash::Hasher;
 use std::iter::Zip;
 use std::slice::Iter;
 
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::dict::DictIter;
-use crate::value::dict::DictObject;
-use crate::value::dict::keys::KeyRef;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::string::ByteStringObject;
+use crate::Value;
+use crate::ValueView;
+use crate::dict::DictIter;
+use crate::dict::DictObject;
+use crate::dict::keys::KeyRef;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::string::ByteStringObject;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct Incomparable;
+pub struct Incomparable;
 
 /// The language's `==`: total, never converting, deep for arrays.
 #[must_use]
 #[inline(never)]
-pub(crate) fn equals(a: &Value, b: &Value) -> bool {
+pub fn equals(a: &Value, b: &Value) -> bool {
     match (a.transparent(), b.transparent()) {
         (ValueView::Uninitialized, _)
         | (_, ValueView::Uninitialized)
@@ -100,7 +100,7 @@ enum HashTask<'value> {
 }
 
 #[must_use]
-pub(crate) fn structural_hash(value: &Value, heap: &Heap) -> u64 {
+pub fn structural_hash(value: &Value, heap: &Heap) -> u64 {
     let state = heap.hash_state();
     let mut tasks = vec![HashTask::Value(value)];
     let mut completed = Vec::new();
@@ -257,7 +257,7 @@ fn equals_shallow<'a>(
             if left.len() != right.len() {
                 return false;
             }
-            if left.len() != 0 {
+            if !left.is_empty() {
                 cursors.push(EqualityCursor::Sequence(left.iter().zip(right.iter())));
             }
             true
@@ -300,7 +300,10 @@ impl<'a> EqualityCursor<'a> {
     }
 }
 
-pub(crate) fn compare(a: &Value, b: &Value) -> Result<Option<Ordering>, Incomparable> {
+/// # Errors
+///
+/// Returns [`Incomparable`] unless both values are numbers or both are strings.
+pub fn compare(a: &Value, b: &Value) -> Result<Option<Ordering>, Incomparable> {
     match (a.transparent(), b.transparent()) {
         (ValueView::Int(left), ValueView::Int(right)) => Ok(Some(left.cmp(right))),
         (ValueView::Float(left), ValueView::Float(right)) => Ok(left.partial_cmp(right)),
@@ -323,7 +326,8 @@ pub(crate) fn compare(a: &Value, b: &Value) -> Result<Option<Ordering>, Incompar
     reason = "the preceding bounds checks make float-to-int truncation defined"
 )]
 #[inline]
-pub(crate) fn compare_int_float(integer: i64, float: f64) -> Option<Ordering> {
+#[must_use]
+pub fn compare_int_float(integer: i64, float: f64) -> Option<Ordering> {
     const TWO_TO_63: f64 = 9_223_372_036_854_775_808.0;
 
     if float.is_nan() {
@@ -345,17 +349,19 @@ pub(crate) fn compare_int_float(integer: i64, float: f64) -> Option<Ordering> {
 }
 
 #[must_use]
-pub(crate) fn render_int(heap: &Heap, value: i64) -> ManagedRef<ByteStringObject> {
+pub fn render_int(heap: &Heap, value: i64) -> ManagedRef<ByteStringObject> {
     let mut buffer = itoa::Buffer::new();
     ByteStringObject::from_bytes(heap, buffer.format(value).as_bytes())
 }
 
-/// Renders a float in its canonical form on `heap`: the shortest decimal that
+/// Renders a float in its canonical form on `heap`.
+///
+/// Uses the shortest decimal that
 /// reads back as the same value, always containing a `.` or an exponent so it
 /// is never mistaken for an integer. The special values render as `NAN`,
 /// `INF`, and `-INF`.
 #[must_use]
-pub(crate) fn render_float(heap: &Heap, value: f64) -> ManagedRef<ByteStringObject> {
+pub fn render_float(heap: &Heap, value: f64) -> ManagedRef<ByteStringObject> {
     if value.is_nan() {
         return ByteStringObject::from_bytes(heap, b"NAN");
     }
@@ -374,10 +380,7 @@ pub(crate) fn render_float(heap: &Heap, value: f64) -> ManagedRef<ByteStringObje
 }
 
 #[must_use]
-pub(crate) fn stringify_for_concat(
-    heap: &Heap,
-    value: &Value,
-) -> Option<ManagedRef<ByteStringObject>> {
+pub fn stringify_for_concat(heap: &Heap, value: &Value) -> Option<ManagedRef<ByteStringObject>> {
     match value.transparent() {
         ValueView::String(string) => Some(string.clone()),
         ValueView::ShortString(string) => {
@@ -393,7 +396,7 @@ pub(crate) fn stringify_for_concat(
 mod tests {
     use std::cmp::Ordering;
 
-    use crate::value::ops::compare_int_float;
+    use crate::ops::compare_int_float;
 
     #[test]
     fn mixed_numeric_comparison_preserves_large_integer_ordering() {

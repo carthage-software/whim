@@ -1,5 +1,7 @@
 //! Literal arguments embedded directly in exact named-function calls.
 
+use whim_value::atom::Atom;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::chunk::descriptors::Literal;
@@ -15,7 +17,6 @@ use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::effect::overwrites_register;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::for_each_mutable_chunk;
-use crate::value::atom::Atom;
 
 pub(in crate::optimizer) fn optimize_unit(
     unit: &mut CompiledUnit,

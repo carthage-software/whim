@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use whim_span::Span;
+use whim_value::heap::Heap;
 
 use super::canonicalize_string_chains;
 use crate::bytecode::chunk::Chunk;
@@ -17,7 +18,6 @@ use crate::bytecode::verify::verify;
 use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
 use crate::optimizer::passes::prune_unreachable;
-use crate::value::heap::Heap;
 
 const SUBJECT: Register = Register::new(0);
 const TEMPORARY: Register = Register::new(1);

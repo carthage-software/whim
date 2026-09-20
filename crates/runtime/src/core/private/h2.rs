@@ -7,12 +7,12 @@ use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_function;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 const DECODER: &str = "Whim\\_Private\\H2FrameDecoder";
 const MAXIMUM_FRAME_SIZE: u32 = 0x00ff_ffff;

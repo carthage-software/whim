@@ -5,20 +5,20 @@ use std::ptr::NonNull;
 
 use whim_base::unwrap_option_invariant;
 
-use crate::value::function::FuncId;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
-use crate::value::object::ClassId;
-use crate::value::object::InstanceObject;
-use crate::value::object::TypeEnvironmentId;
+use crate::function::FuncId;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TraceVisitor;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
+use crate::object::ClassId;
+use crate::object::InstanceObject;
+use crate::object::TypeEnvironmentId;
 
-pub(crate) struct IteratorObject {
+pub struct IteratorObject {
     instance: Option<ManagedRef<InstanceObject>>,
     next: Option<(FuncId, ClassId)>,
     next_environment: TypeEnvironmentId,
@@ -27,7 +27,7 @@ pub(crate) struct IteratorObject {
 
 impl IteratorObject {
     #[must_use]
-    pub(crate) fn new_object(
+    pub fn new_object(
         heap: &Heap,
         instance: ManagedRef<InstanceObject>,
         next: Option<(FuncId, ClassId)>,
@@ -45,7 +45,7 @@ impl IteratorObject {
     }
 
     #[must_use]
-    pub(crate) fn instance(&self) -> &ManagedRef<InstanceObject> {
+    pub fn instance(&self) -> &ManagedRef<InstanceObject> {
         // SAFETY: the surrounding invariant proves this option contains a value.
         unsafe {
             unwrap_option_invariant(
@@ -56,22 +56,22 @@ impl IteratorObject {
     }
 
     #[must_use]
-    pub(crate) const fn next_method(&self) -> Option<(FuncId, ClassId)> {
+    pub const fn next_method(&self) -> Option<(FuncId, ClassId)> {
         self.next
     }
 
     #[must_use]
-    pub(crate) const fn next_environment(&self) -> TypeEnvironmentId {
+    pub const fn next_environment(&self) -> TypeEnvironmentId {
         self.next_environment
     }
 
-    pub(crate) fn begin_object_step(&self) {
+    pub fn begin_object_step(&self) {
         debug_assert!(!self.object_step_pending.get());
         self.object_step_pending.set(true);
     }
 
     #[must_use]
-    pub(crate) const fn take_pending_object_step(&self) -> bool {
+    pub const fn take_pending_object_step(&self) -> bool {
         self.object_step_pending.replace(false)
     }
 }

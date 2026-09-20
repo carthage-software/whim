@@ -6,10 +6,10 @@ use mail_parser::HeaderName;
 use mail_parser::MessageParser;
 use memchr::memchr;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function(
     "Whim\\_Private\\message_parse_headers(string $bytes): null|(vec<(string, string)>, string)",

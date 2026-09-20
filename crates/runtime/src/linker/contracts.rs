@@ -5,10 +5,12 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
-
 use whim_base::limits::MAX_TYPE_DEPTH_U32;
 use whim_base::unwrap_option_invariant;
 use whim_span::Span;
+use whim_value::atom::Atom;
+use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use crate::bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
@@ -35,9 +37,6 @@ use crate::linker::visibility_rank;
 use crate::optimizer::descriptors_equal;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolKind;
-use crate::value::atom::Atom;
-use crate::value::object::ClassId;
-use crate::value::object::TypeEnvironmentId;
 use crate::variance::incompatible_parameter;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;

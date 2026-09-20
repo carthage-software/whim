@@ -1,5 +1,7 @@
 //! Inlining of public literal class constants declared in the same unit.
 
+use whim_value::atom::Atom;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::chunk::descriptors::Literal;
@@ -12,7 +14,6 @@ use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::Visibility;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::value::atom::Atom;
 
 struct LiteralClassConstant {
     class: Atom,

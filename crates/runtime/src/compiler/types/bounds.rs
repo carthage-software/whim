@@ -1,9 +1,9 @@
 //! Conservative same-unit validation of generic construction sites.
 
 use hashbrown::HashMap;
-
 use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_span::Span;
+use whim_value::atom::Atom;
 
 use crate::bytecode::aliases::TypeAliasIndex;
 use crate::bytecode::aliases::expand_aliases_using;
@@ -19,7 +19,6 @@ use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
 use crate::optimizer::descriptor_proves;
 use crate::optimizer::descriptors_equal;
-use crate::value::atom::Atom;
 
 struct UnitIndexes<'unit> {
     classes: HashMap<Atom, &'unit CompiledClassLike>,

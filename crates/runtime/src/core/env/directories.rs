@@ -5,10 +5,10 @@ use std::env;
 use whim_macros::whim_function;
 use whim_sys::path::path_bytes;
 use whim_sys::path::path_from_bytes;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function("Whim\\Env\\current_directory(): null|string")]
 fn current_directory(scope: &Context<'_, '_, '_>) -> Value {

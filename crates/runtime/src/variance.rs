@@ -2,10 +2,11 @@
 
 #![deny(clippy::nursery, clippy::pedantic)]
 
+use whim_value::atom::Atom;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::Variance;
-use crate::value::atom::Atom;
 
 #[expect(
     clippy::redundant_pub_crate,

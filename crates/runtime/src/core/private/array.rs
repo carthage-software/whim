@@ -7,25 +7,24 @@ use std::mem;
 use std::slice;
 
 use hashbrown::HashTable;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::DictIter;
+use whim_value::dict::DictObject;
+use whim_value::dict::keys::Key;
+use whim_value::dict::keys::KeyRef;
+use whim_value::heap::Heap;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::ops;
+use whim_value::vec::VecObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::dict::DictIter;
-use crate::value::dict::DictObject;
-use crate::value::dict::keys::Key;
-use crate::value::dict::keys::KeyRef;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::ops;
-use crate::value::vec::VecObject;
 
 enum ArrayEntriesInner<'value> {
     Indexed(Enumerate<slice::Iter<'value, Value>>),

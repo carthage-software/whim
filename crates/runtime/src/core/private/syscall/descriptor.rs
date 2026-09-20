@@ -1,5 +1,6 @@
 use whim_macros::{whim_closure, whim_function};
 use whim_sys::{Interest, Readiness};
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -9,7 +10,6 @@ use crate::core::async_::task::task_value;
 use crate::core::private::syscall::{
     Descriptor, StandardStream, build_file_descriptor, io_error, system_error, with_descriptor,
 };
-use crate::value::Value;
 
 #[whim_function(
     "Whim\\_Private\\read_descriptor(Whim\\OS\\FileDescriptor $descriptor, (1..) $maxBytes): null|string"

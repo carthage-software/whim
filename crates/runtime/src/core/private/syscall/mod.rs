@@ -2,14 +2,13 @@ use std::cell::{Cell, RefCell};
 
 use whim_base::unwrap_option_invariant;
 use whim_macros::{whim_class, whim_methods};
-
 pub(crate) use whim_sys::{Descriptor, StandardStream};
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 pub(crate) mod constants;
 pub(crate) mod descriptor;

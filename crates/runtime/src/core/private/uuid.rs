@@ -3,13 +3,12 @@
 use std::str::from_utf8;
 
 use uuid::Uuid as RawUuid;
-
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function("Whim\\_Private\\uuid_v4(): string[16]", must_use)]
 pub(crate) fn v4(context: &Context<'_, '_, '_>) -> Value {

@@ -4,6 +4,10 @@ use std::ptr::NonNull;
 use std::rc::Rc;
 
 use whim_span::Span;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::function::FuncId;
+use whim_value::object::ClassId;
 
 use crate::builtin::throw::Throw;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -34,10 +38,6 @@ use crate::symbols::FunctionTable;
 use crate::symbols::RuntimeFunction;
 use crate::symbols::SymbolKind;
 use crate::symbols::UnitContext;
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::function::FuncId;
-use crate::value::object::ClassId;
 use crate::vm::VirtualMachine;
 
 #[derive(Clone)]

@@ -6,10 +6,10 @@ use std::path::Path;
 use whim_macros::whim_function;
 use whim_sys::path::os_string_from_bytes;
 use whim_sys::path::path_bytes;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function("Whim\\Env\\get_variable(string $name): null|string")]
 fn get_variable(scope: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {

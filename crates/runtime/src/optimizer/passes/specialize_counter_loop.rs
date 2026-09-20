@@ -1,5 +1,7 @@
 //! Integer specialization of counted-loop control.
 
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::instruction::Instruction;
@@ -12,7 +14,6 @@ use crate::optimizer::passes::plan_type_specializations;
 use crate::optimizer::passes::specialize_chunk_instructions;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::TypeFlow;
-use crate::value::heap::Heap;
 
 pub(in crate::optimizer) fn optimize_unit(
     plan: &mut RewritePlan,

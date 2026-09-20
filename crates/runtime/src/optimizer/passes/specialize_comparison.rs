@@ -1,5 +1,8 @@
 //! Integer specialization of comparison branches.
 
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -29,8 +32,6 @@ use crate::optimizer::passes::plan_type_specializations;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::TypeFlow;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 pub(in crate::optimizer) fn optimize_unit(
     plan: &mut RewritePlan,

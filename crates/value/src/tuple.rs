@@ -9,20 +9,20 @@ use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 
-use crate::value::Value;
-use crate::value::array::ArrayTypeCheck;
-use crate::value::array::ArrayTypeCheckId;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::Header;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
+use crate::Value;
+use crate::array::ArrayTypeCheck;
+use crate::array::ArrayTypeCheckId;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::Header;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TraceVisitor;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
 
-pub(crate) struct TupleObject;
+pub struct TupleObject;
 
 pub(crate) fn tuple_layout(len: usize) -> Layout {
     if len > 12 {
@@ -44,7 +44,7 @@ pub(crate) fn tuple_layout(len: usize) -> Layout {
 
 impl TupleObject {
     #[must_use]
-    pub(crate) fn with_pair(heap: &Heap, first: Value, second: Value) -> ManagedRef<Self> {
+    pub fn with_pair(heap: &Heap, first: Value, second: Value) -> ManagedRef<Self> {
         let boxed = heap.allocate_tuple_box(2);
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         let destination = unsafe { boxed.as_ptr().add(1).cast::<Value>() };
@@ -62,7 +62,7 @@ impl TupleObject {
     }
 
     #[must_use]
-    pub(crate) fn with_elements(
+    pub fn with_elements(
         heap: &Heap,
         elements: impl IntoIterator<Item = Value, IntoIter: ExactSizeIterator>,
     ) -> ManagedRef<Self> {
@@ -110,7 +110,7 @@ impl TupleObject {
 )]
 impl ManagedRef<TupleObject> {
     #[must_use]
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         // SAFETY: the managed handle points to a live tuple box.
         unsafe { self.raw_box().as_ref() }
             .header_ref()
@@ -118,23 +118,28 @@ impl ManagedRef<TupleObject> {
     }
 
     #[must_use]
-    pub(crate) fn get(&self, index: usize) -> Option<&Value> {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[must_use]
+    pub fn get(&self, index: usize) -> Option<&Value> {
         self.as_slice().get(index)
     }
 
-    pub(crate) fn iter(&self) -> slice::Iter<'_, Value> {
+    pub fn iter(&self) -> slice::Iter<'_, Value> {
         self.as_slice().iter()
     }
 
     #[must_use]
-    pub(crate) fn as_slice(&self) -> &[Value] {
+    pub fn as_slice(&self) -> &[Value] {
         // SAFETY: the managed handle proves the allocation and tuple length.
         unsafe { slice::from_raw_parts(tuple_elements(self.raw_box()), self.len()) }
     }
 
     #[must_use]
     #[inline(always)]
-    pub(crate) fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
+    pub fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
         if self.type_check_cache().get() == Some(id) {
             ArrayTypeCheck::Clean(id)
         } else {
@@ -143,7 +148,7 @@ impl ManagedRef<TupleObject> {
     }
 
     #[inline(always)]
-    pub(crate) fn mark_type_checked(&self, id: ArrayTypeCheckId) {
+    pub fn mark_type_checked(&self, id: ArrayTypeCheckId) {
         self.type_check_cache().set(Some(id));
     }
 
@@ -158,6 +163,15 @@ impl ManagedRef<TupleObject> {
                 .cast::<Cell<Option<ArrayTypeCheckId>>>()
                 .as_ptr()
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a ManagedRef<TupleObject> {
+    type Item = &'a Value;
+    type IntoIter = slice::Iter<'a, Value>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

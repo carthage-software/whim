@@ -2,6 +2,7 @@ use std::path::Path;
 
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
+use whim_value::heap::Heap;
 
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::verify::verify_unit;
@@ -10,7 +11,6 @@ use crate::compiler::compile_with_configuration;
 use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
 use crate::optimizer::OptimizationConfiguration;
-use crate::value::heap::Heap;
 
 const RETURNS: &str = r"
 use Whim\Marker\NeverInline;

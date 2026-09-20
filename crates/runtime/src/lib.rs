@@ -15,5 +15,4 @@ pub(crate) mod core;
 pub(crate) mod linker;
 pub(crate) mod optimizer;
 pub(crate) mod symbols;
-pub(crate) mod value;
 pub(crate) mod vm;

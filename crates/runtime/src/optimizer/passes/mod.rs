@@ -1,5 +1,8 @@
 //! Individually configurable bytecode optimization passes.
 
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::rewrite::compact;
@@ -13,9 +16,6 @@ use crate::optimizer::analysis::Analysis;
 use crate::optimizer::candidates::CandidateSet;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::TypeFlow;
-
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 /// Addresses one compiled chunk inside a unit.
 #[derive(Clone, Copy)]

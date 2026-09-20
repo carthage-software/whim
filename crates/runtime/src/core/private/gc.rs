@@ -2,9 +2,9 @@
 
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
-use crate::value::Value;
 
 /// Runs one cycle collection and returns the number of reclaimed values.
 #[whim_function("Whim\\GC\\collect_cycles(): int")]

@@ -32,6 +32,8 @@ use whim_syn::cst::pattern::UnionPattern;
 use whim_syn::cst::sequence::TokenSeparatedSequence;
 use whim_syn::cst::r#type::NegativeLiteralType;
 use whim_syn::cst::r#type::Type;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
@@ -62,8 +64,6 @@ use crate::compiler::emit::side_table_limit;
 use crate::compiler::emit::tuple_index;
 use crate::compiler::emit::tuple_window_gate;
 use crate::compiler::types::descriptor_is_top;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 #[derive(Clone)]
 enum MatchKey {

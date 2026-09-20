@@ -5,6 +5,7 @@ use std::sync::Arc;
 use whim_macros::{whim_class, whim_function, whim_methods};
 use whim_sys::file::{self, Metadata};
 use whim_sys::operation::Operation;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -14,7 +15,6 @@ use crate::core::private::syscall::path::path;
 use crate::core::private::syscall::{
     Descriptor, build_file_descriptor, io_error, system_error, with_descriptor,
 };
-use crate::value::Value;
 
 enum FileResult {
     Bytes(Vec<u8>),
@@ -393,12 +393,13 @@ pub(crate) fn metadata_value(cx: &Context<'_, '_, '_>, metadata: &Metadata) -> V
 
 #[cfg(test)]
 mod tests {
-    use crate::blocking::BlockingPool;
     use std::error::Error;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::thread;
     use std::time::Duration;
+
+    use crate::blocking::BlockingPool;
 
     #[test]
     fn blocking_jobs_run_away_from_the_caller() -> Result<(), Box<dyn Error>> {

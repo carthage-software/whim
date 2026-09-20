@@ -6,11 +6,11 @@ use std::ptr::NonNull;
 
 use whim_loop::Coroutine;
 use whim_loop::Yielder;
+use whim_value::Value;
 
 use crate::core::async_::task_local::TaskLocalValues;
 use crate::core::async_::task_local::new_task_local_values;
 use crate::engine::Engine;
-use crate::value::Value;
 
 pub(crate) enum CoroutineInput {
     Start(Vec<Value>),

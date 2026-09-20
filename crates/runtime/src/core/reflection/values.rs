@@ -1,5 +1,16 @@
 //! Reflection over live objects, callables, properties, and newtype layers.
 
+use whim_value::Value;
+use whim_value::function::CallTarget;
+use whim_value::function::FuncId;
+use whim_value::function::FunctionObject;
+use whim_value::function::PresetArg;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::newtype::NewtypeValueId;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
@@ -21,16 +32,6 @@ use crate::core::reflection::types;
 use crate::engine::builtins::BuiltInCallable;
 use crate::symbols::FunctionLocator;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::function::CallTarget;
-use crate::value::function::FuncId;
-use crate::value::function::FunctionObject;
-use crate::value::function::PresetArg;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::newtype::NewtypeValueId;
-use crate::value::object::ClassId;
-use crate::value::object::InstanceObject;
-use crate::value::object::TypeEnvironmentId;
 use crate::vm::VirtualMachine;
 
 pub(crate) fn object_dispatch(

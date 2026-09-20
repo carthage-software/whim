@@ -50,10 +50,6 @@ use rustls::server::WebPkiClientVerifier;
 use rustls::sign::CertifiedKey;
 use rustls::version::TLS12;
 use rustls::version::TLS13;
-use x509_parser::certificate::X509Certificate;
-use x509_parser::extensions::GeneralName;
-use x509_parser::parse_x509_certificate;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
@@ -61,17 +57,20 @@ use whim_macros::whim_class;
 use whim_macros::whim_constant;
 use whim_macros::whim_function;
 use whim_macros::whim_methods;
+use whim_value::Value;
+use whim_value::dict::DictObject;
+use whim_value::dict::keys::KeyRef;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::string::ByteStringObject;
+use whim_value::vec::VecObject;
+use x509_parser::certificate::X509Certificate;
+use x509_parser::extensions::GeneralName;
+use x509_parser::parse_x509_certificate;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
-use crate::value::dict::DictObject;
-use crate::value::dict::keys::KeyRef;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::string::ByteStringObject;
-use crate::value::vec::VecObject;
 
 const TLS_ERROR: &str = "Whim\\_Private\\TlsError";
 const TLS_CLIENT_CONFIGURATION: &str = "Whim\\_Private\\TlsClientConfiguration";

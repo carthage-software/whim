@@ -5,13 +5,13 @@ use std::sync::Arc;
 use whim_macros::{whim_class, whim_methods};
 use whim_sys::accounts::{self, Group, Identity, User};
 use whim_sys::operation::Operation;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
 use crate::core::private::syscall::{io_error, system_error};
-use crate::value::Value;
 
 enum OSResult {
     User(Option<User>),

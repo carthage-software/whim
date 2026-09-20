@@ -5,10 +5,10 @@ use hashbrown::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_span::Span;
+use whim_value::heap::Heap;
 
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::instruction::Instruction;
@@ -27,8 +27,6 @@ use crate::bytecode::instruction::operands::PropertyInitializationDescriptorInde
 use crate::bytecode::instruction::operands::Register;
 use crate::bytecode::instruction::operands::SwitchTableIndex;
 use crate::bytecode::reference_registers;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) enum SideTable {

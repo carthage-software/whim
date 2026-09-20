@@ -1,8 +1,9 @@
 //! Symbol operations required by the Rust-backed core.
 
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
+
 use crate::symbols::SymbolKind;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 pub(crate) fn strip_leading_backslash(heap: &Heap, name: Atom) -> Atom {
     let bytes = name.as_bytes();

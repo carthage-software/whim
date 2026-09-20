@@ -42,6 +42,10 @@ jobs:
         run: >-
           cargo +nightly miri test --locked -p whim-formatter --lib
           tests::kitchen_sink_is_idempotent -- --exact
-      - name: Check runtime values
+      - name: Check values
         run: >-
-          cargo +nightly miri test --locked -p whim-runtime --lib value::
+          cargo +nightly miri test --locked -p whim-value --lib
+      - name: Check value type descriptors
+        run: >-
+          cargo +nightly miri test --locked -p whim-runtime --lib
+          bytecode::chunk::descriptors::tests

@@ -1,10 +1,10 @@
 //! Unstable random primitives exposed to the Whim standard library.
 
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function("Whim\\_Private\\random_bytes(int $length): null|string")]
 pub(crate) fn random_bytes(scope: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {

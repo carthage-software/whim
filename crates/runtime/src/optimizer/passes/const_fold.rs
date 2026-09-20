@@ -1,5 +1,7 @@
 //! Folding of operations whose result is known at compile time.
 
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::instruction::Instruction;
@@ -24,7 +26,6 @@ use crate::optimizer::passes::prune_unreachable;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::TypeFlow;
-use crate::value::heap::Heap;
 
 #[cfg(test)]
 mod tests;

@@ -1,6 +1,7 @@
 //! Source and origin metadata for reflected declarations.
 
 use whim_span::Span;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -15,7 +16,6 @@ use crate::core::reflection::support;
 use crate::symbols::UnitContext;
 use crate::symbols::UnitOrigin;
 use crate::symbols::line_of;
-use crate::value::Value;
 
 pub(crate) fn declaration_dispatch(
     context: &mut Context<'_, '_, '_>,

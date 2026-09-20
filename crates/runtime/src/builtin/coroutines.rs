@@ -2,13 +2,13 @@
 
 use whim_loop::Interest;
 use whim_loop::RawDescriptor;
+use whim_value::Value;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::Context;
 use crate::builtin::spec::TypeSpec;
 use crate::builtin::throw::Throw;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
-use crate::value::Value;
-use crate::value::object::TypeEnvironmentId;
 
 impl Context<'_, '_, '_> {
     pub(crate) fn new_instance(&mut self, name: &str) -> Result<Value, Throw> {

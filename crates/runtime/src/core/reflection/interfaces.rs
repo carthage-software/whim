@@ -1,13 +1,13 @@
 //! Shared public reflection contracts.
 
 use whim_macros::whim_interface;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::core::reflection::Operation;
 use crate::core::reflection::dispatch;
-use crate::value::Value;
 
 macro_rules! reflection_interface {
     (

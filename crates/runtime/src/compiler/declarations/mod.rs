@@ -4,7 +4,6 @@
 use std::mem;
 
 use hashbrown::HashSet;
-
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::Program;
@@ -20,6 +19,7 @@ use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Newtype;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeAlias;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -47,7 +47,6 @@ use crate::compiler::types::aliases::collect_alias_references;
 use crate::compiler::types::aliases::find_alias_cycle;
 use crate::compiler::types::lowering::lower_type;
 use crate::compiler::types::rendering::render_type;
-use crate::value::heap::Heap;
 
 pub(in crate::compiler) mod class_likes;
 pub(in crate::compiler) mod functions;

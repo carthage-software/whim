@@ -3,15 +3,14 @@
 use std::ptr::NonNull;
 
 use whim_base::unreachable_invariant;
-
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::dict::DictObject;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::object::InstanceObject;
-use crate::value::string::ByteStringObject;
-use crate::value::vec::VecObject;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::DictObject;
+use whim_value::heap::Heap;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::InstanceObject;
+use whim_value::string::ByteStringObject;
+use whim_value::vec::VecObject;
 
 #[derive(Clone, Copy)]
 pub(crate) struct Arguments<'call> {

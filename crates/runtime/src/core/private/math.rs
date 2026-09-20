@@ -11,22 +11,21 @@ use std::slice;
 use std::vec;
 
 use num_bigint::BigUint;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_constant;
 use whim_macros::whim_function;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::DictIter;
+use whim_value::ops::compare_int_float;
+use whim_value::string::short::ShortString;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::dict::DictIter;
-use crate::value::ops::compare_int_float;
-use crate::value::string::short::ShortString;
 
 const BASE_DIGITS: &[u8; 36] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 

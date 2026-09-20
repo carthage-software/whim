@@ -1,6 +1,7 @@
 //! Common-subexpression elimination for dominating pure operations.
 
 use hashbrown::HashMap;
+use whim_value::atom::Atom;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::IcDescriptor;
@@ -16,7 +17,6 @@ use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::liveness::effect::overwrites_register;
 use crate::optimizer::operands::replace_read_register;
 use crate::optimizer::passes::for_each_mutable_chunk;
-use crate::value::atom::Atom;
 
 pub(in crate::optimizer) fn optimize_unit(
     unit: &mut CompiledUnit,
@@ -529,7 +529,6 @@ mod tests {
     use crate::bytecode::instruction::operands::PropertySlot;
     use crate::bytecode::instruction::operands::Register;
     use crate::bytecode::instruction::operands::ShortJumpOffset;
-
     use crate::optimizer::OptimizationConfiguration;
     use crate::optimizer::OptimizationStatistics;
     use crate::optimizer::passes::cse::Chunk;

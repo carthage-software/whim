@@ -11,15 +11,15 @@ use serde::Serialize;
 use serde::Serializer;
 use serde_seeded::DeserializeSeeded;
 
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::string::ByteStringObject;
-use crate::value::string::hash_bytes;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::HeapBox;
+use crate::string::ByteStringObject;
+use crate::string::hash_bytes;
 
-pub(in crate::value) type AtomBox = NonNull<HeapBox<ByteStringObject>>;
+pub(crate) type AtomBox = NonNull<HeapBox<ByteStringObject>>;
 
-pub(crate) struct Atom(ManagedRef<ByteStringObject>);
+pub struct Atom(ManagedRef<ByteStringObject>);
 
 impl Serialize for Atom {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -89,7 +89,7 @@ unsafe fn box_bytes<'a>(pointer: AtomBox) -> &'a [u8] {
 impl Heap {
     /// Interns bytes with pointer identity within this engine.
     #[must_use]
-    pub(crate) fn intern(&self, bytes: &[u8]) -> Atom {
+    pub fn intern(&self, bytes: &[u8]) -> Atom {
         let state = self.hash_state();
         let hash = hash_bytes(state, bytes);
         if let Some(&pointer) = self
@@ -132,23 +132,23 @@ impl Heap {
 
 impl Atom {
     #[must_use]
-    pub(crate) fn as_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe { self.0.flat_slice() }
     }
 
     #[must_use]
-    pub(crate) fn to_string_lossy(&self) -> Cow<'_, str> {
+    pub fn to_string_lossy(&self) -> Cow<'_, str> {
         String::from_utf8_lossy(self.as_bytes())
     }
 
     #[must_use]
-    pub(crate) fn to_handle(&self) -> ManagedRef<ByteStringObject> {
+    pub fn to_handle(&self) -> ManagedRef<ByteStringObject> {
         self.0.clone()
     }
 
     /// Makes the atom's storage immortal.
-    pub(crate) fn make_immortal(&self) {
+    pub fn make_immortal(&self) {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
         unsafe { self.0.raw_box().as_ref() }
             .header_ref()
@@ -157,7 +157,7 @@ impl Atom {
 
     /// Borrows the atom's string handle without retaining it.
     #[must_use]
-    pub(crate) const fn as_handle(&self) -> &ManagedRef<ByteStringObject> {
+    pub const fn as_handle(&self) -> &ManagedRef<ByteStringObject> {
         &self.0
     }
 }
@@ -169,9 +169,9 @@ mod tests {
     use serde_seeded::de::Seed;
 
     use super::Atom;
-    use crate::value::heap::Heap;
-    use crate::value::heap::metadata::TeardownMode;
-    use crate::value::heap::metadata::TypeTag;
+    use crate::heap::Heap;
+    use crate::heap::metadata::TeardownMode;
+    use crate::heap::metadata::TypeTag;
 
     fn decode(bytes: &[u8], heap: &Heap) -> bincode::Result<Atom> {
         bincode::DefaultOptions::new()

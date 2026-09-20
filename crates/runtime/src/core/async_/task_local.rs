@@ -4,11 +4,11 @@ use foldhash::fast::FixedState;
 use hashbrown::HashMap;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 use crate::vm::VirtualMachine;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]

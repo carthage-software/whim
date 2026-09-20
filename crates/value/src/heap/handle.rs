@@ -9,20 +9,20 @@ use std::ptr::NonNull;
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 
-use crate::value::Value;
-use crate::value::heap::Heap;
-use crate::value::heap::metadata::CowClone;
-use crate::value::heap::metadata::Header;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::object_layout;
-use crate::value::object::BuiltInHooks;
-use crate::value::object::BuiltInState;
-use crate::value::object::InstanceObject;
+use crate::Value;
+use crate::heap::Heap;
+use crate::heap::metadata::CowClone;
+use crate::heap::metadata::Header;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TypeTag;
+use crate::heap::object_layout;
+use crate::object::BuiltInHooks;
+use crate::object::BuiltInState;
+use crate::object::InstanceObject;
 
 #[repr(transparent)]
-pub(crate) struct ManagedRef<T: Trace>(NonNull<HeapBox<T>>, PhantomData<HeapBox<T>>);
+pub struct ManagedRef<T: Trace>(NonNull<HeapBox<T>>, PhantomData<HeapBox<T>>);
 
 impl<T: Trace> ManagedRef<T> {
     #[must_use]
@@ -46,7 +46,7 @@ impl<T: Trace> ManagedRef<T> {
     /// `boxed` must point to a live `T` box. The caller must either transfer an
     /// owned reference to the handle or prevent the handle from being dropped.
     #[must_use]
-    pub(crate) const unsafe fn from_raw(boxed: NonNull<HeapBox<T>>) -> Self {
+    pub const unsafe fn from_raw(boxed: NonNull<HeapBox<T>>) -> Self {
         Self(boxed, PhantomData)
     }
 
@@ -56,7 +56,7 @@ impl<T: Trace> ManagedRef<T> {
     ///
     /// `boxed` must point to a live `T` box.
     #[must_use]
-    pub(crate) unsafe fn retain_raw(boxed: NonNull<HeapBox<T>>) -> Self {
+    pub unsafe fn retain_raw(boxed: NonNull<HeapBox<T>>) -> Self {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         let header = unsafe { &boxed.as_ref().header };
         if !header.is_immortal() {
@@ -67,12 +67,13 @@ impl<T: Trace> ManagedRef<T> {
     }
 
     #[must_use]
-    pub(crate) const fn raw_box(&self) -> NonNull<HeapBox<T>> {
+    pub const fn raw_box(&self) -> NonNull<HeapBox<T>> {
         self.0
     }
 
     /// The heap that owns this box, recovered from the header back-pointer.
-    pub(crate) const fn heap_ref(&self) -> &Heap {
+    #[must_use]
+    pub const fn heap_ref(&self) -> &Heap {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         unsafe { self.header().heap_ptr().cast::<Heap>().as_ref() }
     }
@@ -81,24 +82,24 @@ impl<T: Trace> ManagedRef<T> {
     /// nor interned; both kinds are permanently shared and must not be
     /// mutated.
     #[must_use]
-    pub(crate) const fn is_unique(&self) -> bool {
+    pub const fn is_unique(&self) -> bool {
         let header = self.header();
         !header.is_immortal() && !header.is_interned() && header.reference_count() == 1
     }
 
     #[must_use]
-    pub(crate) const fn has_other_strong_references(&self) -> bool {
+    pub const fn has_other_strong_references(&self) -> bool {
         let header = self.header();
         !header.is_immortal() && header.reference_count() > 1
     }
 
     #[must_use]
-    pub(crate) fn ptr_eq(&self, other: &Self) -> bool {
+    pub fn ptr_eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 
     #[must_use]
-    pub(crate) const fn get_mut(&mut self) -> Option<&mut T> {
+    pub const fn get_mut(&mut self) -> Option<&mut T> {
         if self.is_unique() {
             // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
             Some(unsafe { &mut self.0.as_mut().payload })
@@ -107,7 +108,7 @@ impl<T: Trace> ManagedRef<T> {
         }
     }
 
-    pub(crate) fn make_mut(&mut self) -> &mut T
+    pub fn make_mut(&mut self) -> &mut T
     where
         T: CowClone,
     {
@@ -121,21 +122,22 @@ impl<T: Trace> ManagedRef<T> {
         unsafe { &mut self.0.as_mut().payload }
     }
 
-    pub(in crate::value::heap) const fn header(&self) -> &Header {
+    pub(in crate::heap) const fn header(&self) -> &Header {
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         unsafe { &self.0.as_ref().header }
     }
 
-    pub(crate) const fn erased(&self) -> NonNull<HeapBox<()>> {
+    #[must_use]
+    pub const fn erased(&self) -> NonNull<HeapBox<()>> {
         self.0.cast()
     }
 
     /// The erased box pointer when the payload participates in cycle
     /// collection, for inline built-in state visit hooks; the mirror of
-    /// [`Value::collectable_box`](crate::value::Value::collectable_box) for typed
+    /// [`Value::collectable_box`](crate::Value::collectable_box) for typed
     /// handles.
     #[must_use]
-    pub(crate) fn collectable_box(&self) -> Option<NonNull<HeapBox<()>>> {
+    pub fn collectable_box(&self) -> Option<NonNull<HeapBox<()>>> {
         if T::type_tag().is_collectable() {
             Some(self.erased())
         } else {

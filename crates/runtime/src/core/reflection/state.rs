@@ -2,6 +2,11 @@
 
 use std::cell::RefCell;
 
+use whim_value::Value;
+use whim_value::heap::metadata::TeardownMode;
+use whim_value::heap::metadata::TraceVisitor;
+use whim_value::heap::queue::DropQueue;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
@@ -15,10 +20,6 @@ use crate::core::reflection::model::DeclarationKey;
 use crate::core::reflection::model::ReflectionData;
 use crate::core::reflection::types;
 use crate::core::reflection::values;
-use crate::value::Value;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::queue::DropQueue;
 
 #[derive(Default)]
 pub(crate) struct ReflectionState {

@@ -4,11 +4,11 @@
 use std::slice;
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_value::atom::Atom;
 
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::ALWAYS_REFERENCE_COUNTED;
-use crate::optimizer::type_flow::Atom;
 use crate::optimizer::type_flow::BOOL;
 use crate::optimizer::type_flow::CALLABLE;
 use crate::optimizer::type_flow::CompiledParameter;

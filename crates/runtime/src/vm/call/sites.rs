@@ -2,22 +2,23 @@
 
 use std::rc::Rc;
 
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::function::BuiltInId;
+use whim_value::function::CallTarget;
+use whim_value::newtype::NewtypeId;
+use whim_value::object::TypeEnvironmentId;
+
 use crate::symbols::CachedNewtypeConstructor;
 use crate::symbols::ExactBuiltInFunctionEntry;
 use crate::symbols::NewtypeConstructorWays;
-use crate::value::ValueView;
-use crate::value::newtype::NewtypeId;
 use crate::vm::call::BuiltInCallable;
-use crate::vm::call::BuiltInId;
 use crate::vm::call::CacheEntry;
 use crate::vm::call::CachedCallEnvironment;
-use crate::vm::call::CallTarget;
 use crate::vm::call::Chunk;
 use crate::vm::call::FunctionSpec;
 use crate::vm::call::IcDescriptor;
 use crate::vm::call::TypeDescriptor;
-use crate::vm::call::TypeEnvironmentId;
-use crate::vm::call::Value;
 use crate::vm::call::VirtualMachine;
 use crate::vm::call::VirtualMachineControl;
 use crate::vm::call::argument_guard;

@@ -1,5 +1,8 @@
 //! Refinement of a not-yet-executed live chunk tail after the symbol world grows.
 
+use whim_value::Value;
+use whim_value::heap::Heap;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::unit::CompiledFunction;
@@ -16,8 +19,6 @@ use crate::optimizer::passes::specialize_comparison;
 use crate::optimizer::type_flow::IndexedUnit;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::World;
-use crate::value::Value;
-use crate::value::heap::Heap;
 
 pub(crate) struct Refinement<'a> {
     pub chunk: &'a Chunk,

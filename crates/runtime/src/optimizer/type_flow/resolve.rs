@@ -2,6 +2,7 @@
 //! callee lookups.
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_value::atom::Atom;
 
 use crate::bytecode::unit::CompiledBuiltInFunction;
 use crate::bytecode::unit::CompiledFunction;
@@ -9,7 +10,6 @@ use crate::bytecode::unit::ConstantInitializer;
 use crate::linker::SlotPlacement;
 use crate::linker::slot_placement;
 use crate::optimizer::liveness::effect::effect_on;
-use crate::optimizer::type_flow::Atom;
 use crate::optimizer::type_flow::CAPTURE_ORIGIN;
 use crate::optimizer::type_flow::ClassLikeKind;
 use crate::optimizer::type_flow::CompiledClassLike;

@@ -1,14 +1,14 @@
 //! Dict keys: the owned and borrowed key representations, their hashing,
 //! and their equality.
 
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::hash::HashState;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::string::ByteStringObject;
-use crate::value::string::short::ShortString;
+use crate::Value;
+use crate::ValueView;
+use crate::hash::HashState;
+use crate::heap::handle::ManagedRef;
+use crate::string::ByteStringObject;
+use crate::string::short::ShortString;
 
-pub(crate) enum Key {
+pub enum Key {
     Int(i64),
     Bool(bool),
     String(ManagedRef<ByteStringObject>),
@@ -33,14 +33,14 @@ impl Clone for Key {
 impl Key {
     #[must_use]
     #[inline(always)]
-    pub(crate) fn from_value(value: &Value) -> Option<Self> {
+    pub fn from_value(value: &Value) -> Option<Self> {
         KeyRef::from_value(value).map(KeyRef::to_owned)
     }
 
     /// Converts an owned array-key value without cloning its common forms.
     #[must_use]
     #[inline(always)]
-    pub(crate) fn from_owned_value(value: Value) -> Option<Self> {
+    pub fn from_owned_value(value: Value) -> Option<Self> {
         if let Some(key) = value.as_int() {
             return Some(Self::Int(key));
         }
@@ -88,7 +88,7 @@ impl PartialEq for Key {
 impl Eq for Key {}
 
 #[derive(Clone, Copy)]
-pub(crate) enum KeyRef<'a> {
+pub enum KeyRef<'a> {
     Int(i64),
     Bool(bool),
     String(&'a ManagedRef<ByteStringObject>),
@@ -102,7 +102,7 @@ pub(crate) enum KeyRef<'a> {
 impl<'a> KeyRef<'a> {
     #[must_use]
     #[inline(always)]
-    pub(crate) fn from_value(value: &'a Value) -> Option<Self> {
+    pub fn from_value(value: &'a Value) -> Option<Self> {
         match value.transparent() {
             ValueView::Int(value) => Some(Self::Int(*value)),
             ValueView::Bool(value) => Some(Self::Bool(*value)),
@@ -113,7 +113,7 @@ impl<'a> KeyRef<'a> {
     }
 
     #[must_use]
-    pub(crate) fn to_owned(self) -> Key {
+    pub fn to_owned(self) -> Key {
         match self {
             Self::Int(value) => Key::Int(value),
             Self::Bool(value) => Key::Bool(value),
@@ -123,7 +123,7 @@ impl<'a> KeyRef<'a> {
     }
 
     #[must_use]
-    pub(crate) fn to_value(self) -> Value {
+    pub fn to_value(self) -> Value {
         match self {
             Self::Int(value) => Value::int(value),
             Self::Bool(value) => Value::bool(value),
@@ -132,7 +132,7 @@ impl<'a> KeyRef<'a> {
         }
     }
 
-    pub(in crate::value) fn hash64(self, state: &HashState) -> u64 {
+    pub(crate) fn hash64(self, state: &HashState) -> u64 {
         match self {
             Self::Int(value) => state.hash_int(value),
             Self::Bool(value) => state.hash_bool(value),

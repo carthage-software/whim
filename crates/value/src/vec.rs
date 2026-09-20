@@ -4,28 +4,28 @@ use std::mem;
 use std::ptr::NonNull;
 use std::slice;
 
-use crate::value::Value;
-use crate::value::array::ArrayTypeCheck;
-use crate::value::array::ArrayTypeCheckCache;
-use crate::value::array::ArrayTypeCheckId;
-use crate::value::heap::Heap;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::CowClone;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
+use crate::Value;
+use crate::array::ArrayTypeCheck;
+use crate::array::ArrayTypeCheckCache;
+use crate::array::ArrayTypeCheckId;
+use crate::heap::Heap;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::CowClone;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TraceVisitor;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
 
-pub(crate) struct VecObject {
+pub struct VecObject {
     elements: Vec<Value>,
     type_check: ArrayTypeCheckCache,
 }
 
 impl VecObject {
     #[must_use]
-    pub(crate) fn new(heap: &Heap) -> ManagedRef<Self> {
+    pub fn new(heap: &Heap) -> ManagedRef<Self> {
         ManagedRef::new_in(
             heap,
             Self {
@@ -36,7 +36,7 @@ impl VecObject {
     }
 
     #[must_use]
-    pub(crate) fn with_elements(
+    pub fn with_elements(
         heap: &Heap,
         elements: impl IntoIterator<Item = Value>,
     ) -> ManagedRef<Self> {
@@ -51,17 +51,17 @@ impl VecObject {
     }
 
     #[must_use]
-    pub(crate) const fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.elements.len()
     }
 
     #[must_use]
-    pub(crate) const fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 
     #[must_use]
-    pub(crate) fn get(&self, index: usize) -> Option<&Value> {
+    pub fn get(&self, index: usize) -> Option<&Value> {
         self.elements.get(index)
     }
 
@@ -71,12 +71,12 @@ impl VecObject {
     ///
     /// `index` must be less than [`Self::len`].
     #[must_use]
-    pub(crate) unsafe fn get_unchecked(&self, index: usize) -> &Value {
+    pub unsafe fn get_unchecked(&self, index: usize) -> &Value {
         // SAFETY: the surrounding invariant keeps this index in bounds.
         unsafe { self.elements.get_unchecked(index) }
     }
 
-    pub(crate) fn set(&mut self, index: usize, value: Value) -> Option<Value> {
+    pub fn set(&mut self, index: usize, value: Value) -> Option<Value> {
         let slot = self.elements.get_mut(index)?;
         let previous = mem::replace(slot, value);
         self.type_check.note_mutation(index);
@@ -84,7 +84,7 @@ impl VecObject {
     }
 
     #[inline]
-    pub(crate) fn push(&mut self, value: Value) {
+    pub fn push(&mut self, value: Value) {
         let index = self.elements.len();
         self.elements.push(value);
         self.type_check.note_mutation(index);
@@ -95,15 +95,15 @@ impl VecObject {
         reason = "the VM uses this after proving the cache is already invalid"
     )]
     #[inline(always)]
-    pub(crate) fn push_after_type_check_invalidation(&mut self, value: Value) {
+    pub fn push_after_type_check_invalidation(&mut self, value: Value) {
         self.elements.push(value);
     }
 
-    pub(crate) fn reserve_hint(&mut self, additional: usize) {
+    pub fn reserve_hint(&mut self, additional: usize) {
         self.elements.reserve(additional);
     }
 
-    pub(crate) fn remove(&mut self, index: usize) -> Option<Value> {
+    pub fn remove(&mut self, index: usize) -> Option<Value> {
         if index < self.elements.len() {
             let value = self.elements.remove(index);
             self.type_check.note_removal();
@@ -113,7 +113,7 @@ impl VecObject {
         }
     }
 
-    pub(crate) fn swap_remove(&mut self, index: usize) -> Option<Value> {
+    pub fn swap_remove(&mut self, index: usize) -> Option<Value> {
         if index < self.elements.len() {
             let value = self.elements.swap_remove(index);
             self.type_check.note_removal();
@@ -123,27 +123,27 @@ impl VecObject {
         }
     }
 
-    pub(crate) fn remove_first(&mut self) -> Option<Value> {
+    pub fn remove_first(&mut self) -> Option<Value> {
         self.remove(0)
     }
 
-    pub(crate) fn remove_last(&mut self) -> Option<Value> {
+    pub fn remove_last(&mut self) -> Option<Value> {
         let value = self.elements.pop()?;
         self.type_check.note_removal();
         Some(value)
     }
 
-    pub(crate) fn iter(&self) -> slice::Iter<'_, Value> {
+    pub fn iter(&self) -> slice::Iter<'_, Value> {
         self.elements.iter()
     }
 
     #[must_use]
-    pub(crate) fn as_slice(&self) -> &[Value] {
+    pub fn as_slice(&self) -> &[Value] {
         &self.elements
     }
 
     #[must_use]
-    pub(crate) fn as_mut_slice(&mut self) -> &mut [Value] {
+    pub fn as_mut_slice(&mut self) -> &mut [Value] {
         self.type_check.invalidate();
         &mut self.elements
     }
@@ -154,7 +154,7 @@ impl VecObject {
         reason = "array checks query this cache in the VM hot path"
     )]
     #[inline(always)]
-    pub(crate) const fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
+    pub const fn type_check(&self, id: ArrayTypeCheckId) -> ArrayTypeCheck {
         self.type_check.get(id)
     }
 
@@ -163,7 +163,7 @@ impl VecObject {
         reason = "array checks update this cache in the VM hot path"
     )]
     #[inline(always)]
-    pub(crate) fn mark_type_checked(&self, id: ArrayTypeCheckId) {
+    pub fn mark_type_checked(&self, id: ArrayTypeCheckId) {
         self.type_check.mark_checked(id);
     }
 
@@ -172,8 +172,17 @@ impl VecObject {
         reason = "broad mutations invalidate this cache in the VM hot path"
     )]
     #[inline(always)]
-    pub(crate) fn invalidate_type_check(&self) {
+    pub fn invalidate_type_check(&self) {
         self.type_check.invalidate();
+    }
+}
+
+impl<'a> IntoIterator for &'a VecObject {
+    type Item = &'a Value;
+    type IntoIter = slice::Iter<'a, Value>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -225,14 +234,14 @@ impl Trace for VecObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::value::Value;
-    use crate::value::ValueView;
-    use crate::value::array::ArrayTypeCheck;
-    use crate::value::array::ArrayTypeCheckCache;
-    use crate::value::array::ArrayTypeCheckId;
-    use crate::value::heap::Heap;
-    use crate::value::heap::metadata::CowClone;
-    use crate::value::vec::VecObject;
+    use crate::Value;
+    use crate::ValueView;
+    use crate::array::ArrayTypeCheck;
+    use crate::array::ArrayTypeCheckCache;
+    use crate::array::ArrayTypeCheckId;
+    use crate::heap::Heap;
+    use crate::heap::metadata::CowClone;
+    use crate::vec::VecObject;
 
     fn vector() -> VecObject {
         VecObject {

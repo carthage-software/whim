@@ -9,6 +9,22 @@ use std::rc::Rc;
 use std::slice;
 
 use whim_base::unwrap_option_invariant;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::DictObject;
+use whim_value::dict::keys::KeyRef;
+use whim_value::function::CallTarget;
+use whim_value::function::FuncId;
+use whim_value::function::FunctionObject;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::heap::metadata::HeapBox;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
+use whim_value::ops;
+use whim_value::string::ByteStringObject;
+use whim_value::tuple::TupleObject;
+use whim_value::vec::VecObject;
 
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
@@ -32,37 +48,22 @@ use crate::bytecode::unit::ClassLikeKind;
 use crate::bytecode::unit::literal_value;
 use crate::core::private::syscall::StandardStream;
 use crate::engine::Engine;
-use crate::value::ValueView;
-use crate::value::dict::keys::KeyRef;
-use crate::value::heap::metadata::HeapBox;
 use crate::vm::AsMode;
-use crate::vm::ByteStringObject;
 use crate::vm::CachedIsCheck;
-use crate::vm::CallTarget;
 use crate::vm::Chunk;
-use crate::vm::ClassId;
-use crate::vm::DictObject;
 use crate::vm::Fault;
 use crate::vm::FrameTeardown;
-use crate::vm::FuncId;
-use crate::vm::FunctionObject;
 use crate::vm::IndexAddFault;
-use crate::vm::InstanceObject;
 use crate::vm::Instruction;
 use crate::vm::InstructionKind;
 use crate::vm::InstructionWord;
 use crate::vm::IsCheckWays;
 use crate::vm::Literal;
-use crate::vm::ManagedRef;
 use crate::vm::NonNull;
 use crate::vm::PendingUnwind;
 use crate::vm::RegionSite;
 use crate::vm::Register;
-use crate::vm::TupleObject;
 use crate::vm::TypeDescriptor;
-use crate::vm::TypeEnvironmentId;
-use crate::vm::Value;
-use crate::vm::VecObject;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::advance_cursor;
@@ -124,7 +125,6 @@ use crate::vm::literal_text;
 use crate::vm::name_atom;
 use crate::vm::negate;
 use crate::vm::numeric_loop::NumericLoopOutcome;
-use crate::vm::ops;
 use crate::vm::remove_end;
 use crate::vm::remove_entry;
 use crate::vm::shift_left;
@@ -6823,14 +6823,15 @@ impl VirtualMachine<'_> {
 
 #[cfg(test)]
 mod string_switch_tests {
+    use whim_value::Value;
+    use whim_value::heap::Heap;
+    use whim_value::newtype::NewtypeValueId;
+    use whim_value::string::ByteStringObject;
+    use whim_value::string::short::ShortString;
+
     use super::SwitchTable;
-    use super::Value;
     use super::switch_string_target;
     use crate::bytecode::chunk::descriptors::string_switch_buckets;
-    use crate::value::heap::Heap;
-    use crate::value::newtype::NewtypeValueId;
-    use crate::value::string::ByteStringObject;
-    use crate::value::string::short::ShortString;
 
     #[test]
     fn string_switches_keep_first_duplicate_and_strict_subject_type() {

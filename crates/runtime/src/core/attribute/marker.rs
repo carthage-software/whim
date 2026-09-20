@@ -2,11 +2,11 @@
 
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 pub(crate) const TARGET_CLASS: i64 = 1;
 pub(crate) const TARGET_CALLABLE: i64 = 6;

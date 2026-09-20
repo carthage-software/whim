@@ -20,18 +20,17 @@ use tungstenite::protocol::Role;
 use tungstenite::protocol::WebSocket;
 use tungstenite::protocol::WebSocketConfig;
 use tungstenite::protocol::frame::coding::CloseCode;
-
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_function;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 const CODEC: &str = "Whim\\_Private\\WebSocketCodec";
 const EXCEPTION: &[u8] = b"Whim\\HTTP\\WebSocket\\Exception";

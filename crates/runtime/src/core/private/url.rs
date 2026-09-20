@@ -7,13 +7,13 @@ use iri_string::build::Builder;
 use iri_string::components::AuthorityComponents;
 use iri_string::types::UriReferenceStr;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::core::private::iri::encode_reference;
 use crate::core::private::iri::idna_ascii;
 use crate::core::private::uri_common::host_value;
-use crate::value::Value;
 
 #[whim_function(
     "Whim\\_Private\\url_parse_reference(string $url): null|(string, string, string, null|string, null|string)"

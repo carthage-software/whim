@@ -1,5 +1,10 @@
 //! Reflected type operations.
 
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
@@ -19,10 +24,6 @@ use crate::core::reflection::model::TypeParameterKey;
 use crate::core::reflection::objects;
 use crate::core::reflection::support;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::object::ClassId;
-use crate::value::object::TypeEnvironmentId;
 use crate::vm::VirtualMachine;
 use crate::vm::types::descriptor_same;
 

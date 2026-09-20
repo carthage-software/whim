@@ -4,6 +4,7 @@ use std::io::ErrorKind;
 use whim_macros::{whim_closure, whim_function};
 use whim_sys::path::os_string_from_bytes;
 use whim_sys::process::{self, Spawn, Stream};
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -14,7 +15,6 @@ use crate::core::private::syscall::path::path;
 use crate::core::private::syscall::{
     Descriptor, build_file_descriptor, io_error, system_error, with_descriptor,
 };
-use crate::value::Value;
 
 #[whim_function("Whim\\Process\\get_parent_id(): (0..)", must_use)]
 pub(crate) fn parent_process_id(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {

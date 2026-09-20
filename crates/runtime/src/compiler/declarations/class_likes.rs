@@ -9,6 +9,7 @@ use whim_syn::cst::class::Enum;
 use whim_syn::cst::class::Interface;
 use whim_syn::cst::class::MethodBody;
 use whim_syn::cst::r#type::NamedType;
+use whim_value::heap::Heap;
 
 use crate::bytecode::aliases::expand_aliases;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -36,7 +37,6 @@ use crate::compiler::types;
 use crate::compiler::types::ClassContext;
 use crate::compiler::types::GenericTable;
 use crate::compiler::types::TypeScope;
-use crate::value::heap::Heap;
 use crate::variance::incompatible_parameter;
 
 fn base_reference(

@@ -30,6 +30,7 @@ use whim_syn::cst::r#type::VecType;
 use whim_syn::cst::walker::Flow;
 use whim_syn::cst::walker::Visitor;
 use whim_syn::cst::walker::walk;
+use whim_value::heap::Heap;
 
 use crate::bytecode::aliases::expand_aliases;
 use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
@@ -47,7 +48,6 @@ use crate::compiler::types::rendering::check_type_arguments;
 use crate::compiler::types::rendering::flatten_intersection;
 use crate::compiler::types::rendering::flatten_union;
 use crate::compiler::types::rendering::validate_composition;
-use crate::value::heap::Heap;
 
 pub(in crate::compiler) fn lower_checked_type(
     scope: &TypeScope<'_>,

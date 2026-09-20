@@ -13,26 +13,26 @@ use std::slice;
 
 use whim_base::unreachable_invariant;
 
-use crate::value::hash::HashState;
-use crate::value::heap::Heap;
-use crate::value::heap::bytes::HeapBytes;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::HeapBox;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::Trace;
-use crate::value::heap::metadata::TypeTag;
-use crate::value::heap::queue::DropQueue;
+use crate::hash::HashState;
+use crate::heap::Heap;
+use crate::heap::bytes::HeapBytes;
+use crate::heap::handle::ManagedRef;
+use crate::heap::metadata::HeapBox;
+use crate::heap::metadata::TeardownMode;
+use crate::heap::metadata::Trace;
+use crate::heap::metadata::TypeTag;
+use crate::heap::queue::DropQueue;
 
 const EAGER_FLAT_LIMIT: usize = 32;
 const HASH_BLOCK_SIZE: usize = 256;
 
 const _: () = assert!(size_of::<ShortString>() == 8);
 
-pub(crate) mod short;
+pub mod short;
 
-use crate::value::string::short::ShortString;
+use crate::string::short::ShortString;
 
-pub(crate) struct ByteStringObject {
+pub struct ByteStringObject {
     /// The cached 64-bit hash, or zero when it has not been computed.
     hash: Cell<u64>,
     repr: UnsafeCell<Repr>,
@@ -55,14 +55,14 @@ enum Repr {
     },
 }
 
-pub(crate) struct FlatStringSlices<'source> {
+pub struct FlatStringSlices<'source> {
     base: &'source ManagedRef<ByteStringObject>,
     bytes: &'source [u8],
 }
 
 impl<'source> FlatStringSlices<'source> {
     #[must_use]
-    pub(crate) fn new(base: &'source ManagedRef<ByteStringObject>) -> Self {
+    pub fn new(base: &'source ManagedRef<ByteStringObject>) -> Self {
         Self {
             base,
             bytes: ByteStringObject::handle_bytes(base),
@@ -70,17 +70,12 @@ impl<'source> FlatStringSlices<'source> {
     }
 
     #[must_use]
-    pub(crate) const fn bytes(&self) -> &'source [u8] {
+    pub const fn bytes(&self) -> &'source [u8] {
         self.bytes
     }
 
     #[must_use]
-    pub(crate) fn slice(
-        &self,
-        heap: &Heap,
-        offset: usize,
-        len: usize,
-    ) -> ManagedRef<ByteStringObject> {
+    pub fn slice(&self, heap: &Heap, offset: usize, len: usize) -> ManagedRef<ByteStringObject> {
         debug_assert!(
             offset
                 .checked_add(len)
@@ -111,28 +106,24 @@ impl ByteStringObject {
     }
 
     #[must_use]
-    pub(crate) fn from_bytes(heap: &Heap, bytes: &[u8]) -> ManagedRef<Self> {
+    pub fn from_bytes(heap: &Heap, bytes: &[u8]) -> ManagedRef<Self> {
         ManagedRef::new_in(heap, Self::flat(HeapBytes::from_slice(bytes)))
     }
 
     #[must_use]
-    pub(in crate::value) fn from_hashed_bytes(
-        heap: &Heap,
-        bytes: &[u8],
-        hash: u64,
-    ) -> ManagedRef<Self> {
+    pub(crate) fn from_hashed_bytes(heap: &Heap, bytes: &[u8], hash: u64) -> ManagedRef<Self> {
         let string = Self::flat(HeapBytes::from_slice(bytes));
         string.hash.set(hash);
         ManagedRef::new_in(heap, string)
     }
 
     #[must_use]
-    pub(crate) fn from_vec(heap: &Heap, bytes: Vec<u8>) -> ManagedRef<Self> {
+    pub fn from_vec(heap: &Heap, bytes: Vec<u8>) -> ManagedRef<Self> {
         ManagedRef::new_in(heap, Self::flat(HeapBytes::from_vec(bytes)))
     }
 
     #[must_use]
-    pub(crate) fn concat(
+    pub fn concat(
         heap: &Heap,
         left: &ManagedRef<Self>,
         right: &ManagedRef<Self>,
@@ -165,7 +156,8 @@ impl ByteStringObject {
     ///
     /// `extra` must not overlap `string`'s own buffer: growth can free that
     /// buffer before copying `extra`.
-    pub(crate) unsafe fn append_unique(string: &ManagedRef<Self>, extra: &[u8]) -> bool {
+    #[must_use]
+    pub unsafe fn append_unique(string: &ManagedRef<Self>, extra: &[u8]) -> bool {
         if !string.is_unique() {
             return false;
         }
@@ -192,7 +184,8 @@ impl ByteStringObject {
     /// # Safety
     ///
     /// `extra` and `string` must differ.
-    pub(crate) unsafe fn append_unique_string(
+    #[must_use]
+    pub unsafe fn append_unique_string(
         string: &ManagedRef<Self>,
         extra: &ManagedRef<Self>,
     ) -> bool {
@@ -235,7 +228,7 @@ impl ByteStringObject {
     }
 
     #[must_use]
-    pub(crate) fn slice(
+    pub fn slice(
         heap: &Heap,
         base: &ManagedRef<Self>,
         offset: usize,
@@ -273,7 +266,7 @@ impl ByteStringObject {
     }
 
     #[must_use]
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         // SAFETY: the live string owns this payload, and the VM serializes representation access.
         match unsafe { &*self.repr.get() } {
             Repr::Flat(bytes) => bytes.len(),
@@ -282,11 +275,11 @@ impl ByteStringObject {
     }
 
     #[must_use]
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    pub(crate) fn flatten(&self) -> &[u8] {
+    pub fn flatten(&self) -> &[u8] {
         if !self.is_flat() {
             // SAFETY: the live string owns this payload, and the VM serializes representation access.
             let buffer = unsafe { HeapBytes::from_fragments(self.len(), self.chunks()) };
@@ -297,7 +290,8 @@ impl ByteStringObject {
         unsafe { self.flat_slice() }
     }
 
-    pub(crate) fn handle_bytes(handle: &ManagedRef<Self>) -> &[u8] {
+    #[must_use]
+    pub fn handle_bytes(handle: &ManagedRef<Self>) -> &[u8] {
         if handle.is_flat() {
             // SAFETY: the live string owns this payload, and the VM serializes representation access.
             return unsafe { handle.flat_slice() };
@@ -356,12 +350,13 @@ impl ByteStringObject {
         } else {
             hash_fragments(state, self.len(), self.chunks())
         };
+
         self.hash.set(hash);
         hash
     }
 
     #[must_use]
-    pub(crate) fn eq_bytes(&self, other: &Self) -> bool {
+    pub fn eq_bytes(&self, other: &Self) -> bool {
         if ptr::eq(self, other) {
             return true;
         }
@@ -372,7 +367,7 @@ impl ByteStringObject {
     }
 
     #[must_use]
-    pub(crate) fn cmp_bytes(&self, other: &Self) -> Ordering {
+    pub fn cmp_bytes(&self, other: &Self) -> Ordering {
         if ptr::eq(self, other) {
             return Ordering::Equal;
         }
@@ -414,7 +409,8 @@ impl ByteStringObject {
         }
     }
 
-    fn is_flat(&self) -> bool {
+    #[must_use]
+    pub fn is_flat(&self) -> bool {
         // SAFETY: the live string owns this payload, and the VM serializes representation access.
         matches!(unsafe { &*self.repr.get() }, Repr::Flat(_))
     }
@@ -563,52 +559,14 @@ impl Trace for ByteStringObject {
 
 #[cfg(test)]
 mod tests {
-    use crate::value::heap::Heap;
-    use crate::value::string::ByteStringObject;
-    use crate::value::string::FlatStringSlices;
-    use crate::value::string::Repr;
-    use crate::value::string::hash_bytes;
-    use crate::value::string::short::ShortString;
+    use crate::heap::Heap;
+    use crate::string::ByteStringObject;
+    use crate::string::FlatStringSlices;
+    use crate::string::Repr;
+    use crate::string::hash_bytes;
+    use crate::string::short::ShortString;
 
     const CONTENT: &[u8] = b"0123456789abcdef0123456789abcdef0123456789abcdef";
-
-    #[test]
-    fn length_and_literal_mismatches_keep_rope_storage() {
-        use crate::bytecode::chunk::descriptors::TypeDescriptor;
-        use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
-        use crate::value::Value;
-
-        let heap = Heap::new();
-        let part = ByteStringObject::from_bytes(&heap, &[b'a'; 32]);
-        let rope = ByteStringObject::concat(&heap, &part, &part);
-        let value = Value::string(rope.clone());
-        assert_eq!(value.as_string_len(), Some(64));
-        for (descriptor, expected) in [
-            (
-                TypeDescriptor::StringLength {
-                    min: 64,
-                    max: Some(64),
-                },
-                true,
-            ),
-            (
-                TypeDescriptor::StringLength {
-                    min: 1,
-                    max: Some(63),
-                },
-                false,
-            ),
-            (TypeDescriptor::StringLiteral(heap.intern(b"")), false),
-        ] {
-            assert_eq!(
-                check_trivial_descriptor(&descriptor, &value),
-                Some(expected)
-            );
-            assert!(!rope.is_flat());
-        }
-        let matching = TypeDescriptor::StringLiteral(heap.intern(&[b'a'; 64]));
-        assert_eq!(check_trivial_descriptor(&matching, &value), Some(true));
-    }
 
     #[test]
     fn precomputed_hashes_match_each_heap_and_keep_the_uncached_fallback() {

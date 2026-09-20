@@ -6,12 +6,13 @@
     reason = "linking rules are shared with the engine and optimizer"
 )]
 
+use whim_value::atom::Atom;
+use whim_value::object::ClassId;
+
 use crate::bytecode::unit::Visibility;
 use crate::classes::MethodEntry;
 use crate::classes::PropertyInfo;
 use crate::classes::RuntimeClass;
-use crate::value::atom::Atom;
-use crate::value::object::ClassId;
 
 mod classes;
 mod contracts;

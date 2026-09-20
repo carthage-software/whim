@@ -16,14 +16,14 @@ mod support;
 mod types;
 mod values;
 
-use crate::builtin::Context;
-use crate::builtin::arguments::Arguments;
-use crate::builtin::throw::Throw;
-use crate::value::Value;
-
 pub(crate) use classes::*;
 pub(crate) use enums::*;
 pub(crate) use interfaces::*;
+use whim_value::Value;
+
+use crate::builtin::Context;
+use crate::builtin::arguments::Arguments;
+use crate::builtin::throw::Throw;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Operation {

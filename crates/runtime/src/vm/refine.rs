@@ -3,6 +3,7 @@
 use std::ptr::NonNull;
 
 use hashbrown::HashSet;
+use whim_value::function::FuncId;
 
 use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::instruction::Instruction;
@@ -16,7 +17,6 @@ use crate::symbols::FunctionLocator;
 use crate::symbols::FunctionTable;
 use crate::symbols::InlineCache;
 use crate::symbols::SymbolKind;
-use crate::value::function::FuncId;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 

@@ -4,9 +4,9 @@ use bincode::Options;
 use serde::Deserializer;
 use serde::de::DeserializeSeed;
 use serde_seeded::DeserializeSeeded;
+use whim_value::heap::Heap;
 
 use crate::bytecode::unit::CompiledUnit;
-use crate::value::heap::Heap;
 
 mod adapter;
 
@@ -221,9 +221,8 @@ pub(crate) mod atom_i32_pairs {
     use serde::de::SeqAccess;
     use serde::de::Visitor;
     use serde_seeded::de::Seed;
-
-    use crate::value::atom::Atom;
-    use crate::value::heap::Heap;
+    use whim_value::atom::Atom;
+    use whim_value::heap::Heap;
 
     struct PairSeed<'heap>(&'heap Heap);
 

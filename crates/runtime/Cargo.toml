@@ -1,6 +1,6 @@
 [package]
 name = "whim-runtime"
-description = "The Whim runtime: values, bytecode, compiler, optimizer, linker, and virtual machine"
+description = "The Whim runtime: bytecode, compiler, optimizer, linker, and virtual machine"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -79,6 +79,7 @@ whim-span = { workspace = true }
 whim-sqlite = { workspace = true }
 whim-syn = { workspace = true }
 whim-sys = { workspace = true }
+whim-value = { workspace = true }
 x509-parser = { workspace = true }
 xxhash-rust = { workspace = true }
 zstd = { workspace = true }

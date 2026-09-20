@@ -1,6 +1,7 @@
 //! Elision of constructor dispatch for exact classes without constructors.
 
 use hashbrown::HashSet;
+use whim_value::atom::Atom;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::IcDescriptor;
@@ -15,7 +16,6 @@ use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::passes::compact_removed_instructions;
-use crate::value::atom::Atom;
 
 pub(in crate::optimizer) fn optimize_unit(
     unit: &mut CompiledUnit,

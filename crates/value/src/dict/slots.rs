@@ -8,23 +8,23 @@
 
 use whim_base::unreachable_invariant;
 
-use crate::value::Value;
-use crate::value::dict::keys::Key;
-use crate::value::dict::keys::KeyRef;
-use crate::value::hash::HashState;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::string::ByteStringObject;
-use crate::value::string::short::ShortString;
+use crate::Value;
+use crate::dict::keys::Key;
+use crate::dict::keys::KeyRef;
+use crate::hash::HashState;
+use crate::heap::handle::ManagedRef;
+use crate::string::ByteStringObject;
+use crate::string::short::ShortString;
 
 /// One position in the insertion-ordered entry vector.
 #[derive(Clone)]
-pub(in crate::value::dict) enum Slot {
+pub(in crate::dict) enum Slot {
     Occupied { key: Key, value: Value },
     Vacant,
 }
 
 #[inline(always)]
-pub(in crate::value::dict) fn slot_hash(slot: &Slot, state: &HashState) -> u64 {
+pub(in crate::dict) fn slot_hash(slot: &Slot, state: &HashState) -> u64 {
     match slot {
         Slot::Occupied { key, .. } => key.hash64(state),
         // SAFETY: the surrounding invariant makes this path unreachable.
@@ -34,7 +34,7 @@ pub(in crate::value::dict) fn slot_hash(slot: &Slot, state: &HashState) -> u64 {
     }
 }
 
-pub(in crate::value::dict) fn slot_matches(slot: &Slot, key: &Key) -> bool {
+pub(in crate::dict) fn slot_matches(slot: &Slot, key: &Key) -> bool {
     match slot {
         Slot::Occupied {
             key: occupied_key, ..
@@ -43,7 +43,7 @@ pub(in crate::value::dict) fn slot_matches(slot: &Slot, key: &Key) -> bool {
     }
 }
 
-pub(in crate::value::dict) fn slot_matches_ref(slot: &Slot, key: KeyRef<'_>) -> bool {
+pub(in crate::dict) fn slot_matches_ref(slot: &Slot, key: KeyRef<'_>) -> bool {
     match slot {
         Slot::Occupied { key: occupied, .. } => match (occupied, key) {
             (Key::Int(left), KeyRef::Int(right)) => *left == right,
@@ -63,7 +63,7 @@ pub(in crate::value::dict) fn slot_matches_ref(slot: &Slot, key: KeyRef<'_>) -> 
 }
 
 #[inline(always)]
-pub(in crate::value::dict) fn slot_matches_string(
+pub(in crate::dict) fn slot_matches_string(
     slot: &Slot,
     key: &ManagedRef<ByteStringObject>,
 ) -> bool {
@@ -81,7 +81,7 @@ pub(in crate::value::dict) fn slot_matches_string(
 }
 
 #[inline(always)]
-pub(in crate::value::dict) fn slot_matches_short_string(slot: &Slot, key: ShortString) -> bool {
+pub(in crate::dict) fn slot_matches_short_string(slot: &Slot, key: ShortString) -> bool {
     match slot {
         Slot::Occupied {
             key: Key::String(occupied),

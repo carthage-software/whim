@@ -2,9 +2,10 @@ use std::net::Ipv4Addr;
 use std::net::Ipv6Addr;
 use std::str::from_utf8;
 
+use whim_value::Value;
+
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 macro_rules! uri_reference_builtins {
     (

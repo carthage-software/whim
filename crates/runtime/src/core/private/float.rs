@@ -2,10 +2,10 @@
 
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::value::Value;
 
 #[whim_function("Whim\\Float\\to_bits(float $value): int", must_use)]
 fn to_bits(arguments: Arguments<'_>) -> Value {

@@ -1,10 +1,10 @@
 //! `Whim\Async\drain`: run the event loop until every task has finished.
 
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 #[whim_function("Whim\\Async\\drain(): void")]
 fn drain(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {

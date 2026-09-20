@@ -1,14 +1,15 @@
 //! Checked compound updates of object properties.
 
+use whim_value::Value;
+use whim_value::dict::keys::Key;
+use whim_value::heap::Heap;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::InstanceObject;
+
 use crate::bytecode::instruction::operands::PropertyRemoveMode;
 use crate::vm::ArrayFault;
 use crate::vm::Chunk;
 use crate::vm::Fault;
-use crate::vm::Heap;
-use crate::vm::InstanceObject;
-use crate::vm::Key;
-use crate::vm::ManagedRef;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::append_value;

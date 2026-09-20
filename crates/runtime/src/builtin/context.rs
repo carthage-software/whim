@@ -3,16 +3,16 @@
 use std::borrow::Cow;
 
 use whim_base::unwrap_option_invariant;
+use whim_value::Value;
+use whim_value::atom::Atom;
+use whim_value::dict::DictObject;
+use whim_value::dict::keys::Key;
+use whim_value::tuple::TupleObject;
+use whim_value::vec::VecObject;
 
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
-use crate::value::Value;
-use crate::value::atom::Atom;
-use crate::value::dict::DictObject;
-use crate::value::dict::keys::Key;
-use crate::value::tuple::TupleObject;
-use crate::value::vec::VecObject;
 
 impl Context<'_, '_, '_> {
     #[must_use]

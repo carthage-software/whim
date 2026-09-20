@@ -3,6 +3,7 @@
 use std::ptr::NonNull;
 
 use whim_base::unwrap_option_invariant;
+use whim_value::function::FuncId;
 
 use crate::bytecode::unit::CompiledClassLike;
 use crate::bytecode::verify::verify;
@@ -17,7 +18,6 @@ use crate::optimizer::optimize_callable_method;
 use crate::symbols::CallableOptimization;
 use crate::symbols::FunctionLocator;
 use crate::symbols::UnitContext;
-use crate::value::function::FuncId;
 use crate::vm::VirtualMachineControl;
 
 impl Engine {

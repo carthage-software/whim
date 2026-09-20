@@ -2,14 +2,15 @@
 
 use std::ptr::NonNull;
 
+use whim_value::Value;
+use whim_value::object::BuiltInHooks;
+
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::bytecode::unit::BuiltInCallableMarkers;
 use crate::bytecode::unit::EnumBacking;
 use crate::bytecode::unit::Variance;
 use crate::bytecode::unit::Visibility;
-use crate::value::Value;
-use crate::value::object::BuiltInHooks;
 use crate::vm::VirtualMachine;
 
 pub(crate) type BuiltInHandler =
@@ -163,7 +164,7 @@ pub(crate) struct MethodSpec {
     pub name: &'static str,
     pub visibility: Visibility,
     /// Whether the method is `static`; static handlers receive
-    /// [`crate::value::Value::null()`] as the receiver.
+    /// [`whim_value::Value::null()`] as the receiver.
     pub is_static: bool,
     /// The method's language-level generic binders.
     pub type_parameters: &'static [TypeParameterSpec],

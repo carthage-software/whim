@@ -11,25 +11,24 @@ use bson::oid::ObjectId as BsonObjectId;
 use bson::raw::RawArray;
 use bson::raw::RawDocument;
 use serde::Deserialize;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::dict::DictObject;
+use whim_value::dict::keys::KeyRef;
+use whim_value::newtype::NewtypeId;
+use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
+use whim_value::string::ByteStringObject;
+use whim_value::vec::VecObject;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::symbols::SymbolKind;
-use crate::value::Value;
-use crate::value::ValueView;
-use crate::value::dict::DictObject;
-use crate::value::dict::keys::KeyRef;
-use crate::value::newtype::NewtypeId;
-use crate::value::object::ClassId;
-use crate::value::object::InstanceObject;
-use crate::value::object::TypeEnvironmentId;
-use crate::value::string::ByteStringObject;
-use crate::value::vec::VecObject;
 
 const ENCODING_EXCEPTION: &str = "Whim\\BSON\\EncodingException";
 const DECODING_EXCEPTION: &str = "Whim\\BSON\\DecodingException";
@@ -142,7 +141,7 @@ fn write_document(
 ) -> Result<(), CodecError> {
     require_depth(depth)?;
     let start = begin_container(bytes);
-    for (key, value) in document.iter() {
+    for (key, value) in document {
         let element_type = bytes.len();
         bytes.push(0);
         match key {

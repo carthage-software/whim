@@ -3533,6 +3533,7 @@ dependencies = [
  "whim-sqlite",
  "whim-syn",
  "whim-sys",
+ "whim-value",
  "x509-parser",
  "xxhash-rust",
  "zstd",
@@ -3577,6 +3578,19 @@ dependencies = [
  "uuid",
  "whim-loop",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "whim-value"
+version = "0.10.0"
+dependencies = [
+ "bincode",
+ "hashbrown 0.17.1",
+ "itoa",
+ "ryu",
+ "serde",
+ "serde-seeded",
+ "whim-base",
 ]
 
 [[package]]

@@ -13,8 +13,19 @@ use std::ptr::NonNull;
 use std::rc::Rc;
 
 use hashbrown::HashMap;
-
 use whim_base::unwrap_option_invariant;
+use whim_value::Value;
+use whim_value::array::ArrayTypeCheckId;
+use whim_value::atom::Atom;
+use whim_value::function::BuiltInId;
+use whim_value::function::CallTarget;
+use whim_value::function::FuncId;
+use whim_value::function::FunctionObject;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::newtype::NewtypeId;
+use whim_value::newtype::NewtypeValueId;
+use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::spec::BuiltInDirectHandler;
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
@@ -28,18 +39,6 @@ use crate::bytecode::unit::CompiledParameter;
 use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::CompiledUnit;
 use crate::classes::MethodEntry;
-use crate::value::Value;
-use crate::value::array::ArrayTypeCheckId;
-use crate::value::atom::Atom;
-use crate::value::function::BuiltInId;
-use crate::value::function::CallTarget;
-use crate::value::function::FuncId;
-use crate::value::function::FunctionObject;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::newtype::NewtypeId;
-use crate::value::newtype::NewtypeValueId;
-use crate::value::object::ClassId;
-use crate::value::object::TypeEnvironmentId;
 
 #[expect(
     clippy::inline_always,

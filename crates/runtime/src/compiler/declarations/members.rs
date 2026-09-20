@@ -12,6 +12,7 @@ use whim_syn::cst::class::Method;
 use whim_syn::cst::class::MethodBody;
 use whim_syn::cst::class::Property;
 use whim_syn::cst::r#type::Type;
+use whim_value::atom::Atom;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
@@ -55,7 +56,6 @@ use crate::compiler::types::GenericTable;
 use crate::compiler::types::TypeScope;
 use crate::compiler::types::lowering::lower_type;
 use crate::compiler::types::rendering::render_type;
-use crate::value::atom::Atom;
 
 struct MethodMetadata {
     parameters: Vec<CompiledParameter>,

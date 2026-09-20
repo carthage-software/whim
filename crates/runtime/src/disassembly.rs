@@ -12,12 +12,12 @@ use std::rc::Rc;
 use whim_span::Span;
 use whim_syn::cst::Program;
 use whim_sys::path::path_bytes;
+use whim_value::heap::Heap;
 
 use crate::bytecode::disassemble;
 use crate::bytecode::unit::CompiledUnit;
 use crate::compiler::CompileError;
 use crate::engine::Engine;
-use crate::value::heap::Heap;
 
 /// One compiled program retained for deterministic bytecode rendering.
 pub struct Disassembly {

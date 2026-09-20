@@ -1,15 +1,13 @@
 mod matching;
 
-use crate::engine::Engine;
-use crate::engine::EngineConfiguration;
-use crate::symbols::ExactFunctionEntry;
-use crate::value::function::FuncId;
 use std::ops::Deref;
 use std::path::Path;
 use std::rc::Rc;
 
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
+use whim_value::function::FuncId;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::chunk::descriptors::Literal;
@@ -24,11 +22,13 @@ use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::verify::verify_unit;
 use crate::compiler::CompileConfiguration;
 use crate::compiler::compile_with_configuration;
+use crate::engine::Engine;
+use crate::engine::EngineConfiguration;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::World;
 use crate::optimizer::callable::optimize_function;
 use crate::optimizer::callable::optimize_method;
-use crate::value::heap::Heap;
+use crate::symbols::ExactFunctionEntry;
 
 struct OwnedUnit {
     unit: CompiledUnit,

@@ -10,12 +10,12 @@ use whim_macros::whim_class;
 use whim_macros::whim_closure;
 use whim_macros::whim_function;
 use whim_macros::whim_methods;
+use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
 
 const NANOSECONDS_PER_SECOND: i64 = 1_000_000_000;
 

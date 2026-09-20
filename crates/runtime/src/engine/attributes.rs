@@ -1,6 +1,9 @@
 //! Validating attribute applications.
 
+use whim_value::atom::Atom;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
+use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
 use crate::bytecode::unit::ALWAYS_INLINE_ATTRIBUTE;
 use crate::bytecode::unit::COLD_ATTRIBUTE;
 use crate::bytecode::unit::CompiledAttribute;
@@ -11,10 +14,7 @@ use crate::bytecode::unit::MUST_USE_ATTRIBUTE;
 use crate::bytecode::unit::NEVER_INLINE_ATTRIBUTE;
 use crate::bytecode::unit::TRACK_CALLER_ATTRIBUTE;
 use crate::bytecode::unit::frameless_literal;
-
-use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
 use crate::bytecode::unit::literal_value;
-use crate::engine::Atom;
 use crate::engine::CompiledUnit;
 use crate::engine::Engine;
 use crate::engine::MethodBodyKind;

@@ -1,4 +1,5 @@
 use whim_span::Span;
+use whim_value::heap::Heap;
 
 use super::optimize_chunk;
 use super::optimize_unit;
@@ -17,7 +18,6 @@ use crate::optimizer::analysis::Analysis;
 use crate::optimizer::rewrite::plan::RewritePlan;
 use crate::optimizer::type_flow::IndexedUnit;
 use crate::optimizer::type_flow::World;
-use crate::value::heap::Heap;
 
 const INPUT: Register = Register::new(0);
 const CONDITION: Register = Register::new(1);

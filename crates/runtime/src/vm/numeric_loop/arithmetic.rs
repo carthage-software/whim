@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
 
+use whim_value::ops::compare_int_float;
+
 use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
-use crate::value::ops::compare_int_float;
 use crate::vm::Fault;
 use crate::vm::numeric_loop::NumericKind;
 use crate::vm::numeric_loop::NumericValue;

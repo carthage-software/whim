@@ -8,6 +8,7 @@
 
 use whim_span::HasSpan;
 use whim_syn::cst::Program;
+use whim_value::heap::Heap;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::unit::CompiledBuiltInFunction;
@@ -16,7 +17,6 @@ use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::optimize_unit;
 use crate::symbols::line_starts_of;
-use crate::value::heap::Heap;
 
 mod declarations;
 mod embed;
@@ -41,10 +41,9 @@ use crate::compiler::emit::analysis::collect_scoped_bindings_in_statement;
 use crate::compiler::emit::analysis::collect_variables_in_statement;
 pub(crate) use crate::compiler::error::CompileError;
 pub(crate) use crate::compiler::target::Target;
-use crate::compiler::types::bounds::validate_static_type_argument_bounds;
-
 pub(crate) use crate::compiler::types::AliasGraph;
 pub(crate) use crate::compiler::types::GenericTable;
+use crate::compiler::types::bounds::validate_static_type_argument_bounds;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) struct CompileConfiguration {

@@ -1,13 +1,13 @@
 //! Symbolic descriptor substitution and built-in type-spec conversion.
 
 use hashbrown::HashMap;
+use whim_value::atom::Atom;
+use whim_value::heap::Heap;
 
 use crate::builtin::spec::TypeSpec;
 use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use crate::bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::value::atom::Atom;
-use crate::value::heap::Heap;
 
 pub(in crate::linker) fn substitute_symbolic(
     descriptor: &TypeDescriptor,

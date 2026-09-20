@@ -3,11 +3,20 @@
 use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
-
-use foldhash::fast::FixedState;
 use std::mem::discriminant;
 
+use foldhash::fast::FixedState;
 use whim_base::limits::MAX_TYPE_DEPTH_U32;
+use whim_value::Value;
+use whim_value::ValueView;
+use whim_value::array::ArrayTypeCheckId;
+use whim_value::dict::keys::KeyRef;
+use whim_value::function::CallTarget;
+use whim_value::function::FunctionObject;
+use whim_value::function::PresetArg;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::object::TypeEnvironmentId;
+use whim_value::ops;
 
 use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use crate::bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
@@ -18,27 +27,13 @@ use crate::engine::builtins::BuiltInCallable;
 use crate::engine::builtins::built_in_type_parameters;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::symbols::RuntimeTypeEnvironment;
-use crate::value::ValueView;
-use crate::value::array::ArrayTypeCheckId;
-use crate::value::function::PresetArg;
-use crate::vm::Atom;
-use crate::vm::CallTarget;
 use crate::vm::Chunk;
-use crate::vm::ClassId;
 use crate::vm::DescriptorIndex;
-use crate::vm::FunctionObject;
-use crate::vm::Heap;
-use crate::vm::Key;
-use crate::vm::KeyRef;
-use crate::vm::ManagedRef;
 use crate::vm::SymbolKind;
 use crate::vm::TypeDescriptor;
-use crate::vm::TypeEnvironmentId;
-use crate::vm::Value;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::is_instance_of;
-use crate::vm::ops;
 use crate::vm::unreachable_invariant;
 
 struct ActiveAliases {

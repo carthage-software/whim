@@ -7,9 +7,9 @@ use std::time::UNIX_EPOCH;
 
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
+use whim_value::Value;
 
 use crate::builtin::Context;
-use crate::value::Value;
 
 #[whim_function("Whim\\_Private\\get_system_time(): (int, int)")]
 pub(crate) fn get_system_time(scope: &Context<'_, '_, '_>) -> Value {

@@ -5,17 +5,17 @@ use std::cell::RefCell;
 
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
+use whim_value::Value;
+use whim_value::heap::handle::ManagedRef;
+use whim_value::heap::metadata::TeardownMode;
+use whim_value::heap::metadata::TraceVisitor;
+use whim_value::heap::queue::DropQueue;
+use whim_value::weak::WeakReference;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::BuiltInChildren;
 use crate::builtin::throw::Throw;
-use crate::value::Value;
-use crate::value::heap::handle::ManagedRef;
-use crate::value::heap::metadata::TeardownMode;
-use crate::value::heap::metadata::TraceVisitor;
-use crate::value::heap::queue::DropQueue;
-use crate::value::weak::WeakReference;
 
 #[whim_class("Whim\\Reference\\Weak<T: object>", final, traced)]
 #[derive(Default)]
