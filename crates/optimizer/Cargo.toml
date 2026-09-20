@@ -20,3 +20,7 @@ whim-base = { workspace = true }
 whim-bytecode = { workspace = true }
 whim-span = { workspace = true }
 whim-value = { workspace = true }
+
+[dev-dependencies]
+whim-compiler = { workspace = true }
+whim-syn = { workspace = true }

@@ -1,0 +1,19 @@
+function guaranteed(string $value): int {
+    return match ($value) { int => 1, bool => 2, string => 3, $_ => 4 };
+}
+function impossible(string $value): int {
+    return match ($value) { int => 1, bool => 2, $_ => 3 };
+}
+function overlap(string $value): int {
+    return match ($value) { 'foo' => 1, int => 2, string => 3, $_ => 4 };
+}
+function unhandled(string $value): int {
+    return match ($value) { int => 1, bool => 2 };
+}
+assert!(guaranteed('foo') == 3);
+assert!(impossible('foo') == 3);
+assert!(overlap('foo') == 1);
+assert!(overlap('bar') == 3);
+$caught = false;
+try { unhandled('foo'); } catch (Whim\Unwind\UnhandledMatchError $_) { $caught = true; }
+assert!($caught);

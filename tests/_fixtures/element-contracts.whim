@@ -1,0 +1,18 @@
+use Whim\Marker\NeverInline;
+final readonly class Entry {
+    public function __construct(public int $value) {}
+    #[NeverInline]
+    public function read(): int { return $this->value; }
+}
+#[NeverInline]
+function total(vec<Entry> $entries): int {
+    $sum = 0;
+    foreach ($entries as $entry) { $sum += $entry->value + $entry->read(); }
+    return $sum;
+}
+#[NeverInline]
+function from_key(dict<string, Entry> $entries, string $key): int {
+    return $entries[$key]->value;
+}
+assert!(total(vec[new Entry(2), new Entry(3)]) == 10);
+assert!(from_key(dict['x' => new Entry(7)], 'x') == 7);

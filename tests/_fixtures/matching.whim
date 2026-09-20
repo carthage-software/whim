@@ -1,0 +1,17 @@
+function literal_match(string $value): 1..=3 {
+    return match ($value) { 'foo' => 1, 'bar' => 2, $_ => 3 };
+}
+function typed_match(string $value): 1..=3 {
+    return match ($value) { 'foo' => 1, 'bar' => 2, string => 3 };
+}
+function conditional(string $value): 1..=3 {
+    if ($value == 'foo') { return 1; }
+    if ($value == 'bar') { return 2; }
+    return 3;
+}
+function invalid_return(string $value): 1..=2 {
+    return match ($value) { 'foo' => 1, 'bar' => 2, $_ => 3 };
+}
+function incomplete(mixed $value): 1..=3 {
+    return match ($value) { 'foo' => 1, 'bar' => 2, string => 3 };
+}

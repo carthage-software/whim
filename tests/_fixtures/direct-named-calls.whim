@@ -1,0 +1,23 @@
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function alter(vec<int> $left, vec<int> $right, int $extra = 9): vec<int> {
+    $left[] = $extra;
+    $right[0] = 7;
+    return $left;
+}
+#[NeverInline]
+function identity<T>(T $value): T { return $value; }
+#[NeverInline]
+function fail(vec<int> $value): never { throw new Whim\Unwind\TypeError('failed'); }
+#[NeverInline]
+function exercise(vec<int> $left, vec<int> $right): void {
+    assert!(alter($left, $right) == vec[1, 9]);
+    assert!($left == vec[1] && $right == vec[1]);
+    assert!(identity::<vec<int>>($left) == $left);
+    $caught = false;
+    try { fail($left); } catch (Whim\Unwind\TypeError $error) { $caught = true; }
+    assert!($caught && $left == vec[1]);
+}
+$value = vec[1];
+exercise($value, $value);
+assert!($value == vec[1]);

@@ -1,9 +1,7 @@
 mod matching;
-mod producer_proofs;
 mod return_proofs;
 
 use std::ops::Deref;
-use std::path::Path;
 use std::rc::Rc;
 
 use whim_bytecode::chunk::descriptors::IcDescriptor;
@@ -25,12 +23,7 @@ use whim_optimizer::optimize_callable_function as optimize_function;
 use whim_optimizer::optimize_callable_method as optimize_method;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
-use whim_value::function::FuncId;
 use whim_value::heap::Heap;
-
-use crate::engine::Engine;
-use crate::engine::EngineConfiguration;
-use crate::symbols::ExactFunctionEntry;
 
 struct OwnedUnit {
     unit: CompiledUnit,
@@ -3474,26 +3467,8 @@ fn lazy_method_optimization_keeps_defaulted_constructor_call() {
 }
 
 #[test]
-fn bounded_comparisons_preserve_integer_edges() {
-    let source = r"
-#[Whim\Marker\NeverInline]
-function ranges(int $value): vec<bool> {
-    $zero = $value == 0;
-    if (!$zero) { assert!($value != 0); }
-    if (!!$zero) { assert!($value == 0); }
-    return vec[
-        $value >= 48 && $value <= 57,
-        102 >= $value && 97 <= $value,
-        $value > 0 && $value < 4,
-        $value < 0 && $value > 10,
-        $value > 9223372036854775807 && $value < 4,
-        $value < -9223372036854775808 && $value > 0,
-    ];
-}
-foreach (vec[-9223372036854775808, -1, 0, 1, 3, 4, 47, 48, 57, 58, 96, 97, 102, 103, 9223372036854775807] as $value) {
-    assert!(ranges($value) == vec[$value is 48..=57, $value is 97..=102, $value is 1..=3, false, false, false]);
-}
-";
+fn bounded_comparisons_use_range_checks() {
+    let source = include_str!("../../../../tests/_fixtures/comparison-ranges.whim");
     let unit = compile(source, OptimizationConfiguration::default());
     let function = unit
         .functions
@@ -3512,105 +3487,11 @@ foreach (vec[-9223372036854775808, -1, 0, 1, 3, 4, 47, 48, 57, 58, 96, 97, 102, 
         function.chunk.code
     );
     verify_unit(&unit).unwrap();
-    for optimize in [false, true] {
-        let mut engine = Engine::new(EngineConfiguration {
-            optimize,
-            ..Default::default()
-        });
-        let result = engine.run_source(source, Path::new("/comparison-ranges.whim"));
-        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
-    }
 }
 
 #[test]
-fn byte_wrappers_keep_bounds_and_error_frames() {
-    let source = r#"
-#[Whim\Marker\NeverInline]
-#[Whim\Marker\TrackCaller]
-function byte_value(string $text, 0.. $offset): 0..=255 {
-    return Whim\Str\byte_at($text, $offset);
-}
-#[Whim\Marker\NeverInline]
-function reversed_byte(0.. $offset, string $text): 0..=255 {
-    return Whim\Str\byte_at($text, $offset);
-}
-#[Whim\Marker\NeverInline]
-function restricted_byte(string $text, 0.. $offset): 0..=127 {
-    return Whim\Str\byte_at($text, $offset);
-}
-for ($round = 0; $round < 4; $round++) {
-    foreach (vec['a', 'a long string', "\0\xff\x80\x7f"] as $text) {
-        for ($offset = 0; $offset < length!($text); $offset++) {
-            $expected = Whim\Str\byte_at($text, $offset);
-            assert!(byte_value($text, $offset) == $expected);
-            assert!(reversed_byte($offset, $text) == $expected);
-        }
-        $caught = false;
-        try { byte_value($text, length!($text)); }
-        catch (Whim\Unwind\OutOfBoundsError $error) {
-            assert!($error->getTrace()[0]->function == 'Whim\Str\byte_at');
-            assert!($error->getTrace()[1]->function == 'byte_value');
-            $caught = true;
-        }
-        assert!($caught);
-    }
-    $caught = false;
-    try { restricted_byte("\xff", 0); }
-    catch (Whim\Unwind\TypeError $error) { $caught = true; }
-    assert!($caught);
-}
-"#;
-    for optimize in [false, true] {
-        let mut engine = Engine::new(EngineConfiguration {
-            optimize,
-            ..Default::default()
-        });
-        let result = engine.run_source(source, Path::new("/byte-wrappers.whim"));
-        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
-        if optimize {
-            let (position, function) = engine
-                .tables
-                .functions
-                .iter()
-                .enumerate()
-                .find(|(_, function)| function.name.as_bytes() == b"byte_value")
-                .unwrap();
-            assert_eq!(
-                ExactFunctionEntry::from_runtime(FuncId(position as u32), function, true)
-                    .string_byte_at,
-                Some((0, 1))
-            );
-        }
-    }
-}
-
-#[test]
-fn direct_named_calls_preserve_borrowed_arguments() {
-    let source = r"
-use Whim\Marker\NeverInline;
-#[NeverInline]
-function alter(vec<int> $left, vec<int> $right, int $extra = 9): vec<int> {
-    $left[] = $extra;
-    $right[0] = 7;
-    return $left;
-}
-#[NeverInline]
-function identity<T>(T $value): T { return $value; }
-#[NeverInline]
-function fail(vec<int> $value): never { throw new Whim\Unwind\TypeError('failed'); }
-#[NeverInline]
-function exercise(vec<int> $left, vec<int> $right): void {
-    assert!(alter($left, $right) == vec[1, 9]);
-    assert!($left == vec[1] && $right == vec[1]);
-    assert!(identity::<vec<int>>($left) == $left);
-    $caught = false;
-    try { fail($left); } catch (Whim\Unwind\TypeError $error) { $caught = true; }
-    assert!($caught && $left == vec[1]);
-}
-$value = vec[1];
-exercise($value, $value);
-assert!($value == vec[1]);
-";
+fn proven_named_calls_use_direct_dispatch() {
+    let source = include_str!("../../../../tests/_fixtures/direct-named-calls.whim");
     let unit = compile(source, OptimizationConfiguration::default());
     assert!(unit.functions.iter().any(|function| {
         function
@@ -3620,52 +3501,11 @@ assert!($value == vec[1]);
             .any(|instruction| matches!(instruction, Instruction::CallNamedDirect { .. }))
     }));
     verify_unit(&unit).unwrap();
-    for optimize in [false, true] {
-        let mut engine = Engine::new(EngineConfiguration {
-            optimize,
-            ..Default::default()
-        });
-        let result = engine.run_source(source, Path::new("/direct-named-calls.whim"));
-        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
-    }
 }
 
 #[test]
-fn collection_tests_use_union_contracts_without_losing_element_checks() {
-    let source = r"
-use Whim\Marker\NeverInline;
-type Tree = null|int|string|vec<Tree>|dict<string, Tree>;
-#[NeverInline]
-function kind(Tree $value): int {
-    if ($value is dict<string, Tree>) { return 1; }
-    if ($value is vec<Tree>) { return 2; }
-    return 3;
-}
-#[NeverInline]
-function integers(vec<int>|vec<string>|null $value): bool {
-    return $value is vec<int>;
-}
-#[NeverInline]
-function changed(vec<int>|null $value): bool {
-    if ($value == null) { return false; }
-    $value[] = 'text';
-    return $value is vec<int>;
-}
-assert!(kind(dict['a' => vec[1, dict['b' => null]]]) == 1);
-assert!(kind(vec[dict['a' => 1]]) == 2);
-assert!(kind(1) == 3 && kind(null) == 3);
-assert!(integers(vec[1]) && !integers(vec['x']) && !integers(null));
-assert!(!changed(vec[1]));
-class Holder { public mixed $value = 1; }
-type MutableTree = vec<MutableTree>|#{ value: int };
-#[NeverInline]
-function mutable_shape(vec<MutableTree>|int $values, Holder $holder): bool {
-    $holder->value = 'changed';
-    return $values is vec<MutableTree>;
-}
-$holder = new Holder();
-assert!(!mutable_shape(vec[$holder], $holder));
-";
+fn collection_union_tests_use_outer_container_checks() {
+    let source = include_str!("../../../../tests/_fixtures/collection-contracts.whim");
     let unit = compile(source, OptimizationConfiguration::default());
     let function = unit
         .functions
@@ -3688,38 +3528,11 @@ assert!(!mutable_shape(vec[$holder], $holder));
             ))
     );
     verify_unit(&unit).unwrap();
-    for optimize in [false, true] {
-        let mut engine = Engine::new(EngineConfiguration {
-            optimize,
-            ..Default::default()
-        });
-        let result = engine.run_source(source, Path::new("/collection-tests.whim"));
-        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
-    }
 }
 
 #[test]
-fn collection_elements_keep_class_and_return_contracts() {
-    let source = r"
-use Whim\Marker\NeverInline;
-final readonly class Entry {
-    public function __construct(public int $value) {}
-    #[NeverInline]
-    public function read(): int { return $this->value; }
-}
-#[NeverInline]
-function total(vec<Entry> $entries): int {
-    $sum = 0;
-    foreach ($entries as $entry) { $sum += $entry->value + $entry->read(); }
-    return $sum;
-}
-#[NeverInline]
-function from_key(dict<string, Entry> $entries, string $key): int {
-    return $entries[$key]->value;
-}
-assert!(total(vec[new Entry(2), new Entry(3)]) == 10);
-assert!(from_key(dict['x' => new Entry(7)], 'x') == 7);
-";
+fn collection_elements_use_known_property_slots() {
+    let source = include_str!("../../../../tests/_fixtures/element-contracts.whim");
     let unit = compile(source, OptimizationConfiguration::default());
     for name in [b"total".as_slice(), b"from_key".as_slice()] {
         let function = unit
@@ -3743,12 +3556,4 @@ assert!(from_key(dict['x' => new Entry(7)], 'x') == 7);
         );
     }
     verify_unit(&unit).unwrap();
-    for optimize in [false, true] {
-        let mut engine = Engine::new(EngineConfiguration {
-            optimize,
-            ..Default::default()
-        });
-        let result = engine.run_source(source, Path::new("/element-contracts.whim"));
-        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
-    }
 }

@@ -1,0 +1,17 @@
+#[Whim\Marker\NeverInline]
+function ranges(int $value): vec<bool> {
+    $zero = $value == 0;
+    if (!$zero) { assert!($value != 0); }
+    if (!!$zero) { assert!($value == 0); }
+    return vec[
+        $value >= 48 && $value <= 57,
+        102 >= $value && 97 <= $value,
+        $value > 0 && $value < 4,
+        $value < 0 && $value > 10,
+        $value > 9223372036854775807 && $value < 4,
+        $value < -9223372036854775808 && $value > 0,
+    ];
+}
+foreach (vec[-9223372036854775808, -1, 0, 1, 3, 4, 47, 48, 57, 58, 96, 97, 102, 103, 9223372036854775807] as $value) {
+    assert!(ranges($value) == vec[$value is 48..=57, $value is 97..=102, $value is 1..=3, false, false, false]);
+}

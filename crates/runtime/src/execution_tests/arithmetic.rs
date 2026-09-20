@@ -1,10 +1,7 @@
-use std::path::Path;
-
-use crate::engine::Engine;
-use crate::engine::EngineConfiguration;
+use super::run_both_modes;
 
 #[test]
-fn power_facts_preserve_negative_exponent_result_types_and_consumers() {
+fn negative_powers_preserve_result_types_and_consumers() {
     let source = r"
 use Whim\Marker\NeverInline;
 #[NeverInline]
@@ -51,7 +48,7 @@ assert!($caught);
 }
 
 #[test]
-fn stub_constants_do_not_prove_their_placeholder_type() {
+fn stub_constants_use_native_values() {
     let source = r"
 namespace Whim\_Private;
 use Whim\Marker\Stub;
@@ -62,15 +59,4 @@ assert!(!(OS is null));
 assert!(OS != '');
 ";
     run_both_modes(source, "/stub-constant-proofs.whim");
-}
-
-fn run_both_modes(source: &str, path: &str) {
-    for optimize in [false, true] {
-        let mut engine = Engine::new(EngineConfiguration {
-            optimize,
-            ..EngineConfiguration::default()
-        });
-        let result = engine.run_source(source, Path::new(path));
-        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
-    }
 }

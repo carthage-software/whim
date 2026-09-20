@@ -13,4 +13,4 @@ pub(crate) mod symbols;
 pub(crate) mod vm;
 
 #[cfg(test)]
-mod optimizer_tests;
+mod execution_tests;

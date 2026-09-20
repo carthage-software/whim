@@ -3487,7 +3487,9 @@ dependencies = [
  "ryu",
  "whim-base",
  "whim-bytecode",
+ "whim-compiler",
  "whim-span",
+ "whim-syn",
  "whim-value",
 ]
 

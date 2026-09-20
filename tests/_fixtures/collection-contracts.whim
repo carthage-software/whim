@@ -1,0 +1,32 @@
+use Whim\Marker\NeverInline;
+type Tree = null|int|string|vec<Tree>|dict<string, Tree>;
+#[NeverInline]
+function kind(Tree $value): int {
+    if ($value is dict<string, Tree>) { return 1; }
+    if ($value is vec<Tree>) { return 2; }
+    return 3;
+}
+#[NeverInline]
+function integers(vec<int>|vec<string>|null $value): bool {
+    return $value is vec<int>;
+}
+#[NeverInline]
+function changed(vec<int>|null $value): bool {
+    if ($value == null) { return false; }
+    $value[] = 'text';
+    return $value is vec<int>;
+}
+assert!(kind(dict['a' => vec[1, dict['b' => null]]]) == 1);
+assert!(kind(vec[dict['a' => 1]]) == 2);
+assert!(kind(1) == 3 && kind(null) == 3);
+assert!(integers(vec[1]) && !integers(vec['x']) && !integers(null));
+assert!(!changed(vec[1]));
+class Holder { public mixed $value = 1; }
+type MutableTree = vec<MutableTree>|#{ value: int };
+#[NeverInline]
+function mutable_shape(vec<MutableTree>|int $values, Holder $holder): bool {
+    $holder->value = 'changed';
+    return $values is vec<MutableTree>;
+}
+$holder = new Holder();
+assert!(!mutable_shape(vec[$holder], $holder));
