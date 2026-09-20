@@ -136,6 +136,10 @@ function start(Definition $command): Child {
 #[TrackCaller]
 #[TraceBoundary]
 function exit_status(int $status): ExitStatus {
+  if (operating_system!() == 'windows') {
+    return new Exited($status >> 8);
+  }
+
   $signal = $status & 127;
   if (0 == $signal) {
     return new Exited(($status >> 8) & 255);
@@ -352,6 +356,10 @@ final class ChildImpl implements Child {
       return $settled;
     }
 
+    if (operating_system!() == 'windows') {
+      return $this->kill();
+    }
+
     $this->signal(Signal::Terminate);
 
     // Without a grace the caller asked to terminate, not to kill, so this
@@ -382,7 +390,11 @@ final class ChildImpl implements Child {
       return $settled;
     }
 
-    $this->signal(Signal::Kill);
+    if (operating_system!() == 'windows') {
+      Whim\_Private\terminate_process($this->id);
+    } else {
+      $this->signal(Signal::Kill);
+    }
 
     return $this->waiting->await();
   }

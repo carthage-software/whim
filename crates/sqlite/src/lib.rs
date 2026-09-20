@@ -59,7 +59,8 @@ pub use value::Value;
 const STATUS_OPENING: u8 = 0;
 const STATUS_READY: u8 = 1;
 const STATUS_BROKEN: u8 = 2;
-const STATUS_CLOSED: u8 = 3;
+const STATUS_CLOSING: u8 = 3;
+const STATUS_CLOSED: u8 = 4;
 const FIRST_OPERATION: u64 = 1;
 const RESULT_BUFFER_SIZE: usize = 64;
 const CANCELLATION_PROGRESS_INTERVAL: i32 = 1_000;
@@ -610,9 +611,16 @@ impl ConnectionShared {
     }
 
     fn close(self: &Arc<Self>) {
-        if self.status.swap(STATUS_CLOSED, Ordering::AcqRel) == STATUS_CLOSED {
+        if self
+            .status
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |status| {
+                (!matches!(status, STATUS_CLOSING | STATUS_CLOSED)).then_some(STATUS_CLOSING)
+            })
+            .is_err()
+        {
             return;
         }
+
         let active = self.execution.active.load(Ordering::Acquire);
         if active != 0 {
             self.interrupt(active);
@@ -627,24 +635,31 @@ impl ConnectionShared {
         }
 
         let shared = Arc::clone(self);
-        let _ = self.submit(Box::new(move || shared.close_connection()));
+        if self
+            .submit(Box::new(move || shared.close_connection()))
+            .is_err()
+        {
+            self.close_connection();
+        }
     }
 
     fn close_connection(&self) {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        let Some(connection) = state.connection.take() else {
-            return;
-        };
-        if state.transaction {
-            let _ = connection.execute_batch("ROLLBACK");
-            state.transaction = false;
+        if let Some(connection) = state.connection.take() {
+            if state.transaction {
+                let _ = connection.execute_batch("ROLLBACK");
+                state.transaction = false;
+            }
+            self.interrupt
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take();
+            drop(connection);
         }
-        self.interrupt
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take();
+
+        self.status.store(STATUS_CLOSED, Ordering::Release);
         drop(state);
-        drop(connection);
+        self.notifier.signal();
     }
 }
 
@@ -819,15 +834,36 @@ impl Connection {
             && self.shared.execution.active.load(Ordering::Acquire) == 0
     }
 
-    /// Reports whether the connection is closed.
+    /// Reports whether the connection is closing or closed.
     #[must_use]
     pub fn is_closed(&self) -> bool {
+        matches!(
+            self.shared.status.load(Ordering::Acquire),
+            STATUS_CLOSING | STATUS_CLOSED
+        )
+    }
+
+    /// Starts closing the connection.
+    pub fn close(&self) {
+        self.shared.close();
+    }
+
+    /// Starts closing and reports whether the database has been released.
+    #[must_use]
+    pub fn poll_close(&self) -> bool {
+        self.close();
         self.shared.status.load(Ordering::Acquire) == STATUS_CLOSED
     }
 
-    /// Closes the connection.
-    pub fn close(&self) {
-        self.shared.close();
+    /// Returns the descriptor used to signal completion.
+    #[must_use]
+    pub fn descriptor(&self) -> RawDescriptor {
+        self.shared.notifier.descriptor()
+    }
+
+    /// Clears pending connection notifications.
+    pub fn drain_notification(&self) {
+        self.shared.notifier.drain();
     }
 }
 
@@ -842,8 +878,12 @@ fn open(
     shared: &Arc<ConnectionShared>,
     opening: &Arc<OperationShared>,
 ) {
-    if opening.cancelled.load(Ordering::Acquire) {
-        shared.status.store(STATUS_CLOSED, Ordering::Release);
+    let mut state = shared.state.lock().unwrap_or_else(PoisonError::into_inner);
+    if opening.cancelled.load(Ordering::Acquire)
+        || shared.status.load(Ordering::Acquire) != STATUS_OPENING
+    {
+        drop(state);
+        shared.close_connection();
         shared.release(FIRST_OPERATION);
         opening.complete(Err(Error::message("the SQLite operation was cancelled")));
         return;
@@ -852,14 +892,22 @@ fn open(
     let connection = match open_connection(configuration, Arc::clone(&shared.execution)) {
         Ok(connection) => connection,
         Err(error) => {
-            shared.status.store(STATUS_BROKEN, Ordering::Release);
+            let _ = shared.status.compare_exchange(
+                STATUS_OPENING,
+                STATUS_BROKEN,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+            drop(state);
             shared.release(FIRST_OPERATION);
             opening.complete(Err(error));
             return;
         }
     };
     if opening.cancelled.load(Ordering::Acquire) {
-        shared.status.store(STATUS_CLOSED, Ordering::Release);
+        drop(connection);
+        drop(state);
+        shared.close_connection();
         shared.release(FIRST_OPERATION);
         opening.complete(Err(Error::message("the SQLite operation was cancelled")));
         return;
@@ -869,11 +917,8 @@ fn open(
         .interrupt
         .lock()
         .unwrap_or_else(PoisonError::into_inner) = Some(connection.get_interrupt_handle());
-    shared
-        .state
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .connection = Some(connection);
+    state.connection = Some(connection);
+    drop(state);
     if shared
         .status
         .compare_exchange(

@@ -71,6 +71,7 @@ interface Child {
 
   /**
    * Sends `Terminate` and waits for the child to end.
+   * On Windows, ends the child at once because POSIX signals are unavailable.
    *
    * With a `$grace`, a child still running when it elapses is sent `Kill`.
    * Without one, this waits as long as the child takes: terminating and
@@ -81,7 +82,7 @@ interface Child {
   #[TrackCaller]
   public function terminate(null|Duration $grace = null): ExitStatus;
 
-  /** Ends the child at once, with a signal it cannot refuse. */
+  /** Ends the child at once. */
   #[MustUse]
   #[TrackCaller]
   public function kill(): ExitStatus;

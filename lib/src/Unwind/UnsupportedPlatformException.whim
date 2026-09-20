@@ -1,0 +1,4 @@
+namespace Whim\Unwind;
+
+/** Reports an operation the running platform does not support. */
+class UnsupportedPlatformException extends RuntimeException {}

@@ -105,6 +105,7 @@ percent-encoding = "2.3.2"
 polling = "3"
 pq-sys = { version = "0.7.5", default-features = false }
 proc-macro2 = "1"
+process-wrap = { version = "10", default-features = false, features = ["std", "job-object"] }
 proptest = "1"
 pubgrub = "0.4.0"
 punycode = "0.4.1"
@@ -130,10 +131,10 @@ signal-hook = "0.4"
 simd-adler32 = "0.3.10"
 similar = "3.2"
 sonic-rs = "0.5.8"
+socket2 = { version = "0.6", features = ["all"] }
 spdx = "0.13.5"
 syn = { version = "3", features = ["full", "fold"] }
 tar = { version = "0.4.46", default-features = false }
-target-guard = { package = "whim-support", path = "crates/support", version = "0.10.0" }
 thiserror = "2.0.19"
 toml = "0.8"
 toml_edit = "0.25.13"
@@ -155,6 +156,7 @@ whim-span = { path = "crates/span", version = "0.10.0" }
 whim-sqlite = { path = "crates/sqlite", version = "0.10.0" }
 whim-lib = { path = "lib", version = "0.10.0" }
 whim-syn = { path = "crates/syn", version = "0.10.0" }
+whim-sys = { path = "crates/sys", version = "0.10.0" }
 windows-sys = "0.61"
 x509-parser = "0.18.1"
 xxhash-rust = { version = "0.8.18", features = ["xxh64", "xxh3"] }
@@ -178,14 +180,12 @@ libc = { workspace = true }
 mimalloc = { workspace = true }
 pubgrub = { workspace = true }
 rayon = { workspace = true }
-rustix = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
 spdx = { workspace = true }
 tar = { workspace = true }
-target-guard = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 toml_edit = { workspace = true }
@@ -198,3 +198,11 @@ whim-runtime = { workspace = true }
 whim-span = { workspace = true }
 whim-lib = { workspace = true }
 whim-syn = { workspace = true }
+whim-sys = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+process-wrap = { workspace = true }
+windows-sys = { workspace = true, features = ["Win32_Storage_FileSystem"] }

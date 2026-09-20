@@ -157,19 +157,19 @@ caller may handle. Use `panic!` only when continuing would be wrong.
 ## Platform information
 
 These constructs take no arguments and return strings describing the compilation
-target. This defaults to the platform running Whim.The compiler stores these
+target. This defaults to the platform running Whim. The compiler stores these
 values as string constants.
 
 | Construct | Value | Examples |
 | --- | --- | --- |
 | `cpu_architecture!()` | CPU architecture | `'x86_64'`, `'aarch64'`, `'riscv64'` |
-| `operating_system!()` | Operating system | `'linux'`, `'macos'`, `'freebsd'` |
-| `operating_system_family!()` | Operating system family | `'unix'` |
-| `shared_library_prefix!()` | Shared library filename prefix | `'lib'` |
-| `shared_library_suffix!()` | Shared library filename suffix, including the dot | `'.so'`, `'.dylib'` |
-| `shared_library_extension!()` | Shared library extension without the dot | `'so'`, `'dylib'` |
-| `executable_suffix!()` | Executable filename suffix, including a dot if present | `''` |
-| `executable_extension!()` | Executable extension without the dot | `''` |
+| `operating_system!()` | Operating system | `'linux'`, `'macos'`, `'freebsd'`, `'windows'` |
+| `operating_system_family!()` | Operating system family | `'unix'`, `'windows'` |
+| `shared_library_prefix!()` | Shared library filename prefix | `'lib'`, `''` |
+| `shared_library_suffix!()` | Shared library filename suffix, including the dot | `'.so'`, `'.dylib'`, `'.dll'` |
+| `shared_library_extension!()` | Shared library extension without the dot | `'so'`, `'dylib'`, `'dll'` |
+| `executable_suffix!()` | Executable filename suffix, including a dot if present | `''`, `'.exe'` |
+| `executable_extension!()` | Executable extension without the dot | `''`, `'exe'` |
 
 You can use them in [constant expressions](constant-expressions.md), including
 constant declarations, parameter defaults, property defaults, and attributes:

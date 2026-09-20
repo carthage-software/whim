@@ -339,6 +339,7 @@ whim_core! {
         private::syscall::process::process_times,
         private::syscall::process::replace_process,
         private::syscall::process::send_signal,
+        private::syscall::process::terminate_process,
         private::syscall::process::process_exists,
         private::syscall::process::watch_signal,
         private::syscall::process::spawn_process,
@@ -536,6 +537,7 @@ whim_core! {
     ],
     newtypes: [type_::TypeId],
     constants: [
+        private::syscall::constants::PATH_SEPARATOR,
         system::VERSION,
         private::math::INT_MAX,
         private::math::INT_MIN,

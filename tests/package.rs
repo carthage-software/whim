@@ -11,8 +11,13 @@ use std::io::BufReader;
 use std::num::NonZeroUsize;
 #[cfg(target_os = "linux")]
 use std::os::unix::ffi::OsStringExt;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::{symlink_dir, symlink_file as symlink};
+use std::path::MAIN_SEPARATOR;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Child;
@@ -155,7 +160,8 @@ impl Fixture {
     }
 
     fn command_in(&self, directory: &Path, arguments: &[&str]) -> Command {
-        let remote_base = format!("file://{}/", self.remotes.display());
+        let remote_base =
+            Url::from_directory_path(&self.remotes).expect("the remote path forms a file URL");
         let mut command = Command::new(env!("CARGO_BIN_EXE_whim"));
         command
             .current_dir(directory)
@@ -345,7 +351,11 @@ fn init_does_not_follow_project_links() {
     let linked_directory = Fixture::new("init-linked-directory");
     let outside = linked_directory.directory.join("outside-source");
     fs::create_dir(&outside).expect("the outside directory is creatable");
-    symlink(&outside, linked_directory.application.join("src"))
+    #[cfg(unix)]
+    let link_directory = symlink;
+    #[cfg(windows)]
+    let link_directory = symlink_dir;
+    link_directory(&outside, linked_directory.application.join("src"))
         .expect("the source link is creatable");
 
     let output = linked_directory.run(&["init", "--no-git"]);
@@ -453,7 +463,10 @@ fn package_commands_do_not_follow_dependency_manager_links() {
         if let Some(parent) = link.parent() {
             fs::create_dir_all(parent).expect("the link parent is creatable");
         }
+        #[cfg(unix)]
         symlink(&outside, &link).expect("the manager link is creatable");
+        #[cfg(windows)]
+        symlink_dir(&outside, &link).expect("the manager link is creatable");
 
         let output = fixture.run(&["install"]);
         assert!(!output.status.success());
@@ -1479,10 +1492,12 @@ fn package_commands_reload_the_manifest_after_waiting_for_the_lock() {
 fn informational_commands_do_not_create_or_modify_manager_state() {
     let clean = Fixture::new("read-only-inspection-clean");
     assert_success(&clean.run(&["init", "--no-git"]));
+    #[cfg(unix)]
     let clean_mode = fs::metadata(&clean.application)
         .expect("the project directory is inspectable")
         .permissions()
         .mode();
+    #[cfg(unix)]
     fs::set_permissions(&clean.application, fs::Permissions::from_mode(0o555))
         .expect("the project directory can become read-only");
     for arguments in [&["suggestions"][..], &["fund"][..]] {
@@ -1492,6 +1507,7 @@ fn informational_commands_do_not_create_or_modify_manager_state() {
 
     let why = clean.run(&["why", "git+https://fixtures.invalid/missing"]);
     assert!(!why.status.success());
+    #[cfg(unix)]
     fs::set_permissions(&clean.application, fs::Permissions::from_mode(clean_mode))
         .expect("the project directory can become writable");
     assert!(!clean.application.join("vendor").exists());
@@ -1507,18 +1523,22 @@ fn informational_commands_do_not_create_or_modify_manager_state() {
     ]));
 
     let manager = installed.application.join("vendor/.whim");
+    #[cfg(unix)]
     let manager_mode = fs::metadata(&manager)
         .expect("the manager directory is inspectable")
         .permissions()
         .mode();
+    #[cfg(unix)]
     let project_mode = fs::metadata(&installed.application)
         .expect("the project directory is inspectable")
         .permissions()
         .mode();
     let lock = manager.join("install.lock");
     let lock_contents = fs::read(&lock).expect("the manager lock is readable");
+    #[cfg(unix)]
     fs::set_permissions(&manager, fs::Permissions::from_mode(0o555))
         .expect("the manager directory can become read-only");
+    #[cfg(unix)]
     fs::set_permissions(&installed.application, fs::Permissions::from_mode(0o555))
         .expect("the project directory can become read-only");
 
@@ -1533,11 +1553,13 @@ fn informational_commands_do_not_create_or_modify_manager_state() {
         assert_success(&output);
     }
 
+    #[cfg(unix)]
     fs::set_permissions(
         &installed.application,
         fs::Permissions::from_mode(project_mode),
     )
     .expect("the project directory can become writable");
+    #[cfg(unix)]
     fs::set_permissions(&manager, fs::Permissions::from_mode(manager_mode))
         .expect("the manager directory can become writable");
     assert_eq!(
@@ -1668,7 +1690,12 @@ fn conflicts_explanations_suggestions_funding_and_license_warnings_work_together
         assert!(show.contains(expected), "missing `{expected}` in:\n{show}");
     }
     assert!(show.contains("path            : "), "{show}");
-    assert!(show.contains("/vendor/packages/"), "{show}");
+    assert!(
+        show.contains(&format!(
+            "{MAIN_SEPARATOR}vendor{MAIN_SEPARATOR}packages{MAIN_SEPARATOR}"
+        )),
+        "{show}"
+    );
 
     let missing = fixture.run(&["show", "https://fixtures.invalid/missing.git"]);
     assert!(!missing.status.success());

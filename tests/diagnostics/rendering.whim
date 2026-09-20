@@ -18,6 +18,7 @@ File\write(
   '$a = 1;' . "\n" . '$b = vec[];' . "\n" . '$c = $a + $b;' . "\n",
 );
 
+$fault = Filesystem\canonicalize($fault);
 $run = Command\run($binary, vec[$fault]);
 assert!(!($run->isSuccess()));
 $assertion_value_3 = $run->standardError;
@@ -50,6 +51,7 @@ assert!(!Whim\Str\contains($assertion_value_3, $escape));
 
 $parser = $work . '/parser-error.whim';
 File\write($parser, '$a = 1');
+$parser = Filesystem\canonicalize($parser);
 $run = Command\run($binary, vec[$parser]);
 assert!(!($run->isSuccess()));
 $assertion_value_5 = $run->standardError;
@@ -64,6 +66,7 @@ assert!(Whim\Str\contains($assertion_value_5, ' --> ' . $parser . ':1:7'));
 
 $compiler = $work . '/compiler-error.whim';
 File\write($compiler, 'function f(): void { return 1; }' . "\n");
+$compiler = Filesystem\canonicalize($compiler);
 $run = Command\run($binary, vec[$compiler]);
 assert!(!($run->isSuccess()));
 $assertion_value_7 = $run->standardError;
@@ -90,6 +93,7 @@ File\write(
   . "\n",
 );
 
+$explicit = Filesystem\canonicalize($explicit);
 $run = Command\run($binary, vec[$explicit]);
 assert!(!($run->isSuccess()));
 $assertion_value_9 = $run->standardError;
@@ -115,6 +119,7 @@ File\write(
   . "\n",
 );
 
+$chained = Filesystem\canonicalize($chained);
 $run = Command\run($binary, vec[$chained]);
 assert!(!($run->isSuccess()));
 $assertion_value_11 = $run->standardError;
@@ -135,10 +140,16 @@ assert!(Whim\Str\contains($assertion_value_11, ' --> ' . $chained . ':3:1'));
 
 $broken = $work . '/broken-unit.whim';
 File\write($broken, 'class Broken implements Box {}' . "\n");
+$broken = Filesystem\canonicalize($broken);
 $linker = $work . '/linker-error.whim';
 File\write(
   $linker,
-  'interface Box<T> {}' . "\n" . 'require!(\'' . $broken . '\');' . "\n",
+  'interface Box<T> {}'
+  . "\n"
+  . 'require!(\''
+  . Str\replace($broken, '\\', '\\\\')
+  . '\');'
+  . "\n",
 );
 
 $run = Command\run($binary, vec[$linker]);
@@ -164,6 +175,7 @@ assert!(!Whim\Str\contains($run->standardError, $escape));
 
 $builtIn = $work . '/built-in-boundary.whim';
 File\write($builtIn, 'Whim\Math\abs(\'wrong\');' . "\n");
+$builtIn = Filesystem\canonicalize($builtIn);
 $run = Command\run($binary, vec[$builtIn]);
 assert!(!($run->isSuccess()));
 $assertion_value_16 = $run->standardError;

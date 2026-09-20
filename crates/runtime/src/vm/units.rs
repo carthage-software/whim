@@ -6,6 +6,8 @@ use std::path::Path;
 use whim_span::HasSpan;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser;
+use whim_sys::path::path_bytes;
+use whim_sys::path::path_from_bytes;
 
 use crate::bytecode::unit::CompiledUnit;
 use crate::compiler;
@@ -16,8 +18,6 @@ use crate::engine::diagnostics::DiagnosticLabel;
 use crate::engine::diagnostics::DiagnosticLabels;
 use crate::engine::diagnostics::DiagnosticOrigin;
 use crate::optimizer::OptimizationConfiguration;
-use crate::path::path_bytes;
-use crate::path::path_from_bytes;
 use crate::symbols::line_starts_of;
 use crate::vm::Atom;
 use crate::vm::Frame;
@@ -60,8 +60,8 @@ impl VirtualMachine<'_> {
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
             let unit = unsafe { self.current_frame().unit.as_ref() };
             path_from_bytes(unit.path.as_bytes())
-                .parent()
-                .map(Path::to_path_buf)
+                .ok()
+                .and_then(|path| path.parent().map(Path::to_path_buf))
         };
 
         match self.load_unit(&requested, base.as_deref(), once)? {
@@ -85,7 +85,12 @@ impl VirtualMachine<'_> {
         base: Option<&Path>,
         once: bool,
     ) -> Result<Option<Rc<UnitContext>>, VirtualMachineControl> {
-        let raw = path_from_bytes(requested);
+        let raw = path_from_bytes(requested).map_err(|error| {
+            self.throw_well_known(
+                self.engine.tables.well_known.require_error,
+                format!("cannot read the requested path: {error}"),
+            )
+        })?;
 
         let joined = if raw.is_absolute() {
             raw

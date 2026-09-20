@@ -767,6 +767,10 @@ function replace_process(
 #[TraceBoundary]
 function send_signal(int $process, (0..) $signal): void {}
 
+/** Ends a process at once. */
+#[Stub]
+function terminate_process((1..) $process): void {}
+
 /**
  * Calls `$callback` each time a signal arrives.
  *

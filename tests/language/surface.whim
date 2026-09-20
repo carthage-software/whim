@@ -32,9 +32,18 @@ assert!($assertion_error_4 is TypeError);
 $assertion_value_5 = Whim\VERSION;
 assert!($assertion_value_5 is string);
 assert!($assertion_value_5 != '');
-assert!(Path\SEPARATOR == '/');
 assert!(
-  contains!(vec['Darwin', 'Linux', 'BSD', 'Solaris', 'Unknown'], OS\FAMILY),
+  Path\SEPARATOR == match (operating_system!()) {
+    'windows' => '\\',
+    _ => '/',
+  },
+);
+
+assert!(
+  contains!(
+    vec['Darwin', 'Linux', 'BSD', 'Solaris', 'Windows', 'Unknown'],
+    OS\FAMILY,
+  ),
 );
 
 assert!(Str\length('héllo') == 6);

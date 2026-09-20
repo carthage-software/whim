@@ -6,12 +6,12 @@ use std::error::Error;
 use std::fmt;
 use std::io;
 use std::io::Write;
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::rc::Rc;
 
 use whim_span::Span;
 use whim_syn::cst::Program;
+use whim_sys::path::path_bytes;
 
 use crate::bytecode::disassemble;
 use crate::bytecode::unit::CompiledUnit;
@@ -39,7 +39,7 @@ impl Disassembly {
     ) -> Result<Self, DisassemblyError> {
         let diagnostic_path = path.to_string_lossy();
         let unit = engine
-            .compile_program(program, &diagnostic_path, path.as_os_str().as_bytes())
+            .compile_program(program, &diagnostic_path, &path_bytes(path))
             .map_err(DisassemblyError::from)?;
         let heap = Rc::clone(&engine.heap);
 

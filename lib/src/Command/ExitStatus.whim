@@ -5,7 +5,7 @@ use Whim\Marker\Frameless;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Process\Signal;
-use Whim\Refine\Uint8;
+use Whim\Refine\Uint32;
 
 /** How a child process ended. */
 interface ExitStatus for Exited, Signalled {
@@ -18,7 +18,7 @@ interface ExitStatus for Exited, Signalled {
 /** A child that returned a status code of its own accord. */
 final readonly class Exited implements ExitStatus {
   #[AlwaysInline]
-  public function __construct(public Uint8 $code) {}
+  public function __construct(public Uint32 $code) {}
 
   #[AlwaysInline]
   #[MustUse]

@@ -3,7 +3,10 @@ use std::io;
 use std::io::BufWriter;
 use std::io::Write;
 use std::ops::ControlFlow;
+#[cfg(unix)]
 use std::os::fd::AsFd;
+#[cfg(windows)]
+use std::os::windows::io::AsHandle;
 use std::process::ExitCode;
 use std::time::Duration;
 
@@ -116,8 +119,14 @@ pub(super) struct OutputReducer {
 
 impl OutputReducer {
     pub(super) fn new(format: OutputFormat) -> Result<Self, Error> {
+        #[cfg(unix)]
         let descriptor = io::stdout()
             .as_fd()
+            .try_clone_to_owned()
+            .map_err(Error::WriteOutput)?;
+        #[cfg(windows)]
+        let descriptor = io::stdout()
+            .as_handle()
             .try_clone_to_owned()
             .map_err(Error::WriteOutput)?;
         Ok(Self {

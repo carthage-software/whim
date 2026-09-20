@@ -84,6 +84,10 @@ but not an explicit outgoing interface. Leave `interfaceIndex` in `SendMetadata`
 at `0` for IPv4; a nonzero value throws `NetworkException`. Received datagrams
 still report their interface index, and IPv6 supports selecting an interface.
 A socket bound to a specific IPv4 address must use that source address.
+On FreeBSD 14.4, sockets bound or connected to an IPv4-mapped IPv6 address do not
+receive packet metadata: datagrams report an interface index of `0` and
+`ExplicitCongestion::NotCapable`. Bind to an IPv4 address, or use an unconnected
+dual-stack socket bound to `::`, when you need that metadata.
 
 ## Unix sockets
 

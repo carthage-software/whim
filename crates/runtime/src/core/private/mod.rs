@@ -2,7 +2,6 @@
 
 pub(crate) mod array;
 pub(crate) mod binary;
-mod blocking;
 pub(crate) mod bson;
 pub(crate) mod byte_buffer;
 pub(crate) mod callback_registry;

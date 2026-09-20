@@ -1,5 +1,5 @@
 //! The single-threaded event loop behind Whim's colorless async.
-//! Watches file descriptors on Unix and sockets on Windows.
+//! Watches file descriptors on Unix and sockets or waitable handles on Windows.
 
 #![deny(clippy::nursery, clippy::pedantic)]
 #![forbid(unsafe_op_in_unsafe_fn)]
@@ -9,9 +9,11 @@ use std::os::fd::BorrowedFd as BorrowedDescriptor;
 #[cfg(unix)]
 pub use std::os::fd::RawFd as RawDescriptor;
 #[cfg(windows)]
-use std::os::windows::io::BorrowedSocket as BorrowedDescriptor;
+mod windows;
 #[cfg(windows)]
-pub use std::os::windows::io::RawSocket as RawDescriptor;
+use windows::BorrowedDescriptor;
+#[cfg(windows)]
+pub use windows::RawDescriptor;
 
 mod coroutine;
 #[expect(

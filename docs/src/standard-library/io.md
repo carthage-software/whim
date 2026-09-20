@@ -106,13 +106,43 @@ octal literals such as `0o755`.
 mask and returns its previous value. Set it during startup. A temporary change
 can race with file creation in another task or blocking worker.
 
-`Whim\Path\SEPARATOR` is the POSIX path separator. Path strings use `/`.
+`Whim\Path\SEPARATOR` is `/` on Unix and `\` on Windows. Windows also accepts
+`/` in ordinary paths. Windows paths use UTF-8, with WTF-8 for unpaired UTF-16
+surrogates, so names read from the filesystem can be passed back unchanged.
 
 ## File descriptors
 
-`OS\FileDescriptor` owns one POSIX descriptor. `duplicate($number)` creates a
+`OS\FileDescriptor` owns a Unix descriptor or a Windows handle or socket.
+`duplicate($number)` creates a
 new owned descriptor from an open number. `toInt()` returns its number.
 `isClosed()` and `close()` manage its lifetime.
 
 Duplicating is not the same as borrowing an integer. The new object owns its
 descriptor and closes it.
+
+## Windows platform limits
+
+Files, pipes, TCP, UDP, TLS, Unix stream sockets, child processes, timers, and
+coroutines use Windows APIs. Unsupported POSIX operations throw
+`Whim\Unwind\UnsupportedPlatformException` before starting the operation:
+
+- Unix user and group IDs, account lookups, and supplementary groups.
+- Process sessions and groups, POSIX priorities, and resource limits.
+- Replacing the current process with `Process\replace`.
+- File ownership, POSIX permission changes, creation masks, and filesystem FIFOs.
+- Unix datagram sockets and `SO_REUSEPORT`.
+- Sending UDP packets marked `ExplicitCongestion::CongestionExperienced`.
+- POSIX load averages and signals. `Signal::isSupported()` returns `false`.
+
+On Windows, `Child::kill()` and `Child::terminate()` end the child immediately.
+They return `Command\Exited` with the Windows exit code. Windows exit codes
+use the full unsigned 32-bit range. `terminate()` cannot first send SIGTERM.
+
+File metadata reports `-1` for Unix user and group IDs. Its permission bits
+describe the read-only attribute rather than a POSIX access mode. New files
+inherit Windows access-control rules from their parent directory.
+Creating symbolic links requires Developer Mode or the Windows symlink privilege.
+
+The package manager stores Git executable bits in named file streams so package
+checksums agree across platforms. Use NTFS or another filesystem that supports
+these streams for the project and package cache.

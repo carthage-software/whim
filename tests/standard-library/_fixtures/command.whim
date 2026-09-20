@@ -1,0 +1,17 @@
+use Whim\Async;
+use Whim\Env;
+use Whim\IO;
+use Whim\Int;
+use Whim\Time\Duration;
+
+$arguments = Env\get_arguments();
+match ($arguments[0]) {
+  'output' => sequence!(
+    IO\write_handle()->writeAll($arguments[1]),
+    IO\error_handle()->writeAll($arguments[2]),
+    exit!(Int\try_parse($arguments[3]) as 0..=255),
+  ),
+  'copy' => discard!(IO\copy(IO\input_handle(), IO\write_handle())),
+  'sleep' => Async\sleep(Duration::fromSeconds(10)),
+  'environment' => write!(Env\get_variable('WHIM_COMMAND_VALUE') ?? ''),
+};

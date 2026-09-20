@@ -2,7 +2,6 @@ use Whim\Command;
 use Whim\Env;
 use Whim\File;
 use Whim\Filesystem;
-use Whim\Str;
 use Whim\Unwind\ArgumentCountError;
 use Whim\Unwind\ArithmeticError;
 use Whim\Unwind\DivisionByZeroError;
@@ -283,6 +282,7 @@ File\write(
   . "\n",
 );
 
+$trace = Filesystem\canonicalize($trace);
 $run = Command\run($binary, vec[$trace]);
 assert!($run->status is Command\Exited);
 assert!(($run->status as Command\Exited)->code == 255);
@@ -316,6 +316,7 @@ File\write(
   . "\n",
 );
 
+$literal = Filesystem\canonicalize($literal);
 $run = Command\run($binary, vec[$literal]);
 assert!($run->status is Command\Exited);
 assert!(($run->status as Command\Exited)->code == 255);
@@ -356,8 +357,8 @@ assert!($same == $box);
 try {
   $divided = 1 / 0;
 } catch (Whim\Unwind\Error $error) {
-  assert!(Str\ends_with($error->getFile(), '/execute.whim'));
-  assert!($error->getLine() == 357);
+  assert!($error->getFile() == file!());
+  assert!($error->getLine() == 358);
   assert!($error->getCode() == 0);
 }
 
@@ -473,6 +474,7 @@ assert!(accumulate(5) == 13);
 
 $never = $work . '/never-frame.whim';
 File\write($never, 'function stop(): never {}' . "\n" . 'stop();' . "\n");
+$never = Filesystem\canonicalize($never);
 $run = Command\run($binary, vec[$never]);
 assert!($run->status is Command\Exited);
 assert!(($run->status as Command\Exited)->code == 255);

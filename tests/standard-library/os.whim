@@ -8,6 +8,7 @@ use Whim\OS\MemoryInformation;
 use Whim\OS\User;
 use Whim\Process;
 use Whim\Time\Duration;
+use Whim\Unwind\UnsupportedPlatformException;
 
 $information = OS\information();
 assert!($information is Information);
@@ -17,16 +18,40 @@ $uptime = OS\uptime();
 assert!($uptime is Duration);
 assert!(!($uptime->isNegative()));
 
-$load = OS\load_averages();
-assert!($load is LoadAverages);
-assert!($load->oneMinute >= 0.0);
-assert!($load->fiveMinutes >= 0.0);
-assert!($load->fifteenMinutes >= 0.0);
+if (operating_system!() != 'windows') {
+  $load = OS\load_averages();
+  assert!($load is LoadAverages);
+  assert!($load->oneMinute >= 0.0);
+  assert!($load->fiveMinutes >= 0.0);
+  assert!($load->fifteenMinutes >= 0.0);
+}
 
 $memory = OS\memory();
 assert!($memory is MemoryInformation);
 assert!($memory->total > 0);
 assert!($memory->available <= $memory->total);
+
+if (operating_system!() == 'windows') {
+  assert!($information->systemName == 'Windows');
+  foreach (vec[fn(): void {
+    discard!(OS\load_averages());
+  }, fn(): void {
+    discard!(OS\find_user(0));
+  }, fn(): void {
+    discard!(OS\find_group(0));
+  }] as $operation) {
+    $caught = false;
+    try {
+      $operation();
+    } catch (UnsupportedPlatformException $error) {
+      $caught = true;
+    }
+
+    assert!($caught);
+  }
+
+  exit!(0);
+}
 
 $identity = Process\get_user_identity();
 $user = OS\find_user($identity->effective);

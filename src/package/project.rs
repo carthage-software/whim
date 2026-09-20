@@ -61,7 +61,7 @@ impl Project {
 
         match fs2::FileExt::try_lock_exclusive(&lock) {
             Ok(()) => {}
-            Err(error) if error.kind() == ErrorKind::WouldBlock => {
+            Err(error) if error.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {
                 tracing::info!("waiting for another package command");
                 fs2::FileExt::lock_exclusive(&lock).map_err(|source| {
                     ProjectError::AcquireLock {
@@ -295,7 +295,7 @@ fn acquire_inspection_lock(root: &Path) -> Result<Option<File>, ProjectError> {
 
     match fs2::FileExt::try_lock_shared(&lock) {
         Ok(()) => {}
-        Err(error) if error.kind() == ErrorKind::WouldBlock => {
+        Err(error) if error.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {
             tracing::info!("waiting for another package command");
             fs2::FileExt::lock_shared(&lock).map_err(|source| ProjectError::AcquireLock {
                 path: path.clone(),

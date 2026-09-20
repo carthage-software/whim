@@ -4,7 +4,10 @@ use std::env::temp_dir;
 use std::ffi::OsStr;
 use std::fs;
 use std::iter::empty;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_file as symlink;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -420,22 +423,13 @@ fn colors_control_source_diagnostics() {
 
 #[test]
 fn a_rewrite_replaces_the_file_rather_than_writing_through_it() {
-    use std::os::unix::fs::MetadataExt;
-
     let (directory, path) = fixture("atomic-replace", "$a   =   1;\n");
     let link = directory.join("witness.whim");
     fs::hard_link(&path, &link).expect("a hard link is creatable");
 
-    let before = fs::metadata(&path).expect("the file is readable").ino();
-
     let output = run([path.as_os_str()]);
     assert!(output.status.success(), "{}", stderr_of(&output));
 
-    let after = fs::metadata(&path).expect("the file is readable").ino();
-    assert_ne!(
-        before, after,
-        "the path should point at a new file, not at the one that was rewritten in place"
-    );
     assert_eq!(
         fs::read_to_string(&link).expect("the link is readable"),
         "$a   =   1;\n",
@@ -525,6 +519,7 @@ fn a_broken_symbolic_link_is_reported_and_left_alone() {
 }
 
 #[test]
+#[cfg(unix)]
 fn a_rewrite_keeps_the_file_mode() {
     use std::os::unix::fs::PermissionsExt;
 

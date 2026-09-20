@@ -17,6 +17,7 @@ use crate::bytecode::instruction::operands::PresetDescriptorIndex;
 use crate::bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
 use crate::bytecode::instruction::operands::Register;
 use crate::bytecode::instruction::operands::SwitchTableIndex;
+
 pub(super) fn main(chunks: Vec<Chunk>) -> Result<Chunk, ArtifactError> {
     let mut merged = Chunk::new();
     if chunks.is_empty() {

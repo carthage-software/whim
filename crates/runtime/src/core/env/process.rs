@@ -3,9 +3,9 @@
 use std::env;
 
 use whim_macros::whim_function;
+use whim_sys::path::path_bytes;
 
 use crate::builtin::Context;
-use crate::path::path_bytes;
 use crate::value::Value;
 
 #[whim_function("Whim\\Env\\get_arguments(): vec<string>")]

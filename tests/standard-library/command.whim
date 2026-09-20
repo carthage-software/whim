@@ -1,13 +1,29 @@
 use Whim\Async;
 use Whim\Command;
+use Whim\Env;
 use Whim\IO;
 use Whim\Process\Signal;
 use Whim\Time\Duration;
 
-$output = Command\Command::create('/bin/sh')->withArguments(vec[
-  '-c',
-  'printf standard-output; printf standard-error >&2; exit 7',
-])->run();
+function child_command(string $operation): Command\Command {
+  return Command\Command::create(Env\current_binary())->withArguments(vec[
+    directory!() . '/_fixtures/command.whim',
+    $operation,
+  ]);
+}
+
+function output_command(
+  string $out = '',
+  string $error = '',
+  0..=255 $code = 0,
+): Command\Command {
+  return child_command('output')
+    ->withArgument($out)
+    ->withArgument($error)
+    ->withArgument("{$code}");
+}
+
+$output = output_command('standard-output', 'standard-error', 7)->run();
 
 assert!($output->status is Command\Exited);
 assert!(($output->status as Command\Exited)->code == 7);
@@ -15,14 +31,44 @@ assert!(!($output->isSuccess()));
 assert!($output->standardOutput == 'standard-output');
 assert!($output->standardError == 'standard-error');
 
-$successful = Command\output('/bin/sh', vec['-c', 'printf success']);
+$literal = 'space / slash \\ backslash "quotes" 🐘';
+assert!(output_command($literal)->run()->standardOutput == $literal);
+assert!(
+  child_command('environment')->withVariable(
+    'WHIM_COMMAND_VALUE',
+    $literal,
+  )->run()->standardOutput
+  == $literal,
+);
+
+$successful = Command\output(
+  Env\current_binary(),
+  vec[directory!() . '/_fixtures/command.whim', 'output', 'success', '', '0'],
+);
+
 assert!($successful == 'success');
-assert!(Command\succeeds('/bin/sh', vec['-c', 'exit 0']));
-assert!(!(Command\succeeds('/bin/sh', vec['-c', 'exit 1'])));
+assert!(
+  Command\succeeds(
+    Env\current_binary(),
+    vec[directory!() . '/_fixtures/command.whim', 'output', '', '', '0'],
+  ),
+);
+
+assert!(
+  !(
+    Command\succeeds(
+      Env\current_binary(),
+      vec[directory!() . '/_fixtures/command.whim', 'output', '', '', '1'],
+    )
+  ),
+);
 
 $failure = null;
 $assertion_callable_9 = fn(): string => (
-  Command\output('/bin/sh', vec['-c', 'printf out; printf err >&2; exit 2'])
+  Command\output(
+    Env\current_binary(),
+    vec[directory!() . '/_fixtures/command.whim', 'output', 'out', 'err', '2'],
+  )
 );
 
 try {
@@ -37,9 +83,7 @@ assert!($failure->getStatus() is Command\Exited);
 assert!($failure->getStandardOutput() == 'out');
 assert!($failure->getStandardError() == 'err');
 
-$child = Command\Command::create('/bin/cat')->withStandardInput(
-  Command\piped(),
-)->start();
+$child = child_command('copy')->withStandardInput(Command\piped())->start();
 
 assert!($child->getId() > 0);
 assert!($child->isRunning());
@@ -58,10 +102,9 @@ assert!($cat->standardError == '');
 assert!(!($child->isRunning()));
 assert!($child->wait() == $cat->status);
 
-$unavailable = Command\Command::create('/bin/sh')
-  ->withArguments(vec['-c', 'exit 0'])
-  ->withStandardOutput(Command\discarded())
-  ->start();
+$unavailable = output_command()->withStandardOutput(
+  Command\discarded(),
+)->start();
 
 $assertion_value_23 = fn(): IO\ReadHandle => $unavailable->getStandardOutput();
 $assertion_error_23 = null;
@@ -101,7 +144,7 @@ $write->close();
 ($attachedInput, $inputWriter) = IO\pipe();
 $inputWriter->writeAll('attached-input');
 $inputWriter->close();
-$fromAttachedInput = Command\Command::create('/bin/cat')->withStandardInput(
+$fromAttachedInput = child_command('copy')->withStandardInput(
   Command\attached_input($attachedInput),
 )->run();
 
@@ -110,10 +153,9 @@ assert!($fromAttachedInput->standardOutput == 'attached-input');
 $attachedInput->close();
 
 ($outputReader, $attachedOutput) = IO\pipe();
-$toAttachedOutput = Command\Command::create('/bin/sh')
-  ->withArguments(vec['-c', 'printf attached-output'])
-  ->withStandardOutput(Command\attached_output($attachedOutput))
-  ->run();
+$toAttachedOutput = output_command('attached-output')->withStandardOutput(
+  Command\attached_output($attachedOutput),
+)->run();
 
 assert!($toAttachedOutput->isSuccess());
 assert!($toAttachedOutput->standardOutput == '');
@@ -121,20 +163,43 @@ $attachedOutput->close();
 assert!($outputReader->readAll() == 'attached-output');
 $outputReader->close();
 
-$observed = Command\Command::create('/bin/sh')->withArguments(vec[
-  '-c',
-  'exit 0',
-])->start();
+$observed = output_command()->start();
 
-Async\sleep(Duration::fromMilliseconds(200));
+for ($attempt = 0; $attempt < 500
+&& $observed->isRunning(); $attempt++) {
+  Async\sleep(Duration::fromMilliseconds(10));
+}
+
 assert!(!($observed->isRunning()));
 assert!($observed->wait()->isSuccess());
 
-$killed = Command\Command::create('/bin/sleep')
-  ->withArgument('10')
-  ->withOwnProcessGroup()
-  ->start()
-  ->kill();
+$sleep = child_command('sleep');
+if (operating_system!() != 'windows') {
+  $sleep = $sleep->withOwnProcessGroup();
+}
+
+$killed = $sleep->start()->kill();
+
+if (operating_system!() == 'windows') {
+  $wideExit = Command\Command::create('cmd.exe')->withArguments(vec[
+    '/d',
+    '/c',
+    'exit',
+    '65535',
+  ])->run();
+
+  assert!($wideExit->status is Command\Exited);
+  assert!(($wideExit->status as Command\Exited)->code == 65535);
+  assert!($killed is Command\Exited);
+  assert!(!$killed->isSuccess());
+  $terminated = child_command('sleep')->start()->terminate(
+    Duration::fromMilliseconds(20),
+  );
+
+  assert!($terminated is Command\Exited);
+  assert!(!$terminated->isSuccess());
+  exit!(0);
+}
 
 assert!($killed is Command\Signalled);
 assert!(($killed as Command\Signalled)->signal == Signal::Kill);

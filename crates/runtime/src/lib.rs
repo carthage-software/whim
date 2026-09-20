@@ -4,7 +4,6 @@ pub mod artifact;
 pub mod compiler;
 pub mod disassembly;
 pub mod engine;
-pub mod path;
 
 pub(crate) mod blocking;
 pub(crate) mod builtin;

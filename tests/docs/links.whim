@@ -37,7 +37,7 @@ function namespace_of(string $file): null|string {
 
 $script = Env\current_script();
 assert!($script is string);
-$script = Filesystem\canonicalize($script);
+$script = Str\replace(Filesystem\canonicalize($script), '\\', '/');
 
 $root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as int);
 

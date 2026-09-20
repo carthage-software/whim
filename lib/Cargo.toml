@@ -16,7 +16,6 @@ path = "lib.rs"
 workspace = true
 
 [dependencies]
-target-guard = { workspace = true }
 whim-runtime = { workspace = true }
 
 [build-dependencies]

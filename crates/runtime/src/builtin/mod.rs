@@ -184,7 +184,7 @@ impl<'call, 'vm, 'engine: 'vm> Context<'call, 'vm, 'engine> {
         }
     }
 
-    fn resolve_named_class(&mut self, name: &str) -> Result<ClassId, Throw> {
+    pub(crate) fn resolve_named_class(&mut self, name: &str) -> Result<ClassId, Throw> {
         let atom = self.vm.intern(name.as_bytes());
         let Some(class) = self.vm.resolve_class(atom) else {
             let error = self.vm.intern(b"Whim\\Unwind\\TypeError");

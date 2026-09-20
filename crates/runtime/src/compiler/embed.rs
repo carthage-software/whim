@@ -3,16 +3,18 @@
 use std::cell::RefCell;
 use std::fs;
 use std::io;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
 use hashbrown::HashMap;
+
 use whim_span::Span;
 use whim_syn::cst::atom::LiteralString;
+use whim_sys::path::path_from_bytes;
 
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
-use crate::path::path_from_bytes;
 use crate::value::atom::Atom;
 use crate::value::heap::Heap;
 
@@ -36,8 +38,13 @@ impl EmbeddedFiles {
             ));
         }
 
-        let relative = path_from_bytes(path.value);
-        if relative.is_absolute() {
+        let relative = path_from_bytes(path.value)
+            .map_err(|error| embedded_file_error(Path::new("<invalid path>"), &error, path.span))?;
+        if relative.has_root()
+            || relative
+                .components()
+                .any(|component| matches!(component, Component::Prefix(_)))
+        {
             return Err(CompileError::new(
                 CompileErrorKind::AbsoluteEmbeddedFilePath,
                 "`embed!` accepts only a relative path",
@@ -45,7 +52,9 @@ impl EmbeddedFiles {
             ));
         }
 
-        let source = path_from_bytes(source_path);
+        let source = path_from_bytes(source_path).map_err(|error| {
+            embedded_file_error(Path::new("<invalid source path>"), &error, path.span)
+        })?;
         let resolved = source
             .parent()
             .unwrap_or_else(|| Path::new("."))
@@ -90,9 +99,9 @@ mod tests {
     use whim_span::Span;
     use whim_syn::cst::atom::LiteralString;
     use whim_syn::cst::atom::LiteralStringKind;
+    use whim_sys::path::path_bytes;
 
     use super::EmbeddedFiles;
-    use crate::path::path_bytes;
     use crate::value::heap::Heap;
 
     #[test]
@@ -103,8 +112,8 @@ mod tests {
             Err(error) if error.kind() == ErrorKind::NotFound => {}
             Err(error) => panic!("the old test directory could not be removed: {error}"),
         }
-        fs::create_dir(&directory).expect("the test directory is creatable");
 
+        fs::create_dir(&directory).expect("the test directory is creatable");
         let asset = directory.join("asset.bin");
         fs::write(&asset, b"first").expect("the asset is writable");
         let source = directory.join("source.whim");

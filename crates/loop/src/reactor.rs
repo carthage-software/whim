@@ -7,6 +7,8 @@ use polling::Event;
 use polling::Events;
 use polling::PollMode;
 use polling::Poller;
+#[cfg(windows)]
+use polling::os::iocp::PollerIocpExt;
 
 use crate::BorrowedDescriptor;
 
@@ -57,12 +59,25 @@ impl Reactor {
     /// # Errors
     ///
     /// Returns an operating-system error when registration fails.
-    pub(crate) unsafe fn register(
+    pub(crate) unsafe fn register<'a>(
         &self,
-        fd: BorrowedDescriptor<'_>,
+        fd: impl Into<BorrowedDescriptor<'a>>,
         key: usize,
         interest: Interest,
     ) -> io::Result<()> {
+        let fd = fd.into();
+        #[cfg(windows)]
+        let fd = match fd {
+            BorrowedDescriptor::Socket(socket) => socket,
+            BorrowedDescriptor::Waitable(handle) => {
+                // SAFETY: the caller keeps the handle open until deregistration.
+                return unsafe {
+                    self.poller
+                        .add_waitable(&handle, event_for(key, interest), PollMode::Oneshot)
+                };
+            }
+        };
+
         // SAFETY: the caller keeps `fd` open until it is deregistered.
         unsafe {
             self.poller
@@ -75,12 +90,25 @@ impl Reactor {
     /// # Errors
     ///
     /// Returns an operating-system error when the registration cannot be changed.
-    pub(crate) fn rearm(
+    pub(crate) fn rearm<'a>(
         &self,
-        fd: BorrowedDescriptor<'_>,
+        fd: impl Into<BorrowedDescriptor<'a>>,
         key: usize,
         interest: Interest,
     ) -> io::Result<()> {
+        let fd = fd.into();
+        #[cfg(windows)]
+        let fd = match fd {
+            BorrowedDescriptor::Socket(socket) => socket,
+            BorrowedDescriptor::Waitable(handle) => {
+                return self.poller.modify_waitable(
+                    handle,
+                    event_for(key, interest),
+                    PollMode::Oneshot,
+                );
+            }
+        };
+
         self.poller
             .modify_with_mode(fd, event_for(key, interest), self.mode)
     }
@@ -97,7 +125,14 @@ impl Reactor {
     /// # Errors
     ///
     /// Returns an operating-system error when the descriptor cannot be removed.
-    pub(crate) fn deregister(&self, fd: BorrowedDescriptor<'_>) -> io::Result<()> {
+    pub(crate) fn deregister<'a>(&self, fd: impl Into<BorrowedDescriptor<'a>>) -> io::Result<()> {
+        let fd = fd.into();
+        #[cfg(windows)]
+        let fd = match fd {
+            BorrowedDescriptor::Socket(socket) => socket,
+            BorrowedDescriptor::Waitable(handle) => return self.poller.remove_waitable(handle),
+        };
+
         self.poller.delete(fd)
     }
 

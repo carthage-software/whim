@@ -17,9 +17,18 @@ assert!(Float\is_infinite(-$infinity));
 assert!(!(Float\is_infinite(1.5)));
 
 assert!(length!(Path\SEPARATOR) == 1);
-assert!(Path\SEPARATOR == '/');
 assert!(
-  contains!(vec['Darwin', 'Linux', 'BSD', 'Solaris', 'Unknown'], OS\FAMILY),
+  Path\SEPARATOR == match (operating_system!()) {
+    'windows' => '\\',
+    _ => '/',
+  },
+);
+
+assert!(
+  contains!(
+    vec['Darwin', 'Linux', 'BSD', 'Solaris', 'Windows', 'Unknown'],
+    OS\FAMILY,
+  ),
 );
 
 assert!(Whim\VERSION is string);

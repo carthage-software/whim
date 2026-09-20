@@ -97,7 +97,11 @@ fn validate<'pattern>(
     }
 
     let path = Path::new(pattern);
-    if path.is_absolute() {
+    if path.has_root()
+        || path
+            .components()
+            .any(|component| matches!(component, Component::Prefix(_)))
+    {
         return Err(Error::AbsoluteFilePattern {
             setting,
             pattern: pattern.to_owned(),

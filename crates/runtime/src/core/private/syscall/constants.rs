@@ -1,6 +1,12 @@
 //! Platform constants exposed by name so Whim code never hard-codes ABI values.
 
+use std::path::MAIN_SEPARATOR_STR;
 use whim_macros::whim_constant;
+use whim_sys::constants as libc;
+
+/// The native directory separator.
+#[whim_constant("Whim\\Path\\SEPARATOR", "string")]
+pub(crate) const PATH_SEPARATOR: &str = MAIN_SEPARATOR_STR;
 
 #[whim_constant("Whim\\_Private\\ERRNO_NOT_FOUND", "int")]
 pub(crate) const ERRNO_NOT_FOUND: i64 = libc::ENOENT as i64;
@@ -182,21 +188,11 @@ pub(crate) const SIGNAL_INPUT_OUTPUT: i64 = libc::SIGIO as i64;
 #[whim_constant("Whim\\_Private\\SIGNAL_BAD_SYSTEM_CALL", "int")]
 pub(crate) const SIGNAL_BAD_SYSTEM_CALL: i64 = libc::SIGSYS as i64;
 
-#[cfg(target_os = "linux")]
 #[whim_constant("Whim\\_Private\\SIGNAL_STACK_FAULT", "int")]
 pub(crate) const SIGNAL_STACK_FAULT: i64 = libc::SIGSTKFLT as i64;
 
-#[cfg(any(target_os = "macos", target_os = "freebsd"))]
-#[whim_constant("Whim\\_Private\\SIGNAL_STACK_FAULT", "int")]
-pub(crate) const SIGNAL_STACK_FAULT: i64 = -1;
-
-#[cfg(target_os = "linux")]
 #[whim_constant("Whim\\_Private\\SIGNAL_POWER_FAILURE", "int")]
 pub(crate) const SIGNAL_POWER_FAILURE: i64 = libc::SIGPWR as i64;
-
-#[cfg(any(target_os = "macos", target_os = "freebsd"))]
-#[whim_constant("Whim\\_Private\\SIGNAL_POWER_FAILURE", "int")]
-pub(crate) const SIGNAL_POWER_FAILURE: i64 = -2;
 
 #[whim_constant("Whim\\_Private\\RESOURCE_LIMIT_CPU_TIME", "int")]
 pub(crate) const RESOURCE_LIMIT_CPU_TIME: i64 = libc::RLIMIT_CPU as i64;

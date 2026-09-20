@@ -57,6 +57,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
+      RUSTFLAGS: ${{ matrix.os == 'windows-latest' && '-C target-feature=+crt-static' || '' }}
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
       CC_x86_64_unknown_linux_musl: musl-gcc
@@ -97,8 +98,15 @@ jobs:
           - target: aarch64-unknown-freebsd
             os: ubuntu-24.04-arm
             builder: freebsd-aarch64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            builder: cargo
     steps:
+      - if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
+      - if: runner.os == 'Windows'
+        uses: ilammy/setup-nasm@v1
       - if: endsWith(matrix.target, '-musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - if: ${{ !startsWith(matrix.builder, 'freebsd') }}
@@ -142,6 +150,9 @@ jobs:
       - name: Test musl build
         if: endsWith(matrix.target, '-musl')
         run: target/${{ matrix.target }}/release/whim tests/run.whim '' 2
+      - name: Test Windows build
+        if: runner.os == 'Windows'
+        run: target/${{ matrix.target }}/release/whim.exe tests/run.whim '' 2
       - id: package
         name: Package
         shell: bash
@@ -149,14 +160,23 @@ jobs:
           set -euo pipefail
           package="whim-${{ needs.metadata.outputs.version }}-${{ matrix.target }}"
           archive="${package}.tar.gz"
+          binary="whim"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            archive="${package}.zip"
+            binary="whim.exe"
+          fi
           mkdir -p "dist/${package}"
-          cp "target/${{ matrix.target }}/release/whim" "dist/${package}/whim"
+          cp "target/${{ matrix.target }}/release/${binary}" "dist/${package}/${binary}"
           cp README.md CONTRIBUTING.md SECURITY.md LICENSE-APACHE LICENSE-MIT "dist/${package}/"
-          tar -czf "dist/${archive}" -C dist "${package}"
-          (
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            (cd dist && 7z a -tzip "${archive}" "${package}" && sha256sum "${archive}" > "${archive}.sha256")
+          else
+            tar -czf "dist/${archive}" -C dist "${package}"
+            (
             cd dist
             shasum -a 256 "${archive}" > "${archive}.sha256"
-          )
+            )
+          fi
           echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@v4
         with:
@@ -188,7 +208,7 @@ jobs:
         run: |
           set -euo pipefail
           cd release
-          sha256sum -- *.tar.gz > SHA256SUMS
+          sha256sum -- *.tar.gz *.zip > SHA256SUMS
       - uses: actions/attest-build-provenance@v4
         with:
           subject-path: release/SHA256SUMS
@@ -199,6 +219,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release/*.tar.gz
+            release/*.zip
             release/*.sha256
             release/SHA256SUMS
 

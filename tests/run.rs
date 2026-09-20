@@ -1,15 +1,18 @@
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_file as symlink;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
 use std::process::id;
 
-#[cfg(target_os = "linux")]
-use whim_runtime::path::path_bytes;
 use whim_syn::parser::MAX_STRUCTURAL_DEPTH;
+#[cfg(target_os = "linux")]
+use whim_sys::path::path_bytes;
 
 fn write_fixture(name: &str, source: &str) -> PathBuf {
     let directory = env::temp_dir().join(format!("whim-cli-{}", id()));
@@ -102,6 +105,55 @@ fn current_script_preserves_the_relative_symlink_spelling() {
 
     fs::remove_file(&link).expect("the symbolic link is removable");
     fs::remove_file(&target).expect("the fixture is removable");
+}
+
+#[cfg(windows)]
+#[test]
+fn canonical_script_paths_accept_mixed_separators_and_parent_components() {
+    let file = write_fixture("canonical-script.whim", "write!('canonical');");
+    let directory = fs::canonicalize(file.parent().unwrap()).unwrap();
+    let argument = format!("{}/./unused/../canonical-script.whim", directory.display());
+    let output = Command::new(env!("CARGO_BIN_EXE_whim"))
+        .arg(&argument)
+        .output()
+        .expect("the binary spawns");
+
+    assert_eq!(output.stdout, b"canonical");
+    assert_eq!(output.stderr, b"");
+    assert_eq!(code_of(&output), 0);
+    fs::remove_file(file).expect("the fixture is removable");
+}
+
+#[test]
+fn standard_pipe_handles_preserve_binary_data_under_backpressure() {
+    use std::io::Write;
+    use std::process::Stdio;
+    use std::thread;
+
+    let path = write_fixture(
+        "copy-standard-pipes.whim",
+        "Whim\\IO\\copy(Whim\\IO\\input_handle(), Whim\\IO\\write_handle());",
+    );
+    let mut child = Command::new(env!("CARGO_BIN_EXE_whim"))
+        .arg(&path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("the binary spawns");
+    let bytes: Vec<u8> = (0..=255).cycle().take(256 * 1024).collect();
+    let input = bytes.clone();
+    let mut stdin = child.stdin.take().expect("stdin is piped");
+    let writer = thread::spawn(move || stdin.write_all(&input));
+    let output = child.wait_with_output().expect("the child exits");
+    writer
+        .join()
+        .expect("the writer joins")
+        .expect("input is written");
+    assert_eq!(code_of(&output), 0, "{}", stderr_of(&output));
+    assert_eq!(output.stdout, bytes);
+    assert!(output.stderr.is_empty());
+    fs::remove_file(path).expect("the fixture is removable");
 }
 
 #[test]
@@ -397,6 +449,7 @@ fn arguments_after_the_file_reach_the_program_verbatim() {
 }
 
 #[test]
+#[cfg(unix)]
 fn non_utf8_arguments_reach_the_program_verbatim() {
     use std::ffi::OsString;
     use std::os::unix::ffi::OsStringExt;

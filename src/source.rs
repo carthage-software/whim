@@ -3,6 +3,9 @@ use std::io;
 use std::io::Read;
 use std::path::PathBuf;
 
+#[cfg(windows)]
+use whim_sys::path::{path_bytes, path_from_bytes};
+
 use crate::error::Error;
 
 pub(crate) struct Source {
@@ -14,6 +17,13 @@ pub(crate) struct Source {
 impl Source {
     pub(crate) fn read(file: PathBuf) -> Result<Self, Error> {
         let from_stdin = file.as_os_str() == "-";
+        #[cfg(windows)]
+        let path = path_from_bytes(&path_bytes(&file)).map_err(|source| Error::ResolvePath {
+            path: file.clone(),
+            source,
+        })?;
+        #[cfg(not(windows))]
+        let path = &file;
         let text = if from_stdin {
             let mut source = String::new();
             io::stdin()
@@ -22,7 +32,7 @@ impl Source {
 
             source
         } else {
-            fs::read_to_string(&file).map_err(|source| Error::ReadFile {
+            fs::read_to_string(path.as_path()).map_err(|source| Error::ReadFile {
                 path: file.clone(),
                 source,
             })?
@@ -31,7 +41,7 @@ impl Source {
         let absolute = if from_stdin {
             PathBuf::from("-")
         } else {
-            fs::canonicalize(&file).map_err(|source| Error::ResolvePath {
+            fs::canonicalize(path.as_path()).map_err(|source| Error::ResolvePath {
                 path: file.clone(),
                 source,
             })?

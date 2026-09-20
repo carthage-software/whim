@@ -9,11 +9,14 @@ use std::io::ErrorKind;
 use std::io::Read;
 use std::io::Write;
 use std::num::NonZeroU64;
+#[cfg(unix)]
 use std::os::unix::process::CommandExt;
+#[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
 use std::process::Child;
 use std::process::ChildStderr;
+use std::process::ChildStdin;
 use std::process::ChildStdout;
 use std::process::Command;
 use std::process::ExitStatus;
@@ -24,14 +27,20 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+#[cfg(windows)]
+use process_wrap::std::{ChildWrapper, CommandWrap, JobObject};
+
+#[cfg(unix)]
 use rustix::process::Pid;
 #[cfg(target_os = "linux")]
 use rustix::process::Resource;
 #[cfg(target_os = "linux")]
 use rustix::process::Rlimit;
+#[cfg(unix)]
 use rustix::process::Signal;
 #[cfg(target_os = "linux")]
 use rustix::process::getrlimit;
+#[cfg(unix)]
 use rustix::process::kill_process_group;
 #[cfg(target_os = "linux")]
 use rustix::process::prlimit;
@@ -282,7 +291,11 @@ where
     };
     let output = process.finish(Some(status))?;
     let final_size = cache_size(directory)?;
-    if final_size > limit || output.status.signal() == Some(libc::SIGXFSZ) {
+    #[cfg(unix)]
+    let size_signal = output.status.signal() == Some(libc::SIGXFSZ);
+    #[cfg(windows)]
+    let size_signal = false;
+    if final_size > limit || size_signal {
         return reject_cache(directory, Error::CacheTooLarge { limit });
     }
     if !output.status.success() {
@@ -356,20 +369,42 @@ fn limit_child_file_size(child: &Child, maximum: u64) -> Result<(), Error> {
     Ok(())
 }
 
+#[cfg(unix)]
+type GitChild = Child;
+#[cfg(windows)]
+type GitChild = Box<dyn ChildWrapper>;
+
 struct GitProcess {
     operation: Operation,
-    child: Child,
+    child: GitChild,
+    input: Option<ChildStdin>,
+    output: Option<ChildStdout>,
     diagnostic_reader: Option<thread::JoinHandle<Result<Vec<u8>, IoError>>>,
 }
 
 impl GitProcess {
     fn spawn(mut command: Command, operation: Operation) -> Result<Self, Error> {
-        command.process_group(0);
+        command.stderr(Stdio::piped());
+        #[cfg(unix)]
         let mut child = command
-            .stderr(Stdio::piped())
+            .process_group(0)
             .spawn()
             .map_err(|source| Error::Execute { operation, source })?;
-        let Some(diagnostics) = child.stderr.take() else {
+        #[cfg(windows)]
+        let mut child = CommandWrap::from(command)
+            .wrap(JobObject)
+            .spawn()
+            .map_err(|source| Error::Execute { operation, source })?;
+        #[cfg(unix)]
+        let (input, output, diagnostics) =
+            (child.stdin.take(), child.stdout.take(), child.stderr.take());
+        #[cfg(windows)]
+        let (input, output, diagnostics) = (
+            child.stdin().take(),
+            child.stdout().take(),
+            child.stderr().take(),
+        );
+        let Some(diagnostics) = diagnostics else {
             stop_process_group(&mut child);
             return Err(Error::MissingDiagnostics(operation));
         };
@@ -377,6 +412,8 @@ impl GitProcess {
         Ok(Self {
             operation,
             child,
+            input,
+            output,
             diagnostic_reader: Some(thread::spawn(move || read_diagnostics(diagnostics))),
         })
     }
@@ -387,16 +424,14 @@ impl GitProcess {
     }
 
     fn take_output(&mut self) -> Result<ChildStdout, Error> {
-        self.child
-            .stdout
+        self.output
             .take()
             .ok_or(Error::MissingOutput(self.operation))
     }
 
     fn write_input(&mut self, input: &[u8]) -> Result<(), Error> {
         let mut stdin = self
-            .child
-            .stdin
+            .input
             .take()
             .ok_or(Error::MissingInput(self.operation))?;
         stdin.write_all(input).map_err(|source| Error::WriteInput {
@@ -418,7 +453,7 @@ impl GitProcess {
             None => match self.child.wait() {
                 Ok(status) => status,
                 Err(source) => {
-                    stop(&mut self.child);
+                    stop_process_group(&mut self.child);
                     let _ = self.finish_diagnostics();
                     return Err(Error::Execute {
                         operation: self.operation,
@@ -458,12 +493,20 @@ impl GitProcess {
     }
 }
 
-fn stop_process_group(child: &mut Child) {
+#[cfg(unix)]
+fn stop_process_group(child: &mut GitChild) {
     if let Err(error) = kill_process_group(Pid::from_child(child), Signal::KILL) {
         tracing::debug!(%error, "could not stop rejected Git process group");
     }
 
     stop(child);
+}
+
+#[cfg(windows)]
+fn stop_process_group(child: &mut GitChild) {
+    if let Err(error) = child.kill() {
+        tracing::debug!(%error, "could not stop rejected Git process group");
+    }
 }
 
 fn read_diagnostics(mut diagnostics: ChildStderr) -> Result<Vec<u8>, IoError> {
@@ -670,8 +713,15 @@ mod tests {
 
     #[test]
     fn remote_tag_processes_stop_at_the_network_deadline() {
+        #[cfg(unix)]
         let mut command = Command::new("sh");
-        command.args(["-c", "sleep 60"]).stdout(Stdio::piped());
+        #[cfg(unix)]
+        command.args(["-c", "sleep 60"]);
+        #[cfg(windows)]
+        let mut command = Command::new("cmd.exe");
+        #[cfg(windows)]
+        command.args(["/c", "ping -n 60 127.0.0.1 >nul"]);
+        command.stdout(Stdio::piped());
         let mut process = GitProcess::spawn(command, Operation::ListRemoteTags)
             .expect("the test process should start");
         let output = process.take_output().expect("stdout should be piped");

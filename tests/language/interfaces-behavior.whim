@@ -86,6 +86,7 @@ File\write(
   . "\n",
 );
 
+$conflict = Filesystem\canonicalize($conflict);
 $run = Command\run($binary, vec[$conflict]);
 assert!(!($run->isSuccess()));
 $assertion_value_7 = $run->standardError;
