@@ -74,10 +74,12 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         if !self.consume(b'!') {
             return self.parse_atom();
         }
+
         let inner = self.parse_negated()?;
         if matches!(inner, TypeDescriptor::Void | TypeDescriptor::Wildcard) {
             return None;
         }
+
         Some(TypeDescriptor::Negated(Box::new(inner)))
     }
 
@@ -94,6 +96,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                     self.expect(b'}')?;
                     break;
                 }
+
                 let name = self.take_token()?;
                 if !name
                     .first()
@@ -104,10 +107,12 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                 {
                     return None;
                 }
+
                 let name = self.heap.intern(name);
                 if entries.iter().any(|(existing, _)| existing == &name) {
                     return None;
                 }
+
                 self.expect(b':')?;
                 entries.push((name, self.parse_union()?));
                 if !self.consume(b',') {
@@ -115,12 +120,15 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                     break;
                 }
             }
+
             return Some(TypeDescriptor::ObjectShape { entries, open });
         }
+
         if self.consume(b'(') {
             if self.consume(b')') {
                 return Some(TypeDescriptor::Tuple(Vec::new()));
             }
+
             if self.consume_ellipsis() {
                 let rest = if self.consume(b')') {
                     TypeDescriptor::Mixed
@@ -129,20 +137,24 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                     self.expect(b')')?;
                     rest
                 };
+
                 return Some(TypeDescriptor::TupleRest {
                     elements: Vec::new(),
                     rest: Box::new(rest),
                 });
             }
+
             let first = self.parse_union()?;
             if !self.consume(b',') {
                 self.expect(b')')?;
                 return Some(first);
             }
+
             let mut members = vec![first];
             if self.consume(b')') {
                 return Some(TypeDescriptor::Tuple(members));
             }
+
             loop {
                 if self.consume_ellipsis() {
                     let rest = if self.consume(b')') {
@@ -157,17 +169,22 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                         rest: Box::new(rest),
                     });
                 }
+
                 members.push(self.parse_union()?);
                 if self.consume(b')') {
                     break;
                 }
+
                 self.expect(b',')?;
             }
+
             return Some(TypeDescriptor::Tuple(members));
         }
+
         if self.peek() == Some(b'\'') {
             return self.parse_string_literal();
         }
+
         if let Some(range) = self.parse_integer_range() {
             return Some(range);
         }
@@ -252,6 +269,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                 }
             }
         };
+
         Some(descriptor)
     }
 
@@ -259,6 +277,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         if !self.consume(b'(') {
             return Some(TypeDescriptor::Callable(None));
         }
+
         let mut parameters = Vec::new();
         if !self.consume(b')') {
             loop {
@@ -267,12 +286,15 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                     r#type: self.parse_union()?,
                     optional,
                 });
+
                 if self.consume(b')') {
                     break;
                 }
+
                 self.expect(b',')?;
             }
         }
+
         self.expect(b':')?;
         Some(TypeDescriptor::Callable(Some(FunctionTypeDescriptor {
             parameters,
@@ -284,17 +306,21 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         if !self.consume(b'<') {
             return Some(ParsedArguments::Absent);
         }
+
         let mut arguments = Vec::new();
         if self.consume(b'>') {
             return Some(ParsedArguments::Present(arguments));
         }
+
         loop {
             arguments.push(self.parse_union()?);
             if self.consume(b'>') {
                 break;
             }
+
             self.expect(b',')?;
         }
+
         Some(ParsedArguments::Present(arguments))
     }
 
@@ -309,6 +335,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
                 other => value.push(other),
             }
         }
+
         Some(TypeDescriptor::StringLiteral(self.heap.intern(&value)))
     }
 
@@ -326,11 +353,13 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
             self.position = start;
             return None;
         };
+
         let upper = self.parse_integer_endpoint();
         if lower.is_none() && upper.is_none() {
             self.position = start;
             return None;
         }
+
         let max = if inclusive {
             upper
         } else if let Some(upper) = upper {
@@ -341,6 +370,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         } else {
             None
         };
+
         Some(TypeDescriptor::integer_range(lower, max))
     }
 
@@ -365,11 +395,13 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         } else {
             return None;
         };
+
         let upper = self.parse_nonnegative_integer_endpoint();
         self.expect(b']')?;
         if min.is_none() && upper.is_none() {
             return None;
         }
+
         let min = min.unwrap_or(0);
         let max = if inclusive {
             upper
@@ -377,10 +409,12 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
             let Some(max) = upper.checked_sub(1) else {
                 return Some(TypeDescriptor::Never);
             };
+
             Some(max)
         } else {
             None
         };
+
         Some(TypeDescriptor::string_length(self.heap, min, max))
     }
 
@@ -390,9 +424,11 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
             self.position += 1;
         }
+
         if self.position == start {
             return None;
         }
+
         str::from_utf8(&self.bytes[start..self.position])
             .ok()?
             .parse()
@@ -407,14 +443,17 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
             self.position += 1;
             self.skip_space();
         }
+
         let digits = self.position;
         while self.peek().is_some_and(|byte| byte.is_ascii_digit()) {
             self.position += 1;
         }
+
         if self.position == digits {
             self.position = start;
             return None;
         }
+
         let magnitude = str::from_utf8(&self.bytes[digits..self.position])
             .ok()?
             .parse::<u64>()
@@ -422,9 +461,11 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         if !negative {
             return i64::try_from(magnitude).ok();
         }
+
         if magnitude == (i64::MAX as u64) + 1 {
             return Some(i64::MIN);
         }
+
         i64::try_from(magnitude).ok().map(|value| -value)
     }
 
@@ -433,6 +474,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
         if self.bytes.get(self.position..self.position + 3) != Some(b"...") {
             return false;
         }
+
         self.position += 3;
         true
     }
@@ -505,8 +547,10 @@ pub(in crate::vm) fn push_runtime_union_member(
         for member in nested {
             push_runtime_union_member(members, member);
         }
+
         return;
     }
+
     if !members
         .iter()
         .any(|existing| descriptor_same(existing, &member))
