@@ -1,6 +1,73 @@
 use super::run_both_modes;
 
 #[test]
+fn negated_comparisons_preserve_edges_nan_and_live_results() {
+    for operator in ["<", "<=", ">", ">="] {
+        let source = format!(
+            r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function integers(int $left, int $right): bool {{
+    if (!($left {operator} $right)) {{ return true; }}
+    return false;
+}}
+#[NeverInline]
+function literal(int $left): bool {{
+    if (!($left {operator} 10)) {{ return true; }}
+    return false;
+}}
+#[NeverInline]
+function floats(float $left, float $right): bool {{
+    if (!($left {operator} $right)) {{ return true; }}
+    return false;
+}}
+#[NeverInline]
+function mixed_values(mixed $left, mixed $right): bool {{
+    if (!($left {operator} $right)) {{ return true; }}
+    return false;
+}}
+#[NeverInline]
+function live_result(int $left, int $right): (bool, int) {{
+    $comparison = $left {operator} $right;
+    if (!$comparison) {{ return ($comparison, 1); }}
+    return ($comparison, 0);
+}}
+$values = vec[-9_223_372_036_854_775_808, -1, 0, 9, 10, 11, 9_223_372_036_854_775_807];
+foreach ($values as $left) {{
+    assert!(literal($left) == !($left {operator} 10));
+    foreach ($values as $right) {{
+        $expected = !($left {operator} $right);
+        assert!(integers($left, $right) == $expected);
+        assert!(mixed_values($left, $right) == $expected);
+        assert!(live_result($left, $right) == (!$expected, match ($expected) {{ true => 1, false => 0 }}));
+    }}
+}}
+$infinity = 1e308 * 10.0;
+$nan = $infinity - $infinity;
+foreach (vec[$nan, -$infinity, -1.0, -0.0, 0.0, 1.0, $infinity] as $left) {{
+    foreach (vec[$nan, -$infinity, -0.0, 0.0, $infinity] as $right) {{
+        assert!(floats($left, $right) == !($left {operator} $right));
+        assert!(mixed_values($left, $right) == !($left {operator} $right));
+    }}
+}}
+$caught = false;
+try {{ mixed_values(vec[], 1); }}
+catch (Whim\Unwind\IncompatibleOperandsError $error) {{ $caught = true; }}
+assert!($caught);
+#[NeverInline]
+function backward(int $limit): int {{
+    $value = 0;
+    do {{ $value++; }} while (!($value >= $limit));
+    return $value;
+}}
+assert!(backward(10) == 10);
+"
+        );
+        run_both_modes(&source, "/negated-comparisons.whim");
+    }
+}
+
+#[test]
 fn negative_powers_preserve_result_types_and_consumers() {
     let source = r"
 use Whim\Marker\NeverInline;

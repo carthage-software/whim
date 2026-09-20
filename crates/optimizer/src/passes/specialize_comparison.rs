@@ -53,7 +53,7 @@ pub(crate) fn optimize_unit(
     for analyzed in analysis.chunks() {
         if analyzed.candidates.contains(CandidateSet::COMPARISON) {
             plan_integer_comparison_ranges(analyzed, plan, statistics);
-            plan_boolean_negations(analyzed, plan, statistics);
+            plan_boolean_negations(analyzed, plan, configuration, statistics);
         }
     }
 }
@@ -145,6 +145,7 @@ fn plan_integer_comparison_ranges(
 fn plan_boolean_negations(
     analyzed: &AnalyzedChunk<'_>,
     plan: &mut RewritePlan,
+    configuration: OptimizationConfiguration,
     statistics: &mut OptimizationStatistics,
 ) {
     let chunk = analyzed.chunk;
@@ -179,6 +180,45 @@ fn plan_boolean_negations(
         {
             continue;
         }
+
+        if configuration.fuse_comparison
+            && let Some(previous) = index.checked_sub(1)
+            && let Some((comparison, temporary, left, right)) =
+                fuse_comparison::comparison(chunk.code[previous])
+            && temporary == source
+            && !targets.contains(&index)
+            && plan.is_available(analyzed, previous)
+            && analyzed.flow.proves(previous, left, &TypeDescriptor::Int)
+            && analyzed.flow.proves(previous, right, &TypeDescriptor::Int)
+            && !analyzed
+                .flow
+                .register_may_release_observably(previous, source)
+            && register_is_dead_after(chunk, source, index + 2)
+            && register_is_dead_after(chunk, source, relative_target(index + 1, offset.offset()))
+            && let Some(relative) = offset.offset().checked_add(2)
+            && let Ok(relative) = i16::try_from(relative)
+            && plan.replace(
+                analyzed,
+                previous,
+                Instruction::IntJumpUnless {
+                    comparison: if positive {
+                        comparison.negated()
+                    } else {
+                        comparison
+                    },
+                    left,
+                    right,
+                    offset: ShortJumpOffset::new(relative),
+                },
+            )
+        {
+            plan.remove(analyzed, index);
+            plan.remove(analyzed, index + 1);
+            statistics.instructions_removed += 2;
+            statistics.operations_specialized += 1;
+            continue;
+        }
+
         let Some(offset) = offset.offset().checked_add(1).map(JumpOffset::new) else {
             continue;
         };

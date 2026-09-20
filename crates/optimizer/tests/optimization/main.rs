@@ -9,6 +9,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::SwitchTable;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Comparison;
 use whim_bytecode::instruction::operands::IndexAddMode;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
 use whim_bytecode::instruction::operands::PropertyRemoveMode;
@@ -3464,6 +3465,105 @@ fn lazy_method_optimization_keeps_defaulted_constructor_call() {
                 | Instruction::CallMethodDirect { .. }
         )
     }));
+}
+
+#[test]
+fn generic_call_return_types_use_explicit_arguments() {
+    let unit = compile(
+        r"
+        type Integers = vec<int>;
+        function id<T>(T $value): T { return $value; }
+        function scalar(int $value): int { return id::<int>($value); }
+        function coalesced(int $value): int { return id::<int>($value) ?? 0; }
+        function first(Integers $values): int { return id::<Integers>($values)[0]; }
+        function nullable(null|int $value): int { return id::<null|int>($value) ?? 7; }
+        ",
+        OptimizationConfiguration {
+            inline_leaf_calls: false,
+            ..OptimizationConfiguration::default()
+        },
+    );
+
+    for name in ["scalar", "coalesced", "first"] {
+        let code = &unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name.as_bytes())
+            .unwrap()
+            .chunk
+            .code;
+        assert!(
+            code.iter().any(|instruction| matches!(
+                instruction,
+                Instruction::ReturnUnchecked { .. } | Instruction::ReturnScalarUnchecked { .. }
+            )),
+            "{name:?}: {code:?}"
+        );
+        assert!(
+            code.iter().all(|instruction| !matches!(
+                instruction,
+                Instruction::Return { .. }
+                    | Instruction::JumpIfNull { .. }
+                    | Instruction::JumpIfNotNull { .. }
+            )),
+            "{name:?}: {code:?}"
+        );
+    }
+
+    let nullable = &unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"nullable")
+        .unwrap()
+        .chunk
+        .code;
+    assert!(
+        nullable.iter().any(|instruction| matches!(
+            instruction,
+            Instruction::JumpIfNull { .. } | Instruction::JumpIfNotNull { .. }
+        )),
+        "{nullable:?}"
+    );
+
+    verify_unit(&unit).unwrap();
+}
+
+#[test]
+fn negated_integer_comparisons_use_fused_branches() {
+    for comparison in [
+        Comparison::LessThan,
+        Comparison::LessThanOrEqual,
+        Comparison::GreaterThan,
+        Comparison::GreaterThanOrEqual,
+    ] {
+        for right in ["10", "$right"] {
+            let source = format!(
+                "function select(int $left, int $right): int {{ if (!($left {} {right})) {{ return 1; }} return 0; }}",
+                comparison.operator(),
+            );
+            let unit = compile(&source, OptimizationConfiguration::default());
+            let code = &unit.functions[0].chunk.code;
+            assert!(
+                code.iter().any(|instruction| matches!(
+                    instruction,
+                    Instruction::IntJumpUnless { comparison: actual, .. }
+                        | Instruction::IntJumpUnlessImmediate { comparison: actual, .. }
+                        if *actual == comparison.negated()
+                )),
+                "{source}: {code:?}"
+            );
+            assert!(
+                code.iter().all(|instruction| !matches!(
+                    instruction,
+                    Instruction::Not { .. }
+                        | Instruction::JumpIfTrue { .. }
+                        | Instruction::JumpIfFalse { .. }
+                )),
+                "{source}: {code:?}"
+            );
+            verify_unit(&unit).unwrap();
+        }
+    }
 }
 
 #[test]

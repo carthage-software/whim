@@ -198,6 +198,7 @@ impl<'a> TypeFlow<'a> {
             let descriptor = self.origin_type(origin, 0)?;
             return Some((destination, self.descriptor_fact(&descriptor, origin)));
         }
+        let substituted;
         let (destination, descriptor) = match self.chunk.code.get(index)? {
             Instruction::AsCheck {
                 destination,
@@ -277,7 +278,20 @@ impl<'a> TypeFlow<'a> {
             | Instruction::CallNamedConstantUnchecked { destination, .. }
             | Instruction::CallSelfUnchecked { destination, .. } => {
                 if let Some(function) = self.resolved_function(index) {
-                    (*destination, function.return_type.as_ref()?)
+                    let descriptor = function.return_type.as_ref()?;
+                    let descriptor = if let Some(arguments) = self.call_type_arguments(index) {
+                        substituted = substitute_parameters(
+                            descriptor,
+                            &function.type_parameters,
+                            Some(arguments),
+                            0,
+                        );
+                        &substituted
+                    } else {
+                        descriptor
+                    };
+
+                    (*destination, descriptor)
                 } else if let Some(function) = self.resolved_built_in_function(index) {
                     let descriptor = substitute_parameters(
                         &function.return_type,

@@ -4,6 +4,45 @@ use super::run_both_modes;
 mod fixtures;
 
 #[test]
+fn generic_returns_preserve_nullable_collection_and_invalid_values() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+type Integers = vec<int>;
+#[NeverInline]
+function id<T>(T $value): T { return $value; }
+#[NeverInline]
+function coalesced<T>(T $value): int { return id::<T>($value) ?? 7; }
+#[NeverInline]
+function concrete(int $value): int { return id::<int>($value) ?? 0; }
+#[NeverInline]
+function first(Integers $value): int { return id::<Integers>($value)[0]; }
+#[NeverInline]
+function invalid<T>(mixed $value): T { return $value; }
+#[NeverInline]
+function invalid_caller(): int { return invalid::<int>('wrong') ?? 0; }
+assert!(coalesced::<int>(42) == 42);
+assert!(concrete(42) == 42);
+assert!(coalesced::<null|int>(null) == 7);
+assert!(coalesced::<null|int>(42) == 42);
+assert!(first(vec[3, 4]) == 3);
+$values = vec[1, 2];
+$copy = id::<Integers>($values);
+$copy[0] = 'changed';
+assert!($values == vec[1, 2]);
+assert!(!($copy is Integers));
+$caught = false;
+try { invalid_caller(); } catch (Whim\Unwind\TypeError $error) { $caught = true; }
+assert!($caught);
+$caught = false;
+try { coalesced::<string>('wrong'); } catch (Whim\Unwind\TypeError $error) { $caught = true; }
+assert!($caught);
+",
+        "/generic-returns.whim",
+    );
+}
+
+#[test]
 fn structural_returns_preserve_errors_and_copy_on_write() {
     let mut source = String::from(fixtures::RETURNS);
     source.push_str(
