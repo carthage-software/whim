@@ -95,18 +95,17 @@ jobs:
             builder: freebsd
             arch: x86_64
           - target: aarch64-unknown-freebsd
-            os: macos-15
-            builder: freebsd
-            arch: aarch64
+            os: ubuntu-24.04-arm
+            builder: freebsd-aarch64
     steps:
       - uses: actions/checkout@v7
       - if: endsWith(matrix.target, '-musl')
         run: sudo apt-get update && sudo apt-get install -y musl-tools
-      - if: matrix.builder != 'freebsd'
+      - if: ${{ !startsWith(matrix.builder, 'freebsd') }}
         uses: dtolnay/rust-toolchain@1.98.0
         with:
           targets: ${{ matrix.target }}
-      - if: matrix.builder != 'freebsd'
+      - if: ${{ !startsWith(matrix.builder, 'freebsd') }}
         uses: Swatinem/rust-cache@v2
         with:
           key: release-${{ matrix.target }}
@@ -116,11 +115,11 @@ jobs:
         with:
           tool: cross@0.2.5
       - name: Build
-        if: matrix.builder != 'freebsd'
+        if: ${{ !startsWith(matrix.builder, 'freebsd') }}
         shell: bash
         run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim
-      - if: matrix.builder == 'freebsd' && runner.os == 'macOS'
-        run: brew install rsync
+      - if: matrix.builder == 'freebsd-aarch64'
+        uses: ./.github/actions/freebsd-aarch64
       - name: Build and test FreeBSD
         if: matrix.builder == 'freebsd'
         uses: vmactions/freebsd-vm@v1
