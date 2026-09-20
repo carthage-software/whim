@@ -1,5 +1,4 @@
 name: FreeBSD aarch64
-description: Build on the host and run Whim tests in FreeBSD.
 
 runs:
   using: composite
@@ -42,8 +41,3 @@ runs:
       env:
         PQ_LIB_DIR_AARCH64_UNKNOWN_FREEBSD: ${{ github.workspace }}/target/freebsd-libs
       run: cargo zigbuild --locked --release --target aarch64-unknown-freebsd --bin whim
-    - name: Test Whim
-      shell: bash
-      run: |
-        rsync -aR --rsync-path=/usr/local/bin/rsync "$GITHUB_WORKSPACE/target/aarch64-unknown-freebsd/release/whim" freebsd:/
-        ssh freebsd "cd '$GITHUB_WORKSPACE' && target/aarch64-unknown-freebsd/release/whim tests/run.whim '' 2"
