@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 
+use whim_compiler::target::Target;
 use whim_runtime::artifact::ArtifactConfiguration;
 use whim_runtime::artifact::SourceFile;
-use whim_runtime::compiler::target::Target;
 use whim_runtime::engine::Engine;
 use whim_runtime::engine::EngineConfiguration;
 

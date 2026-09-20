@@ -3,9 +3,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::process;
 
+use whim_compiler::target::Target;
 use whim_runtime::artifact::ArtifactConfiguration;
 use whim_runtime::artifact::SourceFile;
-use whim_runtime::compiler::target::Target;
 use whim_runtime::engine::Engine;
 use whim_runtime::engine::EngineConfiguration;
 

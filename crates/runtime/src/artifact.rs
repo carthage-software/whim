@@ -15,6 +15,10 @@ use whim_bytecode::aliases::expand_unit_declarations;
 use whim_bytecode::decode::compiled_unit;
 use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::verify::verify_unit;
+use whim_compiler::Compilation;
+use whim_compiler::CompilePath;
+use whim_compiler::new_unit;
+use whim_compiler::target::Target;
 use whim_optimizer::OptimizationConfiguration;
 use whim_span::Position;
 use whim_span::lines::line_starts_of;
@@ -23,16 +27,6 @@ use whim_syn::arena::LocalArena;
 use whim_syn::parser;
 use whim_value::heap::Heap;
 
-use crate::compiler::AliasGraph;
-use crate::compiler::Compilation;
-use crate::compiler::CompilePath;
-use crate::compiler::EmbeddedFiles;
-use crate::compiler::GenericTable;
-use crate::compiler::compile_program_into_unit;
-use crate::compiler::extend_generics;
-use crate::compiler::finish_unit;
-use crate::compiler::new_unit;
-use crate::compiler::target::Target;
 use crate::engine::Engine;
 use crate::symbols::SourceText;
 use crate::symbols::UnitSourceFile;
@@ -136,10 +130,6 @@ impl Engine {
     ///
     /// Returns an error when parsing, compilation, linking, verification, or
     /// encoding fails.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "artifact compilation keeps its stages together"
-    )]
     pub fn compile_artifact(
         &mut self,
         path: &str,
@@ -168,62 +158,53 @@ impl Engine {
             programs.push(program);
         }
 
-        let mut generics = GenericTable::new();
-        for program in &programs {
-            extend_generics(program, &mut generics);
-        }
-
         let mut unit = new_unit(path.as_bytes(), &self.heap);
-        let mut aliases = AliasGraph::default();
-        let embedded_files = EmbeddedFiles::default();
         let mut compilation = Compilation::new(
-            &generics,
-            &mut aliases,
-            &embedded_files,
+            &programs,
             &target,
             &line_starts,
             configuration.trusted_return_types,
         );
         let mut main_chunks = Vec::with_capacity(programs.len());
         for (file, program) in sources.iter().zip(&programs) {
-            let chunk = compile_program_into_unit(
-                &self.heap,
-                program,
-                CompilePath {
-                    diagnostic: file.path,
-                    runtime: file.path.as_bytes(),
-                },
-                &mut unit,
-                &mut compilation,
-            )
-            .map_err(|error| {
-                ArtifactError::new(format!(
-                    "failed to compile {}:\n{}",
-                    file.path, error.message
-                ))
-            })?;
+            let chunk = compilation
+                .compile(
+                    &self.heap,
+                    program,
+                    CompilePath {
+                        diagnostic: file.path,
+                        runtime: file.path.as_bytes(),
+                    },
+                    &mut unit,
+                )
+                .map_err(|error| {
+                    ArtifactError::new(format!(
+                        "failed to compile {}:\n{}",
+                        file.path, error.message
+                    ))
+                })?;
             main_chunks.push(chunk);
         }
 
         unit.main = merge::main(main_chunks)?;
-        let mut unit = finish_unit(
-            unit,
-            &aliases,
-            &self.heap,
-            &self.tables.built_in_function_declarations,
-            OptimizationConfiguration {
-                enabled: configuration.optimize,
-                ..OptimizationConfiguration::default()
-            },
-        )
-        .map_err(|error| {
-            let source_path =
-                source_path_for_span(&source_files, error.span.start.offset).unwrap_or(path);
-            ArtifactError::new(format!(
-                "failed to compile {source_path}:\n{}",
-                error.message
-            ))
-        })?;
+        let mut unit = compilation
+            .finish(
+                unit,
+                &self.heap,
+                &self.tables.built_in_function_declarations,
+                OptimizationConfiguration {
+                    enabled: configuration.optimize,
+                    ..OptimizationConfiguration::default()
+                },
+            )
+            .map_err(|error| {
+                let source_path =
+                    source_path_for_span(&source_files, error.span.start.offset).unwrap_or(path);
+                ArtifactError::new(format!(
+                    "failed to compile {source_path}:\n{}",
+                    error.message
+                ))
+            })?;
 
         let aliases = unit.type_aliases.clone();
         expand_unit_declarations(&mut unit, &aliases);

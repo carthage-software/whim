@@ -4,6 +4,8 @@ use std::fs;
 use std::path::Path;
 
 use whim_bytecode::unit::CompiledUnit;
+use whim_compiler::CompileConfiguration;
+use whim_compiler::compile_with_path_bytes_configuration_and_built_in_functions;
 use whim_optimizer::OptimizationConfiguration;
 use whim_span::HasSpan;
 use whim_span::lines::line_starts_of;
@@ -15,8 +17,6 @@ use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::compiler;
-use crate::compiler::CompileConfiguration;
 use crate::core::symbols::strip_leading_backslash;
 use crate::engine::declare::CachedUnit;
 use crate::engine::diagnostics::DiagnosticLabel;
@@ -208,7 +208,7 @@ impl VirtualMachine<'_> {
             }
         };
 
-        let unit = match compiler::compile_with_path_bytes_configuration_and_built_in_functions(
+        let unit = match compile_with_path_bytes_configuration_and_built_in_functions(
             program,
             &path_text,
             &path_bytes(canonical),

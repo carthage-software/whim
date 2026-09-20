@@ -1,7 +1,6 @@
-//! Whim's compiler and runtime.
+//! Whim's runtime.
 
 pub mod artifact;
-pub mod compiler;
 pub mod disassembly;
 pub mod engine;
 

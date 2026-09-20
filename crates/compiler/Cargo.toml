@@ -1,0 +1,23 @@
+[package]
+name = "whim-compiler"
+description = "Bytecode compilation for Whim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hashbrown = { workspace = true }
+whim-base = { workspace = true }
+whim-bytecode = { workspace = true }
+whim-optimizer = { workspace = true }
+whim-span = { workspace = true }
+whim-syn = { workspace = true }
+whim-sys = { workspace = true }
+whim-value = { workspace = true }

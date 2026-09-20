@@ -3,6 +3,7 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
+
 use whim_base::unreachable_invariant;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::ClassLikeKind;

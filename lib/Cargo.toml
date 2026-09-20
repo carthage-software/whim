@@ -19,4 +19,5 @@ workspace = true
 whim-runtime = { workspace = true }
 
 [build-dependencies]
+whim-compiler = { workspace = true }
 whim-runtime = { workspace = true }

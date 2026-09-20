@@ -52,3 +52,7 @@ jobs:
         env:
           MIRIFLAGS: -Zmiri-ignore-leaks
         run: cargo +nightly miri test --locked -p whim-optimizer --lib
+      - name: Check compiler
+        env:
+          MIRIFLAGS: -Zmiri-ignore-leaks
+        run: cargo +nightly miri test --locked -p whim-compiler --lib emit::

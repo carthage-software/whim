@@ -17,6 +17,8 @@ use whim_bytecode::instruction::operands::PropertyRemoveMode;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::verify::verify_unit;
+use whim_compiler::CompileConfiguration;
+use whim_compiler::compile_with_configuration;
 use whim_optimizer::OptimizationConfiguration;
 use whim_optimizer::World;
 use whim_optimizer::optimize_callable_function as optimize_function;
@@ -26,8 +28,6 @@ use whim_syn::parser::parse;
 use whim_value::function::FuncId;
 use whim_value::heap::Heap;
 
-use crate::compiler::CompileConfiguration;
-use crate::compiler::compile_with_configuration;
 use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
 use crate::symbols::ExactFunctionEntry;

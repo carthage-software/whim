@@ -1,0 +1,137 @@
+//! Compile errors: the static gates and their reporting.
+
+use whim_span::Span;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompileErrorKind {
+    StandaloneWildcardType,
+    WildcardTypeArgument,
+    MemberWithoutVisibility,
+    IntegerLiteralOutOfRange,
+    TryWithoutClause,
+    ReturnInsideFinally,
+    ReturnOutsideCallable,
+    LoopJumpEscapesFinally,
+    ValueReturnInVoidFunction,
+    ReturnInNeverFunction,
+    VoidExpressionClosure,
+    VoidInUnion,
+    ReturnOnlyType,
+    AliasOfVoid,
+    TypeNotRuntimeCheckable,
+    InvalidClassnameType,
+    TooManyArguments,
+    TooManyRegisters,
+    SideTableFull,
+    DuplicateParameter,
+    DuplicateUsingBinding,
+    DuplicateNamedArgument,
+    PositionalArgumentAfterNamedArgument,
+    ThisOutsideMethod,
+    CannotDropThis,
+    CannotBindThis,
+    CannotAssignFinalLocal,
+    ClassContextRequired,
+    InvalidMemberType,
+    LoopJumpOutsideLoop,
+    DynamicClassMemberAccess,
+    InvalidIncrementTarget,
+    InvalidCompoundAssignmentTarget,
+    AppendTargetUsedAsValue,
+    ClassConstantTypeMismatch,
+    InvalidEnumBacking,
+    EnumCaseValueMismatch,
+    RedundantTypeComposition,
+    MultipleBaseClasses,
+    AbstractMethodInConcreteClass,
+    UnreachableMatchArm,
+    InconsistentPatternBindings,
+    DuplicatePatternBinding,
+    DuplicateDictionaryKey,
+    DuplicateObjectProperty,
+    InvalidRestPatternBinding,
+    DuplicateImportAlias,
+    GenericEnum,
+    TypeArgumentArityMismatch,
+    TypeArgumentBoundViolation,
+    NonTrailingTypeParameterDefault,
+    UnboundTypeParameterDefault,
+    ClassTypeParameterInStaticMember,
+    TypeParameterClassReference,
+    InvalidVarianceUse,
+    RecursiveTypeAlias,
+    DuplicateModifier,
+    ConflictingModifiers,
+    ModifierNotAllowed,
+    InvalidStaticOnlyClassMember,
+    AbstractBodyMismatch,
+    MemberNotAllowed,
+    InvalidInterfaceProperty,
+    DuplicateMember,
+    EnumCaseValueMissing,
+    EnumCaseValueNotAllowed,
+    DuplicateEnumCaseValue,
+    EnumBuiltInMethodRedeclaration,
+    SealedPermissionViolation,
+    ParameterModifierOutsideConstructor,
+    InvalidLifecycleMethod,
+    NonConstantAttributeArgument,
+    NonConstantParameterDefault,
+    NonConstantInitializer,
+    NonConstantPropertyDefault,
+    EmbeddedFileRequiresPath,
+    AbsoluteEmbeddedFilePath,
+    ReadEmbeddedFile,
+    TooManyTypeCompositionMembers,
+    TooManyTypeArguments,
+    TooManyParameters,
+    TooManyTypeParameters,
+    DuplicateTypeParameter,
+    TooManyCaptures,
+    TooManyInterfaces,
+    TooManyMembers,
+    TooManyTupleElements,
+    SpreadInTuple,
+    TargetAfterRest,
+    RequiredTargetAfterDefault,
+    TooManyCatchClauses,
+    TooManyAttributes,
+    TooManyWrittenValues,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompileError {
+    pub message: String,
+    pub span: Span,
+    pub kind: CompileErrorKind,
+    pub notes: Vec<(Span, String)>,
+}
+
+impl CompileError {
+    #[must_use]
+    pub(crate) fn new(kind: CompileErrorKind, message: impl Into<String>, span: Span) -> Self {
+        Self {
+            message: message.into(),
+            span,
+            kind,
+            notes: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn with_note(mut self, span: Span, message: impl Into<String>) -> Self {
+        self.notes.push((span, message.into()));
+        self
+    }
+
+    #[must_use]
+    pub fn labels(&self) -> Vec<(Span, &str)> {
+        let mut labels = vec![(self.span, self.message.as_str())];
+        labels.extend(
+            self.notes
+                .iter()
+                .map(|(span, message)| (*span, message.as_str())),
+        );
+        labels
+    }
+}

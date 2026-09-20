@@ -1,6 +1,7 @@
 //! Symbolic descriptor substitution and built-in type-spec conversion.
 
 use hashbrown::HashMap;
+
 use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;

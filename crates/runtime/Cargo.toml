@@ -1,6 +1,6 @@
 [package]
 name = "whim-runtime"
-description = "The Whim runtime: compiler, linker, and virtual machine"
+description = "The Whim runtime: linker and virtual machine"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -72,6 +72,7 @@ unicode-general-category = { workspace = true }
 uuid = { workspace = true }
 whim-base = { workspace = true }
 whim-bytecode = { workspace = true }
+whim-compiler = { workspace = true }
 whim-loop = { workspace = true }
 whim-macros = { workspace = true }
 whim-optimizer = { workspace = true }

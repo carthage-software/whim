@@ -17,9 +17,13 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 use hashbrown::HashSet;
+
 use whim_bytecode::unit::CompiledClassLike;
 use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::verify::verify_unit;
+use whim_compiler::CompileConfiguration;
+use whim_compiler::CompileError;
+use whim_compiler::compile_with_path_bytes_configuration_and_built_in_functions;
 use whim_loop::Scheduler;
 use whim_loop::Stack;
 use whim_loop::TaskId;
@@ -46,9 +50,6 @@ use whim_value::object::InstanceObject;
 use crate::blocking::BlockingPool;
 use crate::classes::MethodBodyKind;
 use crate::classes::is_instance_of;
-use crate::compiler::CompileConfiguration;
-use crate::compiler::CompileError;
-use crate::compiler::compile_with_path_bytes_configuration_and_built_in_functions;
 use crate::core::async_::task_local::TaskLocalValues;
 use crate::core::async_::task_local::new_task_local_values;
 use crate::core::classes::ERROR_SLOT_CODE;

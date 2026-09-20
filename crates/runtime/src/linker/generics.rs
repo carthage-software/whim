@@ -3,6 +3,7 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
+
 use whim_bytecode::aliases::expand_aliases_using as expand_aliases;
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;

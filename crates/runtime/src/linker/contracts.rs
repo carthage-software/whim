@@ -5,6 +5,7 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
+
 use whim_base::limits::MAX_TYPE_DEPTH_U32;
 use whim_base::unwrap_option_invariant;
 use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;

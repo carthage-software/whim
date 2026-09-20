@@ -11,12 +11,12 @@ use std::rc::Rc;
 
 use whim_bytecode::disassemble;
 use whim_bytecode::unit::CompiledUnit;
+use whim_compiler::CompileError;
 use whim_span::Span;
 use whim_syn::cst::Program;
 use whim_sys::path::path_bytes;
 use whim_value::heap::Heap;
 
-use crate::compiler::CompileError;
 use crate::engine::Engine;
 
 /// One compiled program retained for deterministic bytecode rendering.

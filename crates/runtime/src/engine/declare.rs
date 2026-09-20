@@ -3,6 +3,7 @@
 use std::iter;
 
 use hashbrown::HashSet;
+
 use whim_base::u32_index;
 use whim_base::unreachable_invariant;
 use whim_bytecode::aliases::expand_unit_declarations;

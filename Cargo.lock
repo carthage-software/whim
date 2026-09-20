@@ -3413,6 +3413,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "whim-compiler"
+version = "0.10.0"
+dependencies = [
+ "hashbrown 0.17.1",
+ "whim-base",
+ "whim-bytecode",
+ "whim-optimizer",
+ "whim-span",
+ "whim-syn",
+ "whim-sys",
+ "whim-value",
+]
+
+[[package]]
 name = "whim-formatter"
 version = "0.10.0"
 dependencies = [
@@ -3426,6 +3440,7 @@ dependencies = [
 name = "whim-lib"
 version = "0.10.0"
 dependencies = [
+ "whim-compiler",
  "whim-runtime",
 ]
 
@@ -3553,6 +3568,7 @@ dependencies = [
  "uuid",
  "whim-base",
  "whim-bytecode",
+ "whim-compiler",
  "whim-loop",
  "whim-macros",
  "whim-optimizer",
