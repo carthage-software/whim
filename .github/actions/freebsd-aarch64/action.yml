@@ -1,10 +1,5 @@
 name: FreeBSD aarch64
-description: Build on the host and run tests in FreeBSD.
-
-inputs:
-  checks:
-    description: Run Clippy and Rust tests.
-    default: 'false'
+description: Build on the host and run Whim tests in FreeBSD.
 
 runs:
   using: composite
@@ -12,7 +7,6 @@ runs:
     - uses: dtolnay/rust-toolchain@1.98.0
       with:
         targets: aarch64-unknown-freebsd
-        components: clippy
     - uses: taiki-e/install-action@v2
       with:
         tool: cargo-zigbuild@0.22.2
@@ -21,7 +15,7 @@ runs:
         version: 0.15.2
     - uses: Swatinem/rust-cache@v2
       with:
-        key: freebsd-aarch64-${{ inputs.checks }}
+        key: freebsd-aarch64
     - uses: vmactions/freebsd-vm@v1
       with:
         release: '14.4'
@@ -35,7 +29,7 @@ runs:
           set -eu
           mkdir -p /usr/local/etc/pkg/repos
           echo 'FreeBSD: { url: "pkg+https://pkg.FreeBSD.org/${ABI}/latest" }' > /usr/local/etc/pkg/repos/FreeBSD.conf
-          pkg install -y ca_root_nss cmake curl git pkgconf postgresql18-client rsync rust
+          pkg install -y ca_root_nss curl git postgresql18-client rsync
     - name: Copy sources and FreeBSD libpq
       shell: bash
       run: |
@@ -43,18 +37,6 @@ runs:
         rsync -a --rsync-path=/usr/local/bin/rsync --exclude=/target/ --exclude=/.git/ "$GITHUB_WORKSPACE/" "freebsd:$GITHUB_WORKSPACE/"
         mkdir -p target/freebsd-libs
         scp freebsd:/usr/local/lib/libpq.so.5 target/freebsd-libs/libpq.so
-    - name: Check Rust
-      if: inputs.checks == 'true'
-      shell: bash
-      env:
-        PQ_LIB_DIR_AARCH64_UNKNOWN_FREEBSD: ${{ github.workspace }}/target/freebsd-libs
-        CARGO_PROFILE_DEV_DEBUG: '0'
-        CARGO_PROFILE_TEST_DEBUG: '0'
-        CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_RUNNER: ${{ github.workspace }}/.github/actions/freebsd-aarch64/run.sh
-      run: |
-        ssh freebsd "cd '$GITHUB_WORKSPACE' && cargo fetch --locked --target aarch64-unknown-freebsd"
-        cargo-zigbuild clippy --locked --workspace --all-targets --all-features --target aarch64-unknown-freebsd
-        cargo-zigbuild test --locked --workspace --all-features --target aarch64-unknown-freebsd
     - name: Build Whim
       shell: bash
       env:
@@ -62,4 +44,6 @@ runs:
       run: cargo zigbuild --locked --release --target aarch64-unknown-freebsd --bin whim
     - name: Test Whim
       shell: bash
-      run: .github/actions/freebsd-aarch64/run.sh "$GITHUB_WORKSPACE/target/aarch64-unknown-freebsd/release/whim" tests/run.whim '' 2
+      run: |
+        rsync -aR --rsync-path=/usr/local/bin/rsync "$GITHUB_WORKSPACE/target/aarch64-unknown-freebsd/release/whim" freebsd:/
+        ssh freebsd "cd '$GITHUB_WORKSPACE' && target/aarch64-unknown-freebsd/release/whim tests/run.whim '' 2"

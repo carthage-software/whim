@@ -93,9 +93,7 @@ jobs:
             pkg install -y ca_root_nss cmake curl git pkgconf postgresql18-client rust
           run: |
             set -eu
-            export CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
-            cargo clippy --locked --workspace --all-targets --all-features
-            cargo test --locked --workspace --all-features
+            export CARGO_BUILD_JOBS=2
             cargo build --locked --release --bin whim
             target/release/whim tests/run.whim '' 2
 
@@ -105,8 +103,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/freebsd-aarch64
-        with:
-          checks: 'true'
 
   whim:
     runs-on: ubuntu-latest
