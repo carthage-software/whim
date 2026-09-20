@@ -76,38 +76,21 @@ impl StandardStream {
     }
 
     pub fn write_all_blocking(self, mut bytes: &[u8]) -> io::Result<()> {
-        let file = self.file();
-        loop {
-            while !bytes.is_empty() {
-                // SAFETY: file is a live C stream and bytes remains readable through the call.
-                let count =
-                    unsafe { libc::fwrite(bytes.as_ptr().cast::<c_void>(), 1, bytes.len(), file) };
-                // SAFETY: file is a live C stream.
-                if unsafe { libc::ferror(file) } != 0 {
-                    let error = io::Error::last_os_error();
-                    // SAFETY: file is a live C stream.
-                    unsafe { libc::clearerr(file) };
-                    match error.kind() {
-                        io::ErrorKind::Interrupted => {}
-                        io::ErrorKind::WouldBlock => self.wait_writable()?,
-                        _ => return Err(error),
-                    }
-                }
-                bytes = &bytes[count..];
-            }
-            // SAFETY: file is a live C stream.
-            if unsafe { libc::fflush(file) } == 0 {
-                return Ok(());
-            }
-            let error = io::Error::last_os_error();
-            // SAFETY: file is a live C stream.
-            unsafe { libc::clearerr(file) };
-            match error.kind() {
-                io::ErrorKind::Interrupted => {}
-                io::ErrorKind::WouldBlock => self.wait_writable()?,
-                _ => return Err(error),
+        let descriptor = Descriptor {
+            inner: Resource::Standard(self),
+        };
+
+        while !bytes.is_empty() {
+            match unix_io::write(descriptor.borrowed(), bytes) {
+                Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+                Ok(count) => bytes = &bytes[count..],
+                Err(Errno::INTR) => {}
+                Err(Errno::AGAIN) => self.wait_writable()?,
+                Err(error) => return Err(error.into()),
             }
         }
+
+        Ok(())
     }
 
     fn wait_writable(self) -> io::Result<()> {
@@ -116,6 +99,7 @@ impl StandardStream {
             events: libc::POLLOUT,
             revents: 0,
         };
+
         loop {
             // SAFETY: request is a live poll record and its descriptor remains open.
             if unsafe { libc::poll(&raw mut request, 1, -1) } >= 0 {
@@ -204,6 +188,7 @@ impl Descriptor {
         } else {
             flags & !fs::OFlags::NONBLOCK
         };
+
         fs::fcntl_setfl(self.borrowed(), flags).map_err(|e| Error::new("fcntl", e))
     }
 
@@ -224,6 +209,7 @@ impl Descriptor {
                 }
                 return Err(Error::new("read", error));
             }
+
             count
         } else {
             match unix_io::read(self.borrowed(), bytes.spare_capacity_mut()) {
@@ -232,28 +218,13 @@ impl Descriptor {
                 Err(error) => return Err(Error::new("read", error)),
             }
         };
+
         // SAFETY: the read initialized exactly count bytes within capacity.
         unsafe { bytes.set_len(count) };
         Ok(Some(bytes))
     }
 
     pub fn write(&self, bytes: &[u8]) -> Result<usize> {
-        if let Resource::Standard(stream) = &self.inner {
-            let file = stream.file();
-            // SAFETY: bytes remains readable and file is a live C stream.
-            let count =
-                unsafe { libc::fwrite(bytes.as_ptr().cast::<c_void>(), 1, bytes.len(), file) };
-            // SAFETY: file is a live C stream.
-            if unsafe { libc::ferror(file) } != 0 {
-                let error = io::Error::last_os_error();
-                // SAFETY: file is a live C stream.
-                unsafe { libc::clearerr(file) };
-                if count == 0 && error.kind() != io::ErrorKind::WouldBlock {
-                    return Err(Error::new("write", error));
-                }
-            }
-            return Ok(count);
-        }
         match unix_io::write(self.borrowed(), bytes) {
             Ok(count) => Ok(count),
             Err(Errno::AGAIN) => Ok(0),
@@ -262,16 +233,6 @@ impl Descriptor {
     }
 
     pub fn flush(&self) -> Result<()> {
-        if let Resource::Standard(stream) = &self.inner {
-            let file = stream.file();
-            // SAFETY: file is a live C stream.
-            if unsafe { libc::fflush(file) } != 0 {
-                let error = Error::last("fflush");
-                // SAFETY: file is a live C stream.
-                unsafe { libc::clearerr(file) };
-                return Err(error);
-            }
-        }
         Ok(())
     }
 

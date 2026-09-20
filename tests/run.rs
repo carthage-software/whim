@@ -126,13 +126,29 @@ fn canonical_script_paths_accept_mixed_separators_and_parent_components() {
 
 #[test]
 fn standard_pipe_handles_preserve_binary_data_under_backpressure() {
+    use std::io::BufRead;
+    use std::io::BufReader;
     use std::io::Write;
     use std::process::Stdio;
     use std::thread;
 
     let path = write_fixture(
         "copy-standard-pipes.whim",
-        "Whim\\IO\\copy(Whim\\IO\\input_handle(), Whim\\IO\\write_handle());",
+        r"
+$writer = Whim\IO\write_handle();
+$block = Whim\Str\repeat('x', 4095);
+$written = 0;
+while (true) {
+    $count = $writer->tryWrite($block);
+    if ($count == 0) {
+        break;
+    }
+    $written += $count;
+}
+write_error_line!($written);
+write!('copy:');
+Whim\IO\copy(Whim\IO\input_handle(), $writer);
+",
     );
     let mut child = Command::new(env!("CARGO_BIN_EXE_whim"))
         .arg(&path)
@@ -145,13 +161,25 @@ fn standard_pipe_handles_preserve_binary_data_under_backpressure() {
     let input = bytes.clone();
     let mut stdin = child.stdin.take().expect("stdin is piped");
     let writer = thread::spawn(move || stdin.write_all(&input));
+    let mut written = String::new();
+    BufReader::with_capacity(1, child.stderr.as_mut().expect("stderr is piped"))
+        .read_line(&mut written)
+        .expect("the child fills its output pipe");
+    let written = written
+        .trim()
+        .parse()
+        .expect("the child reports its progress");
+    let mut expected = vec![b'x'; written];
+    expected.extend_from_slice(b"copy:");
+    expected.extend_from_slice(&bytes);
     let output = child.wait_with_output().expect("the child exits");
     writer
         .join()
         .expect("the writer joins")
         .expect("input is written");
     assert_eq!(code_of(&output), 0, "{}", stderr_of(&output));
-    assert_eq!(output.stdout, bytes);
+    assert_eq!(output.stdout.len(), expected.len());
+    assert_eq!(output.stdout, expected);
     assert!(output.stderr.is_empty());
     fs::remove_file(path).expect("the fixture is removable");
 }
