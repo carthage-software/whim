@@ -5,8 +5,6 @@ pub mod compiler;
 pub mod disassembly;
 pub mod engine;
 
-mod variance;
-
 pub(crate) mod blocking;
 pub(crate) mod builtin;
 pub(crate) mod classes;

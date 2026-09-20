@@ -2,16 +2,13 @@
 
 #![deny(clippy::nursery, clippy::pedantic)]
 
-use whim_bytecode::chunk::descriptors::TypeDescriptor;
-use whim_bytecode::unit::CompiledTypeParameter;
-use whim_bytecode::unit::Variance;
 use whim_value::atom::Atom;
 
-#[expect(
-    clippy::redundant_pub_crate,
-    reason = "the compiler and linker share descriptor variance checks"
-)]
-pub(crate) fn incompatible_parameter<'parameter>(
+use crate::chunk::descriptors::TypeDescriptor;
+use crate::unit::CompiledTypeParameter;
+use crate::unit::Variance;
+
+pub fn incompatible_parameter<'parameter>(
     descriptor: &TypeDescriptor,
     polarity: i8,
     parameters: &'parameter [CompiledTypeParameter],
@@ -46,7 +43,7 @@ pub(crate) fn incompatible_parameter<'parameter>(
                         continue;
                     };
 
-                    pending.push((argument, nested_polarity(position, variance)));
+                    pending.push((argument, variance.nested_polarity(position)));
                 }
             }
             TypeDescriptor::Array(Some((key, value)))
@@ -96,12 +93,4 @@ pub(crate) fn incompatible_parameter<'parameter>(
     }
 
     None
-}
-
-const fn nested_polarity(polarity: i8, variance: Variance) -> i8 {
-    match variance {
-        Variance::Invariant => 0,
-        Variance::Covariant => polarity,
-        Variance::Contravariant => -polarity,
-    }
 }

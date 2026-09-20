@@ -669,7 +669,6 @@ pub(crate) struct UnitSourceFile {
     pub(crate) path: Atom,
     pub(crate) start: u32,
     pub(crate) end: u32,
-    /// Line starts relative to `start`.
     pub(crate) line_starts: Vec<u32>,
 }
 
@@ -931,31 +930,4 @@ pub(crate) struct RuntimeTypeEnvironment {
     /// The one binder introduced at this level. The shared empty environment
     /// has no binding.
     pub binding: Option<(Atom, TypeDescriptor)>,
-}
-
-#[must_use]
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "source offsets and line counts are limited to u32"
-)]
-pub(crate) fn line_of(line_starts: &[u32], offset: u32) -> u32 {
-    if line_starts.is_empty() {
-        return 0;
-    }
-    line_starts.partition_point(|start| *start <= offset) as u32
-}
-
-#[must_use]
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "source offsets are limited to u32"
-)]
-pub(crate) fn line_starts_of(source: &str) -> Vec<u32> {
-    let mut starts = vec![0];
-    for (position, byte) in source.bytes().enumerate() {
-        if byte == b'\n' {
-            starts.push(position as u32 + 1);
-        }
-    }
-    starts
 }

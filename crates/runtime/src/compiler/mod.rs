@@ -13,10 +13,9 @@ use whim_bytecode::unit::CompiledUnit;
 use whim_optimizer::OptimizationConfiguration;
 use whim_optimizer::optimize_unit;
 use whim_span::HasSpan;
+use whim_span::lines::line_starts_of;
 use whim_syn::cst::Program;
 use whim_value::heap::Heap;
-
-use crate::symbols::line_starts_of;
 
 mod declarations;
 mod embed;

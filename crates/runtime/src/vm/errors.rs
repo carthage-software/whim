@@ -17,6 +17,7 @@ use whim_bytecode::unit::TRACE_BOUNDARY_ATTRIBUTE;
 use whim_bytecode::unit::TRACK_CALLER_ATTRIBUTE;
 use whim_bytecode::unit::Visibility;
 use whim_bytecode::unit::has_attribute;
+use whim_span::lines::line_of;
 use whim_sys::path::path_from_bytes;
 use whim_value::Value;
 use whim_value::ValueView;
@@ -54,7 +55,6 @@ use crate::vm::Throw;
 use crate::vm::UnitContext;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
-use crate::vm::line_of;
 use crate::vm::unreachable_invariant;
 
 const ASSERTION_VALUE_LIMIT: usize = 512;

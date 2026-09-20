@@ -64,7 +64,6 @@ use crate::symbols::PropertyGuardWays;
 use crate::symbols::SymbolEntry;
 use crate::symbols::SymbolKind;
 use crate::symbols::UnitContext;
-use crate::symbols::line_of;
 use crate::vm::arithmetic::arithmetic_add;
 use crate::vm::arithmetic::arithmetic_divide;
 use crate::vm::arithmetic::arithmetic_modulo;

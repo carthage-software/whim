@@ -16,6 +16,7 @@ use whim_bytecode::unit::CompiledClassLike;
 use whim_bytecode::unit::CompiledTypeParameter;
 use whim_bytecode::unit::Variance;
 use whim_bytecode::unit::Visibility;
+use whim_bytecode::variance::incompatible_parameter;
 use whim_optimizer::descriptors_equal;
 use whim_span::Span;
 use whim_value::atom::Atom;
@@ -35,7 +36,6 @@ use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::linker::descriptors::substitute_symbolic;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolKind;
-use crate::variance::incompatible_parameter;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 

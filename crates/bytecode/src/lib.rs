@@ -15,6 +15,7 @@ pub mod reference_registers;
 pub mod render;
 pub mod rewrite;
 pub mod unit;
+pub mod variance;
 pub mod verify;
 
 /// The number of registers represented by a reference ownership mask.

@@ -280,6 +280,17 @@ pub enum Variance {
     Contravariant,
 }
 
+impl Variance {
+    #[must_use]
+    pub const fn nested_polarity(&self, polarity: i8) -> i8 {
+        match self {
+            Self::Invariant => 0,
+            Self::Covariant => polarity,
+            Self::Contravariant => -polarity,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
 pub struct CompiledTypeParameter {

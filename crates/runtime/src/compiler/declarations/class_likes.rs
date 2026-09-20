@@ -11,6 +11,7 @@ use whim_bytecode::unit::CompiledTypeParameter;
 use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::unit::EnumBacking;
 use whim_bytecode::unit::Variance;
+use whim_bytecode::variance::incompatible_parameter;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::class::Class;
@@ -37,7 +38,6 @@ use crate::compiler::types;
 use crate::compiler::types::ClassContext;
 use crate::compiler::types::GenericTable;
 use crate::compiler::types::TypeScope;
-use crate::variance::incompatible_parameter;
 
 fn base_reference(
     scope: &Scope<'_>,

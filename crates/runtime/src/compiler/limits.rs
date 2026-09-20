@@ -9,7 +9,6 @@ use crate::compiler::error::CompileErrorKind;
 /// The most of any one repeated thing a single piece of syntax may name.
 pub(in crate::compiler) const COUNT_LIMIT: usize = 64;
 pub(in crate::compiler) const TUPLE_LIMIT: usize = 12;
-
 pub(in crate::compiler) const WINDOW_CAPACITY: usize = u8::MAX as usize;
 
 /// One extra slot lets a method window hold the receiver and all arguments.

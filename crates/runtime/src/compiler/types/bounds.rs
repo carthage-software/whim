@@ -1,6 +1,7 @@
 //! Conservative same-unit validation of generic construction sites.
 
 use hashbrown::HashMap;
+
 use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_bytecode::aliases::TypeAliasIndex;
 use whim_bytecode::aliases::expand_aliases_using;

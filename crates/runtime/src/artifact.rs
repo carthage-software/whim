@@ -17,6 +17,7 @@ use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::verify::verify_unit;
 use whim_optimizer::OptimizationConfiguration;
 use whim_span::Position;
+use whim_span::lines::line_starts_of;
 use whim_syn::arena::Arena;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser;
@@ -35,7 +36,6 @@ use crate::compiler::target::Target;
 use crate::engine::Engine;
 use crate::symbols::SourceText;
 use crate::symbols::UnitSourceFile;
-use crate::symbols::line_starts_of;
 use crate::vm::VirtualMachineControl;
 
 const MAGIC: &[u8; 8] = b"WHIM\0\0\0\0";

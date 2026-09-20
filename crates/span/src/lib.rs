@@ -11,6 +11,8 @@ use std::ops::RangeBounds;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub mod lines;
+
 /// Represents a specific byte offset within a single source file.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[repr(transparent)]
