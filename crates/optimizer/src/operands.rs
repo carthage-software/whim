@@ -56,6 +56,7 @@ pub(crate) fn write_may_alias_inputs(kind: InstructionKind) -> bool {
             | InstructionKind::CallStatic
             | InstructionKind::CallStaticDiscarded
             | InstructionKind::CallValue
+            | InstructionKind::CallValueUnchecked
             | InstructionKind::CallValueDiscarded
             | InstructionKind::ForeachInit
             | InstructionKind::ForeachNext
@@ -100,7 +101,9 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
         InstructionKind::CallNamedUnchecked
         | InstructionKind::CallSelfUnchecked
         | InstructionKind::Require => Some(&[R4, W2]),
-        InstructionKind::CallValue | InstructionKind::CallValueDiscarded => Some(&[W2, R4]),
+        InstructionKind::CallValue
+        | InstructionKind::CallValueUnchecked
+        | InstructionKind::CallValueDiscarded => Some(&[W2, R4]),
         instruction_kinds!(
             Jump | Write
                 | WriteLine
@@ -292,7 +295,7 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
         instructions!(
             CallNamed | CallNamedDiscarded | CallMethod | CallMethodDiscarded
                 | CallMethodUnchecked | CallMethodDirect | CallNamedDirect | CallStatic | CallStaticDiscarded
-                | CallValue | CallValueDiscarded;
+                | CallValue | CallValueUnchecked | CallValueDiscarded;
             {
             argument_count,
             first_argument,
@@ -445,10 +448,21 @@ pub(crate) fn for_each_read_register(
 }
 
 pub(crate) fn replace_read_register(
-    instruction: Instruction,
+    mut instruction: Instruction,
     from: Register,
     to: Register,
 ) -> Option<Instruction> {
+    if let instructions!(Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+        value_count,
+        first_value,
+    }) = &mut instruction
+        && value_count.value() == 1
+        && *first_value == from
+    {
+        *first_value = to;
+        return Some(instruction);
+    }
+
     if matches!(
         instruction,
         Instruction::CallNamedUnchecked {

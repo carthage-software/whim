@@ -141,6 +141,7 @@ pub(crate) fn with_destination(
         | Instruction::ConstantGet { destination, .. }
         | Instruction::ClassConstantGet { destination, .. }
         | Instruction::CallValue { destination, .. }
+        | Instruction::CallValueUnchecked { destination, .. }
         | Instruction::CallNamed { destination, .. }
         | Instruction::CallNamedUnchecked { destination, .. }
         | Instruction::CallNamedConstantUnchecked { destination, .. }

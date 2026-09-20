@@ -351,6 +351,11 @@ fn pinned_window_registers(chunk: &Chunk) -> HashSet<u16> {
                 first_argument,
                 ..
             }
+            | Instruction::CallValueUnchecked {
+                argument_count,
+                first_argument,
+                ..
+            }
             | Instruction::CallValueDiscarded {
                 argument_count,
                 first_argument,
@@ -572,6 +577,11 @@ fn normalize_empty_window_starts(chunk: &mut Chunk) {
                 ..
             }
             | Instruction::CallValue {
+                argument_count,
+                first_argument,
+                ..
+            }
+            | Instruction::CallValueUnchecked {
                 argument_count,
                 first_argument,
                 ..
