@@ -5,6 +5,8 @@ use std::slice;
 
 use hashbrown::HashMap;
 
+use whim_base::limits::MAX_TYPE_DEPTH;
+
 use crate::bytecode::aliases::TypeAliasLookup;
 use crate::bytecode::aliases::expand_aliases_using;
 use crate::bytecode::chunk::descriptors::Literal;
@@ -18,7 +20,6 @@ use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::unit::is_external;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::type_flow::BOOL;
 use crate::optimizer::type_flow::CALLABLE;
 use crate::optimizer::type_flow::FLOAT;

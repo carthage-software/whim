@@ -3,6 +3,9 @@
 
 use hashbrown::HashMap;
 
+use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::atom::Identifier;
@@ -38,9 +41,6 @@ use crate::compiler::types::GenericTable;
 use crate::compiler::types::TypeScope;
 use crate::compiler::types::lowering::is_wildcard;
 use crate::compiler::types::lowering::lower_type;
-use crate::limits::MAX_TYPE_DEPTH;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
 
 pub(in crate::compiler) fn render_annotation(
     scope: &TypeScope<'_>,

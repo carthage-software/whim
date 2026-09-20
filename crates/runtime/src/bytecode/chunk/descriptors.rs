@@ -6,6 +6,8 @@ use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
 use xxhash_rust::xxh3::xxh3_64;
 
+use whim_base::unreachable_invariant;
+
 use crate::bytecode::chunk::Atom;
 use crate::bytecode::chunk::Comparison;
 use crate::bytecode::chunk::ConstantIndex;
@@ -13,7 +15,6 @@ use crate::bytecode::chunk::DescriptorIndex;
 use crate::bytecode::chunk::Register;
 use crate::bytecode::instruction::operands::PropertySlot;
 use crate::bytecode::instruction::operands::PropertyValueMode;
-use crate::unreachable_invariant;
 use crate::value::Value;
 use crate::value::dict::keys::KeyRef;
 use crate::value::heap::Heap;

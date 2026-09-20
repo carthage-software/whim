@@ -6,6 +6,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_span::Span;
 
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
@@ -25,8 +27,6 @@ use crate::bytecode::instruction::operands::PropertyInitializationDescriptorInde
 use crate::bytecode::instruction::operands::Register;
 use crate::bytecode::instruction::operands::SwitchTableIndex;
 use crate::bytecode::reference_registers;
-use crate::unreachable_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::atom::Atom;
 use crate::value::heap::Heap;
 

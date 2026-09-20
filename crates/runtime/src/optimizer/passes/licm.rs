@@ -1,5 +1,7 @@
 //! Loop-invariant code motion for immutable loop bounds.
 
+use whim_base::unreachable_invariant;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::ConstantIndex;
@@ -12,7 +14,6 @@ use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::liveness::register_is_read_before_write;
 use crate::optimizer::liveness::register_is_untouched_between;
-use crate::unreachable_invariant;
 
 /// Hoists a class-constant loop bound by giving it a register that the loop
 /// body cannot reuse and retargeting back edges past the immutable load.

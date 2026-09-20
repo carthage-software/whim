@@ -9,8 +9,9 @@ use std::vec::Vec;
 use hashbrown::HashTable;
 use hashbrown::hash_table::Entry;
 
-use crate::unreachable_invariant;
-use crate::unwrap_result_invariant;
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_result_invariant;
+
 use crate::value::Value;
 use crate::value::array::ArrayTypeCheck;
 use crate::value::array::ArrayTypeCheckCache;

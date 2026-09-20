@@ -1,6 +1,8 @@
 //! Conservative same-unit validation of generic construction sites.
 
 use hashbrown::HashMap;
+
+use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_span::Span;
 
 use crate::bytecode::aliases::TypeAliasIndex;
@@ -15,7 +17,6 @@ use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::CompiledUnit;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::descriptor_proves;
 use crate::optimizer::descriptors_equal;
 use crate::value::atom::Atom;

@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use std::mem::discriminant;
 use std::ptr;
 
+use whim_base::unreachable_invariant;
 use whim_span::HasSpan;
 use whim_syn::cst::array::TupleExpression;
 use whim_syn::cst::atom::Literal;
@@ -61,7 +62,6 @@ use crate::compiler::emit::side_table_limit;
 use crate::compiler::emit::tuple_index;
 use crate::compiler::emit::tuple_window_gate;
 use crate::compiler::types::descriptor_is_top;
-use crate::unreachable_invariant;
 use crate::value::atom::Atom;
 use crate::value::heap::Heap;
 

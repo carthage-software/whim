@@ -5,6 +5,9 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
+
+use whim_base::limits::MAX_TYPE_DEPTH_U32;
+use whim_base::unwrap_option_invariant;
 use whim_span::Span;
 
 use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
@@ -22,7 +25,6 @@ use crate::classes::PropertyInfo;
 use crate::classes::RuntimeClass;
 use crate::engine::Engine;
 use crate::engine::diagnostics::DiagnosticLabel;
-use crate::limits::MAX_TYPE_DEPTH_U32;
 use crate::linker::InterfaceRequirements;
 use crate::linker::OverrideCheck;
 use crate::linker::Replaced;
@@ -33,7 +35,6 @@ use crate::linker::visibility_rank;
 use crate::optimizer::descriptors_equal;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolKind;
-use crate::unwrap_option_invariant;
 use crate::value::atom::Atom;
 use crate::value::object::ClassId;
 use crate::value::object::TypeEnvironmentId;

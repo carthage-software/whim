@@ -5,6 +5,7 @@ use std::rc::Rc;
 use hashbrown::HashMap;
 use hashbrown::HashSet;
 
+use whim_base::unreachable_invariant;
 use whim_span::HasSpan;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::declaration::Use;
@@ -13,7 +14,6 @@ use whim_syn::cst::declaration::UseItems;
 
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
-use crate::unreachable_invariant;
 use crate::value::atom::Atom;
 use crate::value::heap::Heap;
 

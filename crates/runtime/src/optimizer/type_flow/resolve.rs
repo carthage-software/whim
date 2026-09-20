@@ -1,10 +1,11 @@
 //! Resolving facts back to declarations: origins, exact classes, and
 //! callee lookups.
 
+use whim_base::limits::MAX_TYPE_DEPTH;
+
 use crate::bytecode::unit::CompiledBuiltInFunction;
 use crate::bytecode::unit::CompiledFunction;
 use crate::bytecode::unit::ConstantInitializer;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::linker::SlotPlacement;
 use crate::linker::slot_placement;
 use crate::optimizer::liveness::effect::effect_on;

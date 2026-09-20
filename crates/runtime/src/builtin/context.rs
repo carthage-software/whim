@@ -2,10 +2,11 @@
 
 use std::borrow::Cow;
 
+use whim_base::unwrap_option_invariant;
+
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 use crate::value::atom::Atom;
 use crate::value::dict::DictObject;

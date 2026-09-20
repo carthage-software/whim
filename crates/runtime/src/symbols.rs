@@ -14,6 +14,8 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 
+use whim_base::unwrap_option_invariant;
+
 use crate::builtin::spec::BuiltInDirectHandler;
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::Chunk;
@@ -26,7 +28,6 @@ use crate::bytecode::unit::CompiledParameter;
 use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::CompiledUnit;
 use crate::classes::MethodEntry;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 use crate::value::array::ArrayTypeCheckId;
 use crate::value::atom::Atom;

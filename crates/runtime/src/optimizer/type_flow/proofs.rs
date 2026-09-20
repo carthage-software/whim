@@ -3,7 +3,8 @@
 
 use std::slice;
 
-use crate::limits::MAX_TYPE_DEPTH;
+use whim_base::limits::MAX_TYPE_DEPTH;
+
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::ALWAYS_REFERENCE_COUNTED;

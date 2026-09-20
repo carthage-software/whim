@@ -71,6 +71,7 @@ sonic-rs = { workspace = true }
 tungstenite = { workspace = true }
 unicode-general-category = { workspace = true }
 uuid = { workspace = true }
+whim-base = { workspace = true }
 whim-loop = { workspace = true }
 whim-macros = { workspace = true }
 whim-pgsql = { workspace = true }

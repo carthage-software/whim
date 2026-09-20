@@ -4,6 +4,8 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledBuiltInFunction;
 use crate::bytecode::unit::CompiledNewtype;
@@ -20,7 +22,6 @@ use crate::engine::declare::ConstantSlot;
 use crate::symbols::RuntimeFunction;
 use crate::symbols::RuntimeTypeEnvironment;
 use crate::symbols::SymbolEntry;
-use crate::unwrap_result_invariant;
 use crate::value::atom::Atom;
 use crate::value::function::BuiltInId;
 use crate::value::heap::Heap;

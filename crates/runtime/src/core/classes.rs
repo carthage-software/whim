@@ -5,6 +5,9 @@
     reason = "the class macro derives byte constants and docs from one string literal"
 )]
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_result_invariant;
+
 use crate::builtin::Context;
 use crate::builtin::spec::CoreDeclarations;
 use crate::builtin::spec::ParameterSpec;
@@ -12,8 +15,6 @@ use crate::builtin::spec::TypeSpec;
 use crate::builtin::throw::Throw;
 use crate::bytecode::unit::BuiltInCallableAttributes;
 use crate::classes::BuiltInMethodBody;
-use crate::unreachable_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::object::ClassId;
 

@@ -2,15 +2,15 @@
 
 use std::mem;
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_span::Span;
 
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::rewrite::rebase_targets;
 use crate::optimizer::cfg::successors;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 
 /// Replaces the single instruction at `at` with a straight-line sequence,
 /// shifting later instructions and rebasing every jump target and catch

@@ -2,6 +2,8 @@
 
 use hashbrown::HashSet;
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::JumpOffset;
@@ -15,7 +17,6 @@ use crate::optimizer::cfg::relative_target;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::passes::compact_removed_instructions;
-use crate::unwrap_result_invariant;
 
 pub(in crate::optimizer::passes) fn optimize_chunk(
     chunk: &mut Chunk,

@@ -3,7 +3,8 @@
 use std::collections::HashSet;
 use std::ptr::NonNull;
 
-use crate::unwrap_option_invariant;
+use whim_base::unwrap_option_invariant;
+
 use crate::value::heap::Heap;
 use crate::value::heap::Roots;
 use crate::value::heap::metadata::Color;

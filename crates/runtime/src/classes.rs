@@ -12,6 +12,8 @@ use imbl::HashMap as PersistentHashMap;
 use imbl::HashSet as PersistentHashSet;
 use imbl::Vector as PersistentVector;
 
+use whim_base::u32_index;
+
 use crate::builtin::spec::BuiltInHandler;
 use crate::builtin::spec::BuiltInInitializer;
 use crate::builtin::spec::ParameterSpec;
@@ -25,7 +27,6 @@ use crate::bytecode::unit::CompiledAttribute;
 use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::Visibility;
 use crate::symbols::UnitContext;
-use crate::u32_index;
 use crate::value::Value;
 use crate::value::atom::Atom;
 use crate::value::function::FuncId;

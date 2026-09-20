@@ -2,10 +2,11 @@
 
 use std::mem;
 
+use whim_base::unwrap_option_invariant;
+
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::Register;
 use crate::bytecode::instruction::word::InstructionKind;
-use crate::unwrap_option_invariant;
 
 macro_rules! instructions {
     ($($name:ident)|+ ; $fields:tt) => {

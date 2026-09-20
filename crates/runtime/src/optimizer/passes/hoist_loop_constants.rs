@@ -2,6 +2,8 @@
 
 use whim_span::Span;
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::instruction::Instruction;
@@ -16,7 +18,6 @@ use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::rewrite::splice::can_insert_straight_line_before;
 use crate::optimizer::rewrite::splice::insert_straight_line_before;
-use crate::unwrap_result_invariant;
 
 pub(in crate::optimizer::passes) fn optimize_chunk(
     chunk: &mut Chunk,

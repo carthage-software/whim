@@ -3,7 +3,8 @@
 use std::cell::Cell;
 use std::ptr::NonNull;
 
-use crate::unwrap_option_invariant;
+use whim_base::unwrap_option_invariant;
+
 use crate::value::function::FuncId;
 use crate::value::heap::Heap;
 use crate::value::heap::handle::ManagedRef;

@@ -1,10 +1,10 @@
 //! Float representation primitives.
 
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 
 #[whim_function("Whim\\Float\\to_bits(float $value): int", must_use)]

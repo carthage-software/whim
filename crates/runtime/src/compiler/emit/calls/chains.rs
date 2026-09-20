@@ -1,5 +1,6 @@
 //! Member-access chains: links, feet, and receiver-first method calls.
 
+use whim_base::unreachable_invariant;
 use whim_syn::cst::r#type::TypeArgumentList;
 
 use crate::compiler::emit::calls::Access;
@@ -28,7 +29,6 @@ use crate::compiler::emit::calls::argument_gate;
 use crate::compiler::emit::calls::call_method_instruction;
 use crate::compiler::emit::calls::call_value_instruction;
 use crate::compiler::emit::calls::check_named_arguments;
-use crate::unreachable_invariant;
 
 enum ChainLink<'source, 'arena> {
     Property(&'source PropertyAccess<'arena>),

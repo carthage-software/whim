@@ -5,15 +5,16 @@ use memchr::memmem::find as find_bytes;
 use memchr::memmem::find_iter as find_bytes_positions;
 use memchr::memmem::rfind as find_bytes_reverse;
 use memchr::memrchr as find_byte_reverse;
+
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::ValueView;
 use crate::value::string::ByteStringObject;

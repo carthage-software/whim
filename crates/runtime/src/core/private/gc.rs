@@ -1,9 +1,9 @@
 //! Explicit access to the cycle collector.
 
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 
 /// Runs one cycle collection and returns the number of reclaimed values.

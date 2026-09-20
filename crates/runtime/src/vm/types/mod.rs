@@ -7,6 +7,8 @@ use std::hash::Hasher;
 use foldhash::fast::FixedState;
 use std::mem::discriminant;
 
+use whim_base::limits::MAX_TYPE_DEPTH_U32;
+
 use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use crate::bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
 use crate::bytecode::render;
@@ -14,7 +16,6 @@ use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::Variance;
 use crate::engine::builtins::BuiltInCallable;
 use crate::engine::builtins::built_in_type_parameters;
-use crate::limits::MAX_TYPE_DEPTH_U32;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::symbols::RuntimeTypeEnvironment;
 use crate::value::ValueView;

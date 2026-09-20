@@ -8,6 +8,9 @@ use std::rc::Rc;
 use hashbrown::HashMap;
 use hashbrown::hash_map::Entry;
 
+use whim_base::u32_index;
+use whim_base::unwrap_option_invariant;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::unit::CONSISTENT_CONSTRUCTOR_ATTRIBUTE;
@@ -49,8 +52,6 @@ use crate::symbols::FunctionTable;
 use crate::symbols::SymbolEntry;
 use crate::symbols::SymbolKind;
 use crate::symbols::UnitContext;
-use crate::u32_index;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 use crate::value::ValueView;
 use crate::value::atom::Atom;

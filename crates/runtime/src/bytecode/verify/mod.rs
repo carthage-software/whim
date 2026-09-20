@@ -1,5 +1,7 @@
 //! Structural validation of chunks and compiled units.
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::CallDescriptor;
 use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
@@ -28,7 +30,6 @@ use crate::bytecode::unit::CompiledFunction;
 use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::unit::ConstantInitializer;
 use crate::bytecode::verify::instruction::verify_instruction;
-use crate::unwrap_result_invariant;
 
 mod instruction;
 

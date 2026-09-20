@@ -5,6 +5,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 use whim_sqlite::Configuration;
@@ -21,8 +23,6 @@ use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
 use crate::symbols::SymbolKind;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 use crate::value::ValueView;
 use crate::value::heap::handle::ManagedRef;

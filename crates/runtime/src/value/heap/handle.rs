@@ -6,8 +6,9 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::NonNull;
 
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
+
 use crate::value::Value;
 use crate::value::heap::Heap;
 use crate::value::heap::metadata::CowClone;

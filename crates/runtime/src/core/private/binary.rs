@@ -1,12 +1,12 @@
 //! Unstable fixed-width binary primitives used by `Whim\Binary`.
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::unreachable_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 
 #[whim_function(

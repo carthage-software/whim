@@ -1,5 +1,7 @@
 //! Per-instruction structural verification beyond encoded operand bounds.
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
 use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
 use crate::bytecode::chunk::descriptors::IntStepLoopDescriptor;
@@ -31,7 +33,6 @@ use crate::bytecode::verify::check_string_constant;
 use crate::bytecode::verify::check_switch_table;
 use crate::bytecode::verify::check_type_descriptor;
 use crate::bytecode::verify::check_window;
-use crate::unwrap_result_invariant;
 
 fn tuple_window_descriptor(descriptor: &TypeDescriptor, element_count: usize) -> bool {
     match descriptor {

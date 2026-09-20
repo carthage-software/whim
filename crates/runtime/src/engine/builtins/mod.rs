@@ -1,5 +1,8 @@
 //! Declaring the Rust-backed symbols every engine requires.
 
+use whim_base::u32_index;
+use whim_base::unwrap_result_invariant;
+
 use crate::builtin::spec::ConstantValue;
 use crate::builtin::spec::CoreDeclarations;
 use crate::builtin::spec::FunctionSpec;
@@ -36,8 +39,6 @@ use crate::engine::tables::RuntimeTables;
 use crate::symbols::CallableOptimization;
 use crate::symbols::RuntimeFunction;
 use crate::symbols::SymbolEntry;
-use crate::u32_index;
-use crate::unwrap_result_invariant;
 use crate::value::ValueView;
 use crate::value::function::BuiltInId;
 

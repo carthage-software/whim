@@ -6,6 +6,9 @@ use std::fmt::Display;
 
 use httlib_hpack::Decoder;
 use httlib_hpack::Encoder;
+
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 
@@ -13,8 +16,6 @@ use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 
 const HPACK_ENCODER: &str = "Whim\\_Private\\HpackEncoder";

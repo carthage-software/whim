@@ -11,6 +11,10 @@ use std::slice;
 use std::vec;
 
 use num_bigint::BigUint;
+
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_constant;
 use whim_macros::whim_function;
 
@@ -18,8 +22,6 @@ use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 use crate::core::classes::names;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::ValueView;
 use crate::value::dict::DictIter;
@@ -396,7 +398,7 @@ macro_rules! with_constant_base {
             36 => $function::<36>($($argument),*),
             // SAFETY: the surrounding invariant makes this path unreachable.
             _ => unsafe {
-                crate::unreachable_invariant("a conversion base is between 2 and 36")
+                unreachable_invariant("a conversion base is between 2 and 36")
             },
         }
     };

@@ -4,7 +4,8 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
-use crate::unreachable_invariant;
+use whim_base::unreachable_invariant;
+
 use crate::value::heap::BUFFERED_BIT;
 use crate::value::heap::COLOR_MASK;
 use crate::value::heap::COLOR_SHIFT;

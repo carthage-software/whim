@@ -2,6 +2,8 @@
 
 use std::mem;
 
+use whim_base::unwrap_option_invariant;
+
 use crate::optimizer::operands::Access;
 use crate::optimizer::operands::Operand;
 use crate::optimizer::operands::implicit_reads;
@@ -21,7 +23,6 @@ use crate::optimizer::passes::reuse_temporaries::pinned_window_registers;
 use crate::optimizer::passes::reuse_temporaries::register_is_dead_after;
 use crate::optimizer::passes::reuse_temporaries::remap_registers;
 use crate::optimizer::passes::reuse_temporaries::successors;
-use crate::unwrap_option_invariant;
 
 /// Lets a one-argument exact call return into its consumed argument register
 /// when the immediately following instruction replaces that same register

@@ -1,5 +1,6 @@
 //! Runtime type identities.
 
+use whim_base::unreachable_invariant;
 use whim_macros::whim_function;
 use whim_macros::whim_newtype;
 
@@ -8,7 +9,6 @@ use crate::builtin::arguments::Arguments;
 use crate::builtin::spec::TypeSpec;
 use crate::builtin::throw::Throw;
 use crate::symbols::SymbolKind;
-use crate::unreachable_invariant;
 use crate::value::Value;
 use crate::value::newtype::NewtypeId;
 use crate::value::object::TypeEnvironmentId;

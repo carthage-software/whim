@@ -2,6 +2,8 @@
 
 use std::cell::RefCell;
 
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 
@@ -9,8 +11,6 @@ use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::BuiltInChildren;
 use crate::builtin::throw::Throw;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::heap::metadata::TeardownMode;
 use crate::value::heap::metadata::TraceVisitor;

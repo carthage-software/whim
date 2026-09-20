@@ -3,9 +3,10 @@
 
 use std::rc::Rc;
 
+use whim_base::limits::MAX_TYPE_DEPTH_U32;
+
 use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
 use crate::bytecode::chunk::descriptors::ShapeKey;
-use crate::limits::MAX_TYPE_DEPTH_U32;
 use crate::vm::types::Atom;
 use crate::vm::types::BuildHasher;
 use crate::vm::types::ClassId;

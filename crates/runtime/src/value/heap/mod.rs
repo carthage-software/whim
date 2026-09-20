@@ -20,7 +20,8 @@ use hashbrown::DefaultHashBuilder;
 use hashbrown::HashMap;
 use hashbrown::HashTable;
 
-use crate::unreachable_invariant;
+use whim_base::unreachable_invariant;
+
 use crate::value::Value;
 use crate::value::atom::AtomBox;
 use crate::value::dict::DictObject;

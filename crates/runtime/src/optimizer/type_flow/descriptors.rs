@@ -1,9 +1,10 @@
 //! Descriptor-level subtyping, equality, and substitution helpers.
 
+use whim_base::limits::MAX_TYPE_DEPTH;
+
 use crate::bytecode::aliases::TypeAliasLookup;
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::string_length_matches;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::BOOL;
 use crate::optimizer::type_flow::CALLABLE;

@@ -7,13 +7,15 @@ use std::mem;
 use std::slice;
 
 use hashbrown::HashTable;
+
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::ValueView;
 use crate::value::dict::DictIter;
@@ -607,7 +609,7 @@ fn unique_values<'value>(
                 | ValueView::String(_)
                 | ValueView::ShortString(_) => {
                     // SAFETY: these values are accepted by `KeyRef` above.
-                    unsafe { crate::unreachable_invariant("an array key produces a borrowed key") }
+                    unsafe { unreachable_invariant("an array key produces a borrowed key") }
                 }
             },
             |key| {

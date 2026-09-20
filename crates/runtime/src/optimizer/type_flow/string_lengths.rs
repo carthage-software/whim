@@ -1,7 +1,8 @@
 //! Set proofs for composed string-length types.
 
+use whim_base::limits::MAX_TYPE_DEPTH;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::type_flow::STRING;
 use crate::optimizer::type_flow::descriptors::descriptor_mask;
 

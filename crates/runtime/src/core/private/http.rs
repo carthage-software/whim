@@ -9,12 +9,13 @@ use httparse::Response as HttpResponse;
 use httparse::Status as HttpParseStatus;
 use memchr::memchr_iter;
 use memchr::memmem::find;
+
+use whim_base::unwrap_option_invariant;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::core::private::url::is_valid_http_authority;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 use crate::value::dict::DictObject;
 use crate::value::dict::keys::Key;

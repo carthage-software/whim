@@ -6,6 +6,8 @@
 use std::ops::Deref;
 use std::rc::Rc;
 
+use whim_base::limits::MAX_TYPE_DEPTH_U32;
+
 use crate::bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
@@ -15,7 +17,6 @@ use crate::bytecode::unit::Visibility;
 use crate::classes::ClassMemberEntry;
 use crate::classes::MethodBodyKind;
 use crate::engine::builtins::built_in_type_parameters;
-use crate::limits::MAX_TYPE_DEPTH_U32;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolEntry;
 use crate::value::array::ArrayTypeCheck;

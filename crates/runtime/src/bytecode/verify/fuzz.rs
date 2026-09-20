@@ -5,6 +5,8 @@ use std::rc::Rc;
 use proptest::collection::vec as vec_strategy;
 use proptest::option::of;
 use proptest::prelude::*;
+
+use whim_base::unwrap_result_invariant;
 use whim_span::Span;
 
 use crate::bytecode::chunk::Chunk;
@@ -21,7 +23,6 @@ use crate::bytecode::verify::VerifyError;
 use crate::bytecode::verify::verify;
 use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
-use crate::unwrap_result_invariant;
 
 /// A register index drawn from `0..bound`, so some indices exceed the frame's
 /// `register_count` and must be rejected by the verifier.

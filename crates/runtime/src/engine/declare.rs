@@ -3,6 +3,9 @@
 use std::iter;
 
 use hashbrown::HashSet;
+
+use whim_base::u32_index;
+use whim_base::unreachable_invariant;
 use whim_span::Position;
 use whim_span::Span;
 
@@ -49,8 +52,6 @@ use crate::symbols::SourceText;
 use crate::symbols::SymbolEntry;
 use crate::symbols::UnitOrigin;
 use crate::symbols::UnitSourceFile;
-use crate::u32_index;
-use crate::unreachable_invariant;
 use crate::value::function::BuiltInId;
 use crate::value::string::ByteStringObject;
 

@@ -2,6 +2,8 @@
 
 use hashbrown::HashSet;
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_syn::cst::array::DictExpression;
 use whim_syn::cst::array::DictPair;
 use whim_syn::cst::array::TupleExpression;
@@ -51,8 +53,6 @@ use crate::compiler::emit::integer_gate;
 use crate::compiler::emit::lower_checked_type;
 use crate::compiler::emit::side_table_limit;
 use crate::compiler::emit::tuple_window_gate;
-use crate::unreachable_invariant;
-use crate::unwrap_result_invariant;
 
 mod coalescing;
 pub(in crate::compiler::emit) mod operators;

@@ -5,10 +5,10 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 
 use crate::builtin::Context;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 
 #[whim_function("Whim\\_Private\\get_system_time(): (int, int)")]

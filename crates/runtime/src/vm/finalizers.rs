@@ -2,13 +2,13 @@
 
 use std::iter;
 
+use whim_base::unwrap_option_invariant;
 use whim_macros::whim_closure;
 
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
 use crate::classes::MethodBodyKind;
 use crate::engine::builtins::BuiltInCallable;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 use crate::value::function::CallTarget;
 use crate::value::function::FunctionObject;

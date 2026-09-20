@@ -4,6 +4,8 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 
+use whim_base::limits::MAX_TYPE_DEPTH;
+
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::bytecode::unit::CompiledBaseReference;
 use crate::bytecode::unit::CompiledClassLike;
@@ -12,7 +14,6 @@ use crate::bytecode::unit::CompiledTypeAlias;
 use crate::bytecode::unit::CompiledTypeParameter;
 use crate::bytecode::unit::CompiledUnit;
 use crate::bytecode::unit::is_external;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::value::atom::Atom;
 
 pub(crate) trait TypeAliasLookup {

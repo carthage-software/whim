@@ -146,6 +146,7 @@ unicode-general-category = "1.1.0"
 unicode-width = "0.2"
 url = "2.5.8"
 uuid = { version = "1.24.0", features = ["v4", "v7"] }
+whim-base = { path = "crates/base", version = "0.10.0" }
 whim-formatter = { path = "crates/formatter", version = "0.10.0" }
 whim-linter = { path = "crates/linter", version = "0.10.0" }
 whim-loop = { path = "crates/loop", version = "0.10.0" }

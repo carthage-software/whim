@@ -8,6 +8,10 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
+
 use crate::builtin::throw::Throw;
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::Chunk;
@@ -57,9 +61,6 @@ use crate::symbols::SymbolEntry;
 use crate::symbols::SymbolKind;
 use crate::symbols::UnitContext;
 use crate::symbols::line_of;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 use crate::value::atom::Atom;
 use crate::value::dict::DictObject;

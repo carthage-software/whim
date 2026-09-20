@@ -1,6 +1,7 @@
 //! The member set of a class-like declaration: constants, properties,
 //! methods, and enum cases.
 
+use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::atom::Modifier;
@@ -54,7 +55,6 @@ use crate::compiler::types::GenericTable;
 use crate::compiler::types::TypeScope;
 use crate::compiler::types::lowering::lower_type;
 use crate::compiler::types::rendering::render_type;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::value::atom::Atom;
 
 struct MethodMetadata {

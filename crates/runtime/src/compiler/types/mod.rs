@@ -3,6 +3,7 @@
 
 use hashbrown::HashMap;
 
+use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::atom::Identifier;
@@ -16,7 +17,6 @@ use crate::bytecode::unit::Variance;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
 use crate::compiler::names::Resolver;
-use crate::limits::MAX_TYPE_DEPTH;
 use crate::optimizer::descriptors_equal;
 use crate::value::heap::Heap;
 

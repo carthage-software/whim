@@ -5,6 +5,8 @@ mod tests;
 
 use hashbrown::HashMap;
 
+use whim_base::unreachable_invariant;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::Literal;
 use crate::bytecode::chunk::descriptors::LiteralKey;
@@ -22,7 +24,6 @@ use crate::optimizer::analysis::AnalyzedChunk;
 use crate::optimizer::passes::FunctionLocation;
 use crate::optimizer::passes::chunk_mut;
 use crate::optimizer::passes::prune_unreachable;
-use crate::unreachable_invariant;
 
 struct ChunkRewrite {
     location: FunctionLocation,

@@ -3,6 +3,9 @@
 use std::rc::Rc;
 use std::str;
 
+use whim_base::u32_index;
+use whim_base::unwrap_result_invariant;
+
 use crate::builtin::spec::BaseSpec;
 use crate::builtin::spec::ClassConstantSpec;
 use crate::builtin::spec::ClassSpec;
@@ -29,6 +32,8 @@ use crate::classes::PropertyInfo;
 use crate::classes::RuntimeBase;
 use crate::classes::RuntimeClass;
 use crate::core::classes;
+use crate::engine::builtins::built_in_type_parameters;
+use crate::engine::builtins::constant_spec_value;
 use crate::engine::tables::RuntimeTables;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::symbols::FunctionTable;
@@ -37,11 +42,6 @@ use crate::symbols::SymbolKind;
 use crate::value::atom::Atom;
 use crate::value::heap::Heap;
 use crate::value::object::ClassId;
-
-use crate::engine::builtins::built_in_type_parameters;
-use crate::engine::builtins::constant_spec_value;
-use crate::u32_index;
-use crate::unwrap_result_invariant;
 
 pub(in crate::engine::builtins) fn intersect_permissions(
     current: &mut Option<Vec<Atom>>,

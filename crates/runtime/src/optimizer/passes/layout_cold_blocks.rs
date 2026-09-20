@@ -2,6 +2,8 @@
 
 use std::mem;
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::IcDescriptor;
 use crate::bytecode::instruction::Instruction;
@@ -19,7 +21,6 @@ use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::is_block_boundary;
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::passes::for_each_mutable_chunk;
-use crate::unwrap_result_invariant;
 use crate::value::atom::Atom;
 
 struct ColdCallables {

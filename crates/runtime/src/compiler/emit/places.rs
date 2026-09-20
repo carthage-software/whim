@@ -1,5 +1,7 @@
 //! Lvalue lowering: resolving an assignment target and writing back.
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
 use whim_syn::cst::access::StaticPropertyAccess;
 use whim_syn::cst::operation::Assignment;
 use whim_syn::cst::operation::TupleDestructure;
@@ -30,8 +32,6 @@ use crate::compiler::emit::check_tuple_sequence;
 use crate::compiler::emit::compound_instruction;
 use crate::compiler::emit::short_circuit_jump;
 use crate::compiler::emit::tuple_index;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
 
 fn check_destructure_targets(destructure: &TupleDestructure<'_>) -> Result<(), CompileError> {
     check_tuple_sequence(

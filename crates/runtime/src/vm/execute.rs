@@ -8,6 +8,8 @@ use std::ptr;
 use std::rc::Rc;
 use std::slice;
 
+use whim_base::unwrap_option_invariant;
+
 use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
 use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
@@ -30,7 +32,6 @@ use crate::bytecode::unit::ClassLikeKind;
 use crate::bytecode::unit::literal_value;
 use crate::core::private::syscall::StandardStream;
 use crate::engine::Engine;
-use crate::unwrap_option_invariant;
 use crate::value::ValueView;
 use crate::value::dict::keys::KeyRef;
 use crate::value::heap::metadata::HeapBox;

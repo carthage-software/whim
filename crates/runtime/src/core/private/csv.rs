@@ -9,6 +9,9 @@ use csv_core::ReaderBuilder;
 use csv_core::Terminator;
 use csv_core::WriteResult;
 use csv_core::WriterBuilder;
+
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 
@@ -16,8 +19,6 @@ use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 
 const READER: &str = "Whim\\_Private\\CSVReader";

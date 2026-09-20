@@ -4,13 +4,14 @@ use std::mem;
 
 use hashbrown::HashSet;
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::chunk::Chunk;
 use crate::bytecode::chunk::descriptors::SwitchTable;
 use crate::bytecode::instruction::Instruction;
 use crate::bytecode::instruction::operands::JumpOffset;
 use crate::bytecode::instruction::operands::NearJumpOffset;
 use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::unwrap_result_invariant;
 
 pub(crate) fn control_flow_targets(chunk: &Chunk) -> HashSet<usize> {
     let mut targets = HashSet::new();

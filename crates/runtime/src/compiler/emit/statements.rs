@@ -4,6 +4,8 @@ use std::mem;
 use std::ops::Range;
 use std::slice;
 
+use whim_base::unreachable_invariant;
+use whim_base::unwrap_option_invariant;
 use whim_syn::cst::atom::Literal;
 use whim_syn::cst::atom::Variable;
 use whim_syn::cst::binding::BindingTarget as BindTarget;
@@ -51,8 +53,6 @@ use crate::compiler::emit::pop_finally_holes;
 use crate::compiler::emit::pop_loop_frame;
 use crate::compiler::emit::scan_statements;
 use crate::compiler::emit::subtract_holes;
-use crate::unreachable_invariant;
-use crate::unwrap_option_invariant;
 
 fn using_target_variables<'target, 'arena>(
     target: &'target BindTarget<'arena>,

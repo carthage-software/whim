@@ -6,6 +6,8 @@
     reason = "slot probes run inside dictionary hash-table lookups"
 )]
 
+use whim_base::unreachable_invariant;
+
 use crate::value::Value;
 use crate::value::dict::keys::Key;
 use crate::value::dict::keys::KeyRef;
@@ -27,7 +29,7 @@ pub(in crate::value::dict) fn slot_hash(slot: &Slot, state: &HashState) -> u64 {
         Slot::Occupied { key, .. } => key.hash64(state),
         // SAFETY: the surrounding invariant makes this path unreachable.
         Slot::Vacant => unsafe {
-            crate::unreachable_invariant("the index never references a vacant slot")
+            unreachable_invariant("the index never references a vacant slot")
         },
     }
 }

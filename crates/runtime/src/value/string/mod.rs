@@ -11,7 +11,8 @@ use std::ptr;
 use std::ptr::NonNull;
 use std::slice;
 
-use crate::unreachable_invariant;
+use whim_base::unreachable_invariant;
+
 use crate::value::hash::HashState;
 use crate::value::heap::Heap;
 use crate::value::heap::bytes::HeapBytes;

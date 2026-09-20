@@ -3,6 +3,8 @@
 use std::cell::Cell;
 use std::time::Duration;
 
+use whim_base::unwrap_option_invariant;
+use whim_base::unwrap_result_invariant;
 use whim_loop::TaskId as LoopTaskId;
 use whim_macros::whim_class;
 use whim_macros::whim_closure;
@@ -13,8 +15,6 @@ use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::unwrap_option_invariant;
-use crate::unwrap_result_invariant;
 use crate::value::Value;
 
 const NANOSECONDS_PER_SECOND: i64 = 1_000_000_000;

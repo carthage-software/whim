@@ -13,6 +13,8 @@
 use core::any;
 use std::iter;
 
+use whim_base::unwrap_option_invariant;
+
 pub(crate) mod arguments;
 pub(crate) mod convert;
 pub(crate) mod coroutines;
@@ -25,7 +27,6 @@ use crate::builtin::convert::state_ref;
 use crate::builtin::convert::wrong_built_in_state;
 use crate::builtin::spec::FunctionSpec;
 use crate::builtin::throw::Throw;
-use crate::unwrap_option_invariant;
 use crate::value::Value;
 use crate::value::ValueView;
 use crate::value::function::CallTarget;

@@ -2,6 +2,8 @@
 
 use std::ptr::NonNull;
 
+use whim_base::unwrap_option_invariant;
+
 use crate::bytecode::unit::CompiledClassLike;
 use crate::bytecode::verify::verify;
 use crate::engine::Engine;
@@ -15,7 +17,6 @@ use crate::optimizer::optimize_callable_method;
 use crate::symbols::CallableOptimization;
 use crate::symbols::FunctionLocator;
 use crate::symbols::UnitContext;
-use crate::unwrap_option_invariant;
 use crate::value::function::FuncId;
 use crate::vm::VirtualMachineControl;
 

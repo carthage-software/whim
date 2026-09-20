@@ -1,7 +1,8 @@
 //! Indexing, updating, and iterating vecs and dicts.
 
+use whim_base::unwrap_result_invariant;
+
 use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::unwrap_result_invariant;
 use crate::value::ValueView;
 use crate::value::ops;
 use crate::vm::ArrayFault;

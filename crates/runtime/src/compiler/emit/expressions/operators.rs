@@ -1,6 +1,7 @@
 //! Operators: binary spines, short-circuit shapes, unary operations, and
 //! increment and decrement steps.
 
+use whim_base::unwrap_option_invariant;
 use whim_syn::cst::access::PropertyAccess;
 use whim_syn::cst::access::StaticPropertyAccess;
 use whim_syn::cst::array::ArrayAccess;
@@ -31,7 +32,6 @@ use crate::compiler::emit::expressions::Register;
 use crate::compiler::emit::expressions::Scope;
 use crate::compiler::emit::expressions::Span;
 use crate::compiler::emit::expressions::integer_gate;
-use crate::unwrap_option_invariant;
 
 /// Which value an increment or decrement yields.
 #[derive(Clone, Copy)]

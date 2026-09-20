@@ -1,5 +1,6 @@
 //! The frames a statement records its jumps on.
 
+use whim_base::unreachable_invariant;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::walker::Flow;
 use whim_syn::cst::walker::Visitor;
@@ -10,7 +11,6 @@ use crate::compiler::emit::CompileError;
 use crate::compiler::emit::CompileErrorKind;
 use crate::compiler::emit::HasSpan;
 use crate::compiler::emit::Statement;
-use crate::unreachable_invariant;
 
 /// The control-flow frames a statement compiles under, innermost last.
 #[derive(Default)]

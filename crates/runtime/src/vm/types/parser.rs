@@ -2,7 +2,8 @@
 
 use std::str;
 
-use crate::unwrap_option_invariant;
+use whim_base::unwrap_option_invariant;
+
 use crate::vm::types::FunctionTypeDescriptor;
 use crate::vm::types::FunctionTypeParameterDescriptor;
 use crate::vm::types::Heap;

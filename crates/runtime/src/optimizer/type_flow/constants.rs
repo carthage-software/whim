@@ -2,7 +2,8 @@
 
 use hashbrown::HashSet;
 
-use crate::limits::MAX_TYPE_DEPTH;
+use whim_base::limits::MAX_TYPE_DEPTH;
+
 use crate::optimizer::type_flow::BytecodeComparison;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::Fact;

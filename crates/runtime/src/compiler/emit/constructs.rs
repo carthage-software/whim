@@ -1,5 +1,6 @@
 //! The language constructs.
 
+use whim_base::unreachable_invariant;
 use whim_syn::cst::construct::AssertConstruct;
 use whim_syn::cst::construct::CloneConstruct;
 use whim_syn::cst::construct::DropConstruct;
@@ -29,7 +30,6 @@ use crate::compiler::emit::binary_instruction;
 use crate::compiler::emit::lower_checked_type;
 use crate::compiler::emit::side_table_limit;
 use crate::compiler::emit::written_value_gate;
-use crate::unreachable_invariant;
 
 /// The position as `i16`; the arity gate keeps it in range.
 pub(in crate::compiler::emit) fn tuple_index(position: usize) -> i16 {
