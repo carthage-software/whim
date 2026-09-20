@@ -12,13 +12,13 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::unit::CompiledClassLike;
 use whim_bytecode::unit::CompiledTypeParameter;
 use whim_bytecode::unit::CompiledUnit;
+use whim_optimizer::descriptor_proves;
+use whim_optimizer::descriptors_equal;
 use whim_span::Span;
 use whim_value::atom::Atom;
 
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
-use crate::optimizer::descriptor_proves;
-use crate::optimizer::descriptors_equal;
 
 struct UnitIndexes<'unit> {
     classes: HashMap<Atom, &'unit CompiledClassLike>,
@@ -149,7 +149,7 @@ fn statically_is_subtype(
         return None;
     }
 
-    if descriptor_proves(actual, expected, None, depth + 1) {
+    if descriptor_proves(actual, expected, depth + 1) {
         return Some(true);
     }
 

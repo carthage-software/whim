@@ -3,10 +3,9 @@
 #![deny(clippy::nursery, clippy::pedantic)]
 #![expect(
     clippy::redundant_pub_crate,
-    reason = "linking rules are shared with the engine and optimizer"
+    reason = "linking rules are shared with the engine"
 )]
 
-use whim_bytecode::unit::Visibility;
 use whim_value::atom::Atom;
 use whim_value::object::ClassId;
 
@@ -19,28 +18,6 @@ mod contracts;
 pub(crate) mod descriptors;
 mod externals;
 mod generics;
-
-/// Where a declared instance property lands in its inherited slot layout.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum SlotPlacement {
-    Inherited(u32),
-    Appended,
-}
-
-/// Applies the instance property layout rule.
-pub(crate) fn slot_placement(
-    inherited: Option<(u32, Visibility)>,
-    visibility: Visibility,
-) -> SlotPlacement {
-    match inherited {
-        Some((slot, inherited_visibility))
-            if visibility != Visibility::Private && inherited_visibility != Visibility::Private =>
-        {
-            SlotPlacement::Inherited(slot)
-        }
-        _ => SlotPlacement::Appended,
-    }
-}
 
 /// One interface's name and the members it requires, snapshotted so the
 /// linker can report on them without holding the class table borrowed.

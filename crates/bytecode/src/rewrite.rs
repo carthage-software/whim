@@ -280,7 +280,14 @@ pub fn rebase_targets(
     }
 }
 
-fn relative_target(source: usize, offset: i32) -> usize {
+/// Resolves a jump offset from its source instruction.
+///
+/// # Panics
+///
+/// Panics if the source exceeds `u32::MAX` or the target is negative.
+#[must_use]
+#[inline]
+pub fn relative_target(source: usize, offset: i32) -> usize {
     usize::try_from(wide_index(source) + i64::from(offset))
         .expect("a bytecode branch target must be non-negative")
 }

@@ -6,6 +6,7 @@ use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::verify::verify_unit;
+use whim_optimizer::OptimizationConfiguration;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
 use whim_value::heap::Heap;
@@ -13,7 +14,6 @@ use whim_value::heap::Heap;
 use super::CompileErrorKind;
 use crate::compiler::CompileConfiguration;
 use crate::compiler::compile_with_configuration;
-use crate::optimizer::OptimizationConfiguration;
 
 struct Compiled {
     unit: CompiledUnit,

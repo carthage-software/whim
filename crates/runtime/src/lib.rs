@@ -12,6 +12,8 @@ pub(crate) mod builtin;
 pub(crate) mod classes;
 pub(crate) mod core;
 pub(crate) mod linker;
-pub(crate) mod optimizer;
 pub(crate) mod symbols;
 pub(crate) mod vm;
+
+#[cfg(test)]
+mod optimizer_tests;

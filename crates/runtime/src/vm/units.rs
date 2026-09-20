@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 
 use whim_bytecode::unit::CompiledUnit;
+use whim_optimizer::OptimizationConfiguration;
 use whim_span::HasSpan;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser;
@@ -20,7 +21,6 @@ use crate::engine::declare::CachedUnit;
 use crate::engine::diagnostics::DiagnosticLabel;
 use crate::engine::diagnostics::DiagnosticLabels;
 use crate::engine::diagnostics::DiagnosticOrigin;
-use crate::optimizer::OptimizationConfiguration;
 use crate::symbols::line_starts_of;
 use crate::vm::Frame;
 use crate::vm::FrameFlags;

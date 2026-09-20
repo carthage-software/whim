@@ -10,12 +10,12 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::unit::CompiledBuiltInFunction;
 use whim_bytecode::unit::CompiledFile;
 use whim_bytecode::unit::CompiledUnit;
+use whim_optimizer::OptimizationConfiguration;
+use whim_optimizer::optimize_unit;
 use whim_span::HasSpan;
 use whim_syn::cst::Program;
 use whim_value::heap::Heap;
 
-use crate::optimizer::OptimizationConfiguration;
-use crate::optimizer::optimize_unit;
 use crate::symbols::line_starts_of;
 
 mod declarations;

@@ -7,12 +7,12 @@ use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::unit::CompiledFunction;
 use whim_bytecode::verify::verify;
+use whim_optimizer::LiveRefinement;
+use whim_optimizer::World;
+use whim_optimizer::refine_live_chunk;
 use whim_value::function::FuncId;
 
 use crate::engine::declare::prelink_exact_function_cache;
-use crate::optimizer::LiveRefinement;
-use crate::optimizer::World;
-use crate::optimizer::refine_live_chunk;
 use crate::symbols::FunctionLocator;
 use crate::symbols::FunctionTable;
 use crate::symbols::InlineCache;

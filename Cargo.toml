@@ -152,6 +152,7 @@ whim-formatter = { path = "crates/formatter", version = "0.10.0" }
 whim-linter = { path = "crates/linter", version = "0.10.0" }
 whim-loop = { path = "crates/loop", version = "0.10.0" }
 whim-macros = { path = "crates/macros", version = "0.10.0" }
+whim-optimizer = { path = "crates/optimizer", version = "0.10.0" }
 whim-pgsql = { path = "crates/pgsql", version = "0.10.0" }
 whim-runtime = { path = "crates/runtime", version = "0.10.0" }
 whim-span = { path = "crates/span", version = "0.10.0" }

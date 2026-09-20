@@ -15,13 +15,13 @@ use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::word::InstructionKind;
 use whim_bytecode::instruction::word::InstructionWord;
+use whim_bytecode::rewrite::relative_target;
 use whim_bytecode::unit::literal_value;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::dict::keys::Key;
 use whim_value::string::ByteStringObject;
 
-use crate::optimizer::relative_target;
 use crate::vm::ArrayFault;
 use crate::vm::Fault;
 use crate::vm::VirtualMachine;

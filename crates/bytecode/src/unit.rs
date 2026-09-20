@@ -210,30 +210,50 @@ pub enum Visibility {
 
 impl Visibility {
     #[must_use]
-    pub const fn is_at_least(&self, other: Visibility) -> bool {
-        match (self, other) {
-            (Visibility::Public, _) => true,
-            (Visibility::Protected, Visibility::Protected | Visibility::Private) => true,
-            (Visibility::Private, Visibility::Private) => true,
-            _ => false,
-        }
+    pub const fn is_at_least(&self, other: Self) -> bool {
+        self.rank() >= other.rank()
     }
 
     /// How open a visibility is; an override may move up this order, never down.
+    #[must_use]
     pub const fn rank(&self) -> u8 {
         match self {
-            Visibility::Public => 2,
-            Visibility::Protected => 1,
-            Visibility::Private => 0,
+            Self::Public => 2,
+            Self::Protected => 1,
+            Self::Private => 0,
         }
     }
 
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
-            Visibility::Public => "public",
-            Visibility::Protected => "protected",
-            Visibility::Private => "private",
+            Self::Public => "public",
+            Self::Protected => "protected",
+            Self::Private => "private",
         }
+    }
+}
+
+/// Where a declared instance property lands in its inherited slot layout.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SlotPlacement {
+    Inherited(u32),
+    Appended,
+}
+
+/// Applies the instance property layout rule.
+#[must_use]
+pub fn slot_placement(
+    inherited: Option<(u32, Visibility)>,
+    visibility: Visibility,
+) -> SlotPlacement {
+    match inherited {
+        Some((slot, inherited_visibility))
+            if visibility != Visibility::Private && inherited_visibility != Visibility::Private =>
+        {
+            SlotPlacement::Inherited(slot)
+        }
+        _ => SlotPlacement::Appended,
     }
 }
 

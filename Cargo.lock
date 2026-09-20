@@ -3464,6 +3464,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "whim-optimizer"
+version = "0.10.0"
+dependencies = [
+ "hashbrown 0.17.1",
+ "itoa",
+ "ryu",
+ "whim-base",
+ "whim-bytecode",
+ "whim-span",
+ "whim-value",
+]
+
+[[package]]
 name = "whim-pgsql"
 version = "0.10.0"
 dependencies = [
@@ -3542,6 +3555,7 @@ dependencies = [
  "whim-bytecode",
  "whim-loop",
  "whim-macros",
+ "whim-optimizer",
  "whim-pgsql",
  "whim-span",
  "whim-sqlite",

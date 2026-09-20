@@ -7,6 +7,7 @@ use whim_bytecode::aliases::expand_aliases;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::CompiledTypeAlias;
 use whim_bytecode::unit::Variance;
+use whim_optimizer::descriptors_equal;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::atom::Identifier;
@@ -17,7 +18,6 @@ use whim_value::heap::Heap;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
 use crate::compiler::names::Resolver;
-use crate::optimizer::descriptors_equal;
 
 pub(in crate::compiler) mod aliases;
 pub(in crate::compiler) mod bounds;

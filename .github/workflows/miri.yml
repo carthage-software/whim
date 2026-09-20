@@ -48,3 +48,7 @@ jobs:
       - name: Check bytecode
         run: >-
           cargo +nightly miri test --locked -p whim-bytecode
+      - name: Check optimizer
+        env:
+          MIRIFLAGS: -Zmiri-ignore-leaks
+        run: cargo +nightly miri test --locked -p whim-optimizer --lib
