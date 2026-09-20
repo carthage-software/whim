@@ -124,7 +124,6 @@ jobs:
           tool: cross@0.2.5
       - name: Build
         if: ${{ !startsWith(matrix.builder, 'freebsd') }}
-        shell: bash
         run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim
       - if: matrix.builder == 'freebsd-aarch64'
         uses: ./.github/actions/freebsd-aarch64
