@@ -3,10 +3,10 @@
 use std::ptr::NonNull;
 
 use whim_base::unwrap_option_invariant;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::verify::verify;
 use whim_value::function::FuncId;
 
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::verify::verify;
 use crate::engine::Engine;
 use crate::engine::Rc;
 use crate::engine::declare::prelink_exact_function_cache;

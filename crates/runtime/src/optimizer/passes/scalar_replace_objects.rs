@@ -1,23 +1,23 @@
 //! Scalar replacement of non-escaping fresh objects.
 
 use hashbrown::HashSet;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::LiteralKey;
+use whim_bytecode::chunk::descriptors::PropertyInitializationDescriptor;
+use whim_bytecode::chunk::descriptors::literal_key;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::PropertySlot;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::compact;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::LiteralKey;
-use crate::bytecode::chunk::descriptors::PropertyInitializationDescriptor;
-use crate::bytecode::chunk::descriptors::literal_key;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::PropertySlot;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::rewrite::compact;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::branches_or_terminates;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::is_block_boundary;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::liveness::register_is_dead_after;

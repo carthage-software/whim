@@ -17,6 +17,9 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 use hashbrown::HashSet;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::verify::verify_unit;
 use whim_loop::Scheduler;
 use whim_loop::Stack;
 use whim_loop::TaskId;
@@ -36,12 +39,6 @@ use whim_value::object::ClassId;
 use whim_value::object::InstanceObject;
 
 use crate::blocking::BlockingPool;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::unit::literal_value;
-use crate::bytecode::verify::verify_unit;
 use crate::classes::MethodBodyKind;
 use crate::classes::is_instance_of;
 use crate::compiler::CompileConfiguration;

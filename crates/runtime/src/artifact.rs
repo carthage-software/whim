@@ -11,16 +11,16 @@ use std::str::from_utf8_unchecked;
 
 use bincode::ErrorKind as DecodeErrorKind;
 use bincode::serialize;
+use whim_bytecode::aliases::expand_unit_declarations;
+use whim_bytecode::decode::compiled_unit;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::verify::verify_unit;
 use whim_span::Position;
 use whim_syn::arena::Arena;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser;
 use whim_value::heap::Heap;
 
-use crate::bytecode::aliases::expand_unit_declarations;
-use crate::bytecode::decode::compiled_unit;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::verify::verify_unit;
 use crate::compiler::AliasGraph;
 use crate::compiler::Compilation;
 use crate::compiler::CompilePath;

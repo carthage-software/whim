@@ -2,21 +2,21 @@
 
 use hashbrown::HashMap;
 use hashbrown::HashSet;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::PropertyInitializationDescriptor;
+use whim_bytecode::chunk::descriptors::PropertyInitializationEntry;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::PropertyInitializationDescriptor;
-use crate::bytecode::chunk::descriptors::PropertyInitializationEntry;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::branches_or_terminates;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::for_each_mutable_chunk;

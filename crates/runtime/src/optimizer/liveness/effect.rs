@@ -1,9 +1,10 @@
 //! The per-instruction read/write effect classification behind the liveness
 //! queries.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Register;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+
 use crate::optimizer::liveness::Effect;
 
 macro_rules! instructions {

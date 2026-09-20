@@ -7,6 +7,7 @@
 
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
+use whim_bytecode::unit::BuiltInCallableAttributes;
 use whim_value::Value;
 use whim_value::object::ClassId;
 
@@ -15,7 +16,6 @@ use crate::builtin::spec::CoreDeclarations;
 use crate::builtin::spec::ParameterSpec;
 use crate::builtin::spec::TypeSpec;
 use crate::builtin::throw::Throw;
-use crate::bytecode::unit::BuiltInCallableAttributes;
 use crate::classes::BuiltInMethodBody;
 
 macro_rules! define_core_classes {

@@ -1,3 +1,9 @@
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::control_flow::Match;
@@ -10,13 +16,7 @@ use whim_syn::cst::r#type::Type;
 
 use super::BodyCompiler;
 use super::CompileError;
-use super::IcDescriptor;
-use super::ImmediateInt;
-use super::Instruction;
-use super::JumpOffset;
-use super::Register;
 use super::Scope;
-use super::TypeDescriptor;
 use super::lower_pattern_type;
 use super::pattern_has_bindings;
 use super::tuple_index;

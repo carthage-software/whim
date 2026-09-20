@@ -1,16 +1,16 @@
 //! Semantics-preserving optimization of compiled bytecode.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledBuiltInFunction;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::ConstantInitializer;
 use whim_value::atom::Atom;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledBuiltInFunction;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::ConstantInitializer;
 use crate::optimizer::passes::inline_leaf_calls::InlineChanges;
 use crate::optimizer::passes::specialize_comparison;
 use crate::optimizer::rewrite::plan::RewritePlan;

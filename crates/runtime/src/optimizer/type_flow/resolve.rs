@@ -2,35 +2,35 @@
 //! callee lookups.
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
+use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledBuiltInFunction;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledMethod;
+use whim_bytecode::unit::CompiledProperty;
+use whim_bytecode::unit::ConstantInitializer;
 use whim_value::atom::Atom;
 
-use crate::bytecode::unit::CompiledBuiltInFunction;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::ConstantInitializer;
 use crate::linker::SlotPlacement;
 use crate::linker::slot_placement;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::type_flow::CAPTURE_ORIGIN;
-use crate::optimizer::type_flow::ClassLikeKind;
-use crate::optimizer::type_flow::CompiledClassLike;
-use crate::optimizer::type_flow::CompiledMethod;
-use crate::optimizer::type_flow::CompiledProperty;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::ExactClass;
 use crate::optimizer::type_flow::Fact;
-use crate::optimizer::type_flow::FunctionTypeDescriptor;
-use crate::optimizer::type_flow::FunctionTypeParameterDescriptor;
-use crate::optimizer::type_flow::IcDescriptor;
-use crate::optimizer::type_flow::IcSlot;
-use crate::optimizer::type_flow::Instruction;
-use crate::optimizer::type_flow::Literal;
 use crate::optimizer::type_flow::NULL;
 use crate::optimizer::type_flow::PARAMETER_ORIGIN;
-use crate::optimizer::type_flow::Register;
 use crate::optimizer::type_flow::ResolvedProperty;
 use crate::optimizer::type_flow::STRING;
 use crate::optimizer::type_flow::THIS_ORIGIN;
-use crate::optimizer::type_flow::TypeDescriptor;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::callable_signature;
 use crate::optimizer::type_flow::descriptors::descriptor_mask;
@@ -474,6 +474,7 @@ impl<'a> TypeFlow<'a> {
                 if property.is_static {
                     continue;
                 }
+
                 let inherited = names
                     .iter()
                     .find(|(existing, _)| same_atom(existing, &property.name))
@@ -482,6 +483,7 @@ impl<'a> TypeFlow<'a> {
                             .get(*slot as usize)
                             .map(|(_, inherited)| (*slot, inherited.visibility))
                     });
+
                 match slot_placement(inherited, property.visibility) {
                     SlotPlacement::Inherited(slot) => {
                         *occupants.get_mut(slot as usize)? = (owner, property);

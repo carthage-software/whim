@@ -4,22 +4,22 @@
 use std::rc::Rc;
 
 use whim_base::limits::MAX_TYPE_DEPTH_U32;
+use whim_bytecode::aliases::expand_aliases_using as expand_aliases;
+use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
+use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
+use whim_bytecode::chunk::descriptors::ShapeKey;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledTypeParameter;
 use whim_value::atom::Atom;
 use whim_value::object::ClassId;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
-use crate::bytecode::chunk::descriptors::ShapeKey;
 use crate::vm::types::BuildHasher;
-use crate::vm::types::CompiledTypeParameter;
 use crate::vm::types::FixedState;
-use crate::vm::types::FunctionTypeDescriptor;
-use crate::vm::types::FunctionTypeParameterDescriptor;
 use crate::vm::types::Hash;
 use crate::vm::types::Hasher;
 use crate::vm::types::RuntimeTypeEnvironment;
 use crate::vm::types::SymbolKind;
-use crate::vm::types::TypeDescriptor;
 use crate::vm::types::VirtualMachine;
 use crate::vm::types::VirtualMachineControl;
 use crate::vm::types::discriminant;

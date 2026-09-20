@@ -1,15 +1,16 @@
 use std::borrow::Cow;
 use std::mem;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::NearJumpOffset;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::bytecode::rewrite::control_flow_targets;
-use crate::bytecode::rewrite::rebase_targets;
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::NearJumpOffset;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::rewrite::rebase_targets;
+use whim_bytecode::unit::CompiledUnit;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::relative_target;
@@ -345,15 +346,15 @@ fn split(instruction: Instruction) -> Option<(Instruction, Register, i32)> {
 
 #[cfg(test)]
 mod tests {
+    use whim_bytecode::chunk::Chunk;
+    use whim_bytecode::instruction::Instruction;
+    use whim_bytecode::instruction::operands::JumpOffset;
+    use whim_bytecode::instruction::operands::Register;
+    use whim_bytecode::verify::verify;
     use whim_span::Span;
 
     use super::normalize_chunk;
     use super::optimize_chunk;
-    use crate::bytecode::chunk::Chunk;
-    use crate::bytecode::instruction::Instruction;
-    use crate::bytecode::instruction::operands::JumpOffset;
-    use crate::bytecode::instruction::operands::Register;
-    use crate::bytecode::verify::verify;
     use crate::optimizer::OptimizationStatistics;
 
     #[test]

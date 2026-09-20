@@ -1,9 +1,10 @@
 //! Exact property reads proven by whole-unit type flow.
 
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::PropertyReadMode;
-use crate::bytecode::instruction::operands::PropertySlot;
-use crate::bytecode::unit::Visibility;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::PropertyReadMode;
+use whim_bytecode::instruction::operands::PropertySlot;
+use whim_bytecode::unit::Visibility;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::analysis::Analysis;

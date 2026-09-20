@@ -1,8 +1,7 @@
 //! The register allocator: a bump allocator with floors.
 
 use whim_base::unreachable_invariant;
-
-use crate::bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::Register;
 
 pub(in crate::compiler) const REGISTER_CAPACITY: usize = u16::MAX as usize;
 

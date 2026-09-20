@@ -9,13 +9,13 @@ use std::io::Write;
 use std::path::Path;
 use std::rc::Rc;
 
+use whim_bytecode::disassemble;
+use whim_bytecode::unit::CompiledUnit;
 use whim_span::Span;
 use whim_syn::cst::Program;
 use whim_sys::path::path_bytes;
 use whim_value::heap::Heap;
 
-use crate::bytecode::disassemble;
-use crate::bytecode::unit::CompiledUnit;
 use crate::compiler::CompileError;
 use crate::engine::Engine;
 

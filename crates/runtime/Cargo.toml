@@ -1,6 +1,6 @@
 [package]
 name = "whim-runtime"
-description = "The Whim runtime: bytecode, compiler, optimizer, linker, and virtual machine"
+description = "The Whim runtime: compiler, optimizer, linker, and virtual machine"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -62,7 +62,6 @@ rustls-native-certs = { workspace = true }
 rustls-pemfile = { workspace = true }
 ryu = { workspace = true }
 serde = { workspace = true }
-serde-seeded = { workspace = true }
 sha1 = { workspace = true }
 sha2 = { workspace = true }
 sha3 = { workspace = true }
@@ -72,6 +71,7 @@ tungstenite = { workspace = true }
 unicode-general-category = { workspace = true }
 uuid = { workspace = true }
 whim-base = { workspace = true }
+whim-bytecode = { workspace = true }
 whim-loop = { workspace = true }
 whim-macros = { workspace = true }
 whim-pgsql = { workspace = true }

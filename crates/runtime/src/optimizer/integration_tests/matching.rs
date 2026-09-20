@@ -1,10 +1,11 @@
 use std::env::consts;
 use std::path::Path;
 
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::verify::verify_unit;
+
 use super::compile;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::verify::verify_unit;
 use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
 use crate::optimizer::OptimizationConfiguration;

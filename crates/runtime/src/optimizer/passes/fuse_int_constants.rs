@@ -1,11 +1,12 @@
 //! Fusion of integer literal loads into adjacent proven consumers.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledUnit;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::for_each_mutable_chunk;

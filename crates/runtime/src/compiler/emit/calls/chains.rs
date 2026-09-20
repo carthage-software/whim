@@ -1,6 +1,11 @@
 //! Member-access chains: links, feet, and receiver-first method calls.
 
 use whim_base::unreachable_invariant;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::r#type::TypeArgumentList;
 
 use crate::compiler::emit::calls::Access;
@@ -11,17 +16,12 @@ use crate::compiler::emit::calls::BodyCompiler;
 use crate::compiler::emit::calls::Call;
 use crate::compiler::emit::calls::CalleeSource;
 use crate::compiler::emit::calls::CompileError;
-use crate::compiler::emit::calls::Count;
 use crate::compiler::emit::calls::Expression;
 use crate::compiler::emit::calls::HasSpan;
-use crate::compiler::emit::calls::IcDescriptor;
-use crate::compiler::emit::calls::Instruction;
-use crate::compiler::emit::calls::JumpOffset;
 use crate::compiler::emit::calls::MethodCall;
 use crate::compiler::emit::calls::NullSafeMethodCall;
 use crate::compiler::emit::calls::NullSafePropertyAccess;
 use crate::compiler::emit::calls::PropertyAccess;
-use crate::compiler::emit::calls::Register;
 use crate::compiler::emit::calls::Scope;
 use crate::compiler::emit::calls::Span;
 use crate::compiler::emit::calls::ValueUse;

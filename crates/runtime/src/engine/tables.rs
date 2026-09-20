@@ -4,6 +4,10 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 use whim_base::unwrap_result_invariant;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledBuiltInFunction;
+use whim_bytecode::unit::CompiledNewtype;
+use whim_bytecode::unit::CompiledTypeAlias;
 use whim_value::atom::Atom;
 use whim_value::function::BuiltInId;
 use whim_value::heap::Heap;
@@ -13,10 +17,6 @@ use whim_value::newtype::NewtypeValueId;
 use whim_value::object::ClassId;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledBuiltInFunction;
-use crate::bytecode::unit::CompiledNewtype;
-use crate::bytecode::unit::CompiledTypeAlias;
 use crate::classes::RuntimeClass;
 use crate::core::classes::EnumClasses;
 use crate::core::classes::IterateClasses;

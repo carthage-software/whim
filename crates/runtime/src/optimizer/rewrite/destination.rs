@@ -1,8 +1,8 @@
 //! Retargeting an instruction's destination register.
 
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::Register;
 
 pub(in crate::optimizer) fn with_destination(
     mut instruction: Instruction,

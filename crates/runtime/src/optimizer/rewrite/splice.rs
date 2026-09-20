@@ -5,11 +5,11 @@ use std::mem;
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::rewrite::rebase_targets;
 use whim_span::Span;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::rewrite::rebase_targets;
 use crate::optimizer::cfg::successors;
 
 /// Replaces the single instruction at `at` with a straight-line sequence,
@@ -276,14 +276,14 @@ pub(in crate::optimizer) fn insert_straight_line_before(
 
 #[cfg(test)]
 mod tests {
+    use whim_bytecode::chunk::Chunk;
+    use whim_bytecode::chunk::descriptors::CatchEntry;
+    use whim_bytecode::instruction::Instruction;
+    use whim_bytecode::instruction::operands::DescriptorIndex;
+    use whim_bytecode::instruction::operands::JumpOffset;
+    use whim_bytecode::instruction::operands::Register;
     use whim_span::Span;
 
-    use crate::bytecode::chunk::Chunk;
-    use crate::bytecode::chunk::descriptors::CatchEntry;
-    use crate::bytecode::instruction::Instruction;
-    use crate::bytecode::instruction::operands::DescriptorIndex;
-    use crate::bytecode::instruction::operands::JumpOffset;
-    use crate::bytecode::instruction::operands::Register;
     use crate::optimizer::rewrite::splice::insert_straight_line_before;
     use crate::optimizer::rewrite::splice::insert_straight_line_before_many;
     use crate::optimizer::rewrite::splice::splice_replace_many;

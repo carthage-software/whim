@@ -2,46 +2,46 @@
 
 use std::fmt::Write as _;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::CallDescriptor;
-use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
-use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::IntStepLoopDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
-use crate::bytecode::chunk::descriptors::PresetDescriptor;
-use crate::bytecode::chunk::descriptors::PresetSlot;
-use crate::bytecode::chunk::descriptors::PropertyInitializationDescriptor;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::disassemble::operands::operands;
-use crate::bytecode::disassemble::render::call_descriptor;
-use crate::bytecode::disassemble::render::descriptor_reference;
-use crate::bytecode::disassemble::render::float_pair_update_descriptor;
-use crate::bytecode::disassemble::render::float_squares_sum_branch_descriptor;
-use crate::bytecode::disassemble::render::ic_descriptor;
-use crate::bytecode::disassemble::render::int_step_loop_descriptor;
-use crate::bytecode::disassemble::render::literal;
-use crate::bytecode::disassemble::render::prepared_int_loop_descriptor;
-use crate::bytecode::disassemble::render::preset_shape;
-use crate::bytecode::disassemble::render::property_initialization_descriptor;
-use crate::bytecode::disassemble::render::switch_table;
-use crate::bytecode::disassemble::render::type_descriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CallDescriptorIndex;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::IndexAddMode;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::PresetDescriptorIndex;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::bytecode::instruction::operands::SwitchTableIndex;
+use crate::chunk::Chunk;
+use crate::chunk::descriptors::CallDescriptor;
+use crate::chunk::descriptors::FloatPairUpdateDescriptor;
+use crate::chunk::descriptors::FloatSquaresSumBranchDescriptor;
+use crate::chunk::descriptors::IcDescriptor;
+use crate::chunk::descriptors::IntStepLoopDescriptor;
+use crate::chunk::descriptors::Literal;
+use crate::chunk::descriptors::PreparedIntLoopDescriptor;
+use crate::chunk::descriptors::PresetDescriptor;
+use crate::chunk::descriptors::PresetSlot;
+use crate::chunk::descriptors::PropertyInitializationDescriptor;
+use crate::chunk::descriptors::SwitchTable;
+use crate::chunk::descriptors::TypeDescriptor;
+use crate::disassemble::operands::operands;
+use crate::disassemble::render::call_descriptor;
+use crate::disassemble::render::descriptor_reference;
+use crate::disassemble::render::float_pair_update_descriptor;
+use crate::disassemble::render::float_squares_sum_branch_descriptor;
+use crate::disassemble::render::ic_descriptor;
+use crate::disassemble::render::int_step_loop_descriptor;
+use crate::disassemble::render::literal;
+use crate::disassemble::render::prepared_int_loop_descriptor;
+use crate::disassemble::render::preset_shape;
+use crate::disassemble::render::property_initialization_descriptor;
+use crate::disassemble::render::switch_table;
+use crate::disassemble::render::type_descriptor;
+use crate::instruction::Instruction;
+use crate::instruction::operands::CallDescriptorIndex;
+use crate::instruction::operands::ConstantIndex;
+use crate::instruction::operands::DescriptorIndex;
+use crate::instruction::operands::IcSlot;
+use crate::instruction::operands::IndexAddMode;
+use crate::instruction::operands::JumpOffset;
+use crate::instruction::operands::PresetDescriptorIndex;
+use crate::instruction::operands::Register;
+use crate::instruction::operands::ShortJumpOffset;
+use crate::instruction::operands::SwitchTableIndex;
 
 mod operands;
-pub(crate) mod render;
+mod render;
 
 fn write_section<T>(
     output: &mut String,
@@ -60,7 +60,7 @@ fn write_section<T>(
 }
 
 #[must_use]
-pub(crate) fn disassemble(chunk: &Chunk, name: &str) -> String {
+pub fn disassemble(chunk: &Chunk, name: &str) -> String {
     let mut output = String::new();
     let _ = writeln!(output, "== {name} ==");
     let _ = writeln!(output, "registers: {}", chunk.register_count);

@@ -1,13 +1,14 @@
 //! Fusion of a two-element tuple immediately returned by a callable.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Count;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledUnit;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::for_each_mutable_chunk;
 

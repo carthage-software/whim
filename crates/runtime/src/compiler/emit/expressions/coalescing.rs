@@ -1,3 +1,7 @@
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::array::ArrayAccess;
 use whim_syn::cst::operation::Binary;
 
@@ -6,10 +10,6 @@ use crate::compiler::emit::BodyCompiler;
 use crate::compiler::emit::CompileError;
 use crate::compiler::emit::Expression;
 use crate::compiler::emit::HasSpan;
-use crate::compiler::emit::IcDescriptor;
-use crate::compiler::emit::Instruction;
-use crate::compiler::emit::JumpOffset;
-use crate::compiler::emit::Register;
 use crate::compiler::emit::Scope;
 
 impl BodyCompiler<'_, '_> {

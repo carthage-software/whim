@@ -1,5 +1,8 @@
 //! Reflection over live objects, callables, properties, and newtype layers.
 
+use whim_bytecode::aliases::substitute;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::ClassLikeKind;
 use whim_value::Value;
 use whim_value::function::CallTarget;
 use whim_value::function::FuncId;
@@ -14,9 +17,6 @@ use whim_value::object::TypeEnvironmentId;
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::bytecode::aliases::substitute;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::ClassLikeKind;
 use crate::core::reflection::Operation;
 use crate::core::reflection::model::CallableKey;
 use crate::core::reflection::model::DeclarationKey;

@@ -1,10 +1,11 @@
 use hashbrown::HashMap;
 
-use crate::bytecode::chunk::descriptors::DictionaryTypeDescriptor;
-use crate::bytecode::chunk::descriptors::ShapeKey;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Register;
+use whim_bytecode::chunk::descriptors::DictionaryTypeDescriptor;
+use whim_bytecode::chunk::descriptors::ShapeKey;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+
 use crate::optimizer::type_flow::Fact;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::constants::ConstantDictionaryKey;

@@ -4,6 +4,13 @@
 use std::slice;
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::chunk::descriptors::DictionaryTypeDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledTypeParameter;
 use whim_value::atom::Atom;
 
 use crate::optimizer::liveness::effect::effect_on;
@@ -11,24 +18,17 @@ use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::ALWAYS_REFERENCE_COUNTED;
 use crate::optimizer::type_flow::BOOL;
 use crate::optimizer::type_flow::CALLABLE;
-use crate::optimizer::type_flow::CompiledParameter;
-use crate::optimizer::type_flow::CompiledTypeParameter;
 use crate::optimizer::type_flow::DICTIONARY;
-use crate::optimizer::type_flow::DictionaryTypeDescriptor;
 use crate::optimizer::type_flow::FLOAT;
 use crate::optimizer::type_flow::Fact;
 use crate::optimizer::type_flow::INT;
-use crate::optimizer::type_flow::Instruction;
-use crate::optimizer::type_flow::Literal;
 use crate::optimizer::type_flow::MAY_BE_REFERENCE_COUNTED;
 use crate::optimizer::type_flow::NO_ORIGIN;
 use crate::optimizer::type_flow::NULL;
 use crate::optimizer::type_flow::OBJECT;
-use crate::optimizer::type_flow::Register;
 use crate::optimizer::type_flow::STRING;
 use crate::optimizer::type_flow::THIS_ORIGIN;
 use crate::optimizer::type_flow::TUPLE;
-use crate::optimizer::type_flow::TypeDescriptor;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::VECTOR;
 use crate::optimizer::type_flow::callable_signature;

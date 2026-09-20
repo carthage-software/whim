@@ -2,30 +2,30 @@
 
 use std::cmp::Reverse;
 
+use whim_bytecode::aliases::alias_bindings;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::Visibility;
+use whim_bytecode::unit::is_always_inline;
+use whim_bytecode::unit::is_external;
+use whim_bytecode::unit::is_never_inline;
 use whim_value::atom::Atom;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::passes::fuse_coalescing::normalize_chunk;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
-use crate::optimizer::passes::inline_leaf_calls::Chunk;
-use crate::optimizer::passes::inline_leaf_calls::CompiledFunction;
-use crate::optimizer::passes::inline_leaf_calls::CompiledParameter;
-use crate::optimizer::passes::inline_leaf_calls::CompiledTypeParameter;
-use crate::optimizer::passes::inline_leaf_calls::CompiledUnit;
-use crate::optimizer::passes::inline_leaf_calls::IcDescriptor;
 use crate::optimizer::passes::inline_leaf_calls::InlineCandidates;
-use crate::optimizer::passes::inline_leaf_calls::Instruction;
 use crate::optimizer::passes::inline_leaf_calls::Location;
 use crate::optimizer::passes::inline_leaf_calls::OptimizationStatistics;
 use crate::optimizer::passes::inline_leaf_calls::REGISTER_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::TypeFlow;
-use crate::optimizer::passes::inline_leaf_calls::Visibility;
-use crate::optimizer::passes::inline_leaf_calls::alias_bindings;
-use crate::optimizer::passes::inline_leaf_calls::is_always_inline;
-use crate::optimizer::passes::inline_leaf_calls::is_external;
-use crate::optimizer::passes::inline_leaf_calls::is_never_inline;
 use crate::optimizer::passes::inline_leaf_calls::jumping::build_jumping_replacement_bound;
 use crate::optimizer::passes::inline_leaf_calls::leaf::owned_register_mask;
 use crate::optimizer::passes::inline_leaf_calls::methods::descriptor_references_parameter;

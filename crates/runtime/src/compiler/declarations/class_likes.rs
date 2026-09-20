@@ -1,6 +1,16 @@
 //! Class, interface, and enum declarations, their bases, and variance
 //! validation.
 
+use whim_bytecode::aliases::expand_aliases;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledBaseReference;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledTypeAlias;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::EnumBacking;
+use whim_bytecode::unit::Variance;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::class::Class;
@@ -11,16 +21,6 @@ use whim_syn::cst::class::MethodBody;
 use whim_syn::cst::r#type::NamedType;
 use whim_value::heap::Heap;
 
-use crate::bytecode::aliases::expand_aliases;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledBaseReference;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledTypeAlias;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::EnumBacking;
-use crate::bytecode::unit::Variance;
 use crate::compiler::declarations::Array;
 use crate::compiler::declarations::functions::DeclarationContext;
 use crate::compiler::declarations::functions::compile_attributes;

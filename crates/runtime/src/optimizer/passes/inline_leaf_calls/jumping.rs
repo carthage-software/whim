@@ -1,31 +1,31 @@
 //! Self-inlining of recursive bodies and the jumping replacement builder.
 
+use whim_bytecode::aliases::substitute;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::PropertyValueMode;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::rewrite::rebase_targets;
+use whim_bytecode::unit::CompiledFunction;
 use whim_value::atom::Atom;
 
-use crate::bytecode::rewrite::rebase_targets;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::passes::inline_leaf_calls::CALLEE_INSTRUCTION_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
-use crate::optimizer::passes::inline_leaf_calls::Chunk;
-use crate::optimizer::passes::inline_leaf_calls::CompiledFunction;
-use crate::optimizer::passes::inline_leaf_calls::IcDescriptor;
-use crate::optimizer::passes::inline_leaf_calls::IcSlot;
-use crate::optimizer::passes::inline_leaf_calls::Instruction;
-use crate::optimizer::passes::inline_leaf_calls::JumpOffset;
 use crate::optimizer::passes::inline_leaf_calls::OptimizationStatistics;
-use crate::optimizer::passes::inline_leaf_calls::PropertyValueMode;
 use crate::optimizer::passes::inline_leaf_calls::REGISTER_LIMIT;
-use crate::optimizer::passes::inline_leaf_calls::Register;
-use crate::optimizer::passes::inline_leaf_calls::ShortJumpOffset;
 use crate::optimizer::passes::inline_leaf_calls::Span;
-use crate::optimizer::passes::inline_leaf_calls::TypeDescriptor;
 use crate::optimizer::passes::inline_leaf_calls::effect_on;
 use crate::optimizer::passes::inline_leaf_calls::leaf::owned_register_mask;
 use crate::optimizer::passes::inline_leaf_calls::leaf::release_callee_registers;
 use crate::optimizer::passes::inline_leaf_calls::leaf::remap_instruction;
 use crate::optimizer::passes::inline_leaf_calls::leaf::straight_line_body_instruction;
 use crate::optimizer::passes::inline_leaf_calls::splice_replace;
-use crate::optimizer::passes::inline_leaf_calls::substitute;
 
 /// Splices a pristine snapshot of a recursive function's own body into its
 /// self-call sites, halving the call depth of tight recursion.

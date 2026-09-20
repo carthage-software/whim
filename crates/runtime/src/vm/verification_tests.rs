@@ -5,22 +5,21 @@ use std::rc::Rc;
 use proptest::collection::vec as vec_strategy;
 use proptest::option::of;
 use proptest::prelude::*;
-
 use whim_base::unwrap_result_invariant;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::CatchEntry;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::DescriptorIndex;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::verify::VerifyError;
+use whim_bytecode::verify::verify;
 use whim_span::Span;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::CatchEntry;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::verify::VerifyError;
-use crate::bytecode::verify::verify;
 use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
 

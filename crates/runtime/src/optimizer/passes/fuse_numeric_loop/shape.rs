@@ -1,8 +1,9 @@
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+
 use crate::optimizer::passes::fuse_numeric_loop::BytecodeComparison;
-use crate::optimizer::passes::fuse_numeric_loop::Chunk;
-use crate::optimizer::passes::fuse_numeric_loop::Instruction;
-use crate::optimizer::passes::fuse_numeric_loop::Literal;
-use crate::optimizer::passes::fuse_numeric_loop::Register;
 use crate::optimizer::passes::fuse_numeric_loop::effect_on;
 use crate::optimizer::passes::fuse_numeric_loop::relative_target;
 use crate::optimizer::passes::fuse_numeric_loop::successors;

@@ -1,10 +1,10 @@
 //! Same-unit validation of sealed class and interface permissions.
 
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::atom::Atom;
 
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledUnit;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
 

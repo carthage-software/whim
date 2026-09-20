@@ -3,12 +3,12 @@
 use std::ptr::NonNull;
 
 use hashbrown::HashSet;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::verify::verify;
 use whim_value::function::FuncId;
 
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::verify::verify;
 use crate::engine::declare::prelink_exact_function_cache;
 use crate::optimizer::LiveRefinement;
 use crate::optimizer::World;

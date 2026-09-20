@@ -3,22 +3,22 @@
 use std::mem;
 
 use whim_base::unwrap_result_invariant;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::rewrite::rebase_targets;
+use whim_bytecode::unit::COLD_ATTRIBUTE;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::has_attribute;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Comparison;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::bytecode::rewrite::rebase_targets;
-use crate::bytecode::unit::COLD_ATTRIBUTE;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::has_attribute;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::is_block_boundary;
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::passes::for_each_mutable_chunk;

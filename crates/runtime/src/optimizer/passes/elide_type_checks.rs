@@ -1,7 +1,8 @@
 //! Removal of runtime type checks already proven by forward type flow.
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::analysis::Analysis;

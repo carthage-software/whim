@@ -12,7 +12,7 @@ use serde::de::SeqAccess;
 use serde::de::VariantAccess;
 use serde::de::Visitor;
 
-pub(in crate::bytecode::decode) struct SeededDeserializer<D>(pub D);
+pub(in crate::decode) struct SeededDeserializer<D>(pub D);
 
 macro_rules! delegate {
     ($method:ident) => {

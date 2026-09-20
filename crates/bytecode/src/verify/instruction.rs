@@ -2,37 +2,37 @@
 
 use whim_base::unwrap_result_invariant;
 
-use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
-use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
-use crate::bytecode::chunk::descriptors::IntStepLoopDescriptor;
-use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::chunk::descriptors::descriptor_is_trivial;
-use crate::bytecode::chunk::descriptors::string_switch_buckets;
-use crate::bytecode::instruction::InstructionOperand;
-use crate::bytecode::verify::Chunk;
-use crate::bytecode::verify::Instruction;
-use crate::bytecode::verify::PresetSlot;
-use crate::bytecode::verify::Register;
-use crate::bytecode::verify::SwitchTable;
-use crate::bytecode::verify::VerifyError;
-use crate::bytecode::verify::check_cache;
-use crate::bytecode::verify::check_call_descriptor;
-use crate::bytecode::verify::check_constant;
-use crate::bytecode::verify::check_float_constant;
-use crate::bytecode::verify::check_float_pair_update_descriptor;
-use crate::bytecode::verify::check_float_squares_sum_branch_descriptor;
-use crate::bytecode::verify::check_int_step_loop_descriptor;
-use crate::bytecode::verify::check_jump;
-use crate::bytecode::verify::check_optional_register;
-use crate::bytecode::verify::check_prepared_int_loop_descriptor;
-use crate::bytecode::verify::check_property_initialization_descriptor;
-use crate::bytecode::verify::check_register;
-use crate::bytecode::verify::check_relative_target;
-use crate::bytecode::verify::check_string_constant;
-use crate::bytecode::verify::check_switch_table;
-use crate::bytecode::verify::check_type_descriptor;
-use crate::bytecode::verify::check_window;
+use crate::chunk::descriptors::FloatPairUpdateDescriptor;
+use crate::chunk::descriptors::FloatSquaresSumBranchDescriptor;
+use crate::chunk::descriptors::IntStepLoopDescriptor;
+use crate::chunk::descriptors::PreparedIntLoopDescriptor;
+use crate::chunk::descriptors::TypeDescriptor;
+use crate::chunk::descriptors::descriptor_is_trivial;
+use crate::chunk::descriptors::string_switch_buckets;
+use crate::instruction::InstructionOperand;
+use crate::verify::Chunk;
+use crate::verify::Instruction;
+use crate::verify::PresetSlot;
+use crate::verify::Register;
+use crate::verify::SwitchTable;
+use crate::verify::VerifyError;
+use crate::verify::check_cache;
+use crate::verify::check_call_descriptor;
+use crate::verify::check_constant;
+use crate::verify::check_float_constant;
+use crate::verify::check_float_pair_update_descriptor;
+use crate::verify::check_float_squares_sum_branch_descriptor;
+use crate::verify::check_int_step_loop_descriptor;
+use crate::verify::check_jump;
+use crate::verify::check_optional_register;
+use crate::verify::check_prepared_int_loop_descriptor;
+use crate::verify::check_property_initialization_descriptor;
+use crate::verify::check_register;
+use crate::verify::check_relative_target;
+use crate::verify::check_string_constant;
+use crate::verify::check_switch_table;
+use crate::verify::check_type_descriptor;
+use crate::verify::check_window;
 
 fn tuple_window_descriptor(descriptor: &TypeDescriptor, element_count: usize) -> bool {
     match descriptor {
@@ -55,7 +55,7 @@ fn tuple_window_descriptor(descriptor: &TypeDescriptor, element_count: usize) ->
     clippy::too_many_lines,
     reason = "one exhaustive match keeps instruction invariants together"
 )]
-pub(in crate::bytecode::verify) fn verify_instruction(
+pub(in crate::verify) fn verify_instruction(
     chunk: &Chunk,
     at: u32,
     instruction: Instruction,
@@ -141,7 +141,7 @@ pub(in crate::bytecode::verify) fn verify_instruction(
                 let register = unsafe {
                     unwrap_result_invariant(
                         u16::try_from(remaining.trailing_zeros()),
-                        "whim-runtime: a u64 bit index fits u16",
+                        "a u64 bit index fits u16",
                     )
                 };
                 check_register(chunk, at, Register::new(register))?;

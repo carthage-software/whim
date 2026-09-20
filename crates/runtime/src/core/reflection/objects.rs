@@ -1,13 +1,13 @@
 //! Construction and checked projection of reflection objects.
 
 use whim_base::unreachable_invariant;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::core::reflection::classes;
 use crate::core::reflection::model::DeclarationKey;
 use crate::core::reflection::model::MemberKind;

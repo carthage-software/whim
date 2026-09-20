@@ -1,15 +1,15 @@
 //! Loop-invariant code motion for immutable loop bounds.
 
 use whim_base::unreachable_invariant;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::ImmediateInt;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::liveness::register_is_read_before_write;

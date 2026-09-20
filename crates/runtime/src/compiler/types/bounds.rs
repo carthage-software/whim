@@ -2,19 +2,19 @@
 
 use hashbrown::HashMap;
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::aliases::TypeAliasIndex;
+use whim_bytecode::aliases::expand_aliases_using;
+use whim_bytecode::aliases::substitute;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledUnit;
 use whim_span::Span;
 use whim_value::atom::Atom;
 
-use crate::bytecode::aliases::TypeAliasIndex;
-use crate::bytecode::aliases::expand_aliases_using;
-use crate::bytecode::aliases::substitute;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
 use crate::optimizer::descriptor_proves;

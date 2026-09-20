@@ -1,11 +1,11 @@
 use std::path::Path;
 
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::verify::verify_unit;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
 use whim_value::heap::Heap;
 
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::verify::verify_unit;
 use crate::compiler::CompileConfiguration;
 use crate::compiler::compile_with_configuration;
 use crate::engine::Engine;

@@ -1,21 +1,21 @@
 //! Removal of side-effect-free writes whose produced value is never read.
 
 use hashbrown::HashSet;
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledTypeParameter;
 use whim_value::atom::Atom;
 use whim_value::heap::Heap;
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledTypeParameter;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::analysis::Analysis;
 use crate::optimizer::candidates::CandidateSet;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::LivenessQueries;
 use crate::optimizer::operands::for_each_write_register;

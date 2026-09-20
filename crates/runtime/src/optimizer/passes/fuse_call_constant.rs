@@ -1,19 +1,19 @@
 //! Literal arguments embedded directly in exact named-function calls.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::effect::overwrites_register;
 use crate::optimizer::passes::compact_removed_instructions;
 use crate::optimizer::passes::for_each_mutable_chunk;

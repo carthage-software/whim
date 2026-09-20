@@ -1,9 +1,10 @@
 //! Elision of unused keys from specialized collection iteration.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::CompiledUnit;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::liveness::register_is_dead_after;

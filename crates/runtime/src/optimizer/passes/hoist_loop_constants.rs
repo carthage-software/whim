@@ -1,16 +1,15 @@
 //! Hoisting of directly consumed scalar literals from natural loops.
 
+use whim_base::unwrap_result_invariant;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::compact;
 use whim_span::Span;
 
-use whim_base::unwrap_result_invariant;
-
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::ImmediateInt;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::rewrite::compact;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::cfg::is_block_boundary;
 use crate::optimizer::cfg::relative_target;

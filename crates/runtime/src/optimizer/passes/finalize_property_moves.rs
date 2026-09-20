@@ -1,12 +1,13 @@
 //! Validation of ownership-moving property writes after register reuse.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::PropertyValueMode;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::PropertyValueMode;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledUnit;
+
 use crate::optimizer::OptimizationConfiguration;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::liveness::register_is_unused_after;

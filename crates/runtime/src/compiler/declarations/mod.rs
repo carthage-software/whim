@@ -4,6 +4,15 @@
 use std::mem;
 
 use hashbrown::HashSet;
+use whim_bytecode::chunk::descriptors::Literal as BytecodeLiteral;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledConstant;
+use whim_bytecode::unit::CompiledNewtype;
+use whim_bytecode::unit::CompiledTypeAlias;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::ConstantInitializer;
+use whim_bytecode::unit::STUB_ATTRIBUTE_NAME;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::Program;
@@ -21,15 +30,6 @@ use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeAlias;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledConstant;
-use crate::bytecode::unit::CompiledNewtype;
-use crate::bytecode::unit::CompiledTypeAlias;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::unit::STUB_ATTRIBUTE_NAME;
 use crate::compiler::Compilation;
 use crate::compiler::CompilePath;
 use crate::compiler::Target;

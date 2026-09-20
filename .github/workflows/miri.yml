@@ -45,7 +45,6 @@ jobs:
       - name: Check values
         run: >-
           cargo +nightly miri test --locked -p whim-value --lib
-      - name: Check value type descriptors
+      - name: Check bytecode
         run: >-
-          cargo +nightly miri test --locked -p whim-runtime --lib
-          bytecode::chunk::descriptors::tests
+          cargo +nightly miri test --locked -p whim-bytecode

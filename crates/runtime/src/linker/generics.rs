@@ -3,16 +3,16 @@
 use std::rc::Rc;
 
 use hashbrown::HashMap;
+use whim_bytecode::aliases::expand_aliases_using as expand_aliases;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::is_external;
 use whim_value::atom::Atom;
 use whim_value::object::ClassId;
 
-use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::is_external;
 use crate::classes::MethodBodyKind;
 use crate::engine::Engine;
 use crate::engine::GenericValidationJournalEntry;

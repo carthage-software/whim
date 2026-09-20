@@ -1,15 +1,15 @@
 //! Fusion of compiler-expanded indexed property updates.
 
 use hashbrown::HashSet;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
+use whim_bytecode::rewrite::control_flow_targets;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::passes::compact_removed_instructions;
 

@@ -1,14 +1,14 @@
 //! Precise frame ownership metadata for whole-unit exact calls.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::reference_registers::mask_with_classification;
+use whim_bytecode::unit::CompiledProperty;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::reference_registers::mask_with_classification;
-use crate::bytecode::unit::CompiledProperty;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 
 struct FunctionReturn {

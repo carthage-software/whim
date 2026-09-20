@@ -4,10 +4,9 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use whim_syn::arena::LocalArena;
-use whim_syn::fragment::parse_type_parameters;
-
 use whim_syn::cst::r#type::TypeParameterList;
 use whim_syn::cst::r#type::TypeVariance;
+use whim_syn::fragment::parse_type_parameters;
 
 use crate::built_in::type_spec;
 
@@ -58,12 +57,12 @@ pub(super) fn lower_list(
         .map(|parameter| {
             let name = parameter.name.value;
             let variance = match parameter.variance {
-                None => quote!(crate::bytecode::unit::Variance::Invariant),
+                None => quote!(whim_bytecode::unit::Variance::Invariant),
                 Some(TypeVariance::Out(_)) => {
-                    quote!(crate::bytecode::unit::Variance::Covariant)
+                    quote!(whim_bytecode::unit::Variance::Covariant)
                 }
                 Some(TypeVariance::In(_)) => {
-                    quote!(crate::bytecode::unit::Variance::Contravariant)
+                    quote!(whim_bytecode::unit::Variance::Contravariant)
                 }
             };
             let bounds = match parameter.bound.as_ref() {

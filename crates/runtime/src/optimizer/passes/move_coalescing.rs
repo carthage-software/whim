@@ -1,16 +1,16 @@
 //! Coalescing of compiler-generated temporary result registers.
 
 use hashbrown::HashSet;
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledUnit;
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::branches_or_terminates;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::has_shared_switch_table;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::register_is_dead_after_removals;
@@ -388,13 +388,13 @@ fn local_may_own_reference(chunk: &Chunk, register: Register) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use whim_bytecode::chunk::Chunk;
+    use whim_bytecode::instruction::Instruction;
+    use whim_bytecode::instruction::operands::ArrayValueMode;
+    use whim_bytecode::instruction::operands::JumpOffset;
+    use whim_bytecode::instruction::operands::Register;
     use whim_span::Span;
 
-    use crate::bytecode::chunk::Chunk;
-    use crate::bytecode::instruction::Instruction;
-    use crate::bytecode::instruction::operands::ArrayValueMode;
-    use crate::bytecode::instruction::operands::JumpOffset;
-    use crate::bytecode::instruction::operands::Register;
     use crate::optimizer::OptimizationConfiguration;
     use crate::optimizer::OptimizationStatistics;
     use crate::optimizer::passes::move_coalescing::optimize_chunk;

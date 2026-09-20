@@ -1,8 +1,9 @@
 //! Register liveness queries shared by optimizer passes.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Register;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::operands::for_each_read_register;
@@ -376,10 +377,10 @@ pub(super) fn register_is_read_before_write(
 
 #[cfg(test)]
 mod tests {
+    use whim_bytecode::chunk::Chunk;
+    use whim_bytecode::instruction::Instruction;
     use whim_span::Span;
 
-    use crate::bytecode::chunk::Chunk;
-    use crate::bytecode::instruction::Instruction;
     use crate::optimizer::liveness::LivenessQueries;
 
     #[test]

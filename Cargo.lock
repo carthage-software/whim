@@ -3399,6 +3399,20 @@ name = "whim-base"
 version = "0.10.0"
 
 [[package]]
+name = "whim-bytecode"
+version = "0.10.0"
+dependencies = [
+ "bincode",
+ "hashbrown 0.17.1",
+ "serde",
+ "serde-seeded",
+ "whim-base",
+ "whim-span",
+ "whim-value",
+ "xxhash-rust",
+]
+
+[[package]]
 name = "whim-formatter"
 version = "0.10.0"
 dependencies = [
@@ -3516,7 +3530,6 @@ dependencies = [
  "rustls-pemfile",
  "ryu",
  "serde",
- "serde-seeded",
  "sha1",
  "sha2",
  "sha3",
@@ -3526,6 +3539,7 @@ dependencies = [
  "unicode-general-category",
  "uuid",
  "whim-base",
+ "whim-bytecode",
  "whim-loop",
  "whim-macros",
  "whim-pgsql",

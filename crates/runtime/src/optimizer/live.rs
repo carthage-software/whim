@@ -1,12 +1,12 @@
 //! Refinement of a not-yet-executed live chunk tail after the symbol world grows.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::Value;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::successors;

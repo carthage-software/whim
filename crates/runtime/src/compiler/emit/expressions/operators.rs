@@ -2,9 +2,17 @@
 //! increment and decrement steps.
 
 use whim_base::unwrap_option_invariant;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
+use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::access::PropertyAccess;
 use whim_syn::cst::access::StaticPropertyAccess;
 use whim_syn::cst::array::ArrayAccess;
+use whim_syn::cst::atom::Literal;
 use whim_syn::cst::operation::AssignmentOperator;
 use whim_syn::cst::operation::Binary;
 use whim_syn::cst::operation::BinaryOperator;
@@ -13,22 +21,14 @@ use whim_syn::cst::operation::UnaryPostfixOperator;
 use whim_syn::cst::operation::UnaryPrefix;
 use whim_syn::cst::operation::UnaryPrefixOperator;
 
-use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
 use crate::compiler::emit::expressions::Access;
 use crate::compiler::emit::expressions::BodyCompiler;
 use crate::compiler::emit::expressions::ChainStep;
 use crate::compiler::emit::expressions::CompileError;
 use crate::compiler::emit::expressions::CompileErrorKind;
-use crate::compiler::emit::expressions::Count;
 use crate::compiler::emit::expressions::Expression;
 use crate::compiler::emit::expressions::HasSpan;
-use crate::compiler::emit::expressions::IcDescriptor;
-use crate::compiler::emit::expressions::ImmediateInt;
-use crate::compiler::emit::expressions::Instruction;
-use crate::compiler::emit::expressions::JumpOffset;
-use crate::compiler::emit::expressions::Literal;
 use crate::compiler::emit::expressions::Place;
-use crate::compiler::emit::expressions::Register;
 use crate::compiler::emit::expressions::Scope;
 use crate::compiler::emit::expressions::Span;
 use crate::compiler::emit::expressions::integer_gate;

@@ -1,19 +1,19 @@
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::SwitchTable;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::string_switch_buckets;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::SwitchTableIndex;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::verify::verify;
 use whim_span::Span;
 use whim_value::heap::Heap;
 
 use super::ChunkRewrite;
 use super::RewritePlan;
 use super::compact_switch_tables;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::chunk::descriptors::string_switch_buckets;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Count;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::SwitchTableIndex;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::verify::verify;
 use crate::optimizer::passes::FunctionLocation;
 
 const SUBJECT: Register = Register::new(0);

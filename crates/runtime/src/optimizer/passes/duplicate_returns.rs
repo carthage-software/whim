@@ -1,6 +1,7 @@
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledUnit;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::passes::for_each_mutable_chunk;
 use crate::optimizer::passes::prune_unreachable;

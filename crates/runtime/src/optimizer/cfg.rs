@@ -1,14 +1,10 @@
 //! Control-flow graph queries shared by optimizer passes.
 
 use hashbrown::HashSet;
-
 use whim_base::unwrap_result_invariant;
-
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::instruction::Instruction;
-pub(in crate::optimizer) use crate::bytecode::rewrite::control_flow_targets;
-pub(in crate::optimizer) use crate::bytecode::rewrite::for_each_control_flow_target;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::SwitchTable;
+use whim_bytecode::instruction::Instruction;
 
 pub(in crate::optimizer) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize>) {
     match chunk.code[index] {

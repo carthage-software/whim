@@ -1,11 +1,11 @@
 use std::path::Path;
 use std::ptr;
 
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser::parse;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::compiler::CompileConfiguration;
 use crate::compiler::compile_with_configuration;
 use crate::engine::Engine;

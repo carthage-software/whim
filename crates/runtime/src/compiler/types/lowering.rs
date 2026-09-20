@@ -1,6 +1,11 @@
 //! Type lowering: source types to complete runtime descriptors, with the
 //! formation gates applied on the way.
 
+use whim_bytecode::aliases::expand_aliases;
+use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
+use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
+use whim_bytecode::chunk::descriptors::ShapeKey;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::atom::Identifier;
@@ -32,11 +37,6 @@ use whim_syn::cst::walker::Visitor;
 use whim_syn::cst::walker::walk;
 use whim_value::heap::Heap;
 
-use crate::bytecode::aliases::expand_aliases;
-use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
-use crate::bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
-use crate::bytecode::chunk::descriptors::ShapeKey;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::compiler::error::CompileError;
 use crate::compiler::error::CompileErrorKind;
 use crate::compiler::limits::check_sequence;

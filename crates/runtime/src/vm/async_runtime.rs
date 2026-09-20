@@ -5,6 +5,7 @@ use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
 
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_loop::Activation;
 use whim_loop::Interest;
 use whim_loop::RawDescriptor;
@@ -19,7 +20,6 @@ use whim_value::object::TypeEnvironmentId;
 use crate::core::coroutine::CoroutineObject;
 use crate::core::coroutine::CoroutineState;
 use crate::vm::Throw;
-use crate::vm::TypeDescriptor;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::unreachable_invariant;

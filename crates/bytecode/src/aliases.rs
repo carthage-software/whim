@@ -6,25 +6,26 @@ use hashbrown::HashMap;
 use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledBaseReference;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledTypeAlias;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::is_external;
+use crate::chunk::descriptors::TypeDescriptor;
+use crate::unit::CompiledBaseReference;
+use crate::unit::CompiledClassLike;
+use crate::unit::CompiledFunction;
+use crate::unit::CompiledTypeAlias;
+use crate::unit::CompiledTypeParameter;
+use crate::unit::CompiledUnit;
+use crate::unit::is_external;
 
-pub(crate) trait TypeAliasLookup {
+pub trait TypeAliasLookup {
     fn find_alias(&self, name: &Atom) -> Option<&CompiledTypeAlias>;
 }
 
-pub(crate) struct TypeAliasIndex<'alias> {
+pub struct TypeAliasIndex<'alias> {
     aliases: HashMap<Atom, &'alias CompiledTypeAlias>,
 }
 
 impl<'alias> TypeAliasIndex<'alias> {
-    pub(crate) fn new(aliases: &'alias [CompiledTypeAlias]) -> Self {
+    #[must_use]
+    pub fn new(aliases: &'alias [CompiledTypeAlias]) -> Self {
         let mut index = HashMap::with_capacity(aliases.len());
         for alias in aliases {
             index.entry(alias.name.clone()).or_insert(alias);
@@ -56,7 +57,7 @@ impl TypeAliasLookup for [Rc<CompiledTypeAlias>] {
 
 /// Expands known aliases in the runtime-checked declarations of `unit`.
 /// Alias definitions stay canonical so recursive aliases expand only once.
-pub(crate) fn expand_unit_declarations(unit: &mut CompiledUnit, aliases: &[CompiledTypeAlias]) {
+pub fn expand_unit_declarations(unit: &mut CompiledUnit, aliases: &[CompiledTypeAlias]) {
     let aliases = TypeAliasIndex::new(aliases);
     for function in &mut unit.functions {
         if is_external(&function.attributes) {
@@ -144,14 +145,15 @@ fn expand_parameters(parameters: &mut [CompiledTypeParameter], aliases: &impl Ty
     }
 }
 
-pub(crate) fn expand_aliases(
+#[must_use]
+pub fn expand_aliases(
     descriptor: &TypeDescriptor,
     aliases: &[CompiledTypeAlias],
 ) -> TypeDescriptor {
     expand_aliases_using(descriptor, aliases)
 }
 
-pub(crate) fn expand_aliases_using(
+pub fn expand_aliases_using(
     descriptor: &TypeDescriptor,
     aliases: &(impl TypeAliasLookup + ?Sized),
 ) -> TypeDescriptor {
@@ -254,7 +256,8 @@ fn expand_descriptor<L: TypeAliasLookup + ?Sized>(
     }
 }
 
-pub(crate) fn alias_bindings(
+#[must_use]
+pub fn alias_bindings(
     parameters: &[CompiledTypeParameter],
     arguments: Option<&[TypeDescriptor]>,
 ) -> Option<Vec<(Atom, TypeDescriptor)>> {
@@ -276,7 +279,8 @@ pub(crate) fn alias_bindings(
     Some(bindings)
 }
 
-pub(crate) fn substitute(
+#[must_use]
+pub fn substitute(
     descriptor: &TypeDescriptor,
     bindings: &[(Atom, TypeDescriptor)],
     depth: usize,
@@ -301,14 +305,15 @@ mod tests {
     use whim_span::Span;
     use whim_value::heap::Heap;
 
-    use crate::bytecode::aliases::expand_aliases;
-    use crate::bytecode::aliases::expand_unit_declarations;
-    use crate::bytecode::chunk::descriptors::ShapeKey;
-    use crate::bytecode::chunk::descriptors::TypeDescriptor;
-    use crate::bytecode::unit::CompiledTypeAlias;
-    use crate::bytecode::unit::CompiledTypeParameter;
-    use crate::bytecode::unit::Variance;
-    use crate::compiler::new_unit;
+    use crate::aliases::expand_aliases;
+    use crate::aliases::expand_unit_declarations;
+    use crate::chunk::Chunk;
+    use crate::chunk::descriptors::ShapeKey;
+    use crate::chunk::descriptors::TypeDescriptor;
+    use crate::unit::CompiledTypeAlias;
+    use crate::unit::CompiledTypeParameter;
+    use crate::unit::CompiledUnit;
+    use crate::unit::Variance;
 
     #[test]
     fn expands_aliases_nested_in_array_shapes() {
@@ -437,8 +442,16 @@ mod tests {
             ))),
             rendered: heap.intern(b"dict<string, Datum>"),
         };
-        let mut unit = new_unit(b"aliases.whim", &heap);
-        unit.type_aliases = vec![datum, data];
+        let mut unit = CompiledUnit {
+            path: heap.intern(b"aliases.whim"),
+            files: Vec::new(),
+            main: Chunk::new(),
+            functions: Vec::new(),
+            classes: Vec::new(),
+            constants: Vec::new(),
+            type_aliases: vec![datum, data],
+            newtypes: Vec::new(),
+        };
         let aliases = unit.type_aliases.clone();
 
         expand_unit_declarations(&mut unit, &aliases);

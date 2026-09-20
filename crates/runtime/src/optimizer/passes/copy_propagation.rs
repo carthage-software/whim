@@ -1,12 +1,13 @@
 //! Straight-line propagation of stable register copies.
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::rewrite::control_flow_targets;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::branches_or_terminates;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::effect::effect_on;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::operands::replace_read_register;

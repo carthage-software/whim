@@ -1,6 +1,6 @@
 //! Destructor presence for optimizations that may change observable lifetimes.
 
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::CompiledUnit;
 
 const DESTRUCTOR: &[u8] = b"__destruct";
 

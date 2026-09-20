@@ -1,6 +1,17 @@
 //! Function declarations, parameters, initializers, attributes, and
 //! signature rendering.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal as BytecodeLiteral;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledTypeAlias;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::ConstantInitializer;
+use whim_bytecode::unit::STUB_ATTRIBUTE_NAME;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::atom::Literal;
@@ -19,17 +30,6 @@ use whim_syn::cst::r#type::TypeParameterList;
 use whim_syn::cst::r#type::TypeVariance;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal as BytecodeLiteral;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledTypeAlias;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::unit::STUB_ATTRIBUTE_NAME;
 use crate::compiler::declarations::class_likes::validate_variance_use;
 use crate::compiler::declarations::generics::compile_type_parameters;
 use crate::compiler::emit::BodyCompiler;

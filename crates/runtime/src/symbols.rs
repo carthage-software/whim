@@ -14,6 +14,16 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 use whim_base::unwrap_option_invariant;
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::Value;
 use whim_value::array::ArrayTypeCheckId;
 use whim_value::atom::Atom;
@@ -28,16 +38,6 @@ use whim_value::object::ClassId;
 use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::spec::BuiltInDirectHandler;
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
 use crate::classes::MethodEntry;
 
 #[expect(

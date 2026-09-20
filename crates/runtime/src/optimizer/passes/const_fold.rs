@@ -1,19 +1,19 @@
 //! Folding of operations whose result is known at compile time.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::ImmediateInt;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::Register;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::analysis::Analysis;
 use crate::optimizer::candidates::CandidateSet;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::successors;
 use crate::optimizer::liveness::LivenessQueries;
 use crate::optimizer::liveness::LivenessScratch;

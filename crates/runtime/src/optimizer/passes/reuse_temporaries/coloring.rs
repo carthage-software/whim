@@ -3,6 +3,10 @@
 use std::mem;
 
 use whim_base::unwrap_option_invariant;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
 
 use crate::optimizer::operands::Access;
 use crate::optimizer::operands::Operand;
@@ -11,12 +15,8 @@ use crate::optimizer::operands::instruction_bytes;
 use crate::optimizer::operands::operands;
 use crate::optimizer::operands::register_at;
 use crate::optimizer::operands::write_may_alias_inputs;
-use crate::optimizer::passes::reuse_temporaries::Chunk;
-use crate::optimizer::passes::reuse_temporaries::Instruction;
 use crate::optimizer::passes::reuse_temporaries::OptimizationStatistics;
-use crate::optimizer::passes::reuse_temporaries::Register;
 use crate::optimizer::passes::reuse_temporaries::Reverse;
-use crate::optimizer::passes::reuse_temporaries::control_flow_targets;
 use crate::optimizer::passes::reuse_temporaries::normalize_empty_window_starts;
 use crate::optimizer::passes::reuse_temporaries::pinned_high_water;
 use crate::optimizer::passes::reuse_temporaries::pinned_window_registers;

@@ -1,17 +1,17 @@
 //! Inlining of public literal class constants declared in the same unit.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::ConstantInitializer;
+use whim_bytecode::unit::Visibility;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ImmediateInt;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::unit::Visibility;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 

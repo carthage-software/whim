@@ -1,6 +1,7 @@
 //! Exact method-call specialization proven by whole-unit type flow.
 
-use crate::bytecode::instruction::Instruction;
+use whim_bytecode::instruction::Instruction;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::analysis::Analysis;

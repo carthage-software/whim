@@ -3,30 +3,16 @@
 use std::mem;
 
 use hashbrown::HashMap;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::is_always_inline;
+use whim_bytecode::unit::is_external;
+use whim_bytecode::unit::is_never_inline;
 use whim_span::Span;
 use whim_value::atom::Atom;
 use whim_value::heap::Heap;
 
-use crate::bytecode::aliases::alias_bindings;
-use crate::bytecode::aliases::substitute;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::PropertyValueMode;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::Visibility;
-use crate::bytecode::unit::is_always_inline;
-use crate::bytecode::unit::is_external;
-use crate::bytecode::unit::is_never_inline;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::liveness::effect::effect_on;

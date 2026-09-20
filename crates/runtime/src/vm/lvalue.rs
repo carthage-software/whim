@@ -3,6 +3,13 @@
 use std::io;
 use std::mem;
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
+use whim_bytecode::unit::ConstantInitializer;
+use whim_bytecode::unit::Visibility;
+use whim_bytecode::unit::literal_value;
 use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::heap::handle::ManagedRef;
@@ -11,10 +18,6 @@ use whim_value::object::InstanceObject;
 use whim_value::object::TypeEnvironmentId;
 use whim_value::ops;
 
-use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::unit::Visibility;
-use crate::bytecode::unit::literal_value;
 use crate::classes::ClassConstantValue;
 use crate::classes::extends_or_is;
 use crate::core::private::syscall::StandardStream;
@@ -23,13 +26,10 @@ use crate::vm::ArgumentGuard;
 use crate::vm::CacheEntry;
 use crate::vm::CachedPropertyGuard;
 use crate::vm::CachedPropertySlot;
-use crate::vm::Chunk;
-use crate::vm::IcDescriptor;
 use crate::vm::InlineCache;
 use crate::vm::NonNull;
 use crate::vm::PropertyGuardWays;
 use crate::vm::Rc;
-use crate::vm::TypeDescriptor;
 use crate::vm::UnitContext;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;

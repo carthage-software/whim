@@ -1,8 +1,8 @@
 //! Set proofs for composed string-length types.
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
 use crate::optimizer::type_flow::STRING;
 use crate::optimizer::type_flow::descriptors::descriptor_mask;
 
@@ -281,7 +281,8 @@ fn maximum_upper_bound(left: Option<i64>, right: Option<i64>) -> Option<i64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::bytecode::chunk::descriptors::TypeDescriptor;
+    use whim_bytecode::chunk::descriptors::TypeDescriptor;
+
     use crate::optimizer::type_flow::STRING;
     use crate::optimizer::type_flow::descriptors::descriptor_mask;
     use crate::optimizer::type_flow::descriptors::descriptor_proves;

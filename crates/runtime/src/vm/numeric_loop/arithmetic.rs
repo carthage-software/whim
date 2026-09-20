@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
+use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
 use whim_value::ops::compare_int_float;
 
-use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
 use crate::vm::Fault;
 use crate::vm::numeric_loop::NumericKind;
 use crate::vm::numeric_loop::NumericValue;
@@ -325,7 +325,8 @@ pub(in crate::vm::numeric_loop) fn int_ordered_comparison_matches(
 
 #[cfg(test)]
 mod tests {
-    use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
+    use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
+
     use crate::vm::Fault;
     use crate::vm::numeric_loop::NumericValue;
     use crate::vm::numeric_loop::arithmetic::add;

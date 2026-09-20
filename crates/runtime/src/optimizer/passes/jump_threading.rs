@@ -1,8 +1,9 @@
 //! Retargeting of unconditional jumps through chains of unconditional jumps.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::JumpOffset;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::cfg::relative_target;
 
@@ -87,11 +88,11 @@ fn resolve_targets(chunk: &Chunk) -> Vec<Option<usize>> {
 
 #[cfg(test)]
 mod tests {
+    use whim_bytecode::chunk::Chunk;
+    use whim_bytecode::instruction::Instruction;
+    use whim_bytecode::instruction::operands::JumpOffset;
     use whim_span::Span;
 
-    use crate::bytecode::chunk::Chunk;
-    use crate::bytecode::instruction::Instruction;
-    use crate::bytecode::instruction::operands::JumpOffset;
     use crate::optimizer::OptimizationConfiguration;
     use crate::optimizer::passes::jump_threading::optimize_chunk;
 

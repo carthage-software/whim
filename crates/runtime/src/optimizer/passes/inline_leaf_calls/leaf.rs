@@ -1,31 +1,31 @@
 //! Leaf-callee selection and straight-line inlining into caller chunks.
 
 use hashbrown::HashSet;
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::is_always_inline;
+use whim_bytecode::unit::is_external;
+use whim_bytecode::unit::is_never_inline;
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::operands::Count;
 use crate::optimizer::cfg::branches_or_terminates;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::passes::fuse_coalescing::normalized_chunk;
 use crate::optimizer::passes::inline_leaf_calls::CALLEE_INSTRUCTION_LIMIT;
 use crate::optimizer::passes::inline_leaf_calls::CALLER_CODE_LIMIT;
-use crate::optimizer::passes::inline_leaf_calls::Chunk;
-use crate::optimizer::passes::inline_leaf_calls::CompiledFunction;
-use crate::optimizer::passes::inline_leaf_calls::ConstantIndex;
-use crate::optimizer::passes::inline_leaf_calls::IcDescriptor;
 use crate::optimizer::passes::inline_leaf_calls::InlineCandidates;
-use crate::optimizer::passes::inline_leaf_calls::Instruction;
 use crate::optimizer::passes::inline_leaf_calls::OptimizationStatistics;
 use crate::optimizer::passes::inline_leaf_calls::REGISTER_LIMIT;
-use crate::optimizer::passes::inline_leaf_calls::Register;
 use crate::optimizer::passes::inline_leaf_calls::Span;
 use crate::optimizer::passes::inline_leaf_calls::effect_on;
-use crate::optimizer::passes::inline_leaf_calls::is_always_inline;
-use crate::optimizer::passes::inline_leaf_calls::is_external;
-use crate::optimizer::passes::inline_leaf_calls::is_never_inline;
 use crate::optimizer::passes::inline_leaf_calls::jumping::build_jumping_replacement_capped;
 use crate::optimizer::passes::inline_leaf_calls::methods::method_body_inlinable;
 use crate::optimizer::passes::inline_leaf_calls::methods::unchecked_terminal;

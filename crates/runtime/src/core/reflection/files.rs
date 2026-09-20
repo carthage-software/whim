@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
+use whim_bytecode::unit::is_external;
 use whim_value::Value;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::bytecode::unit::is_external;
 use crate::core::reflection::Operation;
 use crate::core::reflection::functions::symbol_kind_argument;
 use crate::core::reflection::metadata;

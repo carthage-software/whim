@@ -7,20 +7,20 @@ use std::rc::Rc;
 use hashbrown::HashMap;
 use whim_base::limits::MAX_TYPE_DEPTH_U32;
 use whim_base::unwrap_option_invariant;
+use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
+use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledBaseReference;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::Variance;
+use whim_bytecode::unit::Visibility;
 use whim_span::Span;
 use whim_value::atom::Atom;
 use whim_value::object::ClassId;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
-use crate::bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledBaseReference;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::Variance;
-use crate::bytecode::unit::Visibility;
 use crate::classes::MethodBodyKind;
 use crate::classes::MethodEntry;
 use crate::classes::PropertyInfo;
@@ -32,8 +32,6 @@ use crate::linker::OverrideCheck;
 use crate::linker::Replaced;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::linker::descriptors::substitute_symbolic;
-use crate::linker::visibility_name;
-use crate::linker::visibility_rank;
 use crate::optimizer::descriptors_equal;
 use crate::symbols::FunctionTable;
 use crate::symbols::SymbolKind;
@@ -717,11 +715,11 @@ impl Engine {
             } else {
                 format!("this method is static and {replaced_noun} is not")
             })
-        } else if visibility_rank(replacement.visibility) < visibility_rank(replaced.visibility) {
+        } else if replacement.visibility.rank() < replaced.visibility.rank() {
             Some(format!(
                 "it is {} where {replaced_noun} is {}; an override may only widen visibility",
-                visibility_name(replacement.visibility),
-                visibility_name(replaced.visibility)
+                replacement.visibility.as_str(),
+                replaced.visibility.as_str()
             ))
         } else if let Some((new_shape, old_shape)) = shapes {
             let (new_required, new_total, new_names) = new_shape;

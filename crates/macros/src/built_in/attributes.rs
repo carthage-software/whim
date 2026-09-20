@@ -73,6 +73,7 @@ impl AttributeArguments {
                 "unexpected positional argument",
             ));
         }
+
         for (name, argument) in &self.named {
             match argument {
                 NamedArgument::Flag(span) if values.contains(&name.as_str()) => {
@@ -152,7 +153,7 @@ impl AttributeArguments {
 }
 
 pub(super) fn visibility_tokens(visibility: Option<&str>) -> syn::Result<TokenStream> {
-    let path = quote!(crate::bytecode::unit::Visibility);
+    let path = quote!(whim_bytecode::unit::Visibility);
     match visibility {
         None | Some("public") => Ok(quote!(#path::Public)),
         Some("protected") => Ok(quote!(#path::Protected)),

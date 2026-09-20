@@ -1,25 +1,25 @@
 //! Descriptor-level subtyping, equality, and substitution helpers.
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::aliases::TypeAliasLookup;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::ShapeKey;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::string_length_matches;
+use whim_bytecode::unit::CompiledTypeParameter;
 use whim_value::atom::Atom;
 
-use crate::bytecode::aliases::TypeAliasLookup;
-use crate::bytecode::chunk::descriptors::ShapeKey;
-use crate::bytecode::chunk::descriptors::string_length_matches;
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::BOOL;
 use crate::optimizer::type_flow::CALLABLE;
-use crate::optimizer::type_flow::CompiledTypeParameter;
 use crate::optimizer::type_flow::DICTIONARY;
 use crate::optimizer::type_flow::FLOAT;
 use crate::optimizer::type_flow::INT;
 use crate::optimizer::type_flow::IndexedUnit;
-use crate::optimizer::type_flow::Literal;
 use crate::optimizer::type_flow::NULL;
 use crate::optimizer::type_flow::OBJECT;
 use crate::optimizer::type_flow::STRING;
 use crate::optimizer::type_flow::TUPLE;
-use crate::optimizer::type_flow::TypeDescriptor;
 use crate::optimizer::type_flow::VECTOR;
 use crate::optimizer::type_flow::same_atom;
 use crate::optimizer::type_flow::string_lengths::string_lengths_prove;

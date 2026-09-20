@@ -1,22 +1,22 @@
-use crate::bytecode::disassemble::Chunk;
-use crate::bytecode::disassemble::IndexAddMode;
-use crate::bytecode::disassemble::Instruction;
-use crate::bytecode::disassemble::Register;
-use crate::bytecode::disassemble::render::cache_reference;
-use crate::bytecode::disassemble::render::call_reference;
-use crate::bytecode::disassemble::render::constant_reference;
-use crate::bytecode::disassemble::render::descriptor_reference;
-use crate::bytecode::disassemble::render::jump;
-use crate::bytecode::disassemble::render::preset_reference;
-use crate::bytecode::disassemble::render::register;
-use crate::bytecode::disassemble::render::short_jump;
-use crate::bytecode::disassemble::render::table_reference;
-use crate::bytecode::disassemble::render::window;
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
-use crate::bytecode::instruction::operands::PropertyReadMode;
-use crate::bytecode::instruction::operands::PropertyRemoveMode;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
+use crate::disassemble::Chunk;
+use crate::disassemble::IndexAddMode;
+use crate::disassemble::Instruction;
+use crate::disassemble::Register;
+use crate::disassemble::render::cache_reference;
+use crate::disassemble::render::call_reference;
+use crate::disassemble::render::constant_reference;
+use crate::disassemble::render::descriptor_reference;
+use crate::disassemble::render::jump;
+use crate::disassemble::render::preset_reference;
+use crate::disassemble::render::register;
+use crate::disassemble::render::short_jump;
+use crate::disassemble::render::table_reference;
+use crate::disassemble::render::window;
+use crate::instruction::operands::ArrayValueMode;
+use crate::instruction::operands::PropertyIndexUpdateMode;
+use crate::instruction::operands::PropertyReadMode;
+use crate::instruction::operands::PropertyRemoveMode;
+use crate::instruction::operands::ShortJumpOffset;
 
 macro_rules! instructions {
     ($($name:ident)|+ ; $fields:tt) => {

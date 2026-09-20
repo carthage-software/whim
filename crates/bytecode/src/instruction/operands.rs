@@ -7,16 +7,16 @@ macro_rules! integer_operand {
     ($(#[$attribute:meta])* $name:ident($integer:ty) => $accessor:ident) => {
         $(#[$attribute])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-        pub(crate) struct $name([u8; size_of::<$integer>()]);
+        pub struct $name([u8; size_of::<$integer>()]);
 
         impl $name {
             #[must_use]
-            pub(crate) const fn new(value: $integer) -> Self {
+            pub const fn new(value: $integer) -> Self {
                 Self(value.to_le_bytes())
             }
 
             #[must_use]
-            pub(crate) const fn $accessor(self) -> $integer {
+            pub const fn $accessor(self) -> $integer {
                 <$integer>::from_le_bytes(self.0)
             }
         }
@@ -28,7 +28,7 @@ integer_operand!(
 );
 
 impl Register {
-    pub(crate) const NONE: Self = Self::new(u16::MAX);
+    pub const NONE: Self = Self::new(u16::MAX);
 }
 
 integer_operand!(
@@ -86,7 +86,7 @@ integer_operand!(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum Comparison {
+pub enum Comparison {
     Equal,
     NotEqual,
     LessThan,
@@ -97,7 +97,7 @@ pub(crate) enum Comparison {
 
 impl Comparison {
     #[must_use]
-    pub(crate) const fn operator(self) -> &'static str {
+    pub const fn operator(self) -> &'static str {
         match self {
             Self::Equal => "==",
             Self::NotEqual => "!=",
@@ -110,7 +110,7 @@ impl Comparison {
 
     /// The equivalent comparison after exchanging its operands.
     #[must_use]
-    pub(crate) const fn reversed(self) -> Self {
+    pub const fn reversed(self) -> Self {
         match self {
             Self::Equal => Self::Equal,
             Self::NotEqual => Self::NotEqual,
@@ -122,7 +122,7 @@ impl Comparison {
     }
 
     #[must_use]
-    pub(crate) const fn negated(self) -> Self {
+    pub const fn negated(self) -> Self {
         match self {
             Self::Equal => Self::NotEqual,
             Self::NotEqual => Self::Equal,
@@ -136,7 +136,7 @@ impl Comparison {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum IndexAddMode {
+pub enum IndexAddMode {
     Generic,
     DictAnyKeyIntValue,
     DictStringKeyIntValue,
@@ -144,7 +144,7 @@ pub(crate) enum IndexAddMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum AsMode {
+pub enum AsMode {
     /// Preserve the value after checking that it already satisfies the type.
     Boundary,
     Cast,
@@ -156,23 +156,23 @@ integer_operand!(
 
 /// An element or argument count, occupying the byte after the tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct Count(u8);
+pub struct Count(u8);
 
 impl Count {
     #[must_use]
-    pub(crate) const fn new(count: u8) -> Self {
+    pub const fn new(count: u8) -> Self {
         Self(count)
     }
 
     #[must_use]
-    pub(crate) const fn value(self) -> u8 {
+    pub const fn value(self) -> u8 {
         self.0
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum ArrayValueMode {
+pub enum ArrayValueMode {
     /// The element may be any value.
     Generic,
     Int,
@@ -181,14 +181,14 @@ pub(crate) enum ArrayValueMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum PropertyReadMode {
+pub enum PropertyReadMode {
     Clone,
     Take,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum PropertyIndexUpdateMode {
+pub enum PropertyIndexUpdateMode {
     Increment,
     Remove,
     Append,
@@ -196,7 +196,7 @@ pub(crate) enum PropertyIndexUpdateMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum PropertyRemoveMode {
+pub enum PropertyRemoveMode {
     Key,
     First,
     Last,
@@ -205,14 +205,14 @@ pub(crate) enum PropertyRemoveMode {
 
 impl PropertyRemoveMode {
     #[must_use]
-    pub(crate) const fn uses_operand(self) -> bool {
+    pub const fn uses_operand(self) -> bool {
         matches!(self, Self::Key | Self::Swap)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
-pub(crate) enum PropertyValueMode {
+pub enum PropertyValueMode {
     Clone,
     /// Move the value, retaining the physical register's teardown bit because
     /// a later temporary reuses it.
@@ -230,7 +230,7 @@ pub(crate) enum PropertyValueMode {
 
 impl PropertyValueMode {
     #[must_use]
-    pub(crate) const fn moves(self) -> bool {
+    pub const fn moves(self) -> bool {
         matches!(
             self,
             Self::Move | Self::MoveAndClear | Self::FreshMove | Self::FreshMoveAndClear
@@ -238,13 +238,13 @@ impl PropertyValueMode {
     }
 
     #[must_use]
-    pub(crate) const fn clears_reference_mask(self) -> bool {
+    pub const fn clears_reference_mask(self) -> bool {
         matches!(self, Self::MoveAndClear | Self::FreshMoveAndClear)
     }
 
     /// Whether user code cannot yet observe the receiver.
     #[must_use]
-    pub(crate) const fn fresh_receiver(self) -> bool {
+    pub const fn fresh_receiver(self) -> bool {
         matches!(
             self,
             Self::FreshClone | Self::FreshMove | Self::FreshMoveAndClear

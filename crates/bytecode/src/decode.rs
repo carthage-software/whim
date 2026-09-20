@@ -6,11 +6,11 @@ use serde::de::DeserializeSeed;
 use serde_seeded::DeserializeSeeded;
 use whim_value::heap::Heap;
 
-use crate::bytecode::unit::CompiledUnit;
+use crate::unit::CompiledUnit;
 
 mod adapter;
 
-use crate::bytecode::decode::adapter::SeededDeserializer;
+use crate::decode::adapter::SeededDeserializer;
 
 const MAX_SEQUENCE_PREALLOCATION: usize = 4096;
 
@@ -24,7 +24,10 @@ impl<'de> DeserializeSeed<'de> for CompiledUnitSeed<'_> {
     }
 }
 
-pub(crate) fn compiled_unit(bytes: &[u8], heap: &Heap) -> bincode::Result<CompiledUnit> {
+/// # Errors
+///
+/// Returns an error if `bytes` cannot be decoded as a unit or contain trailing data.
+pub fn compiled_unit(bytes: &[u8], heap: &Heap) -> bincode::Result<CompiledUnit> {
     bincode::DefaultOptions::new()
         .with_fixint_encoding()
         .reject_trailing_bytes()
@@ -157,7 +160,7 @@ pub(crate) mod pairs {
         use serde::de::Visitor;
         use serde_seeded::DeserializeSeeded;
 
-        use crate::bytecode::decode::pairs::PairSeed;
+        use crate::decode::pairs::PairSeed;
 
         pub(crate) fn deserialize_seeded<'de, Q, A, B, D>(
             seed: &Q,

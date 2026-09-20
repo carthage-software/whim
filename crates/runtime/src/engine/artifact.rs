@@ -2,10 +2,11 @@
 
 use std::rc::Rc;
 
+use whim_bytecode::verify::verify_unit;
+
 use crate::artifact::DecodedArtifact;
 use crate::artifact::decode;
 use crate::artifact::decode_static;
-use crate::bytecode::verify::verify_unit;
 use crate::engine::Engine;
 use crate::engine::EngineError;
 use crate::symbols::UnitSourceFile;

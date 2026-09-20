@@ -1,10 +1,10 @@
 //! Exactly-once optimization of one callable against its declared world.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::World;
 use crate::optimizer::optimize_unit_with_world;

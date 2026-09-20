@@ -1,5 +1,8 @@
 //! Generic-declaration array and type-parameter compilation.
 
+use whim_bytecode::unit::CompiledTypeAlias;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::Variance;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::Program;
@@ -15,9 +18,6 @@ use whim_syn::cst::walker::Visitor;
 use whim_syn::cst::walker::walk;
 use whim_value::heap::Heap;
 
-use crate::bytecode::unit::CompiledTypeAlias;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::Variance;
 use crate::compiler::declarations::namespace_name;
 use crate::compiler::emit::Scope;
 use crate::compiler::error::CompileError;

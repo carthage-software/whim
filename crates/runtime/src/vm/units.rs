@@ -3,6 +3,7 @@
 use std::fs;
 use std::path::Path;
 
+use whim_bytecode::unit::CompiledUnit;
 use whim_span::HasSpan;
 use whim_syn::arena::LocalArena;
 use whim_syn::parser;
@@ -12,7 +13,6 @@ use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::bytecode::unit::CompiledUnit;
 use crate::compiler;
 use crate::compiler::CompileConfiguration;
 use crate::core::symbols::strip_leading_backslash;

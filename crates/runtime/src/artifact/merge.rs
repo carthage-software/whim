@@ -1,22 +1,22 @@
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::SIDE_TABLE_CAPACITY;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::InstructionSideTableMapper;
+use whim_bytecode::instruction::operands::CallDescriptorIndex;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::DescriptorIndex;
+use whim_bytecode::instruction::operands::FloatPairUpdateDescriptorIndex;
+use whim_bytecode::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::IntStepLoopDescriptorIndex;
+use whim_bytecode::instruction::operands::PreparedIntLoopDescriptorIndex;
+use whim_bytecode::instruction::operands::PresetDescriptorIndex;
+use whim_bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::SwitchTableIndex;
 use whim_span::Span;
 
 use crate::artifact::ArtifactError;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::SIDE_TABLE_CAPACITY;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::InstructionSideTableMapper;
-use crate::bytecode::instruction::operands::CallDescriptorIndex;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::FloatPairUpdateDescriptorIndex;
-use crate::bytecode::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::IntStepLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::PreparedIntLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::PresetDescriptorIndex;
-use crate::bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::SwitchTableIndex;
 
 pub(super) fn main(chunks: Vec<Chunk>) -> Result<Chunk, ArtifactError> {
     let mut merged = Chunk::new();

@@ -3,17 +3,17 @@
 use std::mem;
 
 use hashbrown::HashSet;
+use whim_base::u32_index;
 
-use whim_base::unwrap_result_invariant;
+use crate::chunk::Chunk;
+use crate::chunk::descriptors::SwitchTable;
+use crate::instruction::Instruction;
+use crate::instruction::operands::JumpOffset;
+use crate::instruction::operands::NearJumpOffset;
+use crate::instruction::operands::ShortJumpOffset;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::NearJumpOffset;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-
-pub(crate) fn control_flow_targets(chunk: &Chunk) -> HashSet<usize> {
+#[must_use]
+pub fn control_flow_targets(chunk: &Chunk) -> HashSet<usize> {
     let mut targets = HashSet::new();
     for_each_control_flow_target(chunk, |target| {
         targets.insert(target);
@@ -27,7 +27,7 @@ pub(crate) fn control_flow_targets(chunk: &Chunk) -> HashSet<usize> {
     clippy::too_many_lines,
     reason = "the branch target table stays exhaustive in one match"
 )]
-pub(crate) fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(usize)) {
+pub fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(usize)) {
     for (index, instruction) in chunk.code.iter().enumerate() {
         match instruction {
             Instruction::Jump { offset }
@@ -133,7 +133,7 @@ pub(crate) fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(
     }
 }
 
-pub(crate) fn compact(chunk: &mut Chunk, remove: &[bool]) {
+pub fn compact(chunk: &mut Chunk, remove: &[bool]) {
     let old_code = mem::take(&mut chunk.code);
     let old_spans = mem::take(&mut chunk.spans);
     let mut old_to_new = Vec::with_capacity(old_code.len() + 1);
@@ -158,14 +158,18 @@ pub(crate) fn compact(chunk: &mut Chunk, remove: &[bool]) {
     }
 
     for entry in &mut chunk.catch_table {
-        entry.start = narrow_index(old_to_new[native_index(entry.start)]);
-        entry.end = narrow_index(old_to_new[native_index(entry.end)]);
-        entry.handler = narrow_index(old_to_new[native_index(entry.handler)]);
+        entry.start = u32_index(old_to_new[native_index(entry.start)]);
+        entry.end = u32_index(old_to_new[native_index(entry.end)]);
+        entry.handler = u32_index(old_to_new[native_index(entry.handler)]);
     }
 }
 
 /// Rewrites one instruction's relative targets after an index remap.
-pub(crate) fn rebase_targets(
+///
+/// # Panics
+///
+/// Panics if the remap omits a target or a coalescing offset no longer fits.
+pub fn rebase_targets(
     chunk: &mut Chunk,
     instruction: &mut Instruction,
     old_index: usize,
@@ -277,55 +281,22 @@ pub(crate) fn rebase_targets(
 }
 
 fn relative_target(source: usize, offset: i32) -> usize {
-    // SAFETY: verified bytecode keeps every branch within its chunk.
-    unsafe {
-        unwrap_result_invariant(
-            usize::try_from(wide_index(source) + i64::from(offset)),
-            "a bytecode branch target must be non-negative",
-        )
-    }
+    usize::try_from(wide_index(source) + i64::from(offset))
+        .expect("a bytecode branch target must be non-negative")
 }
 
 fn short_offset(source: usize, target: usize) -> i16 {
-    // SAFETY: removing instructions cannot widen an existing short branch.
-    unsafe {
-        unwrap_result_invariant(
-            i16::try_from(new_offset(source, target)),
-            "compaction cannot widen a short jump beyond its old range",
-        )
-    }
+    i16::try_from(new_offset(source, target)).expect("a short jump offset must fit in i16")
 }
 
 fn new_offset(source: usize, target: usize) -> i32 {
-    // SAFETY: bytecode keeps every jump distance within the i32 range.
-    unsafe {
-        unwrap_result_invariant(
-            i32::try_from(wide_index(target) - wide_index(source)),
-            "bytecode has an in-range jump offset",
-        )
-    }
-}
-
-fn narrow_index(index: usize) -> u32 {
-    // SAFETY: bytecode positions fit in the chunk's 32-bit index space.
-    unsafe {
-        unwrap_result_invariant(
-            u32::try_from(index),
-            "bytecode has a thirty-two-bit instruction index",
-        )
-    }
+    i32::try_from(wide_index(target) - wide_index(source)).expect("a jump offset must fit in i32")
 }
 
 fn native_index(index: u32) -> usize {
-    // SAFETY: supported hosts can address every 32-bit bytecode position.
-    unsafe {
-        unwrap_result_invariant(
-            usize::try_from(index),
-            "bytecode has a host-sized instruction index",
-        )
-    }
+    usize::try_from(index).expect("a bytecode index must fit in usize")
 }
 
 fn wide_index(index: usize) -> i64 {
-    i64::from(narrow_index(index))
+    i64::from(u32_index(index))
 }

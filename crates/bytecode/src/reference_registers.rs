@@ -1,15 +1,16 @@
 //! Conservative ownership metadata for fast frame teardown.
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::Register;
+use crate::REFERENCE_REGISTER_LIMIT;
+use crate::chunk::Chunk;
+use crate::chunk::descriptors::Literal;
+use crate::instruction::Instruction;
+use crate::instruction::operands::ArrayValueMode;
+use crate::instruction::operands::Register;
 
 /// Bitmask of registers that may own a reference-counted value; a full mask
 /// means use ordinary teardown for wider frames.
-pub(crate) fn mask(chunk: &Chunk) -> u64 {
+#[must_use]
+pub fn mask(chunk: &Chunk) -> u64 {
     mask_with_classification(chunk, |_| true)
 }
 
@@ -17,7 +18,7 @@ pub(crate) fn mask(chunk: &Chunk) -> u64 {
     clippy::too_many_lines,
     reason = "the exhaustive instruction classification stays visible in one match"
 )]
-pub(crate) fn mask_with_classification(
+pub fn mask_with_classification(
     chunk: &Chunk,
     mut result_may_reference: impl FnMut(Instruction) -> bool,
 ) -> u64 {

@@ -3,6 +3,13 @@
 use std::ptr::NonNull;
 use std::rc::Rc;
 
+use whim_bytecode::aliases::expand_aliases_using as expand_aliases;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::ConstantInitializer;
+use whim_bytecode::unit::literal_value;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::heap::handle::ManagedRef;
@@ -11,21 +18,14 @@ use whim_value::object::ClassId;
 use whim_value::object::InstanceObject;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::bytecode::aliases::expand_aliases_using as expand_aliases;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::unit::literal_value;
 use crate::classes::PropertyDefault;
 use crate::engine::builtins::BuiltInCallable;
 use crate::vm::CachedInstantiationEnvironment;
-use crate::vm::Chunk;
-use crate::vm::IcDescriptor;
 use crate::vm::InstantiationWays;
 use crate::vm::MethodBodyKind;
 use crate::vm::MethodContext;
 use crate::vm::SymbolKind;
 use crate::vm::Throw;
-use crate::vm::TypeDescriptor;
 use crate::vm::UserCallContext;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;

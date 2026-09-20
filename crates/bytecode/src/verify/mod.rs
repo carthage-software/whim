@@ -1,43 +1,40 @@
 //! Structural validation of chunks and compiled units.
 
-use whim_base::unwrap_result_invariant;
+use whim_base::u32_index;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::CallDescriptor;
-use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
-use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
-use crate::bytecode::chunk::descriptors::IntStepLoopDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
-use crate::bytecode::chunk::descriptors::PresetSlot;
-use crate::bytecode::chunk::descriptors::PropertyInitializationDescriptor;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CallDescriptorIndex;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::FloatPairUpdateDescriptorIndex;
-use crate::bytecode::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::IntStepLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::PreparedIntLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::SwitchTableIndex;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::verify::instruction::verify_instruction;
+use crate::chunk::Chunk;
+use crate::chunk::descriptors::CallDescriptor;
+use crate::chunk::descriptors::FloatPairUpdateDescriptor;
+use crate::chunk::descriptors::FloatSquaresSumBranchDescriptor;
+use crate::chunk::descriptors::IntStepLoopDescriptor;
+use crate::chunk::descriptors::Literal;
+use crate::chunk::descriptors::PreparedIntLoopDescriptor;
+use crate::chunk::descriptors::PresetSlot;
+use crate::chunk::descriptors::PropertyInitializationDescriptor;
+use crate::chunk::descriptors::SwitchTable;
+use crate::instruction::Instruction;
+use crate::instruction::operands::CallDescriptorIndex;
+use crate::instruction::operands::ConstantIndex;
+use crate::instruction::operands::DescriptorIndex;
+use crate::instruction::operands::FloatPairUpdateDescriptorIndex;
+use crate::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
+use crate::instruction::operands::IcSlot;
+use crate::instruction::operands::IntStepLoopDescriptorIndex;
+use crate::instruction::operands::JumpOffset;
+use crate::instruction::operands::PreparedIntLoopDescriptorIndex;
+use crate::instruction::operands::PropertyInitializationDescriptorIndex;
+use crate::instruction::operands::Register;
+use crate::instruction::operands::SwitchTableIndex;
+use crate::unit::CompiledClassLike;
+use crate::unit::CompiledFunction;
+use crate::unit::CompiledUnit;
+use crate::unit::ConstantInitializer;
+use crate::verify::instruction::verify_instruction;
 
 mod instruction;
 
-#[cfg(test)]
-mod fuzz;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum VerifyError {
+pub enum VerifyError {
     LocalRegistersOutOfRange {
         locals: u16,
         registers: u16,
@@ -153,7 +150,14 @@ pub(crate) enum VerifyError {
     },
 }
 
-pub(crate) fn verify(chunk: &Chunk) -> Result<(), VerifyError> {
+/// # Errors
+///
+/// Returns the first invalid operand, control-flow target, or metadata entry.
+///
+/// # Panics
+///
+/// Panics if the instruction count exceeds [`u32::MAX`].
+pub fn verify(chunk: &Chunk) -> Result<(), VerifyError> {
     if chunk.local_register_count > chunk.register_count {
         return Err(VerifyError::LocalRegistersOutOfRange {
             locals: chunk.local_register_count,
@@ -196,13 +200,7 @@ pub(crate) fn verify(chunk: &Chunk) -> Result<(), VerifyError> {
     }
 
     for (index, instruction) in chunk.code.iter().enumerate() {
-        // SAFETY: a chunk's instruction count never exceeds u32::MAX, so the index fits u32.
-        let at = unsafe {
-            unwrap_result_invariant(
-                u32::try_from(index),
-                "whim-runtime: a chunk cannot exceed u32::MAX instructions",
-            )
-        };
+        let at = u32_index(index);
 
         verify_instruction(chunk, at, *instruction)?;
     }
@@ -234,13 +232,7 @@ pub(crate) fn verify(chunk: &Chunk) -> Result<(), VerifyError> {
 }
 
 fn verify_catch_table(chunk: &Chunk) -> Result<(), VerifyError> {
-    // SAFETY: a chunk's instruction count never exceeds u32::MAX.
-    let length = unsafe {
-        unwrap_result_invariant(
-            u32::try_from(chunk.code.len()),
-            "whim-runtime: a chunk cannot exceed u32::MAX instructions",
-        )
-    };
+    let length = u32_index(chunk.code.len());
     for (entry_index, entry) in chunk.catch_table.iter().enumerate() {
         if entry.start > entry.end || entry.end > length {
             return Err(VerifyError::CatchRangeInvalid {
@@ -285,7 +277,10 @@ fn verify_catch_table(chunk: &Chunk) -> Result<(), VerifyError> {
     Ok(())
 }
 
-pub(crate) fn verify_unit(unit: &CompiledUnit) -> Result<(), VerifyError> {
+/// # Errors
+///
+/// Returns the first verification error in the unit's chunks and initializers.
+pub fn verify_unit(unit: &CompiledUnit) -> Result<(), VerifyError> {
     for file in &unit.files {
         for attribute in &file.attributes {
             for argument in &attribute.arguments {

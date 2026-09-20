@@ -1,9 +1,9 @@
 //! Canonical rendering of bytecode type descriptors.
 
-use crate::bytecode::chunk::descriptors::ShapeKey;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
+use crate::chunk::descriptors::ShapeKey;
+use crate::chunk::descriptors::TypeDescriptor;
 
-pub(crate) fn type_descriptor(
+pub fn type_descriptor(
     descriptor: &TypeDescriptor,
     render_float: &impl Fn(f64) -> String,
 ) -> String {

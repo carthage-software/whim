@@ -2,6 +2,9 @@
 
 use std::ptr;
 
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
+use whim_bytecode::unit::literal_value;
 use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::CallTarget;
@@ -12,7 +15,6 @@ use whim_value::object::ClassId;
 use whim_value::object::InstanceObject;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::vm::call::BuiltInCallable;
 use crate::vm::call::Frame;
 use crate::vm::call::FrameFlags;
@@ -24,10 +26,8 @@ use crate::vm::call::OptionalFuncId;
 use crate::vm::call::UserCallContext;
 use crate::vm::call::VirtualMachine;
 use crate::vm::call::VirtualMachineControl;
-use crate::vm::call::check_trivial_descriptor;
 use crate::vm::call::frame_argument_count;
 use crate::vm::call::frame_stack_floor_offset;
-use crate::vm::call::literal_value;
 use crate::vm::call::live_parameter_mask;
 use crate::vm::call::unreachable_invariant;
 

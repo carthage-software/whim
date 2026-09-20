@@ -1,17 +1,17 @@
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::CatchEntry;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::verify::verify;
 use whim_span::Span;
 use whim_value::heap::Heap;
 
 use super::optimize_chunk;
 use super::optimize_unit;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::CatchEntry;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Count;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::verify::verify;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::analysis::Analysis;

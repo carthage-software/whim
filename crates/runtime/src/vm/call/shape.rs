@@ -4,6 +4,9 @@
 use std::mem;
 use std::rc::Rc;
 
+use whim_bytecode::chunk::descriptors::CallDescriptor;
+use whim_bytecode::chunk::descriptors::PresetDescriptor;
+use whim_bytecode::chunk::descriptors::PresetSlot;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::atom::Atom;
@@ -20,12 +23,9 @@ use crate::vm::call::ArgumentSlot;
 use crate::vm::call::BuiltInCallable;
 use crate::vm::call::CacheEntry;
 use crate::vm::call::CachedBoundCallable;
-use crate::vm::call::CallDescriptor;
 use crate::vm::call::CalleeShape;
 use crate::vm::call::MethodBodyKind;
 use crate::vm::call::MethodContext;
-use crate::vm::call::PresetDescriptor;
-use crate::vm::call::PresetSlot;
 use crate::vm::call::VirtualMachine;
 use crate::vm::call::VirtualMachineControl;
 use crate::vm::call::built_in_type_parameters;

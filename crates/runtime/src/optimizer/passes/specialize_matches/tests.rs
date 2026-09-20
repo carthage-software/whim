@@ -1,20 +1,20 @@
 use std::rc::Rc;
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::SwitchTable;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::verify::verify;
 use whim_span::Span;
 use whim_value::heap::Heap;
 
 use super::canonicalize_string_chains;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Comparison;
-use crate::bytecode::instruction::operands::ImmediateInt;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::verify::verify;
 use crate::engine::Engine;
 use crate::engine::EngineConfiguration;
 use crate::optimizer::passes::prune_unreachable;

@@ -1,23 +1,24 @@
 //! The per-instruction fact transfer function.
 
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::Comparison;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::Register;
+
 use crate::optimizer::type_flow::ALL;
 use crate::optimizer::type_flow::BOOL;
 use crate::optimizer::type_flow::CALLABLE;
 use crate::optimizer::type_flow::Cell;
-use crate::optimizer::type_flow::Chunk;
 use crate::optimizer::type_flow::DICTIONARY;
 use crate::optimizer::type_flow::FLOAT;
 use crate::optimizer::type_flow::Fact;
 use crate::optimizer::type_flow::INT;
-use crate::optimizer::type_flow::Instruction;
-use crate::optimizer::type_flow::Literal;
 use crate::optimizer::type_flow::NO_ORIGIN;
 use crate::optimizer::type_flow::NULL;
 use crate::optimizer::type_flow::NUMERIC;
 use crate::optimizer::type_flow::OBJECT;
-use crate::optimizer::type_flow::Register;
 use crate::optimizer::type_flow::STRING;
 use crate::optimizer::type_flow::THIS_ORIGIN;
 use crate::optimizer::type_flow::TUPLE;

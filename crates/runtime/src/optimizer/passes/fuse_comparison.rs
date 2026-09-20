@@ -1,15 +1,16 @@
 //! Fusion of comparison results consumed only by a conditional jump.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Comparison;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::rewrite::control_flow_targets;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::liveness::register_is_dead_after_removals;

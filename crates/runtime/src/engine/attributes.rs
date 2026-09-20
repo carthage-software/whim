@@ -1,21 +1,21 @@
 //! Validating attribute applications.
 
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
+use whim_bytecode::unit::ALWAYS_INLINE_ATTRIBUTE;
+use whim_bytecode::unit::COLD_ATTRIBUTE;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::FRAMELESS_ATTRIBUTE;
+use whim_bytecode::unit::MUST_USE_ATTRIBUTE;
+use whim_bytecode::unit::NEVER_INLINE_ATTRIBUTE;
+use whim_bytecode::unit::TRACK_CALLER_ATTRIBUTE;
+use whim_bytecode::unit::frameless_literal;
+use whim_bytecode::unit::literal_value;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
-use crate::bytecode::unit::ALWAYS_INLINE_ATTRIBUTE;
-use crate::bytecode::unit::COLD_ATTRIBUTE;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::FRAMELESS_ATTRIBUTE;
-use crate::bytecode::unit::MUST_USE_ATTRIBUTE;
-use crate::bytecode::unit::NEVER_INLINE_ATTRIBUTE;
-use crate::bytecode::unit::TRACK_CALLER_ATTRIBUTE;
-use crate::bytecode::unit::frameless_literal;
-use crate::bytecode::unit::literal_value;
-use crate::engine::CompiledUnit;
 use crate::engine::Engine;
 use crate::engine::MethodBodyKind;
 use crate::engine::Rc;

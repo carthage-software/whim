@@ -10,6 +10,14 @@ use hashbrown::HashMap;
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::MAIN_FRAME_REGISTER_HEADROOM;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::must_use_note;
 use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::CallTarget;
@@ -22,19 +30,6 @@ use whim_value::object::InstanceObject;
 use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::throw::Throw;
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::MAIN_FRAME_REGISTER_HEADROOM;
-use crate::bytecode::instruction::operands::AsMode;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::word::InstructionKind;
-use crate::bytecode::instruction::word::InstructionWord;
-use crate::bytecode::unit::must_use_note;
 use crate::classes::MethodBodyKind;
 use crate::classes::is_instance_of;
 use crate::classes::visibility_allows;
@@ -156,6 +151,9 @@ pub(crate) mod refine;
 pub(crate) mod resolve;
 pub(crate) mod types;
 pub(crate) mod units;
+
+#[cfg(test)]
+mod verification_tests;
 
 pub(crate) enum VirtualMachineControl {
     Throw(Value),

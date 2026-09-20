@@ -1,20 +1,20 @@
 //! Cheap specialization from exact kinds visible in freshly lowered bytecode.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::for_each_control_flow_target;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::candidates::CandidateSet;
-use crate::optimizer::cfg::for_each_control_flow_target;
 use crate::optimizer::operands::for_each_write_register;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

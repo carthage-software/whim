@@ -4,21 +4,20 @@
 mod tests;
 
 use hashbrown::HashMap;
-
 use whim_base::unreachable_invariant;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::LiteralKey;
+use whim_bytecode::chunk::descriptors::SwitchTable;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::literal_key;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::DescriptorIndex;
+use whim_bytecode::instruction::operands::SwitchTableIndex;
+use whim_bytecode::rewrite::compact;
+use whim_bytecode::unit::CompiledUnit;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::LiteralKey;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::chunk::descriptors::literal_key;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::SwitchTableIndex;
-use crate::bytecode::rewrite::compact;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::analysis::Analysis;
 use crate::optimizer::analysis::AnalyzedChunk;
 use crate::optimizer::passes::FunctionLocation;

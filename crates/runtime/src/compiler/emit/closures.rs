@@ -1,5 +1,14 @@
 //! Closures and the bodies synthesized for them.
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledTypeParameter;
 use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::function::Closure;
 use whim_syn::cst::function::ClosureBody;
@@ -7,12 +16,6 @@ use whim_syn::cst::function::ParameterList;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeParameterList;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledTypeParameter;
 use crate::compiler::declarations::class_likes::validate_variance_use;
 use crate::compiler::declarations::functions::DeclarationContext;
 use crate::compiler::declarations::functions::compile_attributes;
@@ -26,11 +29,8 @@ use crate::compiler::emit::BodyCompiler;
 use crate::compiler::emit::BodyShape;
 use crate::compiler::emit::CompileError;
 use crate::compiler::emit::CompileErrorKind;
-use crate::compiler::emit::Count;
 use crate::compiler::emit::Expression;
 use crate::compiler::emit::HasSpan;
-use crate::compiler::emit::Instruction;
-use crate::compiler::emit::Register;
 use crate::compiler::emit::ReturnKind;
 use crate::compiler::emit::Scope;
 use crate::compiler::emit::Span;

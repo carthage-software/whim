@@ -3,10 +3,9 @@
 use std::mem;
 
 use whim_base::unwrap_option_invariant;
-
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::word::InstructionKind;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::word::InstructionKind;
 
 macro_rules! instructions {
     ($($name:ident)|+ ; $fields:tt) => {

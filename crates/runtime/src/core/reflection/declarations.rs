@@ -1,5 +1,13 @@
 //! Symbol, member, callable, and generic declaration reflection.
 
+use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
+use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledProperty;
+use whim_bytecode::unit::Variance;
+use whim_bytecode::unit::Visibility;
 use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::FuncId;
@@ -8,14 +16,6 @@ use whim_value::object::ClassId;
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::bytecode::chunk::descriptors::FunctionTypeDescriptor;
-use crate::bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledProperty;
-use crate::bytecode::unit::Variance;
-use crate::bytecode::unit::Visibility;
 use crate::classes::MethodEntry;
 use crate::classes::PropertyDefault;
 use crate::classes::PropertyInfo;

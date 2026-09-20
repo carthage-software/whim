@@ -1,12 +1,12 @@
+use whim_bytecode::chunk::descriptors::SwitchTable;
+use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
+use whim_bytecode::chunk::descriptors::string_switch_lookup;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::Register;
 use whim_value::Value;
 use whim_value::tuple::TupleObject;
 
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
-use crate::bytecode::chunk::descriptors::string_switch_lookup;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Count;
-use crate::bytecode::instruction::operands::Register;
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::TypeFlow;

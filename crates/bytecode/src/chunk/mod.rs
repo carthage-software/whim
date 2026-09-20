@@ -5,31 +5,30 @@ use hashbrown::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
-use whim_base::unreachable_invariant;
-use whim_base::unwrap_result_invariant;
+use whim_base::u32_index;
 use whim_span::Span;
 use whim_value::heap::Heap;
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::CallDescriptorIndex;
-use crate::bytecode::instruction::operands::Comparison;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::FloatPairUpdateDescriptorIndex;
-use crate::bytecode::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::IntStepLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::PreparedIntLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::PresetDescriptorIndex;
-use crate::bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::SwitchTableIndex;
-use crate::bytecode::reference_registers;
+use crate::REFERENCE_REGISTER_LIMIT;
+use crate::instruction::Instruction;
+use crate::instruction::operands::CallDescriptorIndex;
+use crate::instruction::operands::Comparison;
+use crate::instruction::operands::ConstantIndex;
+use crate::instruction::operands::DescriptorIndex;
+use crate::instruction::operands::FloatPairUpdateDescriptorIndex;
+use crate::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
+use crate::instruction::operands::IcSlot;
+use crate::instruction::operands::IntStepLoopDescriptorIndex;
+use crate::instruction::operands::JumpOffset;
+use crate::instruction::operands::PreparedIntLoopDescriptorIndex;
+use crate::instruction::operands::PresetDescriptorIndex;
+use crate::instruction::operands::PropertyInitializationDescriptorIndex;
+use crate::instruction::operands::Register;
+use crate::instruction::operands::SwitchTableIndex;
+use crate::reference_registers;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) enum SideTable {
+pub enum SideTable {
     Constants,
     TypeDescriptors,
     CallDescriptors,
@@ -44,7 +43,7 @@ impl SideTable {
     /// What this table counts, phrased for a diagnostic: "a function may
     /// contain at most 65536 *distinct constants*".
     #[must_use]
-    pub(crate) const fn counts(self) -> &'static str {
+    pub const fn counts(self) -> &'static str {
         match self {
             Self::Constants => "distinct constants",
             Self::TypeDescriptors => "type annotations",
@@ -58,26 +57,26 @@ impl SideTable {
     }
 }
 
-pub(crate) mod descriptors;
+pub mod descriptors;
 
-use crate::bytecode::chunk::descriptors::CallDescriptor;
-use crate::bytecode::chunk::descriptors::CatchEntry;
-use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
-use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::chunk::descriptors::IntStepLoopDescriptor;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
-use crate::bytecode::chunk::descriptors::PresetDescriptor;
-use crate::bytecode::chunk::descriptors::PropertyInitializationDescriptor;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::chunk::descriptors::literal_key;
+use crate::chunk::descriptors::CallDescriptor;
+use crate::chunk::descriptors::CatchEntry;
+use crate::chunk::descriptors::FloatPairUpdateDescriptor;
+use crate::chunk::descriptors::FloatSquaresSumBranchDescriptor;
+use crate::chunk::descriptors::IcDescriptor;
+use crate::chunk::descriptors::IntStepLoopDescriptor;
+use crate::chunk::descriptors::Literal;
+use crate::chunk::descriptors::PreparedIntLoopDescriptor;
+use crate::chunk::descriptors::PresetDescriptor;
+use crate::chunk::descriptors::PropertyInitializationDescriptor;
+use crate::chunk::descriptors::SwitchTable;
+use crate::chunk::descriptors::TypeDescriptor;
+use crate::chunk::descriptors::literal_key;
 
-pub(crate) const SIDE_TABLE_CAPACITY: usize = u16::MAX as usize + 1;
+pub const SIDE_TABLE_CAPACITY: usize = u16::MAX as usize + 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct SideTableFull {
+pub struct SideTableFull {
     pub table: SideTable,
 }
 
@@ -87,7 +86,7 @@ fn next_index(length: usize, table: SideTable) -> Result<u16, SideTableFull> {
 
 #[derive(Debug, Clone, Default, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) struct Chunk {
+pub struct Chunk {
     #[seeded(with(serde_seeded::unseeded))]
     pub code: Vec<Instruction>,
     /// The source span of each instruction, parallel to `code`.
@@ -107,15 +106,15 @@ pub(crate) struct Chunk {
     /// chunk's cache slot count.
     pub ic_descriptors: Vec<IcDescriptor>,
     #[seeded(with(serde_seeded::unseeded))]
-    pub(crate) prepared_int_loop_descriptors: Vec<PreparedIntLoopDescriptor>,
+    pub prepared_int_loop_descriptors: Vec<PreparedIntLoopDescriptor>,
     #[seeded(with(serde_seeded::unseeded))]
-    pub(crate) int_step_loop_descriptors: Vec<IntStepLoopDescriptor>,
+    pub int_step_loop_descriptors: Vec<IntStepLoopDescriptor>,
     #[seeded(with(serde_seeded::unseeded))]
-    pub(crate) float_squares_sum_branch_descriptors: Vec<FloatSquaresSumBranchDescriptor>,
+    pub float_squares_sum_branch_descriptors: Vec<FloatSquaresSumBranchDescriptor>,
     #[seeded(with(serde_seeded::unseeded))]
-    pub(crate) float_pair_update_descriptors: Vec<FloatPairUpdateDescriptor>,
+    pub float_pair_update_descriptors: Vec<FloatPairUpdateDescriptor>,
     #[seeded(with(serde_seeded::unseeded))]
-    pub(crate) property_initialization_descriptors: Vec<PropertyInitializationDescriptor>,
+    pub property_initialization_descriptors: Vec<PropertyInitializationDescriptor>,
     /// The leading registers reserved for named locals; they have
     /// source-level lifetime and are never reused for compiler temporaries.
     #[seeded(with(serde_seeded::unseeded))]
@@ -141,7 +140,7 @@ pub(crate) struct Chunk {
     #[seeded(with(serde_seeded::unseeded))]
     pub reference_register_mask: u64,
     #[seeded(with(serde_seeded::unseeded))]
-    pub(crate) vec_append_register_mask: u64,
+    pub vec_append_register_mask: u64,
     #[serde(skip)]
     #[seeded(skip)]
     constant_index: Option<HashMap<descriptors::LiteralKey, ConstantIndex>>,
@@ -149,12 +148,12 @@ pub(crate) struct Chunk {
 
 impl Chunk {
     #[must_use]
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
     #[must_use]
-    pub(crate) fn clone_tail(&self, start: usize) -> Self {
+    pub fn clone_tail(&self, start: usize) -> Self {
         debug_assert!(start <= self.code.len());
         debug_assert!(self.catch_table.is_empty());
 
@@ -186,7 +185,7 @@ impl Chunk {
     }
 
     #[must_use]
-    pub(crate) fn with_replaced_tail(&self, start: usize, mut tail: Self) -> Self {
+    pub fn with_replaced_tail(&self, start: usize, mut tail: Self) -> Self {
         let mut code = Vec::with_capacity(start + tail.code.len());
         code.extend_from_slice(&self.code[..start]);
         code.append(&mut tail.code);
@@ -203,7 +202,7 @@ impl Chunk {
 
     /// Recomputes the conservative set of registers that may own a
     /// reference-counted value.
-    pub(crate) fn refresh_runtime_metadata(&mut self) {
+    pub fn refresh_runtime_metadata(&mut self) {
         self.reference_register_mask = reference_registers::mask(self);
         self.vec_append_register_mask = self.code.iter().fold(0, |mask, instruction| {
             if let Instruction::VecAppend { container, .. } = instruction
@@ -216,14 +215,11 @@ impl Chunk {
         });
     }
 
-    pub(crate) fn emit(&mut self, instruction: Instruction, span: Span) -> u32 {
-        // SAFETY: a chunk's instruction count never exceeds u32::MAX, so the index fits u32.
-        let index = unsafe {
-            unwrap_result_invariant(
-                u32::try_from(self.code.len()),
-                "whim-runtime: a chunk cannot exceed u32::MAX instructions",
-            )
-        };
+    /// # Panics
+    ///
+    /// Panics if the instruction index exceeds [`u32::MAX`].
+    pub fn emit(&mut self, instruction: Instruction, span: Span) -> u32 {
+        let index = u32_index(self.code.len());
         self.code.push(instruction);
         self.spans.push(span);
         index
@@ -231,14 +227,13 @@ impl Chunk {
 
     /// Rewrites the jump at `at` to land on instruction `target`, computing
     /// the offset from the jump's own index.
-    pub(crate) fn patch_jump(&mut self, at: u32, target: u32) {
-        // SAFETY: a jump offset is bounded by the chunk's own length and stays within i32.
-        let relative = unsafe {
-            unwrap_result_invariant(
-                i32::try_from(i64::from(target) - i64::from(at)),
-                "whim-runtime: a jump offset exceeds the i32 range",
-            )
-        };
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at` does not name a patchable jump or the offset exceeds `i32`.
+    pub fn patch_jump(&mut self, at: u32, target: u32) {
+        let relative = i32::try_from(i64::from(target) - i64::from(at))
+            .expect("a jump offset must fit in i32");
         match &mut self.code[at as usize] {
             Instruction::Jump { offset }
             | Instruction::JumpIfFalse { offset, .. }
@@ -246,27 +241,26 @@ impl Chunk {
             | Instruction::JumpIfNull { offset, .. }
             | Instruction::JumpIfNotNull { offset, .. }
             | Instruction::FillDefault { offset, .. } => *offset = JumpOffset::new(relative),
-            // SAFETY: the surrounding invariant makes this path unreachable.
-            _ => unsafe { unreachable_invariant("only a jump instruction can be patched") },
+            _ => panic!("only a jump instruction can be patched"),
         }
     }
 
-    pub(crate) fn add_constant(
-        &mut self,
-        literal: Literal,
-    ) -> Result<ConstantIndex, SideTableFull> {
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if a new constant would exceed the table's capacity.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the constant table already exceeds [`SIDE_TABLE_CAPACITY`].
+    pub fn add_constant(&mut self, literal: Literal) -> Result<ConstantIndex, SideTableFull> {
         let key = literal_key(&literal);
         let index = self.constant_index.get_or_insert_with(|| {
             self.constants
                 .iter()
                 .enumerate()
                 .map(|(position, literal)| {
-                    let index = u16::try_from(position).unwrap_or_else(|_| {
-                        // SAFETY: the constant side table cannot exceed its u16 index space.
-                        unsafe {
-                            unreachable_invariant("a pooled constant has a sixteen-bit index")
-                        }
-                    });
+                    let index = u16::try_from(position)
+                        .expect("a pooled constant must have a sixteen-bit index");
                     (literal_key(literal), ConstantIndex::new(index))
                 })
                 .collect()
@@ -280,10 +274,11 @@ impl Chunk {
 
     /// Appends `literal` without scanning for a duplicate, for callers that
     /// keep their own [`descriptors::LiteralKey`] index over the pool.
-    pub(crate) fn push_constant(
-        &mut self,
-        literal: Literal,
-    ) -> Result<ConstantIndex, SideTableFull> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the constant table is full.
+    pub fn push_constant(&mut self, literal: Literal) -> Result<ConstantIndex, SideTableFull> {
         let index = next_index(self.constants.len(), SideTable::Constants)?;
         let key = self.constant_index.as_ref().map(|_| literal_key(&literal));
         if let Literal::String(atom) = &literal {
@@ -298,7 +293,10 @@ impl Chunk {
         Ok(index)
     }
 
-    pub(crate) fn add_type_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the type descriptor table is full.
+    pub fn add_type_descriptor(
         &mut self,
         descriptor: TypeDescriptor,
     ) -> Result<DescriptorIndex, SideTableFull> {
@@ -308,7 +306,10 @@ impl Chunk {
         Ok(DescriptorIndex::new(index))
     }
 
-    pub(crate) fn add_call_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the call descriptor table is full.
+    pub fn add_call_descriptor(
         &mut self,
         descriptor: CallDescriptor,
     ) -> Result<CallDescriptorIndex, SideTableFull> {
@@ -318,7 +319,10 @@ impl Chunk {
         Ok(CallDescriptorIndex::new(index))
     }
 
-    pub(crate) fn add_prepared_int_loop_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the prepared integer loop table is full.
+    pub fn add_prepared_int_loop_descriptor(
         &mut self,
         descriptor: PreparedIntLoopDescriptor,
     ) -> Result<PreparedIntLoopDescriptorIndex, SideTableFull> {
@@ -331,7 +335,10 @@ impl Chunk {
         Ok(PreparedIntLoopDescriptorIndex::new(index))
     }
 
-    pub(crate) fn add_int_step_loop_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the integer step loop table is full.
+    pub fn add_int_step_loop_descriptor(
         &mut self,
         descriptor: IntStepLoopDescriptor,
     ) -> Result<IntStepLoopDescriptorIndex, SideTableFull> {
@@ -344,7 +351,10 @@ impl Chunk {
         Ok(IntStepLoopDescriptorIndex::new(index))
     }
 
-    pub(crate) fn add_float_squares_sum_branch_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the float squares sum branch table is full.
+    pub fn add_float_squares_sum_branch_descriptor(
         &mut self,
         descriptor: FloatSquaresSumBranchDescriptor,
     ) -> Result<FloatSquaresSumBranchDescriptorIndex, SideTableFull> {
@@ -358,7 +368,10 @@ impl Chunk {
         Ok(FloatSquaresSumBranchDescriptorIndex::new(index))
     }
 
-    pub(crate) fn add_float_pair_update_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the float pair update table is full.
+    pub fn add_float_pair_update_descriptor(
         &mut self,
         descriptor: FloatPairUpdateDescriptor,
     ) -> Result<FloatPairUpdateDescriptorIndex, SideTableFull> {
@@ -371,7 +384,10 @@ impl Chunk {
         Ok(FloatPairUpdateDescriptorIndex::new(index))
     }
 
-    pub(crate) fn add_property_initialization_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the property initialization table is full.
+    pub fn add_property_initialization_descriptor(
         &mut self,
         descriptor: PropertyInitializationDescriptor,
     ) -> Result<PropertyInitializationDescriptorIndex, SideTableFull> {
@@ -385,7 +401,7 @@ impl Chunk {
     }
 
     #[must_use]
-    pub(crate) fn prepared_int_loop_descriptor(
+    pub fn prepared_int_loop_descriptor(
         &self,
         index: PreparedIntLoopDescriptorIndex,
     ) -> &PreparedIntLoopDescriptor {
@@ -393,7 +409,7 @@ impl Chunk {
     }
 
     #[must_use]
-    pub(crate) fn int_step_loop_descriptor(
+    pub fn int_step_loop_descriptor(
         &self,
         index: IntStepLoopDescriptorIndex,
     ) -> &IntStepLoopDescriptor {
@@ -401,7 +417,7 @@ impl Chunk {
     }
 
     #[must_use]
-    pub(crate) fn float_squares_sum_branch_descriptor(
+    pub fn float_squares_sum_branch_descriptor(
         &self,
         index: FloatSquaresSumBranchDescriptorIndex,
     ) -> &FloatSquaresSumBranchDescriptor {
@@ -409,7 +425,7 @@ impl Chunk {
     }
 
     #[must_use]
-    pub(crate) fn float_pair_update_descriptor(
+    pub fn float_pair_update_descriptor(
         &self,
         index: FloatPairUpdateDescriptorIndex,
     ) -> &FloatPairUpdateDescriptor {
@@ -417,14 +433,17 @@ impl Chunk {
     }
 
     #[must_use]
-    pub(crate) fn property_initialization_descriptor(
+    pub fn property_initialization_descriptor(
         &self,
         index: PropertyInitializationDescriptorIndex,
     ) -> &PropertyInitializationDescriptor {
         &self.property_initialization_descriptors[usize::from(index.index())]
     }
 
-    pub(crate) fn add_switch_table(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the switch table pool is full.
+    pub fn add_switch_table(
         &mut self,
         table: SwitchTable,
     ) -> Result<SwitchTableIndex, SideTableFull> {
@@ -434,7 +453,10 @@ impl Chunk {
         Ok(SwitchTableIndex::new(index))
     }
 
-    pub(crate) fn add_preset_descriptor(
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the preset descriptor table is full.
+    pub fn add_preset_descriptor(
         &mut self,
         descriptor: PresetDescriptor,
     ) -> Result<PresetDescriptorIndex, SideTableFull> {
@@ -446,10 +468,11 @@ impl Chunk {
 
     /// Appends an inline-cache descriptor, allocating the site's slot, and
     /// returns it.
-    pub(crate) fn add_ic_descriptor(
-        &mut self,
-        descriptor: IcDescriptor,
-    ) -> Result<IcSlot, SideTableFull> {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SideTableFull`] if the inline cache descriptor table is full.
+    pub fn add_ic_descriptor(&mut self, descriptor: IcDescriptor) -> Result<IcSlot, SideTableFull> {
         let index = next_index(self.ic_descriptors.len(), SideTable::InlineCaches)?;
         self.ic_descriptors.push(descriptor);
 

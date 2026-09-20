@@ -2,6 +2,10 @@
 
 use hashbrown::HashSet;
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
 use whim_value::atom::Atom;
 use whim_value::heap::Heap;
 use whim_value::ops::compare_int_float;
@@ -9,12 +13,8 @@ use whim_value::ops::compare_int_float;
 use crate::optimizer::type_flow::BytecodeComparison;
 use crate::optimizer::type_flow::ConstantValue;
 use crate::optimizer::type_flow::Fact;
-use crate::optimizer::type_flow::Instruction;
-use crate::optimizer::type_flow::Literal;
 use crate::optimizer::type_flow::NO_ORIGIN;
 use crate::optimizer::type_flow::Ordering;
-use crate::optimizer::type_flow::Register;
-use crate::optimizer::type_flow::TypeDescriptor;
 use crate::optimizer::type_flow::TypeFlow;
 use crate::optimizer::type_flow::append_constant_text;
 use crate::optimizer::type_flow::instruction_index;

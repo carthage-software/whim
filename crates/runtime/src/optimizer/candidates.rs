@@ -1,7 +1,8 @@
 //! Cheap discovery of the analyses and rewrites a chunk can use.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+
 use crate::optimizer::OptimizationConfiguration;
 
 /// The type-flow consumers that have at least one candidate in a chunk.
@@ -349,8 +350,9 @@ fn instruction_may_be_a_dead_store(instruction: Instruction) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::bytecode::instruction::Instruction;
-    use crate::bytecode::instruction::operands::Register;
+    use whim_bytecode::instruction::Instruction;
+    use whim_bytecode::instruction::operands::Register;
+
     use crate::optimizer::OptimizationConfiguration;
     use crate::optimizer::candidates::CandidateSet;
     use crate::optimizer::candidates::instruction_candidates;

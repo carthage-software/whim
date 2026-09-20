@@ -1,19 +1,19 @@
 //! Elision of constructor dispatch for exact classes without constructors.
 
 use hashbrown::HashSet;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::ConstantInitializer;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::ConstantInitializer;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::liveness::register_is_dead_after;
 use crate::optimizer::passes::compact_removed_instructions;
 

@@ -1,5 +1,9 @@
 //! Function and static-method call compilation.
 
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::call::FunctionCall;
 use whim_syn::cst::call::StaticMethodCall;
@@ -12,13 +16,9 @@ use crate::compiler::emit::calls::Callee;
 use crate::compiler::emit::calls::CalleeSource;
 use crate::compiler::emit::calls::ClassReference;
 use crate::compiler::emit::calls::CompileError;
-use crate::compiler::emit::calls::Count;
 use crate::compiler::emit::calls::Expression;
 use crate::compiler::emit::calls::HasSpan;
-use crate::compiler::emit::calls::IcDescriptor;
-use crate::compiler::emit::calls::Register;
 use crate::compiler::emit::calls::Scope;
-use crate::compiler::emit::calls::TypeDescriptor;
 use crate::compiler::emit::calls::ValueUse;
 use crate::compiler::emit::calls::argument_gate;
 use crate::compiler::emit::calls::call_named_instruction;

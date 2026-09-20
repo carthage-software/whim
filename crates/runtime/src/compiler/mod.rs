@@ -6,14 +6,14 @@
     reason = "the private compiler module exposes one crate-wide boundary"
 )]
 
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::unit::CompiledBuiltInFunction;
+use whim_bytecode::unit::CompiledFile;
+use whim_bytecode::unit::CompiledUnit;
 use whim_span::HasSpan;
 use whim_syn::cst::Program;
 use whim_value::heap::Heap;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::unit::CompiledBuiltInFunction;
-use crate::bytecode::unit::CompiledFile;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::optimize_unit;
 use crate::symbols::line_starts_of;

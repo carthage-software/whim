@@ -3,6 +3,8 @@
 use std::rc::Rc;
 use std::slice;
 
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledAttribute;
 use whim_value::Value;
 use whim_value::object::ClassId;
 
@@ -10,8 +12,6 @@ use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::spec::TypeSpec;
 use crate::builtin::throw::Throw;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledAttribute;
 use crate::core::reflection::Operation;
 use crate::core::reflection::metadata;
 use crate::core::reflection::model::DeclarationKey;

@@ -4,6 +4,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
+use whim_base::u32_index;
 use whim_base::unreachable_invariant;
 use whim_value::Value;
 use whim_value::atom::Atom;
@@ -13,16 +14,16 @@ use whim_value::heap::handle::ManagedRef;
 use whim_value::string::ByteStringObject;
 use xxhash_rust::xxh3::xxh3_64;
 
-use crate::bytecode::chunk::Comparison;
-use crate::bytecode::chunk::ConstantIndex;
-use crate::bytecode::chunk::DescriptorIndex;
-use crate::bytecode::chunk::Register;
-use crate::bytecode::instruction::operands::PropertySlot;
-use crate::bytecode::instruction::operands::PropertyValueMode;
+use crate::chunk::Comparison;
+use crate::chunk::ConstantIndex;
+use crate::chunk::DescriptorIndex;
+use crate::chunk::Register;
+use crate::instruction::operands::PropertySlot;
+use crate::instruction::operands::PropertyValueMode;
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) enum Literal {
+pub enum Literal {
     Null,
     Bool(#[seeded(with(serde_seeded::unseeded))] bool),
     Int(#[seeded(with(serde_seeded::unseeded))] i64),
@@ -31,7 +32,7 @@ pub(crate) enum Literal {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum LiteralKey {
+pub enum LiteralKey {
     Null,
     Bool(bool),
     Int(i64),
@@ -39,7 +40,8 @@ pub(crate) enum LiteralKey {
     String(*const u8),
 }
 
-pub(crate) fn literal_key(literal: &Literal) -> LiteralKey {
+#[must_use]
+pub fn literal_key(literal: &Literal) -> LiteralKey {
     match literal {
         Literal::Null => LiteralKey::Null,
         Literal::Bool(value) => LiteralKey::Bool(*value),
@@ -49,11 +51,11 @@ pub(crate) fn literal_key(literal: &Literal) -> LiteralKey {
     }
 }
 
-pub(crate) type DictionaryTypeDescriptor = (Box<TypeDescriptor>, Box<TypeDescriptor>);
+pub type DictionaryTypeDescriptor = (Box<TypeDescriptor>, Box<TypeDescriptor>);
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) enum ShapeKey {
+pub enum ShapeKey {
     Int(#[seeded(with(serde_seeded::unseeded))] i64),
     String(Atom),
     Bool(#[seeded(with(serde_seeded::unseeded))] bool),
@@ -65,7 +67,7 @@ pub(crate) enum ShapeKey {
     clippy::use_self,
     reason = "the seeded derive requires the concrete recursive type"
 )]
-pub(crate) enum TypeDescriptor {
+pub enum TypeDescriptor {
     Wildcard,
     Mixed,
     /// Returns normally without a value.
@@ -116,22 +118,18 @@ pub(crate) enum TypeDescriptor {
     StaticClass,
     /// A read-only view over a vec, dict, or tuple, optionally constrained by
     /// key and value type.
-    Array(
-        #[seeded(with(crate::bytecode::decode::pairs::optional))] Option<DictionaryTypeDescriptor>,
-    ),
+    Array(#[seeded(with(crate::decode::pairs::optional))] Option<DictionaryTypeDescriptor>),
     Vector(Option<Box<TypeDescriptor>>),
     /// A vec with fixed leading positions and an optional homogeneous tail.
     VectorShape {
         elements: Vec<TypeDescriptor>,
         rest: Option<Box<TypeDescriptor>>,
     },
-    Dictionary(
-        #[seeded(with(crate::bytecode::decode::pairs::optional))] Option<DictionaryTypeDescriptor>,
-    ),
+    Dictionary(#[seeded(with(crate::decode::pairs::optional))] Option<DictionaryTypeDescriptor>),
     DictionaryShape {
-        #[seeded(with(crate::bytecode::decode::pairs))]
+        #[seeded(with(crate::decode::pairs))]
         entries: Vec<(ShapeKey, TypeDescriptor)>,
-        #[seeded(with(crate::bytecode::decode::pairs::optional))]
+        #[seeded(with(crate::decode::pairs::optional))]
         rest: Option<DictionaryTypeDescriptor>,
     },
     Callable(Option<FunctionTypeDescriptor>),
@@ -149,7 +147,7 @@ pub(crate) enum TypeDescriptor {
     /// The complement of a runtime-checkable type relative to `mixed`.
     Negated(Box<TypeDescriptor>),
     ObjectShape {
-        #[seeded(with(crate::bytecode::decode::pairs))]
+        #[seeded(with(crate::decode::pairs))]
         entries: Vec<(Atom, TypeDescriptor)>,
         #[seeded(with(serde_seeded::unseeded))]
         open: bool,
@@ -158,7 +156,7 @@ pub(crate) enum TypeDescriptor {
 
 impl TypeDescriptor {
     #[must_use]
-    pub(crate) fn integer_range(min: Option<i64>, max: Option<i64>) -> Self {
+    pub fn integer_range(min: Option<i64>, max: Option<i64>) -> Self {
         if min.zip(max).is_some_and(|(min, max)| min > max) {
             Self::Never
         } else if min.is_none_or(|min| min == i64::MIN) && max.is_none_or(|max| max == i64::MAX) {
@@ -173,7 +171,7 @@ impl TypeDescriptor {
     }
 
     #[must_use]
-    pub(crate) fn string_length(heap: &Heap, min: i64, max: Option<i64>) -> Self {
+    pub fn string_length(heap: &Heap, min: i64, max: Option<i64>) -> Self {
         if max.is_some_and(|max| min > max) {
             Self::Never
         } else if min == 0 && max.is_none() {
@@ -186,7 +184,7 @@ impl TypeDescriptor {
     }
 
     #[must_use]
-    pub(crate) fn intersection(mut members: Vec<Self>) -> Self {
+    pub fn intersection(mut members: Vec<Self>) -> Self {
         let string = members
             .iter()
             .enumerate()
@@ -225,7 +223,8 @@ impl TypeDescriptor {
     }
 
     /// Rebuilds this descriptor after transforming each direct child.
-    pub(crate) fn map_children(&self, mut map: impl FnMut(&Self) -> Self) -> Self {
+    #[must_use]
+    pub fn map_children(&self, mut map: impl FnMut(&Self) -> Self) -> Self {
         match self {
             Self::Named {
                 name,
@@ -318,7 +317,7 @@ impl TypeDescriptor {
     /// immediate scalar values, letting the VM skip inspecting those
     /// parameters.
     #[must_use]
-    pub(crate) fn may_hold_reference(&self) -> bool {
+    pub fn may_hold_reference(&self) -> bool {
         match self {
             Self::Void
             | Self::Never
@@ -360,7 +359,7 @@ impl TypeDescriptor {
 }
 
 #[must_use]
-pub(crate) fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
+pub fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
     match descriptor {
         TypeDescriptor::Wildcard
         | TypeDescriptor::Mixed
@@ -422,7 +421,7 @@ pub(crate) fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
 }
 
 #[must_use]
-pub(crate) fn string_length_matches(length: usize, min: i64, max: Option<i64>) -> bool {
+pub fn string_length_matches(length: usize, min: i64, max: Option<i64>) -> bool {
     i64::try_from(length).is_ok_and(|length| length >= min && max.is_none_or(|max| length <= max))
 }
 
@@ -569,7 +568,8 @@ fn check_descriptor_members(
     reason = "trivial type checks sit on every checked VM boundary"
 )]
 #[inline(always)]
-pub(crate) fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Value) -> Option<bool> {
+#[must_use]
+pub fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Value) -> Option<bool> {
     Some(match descriptor {
         TypeDescriptor::Wildcard | TypeDescriptor::Mixed => true,
         TypeDescriptor::Void | TypeDescriptor::Never => false,
@@ -670,7 +670,7 @@ pub(crate) fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Valu
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) struct FunctionTypeDescriptor {
+pub struct FunctionTypeDescriptor {
     /// Parameters in call order.
     pub parameters: Vec<FunctionTypeParameterDescriptor>,
     pub return_type: Box<TypeDescriptor>,
@@ -678,7 +678,7 @@ pub(crate) struct FunctionTypeDescriptor {
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) struct FunctionTypeParameterDescriptor {
+pub struct FunctionTypeParameterDescriptor {
     pub r#type: TypeDescriptor,
     #[seeded(with(serde_seeded::unseeded))]
     pub optional: bool,
@@ -689,7 +689,7 @@ pub(crate) struct FunctionTypeParameterDescriptor {
 /// names to parameters.
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) struct CallDescriptor {
+pub struct CallDescriptor {
     #[seeded(with(serde_seeded::unseeded))]
     pub positional: u8,
     pub named: Vec<Atom>,
@@ -697,10 +697,10 @@ pub(crate) struct CallDescriptor {
 
 /// A match jump table; each target is an
 /// instruction offset relative to the switch instruction, like
-/// [`JumpOffset`](crate::bytecode::instruction::operands::JumpOffset).
+/// [`JumpOffset`](crate::instruction::operands::JumpOffset).
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) enum SwitchTable {
+pub enum SwitchTable {
     Int {
         #[seeded(with(serde_seeded::unseeded))]
         base: i64,
@@ -710,7 +710,7 @@ pub(crate) enum SwitchTable {
         default: i32,
     },
     String {
-        #[seeded(with(crate::bytecode::decode::atom_i32_pairs))]
+        #[seeded(with(crate::decode::atom_i32_pairs))]
         arms: Vec<(Atom, i32)>,
         #[seeded(with(serde_seeded::unseeded))]
         buckets: Vec<u32>,
@@ -756,19 +756,19 @@ pub(crate) enum SwitchTable {
     },
 }
 
-pub(crate) fn string_switch_buckets(arms: &[(Atom, i32)]) -> Vec<u32> {
+/// # Panics
+///
+/// Panics if the bucket count overflows or an arm index exceeds [`u32::MAX`].
+#[must_use]
+pub fn string_switch_buckets(arms: &[(Atom, i32)]) -> Vec<u32> {
     let base = arms.len().max(1).next_power_of_two();
-    let Some(width) = base.checked_mul(2) else {
-        // SAFETY: the bytecode count limit keeps a switch below this size.
-        unsafe { unreachable_invariant("a string switch table has room for empty buckets") }
-    };
+    let width = base
+        .checked_mul(2)
+        .expect("a string switch table must have room for empty buckets");
     let mut buckets = vec![0; width];
     let mask = width - 1;
     for (index, (value, _)) in arms.iter().enumerate() {
-        let Ok(entry) = u32::try_from(index + 1) else {
-            // SAFETY: the bytecode count limit keeps every arm index in u32.
-            unsafe { unreachable_invariant("a string switch arm index fits in u32") }
-        };
+        let entry = u32_index(index + 1);
         let mut bucket = string_switch_bucket(value.as_bytes(), mask);
         while buckets[bucket] != 0 {
             bucket = (bucket + 1) & mask;
@@ -778,11 +778,8 @@ pub(crate) fn string_switch_buckets(arms: &[(Atom, i32)]) -> Vec<u32> {
     buckets
 }
 
-pub(crate) fn string_switch_lookup(
-    arms: &[(Atom, i32)],
-    buckets: &[u32],
-    value: &[u8],
-) -> Option<usize> {
+#[must_use]
+pub fn string_switch_lookup(arms: &[(Atom, i32)], buckets: &[u32], value: &[u8]) -> Option<usize> {
     let mask = buckets.len().checked_sub(1)?;
     let mut bucket = string_switch_bucket(value, mask);
     for _ in 0..buckets.len() {
@@ -814,7 +811,7 @@ fn string_switch_bucket(value: &[u8], mask: usize) -> usize {
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) enum PresetSlot {
+pub enum PresetSlot {
     /// A positional argument fixed when the partial was built; its value
     /// sits in the instruction's window.
     GivenPositional,
@@ -827,7 +824,7 @@ pub(crate) enum PresetSlot {
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) struct PresetDescriptor {
+pub struct PresetDescriptor {
     /// Given values and holes in call order.
     pub slots: Vec<PresetSlot>,
     /// Whether a trailing `...` exposes every parameter not otherwise named.
@@ -838,7 +835,7 @@ pub(crate) struct PresetDescriptor {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub(crate) struct CatchEntry {
+pub struct CatchEntry {
     /// The first protected instruction index, inclusive.
     pub start: u32,
     /// The end of the protected range, exclusive.
@@ -854,7 +851,7 @@ pub(crate) struct CatchEntry {
 /// execution and caches in the site's slot thereafter.
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
-pub(crate) enum IcDescriptor {
+pub enum IcDescriptor {
     Member {
         name: Atom,
         /// Class type arguments for an instantiation site; absent for every
@@ -873,7 +870,7 @@ pub(crate) enum IcDescriptor {
 
 /// Type facts established once before an integer-controlled numeric loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PreparedIntLoopDescriptor {
+pub struct PreparedIntLoopDescriptor {
     pub comparison: Comparison,
     pub counter: Register,
     pub limit: Register,
@@ -881,7 +878,7 @@ pub(crate) struct PreparedIntLoopDescriptor {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct IntStepLoopDescriptor {
+pub struct IntStepLoopDescriptor {
     pub comparison: Comparison,
     pub counter: Register,
     pub limit: Register,
@@ -889,7 +886,7 @@ pub(crate) struct IntStepLoopDescriptor {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct FloatSquaresSumBranchDescriptor {
+pub struct FloatSquaresSumBranchDescriptor {
     pub sum_destination: Register,
     pub first_square_destination: Register,
     pub second_square_destination: Register,
@@ -900,7 +897,7 @@ pub(crate) struct FloatSquaresSumBranchDescriptor {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct FloatPairUpdateDescriptor {
+pub struct FloatPairUpdateDescriptor {
     pub first_destination: Register,
     pub first_operand: Register,
     pub constant: ConstantIndex,
@@ -910,13 +907,13 @@ pub(crate) struct FloatPairUpdateDescriptor {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PropertyInitializationDescriptor {
+pub struct PropertyInitializationDescriptor {
     pub allocates: bool,
     pub entries: Vec<PropertyInitializationEntry>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PropertyInitializationEntry {
+pub struct PropertyInitializationEntry {
     pub value: Register,
     pub slot: PropertySlot,
     pub value_mode: PropertyValueMode,

@@ -91,7 +91,7 @@ fn callable_marker_tokens(
         quote!(::core::option::Option::None)
     };
     quote! {
-        crate::bytecode::unit::BuiltInCallableMarkers {
+        whim_bytecode::unit::BuiltInCallableMarkers {
             track_caller: #track_caller,
             trace_boundary: #trace_boundary,
             must_use: #must_use,

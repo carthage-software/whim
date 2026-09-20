@@ -6,10 +6,10 @@
     reason = "linking rules are shared with the engine and optimizer"
 )]
 
+use whim_bytecode::unit::Visibility;
 use whim_value::atom::Atom;
 use whim_value::object::ClassId;
 
-use crate::bytecode::unit::Visibility;
 use crate::classes::MethodEntry;
 use crate::classes::PropertyInfo;
 use crate::classes::RuntimeClass;
@@ -39,23 +39,6 @@ pub(crate) fn slot_placement(
             SlotPlacement::Inherited(slot)
         }
         _ => SlotPlacement::Appended,
-    }
-}
-
-/// How open a visibility is; an override may move up this order, never down.
-const fn visibility_rank(visibility: Visibility) -> u8 {
-    match visibility {
-        Visibility::Private => 0,
-        Visibility::Protected => 1,
-        Visibility::Public => 2,
-    }
-}
-
-pub(in crate::linker) const fn visibility_name(visibility: Visibility) -> &'static str {
-    match visibility {
-        Visibility::Private => "private",
-        Visibility::Protected => "protected",
-        Visibility::Public => "public",
     }
 }
 

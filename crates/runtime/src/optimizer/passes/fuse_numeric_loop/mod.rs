@@ -1,13 +1,11 @@
 //! Selection of closed, side-effect-free numeric counted loops for unboxed
 //! execution by the VM.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::Literal;
-use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::NUMERIC_LOOP_REGISTER_LIMIT;
-use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
-use crate::bytecode::instruction::operands::Register;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::NUMERIC_LOOP_REGISTER_LIMIT;
+use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
 
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::cfg::relative_target;

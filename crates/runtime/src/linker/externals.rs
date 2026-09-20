@@ -4,19 +4,19 @@ use std::rc::Rc;
 
 use hashbrown::HashMap;
 use whim_base::unreachable_invariant;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledFunction;
+use whim_bytecode::unit::CompiledParameter;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::Visibility;
+use whim_bytecode::unit::is_external;
 use whim_span::Span;
 use whim_value::atom::Atom;
 use whim_value::object::ClassId;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledClassLike;
-use crate::bytecode::unit::CompiledFunction;
-use crate::bytecode::unit::CompiledParameter;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::CompiledUnit;
-use crate::bytecode::unit::Visibility;
-use crate::bytecode::unit::is_external;
 use crate::classes::MethodBodyKind;
 use crate::classes::RuntimeBase;
 use crate::engine::Engine;

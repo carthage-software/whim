@@ -1,13 +1,13 @@
 //! Building attribute instances.
 
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::ConstantInitializer;
+use whim_bytecode::unit::literal_value;
 use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::CallTarget;
 use whim_value::object::ClassId;
 
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::ConstantInitializer;
-use crate::bytecode::unit::literal_value;
 use crate::vm::CalleeShape;
 use crate::vm::MethodBodyKind;
 use crate::vm::Rc;

@@ -2,15 +2,15 @@
 
 use std::rc::Rc;
 
+use whim_bytecode::chunk::descriptors::ShapeKey;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledAttribute;
 use whim_span::Span;
 use whim_value::atom::Atom;
 use whim_value::function::FuncId;
 use whim_value::newtype::NewtypeValueId;
 use whim_value::object::ClassId;
 
-use crate::bytecode::chunk::descriptors::ShapeKey;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledAttribute;
 use crate::symbols::UnitContext;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

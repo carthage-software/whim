@@ -8,38 +8,38 @@ use serde::Deserialize;
 use serde::Serialize;
 
 #[doc(hidden)]
-pub(crate) const NUMERIC_LOOP_REGISTER_LIMIT: u16 = 64;
+pub const NUMERIC_LOOP_REGISTER_LIMIT: u16 = 64;
 
-pub(crate) const MAIN_FRAME_REGISTER_HEADROOM: u16 = 24;
+pub const MAIN_FRAME_REGISTER_HEADROOM: u16 = 24;
 
-pub(crate) mod operands;
+pub mod operands;
 
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::AsMode;
-use crate::bytecode::instruction::operands::CallDescriptorIndex;
-use crate::bytecode::instruction::operands::Comparison;
-use crate::bytecode::instruction::operands::ConstantIndex;
-use crate::bytecode::instruction::operands::Count;
-use crate::bytecode::instruction::operands::DescriptorIndex;
-use crate::bytecode::instruction::operands::FloatPairUpdateDescriptorIndex;
-use crate::bytecode::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::ImmediateInt;
-use crate::bytecode::instruction::operands::IndexAddMode;
-use crate::bytecode::instruction::operands::IntStepLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::NearJumpOffset;
-use crate::bytecode::instruction::operands::PreparedIntLoopDescriptorIndex;
-use crate::bytecode::instruction::operands::PresetDescriptorIndex;
-use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
-use crate::bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
-use crate::bytecode::instruction::operands::PropertyReadMode;
-use crate::bytecode::instruction::operands::PropertyRemoveMode;
-use crate::bytecode::instruction::operands::PropertySlot;
-use crate::bytecode::instruction::operands::PropertyValueMode;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::bytecode::instruction::operands::SwitchTableIndex;
+use crate::instruction::operands::ArrayValueMode;
+use crate::instruction::operands::AsMode;
+use crate::instruction::operands::CallDescriptorIndex;
+use crate::instruction::operands::Comparison;
+use crate::instruction::operands::ConstantIndex;
+use crate::instruction::operands::Count;
+use crate::instruction::operands::DescriptorIndex;
+use crate::instruction::operands::FloatPairUpdateDescriptorIndex;
+use crate::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
+use crate::instruction::operands::IcSlot;
+use crate::instruction::operands::ImmediateInt;
+use crate::instruction::operands::IndexAddMode;
+use crate::instruction::operands::IntStepLoopDescriptorIndex;
+use crate::instruction::operands::JumpOffset;
+use crate::instruction::operands::NearJumpOffset;
+use crate::instruction::operands::PreparedIntLoopDescriptorIndex;
+use crate::instruction::operands::PresetDescriptorIndex;
+use crate::instruction::operands::PropertyIndexUpdateMode;
+use crate::instruction::operands::PropertyInitializationDescriptorIndex;
+use crate::instruction::operands::PropertyReadMode;
+use crate::instruction::operands::PropertyRemoveMode;
+use crate::instruction::operands::PropertySlot;
+use crate::instruction::operands::PropertyValueMode;
+use crate::instruction::operands::Register;
+use crate::instruction::operands::ShortJumpOffset;
+use crate::instruction::operands::SwitchTableIndex;
 
 macro_rules! instruction_set {
     ($declaration:ident) => {
@@ -434,7 +434,7 @@ macro_rules! define_instruction {
         )]
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
         #[repr(u8)]
-        pub(crate) enum Instruction {
+        pub enum Instruction {
             $($variant)*
         }
     };
@@ -442,7 +442,7 @@ macro_rules! define_instruction {
 
 /// An encoded operand whose value refers outside its instruction word.
 #[derive(Clone, Copy)]
-pub(in crate::bytecode) enum InstructionOperand {
+pub(crate) enum InstructionOperand {
     Register(Register),
     OptionalRegister(Register),
     Constant(ConstantIndex),
@@ -461,34 +461,72 @@ pub(in crate::bytecode) enum InstructionOperand {
     PropertyInitializationDescriptor(PropertyInitializationDescriptorIndex),
 }
 
-pub(crate) trait InstructionSideTableMapper {
+pub trait InstructionSideTableMapper {
     type Error;
 
+    /// # Errors
+    ///
+    /// Returns an error if the constant index cannot be mapped.
     fn constant(&mut self, value: ConstantIndex) -> Result<ConstantIndex, Self::Error>;
+
+    /// # Errors
+    ///
+    /// Returns an error if the cache slot cannot be mapped.
     fn cache(&mut self, value: IcSlot) -> Result<IcSlot, Self::Error>;
+
+    /// # Errors
+    ///
+    /// Returns an error if the switch table index cannot be mapped.
     fn switch(&mut self, value: SwitchTableIndex) -> Result<SwitchTableIndex, Self::Error>;
+
+    /// # Errors
+    ///
+    /// Returns an error if the type descriptor index cannot be mapped.
     fn descriptor(&mut self, value: DescriptorIndex) -> Result<DescriptorIndex, Self::Error>;
+
+    /// # Errors
+    ///
+    /// Returns an error if the call descriptor index cannot be mapped.
     fn call(&mut self, value: CallDescriptorIndex) -> Result<CallDescriptorIndex, Self::Error>;
+
+    /// # Errors
+    ///
+    /// Returns an error if the preset descriptor index cannot be mapped.
     fn preset(
         &mut self,
         value: PresetDescriptorIndex,
     ) -> Result<PresetDescriptorIndex, Self::Error>;
+    /// # Errors
+    ///
+    /// Returns an error if the float pair update index cannot be mapped.
     fn float_pair_update(
         &mut self,
         value: FloatPairUpdateDescriptorIndex,
     ) -> Result<FloatPairUpdateDescriptorIndex, Self::Error>;
+    /// # Errors
+    ///
+    /// Returns an error if the float squares sum branch index cannot be mapped.
     fn float_squares_sum_branch(
         &mut self,
         value: FloatSquaresSumBranchDescriptorIndex,
     ) -> Result<FloatSquaresSumBranchDescriptorIndex, Self::Error>;
+    /// # Errors
+    ///
+    /// Returns an error if the integer step loop index cannot be mapped.
     fn int_step_loop(
         &mut self,
         value: IntStepLoopDescriptorIndex,
     ) -> Result<IntStepLoopDescriptorIndex, Self::Error>;
+    /// # Errors
+    ///
+    /// Returns an error if the prepared integer loop index cannot be mapped.
     fn prepared_int_loop(
         &mut self,
         value: PreparedIntLoopDescriptorIndex,
     ) -> Result<PreparedIntLoopDescriptorIndex, Self::Error>;
+    /// # Errors
+    ///
+    /// Returns an error if the property initialization index cannot be mapped.
     fn property_initialization(
         &mut self,
         value: PropertyInitializationDescriptorIndex,
@@ -597,7 +635,7 @@ macro_rules! define_operand_visit {
     ($($(#[$attribute:meta])* $name:ident $({$($(#[$field_attribute:meta])* $field:ident: $type:ident),* $(,)?})? = $tag:literal,)*) => {
         impl Instruction {
             /// Visits every operand that refers to a register or side table.
-            pub(in crate::bytecode) fn try_visit_operands<E>(
+            pub(crate) fn try_visit_operands<E>(
                 self,
                 mut visit: impl FnMut(InstructionOperand) -> Result<(), E>,
             ) -> Result<(), E> {
@@ -656,7 +694,10 @@ macro_rules! map_instruction_side_table {
 macro_rules! define_side_table_map {
     ($($(#[$attribute:meta])* $name:ident $({$($(#[$field_attribute:meta])* $field:ident: $type:ident),* $(,)?})? = $tag:literal,)*) => {
         impl Instruction {
-            pub(crate) fn try_map_side_tables<M: InstructionSideTableMapper>(
+            /// # Errors
+            ///
+            /// Returns the first mapper error. Earlier operands remain mapped.
+            pub fn try_map_side_tables<M: InstructionSideTableMapper>(
                 &mut self,
                 mapper: &mut M,
             ) -> Result<(), M::Error> {
@@ -673,7 +714,7 @@ macro_rules! define_side_table_map {
     };
 }
 
-pub(crate) mod word;
+pub mod word;
 
 instruction_set!(define_instruction);
 instruction_set!(define_operand_visit);

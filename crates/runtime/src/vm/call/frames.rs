@@ -3,6 +3,9 @@
 use std::mem::ManuallyDrop;
 use std::slice;
 
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::unit::literal_value;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::function::FuncId;
@@ -12,20 +15,17 @@ use whim_value::object::ClassId;
 use whim_value::object::InstanceObject;
 use whim_value::object::TypeEnvironmentId;
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
 use crate::vm::call::BuiltInCallable;
 use crate::vm::call::ExactFunctionEntry;
 use crate::vm::call::ExactMethodEntry;
 use crate::vm::call::Frame;
 use crate::vm::call::FrameFlags;
-use crate::vm::call::Literal;
 use crate::vm::call::NonNull;
 use crate::vm::call::OptionalClassId;
 use crate::vm::call::OptionalFuncId;
 use crate::vm::call::VirtualMachine;
 use crate::vm::call::VirtualMachineControl;
 use crate::vm::call::frame_argument_count;
-use crate::vm::call::literal_value;
 use crate::vm::call::live_parameter_mask;
 use crate::vm::call::ptr;
 use crate::vm::call::unreachable_invariant;

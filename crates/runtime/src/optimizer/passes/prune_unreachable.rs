@@ -1,6 +1,7 @@
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::rewrite::compact;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::rewrite::compact;
+
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::cfg::successors;
 

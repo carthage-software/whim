@@ -31,11 +31,11 @@ pub(super) fn expand(attribute: TokenStream, item: TokenStream) -> syn::Result<T
     let backing = match arguments.value_string("backing")?.as_deref() {
         None => quote!(::core::option::Option::None),
         Some("int") => quote!(::core::option::Option::Some(
-            crate::bytecode::unit::EnumBacking::Int
+            whim_bytecode::unit::EnumBacking::Int
         )),
         Some("string") => {
             quote!(::core::option::Option::Some(
-                crate::bytecode::unit::EnumBacking::String
+                whim_bytecode::unit::EnumBacking::String
             ))
         }
         Some(other) => {

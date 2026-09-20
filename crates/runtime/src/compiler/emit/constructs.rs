@@ -1,6 +1,12 @@
 //! The language constructs.
 
 use whim_base::unreachable_invariant;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::Literal as BytecodeLiteral;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::PropertyRemoveMode;
+use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::construct::AssertConstruct;
 use whim_syn::cst::construct::CloneConstruct;
 use whim_syn::cst::construct::DropConstruct;
@@ -9,20 +15,14 @@ use whim_syn::cst::construct::RemoveConstruct;
 use whim_syn::cst::construct::SequenceConstruct;
 use whim_syn::cst::construct::SwapRemoveConstruct;
 
-use crate::bytecode::instruction::operands::PropertyRemoveMode;
 use crate::compiler::emit::BodyCompiler;
-use crate::compiler::emit::BytecodeLiteral;
 use crate::compiler::emit::ChainStep;
 use crate::compiler::emit::CompileError;
 use crate::compiler::emit::CompileErrorKind;
 use crate::compiler::emit::Construct;
-use crate::compiler::emit::Count;
 use crate::compiler::emit::Expression;
 use crate::compiler::emit::HasSpan;
-use crate::compiler::emit::IcDescriptor;
-use crate::compiler::emit::Instruction;
 use crate::compiler::emit::Place;
-use crate::compiler::emit::Register;
 use crate::compiler::emit::Scope;
 use crate::compiler::emit::Span;
 use crate::compiler::emit::WriteTarget;

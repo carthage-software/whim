@@ -2,15 +2,15 @@
 
 use std::ptr::NonNull;
 
+use whim_bytecode::unit::BuiltInCallableMarkers;
+use whim_bytecode::unit::EnumBacking;
+use whim_bytecode::unit::Variance;
+use whim_bytecode::unit::Visibility;
 use whim_value::Value;
 use whim_value::object::BuiltInHooks;
 
 use crate::builtin::Context;
 use crate::builtin::throw::Throw;
-use crate::bytecode::unit::BuiltInCallableMarkers;
-use crate::bytecode::unit::EnumBacking;
-use crate::bytecode::unit::Variance;
-use crate::bytecode::unit::Visibility;
 use crate::vm::VirtualMachine;
 
 pub(crate) type BuiltInHandler =

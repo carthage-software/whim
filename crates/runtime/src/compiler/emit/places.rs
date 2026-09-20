@@ -2,16 +2,21 @@
 
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_option_invariant;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::AsMode;
+use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
+use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::access::StaticPropertyAccess;
 use whim_syn::cst::operation::Assignment;
 use whim_syn::cst::operation::TupleDestructure;
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::operands::IcSlot;
-use crate::bytecode::instruction::operands::IndexAddMode;
-use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
 use crate::compiler::emit::Access;
-use crate::compiler::emit::AsMode;
 use crate::compiler::emit::AssignmentOperator;
 use crate::compiler::emit::AssignmentTarget;
 use crate::compiler::emit::BodyCompiler;
@@ -20,11 +25,6 @@ use crate::compiler::emit::CompileErrorKind;
 use crate::compiler::emit::DestructureTarget;
 use crate::compiler::emit::Expression;
 use crate::compiler::emit::HasSpan;
-use crate::compiler::emit::IcDescriptor;
-use crate::compiler::emit::ImmediateInt;
-use crate::compiler::emit::Instruction;
-use crate::compiler::emit::JumpOffset;
-use crate::compiler::emit::Register;
 use crate::compiler::emit::Scope;
 use crate::compiler::emit::ShortCircuit;
 use crate::compiler::emit::Span;

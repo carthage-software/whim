@@ -1,12 +1,13 @@
 //! Property-write specialization proven by whole-unit type flow.
 
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
-use crate::bytecode::instruction::operands::PropertySlot;
-use crate::bytecode::instruction::operands::PropertyValueMode;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::unit::Visibility;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
+use whim_bytecode::instruction::operands::PropertySlot;
+use whim_bytecode::instruction::operands::PropertyValueMode;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::unit::Visibility;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::analysis::Analysis;

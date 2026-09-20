@@ -1,14 +1,14 @@
 //! Common-subexpression elimination for dominating pure operations.
 
 use hashbrown::HashMap;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::IcDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::compact;
+use whim_bytecode::unit::CompiledUnit;
 use whim_value::atom::Atom;
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::chunk::descriptors::IcDescriptor;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::rewrite::compact;
-use crate::bytecode::unit::CompiledUnit;
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::Dominators;
@@ -519,20 +519,20 @@ fn transparent(instruction: Instruction) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use whim_bytecode::chunk::Chunk;
+    use whim_bytecode::instruction::Instruction;
+    use whim_bytecode::instruction::operands::ArrayValueMode;
+    use whim_bytecode::instruction::operands::Comparison;
+    use whim_bytecode::instruction::operands::ImmediateInt;
+    use whim_bytecode::instruction::operands::JumpOffset;
+    use whim_bytecode::instruction::operands::PropertyReadMode;
+    use whim_bytecode::instruction::operands::PropertySlot;
+    use whim_bytecode::instruction::operands::Register;
+    use whim_bytecode::instruction::operands::ShortJumpOffset;
     use whim_span::Span;
 
-    use crate::bytecode::instruction::operands::ArrayValueMode;
-    use crate::bytecode::instruction::operands::Comparison;
-    use crate::bytecode::instruction::operands::ImmediateInt;
-    use crate::bytecode::instruction::operands::JumpOffset;
-    use crate::bytecode::instruction::operands::PropertyReadMode;
-    use crate::bytecode::instruction::operands::PropertySlot;
-    use crate::bytecode::instruction::operands::Register;
-    use crate::bytecode::instruction::operands::ShortJumpOffset;
     use crate::optimizer::OptimizationConfiguration;
     use crate::optimizer::OptimizationStatistics;
-    use crate::optimizer::passes::cse::Chunk;
-    use crate::optimizer::passes::cse::Instruction;
     use crate::optimizer::passes::cse::optimize_chunk;
 
     fn emit(chunk: &mut Chunk, instruction: Instruction) {

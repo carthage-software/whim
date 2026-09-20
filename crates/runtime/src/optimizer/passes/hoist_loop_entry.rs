@@ -1,8 +1,9 @@
 //! Reuse of immutable values computed at the guarded entry of a counted loop.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::cfg::relative_target;
 use crate::optimizer::liveness::effect::effect_on;

@@ -2,11 +2,10 @@
 
 #![deny(clippy::nursery, clippy::pedantic)]
 
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::Variance;
 use whim_value::atom::Atom;
-
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::Variance;
 
 #[expect(
     clippy::redundant_pub_crate,
@@ -26,11 +25,13 @@ pub(crate) fn incompatible_parameter<'parameter>(
                 else {
                     continue;
                 };
+
                 let valid = match parameter.variance {
                     Variance::Invariant => true,
                     Variance::Covariant => position == 1,
                     Variance::Contravariant => position == -1,
                 };
+
                 if !valid {
                     return Some(parameter);
                 }
@@ -44,6 +45,7 @@ pub(crate) fn incompatible_parameter<'parameter>(
                     let Some(variance) = named_variance(name, index) else {
                         continue;
                     };
+
                     pending.push((argument, nested_polarity(position, variance)));
                 }
             }

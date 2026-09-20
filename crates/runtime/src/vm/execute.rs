@@ -9,6 +9,34 @@ use std::rc::Rc;
 use std::slice;
 
 use whim_base::unwrap_option_invariant;
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
+use whim_bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
+use whim_bytecode::chunk::descriptors::IntStepLoopDescriptor;
+use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
+use whim_bytecode::chunk::descriptors::PropertyInitializationEntry;
+use whim_bytecode::chunk::descriptors::ShapeKey;
+use whim_bytecode::chunk::descriptors::SwitchTable;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
+use whim_bytecode::chunk::descriptors::string_switch_lookup;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::AsMode;
+use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
+use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
+use whim_bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
+use whim_bytecode::instruction::operands::PropertyReadMode;
+use whim_bytecode::instruction::operands::PropertySlot;
+use whim_bytecode::instruction::operands::PropertyValueMode;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::word::InstructionKind;
+use whim_bytecode::instruction::word::InstructionWord;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::literal_value;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::dict::DictObject;
@@ -26,44 +54,16 @@ use whim_value::string::ByteStringObject;
 use whim_value::tuple::TupleObject;
 use whim_value::vec::VecObject;
 
-use crate::bytecode::REFERENCE_REGISTER_LIMIT;
-use crate::bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
-use crate::bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
-use crate::bytecode::chunk::descriptors::IntStepLoopDescriptor;
-use crate::bytecode::chunk::descriptors::PreparedIntLoopDescriptor;
-use crate::bytecode::chunk::descriptors::PropertyInitializationEntry;
-use crate::bytecode::chunk::descriptors::ShapeKey;
-use crate::bytecode::chunk::descriptors::SwitchTable;
-use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
-use crate::bytecode::chunk::descriptors::string_switch_lookup;
-use crate::bytecode::instruction::operands::ArrayValueMode;
-use crate::bytecode::instruction::operands::Comparison as BytecodeComparison;
-use crate::bytecode::instruction::operands::IndexAddMode;
-use crate::bytecode::instruction::operands::PropertyIndexUpdateMode;
-use crate::bytecode::instruction::operands::PropertyInitializationDescriptorIndex;
-use crate::bytecode::instruction::operands::PropertyReadMode;
-use crate::bytecode::instruction::operands::PropertySlot;
-use crate::bytecode::instruction::operands::PropertyValueMode;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::literal_value;
 use crate::core::private::syscall::StandardStream;
 use crate::engine::Engine;
-use crate::vm::AsMode;
 use crate::vm::CachedIsCheck;
-use crate::vm::Chunk;
 use crate::vm::Fault;
 use crate::vm::FrameTeardown;
 use crate::vm::IndexAddFault;
-use crate::vm::Instruction;
-use crate::vm::InstructionKind;
-use crate::vm::InstructionWord;
 use crate::vm::IsCheckWays;
-use crate::vm::Literal;
 use crate::vm::NonNull;
 use crate::vm::PendingUnwind;
 use crate::vm::RegionSite;
-use crate::vm::Register;
-use crate::vm::TypeDescriptor;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::advance_cursor;
@@ -6823,6 +6823,7 @@ impl VirtualMachine<'_> {
 
 #[cfg(test)]
 mod string_switch_tests {
+    use whim_bytecode::chunk::descriptors::string_switch_buckets;
     use whim_value::Value;
     use whim_value::heap::Heap;
     use whim_value::newtype::NewtypeValueId;
@@ -6831,7 +6832,6 @@ mod string_switch_tests {
 
     use super::SwitchTable;
     use super::switch_string_target;
-    use crate::bytecode::chunk::descriptors::string_switch_buckets;
 
     #[test]
     fn string_switches_keep_first_duplicate_and_strict_subject_type() {

@@ -1,14 +1,23 @@
 //! Expressions, operators, and literals.
 
 use hashbrown::HashSet;
-
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
+use whim_bytecode::chunk::descriptors::Literal as BytecodeLiteral;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::AsMode;
+use whim_bytecode::instruction::operands::ConstantIndex;
+use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::array::DictExpression;
 use whim_syn::cst::array::DictPair;
 use whim_syn::cst::array::TupleExpression;
 use whim_syn::cst::array::VecExpression;
 use whim_syn::cst::array::VecFillExpression;
+use whim_syn::cst::atom::Literal;
 use whim_syn::cst::expression::Break;
 use whim_syn::cst::expression::Continue;
 use whim_syn::cst::expression::InterpolatedString;
@@ -21,31 +30,20 @@ use whim_syn::cst::operation::TypeOperator;
 use whim_syn::cst::operation::UnaryPrefixOperator;
 
 use crate::compiler::emit::Access;
-use crate::compiler::emit::AsMode;
 use crate::compiler::emit::BodyCompiler;
-use crate::compiler::emit::BytecodeLiteral;
 use crate::compiler::emit::Call;
 use crate::compiler::emit::ChainStep;
 use crate::compiler::emit::CompileError;
 use crate::compiler::emit::CompileErrorKind;
-use crate::compiler::emit::ConstantIndex;
 use crate::compiler::emit::Construct;
-use crate::compiler::emit::Count;
 use crate::compiler::emit::DictEntry;
 use crate::compiler::emit::Expression;
 use crate::compiler::emit::HasSpan;
-use crate::compiler::emit::IcDescriptor;
-use crate::compiler::emit::ImmediateInt;
-use crate::compiler::emit::Instruction;
-use crate::compiler::emit::JumpOffset;
-use crate::compiler::emit::Literal;
 use crate::compiler::emit::LoopJump;
 use crate::compiler::emit::Place;
-use crate::compiler::emit::Register;
 use crate::compiler::emit::Scope;
 use crate::compiler::emit::Span;
 use crate::compiler::emit::TupleElement;
-use crate::compiler::emit::TypeDescriptor;
 use crate::compiler::emit::ValueUse;
 use crate::compiler::emit::VecElement;
 use crate::compiler::emit::check_tuple_sequence;

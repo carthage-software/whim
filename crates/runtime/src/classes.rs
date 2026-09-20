@@ -11,7 +11,15 @@ use hashbrown::HashMap;
 use imbl::HashMap as PersistentHashMap;
 use imbl::HashSet as PersistentHashSet;
 use imbl::Vector as PersistentVector;
+
 use whim_base::u32_index;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
+use whim_bytecode::unit::BuiltInCallableAttributes;
+use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledAttribute;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::Visibility;
 use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::FuncId;
@@ -23,13 +31,6 @@ use crate::builtin::spec::BuiltInInitializer;
 use crate::builtin::spec::ParameterSpec;
 use crate::builtin::spec::TypeParameterSpec;
 use crate::builtin::spec::TypeSpec;
-use crate::bytecode::chunk::descriptors::TypeDescriptor;
-use crate::bytecode::chunk::descriptors::check_trivial_descriptor;
-use crate::bytecode::unit::BuiltInCallableAttributes;
-use crate::bytecode::unit::ClassLikeKind;
-use crate::bytecode::unit::CompiledAttribute;
-use crate::bytecode::unit::CompiledTypeParameter;
-use crate::bytecode::unit::Visibility;
 use crate::symbols::UnitContext;
 
 #[derive(Clone, Copy)]

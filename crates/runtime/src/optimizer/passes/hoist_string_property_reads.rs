@@ -1,14 +1,15 @@
 //! Loop-invariant motion for exact string property reads.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::JumpOffset;
-use crate::bytecode::instruction::operands::PropertyReadMode;
-use crate::bytecode::instruction::operands::PropertySlot;
-use crate::bytecode::instruction::operands::Register;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
-use crate::bytecode::rewrite::compact;
-use crate::bytecode::unit::CompiledUnit;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::PropertyReadMode;
+use whim_bytecode::instruction::operands::PropertySlot;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::rewrite::compact;
+use whim_bytecode::unit::CompiledUnit;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
 use crate::optimizer::cfg::is_block_boundary;

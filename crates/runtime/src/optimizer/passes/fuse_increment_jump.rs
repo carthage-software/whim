@@ -1,11 +1,12 @@
 //! Fusion of an in-place immediate increment and unconditional jump.
 
-use crate::bytecode::chunk::Chunk;
-use crate::bytecode::instruction::Instruction;
-use crate::bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::chunk::Chunk;
+use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::rewrite::control_flow_targets;
+
 use crate::optimizer::OptimizationConfiguration;
 use crate::optimizer::OptimizationStatistics;
-use crate::optimizer::cfg::control_flow_targets;
 use crate::optimizer::passes::compact_removed_instructions;
 
 pub(in crate::optimizer::passes) fn optimize_chunk(
