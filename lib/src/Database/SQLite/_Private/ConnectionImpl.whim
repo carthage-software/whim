@@ -150,7 +150,7 @@ final class ConnectionImpl implements Connection {
     return $this->connection->isClosed();
   }
 
-  /** Closes this connection without blocking. */
+  /** Waits for the worker to release this connection. */
   public function close(): void {
     $this->transactionActive = false;
     $this->connection->close();

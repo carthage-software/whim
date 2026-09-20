@@ -7,6 +7,7 @@ use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\Throwable;
+use Whim\Unwind\UnsupportedPlatformException;
 use Whim\_Private\TaskId;
 
 /** Watches one process signal and calls a callback each time it arrives. */
@@ -17,8 +18,11 @@ final class SignalWatcher {
   #[TrackCaller]
   public function __construct(Signal $signal, fn(): void $callback) {
     if (!$signal->isSupported()) {
-      throw new InvalidArgumentException(
-        'the signal is not supported by the running system',
+      throw new UnsupportedPlatformException(
+        'signal '
+        . $signal->name
+        . ' is not supported on '
+        . operating_system!(),
       );
     }
 

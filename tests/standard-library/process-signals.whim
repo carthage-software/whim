@@ -1,0 +1,56 @@
+use Whim\Command\UnsupportedSignalException;
+use Whim\Process;
+use Whim\Process\Signal;
+use Whim\Process\SignalWatcher;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\UnsupportedPlatformException;
+
+assert!(
+  new UnsupportedSignalException('unsupported') is UnsupportedPlatformException,
+);
+
+assert!(new UnsupportedPlatformException('unsupported') is RuntimeException);
+
+foreach (Signal::cases() as $signal) {
+  if (operating_system!() == 'windows') {
+    assert!(!$signal->isSupported());
+  }
+
+  if ($signal->isSupported()) {
+    assert!(
+      $signal->isCatchable()
+      == (Signal::Kill != $signal && Signal::Stop != $signal),
+    );
+
+    continue;
+  }
+
+  assert!(!$signal->isCatchable());
+  foreach (vec[fn(): void {
+    Process\signal(Process\get_id(), $signal);
+  }, fn(): void {
+    Process\signal_group(Process\get_id(), $signal);
+  }, fn(): void {
+    discard!(Process\watch_signal($signal, fn(): void {}));
+  }, fn(): void {
+    discard!(new SignalWatcher($signal, fn(): void {}));
+  }] as $operation) {
+    $caught = false;
+    try {
+      $operation();
+    } catch (UnsupportedPlatformException $error) {
+      $caught = true;
+      assert!(
+        $error->getMessage()
+        == 'signal '
+        . $signal->name
+        . ' is not supported on '
+        . operating_system!(),
+      );
+
+      assert!($error->getPrevious() == null);
+    }
+
+    assert!($caught);
+  }
+}

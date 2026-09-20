@@ -14,6 +14,7 @@ use Whim\Refine\NonEmptyString;
 use Whim\Unwind\DiscardedResultError;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\RuntimeException;
+use Whim\Unwind\UnsupportedPlatformException;
 
 const INVALID_PROCESS_ID = 2_147_483_648;
 const INVALID_POSIX_ID = 4_294_967_296;
@@ -42,6 +43,60 @@ assert!(!($cpuTimes->user->isNegative()));
 assert!(!($cpuTimes->system->isNegative()));
 assert!(!($cpuTimes->childrenUser->isNegative()));
 assert!(!($cpuTimes->childrenSystem->isNegative()));
+
+if (operating_system!() == 'windows') {
+  $binary = Env\current_binary() as NonEmptyString;
+  assert!(Process\find_executable($binary) == $binary);
+  assert!(Process\find_executable('cmd') != null);
+  assert!(Process\find_executable('whim-no-such-executable') == null);
+  foreach (vec[fn(): void {
+    discard!(Process\get_user_identity());
+  }, fn(): void {
+    Process\set_user_identity();
+  }, fn(): void {
+    discard!(Process\get_group_identity());
+  }, fn(): void {
+    Process\set_group_identity();
+  }, fn(): void {
+    discard!(Process\get_supplementary_group_ids());
+  }, fn(): void {
+    Process\set_supplementary_group_ids(vec[]);
+  }, fn(): void {
+    Process\initialize_supplementary_group_ids('unused', 0);
+  }, fn(): void {
+    discard!(Process\get_session_id());
+  }, fn(): void {
+    discard!(Process\start_session());
+  }, fn(): void {
+    discard!(Process\get_process_group_id());
+  }, fn(): void {
+    Process\set_process_group_id();
+  }, fn(): void {
+    discard!(Process\get_priority());
+  }, fn(): void {
+    Process\set_priority(0);
+  }, fn(): void {
+    discard!(Process\get_resource_limit(Resource::OpenFiles));
+  }, fn(): void {
+    Process\set_resource_limit(Resource::OpenFiles, new ResourceLimit(10, 10));
+  }, fn(): void {
+    Process\replace($binary);
+  }, fn(): void {
+    discard!(Command\create($binary)->withOwnProcessGroup()->start());
+  }] as $operation) {
+    $caught = false;
+    try {
+      $operation();
+    } catch (UnsupportedPlatformException $error) {
+      assert!($error->getMessage() != '');
+      $caught = true;
+    }
+
+    assert!($caught);
+  }
+
+  exit!(0);
+}
 
 $user = Process\get_user_identity();
 assert!($user is UserIdentity);

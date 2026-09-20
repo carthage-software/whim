@@ -22,6 +22,68 @@ fn compile(source: &str, path: &str) -> Vec<u8> {
 }
 
 #[test]
+fn windows_signal_artifact_rejects_unsupported_operations() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let mut sources: Vec<_> = [
+        "Refine/types.whim",
+        "Unwind/LogicException.whim",
+        "Unwind/RuntimeException.whim",
+        "Unwind/InvalidArgumentException.whim",
+        "Unwind/UnsupportedPlatformException.whim",
+        "Command/UnsupportedSignalException.whim",
+        "Process/Signal.whim",
+        "Process/SignalWatcher.whim",
+        "Process/functions.whim",
+    ]
+    .into_iter()
+    .map(|path| {
+        (
+            format!("/std/{path}"),
+            fs::read_to_string(format!("{root}/../../lib/src/{path}")).unwrap(),
+        )
+    })
+    .collect();
+    sources.push((
+        "/signals.whim".to_owned(),
+        fs::read_to_string(format!(
+            "{root}/../../tests/standard-library/process-signals.whim"
+        ))
+        .unwrap(),
+    ));
+    let mut sources: Vec<_> = sources
+        .iter()
+        .map(|(path, contents)| SourceFile::new(path, contents))
+        .collect();
+    sources.push(SourceFile::new(
+        "/target.whim",
+        "assert!(operating_system!() == 'windows');",
+    ));
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        let artifact = engine
+            .compile_artifact(
+                "/windows-signals.whim",
+                &sources,
+                ArtifactConfiguration {
+                    optimize,
+                    target: Some(Target {
+                        os: "windows".into(),
+                        family: "windows".into(),
+                        ..Target::NATIVE
+                    }),
+                    ..ArtifactConfiguration::default()
+                },
+            )
+            .unwrap()
+            .into_bytes();
+        engine.load_artifact(&artifact).unwrap();
+    }
+}
+
+#[test]
 fn artifacts_load_in_order_and_execute_their_top_level_code() {
     let declarations = compile(
         "function artifact_answer(): int { return 42; }",

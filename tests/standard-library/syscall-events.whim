@@ -1,6 +1,6 @@
 ($process, $input, $output, $error) = Whim\_Private\spawn_process(
-  '/bin/sh',
-  vec['-c', 'printf child'],
+  Whim\Env\current_binary(),
+  vec[directory!() . '/_fixtures/command.whim', 'output', 'child', '', '0'],
   null,
   null,
   vec[
@@ -29,20 +29,22 @@ assert!(Whim\_Private\read_descriptor($error, 16) == '');
 $output->close();
 $error->close();
 
-$signalReceived = Whim\_Private\create_suspension::<null>();
-$signalWatcher = Whim\Process\watch_signal(
-  Whim\Process\Signal::UserDefined1,
-  fn(): void {
-    $signalReceived->resume(null);
-  },
-);
+if (Whim\Process\Signal::UserDefined1->isSupported()) {
+  $signalReceived = Whim\_Private\create_suspension::<null>();
+  $signalWatcher = Whim\Process\watch_signal(
+    Whim\Process\Signal::UserDefined1,
+    fn(): void {
+      $signalReceived->resume(null);
+    },
+  );
 
-Whim\Process\signal(Whim\Process\get_id(), Whim\Process\Signal::UserDefined1);
+  Whim\Process\signal(Whim\Process\get_id(), Whim\Process\Signal::UserDefined1);
 
-$signalReceived->suspend();
-$signalWatcher->close();
-assert!($signalWatcher->isClosed());
-$signalWatcher->close();
+  $signalReceived->suspend();
+  $signalWatcher->close();
+  assert!($signalWatcher->isClosed());
+  $signalWatcher->close();
+}
 
 $receiver = Whim\_Private\create_socket(
   Whim\_Private\SOCKET_FAMILY_INET,

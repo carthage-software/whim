@@ -59,6 +59,13 @@ include `TypeError`, `OutOfBoundsError`, `ReadonlyError`, and
 Both use the same `throw` and `catch` rules. The split tells readers whether a
 failure points to a broken program rule or an expected outside condition.
 
+`Whim\Unwind\UnsupportedPlatformException` extends `RuntimeException` and
+reports an operation the running platform cannot provide. Such operations
+fail before starting work. Before sending or watching a process signal, call
+`isSupported()` on its `Whim\Process\Signal` value. It returns `false` for all
+signals on Windows; unsupported signals also return `false` from `isCatchable()`.
+`Whim\Command\UnsupportedSignalException` extends this exception too.
+
 ## `try` and `catch`
 
 `try` must have at least one `catch`, `else`, or `finally` clause.

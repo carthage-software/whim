@@ -3,11 +3,11 @@
 use std::env;
 
 use whim_macros::whim_function;
+use whim_sys::path::path_bytes;
+use whim_sys::path::path_from_bytes;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::path::path_bytes;
-use crate::path::path_from_bytes;
 use crate::value::Value;
 
 #[whim_function("Whim\\Env\\current_directory(): null|string")]
@@ -21,7 +21,9 @@ fn current_directory(scope: &Context<'_, '_, '_>) -> Value {
 #[whim_function("Whim\\Env\\set_current_directory(string $directory): bool")]
 fn set_current_directory(arguments: Arguments<'_>) -> Value {
     let directory = arguments.bytes(0);
-    let changed = env::set_current_dir(path_from_bytes(directory)).is_ok();
+    let changed = path_from_bytes(directory)
+        .and_then(env::set_current_dir)
+        .is_ok();
     Value::bool(changed)
 }
 

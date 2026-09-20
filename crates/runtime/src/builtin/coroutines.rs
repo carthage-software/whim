@@ -1,8 +1,7 @@
 //! Context methods for the autoload callback and the event loop.
 
-use std::os::fd::RawFd;
-
 use whim_loop::Interest;
+use whim_loop::RawDescriptor;
 
 use crate::builtin::Context;
 use crate::builtin::spec::TypeSpec;
@@ -41,11 +40,17 @@ impl Context<'_, '_, '_> {
             .build_built_in_instance_typed(class, &supplied, environment)
     }
 
-    pub(crate) fn io_wait_until_readable(&mut self, fd: RawFd) -> Result<(), Throw> {
+    pub(crate) fn io_wait_until_readable(
+        &mut self,
+        fd: impl Into<RawDescriptor>,
+    ) -> Result<(), Throw> {
         self.io_wait_until(fd, Interest::Readable)
     }
 
-    pub(crate) fn io_wait_until_writable(&mut self, fd: RawFd) -> Result<(), Throw> {
+    pub(crate) fn io_wait_until_writable(
+        &mut self,
+        fd: impl Into<RawDescriptor>,
+    ) -> Result<(), Throw> {
         self.io_wait_until(fd, Interest::Writable)
     }
 
@@ -53,7 +58,12 @@ impl Context<'_, '_, '_> {
     /// caller is in: inside a coroutine the current task parks on the descriptor
     /// and suspends; at `{main}` there is no current task to park, so a watcher is
     /// placed on the descriptor and the loop is driven until it fires.
-    pub(crate) fn io_wait_until(&mut self, fd: RawFd, interest: Interest) -> Result<(), Throw> {
+    pub(crate) fn io_wait_until(
+        &mut self,
+        fd: impl Into<RawDescriptor>,
+        interest: Interest,
+    ) -> Result<(), Throw> {
+        let fd = fd.into();
         if self.vm.loop_current_task().is_some() {
             return self.vm.loop_park_on_fd(fd, interest);
         }

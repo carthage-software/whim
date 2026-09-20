@@ -10,7 +10,7 @@ use Whim\Str;
 function beside(string $relative): string {
   $script = Env\current_script();
   assert!($script is string);
-  $script = Filesystem\canonicalize($script);
+  $script = Str\replace(Filesystem\canonicalize($script), '\\', '/');
   $slash = Str\search_last($script, '/');
   assert!($slash is int);
 

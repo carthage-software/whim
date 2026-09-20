@@ -235,9 +235,10 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
     pub unsafe fn arm_descriptor(
         &mut self,
         id: TaskId,
-        fd: RawDescriptor,
+        fd: impl Into<RawDescriptor>,
         interest: Interest,
     ) -> io::Result<()> {
+        let fd = fd.into();
         let key = id.reactor_key();
         // SAFETY: the caller keeps `fd` open until this task fires or is disarmed.
         unsafe { self.register_descriptor(key, fd, interest)? };
@@ -600,9 +601,10 @@ impl<H: Clone, V: Clone> Scheduler<H, V> {
     /// Returns an operating-system error when the descriptor cannot be watched.
     pub unsafe fn park_current_on_descriptor(
         &mut self,
-        fd: RawDescriptor,
+        fd: impl Into<RawDescriptor>,
         interest: Interest,
     ) -> io::Result<()> {
+        let fd = fd.into();
         let Some(task) = self.current else {
             return Ok(());
         };

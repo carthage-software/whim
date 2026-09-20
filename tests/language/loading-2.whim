@@ -592,7 +592,7 @@ File\write(
 File\write(
   $work . '/reentrant-widget.whim',
   'require_once!(\''
-  . $work
+  . Whim\Str\replace($work, '\\', '\\\\')
   . '/reentrant-helper.whim\');'
   . "\n"
   . 'class ReentrantWidget {'

@@ -44,6 +44,7 @@ File\write(
   . "\n",
 );
 
+$wrong_target_file = Filesystem\canonicalize($wrong_target_file);
 $wrong_target = Command\run($binary, vec[$wrong_target_file]);
 assert!($wrong_target->status is Command\Exited);
 assert!(($wrong_target->status as Command\Exited)->code == 255);
@@ -469,6 +470,7 @@ File\write(
   . "\n",
 );
 
+$track_caller_file = Filesystem\canonicalize($track_caller_file);
 $relocated = Command\run($binary, vec[$track_caller_file]);
 assert!($relocated->status is Command\Exited);
 assert!(($relocated->status as Command\Exited)->code == 255);

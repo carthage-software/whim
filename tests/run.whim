@@ -158,12 +158,16 @@ function execute(
   string $optimizations,
   vec<string> $arguments,
 ): null|string {
-  $child = Command\Command::create($binary)
+  $command = Command\Command::create($binary)
     ->withArguments($arguments)
     ->withVariable('WHIM_OPTIMIZATIONS', $optimizations)
-    ->withVariable('WHIM_LOG', 'error')
-    ->withOwnProcessGroup()
-    ->start();
+    ->withVariable('WHIM_LOG', 'error');
+
+  if (operating_system!() != 'windows') {
+    $command = $command->withOwnProcessGroup();
+  }
+
+  $child = $command->start();
 
   try {
     $output = $child->join(
@@ -211,6 +215,10 @@ if ($script == null) {
 }
 
 $directory = '.';
+if (operating_system!() == 'windows') {
+  $script = Str\replace($script, '\\', '/');
+}
+
 $slash = Str\search_last($script, '/');
 if ($slash != null) {
   $directory = Str\slice($script, 0, $slash);

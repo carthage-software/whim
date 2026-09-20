@@ -177,11 +177,29 @@ $connected->close();
 $receiver->close();
 
 foreach (vec[
-  (Address::v4('0.0.0.0'), Address::v4('127.0.0.1')),
-  (Address::v6('::'), Address::v6('::1')),
-] as ($wildcard, $loopback)) {
-  $receiver = UDP\bind(new InternetEndpoint($wildcard, 0));
-  $sender = UDP\bind(new InternetEndpoint($loopback, 0));
+  (
+    Address::v4('0.0.0.0'),
+    Address::v4('127.0.0.1'),
+    Address::v4('127.0.0.1'),
+    true,
+  ),
+  (Address::v6('::'), Address::v6('::1'), Address::v6('::1'), true),
+  (
+    Address::v6('::'),
+    Address::v6('::ffff:127.0.0.1'),
+    Address::v6('::ffff:127.0.0.1'),
+    false,
+  ),
+  (
+    Address::v6('::'),
+    Address::v6('::ffff:127.0.0.1'),
+    Address::v6('::'),
+    false,
+  ),
+] as ($wildcard, $loopback, $senderBinding, $onlyIPv6)) {
+  $configuration = new UDP\BindConfiguration(onlyIPv6: $onlyIPv6);
+  $receiver = UDP\bind(new InternetEndpoint($wildcard, 0), $configuration);
+  $sender = UDP\bind(new InternetEndpoint($senderBinding, 0), $configuration);
   $destination = new InternetEndpoint(
     $loopback,
     $receiver->getLocalEndpoint()->port,
@@ -215,10 +233,21 @@ foreach (vec[
   assert!($receiver->sendTo('reply', $datagram->peer, $reply) == 5);
   $received = $sender->receive(64);
   assert!('reply' == $received->bytes);
-  assert!($received->peer->address->toString() == $loopback->toString());
   assert!(
-    UDP\ExplicitCongestion::CapableTransport0 == $received->explicitCongestion,
+    $received
+      ->peer
+      ->address
+      ->toIPv4Mapped()
+      ->toString() == $loopback->toIPv4Mapped()->toString(),
   );
+
+  if (operating_system!() != 'freebsd' || !$senderBinding->isIPv4Mapped()) {
+    assert!($received->interfaceIndex > 0);
+    assert!(
+      UDP\ExplicitCongestion::CapableTransport0
+      == $received->explicitCongestion,
+    );
+  }
 
   if ('freebsd' == operating_system!() && Family::V4 == $loopback->family) {
     $rejected = false;
@@ -238,6 +267,26 @@ foreach (vec[
     }
 
     assert!($rejected);
+  }
+
+  if (operating_system!() == 'windows') {
+    $unsupported = false;
+    try {
+      discard!(
+        $sender->sendTo(
+          'congestion',
+          $destination,
+          new UDP\SendMetadata(
+            $loopback,
+            UDP\ExplicitCongestion::CongestionExperienced,
+          ),
+        ),
+      );
+    } catch (Whim\Unwind\UnsupportedPlatformException $_) {
+      $unsupported = true;
+    }
+
+    assert!($unsupported);
   }
 
   $receiver->close();

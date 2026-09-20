@@ -103,13 +103,13 @@ enum Signal: int {
   #[AlwaysInline]
   #[MustUse]
   public function isCatchable(): bool {
-    return self::Kill != $this && self::Stop != $this;
+    return $this->isSupported() && self::Kill != $this && self::Stop != $this;
   }
 
   /** Whether the running system names this signal. */
   #[AlwaysInline]
   #[MustUse]
   public function isSupported(): bool {
-    return $this->value > 0;
+    return operating_system!() != 'windows' && $this->value > 0;
   }
 }

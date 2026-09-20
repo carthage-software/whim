@@ -116,12 +116,23 @@ jobs:
 
   rust-windows:
     runs-on: windows-latest
+    env:
+      RUSTFLAGS: -Dwarnings -C target-feature=+crt-static
     steps:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: ilammy/setup-nasm@v1
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --locked -p whim-syn -p whim-formatter -p whim-linter -p whim-span -p whim-loop -p whim-sqlite -p whim-pgsql --all-features
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --workspace --all-targets --all-features
+      - run: cargo test --locked --workspace --all-features
+      - run: cargo build --locked --release --bin whim
+      - run: target/release/whim.exe tests/run.whim '' 2
+      - run: target/release/whim.exe fmt --check
+      - run: target/release/whim.exe lint
 
   msrv:
     runs-on: ubuntu-latest

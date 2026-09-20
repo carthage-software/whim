@@ -20,21 +20,21 @@ function pipe(
   );
 }
 
-/** Returns the process's C standard output stream: libc owns the buffering, `flush` is `fflush`. */
+/** Returns the process's standard output stream. */
 #[TrackCaller]
 function write_handle(): BufferedWriteHandle&FileDescriptorHandle {
   ($_input, $output, $_error) = Whim\_Private\standard_descriptors();
   return new _Private\WriteHandleImpl($output);
 }
 
-/** Returns the process's C standard input stream: libc owns the buffering, reads are `fread`. */
+/** Returns the process's standard input stream. */
 #[TrackCaller]
 function input_handle(): ReadHandle&FileDescriptorHandle {
   ($input, $_output, $_error) = Whim\_Private\standard_descriptors();
   return new _Private\ReadHandleImpl($input);
 }
 
-/** Returns the process's C standard error stream: libc owns the buffering, `flush` is `fflush`. */
+/** Returns the process's standard error stream. */
 #[TrackCaller]
 function error_handle(): BufferedWriteHandle&FileDescriptorHandle {
   ($_input, $_output, $error) = Whim\_Private\standard_descriptors();

@@ -6,6 +6,8 @@ use std::path::PathBuf;
 
 use thiserror::Error as ThisError;
 
+use crate::filesystem::sync_directory_io;
+
 #[derive(Debug, ThisError)]
 pub(crate) enum Error {
     #[error("could not read `{}`: {source}", path.display())]
@@ -71,11 +73,9 @@ pub(crate) fn write_file(path: &Path, contents: &[u8]) -> Result<(), Error> {
 }
 
 pub(crate) fn sync_directory(path: &Path) -> Result<(), Error> {
-    File::open(path)
-        .and_then(|directory| directory.sync_all())
-        .map_err(|source| Error::Sync {
-            path: path.to_path_buf(),
-            source,
-        })?;
+    sync_directory_io(path).map_err(|source| Error::Sync {
+        path: path.to_path_buf(),
+        source,
+    })?;
     Ok(())
 }

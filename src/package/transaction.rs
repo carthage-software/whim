@@ -5,7 +5,6 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
 use std::io;
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
@@ -292,7 +291,7 @@ fn remove_stages_in(directory: &Path, prefix: &[u8]) -> Result<(), Error> {
     for entry in entries {
         let entry = entry.map_err(|source| Error::io(IoAction::Inspect, directory, source))?;
         let name = entry.file_name();
-        if name.as_bytes().starts_with(prefix)
+        if name.as_encoded_bytes().starts_with(prefix)
             && entry
                 .file_type()
                 .map_err(|source| Error::io(IoAction::Inspect, entry.path(), source))?

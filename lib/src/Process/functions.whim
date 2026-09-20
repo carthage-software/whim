@@ -13,8 +13,8 @@ use Whim\Refine\NonNegativeInt;
 use Whim\Refine\PositiveInt;
 use Whim\Str;
 use Whim\Time\Duration;
-use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\RuntimeException;
+use Whim\Unwind\UnsupportedPlatformException;
 
 /** Returns the current process identifier. */
 #[Stub]
@@ -281,8 +281,8 @@ function exists((1..) $process): bool {}
 #[TrackCaller]
 function signal(PositiveInt $process, Signal $signal): void {
   if (!$signal->isSupported()) {
-    throw new InvalidArgumentException(
-      'the signal is not supported by the running system',
+    throw new UnsupportedPlatformException(
+      'signal ' . $signal->name . ' is not supported on ' . operating_system!(),
     );
   }
 
@@ -301,8 +301,8 @@ function signal(PositiveInt $process, Signal $signal): void {
 #[TrackCaller]
 function signal_group(PositiveInt $group, Signal $signal): void {
   if (!$signal->isSupported()) {
-    throw new InvalidArgumentException(
-      'the signal is not supported by the running system',
+    throw new UnsupportedPlatformException(
+      'signal ' . $signal->name . ' is not supported on ' . operating_system!(),
     );
   }
 
@@ -327,27 +327,44 @@ function watch_signal(Signal $signal, fn(): void $callback): SignalWatcher {
 #[MustUse]
 #[TrackCaller]
 function find_executable(NonEmptyString $name): null|NonEmptyString {
-  if (Str\contains($name, '/')) {
-    if (Filesystem\is_file($name) && Filesystem\is_executable($name)) {
-      return $name;
-    }
-
-    return null;
+  $windows = operating_system!() == 'windows';
+  $suffixes = vec[''];
+  if ($windows) {
+    $suffixes = vec[
+      '',
+      ...Str\split(Env\get_variable('PATHEXT') ?? '.COM;.EXE;.BAT;.CMD', ';'),
+    ];
   }
 
-  $path = Env\get_variable('PATH') ?? return null;
+  $directories = vec[''];
+  if (
+    !Str\contains($name, '/')
+    && !($windows && (Str\contains($name, '\\') || Str\contains($name, ':')))
+  ) {
+    $path = Env\get_variable('PATH') ?? return null;
+    $directories = Str\split(
+      $path,
+      match ($windows) {
+        true => ';',
+        false => ':',
+      },
+    );
+  }
 
-  foreach (Str\split($path, ':') as $directory) {
-    if ('' == $directory) {
-      $directory = Env\current_directory() ?? '.';
-    }
+  foreach ($directories as $directory) {
+    $prefix = match ($directory) {
+      '' => '',
+      _ => $directory . '/',
+    };
 
-    $candidate = $directory . '/' . $name;
-    if (
-      Filesystem\is_file($candidate)
-      && Filesystem\is_executable($candidate)
-    ) {
-      return $candidate as NonEmptyString;
+    foreach ($suffixes as $suffix) {
+      $candidate = $prefix . $name . $suffix;
+      if (
+        Filesystem\is_file($candidate)
+        && Filesystem\is_executable($candidate)
+      ) {
+        return $candidate as NonEmptyString;
+      }
     }
   }
 

@@ -19,6 +19,7 @@ function family(): string {
   return match (Whim\_Private\OS) {
     'macos' => 'Darwin',
     'linux' => 'Linux',
+    'windows' => 'Windows',
     'freebsd' | 'netbsd' | 'openbsd' | 'dragonfly' => 'BSD',
     'solaris' | 'illumos' => 'Solaris',
     _ => 'Unknown',

@@ -4,6 +4,7 @@ use Whim\File\WriteMode;
 use Whim\Filesystem;
 use Whim\Unwind\TypeError;
 use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\UnsupportedPlatformException;
 
 assert!(Env\current_script() is string);
 
@@ -143,6 +144,18 @@ try {
 assert!($assertion_error_20 is TypeError);
 
 Filesystem\delete_directory($directory, true);
+
+if (operating_system!() == 'windows') {
+  $unsupported = false;
+  try {
+    discard!(Filesystem\exchange_creation_mask(0o077));
+  } catch (UnsupportedPlatformException $error) {
+    $unsupported = true;
+  }
+
+  assert!($unsupported);
+  exit!(0);
+}
 
 $maskDirectory = Filesystem\create_temporary_directory(null, 'whim-mask-');
 $originalMask = Filesystem\exchange_creation_mask(0o077);

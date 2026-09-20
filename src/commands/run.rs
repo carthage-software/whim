@@ -9,7 +9,7 @@ use clap::ColorChoice;
 use tracing::field;
 
 use whim_runtime::engine::EngineConfiguration;
-use whim_runtime::path::path_bytes;
+use whim_sys::path::path_bytes;
 
 use crate::engine;
 use crate::error::Error;

@@ -2,6 +2,7 @@ use std::fs;
 use std::io;
 use std::io::Read;
 use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 use std::path::PathBuf;
@@ -201,12 +202,24 @@ fn parent(path: &Path) -> &Path {
 }
 
 fn sync_directory(directory: &Path) -> Result<(), Error> {
-    fs::File::open(directory)
-        .and_then(|directory| directory.sync_all())
-        .map_err(|source| Error::Sync {
-            path: directory.to_path_buf(),
-            source,
-        })
+    sync_directory_io(directory).map_err(|source| Error::Sync {
+        path: directory.to_path_buf(),
+        source,
+    })
+}
+
+pub(crate) fn sync_directory_io(path: &Path) -> io::Result<()> {
+    let mut options = fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_BACKUP_SEMANTICS;
+
+        options.write(true).custom_flags(FILE_FLAG_BACKUP_SEMANTICS);
+    }
+
+    options.open(path)?.sync_all()
 }
 
 struct TemporaryFile {
@@ -222,12 +235,11 @@ impl TemporaryFile {
         for _ in 0..MAXIMUM_TEMPORARY_ATTEMPTS {
             let ordinal = COUNTER.fetch_add(1, Ordering::Relaxed);
             let path = directory.join(format!(".whim-{}-{ordinal}.tmp", process::id()));
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&path)
-            {
+            let mut options = fs::OpenOptions::new();
+            options.write(true).create_new(true);
+            #[cfg(unix)]
+            options.mode(0o600);
+            match options.open(&path) {
                 Ok(file) => {
                     return Ok(Self {
                         path,
@@ -293,12 +305,15 @@ impl Drop for TemporaryFile {
 #[cfg(test)]
 mod tests {
     use std::env;
+    #[cfg(unix)]
     use std::fs;
     use std::io::Cursor;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     use std::process;
 
     use crate::filesystem::LimitedString;
+    #[cfg(unix)]
     use crate::filesystem::TemporaryFile;
     use crate::filesystem::read_limited_string_from;
     use crate::filesystem::remove_directory_all;
@@ -319,6 +334,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn temporary_files_are_private_before_they_are_written() {
         let directory = env::temp_dir().join(format!(
             "whim-private-temporary-file-test-{}",

@@ -370,7 +370,7 @@ fn run_reports_non_broken_pipe_output_failures() {
     let output = Command::new(env!("CARGO_BIN_EXE_whim"))
         .arg(&program)
         .stdout(Stdio::from(
-            fs::File::open("/dev/null").expect("the null device is readable"),
+            fs::File::open(&program).expect("the source is readable"),
         ))
         .stderr(Stdio::piped())
         .output()
@@ -388,7 +388,7 @@ fn disassemble_reports_non_broken_pipe_output_failures() {
     let output = Command::new(env!("CARGO_BIN_EXE_whim"))
         .args([OsStr::new("disassemble"), program.as_os_str()])
         .stdout(Stdio::from(
-            fs::File::open("/dev/null").expect("the null device is readable"),
+            fs::File::open(&program).expect("the source is readable"),
         ))
         .stderr(Stdio::piped())
         .output()

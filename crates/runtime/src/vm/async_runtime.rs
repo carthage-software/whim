@@ -1,10 +1,10 @@
 //! Driving the event loop, and the concept-free primitives the async standard
 //! library is built on.
 
-use std::os::fd::RawFd;
 use std::rc::Rc;
 use std::time::Duration;
 use std::time::Instant;
+use whim_loop::RawDescriptor;
 
 use whim_loop::Activation;
 use whim_loop::Interest;
@@ -191,7 +191,7 @@ impl VirtualMachine<'_> {
     pub(crate) fn loop_on_fd(
         &mut self,
         callback: Value,
-        fd: RawFd,
+        fd: RawDescriptor,
         interest: Interest,
     ) -> Result<TaskId, Throw> {
         self.ensure_scheduler()?;
@@ -283,7 +283,7 @@ impl VirtualMachine<'_> {
     pub(crate) fn loop_await_fd(
         &mut self,
         callback: Value,
-        fd: RawFd,
+        fd: RawDescriptor,
         interest: Interest,
     ) -> Result<(), Throw> {
         let watcher = self.loop_on_fd(callback, fd, interest)?;
@@ -444,13 +444,21 @@ impl VirtualMachine<'_> {
         coroutine.state.get() == CoroutineState::Terminated
     }
 
-    pub(crate) fn loop_park_on_fd(&mut self, fd: RawFd, interest: Interest) -> Result<(), Throw> {
+    pub(crate) fn loop_park_on_fd(
+        &mut self,
+        fd: RawDescriptor,
+        interest: Interest,
+    ) -> Result<(), Throw> {
         self.loop_arm_fd(fd, interest)?;
         self.loop_suspend()?;
         Ok(())
     }
 
-    pub(crate) fn loop_arm_fd(&mut self, fd: RawFd, interest: Interest) -> Result<(), Throw> {
+    pub(crate) fn loop_arm_fd(
+        &mut self,
+        fd: RawDescriptor,
+        interest: Interest,
+    ) -> Result<(), Throw> {
         if self.loop_current_task().is_none() {
             return Err(self.throw_well_known_value(
                 self.engine.tables.well_known.coroutine_error,

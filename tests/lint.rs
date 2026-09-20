@@ -1,5 +1,6 @@
 use std::env::temp_dir;
 use std::fs;
+use std::path::MAIN_SEPARATOR;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
@@ -189,7 +190,7 @@ enabled = false
     assert!(
         String::from_utf8(output.stdout)
             .unwrap()
-            .contains("other/file.whim")
+            .contains(&format!("other{MAIN_SEPARATOR}file.whim"))
     );
     let output = project.lint(&["src/generated/code.whim", "src/generated/code.whim"]);
     assert_eq!(
@@ -268,7 +269,11 @@ fn syntax_errors_fail_and_valid_files_still_get_linted() {
 #[test]
 fn json_reports_locations_and_annotations_without_color_or_logs() {
     let project = Project::new("");
-    let name = "src/é\"source.whim";
+    let name = if cfg!(windows) {
+        "src/é source.whim"
+    } else {
+        "src/é\"source.whim"
+    };
     let source = "// TODO: track this\r\n'🙂'; $password = 'secret';\r\n";
     project.write(name, source);
     let output = Command::new(env!("CARGO_BIN_EXE_whim"))
@@ -445,12 +450,18 @@ fn logs_count_findings_and_failures_and_keep_worker_context() {
         assert!(summary.contains(field), "{summary}");
     }
     for phase in ["read", "parse", "lint", "render"] {
+        let (pipeline, file) = if cfg!(debug_assertions) {
+            ("pipeline{", "file{path=")
+        } else {
+            ("pipeline:", "file:")
+        };
         assert!(
             logs.lines()
                 .any(|line| line.contains(&format!("phase=\"{phase}\""))
                     && line.contains("lint:")
-                    && line.contains("pipeline{")
-                    && line.contains("file{path=")),
+                    && line.contains(pipeline)
+                    && line.contains(file)
+                    && line.contains("path=")),
             "{logs}"
         );
     }
@@ -503,7 +514,9 @@ fn file_commands_check_buffered_output_errors_and_closed_pipes() {
             .args(args)
             .stderr(Stdio::piped());
         let failed = command
-            .stdout(Stdio::from(fs::File::open("/dev/null").unwrap()))
+            .stdout(Stdio::from(
+                fs::File::open(project.0.join("source.whim")).unwrap(),
+            ))
             .output()
             .unwrap();
         assert_eq!(failed.status.code(), Some(1));
@@ -542,7 +555,7 @@ fn parallel_batches_keep_diagnostic_order_and_explain_skipped_paths() {
     let offsets: Vec<_> = (0..70)
         .map(|index| {
             diagnostics
-                .find(&format!("src/{index:02}.whim:1:"))
+                .find(&format!("src{MAIN_SEPARATOR}{index:02}.whim:1:"))
                 .unwrap()
         })
         .collect();
@@ -553,7 +566,10 @@ fn parallel_batches_keep_diagnostic_order_and_explain_skipped_paths() {
     let diagnostics: Vec<Value> = serde_json::from_slice(&output_json.stdout).unwrap();
     assert_eq!(diagnostics.len(), 70);
     for (index, diagnostic) in diagnostics.iter().enumerate() {
-        assert_eq!(diagnostic["path"], format!("src/{index:02}.whim"));
+        assert_eq!(
+            diagnostic["path"],
+            format!("src{MAIN_SEPARATOR}{index:02}.whim")
+        );
         assert_eq!(diagnostic["code"], "tagged-todo");
     }
     let logs = String::from_utf8(output.stderr).unwrap();
@@ -563,7 +579,11 @@ fn parallel_batches_keep_diagnostic_order_and_explain_skipped_paths() {
         "warnings=70",
         "reason=\"exclude filter\"",
         "reason=\"duplicate\"",
-        "batch{index=1 files=6}",
+        if cfg!(debug_assertions) {
+            "batch{index=1 files=6}"
+        } else {
+            "index=1 files=6"
+        },
     ] {
         assert!(logs.contains(field), "{logs}");
     }

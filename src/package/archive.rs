@@ -1,12 +1,11 @@
 use std::cmp::Reverse;
 use std::collections::BTreeSet;
-use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::Read;
-use std::os::unix::ffi::OsStrExt;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Component;
 use std::path::Path;
@@ -15,6 +14,7 @@ use std::path::StripPrefixError;
 use std::process::ExitStatus;
 
 use thiserror::Error as ThisError;
+use whim_sys::path::{path_bytes, path_from_bytes};
 
 use crate::package::filesystem::Error as FilesystemError;
 use crate::package::filesystem::sync_directory;
@@ -163,11 +163,7 @@ pub(crate) fn checksum(root: &Path) -> Result<String, Error> {
 
     let mut entries = Vec::new();
     collect_entries(root, root, &mut entries)?;
-    entries.sort_by(|left, right| {
-        left.as_os_str()
-            .as_bytes()
-            .cmp(right.as_os_str().as_bytes())
-    });
+    entries.sort_by_cached_key(|path| checksum_path(path));
 
     let mut hasher = blake3::Hasher::new();
     let mut buffer = vec![0_u8; 64 * 1024];
@@ -176,10 +172,10 @@ pub(crate) fn checksum(root: &Path) -> Result<String, Error> {
         let path = root.join(&relative);
         let metadata = fs::symlink_metadata(&path)
             .map_err(|source| Error::io(IoOperation::Inspect, &path, source))?;
-        let path_bytes = relative.as_os_str().as_bytes();
+        let path_bytes = checksum_path(&relative);
         hasher.update(&(path_bytes.len() as u64).to_le_bytes());
-        hasher.update(path_bytes);
-        let executable = u8::from(metadata.permissions().mode() & 0o111 != 0);
+        hasher.update(&path_bytes);
+        let executable = executable(&path, &metadata)?;
         if metadata.is_dir() {
             hasher.update(&[0, executable]);
             hasher.update(&0_u64.to_le_bytes());
@@ -237,7 +233,9 @@ pub(crate) fn copy(source: &Path, destination: &Path) -> Result<(), Error> {
                     .permissions(),
             )
             .map_err(|error| Error::io(IoOperation::SetMode, &to, error))?;
-            File::open(&to)
+            File::options()
+                .write(true)
+                .open(&to)
                 .and_then(|file| file.sync_all())
                 .map_err(|error| Error::io(IoOperation::Sync, &to, error))?;
         } else {
@@ -280,11 +278,30 @@ fn extract(reader: impl Read, destination: &Path) -> Result<(), Error> {
             });
         }
 
-        let path = Path::new(OsStr::from_bytes(&path));
+        #[cfg(windows)]
+        let has_backslash = path.contains(&b'\\');
+        let path = path_from_bytes(&path).map_err(Error::InvalidEntry)?;
+        let path = path.as_path();
         if path.is_absolute()
             || path
                 .components()
                 .any(|component| !matches!(component, Component::Normal(_)))
+        {
+            return Err(Error::UnsafePath(path.to_path_buf()));
+        }
+        #[cfg(windows)]
+        if has_backslash
+            || path.components().any(|component| {
+                let name = component.as_os_str().as_encoded_bytes();
+                name.iter().any(|byte| {
+                    matches!(
+                        byte,
+                        b':' | b'<' | b'>' | b'"' | b'|' | b'?' | b'*' | 0..=31
+                    )
+                }) || name.ends_with(b".")
+                    || name.ends_with(b" ")
+                    || reserved_windows_name(name)
+            })
         {
             return Err(Error::UnsafePath(path.to_path_buf()));
         }
@@ -296,7 +313,7 @@ fn extract(reader: impl Read, destination: &Path) -> Result<(), Error> {
         if entry_type.is_dir() {
             fs::create_dir_all(&target)
                 .map_err(|error| Error::io(IoOperation::Create, &target, error))?;
-            fs::set_permissions(&target, fs::Permissions::from_mode(0o755))
+            set_mode(&target, 0o755)
                 .map_err(|error| Error::io(IoOperation::SetMode, &target, error))?;
             record_directories(destination, &target, &mut directories);
         } else if entry_type.is_file() {
@@ -310,7 +327,7 @@ fn extract(reader: impl Read, destination: &Path) -> Result<(), Error> {
                 .map_err(|error| Error::io(IoOperation::Create, &target, error))?;
             io::copy(&mut entry, &mut file)
                 .map_err(|error| Error::io(IoOperation::Extract, &target, error))?;
-            fs::set_permissions(&target, fs::Permissions::from_mode(0o644 | mode))
+            set_mode(&target, 0o644 | mode)
                 .map_err(|error| Error::io(IoOperation::SetMode, &target, error))?;
             file.sync_all()
                 .map_err(|error| Error::io(IoOperation::Sync, &target, error))?;
@@ -355,7 +372,7 @@ fn collect_entries(root: &Path, directory: &Path, entries: &mut Vec<PathBuf>) ->
                 .strip_prefix(root)
                 .map_err(Error::EscapedRoot)?
                 .to_path_buf();
-            if relative.as_os_str().as_bytes().len() > MAXIMUM_PATH_BYTES {
+            if path_bytes(&relative).len() > MAXIMUM_PATH_BYTES {
                 return Err(Error::InstalledPathTooLong {
                     path: relative,
                     limit: MAXIMUM_PATH_BYTES,
@@ -380,6 +397,89 @@ fn collect_entries(root: &Path, directory: &Path, entries: &mut Vec<PathBuf>) ->
     }
 
     Ok(())
+}
+
+fn checksum_path(path: &Path) -> Vec<u8> {
+    let bytes = path_bytes(path);
+    #[cfg(windows)]
+    let bytes = bytes
+        .into_iter()
+        .map(|byte| if byte == b'\\' { b'/' } else { byte })
+        .collect();
+    bytes
+}
+
+#[cfg(unix)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "reading the Windows executable-bit stream can fail"
+)]
+fn executable(_path: &Path, metadata: &fs::Metadata) -> Result<u8, Error> {
+    Ok(u8::from(metadata.permissions().mode() & 0o111 != 0))
+}
+
+#[cfg(windows)]
+fn executable(path: &Path, metadata: &fs::Metadata) -> Result<u8, Error> {
+    if metadata.is_dir() {
+        return Ok(1);
+    }
+    match fs::read(mode_stream(path)) {
+        Ok(mode) if mode == b"1" => Ok(1),
+        Ok(_) => Err(Error::UnsafeInstalledPath(path.to_path_buf())),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(0),
+        Err(error) => Err(Error::io(IoOperation::Read, path, error)),
+    }
+}
+
+#[cfg(unix)]
+fn set_mode(path: &Path, mode: u32) -> io::Result<()> {
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))
+}
+
+#[cfg(windows)]
+fn set_mode(path: &Path, mode: u32) -> io::Result<()> {
+    if mode & 0o111 != 0 && path.is_file() {
+        use std::io::Write;
+        let mut stream = File::create(mode_stream(path))?;
+        stream.write_all(b"1")?;
+        stream.sync_all()?;
+    } else if path.is_file() {
+        match fs::remove_file(mode_stream(path)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn mode_stream(path: &Path) -> PathBuf {
+    let mut path = path.as_os_str().to_os_string();
+    path.push(":whim-executable");
+    path.into()
+}
+
+#[cfg(windows)]
+fn reserved_windows_name(name: &[u8]) -> bool {
+    let name = name.split(|byte| *byte == b'.').next().unwrap_or_default();
+    [
+        b"CON".as_slice(),
+        b"PRN",
+        b"AUX",
+        b"NUL",
+        b"CONIN$",
+        b"CONOUT$",
+    ]
+    .iter()
+    .any(|reserved| name.eq_ignore_ascii_case(reserved))
+        || (name.len() == 4
+            && (name[..3].eq_ignore_ascii_case(b"COM") || name[..3].eq_ignore_ascii_case(b"LPT"))
+            && matches!(name[3], b'1'..=b'9'))
+        || (name.len() == 5
+            && (name[..3].eq_ignore_ascii_case(b"COM") || name[..3].eq_ignore_ascii_case(b"LPT"))
+            && name[3] == 0xc2
+            && matches!(name[4], 0xb9 | 0xb2 | 0xb3))
 }
 
 fn validate_file_size(path: &Path, size: u64, total: &mut u64) -> Result<(), Error> {

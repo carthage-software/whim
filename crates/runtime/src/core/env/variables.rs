@@ -2,12 +2,13 @@
 
 use std::env;
 use std::path::Path;
+
 use whim_macros::whim_function;
+use whim_sys::path::os_string_from_bytes;
+use whim_sys::path::path_bytes;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
-use crate::path::path_bytes;
-use crate::path::path_from_bytes;
 use crate::value::Value;
 
 #[whim_function("Whim\\Env\\get_variable(string $name): null|string")]
@@ -17,7 +18,9 @@ fn get_variable(scope: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value 
         return Value::null();
     }
 
-    let name = path_from_bytes(name);
+    let Ok(name) = os_string_from_bytes(name) else {
+        return Value::null();
+    };
 
     match env::var_os(name) {
         Some(value) => scope.string(&path_bytes(Path::new(&value))),
@@ -38,8 +41,9 @@ fn set_variable(arguments: Arguments<'_>) -> Value {
         return Value::bool(false);
     }
 
-    let name = path_from_bytes(name);
-    let value = path_from_bytes(value);
+    let (Ok(name), Ok(value)) = (os_string_from_bytes(name), os_string_from_bytes(value)) else {
+        return Value::bool(false);
+    };
 
     // SAFETY: Whim serializes user code, and its native workers do not access the environment.
     unsafe { env::set_var(name, value) };
@@ -54,7 +58,9 @@ fn remove_variable(arguments: Arguments<'_>) -> Value {
         return Value::bool(false);
     }
 
-    let name = path_from_bytes(name);
+    let Ok(name) = os_string_from_bytes(name) else {
+        return Value::bool(false);
+    };
 
     let existed = env::var_os(&name).is_some();
     // SAFETY: Whim serializes user code, and its native workers do not access the environment.

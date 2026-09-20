@@ -1,7 +1,8 @@
 # Installation
 
 Whim supports macOS and FreeBSD on x86-64 and Arm64, Linux with glibc on
-x86-64, Arm64, and RISC-V 64, and Linux with musl on x86-64 and Arm64.
+x86-64, Arm64, and RISC-V 64, Linux with musl on x86-64 and Arm64, and
+Windows on x86-64.
 Run it through the `whim` command.
 
 ## Shell installer
@@ -40,10 +41,22 @@ On Linux, it detects glibc or musl and downloads the matching build.
 
 > Note: Release `0.1.0` has no attestation.
 
+## Windows
+
+On 64-bit Windows 10 version 1803 or later, download
+`whim-<version>-x86_64-pc-windows-msvc.zip` from
+[GitHub Releases](https://github.com/carthage-software/whim/releases).
+Extract `whim.exe` and add its directory to your user `PATH`.
+Open a new terminal and run `whim --version`.
+
+Windows uses the same standard-library API. POSIX-only operations throw
+`Whim\Unwind\UnsupportedPlatformException`; see
+[Windows platform limits](../standard-library/io.md#windows-platform-limits).
+
 ## Manual installation
 
 Download the archive for your system from [GitHub Releases](https://github.com/carthage-software/whim/releases). Put the
-`whim` file in a directory on your `PATH`. Then check it:
+`whim` file (`whim.exe` on Windows) in a directory on your `PATH`. Then check it:
 
 ```console
 whim --version
@@ -69,6 +82,12 @@ cargo build --locked --release
 ```
 
 The build produces the `whim` executable at `target/release/whim`.
+
+On Windows, use the `x86_64-pc-windows-msvc` Rust toolchain. Install Visual Studio
+Build Tools with the C++ tools and Windows SDK, plus CMake, Perl, and NASM.
+The build produces `target\release\whim.exe`. Release builds set
+`RUSTFLAGS=-C target-feature=+crt-static` to include the C runtime.
+The package manager needs Git for Windows on `PATH`.
 
 On FreeBSD, use the `latest` package repository for Rust 1.98 or later, then
 install the build tools and PostgreSQL client library:

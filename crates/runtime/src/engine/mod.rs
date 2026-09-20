@@ -10,8 +10,6 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Write as _;
 use std::io;
-use std::io::ErrorKind;
-use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::ptr::NonNull;
@@ -27,6 +25,8 @@ use whim_span::HasSpan;
 use whim_syn::arena::LocalArena;
 use whim_syn::cst::Program;
 use whim_syn::parser;
+use whim_sys::path::path_bytes;
+use whim_sys::process::Processes;
 
 use crate::blocking::BlockingPool;
 use crate::bytecode::unit::CompiledClassLike;
@@ -195,6 +195,7 @@ impl ExecutionOutcome {
 /// The engine. See the [module documentation](self).
 pub struct Engine {
     pub(crate) blocking: BlockingPool,
+    pub(crate) processes: Processes,
     pub(crate) configuration: EngineConfiguration,
     pub(crate) tables: tables::RuntimeTables,
     pub(crate) units: Vec<Rc<UnitContext>>,
@@ -282,6 +283,7 @@ impl Engine {
     /// An engine writing to the process's standard streams, buffered.
     #[must_use]
     pub fn new(configuration: EngineConfiguration) -> Self {
+        whim_sys::initialize_console();
         let heap = Heap::new();
         heap.configure_cycle_threshold(configuration.cycle_threshold);
 
@@ -289,6 +291,7 @@ impl Engine {
 
         Self {
             blocking: BlockingPool::new(),
+            processes: Processes::default(),
             configuration,
             tables,
             units: Vec::new(),
@@ -338,8 +341,8 @@ impl Engine {
     pub fn run_source(&mut self, source: &str, path: &Path) -> ExecutionOutcome {
         let arena = LocalArena::new();
         let diagnostic_path = path.to_string_lossy();
-        let runtime_path = path.as_os_str().as_bytes();
-        let path_atom = self.heap.intern(runtime_path);
+        let runtime_path = path_bytes(path);
+        let path_atom = self.heap.intern(&runtime_path);
         let retained_source = Rc::<str>::from(source);
         let program = match parser::parse(&arena, source) {
             Ok(program) => program,
@@ -364,7 +367,7 @@ impl Engine {
             }
         };
 
-        let unit = match self.compile_program(program, &diagnostic_path, runtime_path) {
+        let unit = match self.compile_program(program, &diagnostic_path, &runtime_path) {
             Ok(unit) => unit,
             Err(error) => {
                 let origin = DiagnosticOrigin {
@@ -562,68 +565,7 @@ impl Engine {
     }
 
     pub(crate) fn write_standard_stream(stream: StandardStream, bytes: &[u8]) -> io::Result<()> {
-        let file = stream.file();
-        let mut remaining = bytes;
-        loop {
-            while !remaining.is_empty() {
-                // SAFETY: `file` is a live C stream and `remaining` lives through the call.
-                let count = unsafe {
-                    libc::fwrite(
-                        remaining.as_ptr().cast::<libc::c_void>(),
-                        1,
-                        remaining.len(),
-                        file,
-                    )
-                };
-
-                // SAFETY: `file` is a live C stream.
-                if unsafe { libc::ferror(file) } != 0 {
-                    let error = io::Error::last_os_error();
-                    // SAFETY: `file` is a live C stream.
-                    unsafe { libc::clearerr(file) };
-                    match error.kind() {
-                        ErrorKind::Interrupted => {}
-                        ErrorKind::WouldBlock => Self::wait_stream_writable(stream)?,
-                        _ => return Err(error),
-                    }
-                }
-
-                remaining = &remaining[count..];
-            }
-
-            // SAFETY: `file` is a live C stream.
-            if unsafe { libc::fflush(file) } == 0 {
-                return Ok(());
-            }
-
-            let error = io::Error::last_os_error();
-            // SAFETY: `file` is a live C stream.
-            unsafe { libc::clearerr(file) };
-            match error.kind() {
-                ErrorKind::Interrupted => {}
-                ErrorKind::WouldBlock => Self::wait_stream_writable(stream)?,
-                _ => return Err(error),
-            }
-        }
-    }
-
-    fn wait_stream_writable(stream: StandardStream) -> io::Result<()> {
-        let mut request = libc::pollfd {
-            fd: stream.number(),
-            events: libc::POLLOUT,
-            revents: 0,
-        };
-
-        loop {
-            // SAFETY: `request` is a live poll record for this call.
-            if unsafe { libc::poll(std::ptr::addr_of_mut!(request), 1, -1) } >= 0 {
-                return Ok(());
-            }
-            let error = io::Error::last_os_error();
-            if error.kind() != ErrorKind::Interrupted {
-                return Err(error);
-            }
-        }
+        stream.write_all_blocking(bytes)
     }
 
     /// Sets the program arguments as platform bytes without requiring UTF-8.
@@ -632,7 +574,7 @@ impl Engine {
     }
 
     /// Sets the script path as platform path bytes, without requiring UTF-8.
-    /// Bytes returned by [`crate::path::path_bytes`] round-trip through
+    /// Bytes returned by [`whim_sys::path::path_bytes`] round-trip through
     /// `Whim\Env\current_script` exactly.
     pub fn set_script_bytes(&mut self, script: Option<Vec<u8>>) {
         self.script = script;

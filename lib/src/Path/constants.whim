@@ -1,4 +1,7 @@
 namespace Whim\Path;
 
-/** The path separator used by every supported system. */
-const SEPARATOR = '/';
+use Whim\Marker\Stub;
+
+/** The native directory separator. */
+#[Stub]
+const SEPARATOR = SEPARATOR;

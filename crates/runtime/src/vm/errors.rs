@@ -4,7 +4,10 @@ use std::collections::HashSet;
 use std::env::current_dir;
 use std::fmt::Write;
 use std::mem;
+use std::path::PathBuf;
 use std::rc::Rc;
+
+use whim_sys::path::path_from_bytes;
 
 use crate::builtin::spec::ParameterSpec;
 use crate::bytecode::chunk::descriptors::TypeDescriptor;
@@ -20,7 +23,6 @@ use crate::core::classes::ERROR_SLOT_TRACE;
 use crate::engine::diagnostics::DiagnosticLabel;
 use crate::engine::diagnostics::DiagnosticLabels;
 use crate::engine::diagnostics::DiagnosticOrigin;
-use crate::path::path_from_bytes;
 use crate::symbols::UnitSourceFile;
 use crate::value::ValueView;
 use crate::value::function::PresetArg;
@@ -931,7 +933,8 @@ impl VirtualMachine<'_> {
             return format!("[{}:0:0] ", unit.path);
         };
         let (path, line, column) = Self::source_position(unit, span.start.offset);
-        let path = path_from_bytes(path.as_bytes());
+        let path = path_from_bytes(path.as_bytes())
+            .unwrap_or_else(|_| PathBuf::from(path.to_string_lossy().as_ref()));
         let path = match current_dir() {
             Ok(directory) => match path.strip_prefix(directory) {
                 Ok(relative) => relative,

@@ -276,15 +276,14 @@ impl Repository {
                 return Err(Error::NotBare(source.to_string()));
             }
         } else {
+            fs::create_dir(&directory).map_err(|source| Error::CreateCache {
+                path: directory.clone(),
+                source,
+            })?;
             let initialized = run_git_without_output(
                 Operation::Initialize,
-                None,
-                [
-                    OsStr::new("init"),
-                    OsStr::new("--bare"),
-                    OsStr::new("--template="),
-                    directory.as_os_str(),
-                ],
+                Some(&directory),
+                ["init", "--bare", "--template=", "."],
             );
 
             if let Err(error) = initialized {
@@ -704,10 +703,12 @@ fn git_command(directory: Option<&Path>) -> Command {
         "-c",
         "protocol.file.allow=always",
     ]);
+    #[cfg(windows)]
+    command.args(["-c", "core.longpaths=true"]);
 
     clear_repository_environment(&mut command);
     if let Some(directory) = directory {
-        command.arg("-C").arg(directory);
+        command.current_dir(directory);
     }
 
     command

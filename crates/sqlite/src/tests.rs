@@ -162,6 +162,54 @@ fn interrupt_before_query_start_is_not_lost() {
 }
 
 #[test]
+fn closing_waits_for_the_worker_and_cancels_queued_queries() {
+    let executor = Arc::new(ManualExecutor::default());
+    let erased: Arc<dyn Executor> = Arc::clone(&executor) as Arc<dyn Executor>;
+    let (connection, opening) = Connection::open(memory_configuration(), &erased).unwrap();
+    executor.run_next();
+    wait(&opening).unwrap();
+    connection.drain_notification();
+
+    let (result, operation) = connection
+        .execute("SELECT 1".to_string(), Vec::new())
+        .unwrap();
+    assert!(!connection.poll_close());
+    assert!(connection.is_closed());
+    assert!(!connection.is_reusable());
+    assert!(connection.ping().is_err());
+    executor.run_next();
+    assert!(wait(&operation).is_err());
+    assert!(result.is_closed());
+    assert!(!connection.poll_close());
+    executor.run_next();
+    assert!(connection.poll_close());
+    assert!(connection.poll_close());
+}
+
+#[test]
+fn closing_before_opening_does_not_reopen_the_connection() {
+    let executor = Arc::new(ManualExecutor::default());
+    let erased: Arc<dyn Executor> = Arc::clone(&executor) as Arc<dyn Executor>;
+    let (connection, opening) = Connection::open(memory_configuration(), &erased).unwrap();
+    assert!(!connection.poll_close());
+    let closing = executor.jobs.lock().unwrap().pop_back().unwrap();
+    closing();
+    assert!(connection.poll_close());
+    executor.run_next();
+    assert!(wait(&opening).is_err());
+    assert!(connection.poll_close());
+    assert!(connection.ping().is_err());
+}
+
+#[test]
+fn closing_succeeds_after_the_executor_is_dropped() {
+    let (executor, connection) = memory_connection();
+    drop(executor);
+    assert!(connection.poll_close());
+    assert!(connection.poll_close());
+}
+
+#[test]
 fn progress_handler_observes_an_early_interrupt() {
     let execution = Arc::new(ExecutionState::new());
     let Ok(connection) = open_connection(&memory_configuration(), Arc::clone(&execution)) else {

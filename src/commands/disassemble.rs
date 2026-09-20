@@ -2,7 +2,10 @@ use std::fs::File;
 use std::io;
 use std::io::BufWriter;
 use std::io::Write as _;
+#[cfg(unix)]
 use std::os::fd::AsFd as _;
+#[cfg(windows)]
+use std::os::windows::io::AsHandle as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -81,8 +84,14 @@ fn disassemble(
         }
     };
 
+    #[cfg(unix)]
     let descriptor = io::stdout()
         .as_fd()
+        .try_clone_to_owned()
+        .map_err(Error::WriteDisassembly)?;
+    #[cfg(windows)]
+    let descriptor = io::stdout()
+        .as_handle()
         .try_clone_to_owned()
         .map_err(Error::WriteDisassembly)?;
     let mut output = BufWriter::new(File::from(descriptor));

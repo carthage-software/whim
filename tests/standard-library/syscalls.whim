@@ -1,4 +1,4 @@
-assert!(Whim\_Private\SIGNAL_INTERRUPT > 0);
+assert!(Whim\_Private\SIGNAL_INTERRUPT is int);
 assert!(Whim\_Private\ERRNO_NOT_FOUND > 0);
 assert!(Whim\_Private\OPEN_FLAG_READ_ONLY is int);
 assert!(Whim\_Private\SEEK_ORIGIN_START is int);
@@ -57,19 +57,20 @@ $left->close();
 $right->close();
 
 assert!(Whim\Process\get_parent_id() > 0);
-assert!(Whim\_Private\process_user() is (int, int));
-assert!(Whim\_Private\process_group() is (int, int));
-assert!(Whim\_Private\process_supplementary_groups() is vec<int>);
-
-assert!(Whim\_Private\session_id(0) > 0);
-assert!(Whim\_Private\process_group_id(0) > 0);
-assert!(Whim\_Private\process_priority(0) is int);
-assert!(
-  Whim\_Private\resource_limit(Whim\_Private\RESOURCE_LIMIT_OPEN_FILES) is (
-      int,
-      int,
-    ),
-);
+if (operating_system!() != 'windows') {
+  assert!(Whim\_Private\process_user() is (int, int));
+  assert!(Whim\_Private\process_group() is (int, int));
+  assert!(Whim\_Private\process_supplementary_groups() is vec<int>);
+  assert!(Whim\_Private\session_id(0) > 0);
+  assert!(Whim\_Private\process_group_id(0) > 0);
+  assert!(Whim\_Private\process_priority(0) is int);
+  assert!(
+    Whim\_Private\resource_limit(Whim\_Private\RESOURCE_LIMIT_OPEN_FILES) is (
+        int,
+        int,
+      ),
+  );
+}
 
 $resolution = Whim\_Private\HostResolutionOperation::start(
   'localhost',
@@ -100,7 +101,13 @@ try {
 
 assert!($openError is Whim\_Private\SystemError);
 
-assert!($openError->call() == 'open');
+assert!(
+  $openError->call() == match (operating_system!()) {
+    'windows' => 'CreateFileW',
+    _ => 'open',
+  },
+);
+
 assert!($openError->errno() == Whim\_Private\ERRNO_NOT_FOUND);
 
 $descriptor->close();

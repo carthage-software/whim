@@ -1,26 +1,27 @@
 //! Cancellable hostname resolution.
 
 use std::cell::RefCell;
-use std::collections::HashSet;
-use std::net::SocketAddr;
-use std::net::ToSocketAddrs;
+use std::net::IpAddr;
 use std::str::from_utf8;
 use std::sync::Arc;
 
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
+use whim_sys::constants;
+use whim_sys::dns::{self, Family};
+use whim_sys::operation::Operation;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::convert::state_ref;
 use crate::builtin::throw::Throw;
-use crate::core::private::blocking::Operation;
+use crate::core::private::syscall::io_error;
 use crate::core::private::syscall::system_error;
 use crate::value::Value;
 
 const HOST_RESOLUTION_OPERATION: &str = "Whim\\_Private\\HostResolutionOperation";
 
-type Shared = Operation<Vec<SocketAddr>, i32>;
+type Shared = Operation<Vec<IpAddr>, whim_sys::Error>;
 
 #[whim_class("Whim\\_Private\\HostResolutionOperation", final)]
 #[derive(Default)]
@@ -44,11 +45,7 @@ impl HostResolutionOperation {
         let host = from_utf8(arguments.bytes(0))
             .map_err(|_| system_error(cx, "getaddrinfo", libc::EINVAL))?
             .to_owned();
-        let family = i32::try_from(arguments.int(1))
-            .map_err(|_| system_error(cx, "getaddrinfo", libc::EINVAL))?;
-        if !matches!(family, 0 | libc::AF_INET | libc::AF_INET6) {
-            return Err(system_error(cx, "getaddrinfo", libc::EAFNOSUPPORT));
-        }
+        let family = Family::from_raw(arguments.int(1)).map_err(|error| io_error(cx, error))?;
 
         let shared = Shared::new().map_err(|error| {
             system_error(cx, "socketpair", error.raw_os_error().unwrap_or(libc::EIO))
@@ -57,7 +54,9 @@ impl HostResolutionOperation {
         cx.vm
             .engine
             .blocking
-            .submit(Box::new(move || worker.complete(resolve(&host, family))))
+            .submit(Box::new(move || {
+                worker.complete(dns::resolve(&host, family));
+            }))
             .map_err(|error| {
                 system_error(cx, "thread", error.raw_os_error().unwrap_or(libc::EAGAIN))
             })?;
@@ -95,13 +94,13 @@ impl HostResolutionOperation {
         let addresses = match shared.take() {
             Some(Ok(Some(addresses))) => addresses,
             Some(Ok(None)) | None => return Ok(Value::null()),
-            Some(Err(errno)) => return Err(system_error(cx, "getaddrinfo", errno)),
+            Some(Err(error)) => return Err(io_error(cx, error)),
         };
 
         Ok(cx.vec(addresses.into_iter().map(|address| {
             let (family, host) = match address {
-                SocketAddr::V4(address) => (libc::AF_INET, address.ip().to_string()),
-                SocketAddr::V6(address) => (libc::AF_INET6, address.ip().to_string()),
+                IpAddr::V4(address) => (constants::AF_INET, address.to_string()),
+                IpAddr::V6(address) => (constants::AF_INET6, address.to_string()),
             };
             let family = Value::int(i64::from(family));
             let host = cx.string(host.as_bytes());
@@ -123,24 +122,4 @@ fn operation(cx: &mut Context<'_, '_, '_>) -> Result<Arc<Shared>, Throw> {
         .borrow()
         .clone();
     operation.ok_or_else(|| cx.type_error("the host resolution operation is not initialized"))
-}
-
-fn resolve(host: &str, family: i32) -> Result<Vec<SocketAddr>, i32> {
-    (host, 0)
-        .to_socket_addrs()
-        .map(|addresses| {
-            let mut seen = HashSet::new();
-            addresses
-                .filter(|address| {
-                    family == 0
-                        || matches!(
-                            (family, address),
-                            (libc::AF_INET, SocketAddr::V4(_))
-                                | (libc::AF_INET6, SocketAddr::V6(_))
-                        )
-                })
-                .filter(|address| seen.insert(*address))
-                .collect()
-        })
-        .map_err(|error| error.raw_os_error().unwrap_or(libc::EIO))
 }

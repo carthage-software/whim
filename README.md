@@ -53,7 +53,11 @@ whim --version
 The container image is available at `ghcr.io/carthage-software/whim`.
 
 Whim supports macOS and FreeBSD on x86-64 and Arm64, Linux with glibc on
-x86-64, Arm64, and RISC-V 64, and Linux with musl on x86-64 and Arm64.
+x86-64, Arm64, and RISC-V 64, Linux with musl on x86-64 and Arm64, and
+Windows on x86-64.
+
+On Windows, download the `x86_64-pc-windows-msvc` ZIP archive from
+[GitHub Releases], extract `whim.exe`, and add its directory to your `PATH`.
 
 On FreeBSD, install `bash`, `curl`, and `postgresql18-client` before using the
 installer. Release builds target FreeBSD 14.4 or later.

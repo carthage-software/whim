@@ -1,9 +1,6 @@
 //! `SQLite` driver values exposed to `Whim\Database`.
 
 use std::cell::RefCell;
-use std::ffi::OsString;
-use std::os::unix::ffi::OsStringExt;
-use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,6 +14,7 @@ use whim_sqlite::Executor;
 use whim_sqlite::Operation as DriverOperation;
 use whim_sqlite::ResultSet as DriverResult;
 use whim_sqlite::Value as DriverValue;
+use whim_sys::path::path_from_bytes;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -283,7 +281,8 @@ impl SQLiteConnection {
         must_use
     )]
     fn open(cx: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result<Value, Throw> {
-        let path = PathBuf::from(OsString::from_vec(arguments.bytes(0).to_vec()));
+        let path = path_from_bytes(arguments.bytes(0))
+            .map_err(|error| cx.type_error(&error.to_string()))?;
         let busy_timeout = u64::try_from(arguments.int(4))
             .map(Duration::from_millis)
             .map_err(|_| DriverError::message("invalid SQLite busy timeout"))
@@ -388,9 +387,14 @@ impl SQLiteConnection {
         Ok(Value::bool(connection(cx)?.is_closed()))
     }
 
-    #[whim_method("close(): void", no_track_caller, no_trace_boundary)]
+    #[whim_method("close(): void")]
     fn close(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
-        connection(cx)?.close();
+        let connection = connection(cx)?;
+        while !connection.poll_close() {
+            cx.io_wait_until_readable(connection.descriptor())?;
+            connection.drain_notification();
+        }
+
         Ok(Value::null())
     }
 

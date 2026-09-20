@@ -137,7 +137,7 @@ impl ConnectionState {
             return Err(connection_error(raw.as_ptr()));
         }
         #[cfg(windows)]
-        let descriptor = RawDescriptor::from(descriptor.cast_unsigned());
+        let descriptor = RawDescriptor::Socket(u64::from(descriptor.cast_unsigned()));
         Ok(descriptor)
     }
 
@@ -441,7 +441,9 @@ impl Connection {
                 _ = net::shutdown(BorrowedFd::borrow_raw(descriptor), net::Shutdown::Both);
             }
             #[cfg(windows)]
-            if let Ok(socket) = descriptor.try_into() {
+            if let RawDescriptor::Socket(socket) = descriptor
+                && let Ok(socket) = usize::try_from(socket)
+            {
                 _ = shutdown(socket, SD_BOTH);
             }
         }
