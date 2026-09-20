@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::IndexAddMode;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
@@ -40,8 +41,35 @@ pub(crate) fn optimize_chunk(
             continue;
         };
 
-        let Some((result, left, increment, integer)) = addition(chunk.code[start + 1]) else {
-            continue;
+        let (result, left, increment, integer, immediate) = match chunk.code[start + 1] {
+            Instruction::AddImmediate {
+                destination,
+                source,
+                immediate,
+            } if previous != container
+                && previous != index
+                && destination != container
+                && destination != index
+                && matches!(
+                    chunk.code[start],
+                    Instruction::DictIndexGetIntKey {
+                        value_mode: ArrayValueMode::Int,
+                        ..
+                    } | Instruction::DictIndexGetStringKey {
+                        value_mode: ArrayValueMode::Int,
+                        ..
+                    }
+                ) =>
+            {
+                (destination, source, previous, true, Some(immediate))
+            }
+            instruction => {
+                let Some((result, left, increment, integer)) = addition(instruction) else {
+                    continue;
+                };
+
+                (result, left, increment, integer, None)
+            }
         };
 
         let Some((written_container, written_index, value, specialized_mode)) =
@@ -80,7 +108,7 @@ pub(crate) fn optimize_chunk(
                 break;
             };
 
-            let replacement = if destination == fused_increment {
+            let replacement = if immediate.is_none() && destination == fused_increment {
                 &mut fused_increment
             } else if destination == fused_index {
                 &mut fused_index
@@ -89,6 +117,7 @@ pub(crate) fn optimize_chunk(
             };
 
             if targets.contains(&move_index)
+                || (immediate.is_some() && source == previous)
                 || !register_is_dead_after(chunk, destination, start + 3)
                 || !register_is_untouched_between(chunk, source, move_index + 1, start)
             {
@@ -105,14 +134,24 @@ pub(crate) fn optimize_chunk(
         } else {
             IndexAddMode::Generic
         };
-        chunk.code[start] = Instruction::IndexAddAssign {
+        let fused = Instruction::IndexAddAssign {
             container,
             index: fused_index,
             value: fused_increment,
             mode,
         };
 
-        remove[start + 1] = true;
+        if let Some(immediate) = immediate {
+            chunk.code[start] = Instruction::LoadInt {
+                destination: previous,
+                immediate,
+            };
+            chunk.code[start + 1] = fused;
+        } else {
+            chunk.code[start] = fused;
+            remove[start + 1] = true;
+        }
+
         remove[start + 2] = true;
     }
 

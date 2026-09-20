@@ -78,6 +78,26 @@ pub(crate) fn optimize_chunk(
             {
                 Some(Instruction::ReturnIntUnchecked { immediate })
             }
+            Instruction::PropertyAdd {
+                object,
+                source,
+                cache,
+            } if source == temporary && object != temporary => Some(Instruction::PropertyStep {
+                object,
+                cache,
+                immediate,
+            }),
+            Instruction::PropertyAddUnchecked {
+                object,
+                source,
+                slot,
+            } if source == temporary && object != temporary => {
+                Some(Instruction::PropertyStepUnchecked {
+                    object,
+                    slot,
+                    immediate,
+                })
+            }
             Instruction::IntAdd {
                 destination,
                 left,

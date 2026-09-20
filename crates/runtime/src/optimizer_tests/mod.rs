@@ -2511,6 +2511,35 @@ fn locally_built_string_int_dicts_fuse_compound_addition_precisely() {
 }
 
 #[test]
+fn discarded_dict_increments_use_one_lookup() {
+    for (key_type, expected_mode) in [
+        ("string", IndexAddMode::DictStringKeyIntValue),
+        ("int", IndexAddMode::DictAnyKeyIntValue),
+    ] {
+        for update in ["$values[$key]++", "++$values[$key]"] {
+            let unit = compile(
+                &format!(
+                    "function increment(dict<{key_type}, int> $values, {key_type} $key): dict<{key_type}, int> {{
+                        {update};
+                        return $values;
+                    }}"
+                ),
+                OptimizationConfiguration::default(),
+            );
+            verify_unit(&unit).unwrap();
+            let code = &unit.functions[0].chunk.code;
+            assert!(
+                code.iter().any(|instruction| matches!(
+                    instruction,
+                    Instruction::IndexAddAssign { mode, .. } if *mode == expected_mode
+                )),
+                "{code:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn three_integer_operations_use_the_numeric_loop_executor() {
     let unit = compile(
         r"
@@ -2631,6 +2660,33 @@ fn lowered_property_updates_fuse_before_operation_specialization() {
             .iter()
             .any(|instruction| { matches!(instruction, Instruction::PropertyAddUnchecked { .. }) })
     );
+}
+
+#[test]
+fn literal_property_additions_use_steps() {
+    for (receiver_type, unchecked) in [("Counter", true), ("object", false)] {
+        for delta in [-32768, -1, 0, 1, 32767] {
+            let unit = compile(
+                &format!(
+                    "final class Counter {{ public int $value = 0; }}
+                    function add({receiver_type} $counter): void {{ $counter->value += {delta}; }}"
+                ),
+                OptimizationConfiguration::default(),
+            );
+            verify_unit(&unit).unwrap();
+            let code = &unit.functions[0].chunk.code;
+            assert!(
+                code.iter().any(|instruction| match instruction {
+                    Instruction::PropertyStep { immediate, .. } =>
+                        !unchecked && immediate.value() == delta,
+                    Instruction::PropertyStepUnchecked { immediate, .. } =>
+                        unchecked && immediate.value() == delta,
+                    _ => false,
+                }),
+                "{code:?}"
+            );
+        }
+    }
 }
 
 #[test]
