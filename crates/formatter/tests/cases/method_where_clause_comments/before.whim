@@ -1,0 +1,16 @@
+class C<T,U>{
+public function numeric() /* before where */ where /* after where */ T /* before colon */ : /* after colon */ int /* before body */ {}
+public function both():void // before clause
+where T:int, // after first
+// before second
+U:string, // after last
+{return;}
+}
+interface I<T>{
+public function named():void where T:Named & // between bounds
+Stored; // after method
+public function scalar() where T: // before bound
+int|float;
+public function pending():void where // requirements
+T:int,;
+}

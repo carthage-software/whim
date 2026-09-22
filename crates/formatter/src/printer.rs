@@ -456,7 +456,11 @@ where
         let mut has_line_suffix = false;
         let mut stack: Vec<'arena, (Mode, &Document<'arena, A>), A> =
             Vec::with_capacity_in(16, self.arena);
-        let mut commands = self.commands.iter().rev();
+        let mut commands = self.commands.iter().rev().take(if group.measure_tail {
+            self.commands.len()
+        } else {
+            0
+        });
 
         for document in group.contents.iter().rev() {
             stack.push((Mode::Flat, document));
@@ -562,7 +566,7 @@ where
     }
 }
 
-fn clone_in_arena<'arena, A>(
+pub(super) fn clone_in_arena<'arena, A>(
     arena: &'arena A,
     document: &Document<'arena, A>,
 ) -> Document<'arena, A>
@@ -587,6 +591,7 @@ where
         Document::Group(group) => Document::Group(Group {
             contents: clone_vec_in_arena(arena, &group.contents),
             break_mode: group.break_mode.clone(),
+            measure_tail: group.measure_tail,
         }),
         Document::IfBreak(if_break) => Document::IfBreak(IfBreak {
             break_contents: arena.alloc(clone_in_arena(arena, if_break.break_contents)),

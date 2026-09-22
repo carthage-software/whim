@@ -526,10 +526,11 @@ mod tests {
             ("use", TokenKind::Use),
             ("vec", TokenKind::Vec),
             ("void", TokenKind::Void),
+            ("where", TokenKind::Where),
             ("while", TokenKind::While),
         ];
 
-        assert_eq!(cases.len(), 58);
+        assert_eq!(cases.len(), 59);
         for (source, expected) in cases {
             let tokens = lex(source);
             assert_eq!(tokens.len(), 1, "{source}");

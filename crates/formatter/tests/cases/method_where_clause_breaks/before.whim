@@ -1,0 +1,2 @@
+interface Collection<T>{public function collect<U>(fn(T):U $transform):vec<U> where T:Countable&Printable,U:dict['first'=>vec<T>,'second'=>string,...<string,mixed>];public function count():int where T:AnExtremelyLongInterfaceName|AnotherInterface;}
+class Box<T>{public function convert<U>(T $value,U $fallback):U where T:Convertible<U>,U:Serializable{return $fallback;}}

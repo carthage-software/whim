@@ -19,6 +19,8 @@ use crate::cst::class::MethodBody;
 use crate::cst::class::Property;
 use crate::cst::class::PropertyDefault;
 use crate::cst::class::SealedPermissions;
+use crate::cst::class::WhereClause;
+use crate::cst::class::WhereConstraint;
 use crate::cst::declaration::AttributeList;
 use crate::cst::sequence::TokenSeparatedSequence;
 use crate::cst::statement::TopLevelStatement;
@@ -342,6 +344,7 @@ where
         let type_parameters = self.parse_optional_type_parameter_list()?;
         let parameter_list = self.parse_parameter_list()?;
         let return_type = self.parse_return_type()?;
+        let where_clause = self.parse_where_clause()?;
 
         let body = if let Some(semicolon) = self.eat_optional(TokenKind::Semicolon)? {
             MethodBody::Abstract(semicolon)
@@ -357,8 +360,43 @@ where
             type_parameters,
             parameter_list,
             return_type,
+            where_clause,
             body,
         })
+    }
+
+    fn parse_where_clause(&mut self) -> Result<Option<WhereClause<'arena>>, ParseError> {
+        if !self.is_at(TokenKind::Where)? {
+            return Ok(None);
+        }
+
+        let r#where = self.expect_keyword(TokenKind::Where)?;
+        let mut constraints = Vec::new_in(self.arena);
+        let mut commas = Vec::new_in(self.arena);
+        loop {
+            let parameter = self.parse_local_identifier()?;
+            let colon = self.expect_span(TokenKind::Colon)?;
+            let bound = self.parse_type()?;
+            constraints.push(WhereConstraint {
+                parameter,
+                colon,
+                bound,
+            });
+
+            if !self.is_at(TokenKind::Comma)? {
+                break;
+            }
+
+            commas.push(self.consume()?);
+            if self.is_at(TokenKind::LeftBrace)? || self.is_at(TokenKind::Semicolon)? {
+                break;
+            }
+        }
+
+        Ok(Some(WhereClause {
+            r#where,
+            constraints: TokenSeparatedSequence::new(constraints, commas),
+        }))
     }
 
     fn parse_property(

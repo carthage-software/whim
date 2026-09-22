@@ -205,6 +205,7 @@ define_token_kinds! {
     Using => "`using`", Full;
     Vec => "`vec`", Contextual;
     Void => "`void`", Contextual;
+    Where => "`where`", Contextual;
     While => "`while`", Full;
 }
 

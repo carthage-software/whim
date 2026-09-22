@@ -160,6 +160,36 @@ type Weaken<T: W, W> = W;
 
 Here `T` must fit `W`, and the alias exposes only `W` at runtime.
 
+## Method where clauses
+
+A method can declare extra upper bounds with `where`. The clause follows the
+return type, or the parameter list when the method omits its return type:
+
+```whim
+class Collection<T> {
+  public function inspect<U>(): void where T: int|float, U: vec<T> {}
+}
+```
+
+Each entry names a type parameter available to the method, followed by `:` and
+its upper bound. A clause can repeat a parameter. Bounds can refer to class or
+method type parameters; static methods can use only their own type parameters.
+
+Before entering the method body, each call checks the reified class and method
+type arguments against every constraint. Each type argument must be a subtype
+of its bound. If any constraint fails, the call throws `Whim\Unwind\TypeError`.
+Repeated constraints must all hold.
+
+These bounds apply only to the method. They do not change the bounds on the
+class or its other methods. For example, `Collection<string>` is a valid type,
+but calling `inspect::<vec<string>>()` on it throws `TypeError` because `string`
+does not fit `int|float`. On `Collection<int>`, `inspect::<vec<int>>()` satisfies
+both bounds.
+
+An override must accept every set of type arguments that the inherited method
+accepts. It may keep or weaken the inherited where constraints, but must not
+strengthen them.
+
 ## Constructing a type parameter
 
 Code may create a reified type parameter when its bound supplies a constructor.

@@ -27,6 +27,7 @@ const SEEDS: &[&str] = &[
     "function add(int $x, int $y): int { return $x + $y; }",
     "$a = 1; $b = 2; write_line!($a + $b * 3);",
     "class Counter { public int $n = 0; function step(): int { return $this->n; } }",
+    "class C<T> { public function f<U>(): U where T: vec<U>, U: int|float, {} }",
     "if ($x > 0) { write_line!('positive'); } else { write_line!('other'); }",
     "$total = 0; while ($total < 10) { $total = $total + 1; }",
     "$label = match ($code) { 1 => 'one', 2 => 'two', $_ => 'many' };",
@@ -64,6 +65,7 @@ const KEYWORDS: &[&str] = &[
     "new",
     "extends",
     "implements",
+    "where",
 ];
 
 const LITERAL_FRAGMENTS: &[&str] = &[

@@ -43,6 +43,31 @@ fn walks_a_whole_program() {
 }
 
 #[test]
+fn method_where_constraints_are_walked_before_the_body() {
+    let ks = kinds("class C<T> { public function f<U>(): void where T: vec<U>, U: int|float {} }");
+    let clause = ks
+        .iter()
+        .position(|kind| *kind == NodeKind::WhereClause)
+        .unwrap();
+    let body = ks
+        .iter()
+        .position(|kind| *kind == NodeKind::MethodBody)
+        .unwrap();
+    let constraints = &ks[clause..body];
+    assert_eq!(constraints[1], NodeKind::Keyword);
+    assert_eq!(
+        constraints
+            .iter()
+            .filter(|kind| **kind == NodeKind::WhereConstraint)
+            .count(),
+        2
+    );
+    assert!(constraints.contains(&NodeKind::LocalIdentifier));
+    assert!(constraints.contains(&NodeKind::TypeArgumentList));
+    assert!(constraints.contains(&NodeKind::UnionType));
+}
+
+#[test]
 fn namespaces_visit_top_level_items_and_executable_bodies() {
     let ks = kinds(
         "#![A] namespace App { use Tags\\B; #![B] function f() { return 1; } } namespace Other; #![C] work();",

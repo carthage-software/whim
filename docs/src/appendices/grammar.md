@@ -139,7 +139,11 @@ constant-modifier
 
 method          := attributes? method-modifier+ "function"
                    member-name type-parameters? parameter-list
-                   return-type? (block | ";")
+                   return-type? where-clause? (block | ";")
+
+where-clause    := "where" where-constraint ("," where-constraint)* ","?
+where-constraint
+                := identifier ":" type
 
 method-modifier := visibility | "abstract" | "final" | "static"
 visibility      := "public" | "protected" | "private"
@@ -149,6 +153,9 @@ A constructor parameter with a visibility word declares a promoted property.
 `readonly` may appear before or after the visibility word. A property,
 constant, or method has exactly one visibility word. The other modifiers may
 appear in any order, but each may appear only once.
+
+A method's [`where` clause](../language/generics.md#method-where-clauses) requires
+each named type parameter to fit its bound when the method is called.
 
 See [Classes and Properties](../language/classes.md) and [Inheritance and
 Visibility](../language/inheritance.md).

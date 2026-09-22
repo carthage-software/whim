@@ -110,6 +110,46 @@ case!(union_type_breaks);
 case!(final_locals);
 case!(discard_construct);
 case!(hack_layout);
+case!(method_where_clauses);
+case!(method_where_clause_breaks);
+case!(method_where_clause_comments);
+
+#[test]
+fn method_where_clauses_stay_stable_across_widths_and_indentation() {
+    for (name, source) in [
+        (
+            "clauses",
+            include_str!("cases/method_where_clauses/before.whim"),
+        ),
+        (
+            "breaks",
+            include_str!("cases/method_where_clause_breaks/before.whim"),
+        ),
+        (
+            "comments",
+            include_str!("cases/method_where_clause_comments/before.whim"),
+        ),
+    ] {
+        for print_width in [32, 48, 80, 120] {
+            for use_tabs in [false, true] {
+                let settings = FormatSettings {
+                    print_width,
+                    use_tabs,
+                    ..FormatSettings::default()
+                };
+                let arena = LocalArena::new();
+                let formatted = format(&arena, source, settings).unwrap();
+                let next_arena = LocalArena::new();
+                let repeated = format(&next_arena, formatted, settings).unwrap();
+                assert_eq!(
+                    formatted, repeated,
+                    "{name}: width {print_width}, tabs {use_tabs}"
+                );
+                assert_comments_survive(name, source, formatted);
+            }
+        }
+    }
+}
 
 #[test]
 fn every_case_directory_is_registered() {

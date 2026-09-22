@@ -16,6 +16,8 @@ use whim_syn::cst::class::Interface;
 use whim_syn::cst::class::Method;
 use whim_syn::cst::class::MethodBody;
 use whim_syn::cst::class::Property;
+use whim_syn::cst::class::WhereClause;
+use whim_syn::cst::class::WhereConstraint;
 use whim_syn::cst::declaration::Attribute;
 use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::declaration::Constant;
@@ -28,6 +30,7 @@ use whim_syn::cst::declaration::UseItems;
 use whim_syn::cst::function::Function;
 use whim_syn::cst::function::Parameter;
 use whim_syn::cst::function::ParameterList;
+use whim_syn::cst::trivia::TriviaKind;
 use whim_syn::cst::r#type::DictShapeTypeEntry;
 use whim_syn::cst::r#type::FunctionTypeParameter;
 use whim_syn::cst::r#type::IntegerRangeBound;
@@ -48,6 +51,7 @@ use crate::document::Document;
 use crate::document::Group;
 use crate::format::Format;
 use crate::format::FormatterState;
+use crate::printer::clone_in_arena;
 
 /// Collects the members of a left-nested union into source order, stopping at
 /// any non-union type (so an intersection member stays a single member).
@@ -124,6 +128,62 @@ where
             self.space(),
             body,
         ])
+    }
+
+    fn format_where_clause(
+        &mut self,
+        clause: &WhereClause<'arena>,
+        trailing: Option<Document<'arena, A>>,
+        has_body: bool,
+    ) -> Document<'arena, A> {
+        let leading = self.print_leading_comments(clause.span());
+        let keyword_comment = if self
+            .comments
+            .get(self.comment_cursor)
+            .is_some_and(|comment| comment.kind != TriviaKind::SingleLineComment)
+        {
+            self.print_trailing_comments(clause.r#where.span())
+        } else {
+            None
+        };
+
+        let keyword = self.with_comments(leading, self.text("where"), keyword_comment);
+        let mut compact_constraints = self.vec();
+        compact_constraints.push(self.line());
+        let mut expanded_constraints = self.vec();
+        expanded_constraints.push(self.hard_line());
+        for (index, constraint) in clause.constraints.iter().enumerate() {
+            if index != 0 {
+                compact_constraints.push(self.text(","));
+                compact_constraints.push(self.line());
+                expanded_constraints.push(self.text(","));
+                expanded_constraints.push(self.hard_line());
+            }
+
+            let document = constraint.format(self);
+            compact_constraints.push(clone_in_arena(self.arena, &document));
+            expanded_constraints.push(self.never_break(document));
+        }
+
+        let mut compact = self.vec();
+        compact.push(self.space());
+        compact.push(clone_in_arena(self.arena, &keyword));
+        compact.push(self.indent(compact_constraints));
+        if has_body {
+            compact.push(self.line());
+        }
+
+        let mut expanded = self.vec();
+        expanded.push(self.hard_line());
+        expanded.push(keyword);
+        expanded.push(self.indent(expanded_constraints));
+        let expanded = self.concat([self.indent(expanded), self.hard_line()]);
+        let mut contents = self.vec();
+        contents.extend(trailing);
+        contents.push(self.ifbreak(expanded, Document::Group(Group::new(compact))));
+        let mut group = Group::new(contents);
+        group.measure_tail = false;
+        Document::Group(group)
     }
 }
 
@@ -845,8 +905,29 @@ where
         if let Some(type_parameters) = type_parameters {
             signature.push(type_parameters);
         }
+
         signature.push(parameters);
         signature.push(return_type);
+        if let Some(where_clause) = &self.where_clause {
+            let span = self
+                .return_type
+                .as_ref()
+                .map_or_else(|| self.parameter_list.span(), HasSpan::span);
+
+            let trailing = f.print_trailing_comments(span);
+            let clause = f.format_where_clause(where_clause, trailing, !self.is_abstract());
+            let body = match &self.body {
+                MethodBody::Abstract(_) => f.text(";"),
+                MethodBody::Concrete(block) => block.format(f),
+            };
+
+            return f.concat([
+                attributes,
+                Document::Group(Group::new(signature)),
+                clause,
+                body,
+            ]);
+        }
 
         let declaration = match &self.body {
             MethodBody::Abstract(_) => {
@@ -860,6 +941,20 @@ where
         };
 
         f.concat([attributes, declaration])
+    }
+}
+
+impl<'arena, A> Format<'arena, A> for WhereConstraint<'arena>
+where
+    A: Arena,
+{
+    fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
+        wrap!(f, self, {
+            let trailing = f.print_trailing_comments(self.parameter.span());
+            let parameter = f.with_comments(None, f.text(self.parameter.value), trailing);
+            let bound = f.format_type_member(self.bound);
+            f.concat([parameter, f.text(": "), bound])
+        })
     }
 }
 

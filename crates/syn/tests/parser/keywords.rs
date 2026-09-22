@@ -37,6 +37,19 @@ fn contextual_keywords_are_usable_as_names() {
     let TopLevelStatement::Function(_) = top_level_statement(&arena, "function f(): int {}") else {
         panic!("expected a function returning `int`");
     };
+
+    program(
+        &arena,
+        "const where = 1; function where() {} where(); $value = where;",
+    );
+    program(
+        &arena,
+        "class Query<T> { public function where(): void where T: int {} }",
+    );
+    assert!(matches!(
+        expression(&arena, "$query->where();"),
+        Expression::Call(Call::Method(_))
+    ));
 }
 
 #[test]

@@ -1,0 +1,28 @@
+final class Vector<T> {
+  public function sum(): int where T: int {
+    return 0;
+  }
+
+  public function sumFloats(): float where T: int|float {
+    return 0.0;
+  }
+
+  public function visit($value) where T: A, T: B {}
+
+  public static function convert<U>(T $value): U where T: U {
+    return $value;
+  }
+}
+
+interface Source<T> {
+  public function read(): T where T: Named&Stored;
+
+  public function map<U>(fn(T): U $map) where U: Box<T> #{ value: T, ... };
+}
+
+enum Example {
+  case A;
+  public function get<T>(): T where T: (int, string) {
+    return (1, 'a');
+  }
+}

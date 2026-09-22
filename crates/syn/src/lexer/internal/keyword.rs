@@ -95,6 +95,7 @@ fn lookup_len5(bytes: &[u8]) -> Option<TokenKind> {
         b'n' if bytes == b"never" => Some(TokenKind::Never),
         b't' if bytes == b"throw" => Some(TokenKind::Throw),
         b'u' if bytes == b"using" => Some(TokenKind::Using),
+        b'w' if bytes == b"where" => Some(TokenKind::Where),
         b'w' if bytes == b"while" => Some(TokenKind::While),
         _ => None,
     }

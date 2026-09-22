@@ -339,7 +339,20 @@ impl Node<'_, '_> {
                 if let Some(return_type) = &node.return_type {
                     f(Node::ReturnType(return_type));
                 }
+                if let Some(where_clause) = &node.where_clause {
+                    f(Node::WhereClause(where_clause));
+                }
                 f(Node::MethodBody(&node.body));
+            }
+            Node::WhereClause(node) => {
+                f(Node::Keyword(&node.r#where));
+                for constraint in &node.constraints {
+                    f(Node::WhereConstraint(constraint));
+                }
+            }
+            Node::WhereConstraint(node) => {
+                f(Node::LocalIdentifier(&node.parameter));
+                f(Node::Type(node.bound));
             }
             Node::MethodBody(node) => {
                 if let MethodBody::Concrete(block) = node {

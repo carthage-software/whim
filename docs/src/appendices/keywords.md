@@ -47,7 +47,7 @@ extends     final       float       implements  in
 int         interface   mixed       namespace   never
 newtype     object      out         private     protected
 public      readonly    string      type        use
-vec         void
+vec         void        where
 ```
 
 ## The `_` identifier

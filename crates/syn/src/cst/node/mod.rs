@@ -77,6 +77,8 @@ use crate::cst::class::MethodBody;
 use crate::cst::class::Property;
 use crate::cst::class::PropertyDefault;
 use crate::cst::class::SealedPermissions;
+use crate::cst::class::WhereClause;
+use crate::cst::class::WhereConstraint;
 use crate::cst::construct::AssertConstruct;
 use crate::cst::construct::AssertMessage;
 use crate::cst::construct::CPUArchitectureConstruct;
@@ -316,6 +318,8 @@ define_nodes! {
     EnumCase(EnumCase<'arena>),
     EnumCaseValue(EnumCaseValue<'arena>),
     Method(Method<'arena>),
+    WhereClause(WhereClause<'arena>),
+    WhereConstraint(WhereConstraint<'arena>),
     MethodBody(MethodBody<'arena>),
     Property(Property<'arena>),
     PropertyDefault(PropertyDefault<'arena>),

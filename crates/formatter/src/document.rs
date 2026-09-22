@@ -51,6 +51,7 @@ where
 {
     pub contents: Vec<'arena, Document<'arena, A>, A>,
     pub break_mode: RefCell<BreakMode>,
+    pub measure_tail: bool,
 }
 
 #[derive(Default, Debug, Clone, Copy, Eq, PartialEq)]
@@ -103,6 +104,7 @@ where
         Self {
             contents,
             break_mode: RefCell::new(BreakMode::Auto),
+            measure_tail: true,
         }
     }
 
