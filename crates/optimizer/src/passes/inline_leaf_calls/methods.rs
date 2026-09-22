@@ -115,7 +115,7 @@ pub(super) fn inline_direct_methods(
                 }
 
                 if is_never_inline(&method.function.attributes)
-                    || !method.where_constraints.is_empty()
+                    || !method.function.where_constraints.is_empty()
                         && !flow.method_where_constraints_proven(index)
                 {
                     continue;

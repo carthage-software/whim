@@ -1,5 +1,6 @@
 //! Resolving and executing the inline-cache call sites.
 
+use std::ptr::NonNull;
 use std::rc::Rc;
 
 use whim_bytecode::chunk::Chunk;
@@ -103,7 +104,10 @@ impl VirtualMachine<'_> {
             CallTarget::User(function) => {
                 let (parameters, subject) = {
                     let function = &self.engine.tables.functions[function.0 as usize];
-                    (function.type_parameters, function.name.clone())
+                    (
+                        NonNull::from(function.type_parameters()),
+                        function.name.clone(),
+                    )
                 };
                 self.bind_type_parameters(
                     // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.

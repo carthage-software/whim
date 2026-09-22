@@ -16,8 +16,6 @@ use whim_syn::cst::class::Interface;
 use whim_syn::cst::class::Method;
 use whim_syn::cst::class::MethodBody;
 use whim_syn::cst::class::Property;
-use whim_syn::cst::class::WhereClause;
-use whim_syn::cst::class::WhereConstraint;
 use whim_syn::cst::declaration::Attribute;
 use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::declaration::Constant;
@@ -30,6 +28,8 @@ use whim_syn::cst::declaration::UseItems;
 use whim_syn::cst::function::Function;
 use whim_syn::cst::function::Parameter;
 use whim_syn::cst::function::ParameterList;
+use whim_syn::cst::function::WhereClause;
+use whim_syn::cst::function::WhereConstraint;
 use whim_syn::cst::trivia::TriviaKind;
 use whim_syn::cst::r#type::DictShapeTypeEntry;
 use whim_syn::cst::r#type::FunctionTypeParameter;
@@ -130,7 +130,7 @@ where
         ])
     }
 
-    fn format_where_clause(
+    pub(super) fn format_where_clause(
         &mut self,
         clause: &WhereClause<'arena>,
         trailing: Option<Document<'arena, A>>,
@@ -999,8 +999,6 @@ where
         let parameters = self.parameter_list.format(f);
         let return_type =
             f.format_return_type_suffix(self.return_type.as_ref().map(|r#type| r#type.r#type));
-        let body = self.body.format(f);
-
         let mut grouped = f.vec();
         grouped.push(f.text("function"));
         grouped.push(f.space());
@@ -1009,10 +1007,22 @@ where
         grouped.push(parameters);
         grouped.push(return_type);
 
+        let clause = if let Some(clause) = &self.where_clause {
+            let span = self
+                .return_type
+                .as_ref()
+                .map_or_else(|| self.parameter_list.span(), HasSpan::span);
+            let trailing = f.print_trailing_comments(span);
+            f.format_where_clause(clause, trailing, true)
+        } else {
+            f.space()
+        };
+        let body = self.body.format(f);
+
         f.concat([
             attributes,
             Document::Group(Group::new(grouped)),
-            f.space(),
+            clause,
             body,
         ])
     }

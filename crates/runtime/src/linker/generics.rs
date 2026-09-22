@@ -358,7 +358,7 @@ impl Engine {
             if !is_external(&function.attributes) {
                 validated &= self.validate_type_parameter_defaults(
                     &function.name,
-                    &function.type_parameters,
+                    &function.bounded_type_parameters(),
                     path,
                 )?;
             }
@@ -386,7 +386,7 @@ impl Engine {
                     .intern(format!("{}::{}", class.name, method.name).as_bytes());
                 validated &= self.validate_type_parameter_defaults(
                     &subject,
-                    &method.function.type_parameters,
+                    &method.function.bounded_type_parameters(),
                     path,
                 )?;
             }
@@ -588,12 +588,6 @@ fn unit_descriptors(unit: &CompiledUnit) -> Vec<&TypeDescriptor> {
 
         for method in &class.methods {
             collect_function_descriptors(&method.function, &mut descriptors);
-            descriptors.extend(
-                method
-                    .where_constraints
-                    .iter()
-                    .map(|constraint| &constraint.bound),
-            );
         }
     }
 
@@ -605,6 +599,12 @@ fn collect_function_descriptors<'a>(
     descriptors: &mut Vec<&'a TypeDescriptor>,
 ) {
     collect_parameter_descriptors(&function.type_parameters, descriptors);
+    descriptors.extend(
+        function
+            .where_constraints
+            .iter()
+            .map(|constraint| &constraint.bound),
+    );
     for parameter in &function.parameters {
         descriptors.extend(parameter.declared_type.iter());
     }

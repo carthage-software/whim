@@ -267,7 +267,14 @@ impl VirtualMachine<'_> {
         let outer =
             self.exact_method_environment(receiver_class, receiver_environment, entry.scope)?;
         let name = name_atom(chunk, site);
-        let method_environment = self.bind_site_turbofish(chunk, site, method.body, name, outer)?;
+        let method_environment = self.bind_site_turbofish(
+            chunk,
+            site,
+            method.body,
+            name,
+            outer,
+            (receiver_class, receiver_environment),
+        )?;
         let trivial_constructor_parameters =
             Self::trivial_constructor_parameter_count(&entry, count - 1);
 
@@ -411,8 +418,14 @@ impl VirtualMachine<'_> {
             let outer =
                 self.exact_method_environment(receiver_class, receiver_environment, entry.scope)?;
             let name = name_atom(chunk, site);
-            let method_environment =
-                self.bind_site_turbofish(chunk, site, method.body, name, outer)?;
+            let method_environment = self.bind_site_turbofish(
+                chunk,
+                site,
+                method.body,
+                name,
+                outer,
+                (receiver_class, receiver_environment),
+            )?;
 
             let caller_environment = self.current_frame().type_environment;
             Self::cache_guarded_method(
@@ -591,7 +604,14 @@ impl VirtualMachine<'_> {
         )?;
         let name = name_atom(chunk, site);
         let turbofish_bound = site_type_arguments(chunk, site).is_some();
-        let environment = self.bind_site_turbofish(chunk, site, method.body, name, outer)?;
+        let environment = self.bind_site_turbofish(
+            chunk,
+            site,
+            method.body,
+            name,
+            outer,
+            (receiver_class, receiver.type_environment()),
+        )?;
         if !clear_window && turbofish_bound != body.type_parameters.is_empty() {
             let outcome = self.invoke_proven_built_in_method_from_stack(
                 body,
@@ -1211,8 +1231,14 @@ impl VirtualMachine<'_> {
             .unwrap_or_else(TypeEnvironmentId::default);
 
         let turbofish_bound = site_type_arguments(chunk, site).is_some();
-        let type_environment =
-            self.bind_site_turbofish(chunk, site, entry.body, name, type_environment)?;
+        let type_environment = self.bind_site_turbofish(
+            chunk,
+            site,
+            entry.body,
+            name,
+            type_environment,
+            (receiver_class, receiver_environment),
+        )?;
         match entry.body {
             MethodBodyKind::Bytecode(function) => {
                 let arguments_proven = arguments_proven
@@ -1423,6 +1449,7 @@ impl VirtualMachine<'_> {
         body: MethodBodyKind,
         name: &Atom,
         outer: TypeEnvironmentId,
+        receiver: (ClassId, TypeEnvironmentId),
     ) -> Result<TypeEnvironmentId, VirtualMachineControl> {
         let Some(supplied) = site_type_arguments(chunk, site) else {
             return Ok(outer);
@@ -1439,12 +1466,13 @@ impl VirtualMachine<'_> {
                 && entry.outer == outer
                 && entry.caller == caller_environment
                 && entry.caller_class == caller_class
+                && entry.receiver == receiver
             {
                 return Ok(entry.environment);
             }
         }
 
-        let parameters = match body {
+        let mut parameters = match body {
             MethodBodyKind::Bytecode(function) => self.engine.tables.functions[function.0 as usize]
                 .type_parameters()
                 .to_vec(),
@@ -1458,6 +1486,7 @@ impl VirtualMachine<'_> {
             }
         };
 
+        self.resolve_parameter_bounds(&mut parameters, receiver.0, receiver.1);
         let environment = self.bind_type_parameters_from(
             &parameters,
             Some(supplied),
@@ -1476,6 +1505,7 @@ impl VirtualMachine<'_> {
                 outer,
                 caller: caller_environment,
                 caller_class,
+                receiver,
                 environment,
             });
         }
@@ -1636,8 +1666,20 @@ impl VirtualMachine<'_> {
         };
 
         let turbofish_bound = site_type_arguments(chunk, site).is_some();
-        let type_environment =
-            self.bind_site_turbofish(chunk, site, entry.body, member, type_environment)?;
+        let type_environment = self.bind_site_turbofish(
+            chunk,
+            site,
+            entry.body,
+            member,
+            type_environment,
+            (
+                context.called,
+                this.as_ref()
+                    .map_or_else(TypeEnvironmentId::default, |receiver| {
+                        receiver.type_environment()
+                    }),
+            ),
+        )?;
         match entry.body {
             MethodBodyKind::Bytecode(function) => {
                 let arguments_proven = self.cached_argument_guards_match(

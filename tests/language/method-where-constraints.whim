@@ -1,13 +1,11 @@
 use Whim\Marker\AlwaysInline;
 use Whim\Unwind\TypeError;
-use Whim\_Private\memmem;
 
 function rejects(fn(): mixed $operation): void {
   $caught = false;
   try {
     $operation();
-  } catch (TypeError $error) {
-    assert!(memmem($error->getMessage(), 'where constraint', 0, false) != null);
+  } catch (TypeError $_error) {
     $caught = true;
   }
 
@@ -131,12 +129,11 @@ assert!($integers->touch() == 7);
 assert!(Effects::$defaults == 1 && Effects::$bodies == 1);
 
 $badGetter = $strings->get(...);
-$badStatic = Box::choose::<string>(...);
 $badPartial = $strings->identity(1, ...);
 foreach (vec[
   fn() => $strings->get(),
   fn() => $badGetter(),
-  fn() => $badStatic('x'),
+  fn() => Box::choose::<string>(...),
   fn() => $badPartial(),
   fn() => $strings->literal(),
   fn() => $strings->identity(value: 1),

@@ -9,7 +9,7 @@ use whim_span::Span;
 use whim_syn::cst::Program;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::class::ClassLikeMember;
-use whim_syn::cst::class::WhereClause;
+use whim_syn::cst::function::WhereClause;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Type;
@@ -383,6 +383,24 @@ pub(crate) fn check_type_parameters(
     Ok(())
 }
 
+pub(crate) fn enclosing_where_clause_span(
+    clause: Option<&WhereClause<'_>>,
+    parameters: Option<&TypeParameterList<'_>>,
+) -> Option<Span> {
+    clause
+        .filter(|clause| {
+            clause.constraints.iter().any(|constraint| {
+                parameters.is_none_or(|parameters| {
+                    !parameters
+                        .parameters
+                        .iter()
+                        .any(|parameter| parameter.name.value == constraint.parameter.value)
+                })
+            })
+        })
+        .map(HasSpan::span)
+}
+
 pub(crate) fn compile_where_constraints(
     scope: &TypeScope<'_>,
     clause: Option<&WhereClause<'_>>,
@@ -400,7 +418,7 @@ pub(crate) fn compile_where_constraints(
                 } else {
                     CompileErrorKind::UnknownWhereConstraintParameter
                 },
-                format!("`{name}` is not a type parameter available to this method"),
+                format!("`{name}` is not a type parameter available to this callable"),
                 constraint.parameter.span(),
             ));
         }

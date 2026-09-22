@@ -9,10 +9,12 @@ use whim_bytecode::unit::CompiledAttribute;
 use whim_bytecode::unit::CompiledFunction;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledWhereConstraint;
 use whim_syn::cst::declaration::AttributeList;
 use whim_syn::cst::function::Closure;
 use whim_syn::cst::function::ClosureBody;
 use whim_syn::cst::function::ParameterList;
+use whim_syn::cst::function::WhereClause;
 use whim_syn::cst::r#type::Type;
 use whim_syn::cst::r#type::TypeParameterList;
 
@@ -24,6 +26,8 @@ use crate::declarations::functions::render_signature;
 use crate::declarations::generics::binder_names;
 use crate::declarations::generics::check_type_parameters;
 use crate::declarations::generics::compile_type_parameters;
+use crate::declarations::generics::compile_where_constraints;
+use crate::declarations::generics::enclosing_where_clause_span;
 use crate::emit::Block;
 use crate::emit::BodyCompiler;
 use crate::emit::BodyShape;
@@ -59,6 +63,7 @@ struct SynthesizedFunctionSource<'source, 'arena, 'captures> {
     type_parameters: Option<&'source TypeParameterList<'arena>>,
     parameter_list: &'source ParameterList<'arena>,
     return_type: Option<&'source Type<'arena>>,
+    where_clause: Option<&'source WhereClause<'arena>>,
     body: FunctionBodySource<'source, 'arena>,
     captures: &'captures [String],
 }
@@ -74,6 +79,7 @@ impl SynthesizedFunctionSource<'_, '_, '_> {
 struct SynthesizedFunctionMetadata {
     signature: String,
     type_parameters: Vec<CompiledTypeParameter>,
+    where_constraints: Vec<CompiledWhereConstraint>,
     parameters: Vec<CompiledParameter>,
     return_type: Option<TypeDescriptor>,
     attributes: Vec<CompiledAttribute>,
@@ -142,6 +148,7 @@ impl BodyCompiler<'_, '_> {
                 span: closure.span(),
                 attribute_lists: closure.attribute_lists,
                 type_parameters: closure.type_parameters.as_ref(),
+                where_clause: closure.where_clause.as_ref(),
                 parameter_list: &closure.parameter_list,
                 return_type: closure
                     .return_type
@@ -240,6 +247,7 @@ impl BodyCompiler<'_, '_> {
         Ok(SynthesizedFunctionMetadata {
             signature,
             type_parameters,
+            where_constraints: compile_where_constraints(&type_scope, source.where_clause)?,
             parameters,
             return_type,
             attributes,
@@ -270,7 +278,10 @@ impl BodyCompiler<'_, '_> {
             self.synthesized,
             self.aliases,
             BodyShape {
-                where_clause: None,
+                where_clause: enclosing_where_clause_span(
+                    source.where_clause,
+                    source.type_parameters,
+                ),
                 is_instance_method: captured_this,
                 return_kind,
                 promote_parameters: false,
@@ -395,6 +406,7 @@ impl BodyCompiler<'_, '_> {
             span: source.span,
             signature: self.heap.intern(metadata.signature.as_bytes()),
             type_parameters: metadata.type_parameters,
+            where_constraints: metadata.where_constraints,
             parameters: metadata.parameters,
             return_type: metadata.return_type,
             attributes: metadata.attributes,

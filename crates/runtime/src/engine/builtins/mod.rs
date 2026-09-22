@@ -1,5 +1,7 @@
 //! Declaring the Rust-backed symbols every engine requires.
 
+use std::borrow::Cow;
+
 use whim_base::u32_index;
 use whim_base::unwrap_result_invariant;
 use whim_bytecode::REFERENCE_REGISTER_LIMIT;
@@ -115,6 +117,10 @@ pub(crate) fn runtime_function(
         },
         parameters: NonNull::from(function.parameters.as_slice()),
         type_parameters: NonNull::from(function.type_parameters.as_slice()),
+        bound_type_parameters: match function.bounded_type_parameters() {
+            Cow::Borrowed(_) => None,
+            Cow::Owned(parameters) => Some(parameters.into_boxed_slice()),
+        },
         attributes: NonNull::from(function.attributes.as_slice()),
         frameless_literal: frameless_literal(function),
         return_type: function.return_type.clone().map(Box::new),

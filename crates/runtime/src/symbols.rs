@@ -285,6 +285,7 @@ impl ArgumentGuardWays {
 
 #[derive(Clone, Copy)]
 pub(crate) struct CachedTurbofishEnvironment {
+    pub(crate) receiver: (ClassId, TypeEnvironmentId),
     /// The compiled body the site resolved to. A built-in body is never cached:
     /// it has no comparable identity here, and it falls through to the bind.
     pub(crate) function: FuncId,
@@ -760,6 +761,7 @@ pub(crate) struct RuntimeFunction {
     pub(crate) optimization: CallableOptimization,
     pub(crate) parameters: NonNull<[CompiledParameter]>,
     pub(crate) type_parameters: NonNull<[CompiledTypeParameter]>,
+    pub(crate) bound_type_parameters: Option<Box<[CompiledTypeParameter]>>,
     pub(crate) attributes: NonNull<[CompiledAttribute]>,
     pub(crate) frameless_literal: Option<Literal>,
     /// The runtime-enforced return type, boxed so checks may keep its address
@@ -788,9 +790,13 @@ pub(crate) enum CallableOptimization {
 impl RuntimeFunction {
     pub(crate) fn where_constraints(&self) -> &[CompiledWhereConstraint] {
         match self.locator {
-            FunctionLocator::TopLevel(_) => &[],
+            FunctionLocator::TopLevel(index) => {
+                &self.unit.unit.functions[index as usize].where_constraints
+            }
             FunctionLocator::Method { class, method } => {
-                &self.unit.unit.classes[class as usize].methods[method as usize].where_constraints
+                &self.unit.unit.classes[class as usize].methods[method as usize]
+                    .function
+                    .where_constraints
             }
         }
     }
@@ -888,6 +894,9 @@ impl RuntimeFunction {
 
     #[must_use]
     pub(crate) const fn type_parameters(&self) -> &[CompiledTypeParameter] {
+        if let Some(parameters) = &self.bound_type_parameters {
+            return parameters;
+        }
         // SAFETY: the engine owns this stable slice for the function's lifetime.
         unsafe { self.type_parameters.as_ref() }
     }

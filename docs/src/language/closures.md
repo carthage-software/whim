@@ -15,7 +15,8 @@ assert!($double(21) == 42);
 ```
 
 Like a named function, a closure may have type parameters, typed
-parameters, defaults, a return type, attributes, and a block body.
+parameters, defaults, a return type, a [`where` clause](generics.md#where-clauses),
+attributes, and a block body.
 
 A closure may also have an expression body:
 

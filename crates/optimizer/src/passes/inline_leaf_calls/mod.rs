@@ -216,11 +216,12 @@ pub(crate) fn optimize_unit(
         .functions
         .iter()
         .any(|function| !function.type_parameters.is_empty())
-        && unit
-            .main
-            .code
-            .iter()
-            .any(|instruction| matches!(instruction, Instruction::CallNamed { .. }))
+        && unit.main.code.iter().any(|instruction| {
+            matches!(
+                instruction,
+                Instruction::CallNamed { .. } | Instruction::CallNamedUnchecked { .. }
+            )
+        })
     {
         let sites = {
             let indexed = IndexedUnit::with_world(unit, world);

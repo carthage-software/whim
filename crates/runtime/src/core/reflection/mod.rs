@@ -63,7 +63,6 @@ pub(crate) enum Operation {
     DeclaredType,
     DeclaringCallable,
     DeclaringDeclaration,
-    DeclaringMethod,
     DeclaringType,
     Default,
     DefaultValue,

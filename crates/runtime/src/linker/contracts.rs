@@ -920,27 +920,6 @@ impl Engine {
             replacement_environment.insert(replacement.name.clone(), symbolic.clone());
             replaced_environment.insert(replaced.name.clone(), symbolic);
 
-            if replacement.bounds.len() != replaced.bounds.len() {
-                return Ok(Some(format!(
-                    "method type parameter {} has different bounds from {replaced_noun}",
-                    position + 1
-                )));
-            }
-
-            for (replacement_bound, replaced_bound) in
-                replacement.bounds.iter().zip(&replaced.bounds)
-            {
-                let replacement_bound =
-                    substitute_symbolic(replacement_bound, replacement_environment);
-                let replaced_bound = substitute_symbolic(replaced_bound, replaced_environment);
-                if !self.link_descriptors_equivalent(&replacement_bound, &replaced_bound)? {
-                    return Ok(Some(format!(
-                        "method type parameter {} has different bounds from {replaced_noun}",
-                        position + 1
-                    )));
-                }
-            }
-
             let defaults_match = match (&replacement.default, &replaced.default) {
                 (Some(replacement), Some(replaced)) => {
                     let replacement = substitute_symbolic(replacement, replacement_environment);

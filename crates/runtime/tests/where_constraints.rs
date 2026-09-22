@@ -20,6 +20,45 @@ fn where_constraints_enforce_from_source_and_artifacts() {
     ));
 }
 
+#[test]
+fn callable_where_constraints_enforce_from_source_and_artifacts() {
+    run_source_and_artifacts(include_str!(
+        "../../../tests/language/callable-where-constraints.whim"
+    ));
+}
+
+#[test]
+fn callable_where_defaults_follow_inline_bounds() {
+    for (parameters, clause) in [("T: int = string", ""), ("T = string", " where T: int")] {
+        for source in [
+            format!("function invalid<{parameters}>(): void{clause} {{}}"),
+            format!("$invalid = fn<{parameters}>(): void{clause} {{}};"),
+            format!("$invalid = fn<{parameters}>(): null{clause} => null;"),
+            format!(
+                "class Example {{ public function invalid<{parameters}>(): void{clause} {{}} }}"
+            ),
+            format!(
+                "class Example {{ public static function invalid<{parameters}>(): void{clause} {{}} }}"
+            ),
+        ] {
+            for optimize in [false, true] {
+                let mut engine = Engine::new(EngineConfiguration {
+                    optimize,
+                    ..EngineConfiguration::default()
+                });
+                let result = engine.run_source(&source, Path::new("/invalid-where-default.whim"));
+                assert_ne!(result.exit_code(), 0, "{source}");
+                let diagnostic = format!("{result:?}");
+                assert!(diagnostic.contains("LinkerError"), "{diagnostic}");
+                assert!(
+                    diagnostic.contains("does not satisfy its bound"),
+                    "{diagnostic}"
+                );
+            }
+        }
+    }
+}
+
 fn run_source_and_artifacts(source: &str) {
     for optimize in [false, true] {
         let mut engine = Engine::new(EngineConfiguration {

@@ -114,8 +114,8 @@ pub(crate) fn dispatch(
         ReflectionData::TypeParameter(parameter) => {
             declarations::type_parameter_dispatch(context, operation, &parameter)
         }
-        ReflectionData::WhereConstraint { method, position } => {
-            declarations::where_constraint_dispatch(context, operation, &method, position)
+        ReflectionData::WhereConstraint { callable, position } => {
+            declarations::where_constraint_dispatch(context, operation, &callable, position)
         }
         ReflectionData::Attribute {
             target,

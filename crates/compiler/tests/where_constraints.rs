@@ -29,7 +29,7 @@ fn method_where_metadata_preserves_parameters_bounds_order_and_spans() {
             },
         )
         .unwrap();
-        let constraints = &unit.classes[0].methods[0].where_constraints;
+        let constraints = &unit.classes[0].methods[0].function.where_constraints;
         assert_eq!(
             unit.classes[0].methods[0].function.chunk.code[0],
             Instruction::CheckWhereConstraints
@@ -55,6 +55,18 @@ fn method_where_metadata_preserves_parameters_bounds_order_and_spans() {
 #[test]
 fn where_metadata_requires_an_available_parameter_and_a_valid_bound() {
     for (source, kind) in [
+        (
+            "function check<T>(): void where Missing: int {}",
+            CompileErrorKind::UnknownWhereConstraintParameter,
+        ),
+        (
+            "$f = fn<T>() where Missing: int {};",
+            CompileErrorKind::UnknownWhereConstraintParameter,
+        ),
+        (
+            "$f = fn<T>() where T: void => 1;",
+            CompileErrorKind::ReturnOnlyType,
+        ),
         (
             "class Box<T> { public function check(): void where Missing: int {} }",
             CompileErrorKind::UnknownWhereConstraintParameter,

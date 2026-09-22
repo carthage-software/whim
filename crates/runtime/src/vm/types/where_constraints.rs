@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::unit::CompiledTypeParameter;
+use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::symbols::FunctionLocator;
 use crate::vm::VirtualMachine;
@@ -14,12 +17,21 @@ impl VirtualMachine<'_> {
         };
         let environment = frame.type_environment;
         let runtime = &self.engine.tables.functions[function.0 as usize];
-        let FunctionLocator::Method { class, method } = runtime.locator else {
-            return Ok(());
-        };
         let unit = Rc::clone(&runtime.unit);
-        let method = &unit.unit.classes[class as usize].methods[method as usize];
-        for constraint in &method.where_constraints {
+        let function = match runtime.locator {
+            FunctionLocator::TopLevel(index) => &unit.unit.functions[index as usize],
+            FunctionLocator::Method { class, method } => {
+                &unit.unit.classes[class as usize].methods[method as usize].function
+            }
+        };
+        for constraint in &function.where_constraints {
+            if function
+                .type_parameters
+                .iter()
+                .any(|parameter| parameter.name == constraint.parameter)
+            {
+                continue;
+            }
             let argument = self.substitute_descriptor(
                 &TypeDescriptor::Parameter(constraint.parameter.clone()),
                 environment,
@@ -37,7 +49,7 @@ impl VirtualMachine<'_> {
                         constraint.parameter,
                         constraint.parameter,
                         self.render_descriptor(&bound),
-                        method.function.name,
+                        function.name,
                     ),
                 ));
             }
@@ -46,27 +58,62 @@ impl VirtualMachine<'_> {
     }
 
     pub(super) fn resolve_static_argument(&self, descriptor: &TypeDescriptor) -> TypeDescriptor {
-        if matches!(descriptor, TypeDescriptor::StaticClass)
-            && let Some(called) = self
-                .frames
-                .last()
-                .and_then(|frame| frame.called_class.get())
-        {
+        if !matches!(descriptor, TypeDescriptor::StaticClass) {
+            return descriptor.map_children(|child| self.resolve_static_argument(child));
+        }
+        let Some(called) = self
+            .frames
+            .last()
+            .and_then(|frame| frame.called_class.get())
+        else {
+            return descriptor.clone();
+        };
+        self.resolve_static_descriptor(
+            descriptor,
+            called,
+            self.current_this()
+                .map_or_else(TypeEnvironmentId::default, |receiver| {
+                    receiver.type_environment()
+                }),
+        )
+    }
+
+    pub(in crate::vm) fn resolve_parameter_bounds(
+        &self,
+        parameters: &mut [CompiledTypeParameter],
+        called: ClassId,
+        environment: TypeEnvironmentId,
+    ) {
+        for parameter in parameters {
+            for bound in &mut parameter.bounds {
+                *bound = self.resolve_static_descriptor(bound, called, environment);
+            }
+            if let Some(default) = &mut parameter.default {
+                *default = self.resolve_static_descriptor(default, called, environment);
+            }
+        }
+    }
+
+    fn resolve_static_descriptor(
+        &self,
+        descriptor: &TypeDescriptor,
+        called: ClassId,
+        environment: TypeEnvironmentId,
+    ) -> TypeDescriptor {
+        if matches!(descriptor, TypeDescriptor::StaticClass) {
             let class = &self.engine.tables.classes[called.0 as usize];
-            let arguments = self.current_this().and_then(|receiver| {
-                (!class.type_parameters.is_empty()).then(|| {
-                    class
-                        .type_parameters
-                        .iter()
-                        .map(|parameter| {
-                            self.substitute_descriptor(
-                                &TypeDescriptor::Parameter(parameter.name.clone()),
-                                receiver.type_environment(),
-                                0,
-                            )
-                        })
-                        .collect()
-                })
+            let arguments = (!class.type_parameters.is_empty()).then(|| {
+                class
+                    .type_parameters
+                    .iter()
+                    .map(|parameter| {
+                        self.substitute_descriptor(
+                            &TypeDescriptor::Parameter(parameter.name.clone()),
+                            environment,
+                            0,
+                        )
+                    })
+                    .collect()
             });
             return TypeDescriptor::Named {
                 name: class.name.clone(),
@@ -74,6 +121,6 @@ impl VirtualMachine<'_> {
                 recursive: false,
             };
         }
-        descriptor.map_children(|child| self.resolve_static_argument(child))
+        descriptor.map_children(|child| self.resolve_static_descriptor(child, called, environment))
     }
 }

@@ -32,6 +32,7 @@ use whim_value::heap::Heap;
 
 use crate::declarations::class_likes::validate_variance_use;
 use crate::declarations::generics::compile_type_parameters;
+use crate::declarations::generics::compile_where_constraints;
 use crate::emit::BodyCompiler;
 use crate::emit::BodyShape;
 use crate::emit::ReturnKind;
@@ -87,7 +88,6 @@ pub(in crate::declarations) fn compile_function_declaration(
     unit: &mut CompiledUnit,
 ) -> Result<CompiledFunction, CompileError> {
     rules::check_free_function_parameters(&function.parameter_list)?;
-    let name = scope.resolver.qualify(function.name.value);
     let attributes = compile_attributes(
         heap,
         scope,
@@ -107,6 +107,18 @@ pub(in crate::declarations) fn compile_function_declaration(
     )?;
 
     let lowered_return = lower_function_return(heap, scope, &unit.type_aliases, function)?;
+    let where_constraints = compile_where_constraints(
+        &TypeScope {
+            heap,
+            resolver: scope.resolver,
+            class: scope.class,
+            aliases: &unit.type_aliases,
+            binders: &scope.binders,
+            forbidden_binders: &scope.forbidden_binders,
+            generics: scope.generics,
+        },
+        function.where_clause.as_ref(),
+    )?;
 
     let signature = render_signature(
         heap,
@@ -168,10 +180,11 @@ pub(in crate::declarations) fn compile_function_declaration(
     }
 
     Ok(CompiledFunction {
-        name: heap.intern(name.as_bytes()),
+        name: heap.intern(scope.resolver.qualify(function.name.value).as_bytes()),
         span: function.span(),
         signature: heap.intern(signature.as_bytes()),
         type_parameters,
+        where_constraints,
         parameters,
         return_type: lowered_return.descriptor,
         attributes,

@@ -1,0 +1,9 @@
+function identity<T>(T $value):T where T:!null{return $value;}
+function collect<Input,Output>(Input $value):Output where Input:AnExtremelyLongInterfaceName,Output:AnotherExtremelyLongInterfaceName{}
+$identity=fn<T>(T $value):T where T:!null=>$value;
+$block=fn<T>(T $value):T where T:!null,{return $value;};
+$wide=fn<Input,Output>(Input $value):Output where Input:AnExtremelyLongInterfaceName,Output:AnotherExtremelyLongInterfaceName=>$value;
+function commented<T>():void // before clause
+where T: int, // after bound
+{}
+$commented=fn<T>():int /* before clause */ where /* after keyword */ T: int /* before arrow */=>1;

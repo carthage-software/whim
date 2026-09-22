@@ -71,7 +71,7 @@ Files](../language/loading.md).
 ```text
 function-declaration
                 := attributes? "function" function-name type-parameters?
-                   parameter-list return-type? block
+                   parameter-list return-type? where-clause? block
 
 parameter-list  := "(" (parameter ("," parameter)* ","?)? ")"
 
@@ -95,7 +95,7 @@ expression or a block.
 
 ```text
 closure         := attributes? "fn" type-parameters? parameter-list
-                   return-type? closure-body
+                   return-type? where-clause? closure-body
 
 closure-body    := "=>" expression | block
 ```
@@ -154,8 +154,8 @@ A constructor parameter with a visibility word declares a promoted property.
 constant, or method has exactly one visibility word. The other modifiers may
 appear in any order, but each may appear only once.
 
-A method's [`where` clause](../language/generics.md#method-where-clauses) requires
-each named type parameter to fit its bound when the method is called.
+A callable's [`where` clause](../language/generics.md#where-clauses) requires
+each named type parameter to fit its bound.
 
 See [Classes and Properties](../language/classes.md) and [Inheritance and
 Visibility](../language/inheritance.md).

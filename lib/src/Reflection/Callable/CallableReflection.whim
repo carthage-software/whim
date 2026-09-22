@@ -4,6 +4,7 @@ use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Reflection\Generic\GenericDeclarationReflection;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
+use Whim\Reflection\Generic\WhereConstraintReflection;
 use Whim\Reflection\Member\MethodReflection;
 use Whim\Reflection\Symbol\FunctionReflection;
 use Whim\Reflection\Type\ClassTypeReflection;
@@ -20,6 +21,10 @@ interface CallableReflection extends
   /** Returns the declared or synthesized callable name. */
   #[MustUse]
   public function getName(): string;
+
+  /** Returns where constraints in source order, including repeated bounds. */
+  #[MustUse]
+  public function getWhereConstraints(): vec<WhereConstraintReflection>;
 
   /** Returns parameters in declaration order. */
   #[MustUse]

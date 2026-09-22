@@ -1,7 +1,7 @@
 # Functions
 
 A function declaration has a name, optional type parameters, parameters, an
-optional return type, and a body.
+optional return type, an optional [`where` clause](generics.md#where-clauses), and a body.
 
 ```whim
 function area(float $width, float $height): float {

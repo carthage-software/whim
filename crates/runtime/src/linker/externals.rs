@@ -394,11 +394,33 @@ impl Engine {
                 unit,
             )?;
 
-            if method.where_constraints.len() != target.where_constraints.len()
-                || method
-                    .where_constraints
+            let expected_constraints = method
+                .function
+                .where_constraints
+                .iter()
+                .filter(|constraint| {
+                    !method
+                        .function
+                        .type_parameters
+                        .iter()
+                        .any(|parameter| parameter.name == constraint.parameter)
+                })
+                .collect::<Vec<_>>();
+            let actual_constraints = target
+                .where_constraints
+                .iter()
+                .filter(|constraint| {
+                    !target
+                        .function
+                        .type_parameters
+                        .iter()
+                        .any(|parameter| parameter.name == constraint.parameter)
+                })
+                .collect::<Vec<_>>();
+            if expected_constraints.len() != actual_constraints.len()
+                || expected_constraints
                     .iter()
-                    .zip(&target.where_constraints)
+                    .zip(actual_constraints)
                     .any(|(expected, actual)| {
                         expected.parameter != actual.parameter
                             || !descriptors_equal(&expected.bound, &actual.bound, 0)
@@ -625,7 +647,7 @@ impl Engine {
         unit: &CompiledUnit,
     ) -> Result<(), VirtualMachineControl> {
         self.check_type_parameters(
-            &expected.type_parameters,
+            &expected.bounded_type_parameters(),
             &actual.type_parameters,
             name,
             span,

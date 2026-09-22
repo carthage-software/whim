@@ -138,6 +138,7 @@ reflection_interface! {
     )]
     CallableReflection = "Whim\\Reflection\\Callable\\CallableReflection" {
         get_name: "getName(): string" => Name;
+        get_where_constraints: "getWhereConstraints(): vec<Whim\\Reflection\\Generic\\WhereConstraintReflection>" => WhereConstraints;
         get_parameters: "getParameters(): vec<Whim\\Reflection\\Callable\\ParameterReflection>" => Parameters;
         get_parameter: "getParameter(int|string $parameter): null|Whim\\Reflection\\Callable\\ParameterReflection" => Parameter;
         get_required_parameter_count: "getRequiredParameterCount(): (0..)" => RequiredParameterCount;

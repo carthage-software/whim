@@ -1,5 +1,6 @@
 //! Formatting for calls, partial applications, arguments, and closures.
 
+use whim_span::HasSpan;
 use whim_syn::arena::Arena;
 use whim_syn::cst::call::Argument;
 use whim_syn::cst::call::PartialArgument;
@@ -132,6 +133,23 @@ where
             let r#type = return_type.r#type.format(f);
             parts.push(f.text(": "));
             parts.push(r#type);
+        }
+
+        if let Some(clause) = &self.where_clause {
+            let span = self
+                .return_type
+                .as_ref()
+                .map_or_else(|| self.parameter_list.span(), HasSpan::span);
+            let trailing = f.print_trailing_comments(span);
+            let clause = f.format_where_clause(clause, trailing, true);
+            let body = match &self.body {
+                ClosureBody::Expression { expression, .. } => {
+                    let value = f.format_closure_return_value(expression);
+                    f.concat([f.text("=> "), value])
+                }
+                ClosureBody::Block(block) => block.format(f),
+            };
+            return f.concat([Document::Group(Group::new(parts)), clause, body]);
         }
 
         match &self.body {

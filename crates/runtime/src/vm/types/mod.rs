@@ -301,12 +301,10 @@ impl VirtualMachine<'_> {
 
         match function.target() {
             CallTarget::User(id) => {
-                let (parameters, subject) = {
+                let (mut parameters, subject) = {
                     let runtime = &self.engine.tables.functions[id.0 as usize];
-                    (runtime.type_parameters, runtime.name.clone())
+                    (runtime.type_parameters().to_vec(), runtime.name.clone())
                 };
-                // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
-                let parameters = unsafe { parameters.as_ref() };
                 if parameters.is_empty()
                     || parameters
                         .iter()
@@ -315,7 +313,19 @@ impl VirtualMachine<'_> {
                     return Ok(outer);
                 }
 
-                self.bind_type_parameters(parameters, None, outer, subject.as_bytes())
+                if let Some(called) = function
+                    .called()
+                    .or_else(|| function.this().map(|receiver| receiver.class()))
+                {
+                    self.resolve_parameter_bounds(
+                        &mut parameters,
+                        called,
+                        function
+                            .this()
+                            .map_or(outer, |receiver| receiver.type_environment()),
+                    );
+                }
+                self.bind_type_parameters(&parameters, None, outer, subject.as_bytes())
             }
             CallTarget::BuiltIn(id) => {
                 let callable = self.engine.tables.built_in_functions[id.0 as usize].clone();

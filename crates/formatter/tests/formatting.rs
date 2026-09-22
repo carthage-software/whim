@@ -113,10 +113,15 @@ case!(hack_layout);
 case!(method_where_clauses);
 case!(method_where_clause_breaks);
 case!(method_where_clause_comments);
+case!(callable_where_clauses);
 
 #[test]
 fn method_where_clauses_stay_stable_across_widths_and_indentation() {
     for (name, source) in [
+        (
+            "callables",
+            include_str!("cases/callable_where_clauses/before.whim"),
+        ),
         (
             "clauses",
             include_str!("cases/method_where_clauses/before.whim"),

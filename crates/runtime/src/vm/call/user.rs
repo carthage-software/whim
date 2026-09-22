@@ -89,7 +89,7 @@ impl VirtualMachine<'_> {
                 if type_arguments_bound || runtime.type_parameters().is_empty() {
                     None
                 } else {
-                    Some(runtime.type_parameters)
+                    Some(runtime.type_parameters().to_vec())
                 },
             )
         };
@@ -121,13 +121,24 @@ impl VirtualMachine<'_> {
                 ),
             ));
         }
-        let type_environment = if let Some(type_parameters) = type_parameters {
+        let called = method
+            .map(|context| context.called)
+            .or_else(|| this.as_ref().map(|instance| instance.class()));
+        let type_environment = if let Some(mut parameters) = type_parameters {
             let subject = self.engine.tables.functions[function.0 as usize]
                 .name
                 .clone();
+            if let Some(called) = called {
+                self.resolve_parameter_bounds(
+                    &mut parameters,
+                    called,
+                    this.as_ref().map_or(outer_type_environment, |receiver| {
+                        receiver.type_environment()
+                    }),
+                );
+            }
             self.bind_type_parameters(
-                // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
-                unsafe { type_parameters.as_ref() },
+                &parameters,
                 None,
                 outer_type_environment,
                 subject.as_bytes(),
@@ -135,9 +146,6 @@ impl VirtualMachine<'_> {
         } else {
             outer_type_environment
         };
-        let called = method
-            .map(|context| context.called)
-            .or_else(|| this.as_ref().map(|instance| instance.class()));
         let checked_parameters = if arguments_proven { 0 } else { argc };
         if checked_parameters != 0 {
             let parameters = self.engine.tables.functions[function.0 as usize].parameters;

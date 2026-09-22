@@ -934,13 +934,25 @@ impl VirtualMachine<'_> {
                 }
                 let type_environment = match shape.target {
                     CallTarget::User(id) => {
-                        let (parameters, subject) = {
+                        let (mut parameters, subject) = {
                             let function = &self.engine.tables.functions[id.0 as usize];
-                            (function.type_parameters, function.name.clone())
+                            (function.type_parameters().to_vec(), function.name.clone())
                         };
+                        if let Some(called) = shape
+                            .method
+                            .map(|method| method.called)
+                            .or_else(|| shape.this.as_ref().map(|receiver| receiver.class()))
+                        {
+                            self.resolve_parameter_bounds(
+                                &mut parameters,
+                                called,
+                                shape.this.as_ref().map_or(outer_environment, |receiver| {
+                                    receiver.type_environment()
+                                }),
+                            );
+                        }
                         self.bind_type_parameters_from(
-                            // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
-                            unsafe { parameters.as_ref() },
+                            &parameters,
                             Some(arguments),
                             argument_environment,
                             outer_environment,

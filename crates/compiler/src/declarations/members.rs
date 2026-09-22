@@ -45,6 +45,7 @@ use crate::declarations::functions::render_signature;
 use crate::declarations::generics::binder_names;
 use crate::declarations::generics::compile_type_parameters;
 use crate::declarations::generics::compile_where_constraints;
+use crate::declarations::generics::enclosing_where_clause_span;
 use crate::emit::BodyShape;
 use crate::emit::ReturnKind;
 use crate::emit::Scope;
@@ -569,7 +570,10 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
                     &method.parameter_list,
                     block,
                     BodyShape {
-                        where_clause: method.where_clause.as_ref().map(HasSpan::span),
+                        where_clause: enclosing_where_clause_span(
+                            method.where_clause.as_ref(),
+                            method.type_parameters.as_ref(),
+                        ),
                         is_instance_method: !method.is_static(),
                         return_kind: metadata.return_kind,
                         promote_parameters: is_constructor && !method.is_static(),
@@ -586,7 +590,6 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
             is_static: method.is_static(),
             is_abstract: method.is_abstract(),
             is_final: method.is_final(),
-            where_constraints: metadata.where_constraints,
             function: CompiledFunction {
                 name: heap.intern(
                     format!("{}::{}", self.class_context.name, method.name.value).as_bytes(),
@@ -594,6 +597,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
                 span: method.span(),
                 signature: heap.intern(metadata.signature.as_bytes()),
                 type_parameters: metadata.type_parameters,
+                where_constraints: metadata.where_constraints,
                 parameters: metadata.parameters,
                 return_type: metadata.return_type,
                 attributes: metadata.attributes,

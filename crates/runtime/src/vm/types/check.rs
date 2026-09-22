@@ -393,9 +393,11 @@ impl VirtualMachine<'_> {
                 match target {
                     CallTarget::User(id) => {
                         let runtime = &self.engine.tables.functions[id.0 as usize];
+                        let mut parameters = runtime.type_parameters().to_vec();
+                        self.resolve_parameter_bounds(&mut parameters, owner, outer);
                         (
                             target,
-                            runtime.type_parameters().to_vec(),
+                            parameters,
                             member_arguments.as_deref(),
                             outer,
                             runtime.name.clone(),
@@ -2508,7 +2510,7 @@ impl VirtualMachine<'_> {
         if function.target() != target {
             return Ok(false);
         }
-        let (parameters, parameter_count, subject) = match target {
+        let (mut parameters, parameter_count, subject) = match target {
             CallTarget::User(id) => {
                 let runtime = &self.engine.tables.functions[id.0 as usize];
                 (
@@ -2529,6 +2531,13 @@ impl VirtualMachine<'_> {
         if !is_complete_callable_binding(function, parameter_count) {
             return Ok(false);
         }
+        self.resolve_parameter_bounds(
+            &mut parameters,
+            function.called().unwrap_or(owner),
+            function
+                .this()
+                .map_or(environment, |receiver| receiver.type_environment()),
+        );
         if let (Some(instance), Some(class_arguments)) =
             (function.this(), class_arguments.as_deref())
         {

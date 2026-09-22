@@ -19,7 +19,7 @@ use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
 use whim_bytecode::instruction::operands::IndexAddMode;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledClassLike;
-use whim_bytecode::unit::CompiledMethod;
+use whim_bytecode::unit::CompiledFunction;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledProperty;
 use whim_bytecode::unit::CompiledTypeParameter;
@@ -219,7 +219,7 @@ pub(crate) struct TypeFlow<'a> {
     capture_types: Vec<Option<TypeDescriptor>>,
     class_name: Option<&'a Atom>,
     class_type_parameters: &'a [CompiledTypeParameter],
-    where_method: Option<&'a CompiledMethod>,
+    bounded_function: Option<&'a CompiledFunction>,
     unit: Option<&'a IndexedUnit<'a>>,
     allocator: &'a Heap,
     facts: Vec<Fact>,
@@ -449,16 +449,28 @@ impl<'a> TypeFlow<'a> {
 
         let state_count = blocks.len().saturating_mul(register_count);
         let declined = !linear && state_count > MAXIMUM_FLOW_STATES;
-        let where_method = unit.and_then(|unit| {
-            matches!(chunk.code.first(), Some(Instruction::CheckWhereConstraints))
-                .then(|| {
+        let bounded_function = unit.and_then(|unit| {
+            if ptr::eq(&unit.main, chunk) {
+                return None;
+            }
+            unit.functions
+                .iter()
+                .chain(
                     unit.classes
                         .iter()
                         .filter(|class| class_name.is_some_and(|name| same_atom(name, &class.name)))
                         .flat_map(|class| &class.methods)
-                        .find(|method| ptr::eq(&method.function.chunk, chunk))
+                        .map(|method| &method.function),
+                )
+                .find(|function| ptr::eq(&function.chunk, chunk))
+                .filter(|function| {
+                    !function.where_constraints.is_empty()
+                        || function
+                            .type_parameters
+                            .iter()
+                            .chain(class_type_parameters)
+                            .any(|parameter| !parameter.bounds.is_empty())
                 })
-                .flatten()
         });
 
         let mut flow = Self {
@@ -467,7 +479,7 @@ impl<'a> TypeFlow<'a> {
             capture_types,
             class_name,
             class_type_parameters,
-            where_method,
+            bounded_function,
             unit,
             allocator,
             facts: Vec::new(),

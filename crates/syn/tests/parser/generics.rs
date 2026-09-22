@@ -105,12 +105,45 @@ fn where_constraints_accept_composite_types_and_method_forms() {
         "U",
     ] {
         for declaration in [
+            format!("function f<T, U>(): void where T: {bound} {{}}"),
+            format!("$f = fn<T, U>() where T: {bound}, {{}};"),
+            format!("$f = fn<T, U>(): int where T: {bound}, => 1;"),
             format!("class C<T> {{ public static function f<U>(): void where T: {bound} {{}} }}"),
             format!("interface C<T> {{ public function f<U>() where T: {bound},; }}"),
             format!("enum C {{ case A; public function f<T, U>() where T: {bound} {{}} }}"),
         ] {
             program(&arena, &declaration);
         }
+    }
+}
+
+#[test]
+fn function_and_closure_where_clauses_keep_constraints_and_spans() {
+    let arena = LocalArena::new();
+    let source = "function f<T: int, U>(T $value): T where U: vec<T>, T: !null { return $value; }";
+    let TopLevelStatement::Function(function) = top_level_statement(&arena, source) else {
+        panic!("expected a function");
+    };
+    let clause = function.where_clause.as_ref().unwrap();
+    assert_eq!(clause.constraints.len(), 2);
+    assert_eq!(clause.constraints.nodes[0].parameter.value, "U");
+    assert_eq!(clause.constraints.nodes[1].parameter.value, "T");
+    assert_eq!(
+        &source[clause.span().start.offset as usize..clause.span().end.offset as usize],
+        "where U: vec<T>, T: !null"
+    );
+    for body in ["=> $value", "{ return $value; }"] {
+        let source = format!("fn<T>(T $value): T where T: !null, {body};");
+        let Expression::Closure(closure) = expression(&arena, &source) else {
+            panic!("expected a closure");
+        };
+        let clause = closure.where_clause.as_ref().unwrap();
+        assert_eq!(clause.constraints.len(), 1);
+        assert_eq!(clause.constraints.tokens.len(), 1);
+        assert_eq!(
+            &source[clause.span().start.offset as usize..clause.span().end.offset as usize],
+            "where T: !null,"
+        );
     }
 }
 

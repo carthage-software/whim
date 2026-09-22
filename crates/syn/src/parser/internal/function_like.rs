@@ -1,6 +1,7 @@
 //! Function-like constructs: functions and closures.
 
 use crate::arena::Arena;
+use crate::arena::Vec;
 
 use crate::cst::declaration::AttributeList;
 use crate::cst::function::Closure;
@@ -10,6 +11,9 @@ use crate::cst::function::Parameter;
 use crate::cst::function::ParameterDefault;
 use crate::cst::function::ParameterList;
 use crate::cst::function::ReturnType;
+use crate::cst::function::WhereClause;
+use crate::cst::function::WhereConstraint;
+use crate::cst::sequence::TokenSeparatedSequence;
 use crate::error::Expected;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -34,6 +38,7 @@ where
         let type_parameters = self.parse_optional_type_parameter_list()?;
         let parameter_list = self.parse_parameter_list()?;
         let return_type = self.parse_return_type()?;
+        let where_clause = self.parse_where_clause()?;
         let body = self.parse_block()?;
 
         Ok(Function {
@@ -43,6 +48,7 @@ where
             type_parameters,
             parameter_list,
             return_type,
+            where_clause,
             body,
         })
     }
@@ -61,6 +67,7 @@ where
         let type_parameters = self.parse_optional_type_parameter_list()?;
         let parameter_list = self.parse_parameter_list()?;
         let return_type = self.parse_return_type()?;
+        let where_clause = self.parse_where_clause()?;
         let body = match self.peek_kind()? {
             Some(TokenKind::EqualGreaterThan) => {
                 let arrow = self.expect_span(TokenKind::EqualGreaterThan)?;
@@ -82,8 +89,45 @@ where
             type_parameters,
             parameter_list,
             return_type,
+            where_clause,
             body,
         })
+    }
+
+    pub(crate) fn parse_where_clause(&mut self) -> Result<Option<WhereClause<'arena>>, ParseError> {
+        if !self.is_at(TokenKind::Where)? {
+            return Ok(None);
+        }
+
+        let r#where = self.expect_keyword(TokenKind::Where)?;
+        let mut constraints = Vec::new_in(self.arena);
+        let mut commas = Vec::new_in(self.arena);
+        loop {
+            let parameter = self.parse_local_identifier()?;
+            let colon = self.expect_span(TokenKind::Colon)?;
+            let bound = self.parse_type()?;
+            constraints.push(WhereConstraint {
+                parameter,
+                colon,
+                bound,
+            });
+            if !self.is_at(TokenKind::Comma)? {
+                break;
+            }
+
+            commas.push(self.consume()?);
+            if matches!(
+                self.peek_kind()?,
+                Some(TokenKind::LeftBrace | TokenKind::Semicolon | TokenKind::EqualGreaterThan)
+            ) {
+                break;
+            }
+        }
+
+        Ok(Some(WhereClause {
+            r#where,
+            constraints: TokenSeparatedSequence::new(constraints, commas),
+        }))
     }
 
     pub(crate) fn parse_parameter_list(&mut self) -> Result<ParameterList<'arena>, ParseError> {

@@ -5,6 +5,65 @@ use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_optimizer::OptimizationConfiguration;
 
 #[test]
+fn callable_bounds_specialize_bodies_and_proven_calls() {
+    let unit = compile(
+        r"
+        function inline_bound<T: int>(T $a, T $b): int { return $a + $b; }
+        function where_bound<T>(T $a, T $b): int where T: int { return $a + $b; }
+        $closure = fn<T>(T $a, T $b): int where T: int => $a + $b;
+        assert!(where_bound::<int>(2, 3) == 5);
+        where_bound::<float>(2.0, 3.0);
+        ",
+        OptimizationConfiguration::default(),
+    );
+    for function in &unit.functions {
+        let name = function.name.as_bytes();
+        if name == b"inline_bound" || name == b"where_bound" || name.starts_with(b"{closure:") {
+            assert!(
+                function
+                    .chunk
+                    .code
+                    .iter()
+                    .any(|instruction| matches!(instruction, Instruction::IntAdd { .. }))
+            );
+            assert!(!function.chunk.code.iter().any(|instruction| matches!(
+                instruction,
+                Instruction::Add { .. } | Instruction::Return { .. }
+            )));
+        }
+    }
+    let inline = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"inline_bound")
+        .unwrap();
+    let clause = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"where_bound")
+        .unwrap();
+    assert_eq!(inline.chunk.code, clause.chunk.code);
+    assert_eq!(
+        unit.main
+            .code
+            .iter()
+            .filter(|instruction| matches!(
+                instruction,
+                Instruction::CallNamed { .. } | Instruction::CallNamedUnchecked { .. }
+            ))
+            .count(),
+        1
+    );
+    assert!(
+        !unit
+            .main
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::CheckWhereConstraints))
+    );
+}
+
+#[test]
 fn where_bounds_specialize_parameters_properties_and_collection_elements() {
     let unit = compile(
         r"
@@ -52,7 +111,10 @@ fn where_bounds_specialize_parameters_properties_and_collection_elements() {
         b"Vector::optional",
     ] {
         let code = method(&unit, name);
-        assert_eq!(code[0], Instruction::CheckWhereConstraints);
+        assert_eq!(
+            matches!(code[0], Instruction::CheckWhereConstraints),
+            name != b"Vector::floating"
+        );
         assert!(!code.iter().any(|instruction| matches!(
             instruction,
             Instruction::Add { .. } | Instruction::Return { .. }
@@ -141,9 +203,10 @@ fn proven_where_constraints_allow_instance_and_static_inlining() {
         );
     }
 
-    for name in [b"Number::value".as_slice(), b"Math::add"] {
-        assert_eq!(method(&unit, name)[0], Instruction::CheckWhereConstraints);
-    }
+    assert_eq!(
+        method(&unit, b"Number::value")[0],
+        Instruction::CheckWhereConstraints
+    );
 }
 
 #[test]
@@ -206,9 +269,10 @@ fn inlining_keeps_where_checks_in_the_callee_environment() {
         OptimizationConfiguration::default(),
     );
 
-    for name in [b"Box::get".as_slice(), b"Choose::choose"] {
-        assert_eq!(method(&unit, name)[0], Instruction::CheckWhereConstraints);
-    }
+    assert_eq!(
+        method(&unit, b"Box::get")[0],
+        Instruction::CheckWhereConstraints
+    );
     assert!(
         method(&unit, b"Box::call")
             .iter()

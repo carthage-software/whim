@@ -10,6 +10,7 @@ use whim_bytecode::unit::CompiledClassLike;
 use whim_bytecode::unit::CompiledFunction;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledWhereConstraint;
 use whim_bytecode::unit::ConstantInitializer;
 use whim_bytecode::unit::MUST_USE_ATTRIBUTE;
 use whim_bytecode::unit::TRACE_BOUNDARY_ATTRIBUTE;
@@ -46,6 +47,7 @@ pub(crate) struct CallableInfo {
     pub(crate) name: Atom,
     pub(crate) parameters: Vec<CompiledParameter>,
     pub(crate) type_parameters: Vec<CompiledTypeParameter>,
+    pub(crate) where_constraints: Vec<CompiledWhereConstraint>,
     pub(crate) return_type: Option<TypeDescriptor>,
     pub(crate) attributes: Vec<CompiledAttribute>,
     pub(crate) unit: Option<Rc<UnitContext>>,
@@ -89,6 +91,7 @@ fn function_info(vm: &VirtualMachine<'_>, name: &Atom) -> Option<CallableInfo> {
                 name: declaration.name.clone(),
                 parameters: declaration.parameters.clone(),
                 type_parameters: declaration.type_parameters.clone(),
+                where_constraints: Vec::new(),
                 return_type: Some(declaration.return_type.clone()),
                 attributes: built_in_attributes(vm, declaration.attributes),
                 unit: None,
@@ -109,6 +112,7 @@ fn method_info(vm: &VirtualMachine<'_>, class: ClassId, name: &Atom) -> Option<C
             name: name.clone(),
             parameters: built_in_parameters(vm.heap(), body.parameters),
             type_parameters: built_in_type_parameters(vm.heap(), body.type_parameters),
+            where_constraints: Vec::new(),
             return_type: Some(descriptor_from_built_in_spec(vm.heap(), &body.return_spec)),
             attributes: built_in_attributes(vm, body.attributes),
             unit: None,
@@ -130,7 +134,8 @@ fn user_function_info(
     Some(CallableInfo {
         name: name.unwrap_or_else(|| runtime.name.clone()),
         parameters: runtime.parameters().to_vec(),
-        type_parameters: runtime.type_parameters().to_vec(),
+        type_parameters: compiled.type_parameters.clone(),
+        where_constraints: compiled.where_constraints.clone(),
         return_type: runtime.return_type.as_deref().cloned(),
         attributes: runtime.attributes().to_vec(),
         unit: Some(Rc::clone(&runtime.unit)),
@@ -209,8 +214,45 @@ pub(crate) fn type_parameter_key(
         });
     }
 
-    let GenericOwner::Callable(CallableKey::Method { class, .. }) = owner else {
-        return None;
+    let class = match owner {
+        GenericOwner::Callable(CallableKey::Method { class, .. }) => *class,
+        GenericOwner::Callable(CallableKey::Closure(id)) => {
+            let runtime = vm.engine.tables.functions.get(id.0 as usize)?;
+            let span = compiled_function(runtime)?.span;
+            let (index, parent) = vm
+                .engine
+                .tables
+                .functions
+                .iter()
+                .enumerate()
+                .filter(|(_, candidate)| Rc::ptr_eq(&candidate.unit, &runtime.unit))
+                .filter_map(|(index, candidate)| {
+                    let parent_span = compiled_function(candidate)?.span;
+                    (parent_span.start.offset < span.start.offset
+                        && parent_span.end.offset >= span.end.offset)
+                        .then_some((
+                            index,
+                            candidate,
+                            parent_span.end.offset - parent_span.start.offset,
+                        ))
+                })
+                .min_by_key(|(_, _, length)| *length)
+                .map(|(index, parent, _)| (index, parent))?;
+            let parent = match parent.locator {
+                FunctionLocator::TopLevel(_) if parent.name.as_bytes().starts_with(b"{") => {
+                    CallableKey::Closure(FuncId(u32::try_from(index).ok()?))
+                }
+                FunctionLocator::TopLevel(_) => CallableKey::Function(parent.name.clone()),
+                FunctionLocator::Method { class, method } => CallableKey::Method {
+                    class: parent.declaring_class?,
+                    name: parent.unit.unit.classes[class as usize].methods[method as usize]
+                        .name
+                        .clone(),
+                },
+            };
+            return type_parameter_key(vm, &GenericOwner::Callable(parent), name);
+        }
+        _ => return None,
     };
 
     let class = &vm.engine.tables.classes[class.0 as usize];

@@ -19,8 +19,6 @@ use crate::cst::class::MethodBody;
 use crate::cst::class::Property;
 use crate::cst::class::PropertyDefault;
 use crate::cst::class::SealedPermissions;
-use crate::cst::class::WhereClause;
-use crate::cst::class::WhereConstraint;
 use crate::cst::declaration::AttributeList;
 use crate::cst::sequence::TokenSeparatedSequence;
 use crate::cst::statement::TopLevelStatement;
@@ -363,40 +361,6 @@ where
             where_clause,
             body,
         })
-    }
-
-    fn parse_where_clause(&mut self) -> Result<Option<WhereClause<'arena>>, ParseError> {
-        if !self.is_at(TokenKind::Where)? {
-            return Ok(None);
-        }
-
-        let r#where = self.expect_keyword(TokenKind::Where)?;
-        let mut constraints = Vec::new_in(self.arena);
-        let mut commas = Vec::new_in(self.arena);
-        loop {
-            let parameter = self.parse_local_identifier()?;
-            let colon = self.expect_span(TokenKind::Colon)?;
-            let bound = self.parse_type()?;
-            constraints.push(WhereConstraint {
-                parameter,
-                colon,
-                bound,
-            });
-
-            if !self.is_at(TokenKind::Comma)? {
-                break;
-            }
-
-            commas.push(self.consume()?);
-            if self.is_at(TokenKind::LeftBrace)? || self.is_at(TokenKind::Semicolon)? {
-                break;
-            }
-        }
-
-        Ok(Some(WhereClause {
-            r#where,
-            constraints: TokenSeparatedSequence::new(constraints, commas),
-        }))
     }
 
     fn parse_property(

@@ -511,7 +511,7 @@ impl<'a> TypeFlow<'a> {
         if origin & PARAMETER_ORIGIN != 0 && origin != THIS_ORIGIN {
             let index = (origin & !PARAMETER_ORIGIN) as usize;
             let descriptor = self.parameters.get(index)?.declared_type.as_ref()?;
-            return Some(if self.where_method.is_some() {
+            return Some(if self.bounded_function.is_some() {
                 self.constrained_type(descriptor)
             } else {
                 descriptor.clone()
@@ -791,8 +791,8 @@ impl<'a> TypeFlow<'a> {
             && self
                 .class_name
                 .is_some_and(|name| same_atom(name, &owner.name))
-            && self.where_method.is_some_and(|method| {
-                !method.function.type_parameters.iter().any(|parameter| {
+            && self.bounded_function.is_some_and(|function| {
+                !function.type_parameters.iter().any(|parameter| {
                     owner
                         .type_parameters
                         .iter()

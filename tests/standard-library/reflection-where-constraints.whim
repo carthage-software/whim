@@ -7,6 +7,81 @@ use Whim\Reflection\Generic\WhereConstraintReflection;
 type Numeric = int|float;
 type Sequence<T> = vec<T>;
 
+function inline_bound<T: !null>(T $value): T {
+  return $value;
+}
+
+function where_bound<T>(T $value): T where T: !null {
+  return $value;
+}
+
+function both_bounds<T: int|float, U>(U $value): U
+  where
+    T: int,
+    U: vec<T>,
+    T: 1..
+{
+  return $value;
+}
+
+function outer<T>(T $value): mixed {
+  return fn(): T where T: !null => $value;
+}
+
+$inline = Reflection\reflect_function('WhereReflectionTest\\inline_bound');
+$where = Reflection\reflect_function('WhereReflectionTest\\where_bound');
+assert!(length!($inline->getTypeParameter(0)->getBounds()) == 1);
+assert!($inline->getWhereConstraints() == vec[]);
+assert!($where->getTypeParameter(0)->getBounds() == vec[]);
+assert!(length!($where->getWhereConstraints()) == 1);
+assert!($where->getWhereConstraints()[0]->getBound()->toString() == '!null');
+assert!(
+  $where
+    ->getWhereConstraints()[0]
+    ->getDeclaringCallable()
+    ->getName() == $where->getName(),
+);
+
+$both = Reflection\reflect_function('WhereReflectionTest\\both_bounds');
+assert!(length!($both->getTypeParameter('T')->getBounds()) == 1);
+assert!($both->getTypeParameter('U')->getBounds() == vec[]);
+$constraints = $both->getWhereConstraints();
+assert!(length!($constraints) == 3);
+foreach ($constraints as $position => $constraint) {
+  assert!($constraint->getPosition() == $position);
+  assert!(
+    $constraint->getParameter()->getName() == vec['T', 'U', 'T'][$position],
+  );
+}
+
+foreach (vec[
+  fn<T>(T $value): T where T: !null => $value,
+  fn<T>(T $value): T where T: !null {
+    return $value;
+  },
+] as $closure) {
+  $declaration = Reflection\reflect_callable($closure)->getDeclaration();
+  assert!($declaration->getTypeParameter(0)->getBounds() == vec[]);
+  $constraint = $declaration->getWhereConstraints()[0];
+  assert!($constraint->getParameter()->getName() == 'T');
+  assert!($constraint->getBound()->toString() == '!null');
+  assert!(
+    $constraint->getDeclaringCallable()->getName() == $declaration->getName(),
+  );
+
+  if ($declaration->getOrigin() == DeclarationOrigin::User) {
+    assert!($constraint->getLocation() != null);
+  }
+}
+
+$captured = Reflection\reflect_callable(outer::<int>(1))->getDeclaration();
+$parameter = $captured->getWhereConstraints()[0]->getParameter();
+assert!($parameter->getName() == 'T');
+assert!(
+  $parameter->getDeclaringDeclaration()->getName()
+  == 'WhereReflectionTest\\outer',
+);
+
 interface Inspectable<T> {
   public function inspect<U>(): void where T: Numeric, U: Sequence<T>;
 }
@@ -53,10 +128,10 @@ assert!(length!($constraints) == 3);
 foreach ($constraints as $position => $constraint) {
   assert!($constraint is WhereConstraintReflection);
   assert!($constraint->getPosition() == $position);
-  assert!($constraint->getDeclaringMethod()->getName() == 'inspect');
+  assert!($constraint->getDeclaringCallable()->getName() == 'inspect');
   assert!(
     $constraint
-      ->getDeclaringMethod()
+      ->getDeclaringCallable()
       ->getDeclaringType()
       ->getName() == $class->getName(),
   );
@@ -121,7 +196,7 @@ $inherited = Reflection\reflect_class(
 assert!(length!($inherited) == 3);
 assert!(
   $inherited[0]
-    ->getDeclaringMethod()
+    ->getDeclaringCallable()
     ->getDeclaringType()
     ->getName() == $class->getName(),
 );

@@ -12,6 +12,7 @@ use crate::cst::declaration::AttributeList;
 use crate::cst::expression::Expression;
 use crate::cst::function::ParameterList;
 use crate::cst::function::ReturnType;
+use crate::cst::function::WhereClause;
 use crate::cst::sequence::TokenSeparatedSequence;
 use crate::cst::statement::Block;
 use crate::cst::r#type::NamedType;
@@ -304,33 +305,6 @@ pub struct Method<'arena> {
     pub return_type: Option<ReturnType<'arena>>,
     pub where_clause: Option<WhereClause<'arena>>,
     pub body: MethodBody<'arena>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct WhereClause<'arena> {
-    pub r#where: Keyword<'arena>,
-    pub constraints: TokenSeparatedSequence<'arena, WhereConstraint<'arena>>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct WhereConstraint<'arena> {
-    pub parameter: LocalIdentifier<'arena>,
-    pub colon: Span,
-    pub bound: &'arena Type<'arena>,
-}
-
-impl HasSpan for WhereClause<'_> {
-    fn span(&self) -> Span {
-        self.r#where
-            .span()
-            .join(self.constraints.span(self.r#where.span().end))
-    }
-}
-
-impl HasSpan for WhereConstraint<'_> {
-    fn span(&self) -> Span {
-        self.parameter.span().join(self.bound.span())
-    }
 }
 
 /// The body of a method declaration.

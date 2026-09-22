@@ -87,6 +87,9 @@ pub fn expand_unit_declarations(unit: &mut CompiledUnit, aliases: &[CompiledType
 
 fn expand_function(function: &mut CompiledFunction, aliases: &impl TypeAliasLookup) {
     expand_parameters(&mut function.type_parameters, aliases);
+    for constraint in &mut function.where_constraints {
+        constraint.bound = expand_aliases_using(&constraint.bound, aliases);
+    }
     for parameter in &mut function.parameters {
         if let Some(descriptor) = &mut parameter.declared_type {
             *descriptor = expand_aliases_using(descriptor, aliases);
@@ -122,9 +125,6 @@ fn expand_class(class: &mut CompiledClassLike, aliases: &impl TypeAliasLookup) {
 
     for method in &mut class.methods {
         expand_function(&mut method.function, aliases);
-        for constraint in &mut method.where_constraints {
-            constraint.bound = expand_aliases_using(&constraint.bound, aliases);
-        }
     }
 }
 

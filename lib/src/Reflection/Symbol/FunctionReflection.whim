@@ -2,6 +2,7 @@ namespace Whim\Reflection\Symbol;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
+use Whim\Reflection\Generic\WhereConstraintReflection;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\Callable\CallableReflection;
 use Whim\Reflection\Callable\ParameterReflection;
@@ -20,6 +21,10 @@ use Whim\Symbol\SymbolKind;
 #[Stub]
 final class FunctionReflection implements SymbolReflection, CallableReflection {
   private function __construct() {}
+
+  /** Returns where constraints in source order, including repeated bounds. */
+  #[MustUse]
+  public function getWhereConstraints(): vec<WhereConstraintReflection> {}
 
   /** Returns where this function was defined. */
   #[MustUse]

@@ -388,6 +388,9 @@ impl Node<'_, '_> {
                 if let Some(return_type) = &node.return_type {
                     f(Node::ReturnType(return_type));
                 }
+                if let Some(where_clause) = &node.where_clause {
+                    f(Node::WhereClause(where_clause));
+                }
                 f(Node::Block(&node.body));
             }
             Node::Closure(node) => {
@@ -401,6 +404,9 @@ impl Node<'_, '_> {
                 f(Node::ParameterList(&node.parameter_list));
                 if let Some(return_type) = &node.return_type {
                     f(Node::ReturnType(return_type));
+                }
+                if let Some(where_clause) = &node.where_clause {
+                    f(Node::WhereClause(where_clause));
                 }
                 f(Node::ClosureBody(&node.body));
             }

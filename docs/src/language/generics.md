@@ -160,10 +160,29 @@ type Weaken<T: W, W> = W;
 
 Here `T` must fit `W`, and the alias exposes only `W` at runtime.
 
-## Method where clauses
+## Where clauses
 
-A method can declare extra upper bounds with `where`. The clause follows the
-return type, or the parameter list when the method omits its return type:
+A function, method, or closure can declare upper bounds with `where`. The clause
+follows the return type, or the parameter list when the return type is omitted:
+
+```whim
+function identity<T>(T $value): T where T: !null {
+  return $value;
+}
+
+$identity = fn<T>(T $value): T where T: !null => $value;
+
+$block = fn<T>(T $value): T where T: !null {
+  return $value;
+};
+```
+
+For a callable's own type parameters, `<T: Bound>` and `where T: Bound` impose
+the same requirement. Whim checks supplied or defaulted type arguments when it
+binds them, including when creating a callable with explicit type arguments.
+Inline bounds and where constraints both apply when a declaration uses both.
+
+A where clause can also constrain type parameters from an enclosing scope:
 
 ```whim
 class Collection<T> {
@@ -171,27 +190,30 @@ class Collection<T> {
 }
 ```
 
-Each entry names a type parameter available to the method, followed by `:` and
-its upper bound. A clause can repeat a parameter. Bounds can refer to class or
-method type parameters; static methods can use only their own type parameters.
+Each entry names an available type parameter, followed by `:` and its upper
+bound. Instance methods can use class and method type parameters; static methods
+can use only their own type parameters. Closures can use their own type parameters
+and those from their enclosing scope. An inner type parameter shadows an outer
+parameter with the same name.
 
-Before entering the method body, each call checks the reified class and method
-type arguments against every constraint. Each type argument must be a subtype
-of its bound. If any constraint fails, the call throws `Whim\Unwind\TypeError`.
-Repeated constraints must all hold.
+Constraints on enclosing type parameters are checked before the body or default
+parameter expressions run. Each type argument must be a subtype of its bound.
+If any constraint fails, Whim throws `Whim\Unwind\TypeError`. Repeated constraints
+must all hold.
 
-These bounds apply only to the method. They do not change the bounds on the
-class or its other methods. For example, `Collection<string>` is a valid type,
+These bounds apply only to the callable. They do not change the bounds on its
+enclosing scope. For example, `Collection<string>` is a valid type,
 but calling `inspect::<vec<string>>()` on it throws `TypeError` because `string`
 does not fit `int|float`. On `Collection<int>`, `inspect::<vec<int>>()` satisfies
 both bounds.
 
 An override must accept every set of type arguments that the inherited method
-accepts. It may keep or weaken the inherited where constraints, but must not
-strengthen them.
+accepts. It may keep or weaken inherited bounds, but must not strengthen them.
+This applies whether a bound appears in the type parameter list or a where clause.
 
-[`MethodReflection::getWhereConstraints()`](../standard-library/reflection.md#generics)
-exposes the method's constraints in source order.
+[`CallableReflection::getWhereConstraints()`](../standard-library/reflection.md#generics)
+exposes the callable's where constraints in source order. Reflection keeps inline
+bounds in `TypeParameterReflection::getBounds()` and does not combine the two forms.
 
 ## Constructing a type parameter
 

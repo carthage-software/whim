@@ -1,0 +1,167 @@
+use Whim\Marker\AlwaysInline;
+use Whim\Unwind\TypeError;
+
+class Effects {
+  public static int $count = 0;
+}
+
+function value(): int {
+  Effects::$count++;
+  return 7;
+}
+
+function rejects(fn(): mixed $operation): void {
+  $caught = false;
+  try {
+    $operation();
+  } catch (TypeError $_error) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+#[AlwaysInline]
+function inline_bound<T: !null>(T $value): T {
+  return $value;
+}
+
+#[AlwaysInline]
+function where_bound<T>(T $value): T where T: !null {
+  return $value;
+}
+
+type Items<T> = vec<T>;
+
+function dependent<T, U>(U $values): U where U: Items<T>, T: int|float {
+  return $values;
+}
+
+function defaulted<T = int>(T $value = value()): T where T: int {
+  Effects::$count++;
+  return $value;
+}
+
+function repeated<T: int|float>(T $value): T where T: int, T: 1.. {
+  return $value;
+}
+
+function outer<T>(T $value): fn(): T {
+  return fn(): T where T: !null => $value;
+}
+
+function lexical<T>(): mixed {
+  return fn<U>(U $value): U where U: T => $value;
+}
+
+function capture_type<T>(): fn(): bool {
+  return fn(): bool where T: int => true;
+}
+
+class Box<T> {
+  public function __construct(public T $value) {}
+
+  public function reader(): fn(): T {
+    return fn(): T where T: !null => $this->value;
+  }
+
+  public function shadow(): mixed {
+    return fn<T>(T $value): T where T: int => $value;
+  }
+
+  public function late<U>(): bool where U: static {
+    return true;
+  }
+
+  public function lateInline<U: static>(): bool {
+    return true;
+  }
+
+  public function lateDefault<U = static>(): bool where U: static {
+    return true;
+  }
+}
+
+interface Contract {
+  public function first<T: !null>(T $value): T;
+
+  public function second<T>(T $value): T where T: !null;
+
+  public function relaxed<T>(T $value): T where T: int;
+}
+
+class Implementation implements Contract {
+  public function first<T>(T $value): T where T: !null {
+    return $value;
+  }
+
+  public function second<T: !null>(T $value): T {
+    return $value;
+  }
+
+  public function relaxed<T: int|float>(T $value): T {
+    return $value;
+  }
+}
+
+$inline = fn<T: !null>(T $value): T => $value;
+$where = fn<T>(T $value): T where T: !null => $value;
+$block = fn<T>(T $value): T where T: !null {
+  return $value;
+};
+
+assert!(inline_bound::<int>(1) == where_bound::<int>(1));
+assert!(where_bound::<string>(value: 'hello') == 'hello');
+assert!($inline::<int>(2) == $where::<int>(2));
+assert!($block::<string>('hello') == 'hello');
+$bound = where_bound::<int>(...);
+assert!($bound(3) == 3);
+$partial = $where::<int>(4, ...);
+assert!($partial() == 4);
+assert!(dependent::<int, vec<int>>(vec[1, 2]) == vec[1, 2]);
+assert!(repeated::<1>(1) == 1);
+assert!(outer::<int>(5)() == 5);
+assert!(new Box::<int>(6)->reader()() == 6);
+assert!(new Box::<string>('outer')->shadow()::<int>(7) == 7);
+assert!(lexical::<int>()::<1>(1) == 1);
+assert!(capture_type::<int>()());
+$box = new Box::<int>(1);
+assert!($box->late::<Box<int>>());
+assert!($box->lateInline::<Box<int>>());
+assert!($box->lateDefault());
+$late = $box->late::<Box<int>>(...);
+assert!($late());
+$lateDefault = $box->lateDefault(...);
+assert!($lateDefault());
+assert!($lateDefault is fn(): bool);
+$implementation = new Implementation();
+assert!($implementation->first::<int>(1) == 1);
+assert!($implementation->second::<string>('ok') == 'ok');
+assert!($implementation->relaxed::<float>(0.5) == 0.5);
+
+foreach (vec[
+  fn() => inline_bound::<null>(null),
+  fn() => where_bound::<null>(null),
+  fn() => where_bound::<int|null>(1),
+  fn() => inline_bound::<null>(...),
+  fn() => where_bound::<null>(...),
+  fn() => $inline::<null>(...),
+  fn() => $where::<null>(...),
+  fn() => $block::<null>(null),
+  fn() => dependent::<int, vec<string>>(vec['bad']),
+  fn() => repeated::<int>(1),
+  fn() => outer::<null>(null)(),
+  fn() => new Box::<null>(null)->reader()(),
+  fn() => new Box::<int>(1)->shadow()::<string>('bad'),
+  fn() => lexical::<int>()::<string>('bad'),
+  fn() => capture_type::<string>()(),
+  fn() => $box->late::<Box<string>>(...),
+  fn() => $box->lateInline::<Box<string>>(...),
+  fn() => defaulted::<string>(),
+] as $operation) {
+  rejects($operation);
+}
+
+assert!(Effects::$count == 0);
+assert!(defaulted() == 7);
+assert!(Effects::$count == 2);

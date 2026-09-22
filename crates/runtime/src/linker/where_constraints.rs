@@ -32,8 +32,17 @@ impl Engine {
         replacement_environment: &HashMap<Atom, TypeDescriptor>,
         replaced_environment: &HashMap<Atom, TypeDescriptor>,
     ) -> Result<Option<String>, VirtualMachineControl> {
-        let replacement = self.method_where_constraints(replacement).to_vec();
-        if replacement.is_empty() {
+        let mut requirements = self.method_where_constraints(replacement).to_vec();
+        for parameter in self.method_types(replacement).2 {
+            for bound in parameter.bounds {
+                requirements.push(CompiledWhereConstraint {
+                    parameter: parameter.name.clone(),
+                    bound,
+                    span: parameter.span,
+                });
+            }
+        }
+        if requirements.is_empty() {
             return Ok(None);
         }
         let mut assumptions = self
@@ -62,7 +71,7 @@ impl Engine {
                 ));
             }
         }
-        for constraint in replacement {
+        for constraint in requirements {
             let argument = substitute_symbolic(
                 &TypeDescriptor::Parameter(constraint.parameter.clone()),
                 replacement_environment,
@@ -72,7 +81,7 @@ impl Engine {
             let bound = refine_where_type(&bound, &assumptions, &mut Vec::new(), 0);
             if !self.link_descriptor_is_subtype(&argument, &bound)? {
                 return Ok(Some(format!(
-                    "where constraint {}: {} is stronger than the inherited contract",
+                    "constraint {}: {} is stronger than the inherited contract",
                     constraint.parameter,
                     type_descriptor(&constraint.bound, &|value| value.to_string()),
                 )));

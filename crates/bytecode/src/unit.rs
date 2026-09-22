@@ -1,5 +1,7 @@
 //! Everything the compiler produces for one source file.
 
+use std::borrow::Cow;
+
 use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
@@ -335,6 +337,7 @@ pub struct CompiledFunction {
     pub span: Span,
     pub signature: Atom,
     pub type_parameters: Vec<CompiledTypeParameter>,
+    pub where_constraints: Vec<CompiledWhereConstraint>,
     pub parameters: Vec<CompiledParameter>,
     pub return_type: Option<TypeDescriptor>,
     pub attributes: Vec<CompiledAttribute>,
@@ -346,6 +349,22 @@ pub struct CompiledFunction {
 }
 
 impl CompiledFunction {
+    #[must_use]
+    pub fn bounded_type_parameters(&self) -> Cow<'_, [CompiledTypeParameter]> {
+        let mut parameters = Cow::Borrowed(self.type_parameters.as_slice());
+        for constraint in &self.where_constraints {
+            if let Some(position) = parameters
+                .iter()
+                .position(|parameter| parameter.name == constraint.parameter)
+            {
+                parameters.to_mut()[position]
+                    .bounds
+                    .push(constraint.bound.clone());
+            }
+        }
+        parameters
+    }
+
     #[must_use]
     pub fn incoming_register_count(&self, has_receiver: bool) -> u16 {
         let captures = self
@@ -414,7 +433,6 @@ pub struct CompiledMethod {
     pub is_abstract: bool,
     #[seeded(with(serde_seeded::unseeded))]
     pub is_final: bool,
-    pub where_constraints: Vec<CompiledWhereConstraint>,
     pub function: CompiledFunction,
 }
 

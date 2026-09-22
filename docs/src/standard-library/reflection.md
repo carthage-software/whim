@@ -140,16 +140,15 @@ A generic declaration lists its type parameters in source order. Each
 `TypeParameterReflection` gives its owner, position, variance, bounds, and
 default.
 
-`MethodReflection::getWhereConstraints()` returns
+`CallableReflection::getWhereConstraints()` returns
 `Whim\Reflection\Generic\WhereConstraintReflection` entries in source order,
-including repeated constraints. Methods without a clause return an empty vector.
+including repeated constraints. Functions, methods, and closures without a clause
+return an empty vector.
 Each constraint provides:
 
-- `getParameter()`: the exact class or method `TypeParameterReflection` it
-  constrains.
-- `getBound()`: its upper bound as a `TypeReflection`, with generic parameters
-  left unresolved.
-- `getDeclaringMethod()`: the method that declares the constraint.
+- `getParameter()`: the exact `TypeParameterReflection` it constrains.
+- `getBound()`: its upper bound as a `TypeReflection`, with generic parameters left unresolved.
+- `getDeclaringCallable()`: the function, method, or closure that declares the constraint.
 - `getPosition()`: its zero-based position in the clause.
 - `getLocation()`: its source span for user code, or `null` for an artifact.
 

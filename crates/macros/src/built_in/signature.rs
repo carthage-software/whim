@@ -68,6 +68,12 @@ fn lower_function(
     function: &Function<'_>,
     inherited: &HashSet<String>,
 ) -> syn::Result<LoweredSignature> {
+    if function.where_clause.is_some() {
+        return Err(syn::Error::new(
+            Span::call_site(),
+            "native signatures must declare bounds in the type parameter list",
+        ));
+    }
     let mut names = inherited.clone();
     if let Some(list) = function.type_parameters.as_ref() {
         for parameter in list.parameters {

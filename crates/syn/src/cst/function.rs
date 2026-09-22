@@ -23,6 +23,7 @@ pub struct Function<'arena> {
     pub type_parameters: Option<TypeParameterList<'arena>>,
     pub parameter_list: ParameterList<'arena>,
     pub return_type: Option<ReturnType<'arena>>,
+    pub where_clause: Option<WhereClause<'arena>>,
     pub body: Block<'arena>,
 }
 
@@ -44,7 +45,35 @@ pub struct Closure<'arena> {
     pub type_parameters: Option<TypeParameterList<'arena>>,
     pub parameter_list: ParameterList<'arena>,
     pub return_type: Option<ReturnType<'arena>>,
+    pub where_clause: Option<WhereClause<'arena>>,
     pub body: ClosureBody<'arena>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct WhereClause<'arena> {
+    pub r#where: Keyword<'arena>,
+    pub constraints: TokenSeparatedSequence<'arena, WhereConstraint<'arena>>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct WhereConstraint<'arena> {
+    pub parameter: LocalIdentifier<'arena>,
+    pub colon: Span,
+    pub bound: &'arena Type<'arena>,
+}
+
+impl HasSpan for WhereClause<'_> {
+    fn span(&self) -> Span {
+        self.r#where
+            .span()
+            .join(self.constraints.span(self.r#where.span().end))
+    }
+}
+
+impl HasSpan for WhereConstraint<'_> {
+    fn span(&self) -> Span {
+        self.parameter.span().join(self.bound.span())
+    }
 }
 
 /// The expression or statement block executed by a closure.

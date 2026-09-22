@@ -4,7 +4,6 @@ use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::ClassLikeKind;
-use whim_bytecode::unit::CompiledMethod;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledProperty;
 use whim_bytecode::unit::Variance;
@@ -183,7 +182,8 @@ pub(crate) fn symbol_dispatch(
         Operation::Case if entry.kind == SymbolKind::Enum => {
             enum_case(context, arguments, ClassId(entry.index))
         }
-        Operation::Parameters
+        Operation::WhereConstraints
+        | Operation::Parameters
         | Operation::Parameter
         | Operation::RequiredParameterCount
         | Operation::ReturnType
@@ -247,7 +247,6 @@ pub(crate) fn member_dispatch(
             member.name == context.vm.engine.tables.destructor_name,
         )),
         Operation::Prototypes => prototypes(context, member),
-        Operation::WhereConstraints => where_constraints(context, member),
         Operation::Type if member.kind != MemberKind::Property => member_type(context, member),
         Operation::IsStatic if member.kind == MemberKind::Property => {
             let Some((is_static, _, _)) = property_info(context.vm, member) else {
@@ -308,7 +307,8 @@ pub(crate) fn member_dispatch(
             .vm
             .enum_case_value(member.class, member.name.clone())
             .ok_or_else(|| context.type_error("the reflected enum case is no longer loaded")),
-        Operation::Parameters
+        Operation::WhereConstraints
+        | Operation::Parameters
         | Operation::Parameter
         | Operation::RequiredParameterCount
         | Operation::ReturnType
@@ -342,6 +342,9 @@ pub(crate) fn callable_dispatch(
     };
     match operation {
         Operation::Name => Ok(Value::string(info.name.to_handle())),
+        Operation::WhereConstraints => {
+            where_constraints(context, callable, info.where_constraints.len())
+        }
         Operation::Parameters => {
             let mut parameters = Vec::with_capacity(info.parameters.len());
             for position in 0..info.parameters.len() {
@@ -532,16 +535,15 @@ pub(crate) fn type_parameter_dispatch(
 
 fn where_constraints(
     context: &mut Context<'_, '_, '_>,
-    method: &MemberKey,
+    callable: &CallableKey,
+    count: usize,
 ) -> Result<Value, Throw> {
-    let count =
-        compiled_method(context.vm, method).map_or(0, |method| method.where_constraints.len());
     let mut constraints = Vec::with_capacity(count);
     for position in 0..count {
         constraints.push(objects::build(
             context,
             ReflectionData::WhereConstraint {
-                method: method.clone(),
+                callable: callable.clone(),
                 position,
             },
             Vec::new(),
@@ -554,20 +556,17 @@ fn where_constraints(
 pub(crate) fn where_constraint_dispatch(
     context: &mut Context<'_, '_, '_>,
     operation: Operation,
-    method: &MemberKey,
+    callable: &CallableKey,
     position: usize,
 ) -> Result<Value, Throw> {
-    let Some(constraint) = compiled_method(context.vm, method)
-        .and_then(|method| method.where_constraints.get(position))
-        .cloned()
-    else {
+    let Some(info) = support::callable_info(context.vm, callable) else {
+        return Err(context.type_error("the reflected callable is no longer loaded"));
+    };
+    let Some(constraint) = info.where_constraints.get(position).cloned() else {
         return Err(context.type_error("the reflected where constraint is no longer declared"));
     };
 
-    let owner = GenericOwner::Callable(CallableKey::Method {
-        class: method.class,
-        name: method.name.clone(),
-    });
+    let owner = GenericOwner::Callable(callable.clone());
 
     match operation {
         Operation::Parameter => {
@@ -586,9 +585,11 @@ pub(crate) fn where_constraint_dispatch(
         }
         Operation::Bound => objects::r#type(
             context,
-            ReflectedType::owned(constraint.bound, owner).in_class(method.class),
+            ReflectedType::owned(constraint.bound, owner).in_optional_class(info.declaring_class),
         ),
-        Operation::DeclaringMethod => member_reflection(context, method.clone()),
+        Operation::DeclaringCallable => {
+            objects::declaration(context, callable_declaration(callable))
+        }
         Operation::Position => Ok(index_value(position)),
         Operation::Location => {
             let unit = support::generic_owner_unit(context.vm, &owner);
@@ -1305,18 +1306,6 @@ fn compiled_property<'a>(
         .properties
         .iter()
         .find(|property| property.name == member.name)
-}
-
-fn compiled_method<'a>(
-    vm: &'a VirtualMachine<'_>,
-    member: &MemberKey,
-) -> Option<&'a CompiledMethod> {
-    let class = &vm.engine.tables.classes[member.class.0 as usize];
-    let unit = class.attribute_unit.as_ref()?;
-    support::compiled_class(unit, &class.name)?
-        .methods
-        .iter()
-        .find(|method| method.name == member.name)
 }
 
 fn method_entry(vm: &VirtualMachine<'_>, member: &MemberKey) -> Option<MethodEntry> {

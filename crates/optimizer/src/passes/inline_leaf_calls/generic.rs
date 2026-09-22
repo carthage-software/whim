@@ -95,6 +95,13 @@ pub(crate) fn generic_call_sites(
             continue;
         };
 
+        let mut body = Cow::Borrowed(&function.chunk);
+        if !flow.where_constraints_proven(function, &function.type_parameters, Some(arguments)) {
+            continue;
+        }
+        if !function.where_constraints.is_empty() {
+            remove_where_check(body.to_mut());
+        }
         if function.type_parameters.is_empty()
             || !bounds_proven(function, arguments, flow)
             || function.captures_this
@@ -103,11 +110,7 @@ pub(crate) fn generic_call_sites(
                 .iter()
                 .any(|parameter| parameter.has_default)
             || function.parameters.len() != usize::from(argument_count.value())
-            || !generic_body_inlinable(
-                &function.chunk,
-                parameters,
-                is_always_inline(&function.attributes),
-            )
+            || !generic_body_inlinable(&body, parameters, is_always_inline(&function.attributes))
         {
             continue;
         }
@@ -175,6 +178,7 @@ pub(crate) fn splice_generic_sites(
         };
 
         let mut snapshot = function.chunk.clone();
+        remove_where_check(&mut snapshot);
         normalize_chunk(&mut snapshot);
         let Some(terminal) = unchecked_terminal(&snapshot) else {
             continue;
@@ -291,7 +295,7 @@ pub(crate) fn inline_generic_statics(
                 if method.visibility != Visibility::Public
                     || is_never_inline(&method.function.attributes)
                     || !flow.where_constraints_proven(
-                        method,
+                        &method.function,
                         &method.function.type_parameters,
                         Some(arguments),
                     )
@@ -303,7 +307,7 @@ pub(crate) fn inline_generic_statics(
                     continue;
                 };
                 let mut body = Cow::Borrowed(&method.function.chunk);
-                if !method.where_constraints.is_empty() {
+                if !method.function.where_constraints.is_empty() {
                     remove_where_check(body.to_mut());
                 }
 

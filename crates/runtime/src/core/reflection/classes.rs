@@ -230,6 +230,7 @@ macro_rules! reflection_class_methods {
             methods = [
                 $($method : $signature => $operation;)*
                 get_parameters: "getParameters(): vec<Whim\\Reflection\\Callable\\ParameterReflection>" => Parameters;
+                get_where_constraints: "getWhereConstraints(): vec<Whim\\Reflection\\Generic\\WhereConstraintReflection>" => WhereConstraints;
                 get_parameter: "getParameter(int|string $parameter): null|Whim\\Reflection\\Callable\\ParameterReflection" => Parameter;
                 get_required_parameter_count: "getRequiredParameterCount(): (0..)" => RequiredParameterCount;
                 get_return_type: "getReturnType(): null|Whim\\Reflection\\Type\\TypeReflection" => ReturnType;
@@ -428,7 +429,6 @@ reflection_class! {
         "Whim\\Reflection\\Callable\\CallableReflection",
     ]
     with [declaration, member, generic, callable] {
-        get_where_constraints: "getWhereConstraints(): vec<Whim\\Reflection\\Generic\\WhereConstraintReflection>" => WhereConstraints;
         is_static: "isStatic(): bool" => IsStatic;
         is_abstract: "isAbstract(): bool" => IsAbstract;
         is_final: "isFinal(): bool" => IsFinal;
@@ -559,7 +559,7 @@ reflection_class! {
     WhereConstraintReflection = "Whim\\Reflection\\Generic\\WhereConstraintReflection" {
         get_parameter: "getParameter(): Whim\\Reflection\\Generic\\TypeParameterReflection" => Parameter;
         get_bound: "getBound(): Whim\\Reflection\\Type\\TypeReflection" => Bound;
-        get_declaring_method: "getDeclaringMethod(): Whim\\Reflection\\Member\\MethodReflection" => DeclaringMethod;
+        get_declaring_callable: "getDeclaringCallable(): Whim\\Reflection\\Callable\\CallableReflection" => DeclaringCallable;
         get_position: "getPosition(): (0..)" => Position;
         get_location: "getLocation(): null|Whim\\Reflection\\SourceLocation" => Location;
     }
