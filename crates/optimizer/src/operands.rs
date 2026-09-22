@@ -111,6 +111,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | WriteErrorLine
                 | Debug
                 | DrainFinalizers
+                | CheckWhereConstraints
                 | ReturnNull
                 | ReturnNullUnchecked
                 | ReturnIntUnchecked

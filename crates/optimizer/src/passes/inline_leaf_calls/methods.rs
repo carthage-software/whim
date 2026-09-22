@@ -114,7 +114,9 @@ pub(super) fn inline_direct_methods(
                     continue;
                 }
 
-                if is_never_inline(&method.function.attributes) {
+                if !method.where_constraints.is_empty()
+                    || is_never_inline(&method.function.attributes)
+                {
                     continue;
                 }
 

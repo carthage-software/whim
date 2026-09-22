@@ -270,6 +270,7 @@ impl BodyCompiler<'_, '_> {
             self.synthesized,
             self.aliases,
             BodyShape {
+                where_clause: None,
                 is_instance_method: captured_this,
                 return_kind,
                 promote_parameters: false,

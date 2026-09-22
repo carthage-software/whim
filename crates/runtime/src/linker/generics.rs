@@ -588,6 +588,12 @@ fn unit_descriptors(unit: &CompiledUnit) -> Vec<&TypeDescriptor> {
 
         for method in &class.methods {
             collect_function_descriptors(&method.function, &mut descriptors);
+            descriptors.extend(
+                method
+                    .where_constraints
+                    .iter()
+                    .map(|constraint| &constraint.bound),
+            );
         }
     }
 

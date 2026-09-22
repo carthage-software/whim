@@ -3573,6 +3573,13 @@ impl VirtualMachine<'_> {
 
                         continue 'dispatch;
                     }
+                    Instruction::CheckWhereConstraints => {
+                        self.sync_ip(ip);
+                        if let Err(control) = self.check_where_constraints() {
+                            self.handle_control(control, floor)?;
+                        }
+                        continue 'dispatch;
+                    }
                     Instruction::CheckDiscardedResult { source: _ } => {
                         let Some(discarded) = self.pending_discarded_result.take() else {
                             continue 'instructions;

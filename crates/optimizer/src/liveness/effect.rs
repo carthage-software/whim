@@ -89,9 +89,9 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             }
         }
         instructions!(Jump | NumericRegionJump | ReturnIntUnchecked; { .. })
-        | instructions!(ReturnNull | ReturnNullUnchecked | Rethrow | DrainFinalizers) => {
-            Effect::None
-        }
+        | instructions!(
+            ReturnNull | ReturnNullUnchecked | Rethrow | DrainFinalizers | CheckWhereConstraints
+        ) => Effect::None,
         Instruction::JumpIfFalse { condition, .. } | Instruction::JumpIfTrue { condition, .. } => {
             if reads(condition) {
                 Effect::Read

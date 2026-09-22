@@ -160,7 +160,8 @@ impl VirtualMachine<'_> {
         let mut arguments = Vec::with_capacity(parameters.len());
         for (index, parameter) in parameters.iter().enumerate() {
             let argument = if let Some(argument) = supplied.and_then(|values| values.get(index)) {
-                self.canonical_type_argument(argument, argument_environment)?
+                let argument = self.canonical_type_argument(argument, argument_environment)?;
+                self.resolve_static_argument(&argument)
             } else if let Some(default) = &parameter.default {
                 self.canonical_type_argument(default, current)?
             } else {
@@ -207,7 +208,7 @@ impl VirtualMachine<'_> {
         Ok(current)
     }
 
-    fn canonical_type_argument(
+    pub(super) fn canonical_type_argument(
         &mut self,
         descriptor: &TypeDescriptor,
         environment: TypeEnvironmentId,

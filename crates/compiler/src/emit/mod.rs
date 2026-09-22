@@ -185,6 +185,7 @@ impl ReturnKind {
 
 #[derive(Clone, Copy)]
 pub(crate) struct BodyShape {
+    pub where_clause: Option<Span>,
     /// Whether the body is an instance method with `$this` at register zero.
     pub is_instance_method: bool,
     /// The body's return contract.
@@ -380,11 +381,15 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
         aliases: &'compilation [CompiledTypeAlias],
         shape: BodyShape,
     ) -> Self {
+        let mut chunk = Chunk::new();
+        if let Some(span) = shape.where_clause {
+            chunk.emit(Instruction::CheckWhereConstraints, span);
+        }
         Self {
             heap,
             path,
             runtime_path,
-            chunk: Chunk::new(),
+            chunk,
             registers: Registers::new(),
             locals: Vec::new(),
             local_index: HashMap::new(),

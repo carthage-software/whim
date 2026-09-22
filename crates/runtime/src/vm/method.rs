@@ -279,6 +279,7 @@ impl VirtualMachine<'_> {
                 receiver_class,
                 receiver_environment,
                 caller_environment,
+                caller_class: self.current_frame().called_class.get(),
                 method_environment,
                 entry,
                 arguments: CachedMethodArguments::Proven,
@@ -421,6 +422,7 @@ impl VirtualMachine<'_> {
                     receiver_class,
                     receiver_environment,
                     caller_environment,
+                    caller_class: self.current_frame().called_class.get(),
                     method_environment,
                     entry,
                     arguments: CachedMethodArguments::Proven,
@@ -942,8 +944,9 @@ impl VirtualMachine<'_> {
         let entry = unsafe { *entries.get_unchecked(site) }?;
         (entry.receiver_class == receiver_class
             && entry.receiver_environment == receiver_environment
-            && entry.caller_environment == self.current_frame().type_environment)
-            .then_some(entry)
+            && entry.caller_environment == self.current_frame().type_environment
+            && entry.caller_class == self.current_frame().called_class.get())
+        .then_some(entry)
     }
 
     #[inline(always)]
@@ -1233,6 +1236,7 @@ impl VirtualMachine<'_> {
                 };
 
                 let frame_start = self.stack.len();
+                let caller_class = self.current_frame().called_class.get();
                 let outcome = self.push_user_frame(
                     function,
                     destination,
@@ -1275,6 +1279,7 @@ impl VirtualMachine<'_> {
                         receiver_class,
                         receiver_environment,
                         caller_environment,
+                        caller_class,
                         method_environment: type_environment,
                         entry: exact_entry,
                         arguments: CachedMethodArguments::General,
@@ -1425,6 +1430,7 @@ impl VirtualMachine<'_> {
 
         let caller_environment = self.current_frame().type_environment;
         let cache = self.current_frame().cache;
+        let caller_class = self.current_frame().called_class.get();
         if let MethodBodyKind::Bytecode(function) = body {
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
             let entries = unsafe { &*cache.as_ref().turbofish_environments() };
@@ -1432,6 +1438,7 @@ impl VirtualMachine<'_> {
                 && entry.function == function
                 && entry.outer == outer
                 && entry.caller == caller_environment
+                && entry.caller_class == caller_class
             {
                 return Ok(entry.environment);
             }
@@ -1468,6 +1475,7 @@ impl VirtualMachine<'_> {
                 function,
                 outer,
                 caller: caller_environment,
+                caller_class,
                 environment,
             });
         }
@@ -1492,11 +1500,13 @@ impl VirtualMachine<'_> {
         let (class_atom, member) = class_member_atoms(chunk, site);
         let caller_cache = self.current_frame().cache;
         let caller_environment = self.current_frame().type_environment;
+        let caller_class = self.current_frame().called_class.get();
         {
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
             let entries = unsafe { &*caller_cache.as_ref().guarded_methods() };
             if let Some(cached) = entries.get(site).copied().flatten()
                 && cached.caller_environment == caller_environment
+                && cached.caller_class == caller_class
                 && (*class_atom != self.engine.tables.static_atom
                     || self.current_frame().called_class.get() == Some(cached.receiver_class))
                 && self.cached_argument_guards_match(
@@ -1681,6 +1691,7 @@ impl VirtualMachine<'_> {
                         receiver_class: context.called,
                         receiver_environment: TypeEnvironmentId::default(),
                         caller_environment,
+                        caller_class,
                         entry: ExactMethodEntry {
                             function: ExactFunctionEntry::from_call_site(
                                 function,

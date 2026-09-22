@@ -131,6 +131,7 @@ pub(in crate::declarations) fn compile_function_declaration(
             &function.parameter_list,
             &function.body,
             BodyShape {
+                where_clause: None,
                 is_instance_method: false,
                 return_kind: lowered_return.kind,
                 promote_parameters: false,
@@ -476,6 +477,7 @@ pub(crate) fn compile_initializer(
         &mut *context.synthesized,
         context.aliases,
         BodyShape {
+            where_clause: None,
             is_instance_method: false,
             return_kind: ReturnKind::Value,
             promote_parameters: false,

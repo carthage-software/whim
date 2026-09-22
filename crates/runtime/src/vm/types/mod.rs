@@ -141,6 +141,7 @@ impl VirtualMachine<'_> {
 mod check;
 mod environment;
 mod parser;
+mod where_constraints;
 
 pub(crate) use environment::descriptor_same;
 

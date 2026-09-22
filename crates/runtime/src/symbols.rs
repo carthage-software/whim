@@ -24,6 +24,7 @@ use whim_bytecode::unit::CompiledAttribute;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledTypeParameter;
 use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::CompiledWhereConstraint;
 use whim_value::Value;
 use whim_value::array::ArrayTypeCheckId;
 use whim_value::atom::Atom;
@@ -109,6 +110,7 @@ pub(crate) struct CachedExactMethodFrame {
 pub(crate) struct CachedBoundCallable {
     pub(crate) target: CallTarget,
     pub(crate) argument_environment: TypeEnvironmentId,
+    pub(crate) caller_class: Option<ClassId>,
     pub(crate) callable: ManagedRef<FunctionObject>,
 }
 
@@ -116,6 +118,7 @@ pub(crate) struct CachedBoundCallable {
 pub(crate) struct CachedInstantiationEnvironment {
     pub(crate) class: ClassId,
     pub(crate) outer: TypeEnvironmentId,
+    pub(crate) caller_class: Option<ClassId>,
     pub(crate) environment: TypeEnvironmentId,
     pub(crate) allocates_plainly: bool,
     pub(crate) slots_are_acyclic: bool,
@@ -130,10 +133,15 @@ const INSTANTIATION_WAYS: usize = 4;
 impl InstantiationWays {
     pub(crate) const EMPTY: Self = Self([None; INSTANTIATION_WAYS]);
 
-    pub(crate) fn get(&self, outer: TypeEnvironmentId) -> Option<CachedInstantiationEnvironment> {
+    pub(crate) fn get(
+        &self,
+        outer: TypeEnvironmentId,
+        caller_class: Option<ClassId>,
+    ) -> Option<CachedInstantiationEnvironment> {
         for way in &self.0 {
             if let Some(cached) = way
                 && cached.outer == outer
+                && cached.caller_class == caller_class
             {
                 return Some(*cached);
             }
@@ -145,7 +153,7 @@ impl InstantiationWays {
     /// free way. A full set keeps what it has.
     pub(crate) fn record(&mut self, cached: CachedInstantiationEnvironment) {
         record_stable_way(&mut self.0, cached, |existing, cached| {
-            existing.outer == cached.outer
+            existing.outer == cached.outer && existing.caller_class == cached.caller_class
         });
     }
 }
@@ -153,6 +161,7 @@ impl InstantiationWays {
 #[derive(Clone)]
 pub(crate) struct CachedNewtypeConstructor {
     pub(crate) outer: TypeEnvironmentId,
+    pub(crate) caller_class: Option<ClassId>,
     pub(crate) parent: Option<NewtypeValueId>,
     pub(crate) environment: TypeEnvironmentId,
     pub(crate) backing: Rc<TypeDescriptor>,
@@ -174,16 +183,18 @@ impl NewtypeConstructorWays {
         &self,
         outer: TypeEnvironmentId,
         parent: Option<NewtypeValueId>,
+        caller_class: Option<ClassId>,
     ) -> Option<&CachedNewtypeConstructor> {
-        self.0
-            .iter()
-            .flatten()
-            .find(|entry| entry.outer == outer && entry.parent == parent)
+        self.0.iter().flatten().find(|entry| {
+            entry.outer == outer && entry.parent == parent && entry.caller_class == caller_class
+        })
     }
 
     pub(crate) fn record(&mut self, entry: CachedNewtypeConstructor) {
         record_stable_way(&mut self.0, entry, |existing, entry| {
-            existing.outer == entry.outer && existing.parent == entry.parent
+            existing.outer == entry.outer
+                && existing.parent == entry.parent
+                && existing.caller_class == entry.caller_class
         });
     }
 }
@@ -192,6 +203,7 @@ impl NewtypeConstructorWays {
 pub(crate) struct CachedCallEnvironment {
     pub(crate) target: CallTarget,
     pub(crate) outer: TypeEnvironmentId,
+    pub(crate) caller_class: Option<ClassId>,
     pub(crate) environment: TypeEnvironmentId,
 }
 
@@ -279,6 +291,7 @@ pub(crate) struct CachedTurbofishEnvironment {
     /// The scope the callee's own parameters are declared in.
     pub(crate) outer: TypeEnvironmentId,
     pub(crate) caller: TypeEnvironmentId,
+    pub(crate) caller_class: Option<ClassId>,
     pub(crate) environment: TypeEnvironmentId,
 }
 
@@ -428,6 +441,7 @@ pub(crate) struct CachedGuardedMethod {
     /// different bindings reach different method environments through the same
     /// receiver and must not share a cache entry.
     pub(crate) caller_environment: TypeEnvironmentId,
+    pub(crate) caller_class: Option<ClassId>,
     pub(crate) method_environment: TypeEnvironmentId,
     pub(crate) entry: ExactMethodEntry,
     pub(crate) arguments: CachedMethodArguments,
@@ -772,6 +786,15 @@ pub(crate) enum CallableOptimization {
 }
 
 impl RuntimeFunction {
+    pub(crate) fn where_constraints(&self) -> &[CompiledWhereConstraint] {
+        match self.locator {
+            FunctionLocator::TopLevel(_) => &[],
+            FunctionLocator::Method { class, method } => {
+                &self.unit.unit.classes[class as usize].methods[method as usize].where_constraints
+            }
+        }
+    }
+
     fn string_byte_at(&self) -> Option<(u8, u8)> {
         if self.optimization != CallableOptimization::Complete
             || self.declared_parameters != 2

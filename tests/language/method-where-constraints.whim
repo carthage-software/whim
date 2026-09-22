@@ -1,0 +1,255 @@
+use Whim\Marker\AlwaysInline;
+use Whim\Unwind\TypeError;
+use Whim\_Private\memmem;
+
+function rejects(fn(): mixed $operation): void {
+  $caught = false;
+  try {
+    $operation();
+  } catch (TypeError $error) {
+    assert!(memmem($error->getMessage(), 'where constraint', 0, false) != null);
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+class Effects {
+  public static int $defaults = 0;
+  public static int $bodies = 0;
+}
+
+function default_value(): int {
+  Effects::$defaults++;
+  return 7;
+}
+
+type Numbers = int|float;
+type Items<T> = vec<T>;
+
+newtype Tagged<T> = T;
+
+class Holder<T> {}
+
+function matches_type<T>(mixed $value): bool {
+  return $value is T;
+}
+
+class Box<T> {
+  public function __construct(public T $value) {}
+
+  #[AlwaysInline]
+  public function get(): T where T: int {
+    return $this->value;
+  }
+
+  public function literal(): int where T: int {
+    return 1;
+  }
+
+  public function identity(int $value): int where T: int {
+    return $value;
+  }
+
+  public function fluent(): static where T: int {
+    return $this;
+  }
+
+  public function touch(int $value = default_value()): int where T: int {
+    Effects::$bodies++;
+    return $value;
+  }
+
+  public function sequence<U>(U $value): U where T: Numbers, U: Items<T> {
+    return $value;
+  }
+
+  public function repeated(): bool where T: Numbers, T: int {
+    return true;
+  }
+
+  public function same<U>(U $value): U where U: T {
+    return $value;
+  }
+
+  public function shadow<T>(T $value): T where T: string {
+    return $value;
+  }
+
+  public function late<U>(): bool where U: static {
+    return true;
+  }
+
+  public function lateArgument(): bool {
+    return $this->late::<static>();
+  }
+
+  public function lateOn(Box<_> $other): bool {
+    return $other->late::<static>();
+  }
+
+  public function named(mixed $value): bool {
+    return matches_type::<static>($value);
+  }
+
+  public function bound(): fn(mixed): bool {
+    return matches_type::<static>(...);
+  }
+
+  public function boxed(): Holder<static> {
+    return new Holder::<static>();
+  }
+
+  public function tagged(): Tagged<static> {
+    return Tagged::<static>($this);
+  }
+
+  #[AlwaysInline]
+  public static function choose<U = int>(U $value = 1): U where U: int {
+    return $value;
+  }
+}
+
+class Integers extends Box<int> {}
+
+class Renamed<U> extends Box<U> {}
+
+class Created<T> {
+  public function __construct(public int $value) where T: int {
+    Effects::$bodies++;
+  }
+}
+
+$integers = new Box::<int>(3);
+$strings = new Box::<string>('x');
+$inherited = new Integers(5);
+assert!($integers->get() == 3);
+assert!($inherited->get() == 5);
+assert!(new Renamed::<int>(6)->get() == 6);
+assert!($strings->value == 'x');
+assert!($integers->touch() == 7);
+assert!(Effects::$defaults == 1 && Effects::$bodies == 1);
+
+$badGetter = $strings->get(...);
+$badStatic = Box::choose::<string>(...);
+$badPartial = $strings->identity(1, ...);
+foreach (vec[
+  fn() => $strings->get(),
+  fn() => $badGetter(),
+  fn() => $badStatic('x'),
+  fn() => $badPartial(),
+  fn() => $strings->literal(),
+  fn() => $strings->identity(value: 1),
+  fn() => $strings->fluent(),
+  fn() => $strings->touch(),
+  fn() => $integers->sequence::<vec<string>>(vec['x']),
+  fn() => $strings->sequence::<vec<string>>(vec['x']),
+  fn() => $integers->same::<string>('x'),
+  fn() => $strings->shadow::<int>(1),
+  fn() => new Box::<float>(1.0)->repeated(),
+  fn() => new Box::<int|string>(1)->get(),
+  fn() => new Renamed::<string>('x')->get(),
+  fn() => Box::choose::<string>('x'),
+  fn() => new Created::<string>(1),
+  fn() => $integers->late::<Box<string>>(),
+  fn() => $inherited->late::<Box<int>>(),
+] as $operation) {
+  rejects($operation);
+}
+
+assert!(Effects::$defaults == 1 && Effects::$bodies == 1);
+assert!($integers->sequence::<vec<int>>(vec[1, 2]) == vec[1, 2]);
+assert!($strings->same::<'x'>('x') == 'x');
+assert!($integers->shadow::<string>('x') == 'x');
+assert!($integers->repeated());
+assert!($integers->late::<Box<int>>());
+assert!($inherited->late::<Integers>());
+assert!($integers->lateArgument());
+assert!($inherited->lateArgument());
+assert!($integers->lateOn($integers));
+assert!($inherited->lateOn($integers));
+rejects(fn() => $integers->lateOn($strings));
+rejects(fn() => $integers->lateOn($inherited));
+assert!($integers->named($integers));
+assert!(!$inherited->named($integers));
+assert!($integers->bound()($integers));
+assert!(!$inherited->bound()($integers));
+assert!($integers->boxed() is Holder<Box<int>>);
+assert!($inherited->boxed() is Holder<Integers>);
+assert!($integers->tagged() is Tagged<Box<int>>);
+assert!($inherited->tagged() is Tagged<Integers>);
+assert!(Box::choose() == 1);
+assert!(Box::choose::<1>(1) == 1);
+assert!(new Created::<int>(9)->value == 9);
+assert!(Effects::$bodies == 2);
+
+function cached(Box<_> $box): int {
+  return $box->get();
+}
+
+for ($index = 0; $index < 10; $index++) {
+  assert!(cached($integers) == 3);
+  rejects(fn() => cached($strings));
+}
+
+interface Numeric<A> {
+  public function read<B>(): int where A: int, B: vec<A>;
+}
+
+class Narrow<T> implements Numeric<T> {
+  public function read<U>(): int where U: vec<T>, T: int {
+    return 1;
+  }
+}
+
+class Wider<V> extends Narrow<V> {
+  public function read<W>(): int {
+    return 2;
+  }
+}
+
+class Specialized extends Narrow<int> {
+  public function read<U>(): int where U: vec<int> {
+    return 3;
+  }
+}
+
+class DeclaredBound {
+  public function check<T: int>(): int {
+    return 4;
+  }
+}
+
+class RedundantBound extends DeclaredBound {
+  public function check<U: int>(): int where U: int {
+    return 5;
+  }
+}
+
+assert!(new Narrow::<int>()->read::<vec<int>>() == 1);
+rejects(fn() => new Narrow::<string>()->read::<vec<string>>());
+assert!(new Wider::<string>()->read::<null>() == 2);
+assert!(new Specialized()->read::<vec<int>>() == 3);
+rejects(fn() => new Specialized()->read::<string>());
+assert!(new RedundantBound()->check::<int>() == 5);
+
+interface DefaultRead<A> {
+  public function read(): int where A: int {
+    return 6;
+  }
+}
+
+class ViaDefault<T> implements DefaultRead<T> {}
+
+enum Choice {
+  case First;
+
+  public function select<T>(): int where T: int {
+    return 7;
+  }
+}
+
+assert!(new ViaDefault::<int>()->read() == 6);
+rejects(fn() => new ViaDefault::<string>()->read());
+assert!(Choice::First->select::<int>() == 7);
+rejects(fn() => Choice::First->select::<string>());

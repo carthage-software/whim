@@ -739,6 +739,7 @@ pub(crate) fn transfer(
         | Instruction::ReserveArray { .. }
         | Instruction::CheckSoleReference { .. }
         | Instruction::CheckDiscardedResult { .. }
+        | Instruction::CheckWhereConstraints
         | Instruction::DrainFinalizers => {}
         Instruction::Clear { target } => {
             write(target, Fact::UNKNOWN.release_is_unobservable());

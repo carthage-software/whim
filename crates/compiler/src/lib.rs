@@ -236,6 +236,7 @@ fn compile_program_into_unit<'arena>(
         &mut unit.functions,
         &unit.type_aliases,
         BodyShape {
+            where_clause: None,
             is_instance_method: false,
             return_kind: ReturnKind::Forbidden,
             promote_parameters: false,

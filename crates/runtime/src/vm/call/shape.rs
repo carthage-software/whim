@@ -700,8 +700,10 @@ impl VirtualMachine<'_> {
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let cache = unsafe { &*self.current_frame().cache.as_ref().bound_callables() };
         let entry = cache.get(site)?.as_ref()?;
-        (entry.target == target && entry.argument_environment == argument_environment)
-            .then(|| entry.callable.clone())
+        (entry.target == target
+            && entry.argument_environment == argument_environment
+            && entry.caller_class == self.current_frame().called_class.get())
+        .then(|| entry.callable.clone())
     }
 
     pub(in crate::vm) fn cache_bound_callable(
@@ -719,6 +721,7 @@ impl VirtualMachine<'_> {
         cache[site] = Some(CachedBoundCallable {
             target,
             argument_environment,
+            caller_class: self.current_frame().called_class.get(),
             callable,
         });
     }

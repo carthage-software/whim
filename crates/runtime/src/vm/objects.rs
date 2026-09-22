@@ -147,6 +147,7 @@ impl VirtualMachine<'_> {
                     CachedInstantiationEnvironment {
                         class,
                         outer,
+                        caller_class: self.current_frame().called_class.get(),
                         environment: outer,
                         allocates_plainly: true,
                         slots_are_acyclic: entry.slots_are_acyclic,
@@ -174,7 +175,9 @@ impl VirtualMachine<'_> {
                 .instantiation_environments()
         };
 
-        cache.get(site)?.get(outer)
+        cache
+            .get(site)?
+            .get(outer, self.current_frame().called_class.get())
     }
 
     /// Resolves and caches the reified environment of one named `new` site.
@@ -194,7 +197,9 @@ impl VirtualMachine<'_> {
                 .instantiation_environments()
         };
 
-        if let Some(entry) = cache.get(site).and_then(|ways| ways.get(outer))
+        if let Some(entry) = cache
+            .get(site)
+            .and_then(|ways| ways.get(outer, self.current_frame().called_class.get()))
             && entry.class == class
         {
             return Ok(entry.environment);
@@ -222,6 +227,7 @@ impl VirtualMachine<'_> {
             CachedInstantiationEnvironment {
                 class,
                 outer,
+                caller_class: self.current_frame().called_class.get(),
                 environment,
                 allocates_plainly,
                 slots_are_acyclic,

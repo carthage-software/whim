@@ -422,6 +422,7 @@ macro_rules! instruction_set {
             PropertyCoalesce { destination: Register, object: Register, cache: IcSlot, offset: NearJumpOffset, } = 215,
             PropertyCoalesceUnchecked { destination: Register, object: Register, slot: PropertySlot, offset: NearJumpOffset, } = 216,
             StaticPropertyCoalesce { destination: Register, cache: IcSlot, offset: ShortJumpOffset, } = 217,
+            CheckWhereConstraints = 219,
         }
     };
 }

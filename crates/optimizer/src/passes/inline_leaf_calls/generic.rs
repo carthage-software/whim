@@ -287,6 +287,7 @@ pub(crate) fn inline_generic_statics(
 
                 let method = &class.methods[method_position];
                 if method.visibility != Visibility::Public
+                    || !method.where_constraints.is_empty()
                     || is_never_inline(&method.function.attributes)
                 {
                     continue;

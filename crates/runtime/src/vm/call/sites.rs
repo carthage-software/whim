@@ -88,11 +88,13 @@ impl VirtualMachine<'_> {
         supplied: &[TypeDescriptor],
         outer: TypeEnvironmentId,
     ) -> Result<TypeEnvironmentId, VirtualMachineControl> {
+        let caller_class = self.current_frame().called_class.get();
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let cache = unsafe { &mut *self.current_frame().cache.as_ref().call_environments() };
         if let Some(entry) = cache.get(site).and_then(Option::as_ref)
             && entry.target == target
             && entry.outer == outer
+            && entry.caller_class == caller_class
         {
             return Ok(entry.environment);
         }
@@ -127,6 +129,7 @@ impl VirtualMachine<'_> {
         cache[site] = Some(CachedCallEnvironment {
             target,
             outer,
+            caller_class,
             environment,
         });
         Ok(environment)
@@ -317,7 +320,7 @@ impl VirtualMachine<'_> {
             let cache = unsafe { &*self.current_frame().cache.as_ref().newtype_constructors() };
             cache
                 .get(site)
-                .and_then(|ways| ways.get(outer, parent))
+                .and_then(|ways| ways.get(outer, parent, self.current_frame().called_class.get()))
                 .map(|cached| {
                     let allowed = cached
                         .guard
@@ -363,6 +366,7 @@ impl VirtualMachine<'_> {
             .intern_newtype_value(id, environment, parent);
         let entry = CachedNewtypeConstructor {
             outer,
+            caller_class: self.current_frame().called_class.get(),
             parent,
             environment,
             guard: argument_guard(backing.as_ref(), &value),

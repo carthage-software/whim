@@ -1,5 +1,6 @@
 mod matching;
 mod return_proofs;
+mod where_constraints;
 
 use std::ops::Deref;
 use std::rc::Rc;

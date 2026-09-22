@@ -829,6 +829,15 @@ impl Engine {
             }
         }
 
+        if let Some(reason) = self.override_where_reason(
+            replacement,
+            replaced,
+            &replacement_environment,
+            &replaced_environment,
+        )? {
+            return Ok(Some(reason));
+        }
+
         let mut replacement_return =
             substitute_symbolic(&replacement_return, &replacement_environment);
         let mut replaced_return = substitute_symbolic(&replaced_return, &replaced_environment);

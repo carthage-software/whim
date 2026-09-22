@@ -569,6 +569,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
                     &method.parameter_list,
                     block,
                     BodyShape {
+                        where_clause: method.where_clause.as_ref().map(HasSpan::span),
                         is_instance_method: !method.is_static(),
                         return_kind: metadata.return_kind,
                         promote_parameters: is_constructor && !method.is_static(),

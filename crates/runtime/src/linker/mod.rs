@@ -18,6 +18,7 @@ mod contracts;
 pub(crate) mod descriptors;
 mod externals;
 mod generics;
+mod where_constraints;
 
 /// One interface's name and the members it requires, snapshotted so the
 /// linker can report on them without holding the class table borrowed.

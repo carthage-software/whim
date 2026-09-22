@@ -297,6 +297,7 @@ pub fn mask_with_classification(
             | Instruction::IntShiftLeft { .. }
             | Instruction::IntShiftRight { .. }
             | Instruction::DrainFinalizers
+            | Instruction::CheckWhereConstraints
             | Instruction::Clear { .. }
             | Instruction::CheckSoleReference { .. }
             | Instruction::CheckDiscardedResult { .. } => None,

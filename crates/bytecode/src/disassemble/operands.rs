@@ -853,9 +853,9 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
         Instruction::ReturnIntUnchecked { immediate } => {
             format!(" {}", immediate.value())
         }
-        instructions!(ReturnNull | ReturnNullUnchecked | Rethrow | DrainFinalizers) => {
-            String::new()
-        }
+        instructions!(
+            ReturnNull | ReturnNullUnchecked | Rethrow | DrainFinalizers | CheckWhereConstraints
+        ) => String::new(),
         Instruction::MakeClosure {
             capture_count,
             destination,

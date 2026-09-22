@@ -12,8 +12,10 @@ use whim_bytecode::unit::CompiledFunction;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledTypeParameter;
 use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::CompiledWhereConstraint;
 use whim_bytecode::unit::Visibility;
 use whim_bytecode::unit::is_external;
+use whim_optimizer::descriptors_equal;
 use whim_span::Span;
 use whim_value::atom::Atom;
 use whim_value::object::ClassId;
@@ -43,6 +45,7 @@ struct MethodShape {
     is_abstract: bool,
     is_final: bool,
     function: FunctionShape,
+    where_constraints: Vec<CompiledWhereConstraint>,
 }
 
 struct PropertyShape {
@@ -390,6 +393,24 @@ impl Engine {
                 method.function.span,
                 unit,
             )?;
+
+            if method.where_constraints.len() != target.where_constraints.len()
+                || method
+                    .where_constraints
+                    .iter()
+                    .zip(&target.where_constraints)
+                    .any(|(expected, actual)| {
+                        expected.parameter != actual.parameter
+                            || !descriptors_equal(&expected.bound, &actual.bound, 0)
+                    })
+            {
+                return Err(self.external_mismatch(
+                    &expected.name,
+                    method.function.span,
+                    unit,
+                    &format!("method {} has different where constraints", method.name),
+                ));
+            }
         }
 
         Ok(())
@@ -507,6 +528,7 @@ impl Engine {
                     is_abstract: entry.is_abstract,
                     is_final: entry.is_final,
                     function: self.external_method_shape(entry.body),
+                    where_constraints: self.method_where_constraints(&entry).to_vec(),
                 },
             );
         }
@@ -524,6 +546,7 @@ impl Engine {
                     is_abstract: entry.is_abstract,
                     is_final: entry.is_final,
                     function: self.external_method_shape(entry.body),
+                    where_constraints: self.method_where_constraints(entry).to_vec(),
                 },
             );
         }

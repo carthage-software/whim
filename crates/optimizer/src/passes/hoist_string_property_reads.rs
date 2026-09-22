@@ -621,6 +621,7 @@ fn invalidates_property(instruction: Instruction, slot: PropertySlot) -> bool {
             | Instruction::ForeachNext { .. }
             | Instruction::Require { .. }
             | Instruction::DrainFinalizers
+            | Instruction::CheckWhereConstraints
     ) || matches!(instruction, Instruction::PropertySetUnchecked { .. })
         || matches!(
             instruction,

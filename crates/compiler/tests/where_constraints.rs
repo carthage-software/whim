@@ -1,4 +1,5 @@
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::instruction::Instruction;
 use whim_compiler::CompileConfiguration;
 use whim_compiler::CompileErrorKind;
 use whim_compiler::compile_with_configuration;
@@ -29,6 +30,10 @@ fn method_where_metadata_preserves_parameters_bounds_order_and_spans() {
         )
         .unwrap();
         let constraints = &unit.classes[0].methods[0].where_constraints;
+        assert_eq!(
+            unit.classes[0].methods[0].function.chunk.code[0],
+            Instruction::CheckWhereConstraints
+        );
         let expected = [("T", "T: int"), ("U", "U: vec<T>"), ("T", "T: string")];
         assert_eq!(constraints.len(), expected.len());
         for (constraint, (parameter, text)) in constraints.iter().zip(expected) {
@@ -81,5 +86,32 @@ fn where_metadata_requires_an_available_parameter_and_a_valid_bound() {
         )
         .unwrap_err();
         assert_eq!(error.kind, kind, "{source}: {error:?}");
+    }
+}
+
+#[test]
+fn where_check_precedes_defaults_and_promoted_properties() {
+    let source = "function initial(): int { return 1; }
+        class Box<T> { public function __construct(public int $value = initial()) where T: int {} }";
+    for enabled in [false, true] {
+        let arena = LocalArena::new();
+        let heap = Heap::new();
+        let unit = compile_with_configuration(
+            parse(&arena, source).unwrap(),
+            "/where-constructor.whim",
+            &heap,
+            CompileConfiguration {
+                optimization: OptimizationConfiguration {
+                    enabled,
+                    ..OptimizationConfiguration::default()
+                },
+                ..CompileConfiguration::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            unit.classes[0].methods[0].function.chunk.code[0],
+            Instruction::CheckWhereConstraints
+        );
     }
 }
