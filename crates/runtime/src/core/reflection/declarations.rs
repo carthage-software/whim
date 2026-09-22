@@ -4,6 +4,7 @@ use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::ClassLikeKind;
+use whim_bytecode::unit::CompiledMethod;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledProperty;
 use whim_bytecode::unit::Variance;
@@ -246,6 +247,7 @@ pub(crate) fn member_dispatch(
             member.name == context.vm.engine.tables.destructor_name,
         )),
         Operation::Prototypes => prototypes(context, member),
+        Operation::WhereConstraints => where_constraints(context, member),
         Operation::Type if member.kind != MemberKind::Property => member_type(context, member),
         Operation::IsStatic if member.kind == MemberKind::Property => {
             let Some((is_static, _, _)) = property_info(context.vm, member) else {
@@ -524,6 +526,80 @@ pub(crate) fn type_parameter_dispatch(
         }
         _ => {
             Err(context.type_error("the operation is not valid for this reflected type parameter"))
+        }
+    }
+}
+
+fn where_constraints(
+    context: &mut Context<'_, '_, '_>,
+    method: &MemberKey,
+) -> Result<Value, Throw> {
+    let count =
+        compiled_method(context.vm, method).map_or(0, |method| method.where_constraints.len());
+    let mut constraints = Vec::with_capacity(count);
+    for position in 0..count {
+        constraints.push(objects::build(
+            context,
+            ReflectionData::WhereConstraint {
+                method: method.clone(),
+                position,
+            },
+            Vec::new(),
+        )?);
+    }
+
+    Ok(context.vec(constraints))
+}
+
+pub(crate) fn where_constraint_dispatch(
+    context: &mut Context<'_, '_, '_>,
+    operation: Operation,
+    method: &MemberKey,
+    position: usize,
+) -> Result<Value, Throw> {
+    let Some(constraint) = compiled_method(context.vm, method)
+        .and_then(|method| method.where_constraints.get(position))
+        .cloned()
+    else {
+        return Err(context.type_error("the reflected where constraint is no longer declared"));
+    };
+
+    let owner = GenericOwner::Callable(CallableKey::Method {
+        class: method.class,
+        name: method.name.clone(),
+    });
+
+    match operation {
+        Operation::Parameter => {
+            let Some(parameter) =
+                support::type_parameter_key(context.vm, &owner, &constraint.parameter)
+            else {
+                return Err(
+                    context.type_error("the constrained type parameter is no longer declared")
+                );
+            };
+            objects::build(
+                context,
+                ReflectionData::TypeParameter(parameter),
+                Vec::new(),
+            )
+        }
+        Operation::Bound => objects::r#type(
+            context,
+            ReflectedType::owned(constraint.bound, owner).in_class(method.class),
+        ),
+        Operation::DeclaringMethod => member_reflection(context, method.clone()),
+        Operation::Position => Ok(index_value(position)),
+        Operation::Location => {
+            let unit = support::generic_owner_unit(context.vm, &owner);
+            let Some(unit) = unit.as_deref() else {
+                return Ok(Value::null());
+            };
+            metadata::reflect_location(context, unit, constraint.span)
+        }
+        _ => {
+            Err(context
+                .type_error("the operation is not valid for this reflected where constraint"))
         }
     }
 }
@@ -1229,6 +1305,18 @@ fn compiled_property<'a>(
         .properties
         .iter()
         .find(|property| property.name == member.name)
+}
+
+fn compiled_method<'a>(
+    vm: &'a VirtualMachine<'_>,
+    member: &MemberKey,
+) -> Option<&'a CompiledMethod> {
+    let class = &vm.engine.tables.classes[member.class.0 as usize];
+    let unit = class.attribute_unit.as_ref()?;
+    support::compiled_class(unit, &class.name)?
+        .methods
+        .iter()
+        .find(|method| method.name == member.name)
 }
 
 fn method_entry(vm: &VirtualMachine<'_>, member: &MemberKey) -> Option<MethodEntry> {

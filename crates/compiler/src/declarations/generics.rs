@@ -2,12 +2,14 @@
 
 use whim_bytecode::unit::CompiledTypeAlias;
 use whim_bytecode::unit::CompiledTypeParameter;
+use whim_bytecode::unit::CompiledWhereConstraint;
 use whim_bytecode::unit::Variance;
 use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::Program;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::class::ClassLikeMember;
+use whim_syn::cst::class::WhereClause;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::statement::TopLevelStatement;
 use whim_syn::cst::r#type::Type;
@@ -379,6 +381,37 @@ pub(crate) fn check_type_parameters(
     }
 
     Ok(())
+}
+
+pub(crate) fn compile_where_constraints(
+    scope: &TypeScope<'_>,
+    clause: Option<&WhereClause<'_>>,
+) -> Result<Vec<CompiledWhereConstraint>, CompileError> {
+    let Some(clause) = clause else {
+        return Ok(Vec::new());
+    };
+    let mut constraints = Vec::with_capacity(clause.constraints.len());
+    for constraint in &clause.constraints {
+        let name = constraint.parameter.value;
+        if !scope.binders.iter().any(|binder| binder == name) {
+            return Err(CompileError::new(
+                if scope.forbidden_binders.iter().any(|binder| binder == name) {
+                    CompileErrorKind::ClassTypeParameterInStaticMember
+                } else {
+                    CompileErrorKind::UnknownWhereConstraintParameter
+                },
+                format!("`{name}` is not a type parameter available to this method"),
+                constraint.parameter.span(),
+            ));
+        }
+        types::lowering::reject_return_only_annotation(constraint.bound, "where bound")?;
+        constraints.push(CompiledWhereConstraint {
+            parameter: scope.heap.intern(name.as_bytes()),
+            bound: types::lowering::lower_type_argument(scope, constraint.bound)?,
+            span: constraint.span(),
+        });
+    }
+    Ok(constraints)
 }
 
 pub(crate) fn compile_type_parameters(

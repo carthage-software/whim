@@ -190,6 +190,9 @@ An override must accept every set of type arguments that the inherited method
 accepts. It may keep or weaken the inherited where constraints, but must not
 strengthen them.
 
+[`MethodReflection::getWhereConstraints()`](../standard-library/reflection.md#generics)
+exposes the method's constraints in source order.
+
 ## Constructing a type parameter
 
 Code may create a reified type parameter when its bound supplies a constructor.

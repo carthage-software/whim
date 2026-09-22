@@ -414,7 +414,17 @@ pub struct CompiledMethod {
     pub is_abstract: bool,
     #[seeded(with(serde_seeded::unseeded))]
     pub is_final: bool,
+    pub where_constraints: Vec<CompiledWhereConstraint>,
     pub function: CompiledFunction,
+}
+
+#[derive(Debug, Clone, Serialize, DeserializeSeeded)]
+#[seeded(de(seed(Heap)))]
+pub struct CompiledWhereConstraint {
+    pub parameter: Atom,
+    pub bound: TypeDescriptor,
+    #[seeded(with(serde_seeded::unseeded))]
+    pub span: Span,
 }
 
 /// `int` or `string`, the only two the language allows.

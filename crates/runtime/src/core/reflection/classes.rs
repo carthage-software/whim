@@ -428,6 +428,7 @@ reflection_class! {
         "Whim\\Reflection\\Callable\\CallableReflection",
     ]
     with [declaration, member, generic, callable] {
+        get_where_constraints: "getWhereConstraints(): vec<Whim\\Reflection\\Generic\\WhereConstraintReflection>" => WhereConstraints;
         is_static: "isStatic(): bool" => IsStatic;
         is_abstract: "isAbstract(): bool" => IsAbstract;
         is_final: "isFinal(): bool" => IsFinal;
@@ -550,6 +551,16 @@ reflection_class! {
         get_bounds: "getBounds(): vec<Whim\\Reflection\\Type\\TypeReflection>" => Bounds;
         get_default: "getDefault(): null|Whim\\Reflection\\Type\\TypeReflection" => Default;
         get_type: "getType(): Whim\\Reflection\\Type\\TypeParameterTypeReflection" => Type;
+        get_location: "getLocation(): null|Whim\\Reflection\\SourceLocation" => Location;
+    }
+}
+
+reflection_class! {
+    WhereConstraintReflection = "Whim\\Reflection\\Generic\\WhereConstraintReflection" {
+        get_parameter: "getParameter(): Whim\\Reflection\\Generic\\TypeParameterReflection" => Parameter;
+        get_bound: "getBound(): Whim\\Reflection\\Type\\TypeReflection" => Bound;
+        get_declaring_method: "getDeclaringMethod(): Whim\\Reflection\\Member\\MethodReflection" => DeclaringMethod;
+        get_position: "getPosition(): (0..)" => Position;
         get_location: "getLocation(): null|Whim\\Reflection\\SourceLocation" => Location;
     }
 }
@@ -920,6 +931,7 @@ pub(crate) fn state(value: &Value) -> Option<&ReflectionState> {
         CaptureValueReflection,
         BoundArgumentReflection,
         TypeParameterReflection,
+        WhereConstraintReflection,
         TypeBindingReflection,
         TypeEnvironmentReflection,
         AttributeReflection,

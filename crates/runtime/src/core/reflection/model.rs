@@ -131,6 +131,10 @@ pub(crate) enum ReflectionData {
         parameter: usize,
     },
     TypeParameter(TypeParameterKey),
+    WhereConstraint {
+        method: MemberKey,
+        position: usize,
+    },
     TypeBinding {
         parameter: TypeParameterKey,
         argument: ReflectedType,

@@ -30,6 +30,7 @@ use crate::core::reflection::model::DeclarationMetadata;
 use crate::core::reflection::model::GenericOwner;
 use crate::core::reflection::model::MemberKey;
 use crate::core::reflection::model::MemberKind;
+use crate::core::reflection::model::TypeParameterKey;
 use crate::engine::builtins::built_in_parameters;
 use crate::engine::builtins::built_in_type_parameters;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
@@ -191,6 +192,36 @@ pub(crate) fn type_parameters(
             })
         }
     }
+}
+
+pub(crate) fn type_parameter_key(
+    vm: &VirtualMachine<'_>,
+    owner: &GenericOwner,
+    name: &Atom,
+) -> Option<TypeParameterKey> {
+    if let Some(position) = type_parameters(vm, owner)?
+        .iter()
+        .position(|parameter| parameter.name == *name)
+    {
+        return Some(TypeParameterKey {
+            owner: owner.clone(),
+            position,
+        });
+    }
+
+    let GenericOwner::Callable(CallableKey::Method { class, .. }) = owner else {
+        return None;
+    };
+
+    let class = &vm.engine.tables.classes[class.0 as usize];
+    let position = class
+        .type_parameters
+        .iter()
+        .position(|parameter| parameter.name == *name)?;
+    Some(TypeParameterKey {
+        owner: GenericOwner::Symbol(class.name.clone()),
+        position,
+    })
 }
 
 pub(crate) fn generic_owner_unit(

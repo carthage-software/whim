@@ -56,6 +56,7 @@ pub enum CompileErrorKind {
     TypeArgumentBoundViolation,
     NonTrailingTypeParameterDefault,
     UnboundTypeParameterDefault,
+    UnknownWhereConstraintParameter,
     ClassTypeParameterInStaticMember,
     TypeParameterClassReference,
     InvalidVarianceUse,

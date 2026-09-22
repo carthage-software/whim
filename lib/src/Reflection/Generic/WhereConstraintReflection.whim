@@ -1,0 +1,33 @@
+namespace Whim\Reflection\Generic;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\Stub;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Reflection\SourceLocation;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Describes one upper bound in a method's where clause. */
+#[Stub]
+final class WhereConstraintReflection {
+  private function __construct() {}
+
+  /** Returns the type parameter constrained by this clause entry. */
+  #[MustUse]
+  public function getParameter(): TypeParameterReflection {}
+
+  /** Returns the upper bound with type parameters left unresolved. */
+  #[MustUse]
+  public function getBound(): TypeReflection {}
+
+  /** Returns the method that declares this constraint. */
+  #[MustUse]
+  public function getDeclaringMethod(): MethodReflection {}
+
+  /** Returns the zero-based position in the method's where clause. */
+  #[MustUse]
+  public function getPosition(): 0.. {}
+
+  /** Returns the source span of this constraint, when available. */
+  #[MustUse]
+  public function getLocation(): null|SourceLocation {}
+}

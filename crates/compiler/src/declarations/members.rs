@@ -18,6 +18,7 @@ use whim_bytecode::unit::CompiledProperty;
 use whim_bytecode::unit::CompiledTypeAlias;
 use whim_bytecode::unit::CompiledTypeParameter;
 use whim_bytecode::unit::CompiledUnit;
+use whim_bytecode::unit::CompiledWhereConstraint;
 use whim_bytecode::unit::ConstantInitializer;
 use whim_bytecode::unit::EnumBacking;
 use whim_bytecode::unit::STUB_ATTRIBUTE;
@@ -31,7 +32,6 @@ use whim_syn::cst::class::EnumCase;
 use whim_syn::cst::class::Method;
 use whim_syn::cst::class::MethodBody;
 use whim_syn::cst::class::Property;
-use whim_syn::cst::r#type::Type;
 use whim_value::atom::Atom;
 
 use crate::declarations::class_likes::validate_variance_use;
@@ -44,6 +44,7 @@ use crate::declarations::functions::inert_declaration_chunk;
 use crate::declarations::functions::render_signature;
 use crate::declarations::generics::binder_names;
 use crate::declarations::generics::compile_type_parameters;
+use crate::declarations::generics::compile_where_constraints;
 use crate::emit::BodyShape;
 use crate::emit::ReturnKind;
 use crate::emit::Scope;
@@ -61,6 +62,7 @@ struct MethodMetadata {
     parameters: Vec<CompiledParameter>,
     attributes: Vec<CompiledAttribute>,
     type_parameters: Vec<CompiledTypeParameter>,
+    where_constraints: Vec<CompiledWhereConstraint>,
     return_type: Option<TypeDescriptor>,
     signature: String,
     return_kind: ReturnKind,
@@ -428,6 +430,9 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
             })
             .transpose()?;
 
+        let where_constraints =
+            compile_where_constraints(&type_scope, method.where_clause.as_ref())?;
+
         if let Some(descriptor) = &return_type {
             validate_variance_use(
                 descriptor,
@@ -457,13 +462,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
                 .map(|annotation| annotation.r#type),
         )?;
 
-        let returns_void = matches!(
-            method
-                .return_type
-                .as_ref()
-                .map(|annotation| annotation.r#type.unparenthesized()),
-            Some(Type::Void(_))
-        );
+        let returns_void = matches!(return_type, Some(TypeDescriptor::Void));
 
         let returns_never = return_type.as_ref().is_some_and(|descriptor| {
             types::descriptor_is_never(descriptor, &self.unit.type_aliases)
@@ -473,6 +472,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
             parameters,
             attributes,
             type_parameters,
+            where_constraints,
             return_type,
             signature,
             return_kind: ReturnKind::callable(returns_void, returns_never),
@@ -585,6 +585,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
             is_static: method.is_static(),
             is_abstract: method.is_abstract(),
             is_final: method.is_final(),
+            where_constraints: metadata.where_constraints,
             function: CompiledFunction {
                 name: heap.intern(
                     format!("{}::{}", self.class_context.name, method.name.value).as_bytes(),

@@ -39,6 +39,7 @@ pub(crate) enum Operation {
     BaseTypes,
     Binding,
     Bindings,
+    Bound,
     BoundArguments,
     BoundObject,
     Bounds,
@@ -62,6 +63,7 @@ pub(crate) enum Operation {
     DeclaredType,
     DeclaringCallable,
     DeclaringDeclaration,
+    DeclaringMethod,
     DeclaringType,
     Default,
     DefaultValue,
@@ -161,6 +163,7 @@ pub(crate) enum Operation {
     ValueType,
     Variance,
     Visibility,
+    WhereConstraints,
 }
 
 pub(crate) fn dispatch(

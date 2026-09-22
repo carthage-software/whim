@@ -140,6 +140,25 @@ A generic declaration lists its type parameters in source order. Each
 `TypeParameterReflection` gives its owner, position, variance, bounds, and
 default.
 
+`MethodReflection::getWhereConstraints()` returns
+`Whim\Reflection\Generic\WhereConstraintReflection` entries in source order,
+including repeated constraints. Methods without a clause return an empty vector.
+Each constraint provides:
+
+- `getParameter()`: the exact class or method `TypeParameterReflection` it
+  constrains.
+- `getBound()`: its upper bound as a `TypeReflection`, with generic parameters
+  left unresolved.
+- `getDeclaringMethod()`: the method that declares the constraint.
+- `getPosition()`: its zero-based position in the clause.
+- `getLocation()`: its source span for user code, or `null` for an artifact.
+
+Inherited methods retain their original declaring method and type parameters.
+Resolve a bound with an object or callable's `TypeEnvironmentReflection` to
+substitute its type arguments. Where constraints remain separate from
+`TypeParameterReflection::getBounds()`, which describes the parameter declaration.
+Artifacts preserve these constraints.
+
 A `TypeEnvironmentReflection` maps each type parameter to its type argument.
 The declaration forms part of a type parameter's identity, so two parameters
 named `T` use separate keys. Object and callable reflections include bindings

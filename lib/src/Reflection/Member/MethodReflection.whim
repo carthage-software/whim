@@ -7,6 +7,7 @@ use Whim\Reflection\Callable\ParameterReflection;
 use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Generic\TypeParameterReflection;
+use Whim\Reflection\Generic\WhereConstraintReflection;
 use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Callable\CallableReflection;
 use Whim\Reflection\Symbol\ClassLikeReflection;
@@ -64,6 +65,10 @@ final class MethodReflection implements MemberReflection, CallableReflection {
   public function getTypeParameter(
     int|string $parameter,
   ): null|TypeParameterReflection {}
+
+  /** Returns where constraints in source order, including repeated bounds. */
+  #[MustUse]
+  public function getWhereConstraints(): vec<WhereConstraintReflection> {}
 
   /** Returns parameters in declaration order. */
   #[MustUse]

@@ -1,0 +1,234 @@
+namespace WhereReflectionTest;
+
+use Whim\Reflection;
+use Whim\Reflection\DeclarationOrigin;
+use Whim\Reflection\Generic\WhereConstraintReflection;
+
+type Numeric = int|float;
+type Sequence<T> = vec<T>;
+
+interface Inspectable<T> {
+  public function inspect<U>(): void where T: Numeric, U: Sequence<T>;
+}
+
+class Container<T> implements Inspectable<T> {
+  public function inspect<U>(): void
+    where
+      T: Numeric,
+      U: Sequence<T>,
+      T: int|float
+  {}
+
+  public function plain(): void {}
+
+  public function shadow<T, U>(): void where U: vec<T>, T: string {}
+
+  public function same<U>(): void where U: T {}
+
+  public function late<U>(): void where U: static {}
+
+  public static function make<U>(): void where U: string&!'' {}
+}
+
+final class IntegerContainer extends Container<int> {}
+
+final class OverridingContainer extends Container<int> {
+  public function inspect<U>(): void where U: vec<int> {}
+}
+
+abstract class AbstractContainer<T> {
+  abstract public function check(): void where T: object;
+}
+
+enum Choice {
+  case First;
+
+  public function check<T>(): void where T: int {}
+}
+
+$class = Reflection\reflect_class('WhereReflectionTest\\Container');
+$method = $class->getMethod('inspect');
+$constraints = $method->getWhereConstraints();
+assert!(length!($constraints) == 3);
+foreach ($constraints as $position => $constraint) {
+  assert!($constraint is WhereConstraintReflection);
+  assert!($constraint->getPosition() == $position);
+  assert!($constraint->getDeclaringMethod()->getName() == 'inspect');
+  assert!(
+    $constraint
+      ->getDeclaringMethod()
+      ->getDeclaringType()
+      ->getName() == $class->getName(),
+  );
+
+  if ($class->getOrigin() == DeclarationOrigin::User) {
+    $location = $constraint->getLocation();
+    assert!($location != null);
+    assert!($location->getFile() == file!());
+    assert!(
+      $location->getStartOffset() > $method->getLocation()->getStartOffset(),
+    );
+
+    assert!($location->getEndOffset() < $method->getLocation()->getEndOffset());
+    assert!($location->getStartLine() <= $location->getEndLine());
+  } else {
+    assert!($constraint->getLocation() == null);
+  }
+}
+
+assert!($constraints[0]->getParameter()->getName() == 'T');
+assert!($constraints[0]->getParameter()->getPosition() == 0);
+assert!(
+  $constraints[0]
+    ->getParameter()
+    ->getDeclaringDeclaration()
+    ->getName() == $class->getName(),
+);
+
+assert!(
+  $constraints[0]->getBound()->equals(Reflection\reflect_type::<Numeric>()),
+);
+
+assert!($constraints[1]->getParameter()->getName() == 'U');
+assert!($constraints[1]->getParameter()->getPosition() == 0);
+assert!(
+  $constraints[1]
+    ->getParameter()
+    ->getDeclaringDeclaration()
+    ->getName()
+  == 'inspect',
+);
+
+assert!($constraints[1]->getBound()->toString() == 'vec<T>');
+assert!(!$constraints[1]->getBound()->isResolved());
+assert!($constraints[2]->getParameter()->getName() == 'T');
+assert!($constraints[2]->getBound()->equals($constraints[0]->getBound()));
+assert!($class->getTypeParameter('T')->getBounds() == vec[]);
+assert!($method->getTypeParameter('U')->getBounds() == vec[]);
+assert!($class->getMethod('plain')->getWhereConstraints() == vec[]);
+assert!(
+  Reflection\reflect_class(
+    'Whim\\Reflection\\Member\\MethodReflection',
+  )->getMethod('getWhereConstraints')->getWhereConstraints() == vec[],
+);
+
+$object = new IntegerContainer();
+$environment = Reflection\reflect_object($object)->getTypeEnvironment();
+$inherited = Reflection\reflect_class(
+  'WhereReflectionTest\\IntegerContainer',
+)->getMethod('inspect')->getWhereConstraints();
+
+assert!(length!($inherited) == 3);
+assert!(
+  $inherited[0]
+    ->getDeclaringMethod()
+    ->getDeclaringType()
+    ->getName() == $class->getName(),
+);
+
+assert!($environment->get($inherited[0]->getParameter())->toString() == 'int');
+$bound = $inherited[1]->getBound();
+assert!(
+  $bound
+    ->getValueType()
+    ->getParameter()
+    ->getDeclaringDeclaration()
+    ->getName() == $class->getName(),
+);
+
+assert!($bound->resolve($environment)->toString() == 'vec<int>');
+$callable = Reflection\reflect_callable($object->inspect::<vec<int>>(...));
+assert!(
+  $callable
+    ->getTypeEnvironment()
+    ->get($inherited[1]->getParameter())
+    ->toString()
+  == 'vec<int>',
+);
+
+$shadow = $class->getMethod('shadow')->getWhereConstraints();
+assert!($shadow[0]->getParameter()->getPosition() == 1);
+$shadowParameter = $shadow[0]->getBound()->getValueType()->getParameter();
+assert!($shadowParameter->getName() == 'T');
+assert!($shadowParameter->getDeclaringDeclaration()->getName() == 'shadow');
+assert!(
+  $shadow[1]->getParameter()->getDeclaringDeclaration()->getName() == 'shadow',
+);
+
+$shadowCallable = Reflection\reflect_callable(
+  $object->shadow::<string, vec<string>>(...),
+);
+
+assert!(
+  $shadow[0]
+    ->getBound()
+    ->resolve($shadowCallable->getTypeEnvironment())
+    ->toString()
+  == 'vec<string>',
+);
+
+assert!(!$shadow[0]->getBound()->resolve($environment)->isResolved());
+$same = $class->getMethod('same')->getWhereConstraints()[0]->getBound();
+assert!(
+  $same
+    ->getParameter()
+    ->getDeclaringDeclaration()
+    ->getName() == $class->getName(),
+);
+
+assert!($same->resolve($environment)->toString() == 'int');
+$late = $class->getMethod('late')->getWhereConstraints()[0]->getBound();
+assert!($late->getDeclaringType()->getName() == $class->getName());
+assert!(
+  $late->resolve(
+    $environment,
+    Reflection\reflect_object($object)->getType(),
+  )->toString()
+  == 'WhereReflectionTest\\IntegerContainer',
+);
+
+$prototype = $method->getPrototypes()[0];
+assert!(
+  $prototype->getDeclaringType()->getName()
+  == 'WhereReflectionTest\\Inspectable',
+);
+
+$interfaceConstraints = $prototype->getWhereConstraints();
+assert!(length!($interfaceConstraints) == 2);
+assert!($interfaceConstraints[0]->getParameter()->getName() == 'T');
+assert!(
+  $interfaceConstraints[1]
+    ->getBound()
+    ->resolve($environment)
+    ->toString()
+  == 'vec<int>',
+);
+
+$abstract = Reflection\reflect_class(
+  'WhereReflectionTest\\AbstractContainer',
+)->getMethod('check')->getWhereConstraints();
+
+assert!($abstract[0]->getBound()->toString() == 'object');
+$override = Reflection\reflect_class(
+  'WhereReflectionTest\\OverridingContainer',
+)->getMethod('inspect');
+
+assert!(length!($override->getWhereConstraints()) == 1);
+assert!(
+  $override->getWhereConstraints()[0]->getBound()->toString() == 'vec<int>',
+);
+
+assert!(length!($override->getPrototypes()[0]->getWhereConstraints()) == 3);
+$enum = Reflection\reflect_enum('WhereReflectionTest\\Choice')->getMethod(
+  'check',
+)->getWhereConstraints();
+
+assert!($enum[0]->getBound()->toString() == 'int');
+$static = $class->getMethod('make')->getWhereConstraints();
+assert!(
+  $static[0]->getParameter()->getDeclaringDeclaration()->getName() == 'make',
+);
+
+assert!(
+  $static[0]->getBound()->equals(Reflection\reflect_type::<string&!''>()),
+);

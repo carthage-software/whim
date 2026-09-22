@@ -122,6 +122,9 @@ fn expand_class(class: &mut CompiledClassLike, aliases: &impl TypeAliasLookup) {
 
     for method in &mut class.methods {
         expand_function(&mut method.function, aliases);
+        for constraint in &mut method.where_constraints {
+            constraint.bound = expand_aliases_using(&constraint.bound, aliases);
+        }
     }
 }
 

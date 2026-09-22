@@ -143,6 +143,9 @@ fn class_name(
             "Whim\\Reflection\\Callable\\BoundArgumentReflection"
         }
         ReflectionData::TypeParameter(_) => "Whim\\Reflection\\Generic\\TypeParameterReflection",
+        ReflectionData::WhereConstraint { .. } => {
+            "Whim\\Reflection\\Generic\\WhereConstraintReflection"
+        }
         ReflectionData::TypeBinding { .. } => "Whim\\Reflection\\Generic\\TypeBindingReflection",
         ReflectionData::TypeEnvironment(_) => {
             "Whim\\Reflection\\Generic\\TypeEnvironmentReflection"

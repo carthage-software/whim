@@ -493,24 +493,18 @@ fn type_parameter(
     let TypeDescriptor::Parameter(name) = &reflected.descriptor else {
         return Err(context.type_error("the reflected type is not a type-parameter reference"));
     };
+
     let Some(owner) = reflected.owner.as_ref() else {
         return Err(context.type_error("the reflected type parameter has no declaration owner"));
     };
-    let Some(parameters) = support::type_parameters(context.vm, owner) else {
-        return Err(context.type_error("the reflected type parameter owner is not loaded"));
-    };
-    let Some(position) = parameters
-        .iter()
-        .position(|parameter| parameter.name == *name)
-    else {
+
+    let Some(parameter) = support::type_parameter_key(context.vm, owner, name) else {
         return Err(context.type_error("the reflected type parameter is not declared"));
     };
+
     objects::build(
         context,
-        ReflectionData::TypeParameter(TypeParameterKey {
-            owner: owner.clone(),
-            position,
-        }),
+        ReflectionData::TypeParameter(parameter),
         Vec::new(),
     )
 }
@@ -901,17 +895,12 @@ pub(crate) fn resolve_type(
     ) -> TypeDescriptor {
         match descriptor {
             TypeDescriptor::Parameter(name) => owner
-                .and_then(|owner| {
-                    bindings.iter().find_map(|(parameter, argument)| {
-                        if &parameter.owner != owner {
-                            return None;
-                        }
-                        let parameters = support::type_parameters(vm, &parameter.owner)?;
-                        (parameters.get(parameter.position)?.name == *name)
-                            .then(|| argument.descriptor.clone())
-                    })
-                })
-                .unwrap_or_else(|| descriptor.clone()),
+                .and_then(|owner| support::type_parameter_key(vm, owner, name))
+                .and_then(|key| bindings.iter().find(|(parameter, _)| *parameter == key))
+                .map_or_else(
+                    || descriptor.clone(),
+                    |(_, argument)| argument.descriptor.clone(),
+                ),
             TypeDescriptor::StaticClass => called.map_or(TypeDescriptor::StaticClass, |called| {
                 called.descriptor.clone()
             }),

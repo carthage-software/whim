@@ -476,6 +476,7 @@ whim_core! {
         reflection::CaptureValueReflection,
         reflection::BoundArgumentReflection,
         reflection::TypeParameterReflection,
+        reflection::WhereConstraintReflection,
         reflection::TypeBindingReflection,
         reflection::TypeEnvironmentReflection,
         reflection::AttributeReflection,
