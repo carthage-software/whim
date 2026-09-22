@@ -1,5 +1,6 @@
 //! Splicing and trampolining of proven reified generic call sites.
 
+use std::borrow::Cow;
 use std::cmp::Reverse;
 
 use whim_bytecode::aliases::alias_bindings;
@@ -30,6 +31,7 @@ use crate::passes::inline_leaf_calls::jumping::build_jumping_replacement_bound;
 use crate::passes::inline_leaf_calls::leaf::owned_register_mask;
 use crate::passes::inline_leaf_calls::methods::descriptor_references_parameter;
 use crate::passes::inline_leaf_calls::methods::generic_body_inlinable;
+use crate::passes::inline_leaf_calls::methods::remove_where_check;
 use crate::passes::inline_leaf_calls::methods::unchecked_terminal;
 use crate::passes::inline_leaf_calls::splice_replace;
 use crate::type_flow::IndexedUnit;
@@ -287,8 +289,12 @@ pub(crate) fn inline_generic_statics(
 
                 let method = &class.methods[method_position];
                 if method.visibility != Visibility::Public
-                    || !method.where_constraints.is_empty()
                     || is_never_inline(&method.function.attributes)
+                    || !flow.where_constraints_proven(
+                        method,
+                        &method.function.type_parameters,
+                        Some(arguments),
+                    )
                 {
                     continue;
                 }
@@ -296,6 +302,10 @@ pub(crate) fn inline_generic_statics(
                 let Ok(parameters) = u16::try_from(method.function.parameters.len()) else {
                     continue;
                 };
+                let mut body = Cow::Borrowed(&method.function.chunk);
+                if !method.where_constraints.is_empty() {
+                    remove_where_check(body.to_mut());
+                }
 
                 if method.function.type_parameters.is_empty()
                     || !bounds_proven(&method.function, arguments, &flow)
@@ -308,7 +318,7 @@ pub(crate) fn inline_generic_statics(
                         .any(|parameter| parameter.has_default)
                     || method.function.parameters.len() != usize::from(argument_count.value())
                     || !generic_body_inlinable(
-                        &method.function.chunk,
+                        &body,
                         parameters,
                         is_always_inline(&method.function.attributes),
                     )
@@ -407,6 +417,7 @@ pub(crate) fn inline_generic_statics(
 
         let callee = &unit.classes[site.class].methods[site.method].function;
         let mut snapshot = callee.chunk.clone();
+        remove_where_check(&mut snapshot);
         normalize_chunk(&mut snapshot);
         let type_parameters = callee.type_parameters.clone();
         let Ok(parameters) = u16::try_from(callee.parameters.len()) else {

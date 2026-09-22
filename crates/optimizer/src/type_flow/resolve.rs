@@ -21,6 +21,7 @@ use whim_bytecode::unit::SlotPlacement;
 use whim_bytecode::unit::slot_placement;
 use whim_value::atom::Atom;
 
+use crate::liveness::effect::changes_value;
 use crate::liveness::effect::effect_on;
 use crate::type_flow::CAPTURE_ORIGIN;
 use crate::type_flow::ConstantValue;
@@ -32,6 +33,7 @@ use crate::type_flow::ResolvedProperty;
 use crate::type_flow::STRING;
 use crate::type_flow::THIS_ORIGIN;
 use crate::type_flow::TypeFlow;
+use crate::type_flow::array_shape;
 use crate::type_flow::callable_signature;
 use crate::type_flow::descriptors::descriptor_mask;
 use crate::type_flow::descriptors::descriptors_equal;
@@ -146,7 +148,11 @@ impl<'a> TypeFlow<'a> {
                         .dominates(previous, index)
                         .then_some((previous, source));
                 }
-                _ if effect_on(self.chunk, instruction, register).writes() => return None,
+                _ if effect_on(self.chunk, instruction, register).writes()
+                    || changes_value(self.chunk, instruction, register) =>
+                {
+                    return None;
+                }
                 _ => {}
             }
         }
@@ -204,10 +210,13 @@ impl<'a> TypeFlow<'a> {
                 destination,
                 descriptor,
                 ..
-            } => (
-                *destination,
-                &self.chunk.type_descriptors[usize::from(descriptor.index())],
-            ),
+            } => {
+                substituted = self.constrained_type(
+                    &self.chunk.type_descriptors[usize::from(descriptor.index())],
+                );
+
+                (*destination, &substituted)
+            }
             Instruction::AsOrNull {
                 destination,
                 descriptor,
@@ -219,25 +228,10 @@ impl<'a> TypeFlow<'a> {
                 fact.mask |= NULL;
                 return Some((*destination, fact));
             }
-            Instruction::PropertyGet {
-                destination,
-                object,
-                cache,
-            } => {
-                let property = self.resolved_property(index, *object, *cache)?.property;
-                (*destination, property.declared_type.as_ref()?)
-            }
-            Instruction::PropertyGetUnchecked {
-                destination,
-                object,
-                slot,
-                ..
-            } => {
-                let resolved = self.property_class_specialization(index, *object, 0)?;
-                let (_, property) = *self
-                    .flattened_layout(resolved.class)?
-                    .get(usize::from(slot.index()))?;
-                (*destination, property.declared_type.as_ref()?)
+            Instruction::PropertyGet { destination, .. }
+            | Instruction::PropertyGetUnchecked { destination, .. } => {
+                substituted = self.origin_type(origin, 0)?;
+                (*destination, &substituted)
             }
             Instruction::ConstantGet { destination, .. } => {
                 let descriptor = self.origin_type(origin, 0)?;
@@ -331,15 +325,12 @@ impl<'a> TypeFlow<'a> {
                 ..
             } => {
                 let fact = self.fact(index, *container);
-                if let Some(container) = self.origin_type(fact.origin, 0) {
-                    let descriptor = match container {
-                        TypeDescriptor::Array(Some((_, value)))
-                        | TypeDescriptor::Dictionary(Some((_, value))) => *value,
-                        TypeDescriptor::Vector(Some(element)) => *element,
-                        _ => return None,
-                    };
-                    return Some((*destination, self.descriptor_fact(&descriptor, origin)));
+                if let Some(container) = self.origin_type(fact.origin, 0)
+                    && let Some((_, element)) = array_shape(&container)
+                {
+                    return Some((*destination, self.descriptor_fact(element, origin)));
                 }
+
                 if fact.array != 0 {
                     let mask = self
                         .array_elements
@@ -519,8 +510,14 @@ impl<'a> TypeFlow<'a> {
         }
         if origin & PARAMETER_ORIGIN != 0 && origin != THIS_ORIGIN {
             let index = (origin & !PARAMETER_ORIGIN) as usize;
-            return self.parameters.get(index)?.declared_type.clone();
+            let descriptor = self.parameters.get(index)?.declared_type.as_ref()?;
+            return Some(if self.where_method.is_some() {
+                self.constrained_type(descriptor)
+            } else {
+                descriptor.clone()
+            });
         }
+
         if origin & CAPTURE_ORIGIN != 0 && origin != THIS_ORIGIN {
             let index = (origin & !CAPTURE_ORIGIN) as usize;
             return self.capture_types.get(index)?.clone();
@@ -539,6 +536,11 @@ impl<'a> TypeFlow<'a> {
         }
         let index = instruction_index(origin)?;
         match self.chunk.code[index] {
+            Instruction::AsCheck { descriptor, .. } => {
+                Some(self.constrained_type(
+                    &self.chunk.type_descriptors[usize::from(descriptor.index())],
+                ))
+            }
             Instruction::NewStatic { cache, .. } => self.member_type_descriptor(cache),
             Instruction::InitializeProperties {
                 cache, descriptor, ..
@@ -681,12 +683,10 @@ impl<'a> TypeFlow<'a> {
                 ..
             } => {
                 let container = self.register_type_at(index, container, depth + 1)?;
-                if let TypeDescriptor::Array(Some((_, element)))
-                | TypeDescriptor::Dictionary(Some((_, element)))
-                | TypeDescriptor::Vector(Some(element)) = container
-                {
-                    return Some(*element);
+                if let Some((_, element)) = array_shape(&container) {
+                    return Some(element.clone());
                 }
+
                 let ConstantValue::Int(key) =
                     self.constant_value_fact(self.fact(index, key), depth + 1)?
                 else {
@@ -706,26 +706,23 @@ impl<'a> TypeFlow<'a> {
             Instruction::PropertyGet { object, cache, .. } => {
                 let resolved = self.property_class_specialization(index, object, depth + 1)?;
                 let name = self.member_name(cache)?;
-                let property = self.instance_slot_of(resolved.class, name)?.property;
-                Some(substitute_parameters(
-                    property.declared_type.as_ref()?,
-                    &resolved.class.type_parameters,
-                    resolved.arguments.as_deref(),
+                let property = self.instance_slot_of(resolved.class, name)?;
+                self.property_value_type(
+                    index,
+                    object,
+                    &resolved,
+                    property.class,
+                    property.property,
                     depth + 1,
-                ))
+                )
             }
             Instruction::PropertyGetUnchecked { object, slot, .. } => {
-                let resolved = self.exact_class_at(index, object, depth + 1)?;
+                let resolved = self.property_class_specialization(index, object, depth + 1)?;
                 // The slot indexes the flattened layout, not the class's own
                 // declarations.
                 let layout = self.flattened_layout(resolved.class)?;
-                let (_, property) = *layout.get(usize::from(slot.index()))?;
-                Some(substitute_parameters(
-                    property.declared_type.as_ref()?,
-                    &resolved.class.type_parameters,
-                    resolved.arguments.as_deref(),
-                    depth + 1,
-                ))
+                let (owner, property) = *layout.get(usize::from(slot.index()))?;
+                self.property_value_type(index, object, &resolved, owner, property, depth + 1)
             }
             Instruction::CallValue { callee, .. }
             | Instruction::CallValueDiscarded { callee, .. }
@@ -767,6 +764,45 @@ impl<'a> TypeFlow<'a> {
                 self.origin_type(self.fact(index, source).origin, depth + 1)
             }
             _ => self.origin_descriptor(origin, depth + 1).cloned(),
+        }
+    }
+
+    fn property_value_type(
+        &self,
+        index: usize,
+        object: Register,
+        receiver: &ExactClass<'_>,
+        owner: &CompiledClassLike,
+        property: &CompiledProperty,
+        depth: usize,
+    ) -> Option<TypeDescriptor> {
+        if !ptr::eq(owner, receiver.class) && !owner.type_parameters.is_empty() {
+            return None;
+        }
+
+        let descriptor = substitute_parameters(
+            property.declared_type.as_ref()?,
+            &owner.type_parameters,
+            receiver.arguments.as_deref(),
+            depth + 1,
+        );
+
+        if self.fact(index, object).origin == THIS_ORIGIN
+            && self
+                .class_name
+                .is_some_and(|name| same_atom(name, &owner.name))
+            && self.where_method.is_some_and(|method| {
+                !method.function.type_parameters.iter().any(|parameter| {
+                    owner
+                        .type_parameters
+                        .iter()
+                        .any(|class_parameter| same_atom(&parameter.name, &class_parameter.name))
+                })
+            })
+        {
+            Some(self.constrained_type(&descriptor))
+        } else {
+            Some(self.expand_aliases_owned(descriptor))
         }
     }
 
@@ -1003,7 +1039,7 @@ impl<'a> TypeFlow<'a> {
             .map(|(_, method)| method)
     }
 
-    fn resolved_method_receiver_at(
+    pub(super) fn resolved_method_receiver_at(
         &self,
         index: usize,
         depth: usize,

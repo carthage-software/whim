@@ -13,6 +13,7 @@ use crate::OptimizationConfiguration;
 use crate::OptimizationStatistics;
 use crate::cfg::Dominators;
 use crate::cfg::successors;
+use crate::liveness::effect::changes_value;
 use crate::liveness::effect::effect_on;
 use crate::liveness::effect::overwrites_register;
 use crate::operands::replace_read_register;
@@ -413,34 +414,6 @@ fn propagate_available_value(
         chunk.code[index] = replacement;
     }
     true
-}
-
-fn changes_value(chunk: &Chunk, instruction: Instruction, register: Register) -> bool {
-    match instruction {
-        Instruction::IndexSet { container, .. }
-        | Instruction::VecIndexSet { container, .. }
-        | Instruction::DictIndexSetIntKey { container, .. }
-        | Instruction::DictIndexSetStringKey { container, .. }
-        | Instruction::DictIndexSet { container, .. }
-        | Instruction::IndexAddAssign { container, .. }
-        | Instruction::Append { container, .. }
-        | Instruction::VecAppend { container, .. }
-        | Instruction::Spread { container, .. }
-        | Instruction::Remove { container, .. }
-        | Instruction::SwapRemove { container, .. }
-        | Instruction::RemoveFirst { container, .. }
-        | Instruction::RemoveLast { container, .. }
-        | Instruction::ReserveArray { container, .. } => container == register,
-        Instruction::PropertySetUnchecked {
-            value, value_mode, ..
-        } => value == register && value_mode.moves(),
-        Instruction::InitializeProperties { descriptor, .. } => chunk
-            .property_initialization_descriptor(descriptor)
-            .entries
-            .iter()
-            .any(|entry| entry.value == register && entry.value_mode.moves()),
-        _ => false,
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

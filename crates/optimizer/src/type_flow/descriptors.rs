@@ -85,11 +85,12 @@ pub(crate) fn descriptor_mask(descriptor: &TypeDescriptor) -> Option<u16> {
             Some(mask)
         }
         TypeDescriptor::Intersection(members) => {
-            let mut members = members.iter();
-            let mut mask = descriptor_mask(members.next()?)?;
-            for member in members {
-                mask &= descriptor_mask(member)?;
+            let mut masks = members.iter().filter_map(descriptor_mask);
+            let mut mask = masks.next()?;
+            for member in masks {
+                mask &= member;
             }
+
             Some(mask)
         }
     }

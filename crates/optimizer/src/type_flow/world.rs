@@ -350,11 +350,14 @@ impl<'a> IndexedUnit<'a> {
                 Some(mask)
             }
             TypeDescriptor::Intersection(members) => {
-                let mut members = members.iter();
-                let mut mask = self.descriptor_mask(members.next()?, depth + 1)?;
-                for member in members {
-                    mask &= self.descriptor_mask(member, depth + 1)?;
+                let mut masks = members
+                    .iter()
+                    .filter_map(|member| self.descriptor_mask(member, depth + 1));
+                let mut mask = masks.next()?;
+                for member in masks {
+                    mask &= member;
                 }
+
                 Some(mask)
             }
             _ => descriptors::descriptor_mask(descriptor),

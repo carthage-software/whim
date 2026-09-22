@@ -19,6 +19,7 @@ use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
 use whim_bytecode::instruction::operands::IndexAddMode;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledClassLike;
+use whim_bytecode::unit::CompiledMethod;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledProperty;
 use whim_bytecode::unit::CompiledTypeParameter;
@@ -46,6 +47,7 @@ mod resolve;
 mod shapes;
 mod string_lengths;
 mod transfer;
+mod where_constraints;
 mod world;
 
 #[cfg(test)]
@@ -217,6 +219,7 @@ pub(crate) struct TypeFlow<'a> {
     capture_types: Vec<Option<TypeDescriptor>>,
     class_name: Option<&'a Atom>,
     class_type_parameters: &'a [CompiledTypeParameter],
+    where_method: Option<&'a CompiledMethod>,
     unit: Option<&'a IndexedUnit<'a>>,
     allocator: &'a Heap,
     facts: Vec<Fact>,
@@ -446,12 +449,25 @@ impl<'a> TypeFlow<'a> {
 
         let state_count = blocks.len().saturating_mul(register_count);
         let declined = !linear && state_count > MAXIMUM_FLOW_STATES;
+        let where_method = unit.and_then(|unit| {
+            matches!(chunk.code.first(), Some(Instruction::CheckWhereConstraints))
+                .then(|| {
+                    unit.classes
+                        .iter()
+                        .filter(|class| class_name.is_some_and(|name| same_atom(name, &class.name)))
+                        .flat_map(|class| &class.methods)
+                        .find(|method| ptr::eq(&method.function.chunk, chunk))
+                })
+                .flatten()
+        });
+
         let mut flow = Self {
             chunk,
             parameters,
             capture_types,
             class_name,
             class_type_parameters,
+            where_method,
             unit,
             allocator,
             facts: Vec::new(),
@@ -564,7 +580,7 @@ impl<'a> TypeFlow<'a> {
             if !parameter.has_default
                 && let Some(descriptor) = &parameter.declared_type
             {
-                let descriptor = self.expanded_aliases(descriptor);
+                let descriptor = self.constrained_type(descriptor);
                 let mut fact = self.descriptor_fact(&descriptor, PARAMETER_ORIGIN | index as u32);
                 let array = self.parameter_array_identity(index);
                 if !self.array_elements.is_empty()
@@ -1000,7 +1016,7 @@ impl<'a> TypeFlow<'a> {
                 continue;
             };
 
-            let descriptor = self.expanded_aliases(descriptor);
+            let descriptor = self.constrained_type(descriptor);
 
             let Some((keys, element)) = array_shape(&descriptor) else {
                 continue;
@@ -1214,6 +1230,7 @@ fn array_shape(descriptor: &TypeDescriptor) -> Option<(u16, &TypeDescriptor)> {
             Some((descriptor_mask(key).unwrap_or(INT | STRING), value.as_ref()))
         }
         TypeDescriptor::Vector(Some(element)) => Some((INT, element.as_ref())),
+        TypeDescriptor::Intersection(members) => members.iter().find_map(array_shape),
         _ => None,
     }
 }

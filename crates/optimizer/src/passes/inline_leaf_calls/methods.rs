@@ -114,8 +114,9 @@ pub(super) fn inline_direct_methods(
                     continue;
                 }
 
-                if !method.where_constraints.is_empty()
-                    || is_never_inline(&method.function.attributes)
+                if is_never_inline(&method.function.attributes)
+                    || !method.where_constraints.is_empty()
+                        && !flow.method_where_constraints_proven(index)
                 {
                     continue;
                 }
@@ -220,6 +221,7 @@ pub(super) fn inline_direct_methods(
             .function
             .clone();
         let mut snapshot = callee.chunk.clone();
+        remove_where_check(&mut snapshot);
         normalize_chunk(&mut snapshot);
         let declared = callee.parameters.len();
         let Ok(parameters) = u16::try_from(declared + 1) else {
@@ -297,6 +299,14 @@ pub(super) fn inline_direct_methods(
     }
 
     changed
+}
+
+pub(super) fn remove_where_check(chunk: &mut Chunk) {
+    if matches!(chunk.code.first(), Some(Instruction::CheckWhereConstraints)) {
+        let mut remove = vec![false; chunk.code.len()];
+        remove[0] = true;
+        compact(chunk, &remove);
+    }
 }
 
 fn local_method_locations(unit: &CompiledUnit) -> HashMap<*const CompiledMethod, (usize, usize)> {

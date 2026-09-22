@@ -253,3 +253,105 @@ assert!(new ViaDefault::<int>()->read() == 6);
 rejects(fn() => new ViaDefault::<string>()->read());
 assert!(Choice::First->select::<int>() == 7);
 rejects(fn() => Choice::First->select::<string>());
+
+final class Constrained<T> {
+  public function __construct(public T $value, private vec<T> $values) {}
+
+  public function integer(): int where T: int {
+    return $this->value;
+  }
+
+  public function sum(): int where T: int {
+    $sum = 0;
+    foreach ($this->values as $value) {
+      $sum += $value;
+    }
+
+    return $sum;
+  }
+
+  public function increment(T $value): T where T: int {
+    return $value + 1;
+  }
+
+  public function widen(): int|float where T: int {
+    $values = $this->values;
+    $values[] = 0.5;
+    $sum = 0;
+    foreach ($values as $value) {
+      $sum += $value;
+    }
+
+    return $sum;
+  }
+
+  public function shadow<T>(): bool where T: int {
+    return $this->value is int;
+  }
+
+  public function shadowCall<T>(): int where T: int {
+    return $this->integer();
+  }
+
+  public function invariant(Constrained<T> $value): Constrained<int>
+    where
+      T: int
+  {
+    return $value;
+  }
+
+  public function callback(fn(T): int $value): fn(int): int where T: int {
+    return $value;
+  }
+
+  public function negative(!T $value): !int where T: int {
+    return $value;
+  }
+}
+
+final class ConstrainedMath {
+  public static function add<U>(U $left, U $right): int where U: int {
+    return $left + $right;
+  }
+
+  public static function cycle<A, B>(A $value): int where A: B, B: A, B: int {
+    return $value + 1;
+  }
+}
+
+$numbers = new Constrained::<int>(2, vec[1, 2, 3]);
+assert!($numbers->integer() == 2);
+assert!($numbers->sum() == 6);
+assert!($numbers->increment(2) == 3);
+assert!($numbers->widen() == 6.5);
+assert!($numbers->sum() == 6);
+assert!($numbers->shadow::<int>());
+assert!($numbers->shadowCall::<int>() == 2);
+assert!(ConstrainedMath::add::<int>(2, 3) == 5);
+assert!(ConstrainedMath::cycle::<int, int>(4) == 5);
+rejects(fn() => ConstrainedMath::add::<float>(2.0, 3.0));
+
+$strings = new Constrained::<string>('hello', vec['hello']);
+assert!(!$strings->shadow::<int>());
+rejects(fn() => $strings->shadowCall::<int>());
+rejects(fn() => $strings->integer());
+rejects(fn() => $strings->sum());
+
+$literal = new Constrained::<1>(1, vec[1, 1]);
+assert!($literal->integer() == 1);
+assert!($literal->sum() == 2);
+foreach (vec[
+  fn() => $literal->increment(1),
+  fn() => $literal->invariant($literal),
+  fn() => $literal->callback(fn(1 $value): int => $value),
+  fn() => $literal->negative(2),
+] as $operation) {
+  $caught = false;
+  try {
+    $operation();
+  } catch (TypeError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}

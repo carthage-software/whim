@@ -904,6 +904,7 @@ fn abstract_class_methods_specialize_their_own_property_slots() {
     let unit = compile(
         r#"
         final class Target {
+            #[Whim\Marker\NeverInline]
             public function take(int $value): int {
                 return $value;
             }
