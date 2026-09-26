@@ -299,12 +299,15 @@ const fn closed_scalar(descriptor: &TypeDescriptor) -> bool {
             | TypeDescriptor::Null
             | TypeDescriptor::Bool
             | TypeDescriptor::Int
+            | TypeDescriptor::Uint
             | TypeDescriptor::Float
             | TypeDescriptor::String
             | TypeDescriptor::StringLength { .. }
             | TypeDescriptor::TrueLiteral
             | TypeDescriptor::FalseLiteral
             | TypeDescriptor::IntLiteral(_)
+            | TypeDescriptor::UintLiteral(_)
+            | TypeDescriptor::UintRange { .. }
             | TypeDescriptor::IntRange { .. }
             | TypeDescriptor::FloatLiteral(_)
             | TypeDescriptor::StringLiteral(_)

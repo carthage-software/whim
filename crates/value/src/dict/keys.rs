@@ -10,6 +10,7 @@ use crate::string::short::ShortString;
 
 pub enum Key {
     Int(i64),
+    Uint(u64),
     Bool(bool),
     String(ManagedRef<ByteStringObject>),
     ShortString(ShortString),
@@ -19,6 +20,7 @@ impl Clone for Key {
     fn clone(&self) -> Self {
         match self {
             Self::Int(value) => Self::Int(*value),
+            Self::Uint(value) => Self::Uint(*value),
             Self::Bool(value) => Self::Bool(*value),
             Self::String(string) => Self::String(string.clone()),
             Self::ShortString(string) => Self::ShortString(*string),
@@ -44,6 +46,9 @@ impl Key {
         if let Some(key) = value.as_int() {
             return Some(Self::Int(key));
         }
+        if let Some(key) = value.as_uint() {
+            return Some(Self::Uint(key));
+        }
         if let Some(key) = value.as_bool() {
             return Some(Self::Bool(key));
         }
@@ -62,6 +67,7 @@ impl Key {
     pub(crate) fn hash64(&self, state: &HashState) -> u64 {
         match self {
             Self::Int(value) => state.hash_int(*value),
+            Self::Uint(value) => state.hash_uint(*value),
             Self::Bool(value) => state.hash_bool(*value),
             Self::String(string) => string.hash64(state),
             Self::ShortString(string) => string.hash64(state),
@@ -73,6 +79,7 @@ impl PartialEq for Key {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Int(left), Self::Int(right)) => left == right,
+            (Self::Uint(left), Self::Uint(right)) => left == right,
             (Self::Bool(left), Self::Bool(right)) => left == right,
             (Self::String(left), Self::String(right)) => left.eq_bytes(right),
             (Self::ShortString(left), Self::ShortString(right)) => left == right,
@@ -90,6 +97,7 @@ impl Eq for Key {}
 #[derive(Clone, Copy)]
 pub enum KeyRef<'a> {
     Int(i64),
+    Uint(u64),
     Bool(bool),
     String(&'a ManagedRef<ByteStringObject>),
     ShortString(ShortString),
@@ -105,6 +113,7 @@ impl<'a> KeyRef<'a> {
     pub fn from_value(value: &'a Value) -> Option<Self> {
         match value.transparent() {
             ValueView::Int(value) => Some(Self::Int(*value)),
+            ValueView::Uint(value) => Some(Self::Uint(*value)),
             ValueView::Bool(value) => Some(Self::Bool(*value)),
             ValueView::String(value) => Some(Self::String(value)),
             ValueView::ShortString(value) => Some(Self::ShortString(*value)),
@@ -116,6 +125,7 @@ impl<'a> KeyRef<'a> {
     pub fn to_owned(self) -> Key {
         match self {
             Self::Int(value) => Key::Int(value),
+            Self::Uint(value) => Key::Uint(value),
             Self::Bool(value) => Key::Bool(value),
             Self::String(value) => Key::String(value.clone()),
             Self::ShortString(value) => Key::ShortString(value),
@@ -126,6 +136,7 @@ impl<'a> KeyRef<'a> {
     pub fn to_value(self) -> Value {
         match self {
             Self::Int(value) => Value::int(value),
+            Self::Uint(value) => Value::uint(value),
             Self::Bool(value) => Value::bool(value),
             Self::String(value) => Value::string(value.clone()),
             Self::ShortString(value) => Value::short_string(value),
@@ -135,6 +146,7 @@ impl<'a> KeyRef<'a> {
     pub(crate) fn hash64(self, state: &HashState) -> u64 {
         match self {
             Self::Int(value) => state.hash_int(value),
+            Self::Uint(value) => state.hash_uint(value),
             Self::Bool(value) => state.hash_bool(value),
             Self::String(string) => string.hash64(state),
             Self::ShortString(string) => string.hash64(state),
@@ -146,6 +158,7 @@ impl<'a> From<&'a Key> for KeyRef<'a> {
     fn from(value: &'a Key) -> Self {
         match value {
             Key::Int(value) => Self::Int(*value),
+            Key::Uint(value) => Self::Uint(*value),
             Key::Bool(value) => Self::Bool(*value),
             Key::String(value) => Self::String(value),
             Key::ShortString(value) => Self::ShortString(*value),

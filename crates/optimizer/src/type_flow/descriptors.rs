@@ -20,6 +20,7 @@ use crate::type_flow::NULL;
 use crate::type_flow::OBJECT;
 use crate::type_flow::STRING;
 use crate::type_flow::TUPLE;
+use crate::type_flow::UINT;
 use crate::type_flow::VECTOR;
 use crate::type_flow::same_atom;
 use crate::type_flow::string_lengths::string_lengths_prove;
@@ -59,6 +60,9 @@ pub(crate) fn descriptor_mask(descriptor: &TypeDescriptor) -> Option<u16> {
         TypeDescriptor::Int | TypeDescriptor::IntLiteral(_) | TypeDescriptor::IntRange { .. } => {
             Some(INT)
         }
+        TypeDescriptor::Uint
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. } => Some(UINT),
         TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => Some(FLOAT),
         TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -103,6 +107,7 @@ pub(in crate::type_flow) fn exact_descriptor_mask(descriptor: &TypeDescriptor) -
         TypeDescriptor::Never => Some(0),
         TypeDescriptor::Bool => Some(BOOL),
         TypeDescriptor::Int => Some(INT),
+        TypeDescriptor::Uint => Some(UINT),
         TypeDescriptor::Float => Some(FLOAT),
         TypeDescriptor::String => Some(STRING),
         TypeDescriptor::Object => Some(OBJECT),
@@ -149,6 +154,9 @@ pub(in crate::type_flow) fn descriptor_may_release_observably(descriptor: &TypeD
         | TypeDescriptor::Null
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
+        | TypeDescriptor::Uint
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -397,6 +405,7 @@ pub(crate) fn descriptor_proves(
                     ShapeKey::Bool(true) => TypeDescriptor::TrueLiteral,
                     ShapeKey::Bool(false) => TypeDescriptor::FalseLiteral,
                     ShapeKey::Int(_) => TypeDescriptor::Int,
+                    ShapeKey::Uint(_) => TypeDescriptor::Uint,
                     ShapeKey::String(_) => TypeDescriptor::String,
                 };
                 descriptor_proves(&key, expected_key, unit, depth + 1)
@@ -427,6 +436,7 @@ pub(crate) fn descriptor_proves(
             expected,
             TypeDescriptor::Bool
                 | TypeDescriptor::Int
+                | TypeDescriptor::Uint
                 | TypeDescriptor::Float
                 | TypeDescriptor::String
                 | TypeDescriptor::Object
@@ -448,6 +458,8 @@ pub(crate) fn descriptor_proves(
             TypeDescriptor::Bool
         ) | (TypeDescriptor::IntLiteral(_), TypeDescriptor::Int)
             | (TypeDescriptor::IntRange { .. }, TypeDescriptor::Int)
+            | (TypeDescriptor::UintLiteral(_), TypeDescriptor::Uint)
+            | (TypeDescriptor::UintRange { .. }, TypeDescriptor::Uint)
             | (TypeDescriptor::FloatLiteral(_), TypeDescriptor::Float)
             | (TypeDescriptor::StringLiteral(_), TypeDescriptor::String)
             | (TypeDescriptor::StringLength { .. }, TypeDescriptor::String)
@@ -458,6 +470,15 @@ pub(crate) fn descriptor_proves(
             TypeDescriptor::IntLiteral(value),
             TypeDescriptor::IntRange { min, max }
         ) if min.is_none_or(|min| *value >= min) && max.is_none_or(|max| *value <= max)
+    ) || matches!(
+        (actual, expected),
+        (TypeDescriptor::UintLiteral(value), TypeDescriptor::UintRange { min, max })
+            if min.is_none_or(|min| *value >= min) && max.is_none_or(|max| *value <= max)
+    ) || matches!(
+        (actual, expected),
+        (TypeDescriptor::UintRange { min: actual_min, max: actual_max },
+         TypeDescriptor::UintRange { min: expected_min, max: expected_max })
+            if range_lower_contains(*expected_min, *actual_min) && range_upper_contains(*expected_max, *actual_max)
     ) || matches!(
         (actual, expected),
         (
@@ -542,6 +563,24 @@ pub(crate) fn descriptors_disjoint(
         (TypeDescriptor::TrueLiteral, TypeDescriptor::FalseLiteral)
         | (TypeDescriptor::FalseLiteral, TypeDescriptor::TrueLiteral) => true,
         (TypeDescriptor::IntLiteral(left), TypeDescriptor::IntLiteral(right)) => left != right,
+        (TypeDescriptor::UintLiteral(left), TypeDescriptor::UintLiteral(right)) => left != right,
+        (TypeDescriptor::UintLiteral(value), TypeDescriptor::UintRange { min, max })
+        | (TypeDescriptor::UintRange { min, max }, TypeDescriptor::UintLiteral(value)) => {
+            min.is_some_and(|min| *value < min) || max.is_some_and(|max| *value > max)
+        }
+        (
+            TypeDescriptor::UintRange {
+                min: left_min,
+                max: left_max,
+            },
+            TypeDescriptor::UintRange {
+                min: right_min,
+                max: right_max,
+            },
+        ) => {
+            left_max.is_some_and(|max| right_min.is_some_and(|min| max < min))
+                || right_max.is_some_and(|max| left_min.is_some_and(|min| max < min))
+        }
         (TypeDescriptor::IntLiteral(value), TypeDescriptor::IntRange { min, max })
         | (TypeDescriptor::IntRange { min, max }, TypeDescriptor::IntLiteral(value)) => {
             min.is_some_and(|min| *value < min) || max.is_some_and(|max| *value > max)
@@ -603,6 +642,7 @@ pub fn descriptors_equal(left: &TypeDescriptor, right: &TypeDescriptor, depth: u
         | (TypeDescriptor::Null, TypeDescriptor::Null)
         | (TypeDescriptor::Bool, TypeDescriptor::Bool)
         | (TypeDescriptor::Int, TypeDescriptor::Int)
+        | (TypeDescriptor::Uint, TypeDescriptor::Uint)
         | (TypeDescriptor::Float, TypeDescriptor::Float)
         | (TypeDescriptor::String, TypeDescriptor::String)
         | (TypeDescriptor::Object, TypeDescriptor::Object)
@@ -612,6 +652,17 @@ pub fn descriptors_equal(left: &TypeDescriptor, right: &TypeDescriptor, depth: u
         | (TypeDescriptor::TupleAny, TypeDescriptor::TupleAny)
         | (TypeDescriptor::Callable(None), TypeDescriptor::Callable(None)) => true,
         (TypeDescriptor::IntLiteral(left), TypeDescriptor::IntLiteral(right)) => left == right,
+        (TypeDescriptor::UintLiteral(left), TypeDescriptor::UintLiteral(right)) => left == right,
+        (
+            TypeDescriptor::UintRange {
+                min: left_min,
+                max: left_max,
+            },
+            TypeDescriptor::UintRange {
+                min: right_min,
+                max: right_max,
+            },
+        ) => left_min == right_min && left_max == right_max,
         (
             TypeDescriptor::StringLength {
                 min: left_min,
@@ -746,6 +797,10 @@ pub(crate) fn literal_descriptor_matches(literal: &Literal, expected: &TypeDescr
         (Literal::Bool(true), TypeDescriptor::TrueLiteral)
         | (Literal::Bool(false), TypeDescriptor::FalseLiteral) => true,
         (Literal::Int(left), TypeDescriptor::IntLiteral(right)) => left == right,
+        (Literal::Uint(left), TypeDescriptor::UintLiteral(right)) => left == right,
+        (Literal::Uint(value), TypeDescriptor::UintRange { min, max }) => {
+            min.is_none_or(|min| *value >= min) && max.is_none_or(|max| *value <= max)
+        }
         (Literal::Int(value), TypeDescriptor::IntRange { min, max }) => {
             min.is_none_or(|min| *value >= min) && max.is_none_or(|max| *value <= max)
         }
@@ -766,13 +821,14 @@ pub(crate) fn literal_descriptor_disjoint(literal: &Literal, excluded: &TypeDesc
         Literal::Bool(true) => TypeDescriptor::TrueLiteral,
         Literal::Bool(false) => TypeDescriptor::FalseLiteral,
         Literal::Int(value) => TypeDescriptor::IntLiteral(*value),
+        Literal::Uint(value) => TypeDescriptor::UintLiteral(*value),
         Literal::Float(value) => TypeDescriptor::FloatLiteral(*value),
         Literal::String(value) => TypeDescriptor::StringLiteral(value.clone()),
     };
     descriptors_disjoint(&descriptor, excluded, 0)
 }
 
-fn range_lower_contains(expected: Option<i64>, actual: Option<i64>) -> bool {
+fn range_lower_contains<T: Ord>(expected: Option<T>, actual: Option<T>) -> bool {
     match (expected, actual) {
         (None, _) => true,
         (Some(_), None) => false,
@@ -780,7 +836,7 @@ fn range_lower_contains(expected: Option<i64>, actual: Option<i64>) -> bool {
     }
 }
 
-fn range_upper_contains(expected: Option<i64>, actual: Option<i64>) -> bool {
+fn range_upper_contains<T: Ord>(expected: Option<T>, actual: Option<T>) -> bool {
     match (expected, actual) {
         (None, _) => true,
         (Some(_), None) => false,

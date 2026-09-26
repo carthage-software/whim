@@ -128,6 +128,7 @@ pub(crate) fn shape_entry_dispatch(
         Operation::Key => Ok(match key {
             ShapeKey::Bool(key) => Value::bool(*key),
             ShapeKey::Int(key) => Value::int(*key),
+            ShapeKey::Uint(key) => Value::uint(*key),
             ShapeKey::String(key) => Value::string(key.to_handle()),
         }),
         Operation::Type => objects::r#type(context, reflected.clone()),
@@ -202,6 +203,7 @@ fn type_kind(
         TypeDescriptor::Null => "Null",
         TypeDescriptor::Bool => "Bool",
         TypeDescriptor::Int => "Int",
+        TypeDescriptor::Uint => "Uint",
         TypeDescriptor::Float => "Float",
         TypeDescriptor::String => "String",
         TypeDescriptor::StringLength { .. } => "StringLength",
@@ -209,9 +211,10 @@ fn type_kind(
         TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
+        | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::FloatLiteral(_)
         | TypeDescriptor::StringLiteral(_) => "Literal",
-        TypeDescriptor::IntRange { .. } => "IntegerRange",
+        TypeDescriptor::IntRange { .. } | TypeDescriptor::UintRange { .. } => "IntegerRange",
         TypeDescriptor::Named { .. } => "Named",
         TypeDescriptor::Member { .. } => "Member",
         TypeDescriptor::Parameter(_) => "TypeParameter",
@@ -310,6 +313,7 @@ fn literal_value(
         TypeDescriptor::TrueLiteral => Value::bool(true),
         TypeDescriptor::FalseLiteral => Value::bool(false),
         TypeDescriptor::IntLiteral(value) => Value::int(*value),
+        TypeDescriptor::UintLiteral(value) => Value::uint(*value),
         TypeDescriptor::FloatLiteral(value) => Value::float(*value),
         TypeDescriptor::StringLiteral(value) => Value::string(value.to_handle()),
         _ => return Err(context.type_error("the reflected type is not a literal type")),
@@ -317,10 +321,15 @@ fn literal_value(
 }
 
 fn range_bound(descriptor: &TypeDescriptor, lower: bool) -> Value {
-    let TypeDescriptor::IntRange { min, max } = descriptor else {
-        return Value::null();
-    };
-    if lower { *min } else { *max }.map_or_else(Value::null, Value::int)
+    match descriptor {
+        TypeDescriptor::IntRange { min, max } => {
+            if lower { *min } else { *max }.map_or_else(Value::null, Value::int)
+        }
+        TypeDescriptor::UintRange { min, max } => {
+            if lower { *min } else { *max }.map_or_else(Value::null, Value::uint)
+        }
+        _ => Value::null(),
+    }
 }
 
 fn string_length_bound(descriptor: &TypeDescriptor, minimum: bool) -> Value {

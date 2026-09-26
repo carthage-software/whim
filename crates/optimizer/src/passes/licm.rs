@@ -6,6 +6,7 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::IcSlot;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateUint;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
@@ -42,6 +43,10 @@ pub(in crate::passes) fn optimize_chunk(
                 destination,
                 immediate,
             } => (destination, InvariantLoad::Int { immediate }),
+            Instruction::LoadUint {
+                destination,
+                immediate,
+            } => (destination, InvariantLoad::Uint { immediate }),
             _ => continue,
         };
 
@@ -100,6 +105,10 @@ pub(in crate::passes) fn optimize_chunk(
                 constant,
             },
             InvariantLoad::Int { immediate } => Instruction::LoadInt {
+                destination: invariant,
+                immediate,
+            },
+            InvariantLoad::Uint { immediate } => Instruction::LoadUint {
                 destination: invariant,
                 immediate,
             },
@@ -238,4 +247,5 @@ enum InvariantLoad {
     ClassConstant { cache: IcSlot },
     Constant { constant: ConstantIndex },
     Int { immediate: ImmediateInt },
+    Uint { immediate: ImmediateUint },
 }

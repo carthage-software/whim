@@ -46,6 +46,7 @@ pub fn mask_with_classification(
             Instruction::IndexGetOrNull { destination, .. }
             | Instruction::VecIndexGetOrNull { destination, .. }
             | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+            | Instruction::DictIndexGetUintKeyOrNull { destination, .. }
             | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
             | Instruction::StringIndexGetOrNull { destination, .. }
             | Instruction::PropertyGetOrNull { destination, .. }
@@ -54,6 +55,7 @@ pub fn mask_with_classification(
             | Instruction::IndexCoalesce { destination, .. }
             | Instruction::VecIndexCoalesce { destination, .. }
             | Instruction::DictIndexCoalesceIntKey { destination, .. }
+            | Instruction::DictIndexCoalesceUintKey { destination, .. }
             | Instruction::DictIndexCoalesceStringKey { destination, .. }
             | Instruction::StringIndexCoalesce { destination, .. }
             | Instruction::PropertyCoalesce { destination, .. }
@@ -156,12 +158,41 @@ pub fn mask_with_classification(
                 destination,
                 value_mode,
                 ..
+            }
+            | Instruction::DictIndexGetUintKey {
+                destination,
+                value_mode,
+                ..
             } => (value_mode == ArrayValueMode::Generic).then_some(destination),
             Instruction::MoveOwned { .. }
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInt { .. }
+            | Instruction::LoadUint { .. }
+            | Instruction::UintAdd { .. }
+            | Instruction::UintSubtract { .. }
+            | Instruction::UintMultiply { .. }
+            | Instruction::UintModulo { .. }
+            | Instruction::UintAddAssign { .. }
+            | Instruction::UintBitwiseAnd { .. }
+            | Instruction::UintBitwiseOr { .. }
+            | Instruction::UintBitwiseXor { .. }
+            | Instruction::UintBitwiseNot { .. }
+            | Instruction::UintShiftLeft { .. }
+            | Instruction::UintShiftRight { .. }
+            | Instruction::UintAddImmediate { .. }
+            | Instruction::UintSubtractImmediate { .. }
+            | Instruction::UintMultiplyImmediate { .. }
+            | Instruction::UintModuloImmediate { .. }
+            | Instruction::UintJumpUnless { .. }
+            | Instruction::UintJumpUnlessImmediate { .. }
+            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::UintCounterLoop { .. }
+            | Instruction::UintRangeJumpIf { .. }
+            | Instruction::UintRangeJumpUnless { .. }
+            | Instruction::UintStep { .. }
+            | Instruction::DictIndexSetUintKey { .. }
             | Instruction::Add { .. }
             | Instruction::Subtract { .. }
             | Instruction::Multiply { .. }
@@ -171,6 +202,7 @@ pub fn mask_with_classification(
             | Instruction::Negate { .. }
             | Instruction::UnaryPlus { .. }
             | Instruction::AddImmediate { .. }
+            | Instruction::Step { .. }
             | Instruction::SubtractImmediate { .. }
             | Instruction::BitwiseAnd { .. }
             | Instruction::BitwiseOr { .. }

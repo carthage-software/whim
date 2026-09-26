@@ -57,6 +57,14 @@ impl<'call> Arguments<'call> {
         unsafe { self.int_unchecked(index) }
     }
 
+    #[inline(always)]
+    pub(crate) fn uint(&self, index: usize) -> u64 {
+        // SAFETY: built-in dispatch checked this argument against its declaration.
+        let value = unsafe { self.window.get_unchecked(index) };
+        // SAFETY: a validated uint argument contains an unsigned integer.
+        unsafe { value.as_uint_unchecked() }
+    }
+
     /// # Safety
     ///
     /// `index` must be present and contain an integer.

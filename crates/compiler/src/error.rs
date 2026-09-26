@@ -8,6 +8,8 @@ pub enum CompileErrorKind {
     WildcardTypeArgument,
     MemberWithoutVisibility,
     IntegerLiteralOutOfRange,
+    NegativeUnsignedLiteral,
+    MixedIntegerRangeBounds,
     TryWithoutClause,
     ReturnInsideFinally,
     ReturnOutsideCallable,

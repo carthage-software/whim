@@ -102,6 +102,15 @@ fn where_constraints_accept_composite_types_and_method_forms() {
         "Box<U> #{ value: T, ... }",
         "string & !''",
         "0..=100",
+        "0u..=100u",
+        "0..=100u",
+        "0u..=100",
+        "0i..=100",
+        "0..=100i",
+        "..=100i",
+        "10i..",
+        "0xffff_ffff_ffff_ffffu|0b101010u|0o52u|42u",
+        "0xffff_ffff_ffff_ffffi|0b101010i|0o52i|42i",
         "U",
     ] {
         for declaration in [

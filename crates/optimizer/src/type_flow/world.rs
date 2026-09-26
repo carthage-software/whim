@@ -27,6 +27,7 @@ use crate::type_flow::INT;
 use crate::type_flow::NULL;
 use crate::type_flow::OBJECT;
 use crate::type_flow::STRING;
+use crate::type_flow::UINT;
 use crate::type_flow::descriptors;
 use crate::type_flow::same_atom;
 
@@ -433,6 +434,7 @@ fn initializer_mask(initializer: &ConstantInitializer) -> Option<u16> {
         Literal::Null => NULL,
         Literal::Bool(_) => BOOL,
         Literal::Int(_) => INT,
+        Literal::Uint(_) => UINT,
         Literal::Float(_) => FLOAT,
         Literal::String(_) => STRING,
     })

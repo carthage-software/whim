@@ -605,6 +605,7 @@ fn unique_values<'value>(
                 ValueView::Uninitialized | ValueView::Iter(_) => true,
                 ValueView::Bool(_)
                 | ValueView::Int(_)
+                | ValueView::Uint(_)
                 | ValueView::String(_)
                 | ValueView::ShortString(_) => {
                     // SAFETY: these values are accepted by `KeyRef` above.

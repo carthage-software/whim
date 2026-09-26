@@ -9,13 +9,13 @@ trait UnitEnum {
     fn cases();
 }
 
-#[whim_interface("Whim\\Enum\\BackedEnum<T: int|string>")]
+#[whim_interface("Whim\\Enum\\BackedEnum<T: int|uint|string>")]
 #[whim_extends("Whim\\Enum\\UnitEnum")]
 #[whim_property("public readonly T $value")]
 trait BackedEnum {
-    #[whim_method("from(int|string $value): static", static)]
+    #[whim_method("from(int|uint|string $value): static", static)]
     fn from();
 
-    #[whim_method("tryFrom(int|string $value): static|null", static)]
+    #[whim_method("tryFrom(int|uint|string $value): static|null", static)]
     fn try_from();
 }

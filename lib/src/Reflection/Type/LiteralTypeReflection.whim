@@ -51,5 +51,5 @@ final class LiteralTypeReflection implements TypeReflection {
 
   /** Returns the literal value. */
   #[MustUse]
-  public function getValue(): null|bool|int|float|string {}
+  public function getValue(): null|bool|int|uint|float|string {}
 }

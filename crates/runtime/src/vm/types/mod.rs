@@ -58,6 +58,9 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::Null
             | TypeDescriptor::Bool
             | TypeDescriptor::Int
+            | TypeDescriptor::Uint
+            | TypeDescriptor::UintLiteral(_)
+            | TypeDescriptor::UintRange { .. }
             | TypeDescriptor::Float
             | TypeDescriptor::String
             | TypeDescriptor::StringLength { .. }
@@ -396,6 +399,7 @@ impl VirtualMachine<'_> {
             ValueView::Null => TypeDescriptor::Null,
             ValueView::Bool(_) => TypeDescriptor::Bool,
             ValueView::Int(_) => TypeDescriptor::Int,
+            ValueView::Uint(_) => TypeDescriptor::Uint,
             ValueView::Float(_) => TypeDescriptor::Float,
             ValueView::String(_) | ValueView::ShortString(_) => TypeDescriptor::String,
             ValueView::Vec(vector) => {
@@ -416,6 +420,7 @@ impl VirtualMachine<'_> {
                         &mut keys,
                         match key {
                             KeyRef::Int(_) => TypeDescriptor::Int,
+                            KeyRef::Uint(_) => TypeDescriptor::Uint,
                             KeyRef::Bool(_) => TypeDescriptor::Bool,
                             KeyRef::String(_) | KeyRef::ShortString(_) => TypeDescriptor::String,
                         },

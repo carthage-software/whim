@@ -27,6 +27,7 @@ pub enum Literal {
     Null,
     Bool(#[seeded(with(serde_seeded::unseeded))] bool),
     Int(#[seeded(with(serde_seeded::unseeded))] i64),
+    Uint(#[seeded(with(serde_seeded::unseeded))] u64),
     Float(#[seeded(with(serde_seeded::unseeded))] f64),
     String(Atom),
 }
@@ -36,6 +37,7 @@ pub enum LiteralKey {
     Null,
     Bool(bool),
     Int(i64),
+    Uint(u64),
     Float(u64),
     String(*const u8),
 }
@@ -46,6 +48,7 @@ pub fn literal_key(literal: &Literal) -> LiteralKey {
         Literal::Null => LiteralKey::Null,
         Literal::Bool(value) => LiteralKey::Bool(*value),
         Literal::Int(value) => LiteralKey::Int(*value),
+        Literal::Uint(value) => LiteralKey::Uint(*value),
         Literal::Float(value) => LiteralKey::Float(value.to_bits()),
         Literal::String(atom) => LiteralKey::String(atom.as_bytes().as_ptr()),
     }
@@ -57,6 +60,7 @@ pub type DictionaryTypeDescriptor = (Box<TypeDescriptor>, Box<TypeDescriptor>);
 #[seeded(de(seed(Heap)))]
 pub enum ShapeKey {
     Int(#[seeded(with(serde_seeded::unseeded))] i64),
+    Uint(#[seeded(with(serde_seeded::unseeded))] u64),
     String(Atom),
     Bool(#[seeded(with(serde_seeded::unseeded))] bool),
 }
@@ -77,6 +81,7 @@ pub enum TypeDescriptor {
     Null,
     Bool,
     Int,
+    Uint,
     Float,
     String,
     StringLength {
@@ -89,6 +94,13 @@ pub enum TypeDescriptor {
     TrueLiteral,
     FalseLiteral,
     IntLiteral(#[seeded(with(serde_seeded::unseeded))] i64),
+    UintLiteral(#[seeded(with(serde_seeded::unseeded))] u64),
+    UintRange {
+        #[seeded(with(serde_seeded::unseeded))]
+        min: Option<u64>,
+        #[seeded(with(serde_seeded::unseeded))]
+        max: Option<u64>,
+    },
     IntRange {
         #[seeded(with(serde_seeded::unseeded))]
         min: Option<i64>,
@@ -155,6 +167,21 @@ pub enum TypeDescriptor {
 }
 
 impl TypeDescriptor {
+    #[must_use]
+    pub fn unsigned_integer_range(min: Option<u64>, max: Option<u64>) -> Self {
+        if min.zip(max).is_some_and(|(min, max)| min > max) {
+            Self::Never
+        } else if min.is_none_or(|min| min == 0) && max.is_none_or(|max| max == u64::MAX) {
+            Self::Uint
+        } else if let (Some(min), Some(max)) = (min, max)
+            && min == max
+        {
+            Self::UintLiteral(min)
+        } else {
+            Self::UintRange { min, max }
+        }
+    }
+
     #[must_use]
     pub fn integer_range(min: Option<i64>, max: Option<i64>) -> Self {
         if min.zip(max).is_some_and(|(min, max)| min > max) {
@@ -324,11 +351,14 @@ impl TypeDescriptor {
             | Self::Null
             | Self::Bool
             | Self::Int
+            | Self::Uint
             | Self::Float
             | Self::TrueLiteral
             | Self::FalseLiteral
             | Self::IntLiteral(_)
             | Self::IntRange { .. }
+            | Self::UintLiteral(_)
+            | Self::UintRange { .. }
             | Self::FloatLiteral(_) => false,
             Self::Union(members) => members.iter().any(Self::may_hold_reference),
             Self::Wildcard
@@ -368,6 +398,7 @@ pub fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Null
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
+        | TypeDescriptor::Uint
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -376,6 +407,8 @@ pub fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
         | TypeDescriptor::IntRange { .. }
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::FloatLiteral(_)
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Array(None)
@@ -456,6 +489,7 @@ fn shape_key_matches(expected: &ShapeKey, actual: KeyRef<'_>) -> bool {
     match (expected, actual) {
         (ShapeKey::Bool(expected), KeyRef::Bool(actual)) => *expected == actual,
         (ShapeKey::Int(expected), KeyRef::Int(actual)) => *expected == actual,
+        (ShapeKey::Uint(expected), KeyRef::Uint(actual)) => *expected == actual,
         (ShapeKey::String(expected), KeyRef::String(actual)) => {
             expected.as_bytes() == ByteStringObject::handle_bytes(actual)
         }
@@ -481,6 +515,7 @@ fn check_dictionary_shape(
         let value = match key {
             ShapeKey::Bool(key) => dictionary.get_ref(KeyRef::Bool(*key)),
             ShapeKey::Int(key) => dictionary.get_int(*key),
+            ShapeKey::Uint(key) => dictionary.get_ref(KeyRef::Uint(*key)),
             ShapeKey::String(key) => dictionary.get_string(key.as_handle()),
         };
         let Some(value) = value else {
@@ -502,6 +537,7 @@ fn check_dictionary_shape(
         }
         let key = match key {
             KeyRef::Int(key) => Value::int(key),
+            KeyRef::Uint(key) => Value::uint(key),
             KeyRef::Bool(key) => Value::bool(key),
             KeyRef::String(key) => Value::string(key.clone()),
             KeyRef::ShortString(key) => Value::short_string(key),
@@ -576,6 +612,7 @@ pub fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Value) -> O
         TypeDescriptor::Null => value.is_null(),
         TypeDescriptor::Bool => value.is_bool(),
         TypeDescriptor::Int => value.is_int(),
+        TypeDescriptor::Uint => value.is_uint(),
         TypeDescriptor::Float => value.is_float(),
         TypeDescriptor::String => value.is_string(),
         TypeDescriptor::StringLength { min, max } => value
@@ -592,13 +629,12 @@ pub fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Value) -> O
         TypeDescriptor::IntRange { min, max } => value.as_int().is_some_and(|value| {
             min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
         }),
+        TypeDescriptor::UintLiteral(expected) => value.as_uint() == Some(*expected),
+        TypeDescriptor::UintRange { min, max } => value.as_uint().is_some_and(|value| {
+            min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
+        }),
         TypeDescriptor::FloatLiteral(expected) => value.as_float() == Some(*expected),
-        TypeDescriptor::StringLiteral(expected) => {
-            value.as_string_len() == Some(expected.as_bytes().len())
-                && value
-                    .as_string_bytes()
-                    .is_some_and(|string| string == expected.as_bytes())
-        }
+        TypeDescriptor::StringLiteral(expected) => string_literal_matches(value, expected),
         TypeDescriptor::Array(None) => value.is_vec() || value.is_dict() || value.is_tuple(),
         TypeDescriptor::Array(Some((key, element)))
             if matches!(key.as_ref(), TypeDescriptor::Wildcard)
@@ -666,6 +702,13 @@ pub fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Value) -> O
         }
         _ => return None,
     })
+}
+
+fn string_literal_matches(value: &Value, expected: &Atom) -> bool {
+    value.as_string_len() == Some(expected.as_bytes().len())
+        && value
+            .as_string_bytes()
+            .is_some_and(|string| string == expected.as_bytes())
 }
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]

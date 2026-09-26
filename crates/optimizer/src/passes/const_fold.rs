@@ -5,6 +5,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateUint;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
@@ -193,7 +194,8 @@ fn literal_destination(instruction: Instruction) -> Option<Register> {
         | Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
-        | Instruction::LoadInt { destination, .. } => Some(destination),
+        | Instruction::LoadInt { destination, .. }
+        | Instruction::LoadUint { destination, .. } => Some(destination),
         _ => None,
     }
 }
@@ -410,6 +412,7 @@ fn foldable(instruction: Instruction) -> bool {
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInt { .. }
+            | Instruction::LoadUint { .. }
     )
 }
 
@@ -443,6 +446,17 @@ fn constant_instruction(
                 constant,
             })
         }
+        ConstantValue::Uint(value) => Some(if let Ok(immediate) = u16::try_from(value) {
+            Instruction::LoadUint {
+                destination,
+                immediate: ImmediateUint::new(immediate),
+            }
+        } else {
+            Instruction::LoadConstant {
+                destination,
+                constant: intern(Literal::Uint(value))?,
+            }
+        }),
         ConstantValue::String(value) => {
             let constant = intern(Literal::String(value))?;
             Some(Instruction::LoadConstant {

@@ -78,6 +78,8 @@ define_token_kinds! {
     QualifiedIdentifier => "a qualified name";
     FullyQualifiedIdentifier => "a fully-qualified name";
     LiteralInteger => "an integer literal";
+    LiteralSignedInteger => "a signed integer literal";
+    LiteralUnsignedInteger => "an unsigned integer literal";
     LiteralFloat => "a float literal";
     LiteralString => "a string literal";
     StringPart => "part of an interpolated string";
@@ -179,6 +181,7 @@ define_token_kinds! {
     Implements => "`implements`", Contextual;
     In => "`in`", Contextual;
     Int => "`int`", Contextual;
+    Uint => "`uint`", Contextual;
     Interface => "`interface`", Contextual;
     Is => "`is`", Soft;
     Match => "`match`", Full;
@@ -310,6 +313,8 @@ impl TokenKind {
                 | Self::Null
                 | Self::LiteralFloat
                 | Self::LiteralInteger
+                | Self::LiteralSignedInteger
+                | Self::LiteralUnsignedInteger
                 | Self::LiteralString
         )
     }

@@ -1349,6 +1349,7 @@ fn literal_type(literal: &Literal) -> TypeDescriptor {
         Literal::Bool(true) => TypeDescriptor::TrueLiteral,
         Literal::Bool(false) => TypeDescriptor::FalseLiteral,
         Literal::Int(value) => TypeDescriptor::IntLiteral(*value),
+        Literal::Uint(value) => TypeDescriptor::UintLiteral(*value),
         Literal::Float(value) => TypeDescriptor::FloatLiteral(*value),
         Literal::String(value) => TypeDescriptor::StringLiteral(value.clone()),
     }

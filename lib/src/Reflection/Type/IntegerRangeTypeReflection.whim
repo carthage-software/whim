@@ -51,9 +51,9 @@ final class IntegerRangeTypeReflection implements TypeReflection {
 
   /** Returns the inclusive lower bound, or null when unbounded. */
   #[MustUse]
-  public function getLowerBound(): null|int {}
+  public function getLowerBound(): null|int|uint {}
 
   /** Returns the inclusive upper bound, or null when unbounded. */
   #[MustUse]
-  public function getUpperBound(): null|int {}
+  public function getUpperBound(): null|int|uint {}
 }

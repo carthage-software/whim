@@ -22,6 +22,41 @@ fn compile(source: &str, path: &str) -> Vec<u8> {
 }
 
 #[test]
+fn unsigned_values_and_descriptors_survive_artifacts() {
+    let source = r"
+const MAXIMUM = 18446744073709551615u;
+enum Code: uint { case Maximum = MAXIMUM; }
+type Upper = 9223372036854775808u..;
+function increment(uint $value = 0u): uint { return ++$value; }
+$captured = MAXIMUM;
+$closure = fn(): uint => $captured;
+assert!($closure() == MAXIMUM);
+assert!(MAXIMUM is Upper);
+assert!(increment() == 1u);
+assert!(Code::from(MAXIMUM) == Code::Maximum);
+assert!(dict[MAXIMUM => 1u][MAXIMUM] == 1u);
+assert!(dict[MAXIMUM => 1u] is dict[18446744073709551615u => uint]);
+assert!(match (MAXIMUM) { 18446744073709551615u => true, _ => false });
+";
+    for optimize in [false, true] {
+        let mut compiler = Engine::new(EngineConfiguration::default());
+        let artifact = compiler
+            .compile_artifact(
+                "/uint.whim",
+                &[SourceFile::new("/uint.whim", source)],
+                ArtifactConfiguration {
+                    optimize,
+                    ..ArtifactConfiguration::default()
+                },
+            )
+            .unwrap()
+            .into_bytes();
+        let mut engine = Engine::new(EngineConfiguration::default());
+        engine.load_artifact(&artifact).unwrap();
+    }
+}
+
+#[test]
 fn windows_signal_artifact_rejects_unsupported_operations() {
     let root = env!("CARGO_MANIFEST_DIR");
     let mut sources: Vec<_> = [

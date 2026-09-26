@@ -43,6 +43,7 @@ pub fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(usize))
             Instruction::IndexCoalesce { offset, .. }
             | Instruction::VecIndexCoalesce { offset, .. }
             | Instruction::DictIndexCoalesceIntKey { offset, .. }
+            | Instruction::DictIndexCoalesceUintKey { offset, .. }
             | Instruction::DictIndexCoalesceStringKey { offset, .. }
             | Instruction::StringIndexCoalesce { offset, .. }
             | Instruction::PropertyCoalesce { offset, .. }
@@ -53,6 +54,11 @@ pub fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(usize))
             | Instruction::StaticPropertyCoalesce { offset, .. }
             | Instruction::JumpUnless { offset, .. }
             | Instruction::IntJumpUnless { offset, .. }
+            | Instruction::UintJumpUnless { offset, .. }
+            | Instruction::UintJumpUnlessImmediate { offset, .. }
+            | Instruction::UintRangeJumpIf { offset, .. }
+            | Instruction::UintRangeJumpUnless { offset, .. }
+            | Instruction::UintCounterLoop { offset, .. }
             | Instruction::StringJumpUnless { offset, .. }
             | Instruction::StringByteJumpUnlessEqual { offset, .. }
             | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
@@ -202,6 +208,7 @@ pub fn rebase_targets(
         Instruction::IndexCoalesce { offset, .. }
         | Instruction::VecIndexCoalesce { offset, .. }
         | Instruction::DictIndexCoalesceIntKey { offset, .. }
+        | Instruction::DictIndexCoalesceUintKey { offset, .. }
         | Instruction::DictIndexCoalesceStringKey { offset, .. }
         | Instruction::StringIndexCoalesce { offset, .. }
         | Instruction::PropertyCoalesce { offset, .. }
@@ -216,6 +223,11 @@ pub fn rebase_targets(
         | Instruction::StaticPropertyCoalesce { offset, .. }
         | Instruction::JumpUnless { offset, .. }
         | Instruction::IntJumpUnless { offset, .. }
+        | Instruction::UintJumpUnless { offset, .. }
+        | Instruction::UintJumpUnlessImmediate { offset, .. }
+        | Instruction::UintRangeJumpIf { offset, .. }
+        | Instruction::UintRangeJumpUnless { offset, .. }
+        | Instruction::UintCounterLoop { offset, .. }
         | Instruction::StringJumpUnless { offset, .. }
         | Instruction::StringByteJumpUnlessEqual { offset, .. }
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
@@ -240,43 +252,53 @@ pub fn rebase_targets(
         | Instruction::SwitchFloat { table, .. }
         | Instruction::SwitchPattern { table, .. }
         | Instruction::SwitchTuplePattern { table, .. } => {
-            match &mut chunk.switch_tables[usize::from(table.index())] {
-                SwitchTable::Int {
-                    targets, default, ..
-                }
-                | SwitchTable::StringByte {
-                    targets, default, ..
-                }
-                | SwitchTable::Pattern {
-                    targets, default, ..
-                }
-                | SwitchTable::DictionaryShape {
-                    targets, default, ..
-                }
-                | SwitchTable::Bool { targets, default }
-                | SwitchTable::Float {
-                    targets, default, ..
-                } => {
-                    for offset in targets {
-                        let target = relative_target(old_index, *offset);
-                        *offset = new_offset(new_index, old_to_new[target]);
-                    }
-
-                    let target = relative_target(old_index, *default);
-                    *default = new_offset(new_index, old_to_new[target]);
-                }
-                SwitchTable::String { arms, default, .. } => {
-                    for (_, offset) in arms {
-                        let target = relative_target(old_index, *offset);
-                        *offset = new_offset(new_index, old_to_new[target]);
-                    }
-
-                    let target = relative_target(old_index, *default);
-                    *default = new_offset(new_index, old_to_new[target]);
-                }
-            }
+            rebase_switch_table(
+                &mut chunk.switch_tables[usize::from(table.index())],
+                old_index,
+                new_index,
+                old_to_new,
+            );
         }
         _ => {}
+    }
+}
+
+fn rebase_switch_table(
+    table: &mut SwitchTable,
+    old_index: usize,
+    new_index: usize,
+    old_to_new: &[usize],
+) {
+    let rebase = |offset: &mut i32| {
+        let target = relative_target(old_index, *offset);
+        *offset = new_offset(new_index, old_to_new[target]);
+    };
+    match table {
+        SwitchTable::Int {
+            targets, default, ..
+        }
+        | SwitchTable::StringByte {
+            targets, default, ..
+        }
+        | SwitchTable::Pattern {
+            targets, default, ..
+        }
+        | SwitchTable::DictionaryShape {
+            targets, default, ..
+        }
+        | SwitchTable::Bool { targets, default }
+        | SwitchTable::Float {
+            targets, default, ..
+        } => {
+            targets.iter_mut().for_each(rebase);
+            rebase(default);
+        }
+        SwitchTable::String { arms, default, .. } => {
+            for (_, offset) in arms {
+                rebase(offset);
+            }
+            rebase(default);
+        }
     }
 }
 

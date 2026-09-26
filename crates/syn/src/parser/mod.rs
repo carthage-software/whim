@@ -151,6 +151,11 @@ where
     }
 
     #[inline]
+    pub(crate) fn is_at_any(&mut self, kinds: &[TokenKind]) -> Result<bool, ParseError> {
+        self.stream.is_at_any(kinds)
+    }
+
+    #[inline]
     pub(crate) fn consume(&mut self) -> Result<Token<'input>, ParseError> {
         self.stream.consume()
     }

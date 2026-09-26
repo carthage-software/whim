@@ -528,6 +528,7 @@ where
             Type::Tuple(tuple) => f.format_tuple_type(tuple),
             Type::String(keyword)
             | Type::Int(keyword)
+            | Type::Uint(keyword)
             | Type::Float(keyword)
             | Type::Bool(keyword)
             | Type::Void(keyword)

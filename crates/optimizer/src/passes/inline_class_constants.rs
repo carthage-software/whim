@@ -5,6 +5,7 @@ use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateUint;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledAttribute;
 use whim_bytecode::unit::CompiledUnit;
@@ -183,7 +184,11 @@ fn literal_instruction(
                 })
             }
         }
-        literal @ (Literal::Float(_) | Literal::String(_)) => {
+        Literal::Uint(value) if u16::try_from(value).is_ok() => Some(Instruction::LoadUint {
+            destination,
+            immediate: ImmediateUint::new(value as u16),
+        }),
+        literal @ (Literal::Uint(_) | Literal::Float(_) | Literal::String(_)) => {
             let constant = chunk.add_constant(literal).ok()?;
             Some(Instruction::LoadConstant {
                 destination,

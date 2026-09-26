@@ -41,6 +41,8 @@ pub(crate) enum TypeSpec {
     Bool,
     Int,
     IntRange(Option<i64>, Option<i64>),
+    Uint,
+    UintRange(Option<u64>, Option<u64>),
     Float,
     String,
     StringLength(i64, Option<i64>),
@@ -115,6 +117,7 @@ pub(crate) enum ParameterDefaultSpec {
     Null,
     Bool(bool),
     Int(i64),
+    Uint(u64),
     Float(f64),
     String(&'static [u8]),
 }
@@ -148,6 +151,7 @@ pub(crate) struct FunctionDeclaration {
 pub(crate) enum ConstantValue {
     Bool(bool),
     Int(i64),
+    Uint(u64),
     Float(f64),
     String(&'static str),
 }

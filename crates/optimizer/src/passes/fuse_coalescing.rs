@@ -84,6 +84,16 @@ fn fused(instruction: Instruction, subject: Register, relative: i32) -> Option<I
             index,
             offset: NearJumpOffset::new(relative.try_into().ok()?),
         },
+        Instruction::DictIndexGetUintKeyOrNull {
+            destination,
+            container,
+            index,
+        } if destination == subject => Instruction::DictIndexCoalesceUintKey {
+            destination,
+            container,
+            index,
+            offset: NearJumpOffset::new(relative.try_into().ok()?),
+        },
         Instruction::DictIndexGetIntKeyOrNull {
             destination,
             container,
@@ -236,6 +246,20 @@ fn split(instruction: Instruction) -> Option<(Instruction, Register, i32)> {
             offset,
         } => (
             Instruction::VecIndexGetOrNull {
+                destination,
+                container,
+                index,
+            },
+            destination,
+            i32::from(offset.offset()),
+        ),
+        Instruction::DictIndexCoalesceUintKey {
+            destination,
+            container,
+            index,
+            offset,
+        } => (
+            Instruction::DictIndexGetUintKeyOrNull {
                 destination,
                 container,
                 index,

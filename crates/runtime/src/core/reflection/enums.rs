@@ -84,6 +84,8 @@ pub(crate) enum TypeKind {
     Bool,
     #[whim_case("Int")]
     Int,
+    #[whim_case("Uint")]
+    Uint,
     #[whim_case("Float")]
     Float,
     #[whim_case("String")]

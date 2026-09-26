@@ -125,7 +125,15 @@ pub(in crate::types) fn validate_composition(
             let base = match member.unparenthesized() {
                 Type::Literal(Literal::Integer(_))
                 | Type::NegativeLiteral(NegativeLiteralType::Integer { .. })
-                | Type::IntegerRange(_) => Some("int"),
+                | Type::IntegerRange(_) => Some(
+                    if integer_member_interval(member.unparenthesized())
+                        .is_some_and(|interval| interval.2)
+                    {
+                        "uint"
+                    } else {
+                        "int"
+                    },
+                ),
                 Type::Literal(Literal::Float(_))
                 | Type::NegativeLiteral(NegativeLiteralType::Float { .. }) => Some("float"),
                 Type::Literal(Literal::String(_)) | Type::StringLength(_) => Some("string"),
@@ -177,6 +185,9 @@ fn validate_integer_union_members(
             let Some(container) = integer_member_interval(other.unparenthesized()) else {
                 continue;
             };
+            if candidate.2 != container.2 {
+                continue;
+            }
             if candidate == container && index < other_index {
                 continue;
             }
@@ -196,41 +207,88 @@ fn validate_integer_union_members(
     Ok(())
 }
 
-fn integer_member_interval(member: &Type<'_>) -> Option<(i128, i128)> {
+fn integer_member_interval(member: &Type<'_>) -> Option<(i128, i128, bool)> {
     match member {
         Type::Literal(Literal::Integer(literal)) => {
-            let value = i64::try_from(literal.value).ok()?;
-            let value = i128::from(value);
-            Some((value, value))
+            let unsigned = literal.is_unsigned();
+            let value = if unsigned {
+                i128::from(literal.value)
+            } else {
+                i128::from(i64::try_from(literal.value).ok()?)
+            };
+            Some((value, value, unsigned))
         }
         Type::NegativeLiteral(NegativeLiteralType::Integer { literal, .. }) => {
+            if literal.is_unsigned() {
+                return (literal.value == 0).then_some((0, 0, true));
+            }
             let value = negative_integer_value(literal.value)?;
             let value = i128::from(value);
-            Some((value, value))
+            Some((value, value, false))
         }
         Type::IntegerRange(range) => {
+            let unsigned = range
+                .lower
+                .as_ref()
+                .or(range.upper.as_ref())
+                .is_some_and(|bound| match bound {
+                    IntegerRangeBound::Positive(literal)
+                    | IntegerRangeBound::Negative { literal, .. } => literal.is_unsigned(),
+                });
+            if range
+                .lower
+                .iter()
+                .chain(range.upper.iter())
+                .any(|bound| match bound {
+                    IntegerRangeBound::Positive(literal)
+                    | IntegerRangeBound::Negative { literal, .. } => {
+                        literal.is_unsigned() != unsigned
+                    }
+                })
+            {
+                return None;
+            }
             let lower = match &range.lower {
-                Some(bound) => i128::from(integer_range_bound_value(bound)?),
-                None => i128::from(i64::MIN),
+                Some(bound) => integer_range_bound_value(bound)?,
+                None => {
+                    if unsigned {
+                        0
+                    } else {
+                        i128::from(i64::MIN)
+                    }
+                }
             };
             let upper = match &range.upper {
                 Some(bound) => {
                     let upper = integer_range_bound_value(bound)?;
-                    i128::from(upper)
-                        - i128::from(matches!(range.operator, IntegerRangeOperator::Exclusive(_)))
+                    upper - i128::from(matches!(range.operator, IntegerRangeOperator::Exclusive(_)))
                 }
-                None => i128::from(i64::MAX),
+                None => {
+                    if unsigned {
+                        i128::from(u64::MAX)
+                    } else {
+                        i128::from(i64::MAX)
+                    }
+                }
             };
-            Some((lower, upper))
+            Some((lower, upper, unsigned))
         }
         _ => None,
     }
 }
 
-fn integer_range_bound_value(bound: &IntegerRangeBound<'_>) -> Option<i64> {
+fn integer_range_bound_value(bound: &IntegerRangeBound<'_>) -> Option<i128> {
     match bound {
-        IntegerRangeBound::Positive(literal) => i64::try_from(literal.value).ok(),
-        IntegerRangeBound::Negative { literal, .. } => negative_integer_value(literal.value),
+        IntegerRangeBound::Positive(literal) if literal.is_unsigned() => {
+            Some(i128::from(literal.value))
+        }
+        IntegerRangeBound::Positive(literal) => i64::try_from(literal.value).ok().map(i128::from),
+        IntegerRangeBound::Negative { literal, .. } if literal.is_unsigned() => {
+            (literal.value == 0).then_some(0)
+        }
+        IntegerRangeBound::Negative { literal, .. } => {
+            negative_integer_value(literal.value).map(i128::from)
+        }
     }
 }
 
@@ -374,6 +432,7 @@ fn render_type_with_state(
         Type::Mixed(_) => "mixed".to_string(),
         Type::Bool(_) => "bool".to_string(),
         Type::Int(_) => "int".to_string(),
+        Type::Uint(_) => "uint".to_string(),
         Type::Float(_) => "float".to_string(),
         Type::String(_) => "string".to_string(),
         Type::StringLength(string) => format!(

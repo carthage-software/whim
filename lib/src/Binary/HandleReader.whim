@@ -81,11 +81,10 @@ final class HandleReader implements Reader {
    * Reads an unsigned 64-bit integer.
    *
    * @throws UnderflowException when the source ends before the value is complete.
-   * @throws OverflowException when the value does not fit in a signed 64-bit integer.
    */
   #[MustUse]
   #[TrackCaller]
-  public function u64(null|Endianness $endianness = null): NonNegativeInt {
+  public function u64(null|Endianness $endianness = null): uint {
     return decode_u64($this->consume(8), $endianness ?? $this->endianness);
   }
 

@@ -10,6 +10,14 @@ const INT_MAX = INT_MAX;
 #[Stub]
 const INT_MIN = INT_MIN;
 
+/** The smallest unsigned integer, 0u. */
+#[Stub]
+const UINT_MIN = UINT_MIN;
+
+/** The largest unsigned integer, 18446744073709551615u. */
+#[Stub]
+const UINT_MAX = UINT_MAX;
+
 /** The float max numeric constant. */
 #[Stub]
 const FLOAT_MAX = FLOAT_MAX;

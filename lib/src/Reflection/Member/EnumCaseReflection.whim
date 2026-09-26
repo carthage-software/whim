@@ -55,7 +55,7 @@ final class EnumCaseReflection implements MemberReflection {
 
   /** Returns the scalar backing value, when present. */
   #[MustUse]
-  public function getBackingValue(): null|int|string {}
+  public function getBackingValue(): null|int|uint|string {}
 
   /** Returns the shared enum-case object. */
   #[MustUse]

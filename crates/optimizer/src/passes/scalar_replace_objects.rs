@@ -447,6 +447,7 @@ fn has_scalar_origin(
             | Instruction::LoadTrue { destination }
             | Instruction::LoadFalse { destination }
             | Instruction::LoadInt { destination, .. }
+            | Instruction::LoadUint { destination, .. }
                 if destination == register =>
             {
                 return true;

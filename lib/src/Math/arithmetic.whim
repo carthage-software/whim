@@ -24,4 +24,4 @@ function div(int $numerator, int $denominator): int {
 
 /** Formats a non-negative integer in the given base. */
 #[Stub]
-function to_base((0..) $number, 2..=36 $base): string[1..] {}
+function to_base((0..)|uint $number, 2..=36 $base): string[1..] {}

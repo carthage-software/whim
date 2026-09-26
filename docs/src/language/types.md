@@ -5,13 +5,14 @@ accepts. Whim checks that rule when the program reaches the boundary.
 
 ## Scalar values
 
-Whim has five scalar value kinds.
+Whim has six scalar value kinds.
 
 | Type | Values |
 | --- | --- |
 | `null` | `null` |
 | `bool` | `true` and `false` |
 | `int` | signed 64-bit integers |
+| `uint` | unsigned 64-bit integers, from 0 through 18,446,744,073,709,551,615 |
 | `float` | double-precision floating-point numbers |
 | `string` | byte strings |
 
@@ -19,7 +20,9 @@ Integers and floats stay distinct:
 
 ```whim
 assert!(1 is int);
+assert!(1u is uint);
 assert!(1.0 is float);
+assert!(1u != 1);
 assert!(1 != 1.0);
 ```
 
@@ -96,7 +99,7 @@ function choose('yes'|'no' $answer): bool {
 assert!(choose('yes'));
 ```
 
-`true`, `42`, and `'yes'` each describe one value. Literal types make unions,
+`true`, `42`, `42u`, and `'yes'` each describe one value. Literal types make unions,
 ranges, enum cases, and constants precise.
 
 ## String length types

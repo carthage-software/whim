@@ -21,11 +21,16 @@ pub(in crate::passes) fn optimize_chunk(
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
     for index in 0..chunk.code.len() - 1 {
-        let Instruction::AddImmediate {
+        let (Instruction::Step {
             destination,
             source,
             immediate,
-        } = chunk.code[index]
+        }
+        | Instruction::UintStep {
+            destination,
+            source,
+            immediate,
+        }) = chunk.code[index]
         else {
             continue;
         };
@@ -34,7 +39,7 @@ pub(in crate::passes) fn optimize_chunk(
             continue;
         };
 
-        if destination != source || targets.contains(&(index + 1)) {
+        if destination != source || immediate.value() < 0 || targets.contains(&(index + 1)) {
             continue;
         }
 

@@ -148,6 +148,7 @@ pub(crate) fn debug_render(heap: &Heap, value: &Value, depth: u32) -> String {
         ValueView::Null => "null".to_string(),
         ValueView::Bool(value) => value.to_string(),
         ValueView::Int(rendered) => rendered.to_string(),
+        ValueView::Uint(rendered) => format!("{rendered}u"),
         ValueView::Float(rendered) => {
             String::from_utf8_lossy(ops::render_float(heap, *rendered).flatten()).into_owned()
         }
@@ -170,6 +171,7 @@ pub(crate) fn debug_render(heap: &Heap, value: &Value, depth: u32) -> String {
                 .map(|(key, entry)| {
                     let key = match key {
                         KeyRef::Int(rendered) => rendered.to_string(),
+                        KeyRef::Uint(rendered) => format!("{rendered}u"),
                         KeyRef::Bool(rendered) => rendered.to_string(),
                         KeyRef::String(rendered) => {
                             format!("'{}'", String::from_utf8_lossy(rendered.flatten()))
@@ -242,6 +244,7 @@ impl<'vm, 'engine> DetailedDebugRenderer<'vm, 'engine> {
             ValueView::Null => "null".to_string(),
             ValueView::Bool(value) => value.to_string(),
             ValueView::Int(value) => value.to_string(),
+            ValueView::Uint(value) => format!("{value}u"),
             ValueView::Float(value) => {
                 String::from_utf8_lossy(ops::render_float(&self.vm.heap, *value).flatten())
                     .into_owned()
@@ -334,6 +337,7 @@ impl<'vm, 'engine> DetailedDebugRenderer<'vm, 'engine> {
     fn render_key(key: KeyRef<'_>) -> String {
         match key {
             KeyRef::Int(value) => value.to_string(),
+            KeyRef::Uint(value) => format!("{value}u"),
             KeyRef::Bool(value) => value.to_string(),
             KeyRef::String(value) => render_debug_string(value.flatten()),
             KeyRef::ShortString(value) => render_debug_string(value.as_bytes()),
@@ -647,6 +651,7 @@ impl VirtualMachine<'_> {
             ValueView::Null => rendered.push("null"),
             ValueView::Bool(value) => rendered.push(if *value { "true" } else { "false" }),
             ValueView::Int(value) => rendered.push(&value.to_string()),
+            ValueView::Uint(value) => rendered.push(&format!("{value}u")),
             ValueView::Float(value) => {
                 rendered.push_bytes(ops::render_float(&self.heap, *value).flatten());
             }
@@ -684,6 +689,7 @@ impl VirtualMachine<'_> {
 
                     match key {
                         KeyRef::Int(value) => rendered.push(&value.to_string()),
+                        KeyRef::Uint(value) => rendered.push(&format!("{value}u")),
                         KeyRef::Bool(value) => rendered.push(if value { "true" } else { "false" }),
                         KeyRef::String(value) => {
                             rendered.push("'");

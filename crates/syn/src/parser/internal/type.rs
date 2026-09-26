@@ -167,6 +167,7 @@ where
             TokenKind::Static => Type::Static(self.expect_keyword(TokenKind::Static)?),
             TokenKind::String => self.parse_string_type()?,
             TokenKind::Int => Type::Int(self.expect_keyword(TokenKind::Int)?),
+            TokenKind::Uint => Type::Uint(self.expect_keyword(TokenKind::Uint)?),
             TokenKind::Float => Type::Float(self.expect_keyword(TokenKind::Float)?),
             TokenKind::Bool => Type::Bool(self.expect_keyword(TokenKind::Bool)?),
             TokenKind::Void => Type::Void(self.expect_keyword(TokenKind::Void)?),
@@ -174,7 +175,9 @@ where
             TokenKind::Never => Type::Never(self.expect_keyword(TokenKind::Never)?),
             TokenKind::Object => Type::Object(self.expect_keyword(TokenKind::Object)?),
             TokenKind::Minus => self.parse_negative_numeric_type()?,
-            TokenKind::LiteralInteger => {
+            TokenKind::LiteralInteger
+            | TokenKind::LiteralUnsignedInteger
+            | TokenKind::LiteralSignedInteger => {
                 let bound = IntegerRangeBound::Positive(self.parse_integer_literal()?);
                 self.parse_integer_literal_or_range(bound)?
             }
@@ -223,7 +226,11 @@ where
 
         let left_bracket = self.expect_span(TokenKind::LeftBracket)?;
         let length = match self.peek()?.map(|token| token.kind) {
-            Some(TokenKind::LiteralInteger) => {
+            Some(
+                TokenKind::LiteralInteger
+                | TokenKind::LiteralUnsignedInteger
+                | TokenKind::LiteralSignedInteger,
+            ) => {
                 let literal = self.parse_integer_literal()?;
                 if self.is_at(TokenKind::DotDot)? || self.is_at(TokenKind::DotDotEqual)? {
                     StringLength::Range(self.parse_nonnegative_integer_range(
@@ -261,7 +268,9 @@ where
             )));
         };
         match token.kind {
-            TokenKind::LiteralInteger => {
+            TokenKind::LiteralInteger
+            | TokenKind::LiteralUnsignedInteger
+            | TokenKind::LiteralSignedInteger => {
                 let literal = self.parse_integer_literal()?;
                 self.parse_integer_literal_or_range(IntegerRangeBound::Negative { minus, literal })
             }
@@ -335,7 +344,12 @@ where
         } else {
             IntegerRangeOperator::Exclusive(self.expect_span(TokenKind::DotDot)?)
         };
-        let upper = if upper_required || self.is_at(TokenKind::LiteralInteger)? {
+        let upper = if upper_required
+            || self.is_at_any(&[
+                TokenKind::LiteralInteger,
+                TokenKind::LiteralUnsignedInteger,
+                TokenKind::LiteralSignedInteger,
+            ])? {
             Some(IntegerRangeBound::Positive(self.parse_integer_literal()?))
         } else {
             None
@@ -349,17 +363,24 @@ where
     }
 
     fn integer_range_bound_starts(&mut self) -> Result<bool, ParseError> {
-        Ok(matches!(
-            self.peek()?.map(|token| token.kind),
-            Some(TokenKind::Minus | TokenKind::LiteralInteger)
-        ))
+        self.is_at_any(&[
+            TokenKind::Minus,
+            TokenKind::LiteralInteger,
+            TokenKind::LiteralUnsignedInteger,
+            TokenKind::LiteralSignedInteger,
+        ])
     }
 
     fn parse_integer_range_bound(&mut self) -> Result<IntegerRangeBound<'arena>, ParseError> {
         let minus = self.eat_optional(TokenKind::Minus)?;
-        if !self.is_at(TokenKind::LiteralInteger)? {
+        if !self.is_at_any(&[
+            TokenKind::LiteralInteger,
+            TokenKind::LiteralUnsignedInteger,
+            TokenKind::LiteralSignedInteger,
+        ])? {
             return Err(self.unexpected(Expected::Description("an integer literal range bound")));
         }
+
         let literal = self.parse_integer_literal()?;
 
         Ok(minus.map_or(IntegerRangeBound::Positive(literal), |minus| {
@@ -696,6 +717,8 @@ where
                     token.kind,
                     TokenKind::LiteralString
                         | TokenKind::LiteralInteger
+                        | TokenKind::LiteralSignedInteger
+                        | TokenKind::LiteralUnsignedInteger
                         | TokenKind::True
                         | TokenKind::False
                 ) {
@@ -812,14 +835,17 @@ where
                     } else {
                         Some(self.parse_type()?)
                     };
+
                 trailing_type = Some(TrailingType { ellipsis, r#type });
                 if self.is_at(TokenKind::Comma)? {
                     return Err(self.unexpected(Expected::Description(
                         "a tuple rest type must be the final tuple element",
                     )));
                 }
+
                 break;
             }
+
             elements.push(self.parse_type()?.clone());
         }
 

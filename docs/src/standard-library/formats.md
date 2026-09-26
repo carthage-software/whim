@@ -28,7 +28,7 @@ URL-safe text uses a different alphabet from normal Base64.
 `Json\Value` is:
 
 ```text
-null|bool|int|float|string|vec<Value>|dict<string, Value>
+null|bool|int|uint|float|string|vec<Value>|dict<string, Value>
 ```
 
 `Json\encode($value, $pretty)` accepts that union or an object implementing
@@ -45,6 +45,16 @@ assert!($decoded is dict<string, Json\Value>);
 
 JSON objects have string keys. The encoder rejects non-finite floats. Bad text
 throws `DecodingException`; an unsupported value throws `EncodingException`.
+
+Unsigned encoding writes exact decimal digits. Integer tokens decode as `int`
+when they fit, then `uint` when they fit the unsigned range; integers outside
+both ranges throw `DecodingException`. Decimal points and exponents select
+float. `-0` decodes as signed zero. Oversized integer tokens do not fall back
+to a rounded float.
+
+JSON has no unsigned marker. Encoding `42u` and decoding it returns signed `42`.
+The unsigned maximum can round-trip with its kind intact because it exceeds
+the signed range. Unsigned dict keys remain invalid JSON object keys.
 
 ## CSV
 

@@ -6,6 +6,7 @@ use std::hash::BuildHasher;
 use std::hash::Hasher;
 
 const INT_SEED_DOMAIN: u64 = 0x7df2_720f_8d2d_878d;
+const UINT_SEED_DOMAIN: u64 = 0x8c91_b41e_6de2_571b;
 const BOOL_SEED_DOMAIN: u64 = 0xf8d2_84dd_44bd_aebd;
 const SHORT_STRING_SEED_DOMAIN: u64 = 0x65a1_14da_5446_886d;
 const STRING_HASH_DOMAIN: u8 = 2;
@@ -13,6 +14,7 @@ const STRING_HASH_DOMAIN: u8 = 2;
 pub(crate) struct HashState {
     random: RandomState,
     int_seed: u64,
+    uint_seed: u64,
     bool_seed: u64,
     short_string_seed: u64,
 }
@@ -27,6 +29,7 @@ impl HashState {
         let random = RandomState::new();
         Self {
             int_seed: derive_seed(&random, INT_SEED_DOMAIN),
+            uint_seed: derive_seed(&random, UINT_SEED_DOMAIN),
             bool_seed: derive_seed(&random, BOOL_SEED_DOMAIN),
             short_string_seed: derive_seed(&random, SHORT_STRING_SEED_DOMAIN),
             random,
@@ -37,6 +40,12 @@ impl HashState {
     #[inline(always)]
     pub(crate) const fn hash_int(&self, value: i64) -> u64 {
         permute(value.cast_unsigned(), self.int_seed)
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub(crate) const fn hash_uint(&self, value: u64) -> u64 {
+        permute(value, self.uint_seed)
     }
 
     #[must_use]

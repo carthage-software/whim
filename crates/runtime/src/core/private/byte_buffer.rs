@@ -6,6 +6,7 @@ use whim_base::unwrap_option_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 use whim_value::Value;
+use whim_value::ValueView;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -168,7 +169,7 @@ impl ByteBuffer {
     }
 
     #[whim_method(
-        "appendInteger(int $value, int $width, bool $little): void",
+        "appendInteger(int|uint $value, int $width, bool $little): void",
         no_track_caller,
         no_trace_boundary
     )]
@@ -176,7 +177,12 @@ impl ByteBuffer {
         context: &mut Context<'_, '_, '_>,
         arguments: Arguments<'_>,
     ) -> Result<Value, Throw> {
-        let value = arguments.int(0);
+        let value = arguments.local(0);
+        let value = match value.transparent() {
+            ValueView::Int(value) => value.cast_unsigned(),
+            ValueView::Uint(value) => *value,
+            _ => return Err(context.type_error("an integer is required")),
+        };
         let width = width(context, arguments.int(1))?;
         let little = arguments.bool(2);
         let mut bytes = context.state::<Self>()?.bytes.borrow_mut();
@@ -249,7 +255,7 @@ fn value_error(context: &mut Context<'_, '_, '_>, message: &str) -> Throw {
     context.vm.throw(class, message, 0)
 }
 
-fn append_integer_bytes(bytes: &mut Vec<u8>, value: i64, width: usize, little: bool) {
+fn append_integer_bytes(bytes: &mut Vec<u8>, value: u64, width: usize, little: bool) {
     let encoded = if little {
         value.to_le_bytes()
     } else {

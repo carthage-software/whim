@@ -54,7 +54,7 @@ assert!(
   ],
 );
 
-assert!(Json\decode('18446744073709551615') == 18446744073709551615.0);
+assert!(Json\decode('18446744073709551615') == 18446744073709551615u);
 $assertion_value_30 = fn(): Value => Json\decode('1e9999');
 $assertion_error_30 = null;
 try {

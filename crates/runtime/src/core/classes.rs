@@ -163,7 +163,7 @@ pub(crate) fn abstract_method_body<'call>(
 
 static ENUM_BACKING_PARAMETER: [ParameterSpec; 1] = [ParameterSpec {
     name: "value",
-    type_spec: TypeSpec::Union(&[TypeSpec::Int, TypeSpec::String]),
+    type_spec: TypeSpec::Union(&[TypeSpec::Int, TypeSpec::Uint, TypeSpec::String]),
     optional: false,
     default: None,
     sensitive: false,
@@ -188,7 +188,7 @@ pub(crate) fn enum_from_body() -> BuiltInMethodBody {
         type_parameters: &[],
         parameters: &ENUM_BACKING_PARAMETER,
         return_spec: TypeSpec::Static,
-        signature: "fn(int|string): static",
+        signature: "fn(int|uint|string): static",
         attributes: BuiltInCallableAttributes::for_whim_symbol("Whim\\Enum"),
     }
 }
@@ -199,7 +199,7 @@ pub(crate) fn enum_try_from_body() -> BuiltInMethodBody {
         type_parameters: &[],
         parameters: &ENUM_BACKING_PARAMETER,
         return_spec: TypeSpec::Optional(&ENUM_STATIC_TYPE),
-        signature: "fn(int|string): null|static",
+        signature: "fn(int|uint|string): null|static",
         attributes: BuiltInCallableAttributes::for_whim_symbol("Whim\\Enum"),
     }
 }

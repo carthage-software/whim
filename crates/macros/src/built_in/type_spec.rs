@@ -8,6 +8,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use whim_syn::cst::atom::Literal;
+use whim_syn::cst::atom::LiteralInteger;
 use whim_syn::cst::r#type::ArrayType;
 use whim_syn::cst::r#type::DictType;
 use whim_syn::cst::r#type::FunctionType;
@@ -30,6 +31,7 @@ pub(super) fn type_spec(
 
     let spec = match subject {
         Type::Int(_) => quote!(#path::Int),
+        Type::Uint(_) => quote!(#path::Uint),
         Type::IntegerRange(range) => integer_range_spec(range, &path)?,
         Type::Float(_) => quote!(#path::Float),
         Type::Bool(_) => quote!(#path::Bool),
@@ -293,6 +295,7 @@ pub(super) fn base_spec(
 pub(super) fn render(subject: &Type<'_>) -> String {
     match subject {
         Type::Int(_) => "int".to_owned(),
+        Type::Uint(_) => "uint".to_owned(),
         Type::Float(_) => "float".to_owned(),
         Type::Bool(_) => "bool".to_owned(),
         Type::String(_) => "string".to_owned(),
@@ -419,6 +422,50 @@ fn integer_range_spec(
     range: &IntegerRangeType<'_>,
     path: &TokenStream,
 ) -> syn::Result<TokenStream> {
+    let bounds = range.lower.iter().chain(range.upper.iter());
+    if bounds
+        .clone()
+        .any(|bound| bound_literal(bound).is_unsigned())
+    {
+        if bounds.clone().any(|bound| bound_literal(bound).is_signed()) {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                "integer range bounds must have the same signedness",
+            ));
+        }
+
+        let unsigned_bound = |bound: &IntegerRangeBound<'_>| {
+            let literal = bound_literal(bound);
+            if matches!(bound, IntegerRangeBound::Negative { .. }) && literal.value != 0 {
+                Err(syn::Error::new(
+                    Span::call_site(),
+                    "an unsigned literal cannot be negative",
+                ))
+            } else {
+                Ok(literal.value)
+            }
+        };
+
+        let min = range.lower.as_ref().map(unsigned_bound).transpose()?;
+        let mut max = range.upper.as_ref().map(unsigned_bound).transpose()?;
+        if matches!(range.operator, IntegerRangeOperator::Exclusive(_))
+            && let Some(upper) = max
+        {
+            let Some(inclusive) = upper.checked_sub(1) else {
+                return Ok(quote!(#path::Never));
+            };
+            max = Some(inclusive);
+        }
+
+        if min.zip(max).is_some_and(|(min, max)| min > max) {
+            return Ok(quote!(#path::Never));
+        }
+
+        let min = option_integer(min);
+        let max = option_integer(max);
+        return Ok(quote!(#path::UintRange(#min, #max)));
+    }
+
     let min = range.lower.as_ref().map(integer_bound).transpose()?;
     let mut max = range.upper.as_ref().map(integer_bound).transpose()?;
     if matches!(range.operator, IntegerRangeOperator::Exclusive(_))
@@ -429,12 +476,15 @@ fn integer_range_spec(
         };
         max = Some(inclusive);
     }
+
     if min.zip(max).is_some_and(|(min, max)| min > max) {
         return Ok(quote!(#path::Never));
     }
+
     if min.is_none_or(|min| min == i64::MIN) && max.is_none_or(|max| max == i64::MAX) {
         return Ok(quote!(#path::Int));
     }
+
     let min = option_integer(min);
     let max = option_integer(max);
 
@@ -444,6 +494,13 @@ fn integer_range_spec(
 fn string_length_spec(subject: &StringLength<'_>, path: &TokenStream) -> syn::Result<TokenStream> {
     let (min, max) = match subject {
         StringLength::Exact(literal) => {
+            if literal.is_unsigned() {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "a string length must be signed",
+                ));
+            }
+
             let value = i64::try_from(literal.value)
                 .map_err(|_| syn::Error::new(Span::call_site(), "string length is too large"))?;
             (value, Some(value))
@@ -464,12 +521,15 @@ fn string_length_spec(subject: &StringLength<'_>, path: &TokenStream) -> syn::Re
                 };
                 max = Some(inclusive);
             }
+
             (min, max)
         }
     };
+
     if max.is_some_and(|max| min > max) {
         return Ok(quote!(#path::Never));
     }
+
     if min == 0 && max.is_none() {
         return Ok(quote!(#path::String));
     }
@@ -479,6 +539,13 @@ fn string_length_spec(subject: &StringLength<'_>, path: &TokenStream) -> syn::Re
 }
 
 fn integer_bound(bound: &IntegerRangeBound<'_>) -> syn::Result<i64> {
+    if bound_literal(bound).is_unsigned() {
+        return Err(syn::Error::new(
+            Span::call_site(),
+            "a signed integer bound is required",
+        ));
+    }
+
     match bound {
         IntegerRangeBound::Positive(literal) => i64::try_from(literal.value)
             .map_err(|_| syn::Error::new(Span::call_site(), "integer range bound is too large")),
@@ -493,7 +560,15 @@ fn integer_bound(bound: &IntegerRangeBound<'_>) -> syn::Result<i64> {
     }
 }
 
-fn option_integer(value: Option<i64>) -> TokenStream {
+fn bound_literal<'a>(bound: &'a IntegerRangeBound<'a>) -> &'a LiteralInteger<'a> {
+    match bound {
+        IntegerRangeBound::Positive(literal) | IntegerRangeBound::Negative { literal, .. } => {
+            literal
+        }
+    }
+}
+
+fn option_integer<T: quote::ToTokens>(value: Option<T>) -> TokenStream {
     match value {
         Some(value) => quote!(::core::option::Option::Some(#value)),
         None => quote!(::core::option::Option::None),
@@ -535,7 +610,7 @@ fn render_literal(literal: &Literal<'_>) -> String {
         Literal::True(_) => "true".to_owned(),
         Literal::False(_) => "false".to_owned(),
         Literal::Null(_) => "null".to_owned(),
-        Literal::Integer(integer) => integer.value.to_string(),
+        Literal::Integer(integer) => integer.raw.to_owned(),
         Literal::Float(float) => float.value.to_string(),
         Literal::String(string) => string.raw.to_owned(),
     }

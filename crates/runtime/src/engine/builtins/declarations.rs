@@ -174,6 +174,7 @@ fn install_enum_members(class: &mut RuntimeClass, heap: &Heap, id: ClassId, spec
             default: None,
             declared_type: Some(match backing {
                 EnumBacking::Int => TypeDescriptor::Int,
+                EnumBacking::Uint => TypeDescriptor::Uint,
                 EnumBacking::String => TypeDescriptor::String,
             }),
         });
@@ -607,6 +608,10 @@ impl RuntimeTables {
         backing: Option<EnumBacking>,
     ) {
         let (protocol_name, type_arguments) = match backing {
+            Some(EnumBacking::Uint) => (
+                classes::names::BACKED_ENUM,
+                Some(vec![TypeDescriptor::Uint]),
+            ),
             None => (classes::names::UNIT_ENUM, None),
             Some(EnumBacking::Int) => {
                 (classes::names::BACKED_ENUM, Some(vec![TypeDescriptor::Int]))

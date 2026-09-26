@@ -20,6 +20,7 @@ use whim_bytecode::unit::CompiledTypeParameter;
 use whim_bytecode::unit::Variance;
 use whim_bytecode::unit::Visibility;
 use whim_value::Value;
+use whim_value::ValueView;
 use whim_value::array::ArrayTypeCheck;
 use whim_value::array::ArrayTypeCheckId;
 use whim_value::dict::DictObject;
@@ -86,6 +87,7 @@ impl Deref for ResolvedElementDescriptor<'_> {
 fn key_ref_value(key: KeyRef<'_>) -> Value {
     match key {
         KeyRef::Int(key) => Value::int(key),
+        KeyRef::Uint(key) => Value::uint(key),
         KeyRef::Bool(key) => Value::bool(key),
         KeyRef::String(key) => Value::string(key.clone()),
         KeyRef::ShortString(key) => Value::short_string(key),
@@ -95,6 +97,7 @@ fn key_ref_value(key: KeyRef<'_>) -> Value {
 fn key_value(key: Key) -> Value {
     match key {
         Key::Int(key) => Value::int(key),
+        Key::Uint(key) => Value::uint(key),
         Key::Bool(key) => Value::bool(key),
         Key::String(key) => Value::string(key),
         Key::ShortString(key) => Value::short_string(key),
@@ -105,6 +108,7 @@ fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
     match (left, right) {
         (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
         (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
+        (ShapeKey::Uint(left), ShapeKey::Uint(right)) => left == right,
         (ShapeKey::String(left), ShapeKey::String(right)) => left.as_bytes() == right.as_bytes(),
         _ => false,
     }
@@ -115,6 +119,7 @@ fn shape_key_descriptor(key: &ShapeKey) -> TypeDescriptor {
         ShapeKey::Bool(true) => TypeDescriptor::TrueLiteral,
         ShapeKey::Bool(false) => TypeDescriptor::FalseLiteral,
         ShapeKey::Int(key) => TypeDescriptor::IntLiteral(*key),
+        ShapeKey::Uint(key) => TypeDescriptor::UintLiteral(*key),
         ShapeKey::String(key) => TypeDescriptor::StringLiteral(key.clone()),
     }
 }
@@ -448,6 +453,7 @@ impl VirtualMachine<'_> {
             TypeDescriptor::TrueLiteral => Some(Value::bool(true)),
             TypeDescriptor::FalseLiteral => Some(Value::bool(false)),
             TypeDescriptor::IntLiteral(value) => Some(Value::int(value)),
+            TypeDescriptor::UintLiteral(value) => Some(Value::uint(value)),
             TypeDescriptor::FloatLiteral(value) => Some(Value::float(value)),
             TypeDescriptor::StringLiteral(value) => {
                 Some(Value::from_string_bytes(&self.heap, value.as_bytes()))
@@ -551,6 +557,9 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::Null
             | TypeDescriptor::Bool
             | TypeDescriptor::Int
+            | TypeDescriptor::Uint
+            | TypeDescriptor::UintLiteral(_)
+            | TypeDescriptor::UintRange { .. }
             | TypeDescriptor::Float
             | TypeDescriptor::String
             | TypeDescriptor::StringLength { .. }
@@ -576,10 +585,6 @@ impl VirtualMachine<'_> {
         }
     }
 
-    /// Performs an explicit `as`/`?as` conversion. Newtypes are the only
-    /// descriptors whose cast changes a value: casting to one adds or
-    /// replaces its outer nominal tag, while casting from one to an ordinary
-    /// backing type removes all nominal layers.
     pub(in crate::vm) fn cast_value(
         &mut self,
         descriptor: &TypeDescriptor,
@@ -673,8 +678,101 @@ impl VirtualMachine<'_> {
         if self.check_descriptor(&target, &candidate, called, environment, 0)? {
             Ok(Some(candidate))
         } else {
-            Ok(None)
+            Ok(self
+                .numeric_cast_candidates(&target, &candidate, called, environment, 0)?
+                .into_iter()
+                .flatten()
+                .next())
         }
+    }
+
+    fn numeric_cast_candidates(
+        &mut self,
+        target: &TypeDescriptor,
+        value: &Value,
+        called: Option<ClassId>,
+        environment: TypeEnvironmentId,
+        depth: u32,
+    ) -> Result<[Option<Value>; 3], VirtualMachineControl> {
+        if depth > MAX_TYPE_DEPTH_U32 || !(value.is_int() || value.is_uint() || value.is_float()) {
+            return Ok([None, None, None]);
+        }
+        let target = self.substitute_descriptor(target, environment, depth + 1);
+        if let Some(expanded) = self.expand_type_alias_once(&target, depth + 1)? {
+            return self.numeric_cast_candidates(&expanded, value, called, environment, depth + 1);
+        }
+        let mut candidates: [Option<Value>; 3] = [None, None, None];
+        match &target {
+            TypeDescriptor::Union(members) | TypeDescriptor::Intersection(members) => {
+                for member in members {
+                    for candidate in self
+                        .numeric_cast_candidates(member, value, called, environment, depth + 1)?
+                        .into_iter()
+                        .flatten()
+                    {
+                        if !candidates
+                            .iter()
+                            .flatten()
+                            .any(|previous| previous.kind_bit() == candidate.kind_bit())
+                            && let Some(slot) = candidates.iter_mut().find(|slot| slot.is_none())
+                        {
+                            *slot = Some(candidate);
+                        }
+                    }
+                }
+            }
+            TypeDescriptor::Int
+            | TypeDescriptor::IntLiteral(_)
+            | TypeDescriptor::IntRange { .. } => {
+                let converted = match value.transparent() {
+                    ValueView::Int(value) => Some(*value),
+                    ValueView::Uint(value) => i64::try_from(*value).ok(),
+                    ValueView::Float(value)
+                        if value.fract() == 0.0
+                            && (-9_223_372_036_854_775_808.0..9_223_372_036_854_775_808.0)
+                                .contains(value) =>
+                    {
+                        Some(*value as i64)
+                    }
+                    _ => None,
+                };
+                candidates[0] = converted.map(Value::int);
+            }
+            TypeDescriptor::Uint
+            | TypeDescriptor::UintLiteral(_)
+            | TypeDescriptor::UintRange { .. } => {
+                let converted = match value.transparent() {
+                    ValueView::Uint(value) => Some(*value),
+                    ValueView::Int(value) => u64::try_from(*value).ok(),
+                    ValueView::Float(value)
+                        if value.fract() == 0.0
+                            && (0.0..18_446_744_073_709_551_616.0).contains(value) =>
+                    {
+                        Some(*value as u64)
+                    }
+                    _ => None,
+                };
+                candidates[0] = converted.map(Value::uint);
+            }
+            TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => {
+                let converted = match value.transparent() {
+                    ValueView::Int(value) => Some(*value as f64),
+                    ValueView::Uint(value) => Some(*value as f64),
+                    ValueView::Float(value) => Some(*value),
+                    _ => None,
+                };
+                candidates[0] = converted.map(Value::float);
+            }
+            _ => {}
+        }
+        for candidate in &mut candidates {
+            if let Some(value) = candidate
+                && !self.check_descriptor(&target, value, called, environment, depth + 1)?
+            {
+                *candidate = None;
+            }
+        }
+        Ok(candidates)
     }
 
     pub(crate) fn descriptor_is_subtype(
@@ -951,9 +1049,27 @@ impl VirtualMachine<'_> {
             return Ok(false);
         }
         Ok(match (&actual, &expected) {
+            (TypeDescriptor::UintLiteral(value), TypeDescriptor::UintRange { min, max }) => {
+                min.is_none_or(|min| *value >= min) && max.is_none_or(|max| *value <= max)
+            }
+            (
+                TypeDescriptor::UintRange {
+                    min: actual_min,
+                    max: actual_max,
+                },
+                TypeDescriptor::UintRange {
+                    min: expected_min,
+                    max: expected_max,
+                },
+            ) => {
+                range_lower_contains(*expected_min, *actual_min)
+                    && range_upper_contains(*expected_max, *actual_max)
+            }
             (TypeDescriptor::TrueLiteral | TypeDescriptor::FalseLiteral, TypeDescriptor::Bool)
             | (TypeDescriptor::IntLiteral(_), TypeDescriptor::Int)
             | (TypeDescriptor::IntRange { .. }, TypeDescriptor::Int)
+            | (TypeDescriptor::UintLiteral(_), TypeDescriptor::Uint)
+            | (TypeDescriptor::UintRange { .. }, TypeDescriptor::Uint)
             | (TypeDescriptor::FloatLiteral(_), TypeDescriptor::Float)
             | (TypeDescriptor::StringLiteral(_), TypeDescriptor::String)
             | (TypeDescriptor::StringLength { .. }, TypeDescriptor::String) => true,
@@ -1257,6 +1373,7 @@ impl VirtualMachine<'_> {
                         ShapeKey::Bool(true) => TypeDescriptor::TrueLiteral,
                         ShapeKey::Bool(false) => TypeDescriptor::FalseLiteral,
                         ShapeKey::Int(_) => TypeDescriptor::Int,
+                        ShapeKey::Uint(_) => TypeDescriptor::Uint,
                         ShapeKey::String(_) => TypeDescriptor::String,
                     };
                     if !self.descriptor_is_subtype(&key, expected_key, environment, depth + 1)?
@@ -1881,6 +1998,26 @@ impl VirtualMachine<'_> {
             (TypeDescriptor::TrueLiteral, TypeDescriptor::FalseLiteral)
             | (TypeDescriptor::FalseLiteral, TypeDescriptor::TrueLiteral) => true,
             (TypeDescriptor::IntLiteral(left), TypeDescriptor::IntLiteral(right)) => left != right,
+            (TypeDescriptor::UintLiteral(left), TypeDescriptor::UintLiteral(right)) => {
+                left != right
+            }
+            (TypeDescriptor::UintLiteral(value), TypeDescriptor::UintRange { min, max })
+            | (TypeDescriptor::UintRange { min, max }, TypeDescriptor::UintLiteral(value)) => {
+                min.is_some_and(|min| *value < min) || max.is_some_and(|max| *value > max)
+            }
+            (
+                TypeDescriptor::UintRange {
+                    min: left_min,
+                    max: left_max,
+                },
+                TypeDescriptor::UintRange {
+                    min: right_min,
+                    max: right_max,
+                },
+            ) => {
+                left_max.is_some_and(|max| right_min.is_some_and(|min| max < min))
+                    || right_max.is_some_and(|max| left_min.is_some_and(|min| max < min))
+            }
             (TypeDescriptor::IntLiteral(value), TypeDescriptor::IntRange { min, max })
             | (TypeDescriptor::IntRange { min, max }, TypeDescriptor::IntLiteral(value)) => {
                 min.is_some_and(|min| *value < min) || max.is_some_and(|max| *value > max)
@@ -1936,6 +2073,9 @@ impl VirtualMachine<'_> {
     ) -> Result<Option<u8>, VirtualMachineControl> {
         Ok(match descriptor {
             TypeDescriptor::Null => Some(0),
+            TypeDescriptor::Uint
+            | TypeDescriptor::UintLiteral(_)
+            | TypeDescriptor::UintRange { .. } => Some(10),
             TypeDescriptor::Bool | TypeDescriptor::TrueLiteral | TypeDescriptor::FalseLiteral => {
                 Some(1)
             }
@@ -2621,6 +2761,11 @@ impl VirtualMachine<'_> {
             TypeDescriptor::Null => value.is_null(),
             TypeDescriptor::Bool => value.is_bool(),
             TypeDescriptor::Int => value.is_int(),
+            TypeDescriptor::Uint => value.is_uint(),
+            TypeDescriptor::UintLiteral(expected) => value.as_uint() == Some(*expected),
+            TypeDescriptor::UintRange { min, max } => value.as_uint().is_some_and(|value| {
+                min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
+            }),
             TypeDescriptor::Float => value.is_float(),
             TypeDescriptor::String => value.is_string(),
             TypeDescriptor::StringLength { min, max } => value
@@ -3088,6 +3233,7 @@ impl VirtualMachine<'_> {
                         let key = match key {
                             ShapeKey::Bool(key) => Key::Bool(*key),
                             ShapeKey::Int(key) => Key::Int(*key),
+                            ShapeKey::Uint(key) => Key::Uint(*key),
                             ShapeKey::String(key) => Key::String(key.to_handle()),
                         };
                         let Some(value) = dictionary.get(&key) else {
@@ -3107,6 +3253,9 @@ impl VirtualMachine<'_> {
                                 (ShapeKey::Int(expected), KeyRef::Int(actual)) => {
                                     *expected == actual
                                 }
+                                (ShapeKey::Uint(expected), KeyRef::Uint(actual)) => {
+                                    *expected == actual
+                                }
                                 (ShapeKey::String(expected), KeyRef::String(actual)) => {
                                     expected.as_bytes() == ByteStringObject::handle_bytes(actual)
                                 }
@@ -3119,6 +3268,7 @@ impl VirtualMachine<'_> {
                             }
                             let key_value = match key {
                                 KeyRef::Int(key) => Value::int(key),
+                                KeyRef::Uint(key) => Value::uint(key),
                                 KeyRef::Bool(key) => Value::bool(key),
                                 KeyRef::String(key) => Value::string(key.clone()),
                                 KeyRef::ShortString(key) => Value::short_string(key),
@@ -3327,7 +3477,7 @@ impl VirtualMachine<'_> {
     }
 }
 
-fn range_lower_contains(expected: Option<i64>, actual: Option<i64>) -> bool {
+fn range_lower_contains<T: Ord>(expected: Option<T>, actual: Option<T>) -> bool {
     match (expected, actual) {
         (None, _) => true,
         (Some(_), None) => false,
@@ -3335,7 +3485,7 @@ fn range_lower_contains(expected: Option<i64>, actual: Option<i64>) -> bool {
     }
 }
 
-fn range_upper_contains(expected: Option<i64>, actual: Option<i64>) -> bool {
+fn range_upper_contains<T: Ord>(expected: Option<T>, actual: Option<T>) -> bool {
     match (expected, actual) {
         (None, _) => true,
         (Some(_), None) => false,

@@ -43,8 +43,27 @@ macro_rules! write_proven_int_register {
     }};
 }
 
+macro_rules! write_proven_uint_register {
+    ($registers:expr, $register:expr, $value:expr) => {{
+        // SAFETY: verified bytecode keeps the register in the active frame.
+        let destination = unsafe { $registers.add($register.index() as usize) };
+        // SAFETY: the destination points to an initialized active-frame value.
+        debug_assert!(unsafe { &*destination }.is_uint());
+        // SAFETY: type flow proves the old value is an inline uint with no drop.
+        unsafe { destination.write(Value::uint($value)) };
+    }};
+}
+
 /// Requires tag dispatch to have already selected the variant.
 macro_rules! decode_instruction {
+    ($word:ident, $first:ident, { $($first_fields:tt)* } $(| $variant:ident, { $($fields:tt)* })+) => {
+        // SAFETY: dispatch matched one of these instruction tags.
+        let instruction = unsafe { $word.decode() };
+        let (Instruction::$first { $($first_fields)* } $(| Instruction::$variant { $($fields)* })+) = instruction else {
+            // SAFETY: `decode` must return the variant selected by the tag.
+            unsafe { unreachable_invariant("an instruction tag selects its own payload") }
+        };
+    };
     ($word:ident, $variant:ident, { $($fields:tt)* }) => {
         // SAFETY: dispatch matched the word's instruction tag.
         let instruction = unsafe { $word.decode() };
@@ -60,15 +79,15 @@ macro_rules! dispatch_instruction {
     (
         $word:ident {
             $(
-                Instruction::$variant:ident $( { $($fields:tt)* } )? => $body:block
+                $(Instruction::$variant:ident $( { $($fields:tt)* } )?)|+ => $body:block
             )*
             _ => $fallback:block
         }
     ) => {
         match $word.kind() {
             $(
-                InstructionKind::$variant => {
-                    decode_instruction!($word, $variant $(, { $($fields)* })?);
+                $(InstructionKind::$variant)|+ => {
+                    decode_instruction!($word, $($variant $(, { $($fields)* })?)|+);
                     $body
                 }
             )*
@@ -78,14 +97,14 @@ macro_rules! dispatch_instruction {
     (
         $word:ident {
             $(
-                Instruction::$variant:ident $( { $($fields:tt)* } )? => $body:block
+                $(Instruction::$variant:ident $( { $($fields:tt)* } )?)|+ => $body:block
             )*
         }
     ) => {
         match $word.kind() {
             $(
-                InstructionKind::$variant => {
-                    decode_instruction!($word, $variant $(, { $($fields)* })?);
+                $(InstructionKind::$variant)|+ => {
+                    decode_instruction!($word, $($variant $(, { $($fields)* })?)|+);
                     $body
                 }
             )*
@@ -194,17 +213,17 @@ macro_rules! binary_arithmetic {
     }};
 }
 
-/// Requires both operands to already be proven ints.
+/// Requires both operands to have the proven numeric kind.
 macro_rules! integer_arithmetic {
     ($self:ident, $registers:ident, $ip:ident, $floor:ident, $dispatch:lifetime,
-     $destination:ident, $left:ident, $right:ident, $operation:path, $operator:literal) => {{
-        // SAFETY: type flow proves both active-frame registers contain ints.
-        let left_value = unsafe { int_register($registers, $left) };
-        // SAFETY: type flow proves both active-frame registers contain ints.
-        let right_value = unsafe { int_register($registers, $right) };
+     $destination:ident, $left:ident, $right:ident, $read:path, $kind:ident, $operation:path, $operator:literal) => {{
+        // SAFETY: type flow proves the active-frame operands have this numeric kind.
+        let left_value = unsafe { $read($registers, $left) };
+        // SAFETY: type flow proves the active-frame operands have this numeric kind.
+        let right_value = unsafe { $read($registers, $right) };
         match $operation(left_value, right_value) {
             Ok(value) => {
-                write_register!($registers, $destination, Value::int(value));
+                write_register!($registers, $destination, Value::$kind(value));
             }
             Err(fault) => {
                 fail!(
@@ -212,7 +231,7 @@ macro_rules! integer_arithmetic {
                     $ip,
                     $floor,
                     $dispatch,
-                    $self.binary_fault(fault, $operator, "int", "int")
+                    $self.binary_fault(fault, $operator, stringify!($kind), stringify!($kind))
                 );
             }
         }

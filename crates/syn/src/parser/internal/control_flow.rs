@@ -337,8 +337,10 @@ where
                 if self.is_at(TokenKind::Comma)? {
                     commas.push(self.consume()?);
                 }
+
                 break;
             }
+
             let key = if self.is_at(TokenKind::Minus)? {
                 DictPatternKey::Integer {
                     minus: Some(self.expect_span(TokenKind::Minus)?),
@@ -349,6 +351,8 @@ where
                 if !matches!(
                     token.kind,
                     TokenKind::LiteralInteger
+                        | TokenKind::LiteralUnsignedInteger
+                        | TokenKind::LiteralSignedInteger
                         | TokenKind::LiteralString
                         | TokenKind::True
                         | TokenKind::False
@@ -361,6 +365,7 @@ where
                         token.compute_span(),
                     ));
                 }
+
                 match self.literal_of(token)? {
                     Literal::Integer(literal) => DictPatternKey::Integer {
                         minus: None,
@@ -372,6 +377,7 @@ where
                     _ => unreachable!("the token kind permits only dictionary key literals"),
                 }
             };
+
             let double_arrow = self.expect_span(TokenKind::EqualGreaterThan)?;
             let pattern = self.parse_match_pattern()?;
             entries.push(DictPatternEntry {
@@ -379,12 +385,14 @@ where
                 double_arrow,
                 pattern,
             });
+
             if self.is_at(TokenKind::Comma)? {
                 commas.push(self.consume()?);
             } else {
                 break;
             }
         }
+
         let right_bracket = self.expect_span(TokenKind::RightBracket)?;
 
         Ok(self.arena.alloc(Pattern::Dict(DictPattern {

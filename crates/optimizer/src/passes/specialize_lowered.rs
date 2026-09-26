@@ -23,6 +23,7 @@ enum KnownKind {
     Null,
     Bool,
     Int,
+    Uint,
     Float,
     String,
     Object,
@@ -286,9 +287,11 @@ fn specialize_return(
             }) =>
         {
             Some(match facts.get(source) {
-                KnownKind::Null | KnownKind::Bool | KnownKind::Int | KnownKind::Float => {
-                    Instruction::ReturnScalarUnchecked { source }
-                }
+                KnownKind::Null
+                | KnownKind::Bool
+                | KnownKind::Int
+                | KnownKind::Uint
+                | KnownKind::Float => Instruction::ReturnScalarUnchecked { source },
                 KnownKind::Object
                 | KnownKind::Vec
                 | KnownKind::Dict
@@ -316,6 +319,7 @@ fn return_kind_satisfies(
         TypeDescriptor::Null => kind == KnownKind::Null,
         TypeDescriptor::Bool => kind == KnownKind::Bool,
         TypeDescriptor::Int => kind == KnownKind::Int,
+        TypeDescriptor::Uint => kind == KnownKind::Uint,
         TypeDescriptor::Float => kind == KnownKind::Float,
         TypeDescriptor::String => kind == KnownKind::String,
         TypeDescriptor::Object => kind == KnownKind::Object,
@@ -344,6 +348,8 @@ fn return_kind_satisfies(
         | TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::IntRange { .. }
         | TypeDescriptor::FloatLiteral(_)
         | TypeDescriptor::StringLength { .. }
@@ -412,6 +418,7 @@ fn specialize_arithmetic(instruction: Instruction, facts: &Facts) -> Option<Inst
     super::specialize_arithmetic::specialize_with(
         instruction,
         |register| facts.get(register) == KnownKind::Int,
+        |register| facts.get(register) == KnownKind::Uint,
         |register| facts.get(register) == KnownKind::Float,
     )
 }
@@ -421,6 +428,7 @@ fn specialize_array(instruction: Instruction, facts: &Facts) -> Option<Instructi
         instruction,
         |register| facts.get(register) == KnownKind::String,
         |register| facts.get(register) == KnownKind::Int,
+        |register| facts.get(register) == KnownKind::Uint,
         |register| facts.get(register) == KnownKind::Vec,
         |register| facts.get(register) == KnownKind::Dict,
         |_, _| ArrayValueMode::Generic,
@@ -431,14 +439,17 @@ fn specialize_comparison(instruction: Instruction, facts: &Facts) -> Option<Inst
     super::specialize_comparison::specialize_with(
         instruction,
         |register| facts.get(register) == KnownKind::Int,
+        |register| facts.get(register) == KnownKind::Uint,
         |register| facts.get(register) == KnownKind::String,
     )
 }
 
 fn specialize_counter_loop(instruction: Instruction, facts: &Facts) -> Option<Instruction> {
-    super::specialize_counter_loop::specialize_with(instruction, |register| {
-        facts.get(register) == KnownKind::Int
-    })
+    super::specialize_counter_loop::specialize_with(
+        instruction,
+        |register| facts.get(register) == KnownKind::Int,
+        |register| facts.get(register) == KnownKind::Uint,
+    )
 }
 
 fn transfer(
@@ -454,6 +465,7 @@ fn transfer(
         Instruction::Negate { source, .. }
         | Instruction::UnaryPlus { source, .. }
         | Instruction::AddImmediate { source, .. }
+        | Instruction::Step { source, .. }
         | Instruction::SubtractImmediate { source, .. }
         | Instruction::IncrementJump { target: source, .. }
         | Instruction::CounterLoop {
@@ -514,14 +526,53 @@ fn transfer(
         | Instruction::IntModuloImmediate { destination, .. }
         | Instruction::Length { destination, .. }
         | Instruction::StringLength { destination, .. }
-        | Instruction::Modulo { destination, .. }
-        | Instruction::BitwiseAnd { destination, .. }
-        | Instruction::BitwiseOr { destination, .. }
-        | Instruction::BitwiseXor { destination, .. }
-        | Instruction::BitwiseNot { destination, .. }
-        | Instruction::ShiftLeft { destination, .. }
-        | Instruction::ShiftRight { destination, .. }
         | Instruction::Compare { destination, .. } => (destination, KnownKind::Int),
+        Instruction::LoadUint { destination, .. }
+        | Instruction::UintAdd { destination, .. }
+        | Instruction::UintSubtract { destination, .. }
+        | Instruction::UintMultiply { destination, .. }
+        | Instruction::UintModulo { destination, .. }
+        | Instruction::UintBitwiseAnd { destination, .. }
+        | Instruction::UintBitwiseOr { destination, .. }
+        | Instruction::UintBitwiseXor { destination, .. }
+        | Instruction::UintBitwiseNot { destination, .. }
+        | Instruction::UintShiftLeft { destination, .. }
+        | Instruction::UintShiftRight { destination, .. }
+        | Instruction::UintAddImmediate { destination, .. }
+        | Instruction::UintSubtractImmediate { destination, .. }
+        | Instruction::UintMultiplyImmediate { destination, .. }
+        | Instruction::UintModuloImmediate { destination, .. }
+        | Instruction::UintStep { destination, .. }
+        | Instruction::UintAddAssign {
+            target: destination,
+            ..
+        }
+        | Instruction::UintCounterLoop {
+            counter: destination,
+            ..
+        } => (destination, KnownKind::Uint),
+        Instruction::Modulo {
+            destination, left, ..
+        }
+        | Instruction::BitwiseAnd {
+            destination, left, ..
+        }
+        | Instruction::BitwiseOr {
+            destination, left, ..
+        }
+        | Instruction::BitwiseXor {
+            destination, left, ..
+        }
+        | Instruction::ShiftLeft {
+            destination, left, ..
+        }
+        | Instruction::ShiftRight {
+            destination, left, ..
+        } => (destination, facts.get(left)),
+        Instruction::BitwiseNot {
+            destination,
+            source,
+        } => (destination, facts.get(source)),
         Instruction::FloatAdd { destination, .. }
         | Instruction::FloatSubtract { destination, .. }
         | Instruction::FloatMultiply { destination, .. }
@@ -560,6 +611,7 @@ fn transfer(
         Instruction::Negate { destination, .. }
         | Instruction::UnaryPlus { destination, .. }
         | Instruction::AddImmediate { destination, .. }
+        | Instruction::Step { destination, .. }
         | Instruction::SubtractImmediate { destination, .. } => (destination, moved),
         Instruction::Concatenate { destination, .. }
         | Instruction::ConcatenateRightConstant { destination, .. }
@@ -601,6 +653,11 @@ fn transfer(
             value_mode,
             ..
         }
+        | Instruction::DictIndexGetUintKey {
+            destination,
+            value_mode,
+            ..
+        }
         | Instruction::DictIndexGetStringKey {
             destination,
             value_mode,
@@ -619,6 +676,7 @@ fn literal_kind(literal: &Literal) -> KnownKind {
         Literal::Null => KnownKind::Null,
         Literal::Bool(_) => KnownKind::Bool,
         Literal::Int(_) => KnownKind::Int,
+        Literal::Uint(_) => KnownKind::Uint,
         Literal::Float(_) => KnownKind::Float,
         Literal::String(_) => KnownKind::String,
     }
@@ -627,6 +685,7 @@ fn literal_kind(literal: &Literal) -> KnownKind {
 fn array_value_kind(mode: ArrayValueMode) -> KnownKind {
     match mode {
         ArrayValueMode::Int => KnownKind::Int,
+        ArrayValueMode::Uint => KnownKind::Uint,
         ArrayValueMode::Float => KnownKind::Float,
         ArrayValueMode::Generic => KnownKind::Unknown,
     }
@@ -635,6 +694,7 @@ fn array_value_kind(mode: ArrayValueMode) -> KnownKind {
 fn same_numeric_kind(left: KnownKind, right: KnownKind) -> KnownKind {
     match (left, right) {
         (KnownKind::Int, KnownKind::Int) => KnownKind::Int,
+        (KnownKind::Uint, KnownKind::Uint) => KnownKind::Uint,
         (KnownKind::Float, KnownKind::Float) => KnownKind::Float,
         _ => KnownKind::Unknown,
     }
@@ -649,6 +709,9 @@ fn descriptor_kind(descriptor: &TypeDescriptor) -> KnownKind {
         TypeDescriptor::Int | TypeDescriptor::IntLiteral(_) | TypeDescriptor::IntRange { .. } => {
             KnownKind::Int
         }
+        TypeDescriptor::Uint
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. } => KnownKind::Uint,
         TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => KnownKind::Float,
         TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -719,6 +782,8 @@ fn has_no_fallthrough(instruction: Instruction) -> bool {
             | Instruction::SwitchTuplePattern { .. }
             | Instruction::IntRangeJumpIf { .. }
             | Instruction::IntRangeJumpUnless { .. }
+            | Instruction::UintRangeJumpIf { .. }
+            | Instruction::UintRangeJumpUnless { .. }
             | Instruction::BoolPatternBranch { .. }
             | Instruction::Return { .. }
             | Instruction::ReturnUnchecked { .. }
@@ -728,6 +793,7 @@ fn has_no_fallthrough(instruction: Instruction) -> bool {
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }

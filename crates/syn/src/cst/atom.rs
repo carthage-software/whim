@@ -99,12 +99,35 @@ pub struct LiteralString<'arena> {
     pub value: &'arena [u8],
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum LiteralIntegerSuffix {
+    // `u` or `U`
+    Unsigned,
+    // `i` or `I`
+    Signed,
+}
+
 /// An integer literal.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct LiteralInteger<'arena> {
     pub span: Span,
     pub raw: &'arena str,
     pub value: u64,
+    pub suffix: Option<LiteralIntegerSuffix>,
+}
+
+impl LiteralInteger<'_> {
+    #[inline]
+    #[must_use]
+    pub const fn is_signed(&self) -> bool {
+        matches!(self.suffix, None | Some(LiteralIntegerSuffix::Signed))
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_unsigned(&self) -> bool {
+        matches!(self.suffix, Some(LiteralIntegerSuffix::Unsigned))
+    }
 }
 
 /// A float literal.

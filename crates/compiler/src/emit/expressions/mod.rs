@@ -10,6 +10,7 @@ use whim_bytecode::instruction::operands::AsMode;
 use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateUint;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::array::DictExpression;
@@ -62,6 +63,7 @@ fn literal_check_descriptor(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
+        | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::FloatLiteral(_)
         | TypeDescriptor::StringLiteral(_) => true,
         TypeDescriptor::Union(members) | TypeDescriptor::Intersection(members) => {
@@ -477,6 +479,7 @@ impl BodyCompiler<'_, '_> {
             | TypeDescriptor::TrueLiteral
             | TypeDescriptor::FalseLiteral
             | TypeDescriptor::IntLiteral(_)
+            | TypeDescriptor::UintLiteral(_)
             | TypeDescriptor::FloatLiteral(_)
             | TypeDescriptor::StringLiteral(_) => {
                 self.emit_literal_equality(source, destination, descriptor, span)?;
@@ -542,6 +545,9 @@ impl BodyCompiler<'_, '_> {
             }
             TypeDescriptor::IntLiteral(value) => {
                 self.load_integer(expected, *value, span)?;
+            }
+            TypeDescriptor::UintLiteral(value) => {
+                self.load_unsigned_integer(expected, *value, span)?;
             }
             TypeDescriptor::FloatLiteral(value) => {
                 let constant = self.add_constant(BytecodeLiteral::Float(*value), span)?;
@@ -736,8 +742,12 @@ impl BodyCompiler<'_, '_> {
                     .emit(Instruction::LoadFalse { destination }, keyword.span());
             }
             Literal::Integer(integer) => {
-                let value = integer_gate(integer.value, false, integer.span)?;
-                self.load_integer(destination, value, integer.span)?;
+                if integer.is_unsigned() {
+                    self.load_unsigned_integer(destination, integer.value, integer.span)?;
+                } else {
+                    let value = integer_gate(integer.value, false, integer.span)?;
+                    self.load_integer(destination, value, integer.span)?;
+                }
             }
             Literal::Float(float) => {
                 let constant =
@@ -795,6 +805,27 @@ impl BodyCompiler<'_, '_> {
         Ok(())
     }
 
+    fn load_unsigned_integer(
+        &mut self,
+        destination: Register,
+        value: u64,
+        span: Span,
+    ) -> Result<(), CompileError> {
+        let instruction = if let Ok(immediate) = u16::try_from(value) {
+            Instruction::LoadUint {
+                destination,
+                immediate: ImmediateUint::new(immediate),
+            }
+        } else {
+            Instruction::LoadConstant {
+                destination,
+                constant: self.add_constant(BytecodeLiteral::Uint(value), span)?,
+            }
+        };
+        self.chunk.emit(instruction, span);
+        Ok(())
+    }
+
     pub(in crate::emit) fn string_constant(
         &mut self,
         bytes: &[u8],
@@ -829,6 +860,7 @@ fn check_duplicate_dict_keys(dictionary: &DictExpression<'_>) -> Result<(), Comp
 #[derive(Hash, PartialEq, Eq)]
 enum ConstantDictKey<'arena> {
     Integer(i128),
+    UnsignedInteger(u64),
     Boolean(bool),
     String(&'arena [u8]),
 }
@@ -836,6 +868,9 @@ enum ConstantDictKey<'arena> {
 fn constant_dict_key<'arena>(expression: &Expression<'arena>) -> Option<ConstantDictKey<'arena>> {
     match expression {
         Expression::Parenthesized(expression) => constant_dict_key(expression.expression),
+        Expression::Literal(Literal::Integer(integer)) if integer.is_unsigned() => {
+            Some(ConstantDictKey::UnsignedInteger(integer.value))
+        }
         Expression::Literal(Literal::Integer(integer)) => {
             Some(ConstantDictKey::Integer(i128::from(integer.value)))
         }
@@ -848,6 +883,9 @@ fn constant_dict_key<'arena>(expression: &Expression<'arena>) -> Option<Constant
             let Expression::Literal(Literal::Integer(integer)) = expression.operand else {
                 return None;
             };
+            if integer.is_unsigned() {
+                return (integer.value == 0).then_some(ConstantDictKey::UnsignedInteger(0));
+            }
             Some(ConstantDictKey::Integer(-i128::from(integer.value)))
         }
         _ => None,

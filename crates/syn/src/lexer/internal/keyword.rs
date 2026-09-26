@@ -66,6 +66,7 @@ fn lookup_len4(bytes: &[u8]) -> Option<TokenKind> {
             _ => None,
         },
         b'v' if bytes == b"void" => Some(TokenKind::Void),
+        b'u' if bytes == b"uint" => Some(TokenKind::Uint),
         _ => None,
     }
 }

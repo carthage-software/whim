@@ -33,14 +33,17 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function u8(Uint8 $value): self {
+  public function u8(Uint8|0u..=255u $value): self {
     $this->buffer->appendInteger($value, 1, false);
     return $this;
   }
 
   #[AlwaysInline]
   #[MustUse]
-  public function u16(Uint16 $value, null|Endianness $endianness = null): self {
+  public function u16(
+    Uint16|0u..=65_535u $value,
+    null|Endianness $endianness = null,
+  ): self {
     $this->buffer->appendInteger(
       $value,
       2,
@@ -52,7 +55,10 @@ final class MemoryWriter implements BufferedWriter, Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function u32(Uint32 $value, null|Endianness $endianness = null): self {
+  public function u32(
+    Uint32|0u..=4_294_967_295u $value,
+    null|Endianness $endianness = null,
+  ): self {
     $this->buffer->appendInteger(
       $value,
       4,
@@ -65,7 +71,7 @@ final class MemoryWriter implements BufferedWriter, Default {
   #[AlwaysInline]
   #[MustUse]
   public function u64(
-    NonNegativeInt $value,
+    NonNegativeInt|uint $value,
     null|Endianness $endianness = null,
   ): self {
     $this->buffer->appendInteger(

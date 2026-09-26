@@ -60,6 +60,7 @@ impl Serialize for JsonSource<'_> {
             ValueView::Null => serializer.serialize_unit(),
             ValueView::Bool(value) => serializer.serialize_bool(*value),
             ValueView::Int(value) => serializer.serialize_i64(*value),
+            ValueView::Uint(value) => serializer.serialize_u64(*value),
             ValueView::Float(value) if value.is_finite() => serializer.serialize_f64(*value),
             ValueView::Float(_) => Err(S::Error::custom(
                 "the value holds a float JSON cannot represent",
@@ -83,7 +84,7 @@ impl Serialize for JsonSource<'_> {
                     let bytes = match &key {
                         KeyRef::String(string) => ByteStringObject::handle_bytes(string),
                         KeyRef::ShortString(short) => short.as_bytes(),
-                        KeyRef::Int(_) | KeyRef::Bool(_) => {
+                        KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) => {
                             return Err(S::Error::custom(
                                 "the value holds a dictionary key that is not a string",
                             ));
@@ -147,7 +148,13 @@ pub(crate) fn json_decode(
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
     let bytes = arguments.bytes(0);
-    match sonic_rs::from_slice::<sonic_rs::Value>(bytes) {
+    let mut decoder = sonic_rs::Deserializer::from_slice(bytes).use_rawnumber();
+    let result = decoder.deserialize::<sonic_rs::Value>().and_then(|value| {
+        decoder.end()?;
+        Ok(value)
+    });
+
+    match result {
         Ok(node) => convert(context, &node),
         Err(error) => {
             let class = context.vm.intern(JSON_ERROR.as_bytes());
@@ -162,25 +169,38 @@ fn convert(context: &mut Context<'_, '_, '_>, node: &sonic_rs::Value) -> Result<
         JsonType::Null => Ok(Value::null()),
         JsonType::Boolean => Ok(Value::bool(node.is_true())),
         JsonType::Number => {
-            if let Some(value) = node.as_i64() {
-                return Ok(Value::int(value));
-            }
-
-            let Some(value) = node.as_f64() else {
-                let class = context.vm.intern(JSON_ERROR.as_bytes());
-                return Err(context.vm.throw(
-                    class,
-                    "the JSON number is outside Whim's numeric range",
-                    0,
-                ));
+            let number = node.as_raw_number();
+            let number = number.as_ref().map_or("", |number| number.as_str());
+            let value = if number
+                .bytes()
+                .any(|byte| matches!(byte, b'.' | b'e' | b'E'))
+            {
+                number
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|value| value.is_finite())
+                    .map(Value::float)
+            } else {
+                number
+                    .parse::<i64>()
+                    .ok()
+                    .map(Value::int)
+                    .or_else(|| number.parse::<u64>().ok().map(Value::uint))
             };
-            Ok(Value::float(value))
+
+            value.ok_or_else(|| {
+                let class = context.vm.intern(JSON_ERROR.as_bytes());
+                context
+                    .vm
+                    .throw(class, "the JSON number is outside Whim's numeric range", 0)
+            })
         }
         JsonType::String => {
             // SAFETY: the surrounding invariant proves this option contains a value.
             let string = unsafe {
                 unwrap_option_invariant(node.as_str(), "a JSON string node contains a string")
             };
+
             Ok(context.string(string.as_bytes()))
         }
         JsonType::Array => {
@@ -200,6 +220,7 @@ fn convert(context: &mut Context<'_, '_, '_>, node: &sonic_rs::Value) -> Result<
             let source = unsafe {
                 unwrap_option_invariant(node.as_object(), "a JSON object node contains an object")
             };
+
             let mut entries = Vec::with_capacity(source.len());
             for (key, value) in source {
                 let key = context.string(key.as_bytes());

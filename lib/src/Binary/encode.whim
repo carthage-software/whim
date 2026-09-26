@@ -15,7 +15,7 @@ use Whim\Refine\Uint8;
 /** Writes an unsigned 8-bit integer as one byte. */
 #[AlwaysInline]
 #[MustUse]
-function encode_u8(Uint8 $value): string[1] {
+function encode_u8(Uint8|0u..=255u $value): string[1] {
   return _Private\binary_encode($value, 1, false);
 }
 
@@ -30,7 +30,7 @@ function encode_i8(Int8 $value): string[1] {
 #[AlwaysInline]
 #[MustUse]
 function encode_u16(
-  Uint16 $value,
+  Uint16|0u..=65_535u $value,
   Endianness $endianness = Endianness::Big,
 ): string[2] {
   return _Private\binary_encode($value, 2, Endianness::Little == $endianness);
@@ -50,7 +50,7 @@ function encode_i16(
 #[AlwaysInline]
 #[MustUse]
 function encode_u32(
-  Uint32 $value,
+  Uint32|0u..=4_294_967_295u $value,
   Endianness $endianness = Endianness::Big,
 ): string[4] {
   return _Private\binary_encode($value, 4, Endianness::Little == $endianness);
@@ -70,7 +70,7 @@ function encode_i32(
 #[AlwaysInline]
 #[MustUse]
 function encode_u64(
-  NonNegativeInt $value,
+  NonNegativeInt|uint $value,
   Endianness $endianness = Endianness::Big,
 ): string[8] {
   return _Private\binary_encode($value, 8, Endianness::Little == $endianness);

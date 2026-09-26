@@ -25,6 +25,7 @@ use crate::instruction::operands::FloatPairUpdateDescriptorIndex;
 use crate::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
 use crate::instruction::operands::IcSlot;
 use crate::instruction::operands::ImmediateInt;
+use crate::instruction::operands::ImmediateUint;
 use crate::instruction::operands::IndexAddMode;
 use crate::instruction::operands::IntStepLoopDescriptorIndex;
 use crate::instruction::operands::JumpOffset;
@@ -36,6 +37,7 @@ use crate::instruction::operands::PropertyInitializationDescriptorIndex;
 use crate::instruction::operands::PropertyReadMode;
 use crate::instruction::operands::PropertyRemoveMode;
 use crate::instruction::operands::PropertySlot;
+use crate::instruction::operands::PropertyStepMode;
 use crate::instruction::operands::PropertyValueMode;
 use crate::instruction::operands::Register;
 use crate::instruction::operands::ShortJumpOffset;
@@ -240,7 +242,7 @@ macro_rules! instruction_set {
             NumericLoop { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 95,
             /// Updates an array held by an object property in place.
             PropertyIndexUpdate { object: Register, operand: Register, cache: IcSlot, mode: PropertyIndexUpdateMode, } = 96,
-            PropertyStep { object: Register, cache: IcSlot, immediate: ImmediateInt, } = 97,
+            PropertyStep { object: Register, cache: IcSlot, immediate: ImmediateInt, mode: PropertyStepMode, } = 97,
             PropertyAdd { object: Register, source: Register, cache: IcSlot, } = 98,
             /// Returns `source` after the optimizer proved it satisfies the declared
             /// return type on every path reaching this instruction.
@@ -283,7 +285,7 @@ macro_rules! instruction_set {
             PropertyIndexUpdateUnchecked { object: Register, operand: Register, slot: PropertySlot, mode: PropertyIndexUpdateMode, } = 119,
             /// Steps a numeric property after whole-unit type flow proved that the
             /// property is mutable and the result retains its declared type.
-            PropertyStepUnchecked { object: Register, slot: PropertySlot, immediate: ImmediateInt, } = 120,
+            PropertyStepUnchecked { object: Register, slot: PropertySlot, immediate: ImmediateInt, mode: PropertyStepMode, } = 120,
             /// Adds into a numeric property after whole-unit type flow proved that
             /// the property is mutable and the result retains its declared type.
             PropertyAddUnchecked { object: Register, source: Register, slot: PropertySlot, } = 121,
@@ -423,6 +425,34 @@ macro_rules! instruction_set {
             PropertyCoalesceUnchecked { destination: Register, object: Register, slot: PropertySlot, offset: NearJumpOffset, } = 216,
             StaticPropertyCoalesce { destination: Register, cache: IcSlot, offset: ShortJumpOffset, } = 217,
             CheckWhereConstraints = 219,
+            Step { destination: Register, source: Register, immediate: ImmediateInt, } = 220,
+            LoadUint { destination: Register, immediate: ImmediateUint, } = 221,
+            UintAdd { destination: Register, left: Register, right: Register, } = 222,
+            UintSubtract { destination: Register, left: Register, right: Register, } = 223,
+            UintMultiply { destination: Register, left: Register, right: Register, } = 224,
+            UintModulo { destination: Register, left: Register, right: Register, } = 225,
+            UintAddAssign { target: Register, source: Register, } = 226,
+            UintBitwiseAnd { destination: Register, left: Register, right: Register, } = 227,
+            UintBitwiseOr { destination: Register, left: Register, right: Register, } = 228,
+            UintBitwiseXor { destination: Register, left: Register, right: Register, } = 229,
+            UintBitwiseNot { destination: Register, source: Register, } = 230,
+            UintShiftLeft { destination: Register, left: Register, right: Register, } = 231,
+            UintShiftRight { destination: Register, left: Register, right: Register, } = 232,
+            UintAddImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 233,
+            UintSubtractImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 234,
+            UintMultiplyImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 235,
+            UintModuloImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 236,
+            UintJumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 237,
+            UintJumpUnlessImmediate { comparison: Comparison, source: Register, immediate: ImmediateUint, offset: ShortJumpOffset, } = 238,
+            ReturnUintUnchecked { immediate: ImmediateUint, } = 239,
+            UintCounterLoop { comparison: Comparison, counter: Register, limit: Register, offset: ShortJumpOffset, } = 240,
+            UintRangeJumpIf { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 241,
+            UintRangeJumpUnless { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 242,
+            UintStep { destination: Register, source: Register, immediate: ImmediateInt, } = 243,
+            DictIndexGetUintKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 244,
+            DictIndexSetUintKey { container: Register, index: Register, value: Register, } = 245,
+            DictIndexGetUintKeyOrNull { destination: Register, container: Register, index: Register, } = 246,
+            DictIndexCoalesceUintKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 247,
         }
     };
 }

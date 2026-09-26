@@ -44,7 +44,7 @@ makes the meaning clear:
 abstract    array       bool        case        class
 classname   const       default     dict        enum
 extends     final       float       implements  in
-int         interface   mixed       namespace   never
+int         uint        interface   mixed       namespace   never
 newtype     object      out         private     protected
 public      readonly    string      type        use
 vec         void        where

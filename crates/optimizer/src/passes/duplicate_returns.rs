@@ -70,6 +70,7 @@ fn optimize_chunk(chunk: &mut Chunk) -> bool {
                 | Instruction::ReturnScalarUnchecked { .. }
                 | Instruction::ReturnPairUnchecked { .. }
                 | Instruction::ReturnIntUnchecked { .. }
+                | Instruction::ReturnUintUnchecked { .. }
                 | Instruction::ReturnNull
                 | Instruction::ReturnNullUnchecked
         ) {

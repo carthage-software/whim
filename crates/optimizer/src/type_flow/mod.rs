@@ -70,8 +70,9 @@ const VECTOR: u16 = 1 << 6;
 const DICTIONARY: u16 = 1 << 7;
 const TUPLE: u16 = 1 << 8;
 const CALLABLE: u16 = 1 << 9;
+const UINT: u16 = 1 << 10;
 const ALL: u16 = u16::MAX;
-const NUMERIC: u16 = INT | FLOAT;
+const NUMERIC: u16 = INT | UINT | FLOAT;
 const ALWAYS_REFERENCE_COUNTED: u16 = OBJECT | VECTOR | DICTIONARY | TUPLE | CALLABLE;
 const MAY_BE_REFERENCE_COUNTED: u16 = STRING | OBJECT | VECTOR | DICTIONARY | TUPLE | CALLABLE;
 const NO_ORIGIN: u32 = 0;
@@ -96,6 +97,7 @@ pub(crate) enum ConstantValue {
     Null,
     Bool(bool),
     Int(i64),
+    Uint(u64),
     Float(f64),
     String(Atom),
 }
@@ -160,6 +162,7 @@ impl Fact {
             ValueView::Null => Self::known(NULL),
             ValueView::Bool(_) => Self::known(BOOL),
             ValueView::Int(value) => Self::integer(*value, NO_ORIGIN),
+            ValueView::Uint(_) => Self::known(UINT),
             ValueView::Float(_) => Self::known(FLOAT),
             ValueView::String(_) | ValueView::ShortString(_) => Self::known(STRING),
             ValueView::Object(_) => Self::known(OBJECT),
@@ -949,6 +952,13 @@ impl<'a> TypeFlow<'a> {
                     self.fact(index, value).mask,
                     INT,
                 ),
+                Instruction::DictIndexSetUintKey {
+                    container, value, ..
+                } => (
+                    self.fact(index, container).array,
+                    self.fact(index, value).mask,
+                    UINT,
+                ),
                 Instruction::DictIndexSetStringKey {
                     container, value, ..
                 } => (
@@ -1006,6 +1016,7 @@ impl<'a> TypeFlow<'a> {
                 Instruction::IndexGet { .. }
                     | Instruction::VecIndexGet { .. }
                     | Instruction::DictIndexGetIntKey { .. }
+                    | Instruction::DictIndexGetUintKey { .. }
                     | Instruction::DictIndexGetStringKey { .. }
                     | Instruction::ForeachNext { .. }
                     | Instruction::VecForeachNext {
@@ -1238,9 +1249,10 @@ impl<'a> TypeFlow<'a> {
 fn array_shape(descriptor: &TypeDescriptor) -> Option<(u16, &TypeDescriptor)> {
     match descriptor {
         TypeDescriptor::Array(Some((key, value)))
-        | TypeDescriptor::Dictionary(Some((key, value))) => {
-            Some((descriptor_mask(key).unwrap_or(INT | STRING), value.as_ref()))
-        }
+        | TypeDescriptor::Dictionary(Some((key, value))) => Some((
+            descriptor_mask(key).unwrap_or(INT | UINT | BOOL | STRING),
+            value.as_ref(),
+        )),
         TypeDescriptor::Vector(Some(element)) => Some((INT, element.as_ref())),
         TypeDescriptor::Intersection(members) => members.iter().find_map(array_shape),
         _ => None,
@@ -1329,6 +1341,8 @@ fn comparison_lower_bound(
 fn unary_numeric_result(source: Fact) -> Fact {
     if source.mask & !INT == 0 {
         Fact::known(INT)
+    } else if source.mask & !UINT == 0 {
+        Fact::known(UINT)
     } else if source.mask & !FLOAT == 0 {
         Fact::known(FLOAT)
     } else {
@@ -1368,6 +1382,10 @@ fn append_constant_text(bytes: &mut Vec<u8>, value: ConstantValue) -> Option<()>
     match value {
         ConstantValue::String(value) => bytes.extend_from_slice(value.as_bytes()),
         ConstantValue::Int(value) => {
+            let mut buffer = itoa::Buffer::new();
+            bytes.extend_from_slice(buffer.format(value).as_bytes());
+        }
+        ConstantValue::Uint(value) => {
             let mut buffer = itoa::Buffer::new();
             bytes.extend_from_slice(buffer.format(value).as_bytes());
         }

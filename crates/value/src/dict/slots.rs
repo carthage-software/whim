@@ -47,6 +47,7 @@ pub(in crate::dict) fn slot_matches_ref(slot: &Slot, key: KeyRef<'_>) -> bool {
     match slot {
         Slot::Occupied { key: occupied, .. } => match (occupied, key) {
             (Key::Int(left), KeyRef::Int(right)) => *left == right,
+            (Key::Uint(left), KeyRef::Uint(right)) => *left == right,
             (Key::Bool(left), KeyRef::Bool(right)) => *left == right,
             (Key::String(left), KeyRef::String(right)) => left.eq_bytes(right),
             (Key::ShortString(left), KeyRef::ShortString(right)) => *left == right,

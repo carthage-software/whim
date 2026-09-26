@@ -26,7 +26,7 @@ function math_sum_floats(vec<float> $numbers): float {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function math_compare(int|float $left, int|float $right): int {}
+function math_compare(int|uint|float $left, int|uint|float $right): int {}
 
 /** Computes the square root of a float. */
 #[Stub]

@@ -9,6 +9,8 @@ Whim does not convert either side of an equality check.
 ```whim
 assert!(1 == 1);
 assert!(1 != 1.0);
+assert!(1u != 1);
+assert!(1u != 1.0);
 assert!('1' != 1);
 assert!(0 != false);
 assert!('' != null);
@@ -51,8 +53,7 @@ including itself.
 
 `<`, `<=`, `>`, and `>=` compare:
 
-- int with int or float;
-- float with int or float;
+- any pair of int, uint, and float;
 - string with string, in byte order.
 
 Other pairs throw `IncompatibleOperandsError`. Arrays, objects, callables,
@@ -66,6 +67,17 @@ assert!('10' < '9');
 ```
 
 A comparison with NaN is false.
+
+Numeric ordering compares mathematical values without first rounding integers
+to float. It can find equal magnitudes where strict equality is false:
+
+```whim
+assert!(1u <= 1);
+assert!((1u <=> 1) == 0);
+assert!(0u > -1);
+assert!(9_007_199_254_740_993u > 9_007_199_254_740_992.0);
+assert!(Whim\Math\UINT_MAX < 18_446_744_073_709_551_616.0);
+```
 
 ## Three-way comparison
 

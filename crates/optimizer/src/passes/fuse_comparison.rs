@@ -46,21 +46,24 @@ fn fuse_int_range_result(chunk: &mut Chunk, statistics: &mut OptimizationStatist
         else {
             continue;
         };
-        if !matches!(
-            chunk.type_descriptors[usize::from(descriptor.index())],
-            TypeDescriptor::IntRange { .. }
-        ) {
-            continue;
-        }
+
+        let unsigned = match chunk.type_descriptors[usize::from(descriptor.index())] {
+            TypeDescriptor::IntRange { .. } => false,
+            TypeDescriptor::UintRange { .. } => true,
+            _ => continue,
+        };
+
         let (condition, offset, jumps_if_match) = match chunk.code[index + 1] {
             Instruction::JumpIfFalse { condition, offset } => (condition, offset, false),
             Instruction::JumpIfTrue { condition, offset } => (condition, offset, true),
             _ => continue,
         };
+
         let target = index as i64 + 1 + i64::from(offset.offset());
         let Ok(target_index) = usize::try_from(target) else {
             continue;
         };
+
         if condition != destination
             || targets.contains(&(index + 1))
             || !register_is_dead_after_removals(chunk, destination, index + 2, &remove)
@@ -68,11 +71,25 @@ fn fuse_int_range_result(chunk: &mut Chunk, statistics: &mut OptimizationStatist
         {
             continue;
         }
+
         let Ok(relative) = i16::try_from(target - index as i64) else {
             continue;
         };
+
         let offset = ShortJumpOffset::new(relative);
-        chunk.code[index] = if jumps_if_match {
+        chunk.code[index] = if unsigned && jumps_if_match {
+            Instruction::UintRangeJumpIf {
+                subject: source,
+                descriptor,
+                offset,
+            }
+        } else if unsigned {
+            Instruction::UintRangeJumpUnless {
+                subject: source,
+                descriptor,
+                offset,
+            }
+        } else if jumps_if_match {
             Instruction::IntRangeJumpIf {
                 subject: source,
                 descriptor,
@@ -85,6 +102,7 @@ fn fuse_int_range_result(chunk: &mut Chunk, statistics: &mut OptimizationStatist
                 offset,
             }
         };
+
         remove[index + 1] = true;
     }
 

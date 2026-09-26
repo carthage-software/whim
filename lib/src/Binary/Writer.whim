@@ -15,13 +15,13 @@ interface Writer {
   /** Writes an unsigned 8-bit integer. */
   #[MustUse]
   #[TrackCaller]
-  public function u8(Uint8 $value): static;
+  public function u8(Uint8|0u..=255u $value): static;
 
   /** Writes an unsigned 16-bit integer. */
   #[MustUse]
   #[TrackCaller]
   public function u16(
-    Uint16 $value,
+    Uint16|0u..=65_535u $value,
     null|Endianness $endianness = null,
   ): static;
 
@@ -29,7 +29,7 @@ interface Writer {
   #[MustUse]
   #[TrackCaller]
   public function u32(
-    Uint32 $value,
+    Uint32|0u..=4_294_967_295u $value,
     null|Endianness $endianness = null,
   ): static;
 
@@ -37,7 +37,7 @@ interface Writer {
   #[MustUse]
   #[TrackCaller]
   public function u64(
-    NonNegativeInt $value,
+    NonNegativeInt|uint $value,
     null|Endianness $endianness = null,
   ): static;
 

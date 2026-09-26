@@ -198,6 +198,7 @@ pub(crate) fn literal(value: &Literal) -> String {
         Literal::Bool(true) => "true".to_string(),
         Literal::Bool(false) => "false".to_string(),
         Literal::Int(value) => value.to_string(),
+        Literal::Uint(value) => format!("{value}u"),
         Literal::Float(value) => format!("{value:?}"),
         Literal::String(atom) => format!("'{}'", atom.to_string_lossy()),
     }

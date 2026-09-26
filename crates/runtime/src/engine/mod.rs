@@ -634,6 +634,7 @@ impl Engine {
                     .map(|(key, value)| {
                         let key = match key {
                             KeyRef::Int(key) => key.to_string(),
+                            KeyRef::Uint(key) => format!("{key}u"),
                             KeyRef::Bool(key) => key.to_string(),
                             KeyRef::String(key) => {
                                 format!("'{}'", String::from_utf8_lossy(key.flatten()))

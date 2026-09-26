@@ -1,0 +1,103 @@
+use Whim\Binary;
+use Whim\IO\MemoryHandle;
+use Whim\Json;
+use Whim\Math;
+use Whim\Refine;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+
+function expect_error<T: Throwable>(fn $operation): void {
+  $caught = false;
+  try {
+    $operation();
+  } catch (Throwable $error) {
+    assert!($error is T);
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+assert!(1u is Refine\Numeric);
+assert!(1u is Refine\Scalar);
+assert!(1u is Refine\ArrayKey);
+assert!(1u is Refine\NonZero<uint>);
+assert!(!(0u is Refine\NonZero<uint>));
+assert!(0u is Refine\Falsy);
+assert!(!(1u is Refine\Uint8));
+assert!(Math\to_base(Math\UINT_MAX, 16) == 'ffffffffffffffff');
+assert!(Math\to_base(0u, 10) == '0');
+assert!(Math\abs(Math\UINT_MAX) == Math\UINT_MAX);
+assert!(Math\clamp(Math\UINT_MAX, 0u, 100u) == 100u);
+assert!(Math\clamp(1u, 0, 2.0) == 1u);
+assert!(Math\min(vec[-1, 0u, Math\UINT_MAX]) == -1);
+assert!(Math\max(vec[Math\INT_MAX, Math\UINT_MAX]) == Math\UINT_MAX);
+assert!(
+  Math\maxva(9_007_199_254_740_992.0, 9_007_199_254_740_993u)
+  == 9_007_199_254_740_993u,
+);
+
+assert!(Math\minva(1u, 2) == 1u);
+assert!(Math\mean(vec[2u, 4u, 6]) == 4.0);
+assert!(Math\median(vec[1u, 2, 3u, 4]) == 2.5);
+expect_error::<TypeError>(fn() => Math\sum(vec[1u]));
+
+foreach (vec[Binary\Endianness::Big, Binary\Endianness::Little] as $order) {
+  foreach (vec[0u, 1u, 9_223_372_036_854_775_808u, Math\UINT_MAX] as $value) {
+    $bytes = Binary\encode_u64($value, $order);
+    assert!(length!($bytes) == 8);
+    assert!(Binary\decode_u64($bytes, $order) == $value);
+    $writer = Binary\MemoryWriter::default()->u64($value, $order);
+    assert!($writer->toString() == $bytes);
+    assert!(new Binary\MemoryReader($bytes)->u64($order) == $value);
+    $handle = new MemoryHandle();
+    discard!(new Binary\HandleWriter($handle, $order)->u64($value));
+    discard!($handle->seek(0));
+    assert!(new Binary\HandleReader($handle, $order)->u64() == $value);
+  }
+}
+
+assert!(Binary\decode_u64(Binary\encode_u64(42)) == 42u);
+assert!(Binary\decode_u8(Binary\encode_u8(255u)) == 255);
+assert!(Binary\decode_u16(Binary\encode_u16(65535u)) == 65535);
+assert!(Binary\decode_u32(Binary\encode_u32(4294967295u)) == 4294967295);
+expect_error::<TypeError>(fn() => Binary\encode_u8(256u));
+expect_error::<TypeError>(fn() => Binary\encode_u16(65536u));
+expect_error::<TypeError>(fn() => Binary\encode_u32(4294967296u));
+expect_error::<TypeError>(fn() => Binary\encode_i64(1u));
+$prefixed = Binary\MemoryWriter::default()->u64PrefixedBytes(
+  'bytes',
+)->toString();
+
+assert!(new Binary\MemoryReader($prefixed)->u64PrefixedBytes() == 'bytes');
+
+assert!(Json\encode(Math\UINT_MAX) == '18446744073709551615');
+assert!(Json\decode('18446744073709551615') == Math\UINT_MAX);
+assert!(Json\decode('9223372036854775808') == 9_223_372_036_854_775_808u);
+assert!(Json\decode('9223372036854775807') == Math\INT_MAX);
+assert!(Json\decode('-9223372036854775808') == Math\INT_MIN);
+assert!(Json\decode('-0') == 0);
+assert!(Json\decode(Json\encode(42u)) == 42);
+assert!(Json\decode('18446744073709551616.0') is float);
+assert!(Json\decode('1e20') is float);
+assert!(Json\decode('[18446744073709551615, 1]') == vec[Math\UINT_MAX, 1]);
+assert!(
+  Json\decode('{"maximum":18446744073709551615}') == dict[
+    'maximum' => Math\UINT_MAX,
+  ],
+);
+
+expect_error::<Json\DecodingException>(
+  fn() => Json\decode('18446744073709551616'),
+);
+
+expect_error::<Json\DecodingException>(
+  fn() => Json\decode('-9223372036854775809'),
+);
+
+expect_error::<Json\DecodingException>(fn() => Json\decode('42u'));
+expect_error::<Json\DecodingException>(
+  fn() => Json\decode('184467440737095516150000000000000000000000000'),
+);
+
+expect_error::<TypeError>(fn() => Json\encode(dict[1u => 'one']));

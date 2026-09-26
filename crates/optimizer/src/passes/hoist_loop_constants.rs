@@ -6,6 +6,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateUint;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::compact;
 use whim_bytecode::rewrite::relative_target;
@@ -118,6 +119,7 @@ fn backward_target(instruction: Instruction, source: usize) -> Option<usize> {
         Instruction::IncrementJump { offset, .. }
         | Instruction::CounterLoop { offset, .. }
         | Instruction::IntCounterLoop { offset, .. }
+        | Instruction::UintCounterLoop { offset, .. }
         | Instruction::IntStepLoop { offset, .. } => {
             relative_target(source, i32::from(offset.offset()))
         }
@@ -175,6 +177,7 @@ struct Candidate {
 #[derive(Clone, Copy)]
 enum ScalarLoad {
     Int(ImmediateInt),
+    Uint(ImmediateUint),
     Constant(ConstantIndex),
 }
 
@@ -182,6 +185,10 @@ impl ScalarLoad {
     fn with_destination(self, destination: Register) -> Instruction {
         match self {
             Self::Int(immediate) => Instruction::LoadInt {
+                destination,
+                immediate,
+            },
+            Self::Uint(immediate) => Instruction::LoadUint {
                 destination,
                 immediate,
             },
@@ -199,6 +206,10 @@ fn scalar_load(chunk: &Chunk, instruction: Instruction) -> Option<(Register, Sca
             destination,
             immediate,
         } => Some((destination, ScalarLoad::Int(immediate))),
+        Instruction::LoadUint {
+            destination,
+            immediate,
+        } => Some((destination, ScalarLoad::Uint(immediate))),
         Instruction::LoadConstant {
             destination,
             constant,
@@ -207,6 +218,7 @@ fn scalar_load(chunk: &Chunk, instruction: Instruction) -> Option<(Register, Sca
             Literal::Null
                 | Literal::Bool(_)
                 | Literal::Int(_)
+                | Literal::Uint(_)
                 | Literal::Float(_)
                 | Literal::String(_)
         ) =>
@@ -381,6 +393,51 @@ fn replace_binary_read(
             left,
             right,
         } => replace!(IntShiftRight, destination, left, right),
+        Instruction::UintAdd {
+            destination,
+            left,
+            right,
+        } => replace!(UintAdd, destination, left, right),
+        Instruction::UintSubtract {
+            destination,
+            left,
+            right,
+        } => replace!(UintSubtract, destination, left, right),
+        Instruction::UintMultiply {
+            destination,
+            left,
+            right,
+        } => replace!(UintMultiply, destination, left, right),
+        Instruction::UintModulo {
+            destination,
+            left,
+            right,
+        } => replace!(UintModulo, destination, left, right),
+        Instruction::UintBitwiseAnd {
+            destination,
+            left,
+            right,
+        } => replace!(UintBitwiseAnd, destination, left, right),
+        Instruction::UintBitwiseOr {
+            destination,
+            left,
+            right,
+        } => replace!(UintBitwiseOr, destination, left, right),
+        Instruction::UintBitwiseXor {
+            destination,
+            left,
+            right,
+        } => replace!(UintBitwiseXor, destination, left, right),
+        Instruction::UintShiftLeft {
+            destination,
+            left,
+            right,
+        } => replace!(UintShiftLeft, destination, left, right),
+        Instruction::UintShiftRight {
+            destination,
+            left,
+            right,
+        } => replace!(UintShiftRight, destination, left, right),
         Instruction::FloatAdd {
             destination,
             left,

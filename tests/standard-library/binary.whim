@@ -1,7 +1,6 @@
 use Whim\Binary;
 use Whim\IO\MemoryHandle;
 use Whim\Math;
-use Whim\Unwind\OverflowException;
 use Whim\Unwind\TypeError;
 
 $big = Binary\Endianness::Big;
@@ -29,7 +28,7 @@ assert!(Binary\decode_u32("\x78\x56\x34\x12", $little) == 0x12345678);
 assert!(Binary\encode_i32(-2, $big) == "\xff\xff\xff\xfe");
 assert!(Binary\decode_i32("\xfe\xff\xff\xff", $little) == -2);
 
-$u64 = 81_985_529_216_486_895;
+$u64 = 81_985_529_216_486_895u;
 $u64Big = "\x01\x23\x45\x67\x89\xab\xcd\xef";
 $u64Little = "\xef\xcd\xab\x89\x67\x45\x23\x01";
 assert!(Binary\encode_u64($u64, $big) == $u64Big);
@@ -107,15 +106,5 @@ try {
 
 assert!($assertion_error_52 is TypeError);
 
-$assertion_value_53 = fn(): int => (
-  Binary\decode_u64("\xff\xff\xff\xff\xff\xff\xff\xff")
-);
-
-$assertion_error_53 = null;
-try {
-  $assertion_value_53();
-} catch (OverflowException $assertion_caught_53) {
-  $assertion_error_53 = $assertion_caught_53;
-}
-
-assert!($assertion_error_53 is OverflowException);
+assert!(Binary\decode_u64("\xff\xff\xff\xff\xff\xff\xff\xff") == Math\UINT_MAX);
+assert!(Binary\encode_u64(Math\UINT_MAX) == "\xff\xff\xff\xff\xff\xff\xff\xff");

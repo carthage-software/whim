@@ -8,6 +8,7 @@ use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::ImmediateInt;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
+use whim_bytecode::instruction::operands::PropertyStepMode;
 use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::access::PropertyAccess;
 use whim_syn::cst::access::StaticPropertyAccess;
@@ -32,6 +33,7 @@ use crate::emit::expressions::Place;
 use crate::emit::expressions::Scope;
 use crate::emit::expressions::Span;
 use crate::emit::expressions::integer_gate;
+use crate::emit::unsigned_integer_gate;
 
 /// Which value an increment or decrement yields.
 #[derive(Clone, Copy)]
@@ -273,18 +275,10 @@ pub(in crate::emit) fn compound_instruction(
 }
 
 const fn step_instruction(destination: Register, source: Register, step: i16) -> Instruction {
-    if step >= 0 {
-        Instruction::AddImmediate {
-            destination,
-            source,
-            immediate: ImmediateInt::new(step),
-        }
-    } else {
-        Instruction::SubtractImmediate {
-            destination,
-            source,
-            immediate: ImmediateInt::new(-step),
-        }
+    Instruction::Step {
+        destination,
+        source,
+        immediate: ImmediateInt::new(step),
     }
 }
 
@@ -317,7 +311,7 @@ fn immediate_step(
     expression: &Expression<'_>,
 ) -> Result<Option<ImmediateStep>, CompileError> {
     let value = match expression.unparenthesized() {
-        Expression::Literal(Literal::Integer(integer)) => {
+        Expression::Literal(Literal::Integer(integer)) if integer.is_signed() => {
             integer_gate(integer.value, false, integer.span)?
         }
         Expression::UnaryPrefix(expression)
@@ -326,6 +320,9 @@ fn immediate_step(
             let Expression::Literal(Literal::Integer(integer)) = expression.operand else {
                 return Ok(None);
             };
+            if integer.is_unsigned() {
+                return Ok(None);
+            }
             integer_gate(integer.value, true, expression.span())?
         }
         _ => return Ok(None),
@@ -463,6 +460,10 @@ impl BodyCompiler<'_, '_> {
                 if let Expression::Literal(Literal::Integer(integer)) =
                     unary.operand.unparenthesized()
                 {
+                    if integer.is_unsigned() {
+                        unsigned_integer_gate(integer.value, true, unary.span())?;
+                        return self.literal(&Literal::Integer(*integer));
+                    }
                     let value = integer_gate(integer.value, true, unary.span())?;
                     let destination = self.allocate(unary.span())?;
                     self.load_integer(destination, value, span.join(integer.span))?;
@@ -594,6 +595,7 @@ impl BodyCompiler<'_, '_> {
                         object,
                         cache,
                         immediate: ImmediateInt::new(step),
+                        mode: PropertyStepMode::Increment,
                     },
                     span,
                 );

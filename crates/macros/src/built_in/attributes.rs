@@ -170,6 +170,7 @@ pub(super) fn visibility_tokens(visibility: Option<&str>) -> syn::Result<TokenSt
 pub(super) fn constant_value_tokens(literal: &Lit) -> syn::Result<TokenStream> {
     let path = quote!(crate::builtin::spec::ConstantValue);
     match literal {
+        Lit::Int(value) if value.suffix() == "u64" => Ok(quote!(#path::Uint(#value))),
         Lit::Int(value) => Ok(quote!(#path::Int(#value))),
         Lit::Float(value) => Ok(quote!(#path::Float(#value))),
         Lit::Bool(value) => Ok(quote!(#path::Bool(#value))),

@@ -50,7 +50,9 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
             Instruction::Concatenate {
                 destination, left, ..
             } if destination == left => return true,
-            Instruction::AddImmediate { .. } | Instruction::IntAddAssign { .. }
+            Instruction::AddImmediate { .. }
+            | Instruction::Step { .. }
+            | Instruction::IntAddAssign { .. }
                 if index < tail
                     && matches!(chunk.code[index + 1], Instruction::IntCounterLoop { .. }) =>
             {
@@ -220,11 +222,16 @@ fn dict_build_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
                 return false;
             }
         } else {
-            let Instruction::AddImmediate {
+            let (Instruction::AddImmediate {
                 destination,
                 source,
                 immediate,
-            } = instruction
+            }
+            | Instruction::Step {
+                destination,
+                source,
+                immediate,
+            }) = instruction
             else {
                 return false;
             };
@@ -372,6 +379,7 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::FloatScaleProductAdd { .. }
             | Instruction::FloatPairUpdate { .. }
             | Instruction::AddImmediate { .. }
+            | Instruction::Step { .. }
             | Instruction::SubtractImmediate { .. }
             | Instruction::Squares { .. }
             | Instruction::FloatSquares { .. }
@@ -402,6 +410,7 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::ReturnPairUnchecked { .. }
             | Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked => {}
             Instruction::JumpIfFalse { offset, .. }

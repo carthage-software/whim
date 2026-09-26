@@ -675,10 +675,10 @@ fn vec_and_dict_literals() {
     };
     assert_eq!(vec.elements.len(), 3);
 
-    let Expression::Dict(dict) = expression(&arena, "dict[1 => 'a', $k => 'b'];") else {
+    let Expression::Dict(dict) = expression(&arena, "dict[1 => 'a', $k => 'b', 4u => 1];") else {
         panic!("expected a dict literal");
     };
-    assert_eq!(dict.entries.len(), 2);
+    assert_eq!(dict.entries.len(), 3);
 
     assert!(matches!(
         error("$x = vec[1 => 2];"),

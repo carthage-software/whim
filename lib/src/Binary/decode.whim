@@ -2,16 +2,13 @@ namespace Whim\Binary;
 
 use Whim;
 use Whim\Marker\MustUse;
-use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\Int16;
 use Whim\Refine\Int32;
 use Whim\Refine\Int8;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Uint16;
 use Whim\Refine\Uint32;
 use Whim\Refine\Uint8;
-use Whim\Unwind\OverflowException;
 
 /** Reads one byte as an unsigned 8-bit integer. */
 #[MustUse]
@@ -103,33 +100,23 @@ function decode_i32(
   );
 }
 
-/**
- * Reads eight bytes as an unsigned 64-bit integer.
- *
- * @throws OverflowException when the value does not fit in a signed 64-bit integer.
- */
+/** Reads eight bytes as an unsigned 64-bit integer. */
 #[MustUse]
-#[NeverInline]
 #[TrackCaller]
 function decode_u64(
   string[8..] $bytes,
   Endianness $endianness = Endianness::Big,
-): NonNegativeInt {
-  $value = Whim\_Private\binary_decode(
-    $bytes,
-    0,
-    8,
-    false,
-    Endianness::Little == $endianness,
+): uint {
+  return (
+    Whim\_Private\binary_decode(
+      $bytes,
+      0,
+      8,
+      false,
+      Endianness::Little == $endianness,
+    )
+      as uint
   );
-
-  if (null == $value) {
-    throw new OverflowException(
-      'the value does not fit in a signed 64-bit integer',
-    );
-  }
-
-  return $value;
 }
 
 /** Reads eight bytes as a signed 64-bit integer. */

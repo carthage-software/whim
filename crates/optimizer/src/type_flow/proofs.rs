@@ -30,6 +30,7 @@ use crate::type_flow::STRING;
 use crate::type_flow::THIS_ORIGIN;
 use crate::type_flow::TUPLE;
 use crate::type_flow::TypeFlow;
+use crate::type_flow::UINT;
 use crate::type_flow::VECTOR;
 use crate::type_flow::callable_signature;
 use crate::type_flow::descriptors::descriptor_mask;
@@ -808,6 +809,7 @@ impl TypeFlow<'_> {
             TypeDescriptor::Void | TypeDescriptor::Null => fact.mask & !NULL == 0,
             TypeDescriptor::Bool => fact.mask & !BOOL == 0,
             TypeDescriptor::Int => fact.mask & !INT == 0,
+            TypeDescriptor::Uint => fact.mask & !UINT == 0,
             TypeDescriptor::Float => fact.mask & !FLOAT == 0,
             TypeDescriptor::String => fact.mask & !STRING == 0,
             TypeDescriptor::Object => fact.mask & !OBJECT == 0,
@@ -824,6 +826,8 @@ impl TypeFlow<'_> {
             TypeDescriptor::TrueLiteral
             | TypeDescriptor::FalseLiteral
             | TypeDescriptor::IntLiteral(_)
+            | TypeDescriptor::UintLiteral(_)
+            | TypeDescriptor::UintRange { .. }
             | TypeDescriptor::IntRange { .. }
             | TypeDescriptor::FloatLiteral(_)
             | TypeDescriptor::StringLiteral(_)

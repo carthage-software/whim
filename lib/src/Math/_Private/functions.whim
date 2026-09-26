@@ -7,7 +7,7 @@ use Whim\Math;
 /** Computes an overflow-safe midpoint. */
 #[TrackCaller]
 #[TraceBoundary]
-function midpoint(int|float $left, int|float $right): float {
+function midpoint(int|uint|float $left, int|uint|float $right): float {
   if ($left is int && $right is int) {
     $whole = Math\div($left, 2) + Math\div($right, 2);
     $remainder = ($left % 2) + ($right % 2);

@@ -13,7 +13,11 @@ use Whim;
  */
 #[NeverInline]
 #[TrackCaller]
-function clamp(int|float $number, int|float $min, int|float $max): int|float {
+function clamp(
+  int|uint|float $number,
+  int|uint|float $min,
+  int|uint|float $max,
+): int|uint|float {
   if ($number is float && Float\is_nan($number)) {
     return $number;
   }

@@ -39,6 +39,7 @@ use crate::emit::ReturnKind;
 use crate::emit::Scope;
 use crate::emit::analysis::collect_assigned_in_statements;
 use crate::emit::integer_gate;
+use crate::emit::unsigned_integer_gate;
 use crate::error::CompileError;
 use crate::error::CompileErrorKind;
 use crate::limits::check_count;
@@ -515,6 +516,9 @@ fn fold_literal(
             Literal::Null(_) => BytecodeLiteral::Null,
             Literal::True(_) => BytecodeLiteral::Bool(true),
             Literal::False(_) => BytecodeLiteral::Bool(false),
+            Literal::Integer(integer) if integer.is_unsigned() => {
+                BytecodeLiteral::Uint(integer.value)
+            }
             Literal::Integer(integer) => {
                 BytecodeLiteral::Int(integer_gate(integer.value, false, integer.span)?)
             }
@@ -530,6 +534,13 @@ fn fold_literal(
             if matches!(unary.operator, UnaryPrefixOperator::Negation(_)) =>
         {
             match unary.operand.unparenthesized() {
+                Expression::Literal(Literal::Integer(integer)) if integer.is_unsigned() => {
+                    Ok(Some(BytecodeLiteral::Uint(unsigned_integer_gate(
+                        integer.value,
+                        true,
+                        unary.span(),
+                    )?)))
+                }
                 Expression::Literal(Literal::Integer(integer)) => Ok(Some(BytecodeLiteral::Int(
                     integer_gate(integer.value, true, unary.operand.span())?,
                 ))),

@@ -38,13 +38,62 @@ pub(crate) fn with_destination(
         });
     }
 
+    if let Instruction::UintAdd {
+        destination: current,
+        left,
+        right,
+    } = instruction
+    {
+        if current != expected {
+            return None;
+        }
+
+        return Some(if destination == left {
+            Instruction::UintAddAssign {
+                target: destination,
+                source: right,
+            }
+        } else if destination == right {
+            Instruction::UintAddAssign {
+                target: destination,
+                source: left,
+            }
+        } else {
+            Instruction::UintAdd {
+                destination,
+                left,
+                right,
+            }
+        });
+    }
+
     let current = match &mut instruction {
+        Instruction::UintSubtract { destination, .. }
+        | Instruction::UintMultiply { destination, .. }
+        | Instruction::UintModulo { destination, .. }
+        | Instruction::UintBitwiseAnd { destination, .. }
+        | Instruction::UintBitwiseOr { destination, .. }
+        | Instruction::UintBitwiseXor { destination, .. }
+        | Instruction::UintBitwiseNot { destination, .. }
+        | Instruction::UintShiftLeft { destination, .. }
+        | Instruction::UintShiftRight { destination, .. }
+        | Instruction::UintAddImmediate { destination, .. }
+        | Instruction::UintSubtractImmediate { destination, .. }
+        | Instruction::UintMultiplyImmediate { destination, .. }
+        | Instruction::UintModuloImmediate { destination, .. }
+        | Instruction::UintStep { destination, .. }
+        | Instruction::LoadUint { destination, .. } => destination,
         Instruction::VecIndexGet {
             destination,
             value_mode,
             ..
         }
         | Instruction::DictIndexGetIntKey {
+            destination,
+            value_mode,
+            ..
+        }
+        | Instruction::DictIndexGetUintKey {
             destination,
             value_mode,
             ..
@@ -57,6 +106,7 @@ pub(crate) fn with_destination(
         Instruction::IndexGetOrNull { destination, .. }
         | Instruction::VecIndexGetOrNull { destination, .. }
         | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+        | Instruction::DictIndexGetUintKeyOrNull { destination, .. }
         | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
         | Instruction::StringIndexGetOrNull { destination, .. }
         | Instruction::PropertyGetOrNull { destination, .. }
@@ -83,6 +133,7 @@ pub(crate) fn with_destination(
         | Instruction::Negate { destination, .. }
         | Instruction::UnaryPlus { destination, .. }
         | Instruction::AddImmediate { destination, .. }
+        | Instruction::Step { destination, .. }
         | Instruction::SubtractImmediate { destination, .. }
         | Instruction::IntMultiplyImmediate { destination, .. }
         | Instruction::IntModuloImmediate { destination, .. }

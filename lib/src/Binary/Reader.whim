@@ -30,7 +30,7 @@ interface Reader {
   /** Reads an unsigned 64-bit integer. */
   #[MustUse]
   #[TrackCaller]
-  public function u64(null|Endianness $endianness = null): NonNegativeInt;
+  public function u64(null|Endianness $endianness = null): uint;
 
   /** Reads a signed 8-bit integer. */
   #[MustUse]
@@ -107,6 +107,6 @@ interface Reader {
   #[MustUse]
   #[TrackCaller]
   public function u64PrefixedBytes(null|Endianness $endianness = null): string {
-    return $this->bytes($this->u64($endianness));
+    return $this->bytes($this->u64($endianness) as int);
   }
 }

@@ -314,6 +314,9 @@ impl VirtualMachine<'_> {
                 | TypeDescriptor::Null
                 | TypeDescriptor::Bool
                 | TypeDescriptor::Int
+                | TypeDescriptor::Uint
+                | TypeDescriptor::UintLiteral(_)
+                | TypeDescriptor::UintRange { .. }
                 | TypeDescriptor::Float
                 | TypeDescriptor::String
                 | TypeDescriptor::StringLength { .. }
@@ -571,6 +574,7 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
         | TypeDescriptor::Null
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
+        | TypeDescriptor::Uint
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::Object
@@ -579,6 +583,11 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
         | TypeDescriptor::StaticClass
         | TypeDescriptor::TupleAny => {}
         TypeDescriptor::IntLiteral(value) => value.hash(state),
+        TypeDescriptor::UintLiteral(value) => value.hash(state),
+        TypeDescriptor::UintRange { min, max } => {
+            min.hash(state);
+            max.hash(state);
+        }
         TypeDescriptor::IntRange { min, max } => {
             min.hash(state);
             max.hash(state);
@@ -660,6 +669,10 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
                         0u8.hash(state);
                         key.hash(state);
                     }
+                    ShapeKey::Uint(key) => {
+                        3u8.hash(state);
+                        key.hash(state);
+                    }
                     ShapeKey::String(key) => {
                         1u8.hash(state);
                         key.hash(state);
@@ -713,6 +726,7 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
         | (TypeDescriptor::Null, TypeDescriptor::Null)
         | (TypeDescriptor::Bool, TypeDescriptor::Bool)
         | (TypeDescriptor::Int, TypeDescriptor::Int)
+        | (TypeDescriptor::Uint, TypeDescriptor::Uint)
         | (TypeDescriptor::Float, TypeDescriptor::Float)
         | (TypeDescriptor::String, TypeDescriptor::String)
         | (TypeDescriptor::Object, TypeDescriptor::Object)
@@ -721,6 +735,17 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
         | (TypeDescriptor::StaticClass, TypeDescriptor::StaticClass)
         | (TypeDescriptor::TupleAny, TypeDescriptor::TupleAny) => true,
         (TypeDescriptor::IntLiteral(left), TypeDescriptor::IntLiteral(right)) => left == right,
+        (TypeDescriptor::UintLiteral(left), TypeDescriptor::UintLiteral(right)) => left == right,
+        (
+            TypeDescriptor::UintRange {
+                min: left_min,
+                max: left_max,
+            },
+            TypeDescriptor::UintRange {
+                min: right_min,
+                max: right_max,
+            },
+        ) => left_min == right_min && left_max == right_max,
         (
             TypeDescriptor::StringLength {
                 min: left_min,
@@ -909,6 +934,7 @@ fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
     match (left, right) {
         (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
         (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
+        (ShapeKey::Uint(left), ShapeKey::Uint(right)) => left == right,
         (ShapeKey::String(left), ShapeKey::String(right)) => left == right,
         _ => false,
     }

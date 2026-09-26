@@ -337,7 +337,7 @@ impl VirtualMachine<'_> {
                             )
                         };
                     }
-                    ArrayValueMode::Generic => {
+                    ArrayValueMode::Generic | ArrayValueMode::Uint => {
                         // SAFETY: the destination is in the active numeric register window.
                         unsafe {
                             assign_array_element(
@@ -457,7 +457,7 @@ impl VirtualMachine<'_> {
                             )
                         };
                     }
-                    ArrayValueMode::Generic => {
+                    ArrayValueMode::Generic | ArrayValueMode::Uint => {
                         // SAFETY: the destination is in the active numeric register window.
                         unsafe {
                             assign_array_element(
@@ -714,6 +714,7 @@ impl VirtualMachine<'_> {
                                 ))
                             }
                             ArrayValueMode::Int
+                            | ArrayValueMode::Uint
                             | ArrayValueMode::Float
                             | ArrayValueMode::Generic => comparison_matches_numeric(
                                 comparison,
@@ -730,14 +731,14 @@ impl VirtualMachine<'_> {
                             }
                             continue;
                         }
-                    } else if tail.kind() == InstructionKind::AddImmediate {
+                    } else if matches!(tail.kind(), InstructionKind::AddImmediate | InstructionKind::Step) {
                         // SAFETY: dispatch matched the instruction tag.
-                        let Instruction::AddImmediate {
+                        let (Instruction::AddImmediate {
                             destination,
                             source,
                             immediate,
                             // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                        } = (unsafe { tail.decode() })
+                        } | Instruction::Step { destination, source, immediate }) = (unsafe { tail.decode() })
                         else {
                             // SAFETY: `decode` must return the variant selected by the tag.
                             unsafe {
@@ -1248,7 +1249,7 @@ impl VirtualMachine<'_> {
                     destination,
                     source,
                     immediate,
-                } => {
+                } | Instruction::Step { destination, source, immediate } => {
                     let amount = i64::from(immediate.value());
                     if destination == source
                         && values.kind(source.index() as usize) == NumericKind::Int
@@ -3600,6 +3601,11 @@ unsafe fn try_dict_build_burst(
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
         match unsafe { word(at + 1).decode() } {
             Instruction::AddImmediate {
+                destination,
+                source,
+                immediate,
+            }
+            | Instruction::Step {
                 destination,
                 source,
                 immediate,

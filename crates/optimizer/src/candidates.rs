@@ -76,6 +76,7 @@ fn instruction_candidates(
                 | Instruction::Divide { .. }
                 | Instruction::Modulo { .. }
                 | Instruction::Power { .. }
+                | Instruction::Step { .. }
                 | Instruction::Negate { .. }
                 | Instruction::UnaryPlus { .. }
                 | Instruction::BitwiseAnd { .. }
@@ -142,6 +143,7 @@ fn instruction_candidates(
                 | Instruction::Append { .. }
                 | Instruction::DictIndexSet { .. }
                 | Instruction::DictIndexGetIntKey { .. }
+                | Instruction::DictIndexGetUintKey { .. }
                 | Instruction::DictIndexGetStringKey { .. }
                 | Instruction::ForeachInit { .. }
                 | Instruction::ForeachNext { .. }
@@ -181,6 +183,7 @@ fn instruction_candidates(
                 | Instruction::Is { .. }
                 | Instruction::SwitchPattern { .. }
                 | Instruction::IntRangeJumpUnless { .. }
+                | Instruction::UintRangeJumpUnless { .. }
         )
     {
         candidates.insert(CandidateSet::COMPARISON);
@@ -302,10 +305,26 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::IntBitwiseNot { .. }
             | Instruction::IntShiftLeft { .. }
             | Instruction::IntShiftRight { .. }
+            | Instruction::UintAdd { .. }
+            | Instruction::UintSubtract { .. }
+            | Instruction::UintMultiply { .. }
+            | Instruction::UintModulo { .. }
+            | Instruction::UintBitwiseAnd { .. }
+            | Instruction::UintBitwiseOr { .. }
+            | Instruction::UintBitwiseXor { .. }
+            | Instruction::UintBitwiseNot { .. }
+            | Instruction::UintShiftLeft { .. }
+            | Instruction::UintShiftRight { .. }
+            | Instruction::UintStep { .. }
+            | Instruction::UintAddImmediate { .. }
+            | Instruction::UintSubtractImmediate { .. }
+            | Instruction::UintMultiplyImmediate { .. }
+            | Instruction::UintModuloImmediate { .. }
             | Instruction::FloatAdd { .. }
             | Instruction::FloatSubtract { .. }
             | Instruction::FloatMultiply { .. }
             | Instruction::AddImmediate { .. }
+            | Instruction::Step { .. }
             | Instruction::SubtractImmediate { .. }
             | Instruction::IntMultiplyImmediate { .. }
             | Instruction::IntModuloImmediate { .. }
@@ -315,9 +334,11 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::JumpIfNotNull { .. }
             | Instruction::JumpUnless { .. }
             | Instruction::IntJumpUnless { .. }
+            | Instruction::UintJumpUnless { .. }
             | Instruction::StringJumpUnless { .. }
             | Instruction::JumpUnlessConstant { .. }
             | Instruction::IntJumpUnlessImmediate { .. }
+            | Instruction::UintJumpUnlessImmediate { .. }
             | Instruction::BoolPatternBranch { .. }
             | Instruction::SwitchInt { .. }
             | Instruction::SwitchString { .. }
@@ -338,9 +359,11 @@ fn instruction_may_be_a_dead_store(instruction: Instruction) -> bool {
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInt { .. }
+            | Instruction::LoadUint { .. }
             | Instruction::Clear { .. }
             | Instruction::VecIndexGet { .. }
             | Instruction::DictIndexGetIntKey { .. }
+            | Instruction::DictIndexGetUintKey { .. }
             | Instruction::DictIndexGetStringKey { .. }
     )
 }

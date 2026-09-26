@@ -4,13 +4,14 @@ use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 use whim_value::Value;
+use whim_value::ValueView;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
 
 #[whim_function(
-    "Whim\\_Private\\binary_decode(string $bytes, int $offset, int $width, bool $signed, bool $little): null|int"
+    "Whim\\_Private\\binary_decode(string $bytes, int $offset, int $width, bool $signed, bool $little): null|int|uint"
 )]
 fn decode(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result<Value, Throw> {
     let bytes = arguments.bytes(0);
@@ -41,14 +42,8 @@ fn decode(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result
         (4, true, true) => i64::from(i32::from_le_bytes(fixed(bytes))),
         (8, true, false) => i64::from_be_bytes(fixed(bytes)),
         (8, true, true) => i64::from_le_bytes(fixed(bytes)),
-        (8, false, false) => match i64::try_from(u64::from_be_bytes(fixed(bytes))) {
-            Ok(value) => value,
-            Err(_) => return Ok(Value::null()),
-        },
-        (8, false, true) => match i64::try_from(u64::from_le_bytes(fixed(bytes))) {
-            Ok(value) => value,
-            Err(_) => return Ok(Value::null()),
-        },
+        (8, false, false) => return Ok(Value::uint(u64::from_be_bytes(fixed(bytes)))),
+        (8, false, true) => return Ok(Value::uint(u64::from_le_bytes(fixed(bytes)))),
         // SAFETY: the surrounding invariant makes this path unreachable.
         _ => unsafe { unreachable_invariant("binary widths are limited to 1, 2, 4, or 8") },
     };
@@ -56,9 +51,16 @@ fn decode(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result
     Ok(Value::int(value))
 }
 
-#[whim_function("Whim\\_Private\\binary_encode(int $value, int $width, bool $little): string")]
+#[whim_function("Whim\\_Private\\binary_encode(int|uint $value, int $width, bool $little): string")]
 fn encode(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result<Value, Throw> {
-    let value = arguments.int(0);
+    let value = arguments.local(0);
+    let value = match value.transparent() {
+        ValueView::Int(value) => value.cast_unsigned(),
+        ValueView::Uint(value) => *value,
+        // SAFETY: dispatch checked the int|uint argument.
+        _ => unsafe { unreachable_invariant("a binary encoder receives an integer") },
+    };
+
     let width = binary_width(context, arguments.int(1))?;
     let little = arguments.bool(2);
     let bytes = if little {

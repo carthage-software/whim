@@ -453,7 +453,7 @@ callable-type   := "fn" | "fn" "(" callable-parameters? ")" ":" type
 classname-type  := "classname" "<" type ">"
 
 type-list       := type ("," type)* ","?
-built-in-type   := "null" | "bool" | "int" | "float" | "string"
+built-in-type   := "null" | "bool" | "int" | "uint" | "float" | "string"
                  | "object" | "mixed" | "never" | "void"
 literal-type    := literal | "-" (integer-literal | float-literal)
 range-type      := signed-integer-literal (".." | "..=")

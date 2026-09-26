@@ -152,7 +152,8 @@ fn literal_destination(instruction: Instruction) -> Option<Register> {
         | Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
-        | Instruction::LoadInt { destination, .. } => Some(destination),
+        | Instruction::LoadInt { destination, .. }
+        | Instruction::LoadUint { destination, .. } => Some(destination),
         _ => None,
     }
 }

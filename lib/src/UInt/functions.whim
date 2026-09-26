@@ -1,0 +1,14 @@
+namespace Whim\UInt;
+
+use Whim\Marker\Stub;
+use Whim\Marker\MustUse;
+
+/** Parses a complete unsigned decimal integer string, or returns null. */
+#[Stub]
+#[MustUse]
+function try_parse(string $value): null|uint {}
+
+/** Divides two unsigned integers, discarding the remainder. */
+#[Stub]
+#[MustUse]
+function div(uint $numerator, uint $denominator): uint {}

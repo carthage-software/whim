@@ -1,0 +1,490 @@
+use Whim\Marker\NeverInline;
+use Whim\Math;
+use Whim\Reflection;
+use Whim\Type;
+use Whim\Unwind\ArithmeticError;
+use Whim\Unwind\DivisionByZeroError;
+use Whim\Unwind\IncompatibleOperandsError;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UnderflowError;
+
+const MAXIMUM = 18_446_744_073_709_551_615u;
+type UpperHalf = 9_223_372_036_854_775_808u..;
+type SmallUnsigned = 1u..=20U;
+type OrderedCast = 1u|int|2u..;
+newtype Identifier = uint;
+
+enum UnsignedCode: uint {
+  case Zero = 0u;
+  case Maximum = MAXIMUM;
+}
+
+class Counter {
+  public uint $value = 0u;
+  public static uint $maximum = MAXIMUM;
+  public vec<1u..=10u> $values = vec[10u];
+}
+
+#[NeverInline]
+function unsigned(uint $value = 0U): uint {
+  return $value;
+}
+
+#[NeverInline]
+function signed(int $value): int {
+  return $value;
+}
+
+#[NeverInline]
+function convert<T>(mixed $value): T {
+  return $value as T;
+}
+
+#[NeverInline]
+function bounded<T>(T $value): T where T: uint {
+  return $value;
+}
+
+#[NeverInline]
+function calculate(uint $left, uint $right): vec<uint> {
+  return vec[
+    $left + $right,
+    $left - $right,
+    $left * $right,
+    $left % $right,
+    $left ** $right,
+    $left & $right,
+    $left | $right,
+    $left ^ $right,
+    $left << $right,
+    $left >> $right,
+    +$left,
+    ~$right,
+  ];
+}
+
+#[NeverInline]
+function shifted(uint $value, int $count): (uint, uint) {
+  return ($value << $count, $value >> $count);
+}
+
+#[NeverInline]
+function immediate(uint $value): vec<uint> {
+  return vec[$value + 65535u, $value - 2u, $value * 3u, $value % 4u];
+}
+
+#[NeverInline]
+function order(uint $left, uint $right): int {
+  if ($left < $right) {
+    return -1;
+  }
+
+  if ($left > $right) {
+    return 1;
+  }
+
+  return 0;
+}
+
+#[NeverInline]
+function in_range(mixed $value): bool {
+  if ($value is 9_223_372_036_854_775_808u..=18446744073709551615u) {
+    return true;
+  }
+
+  return false;
+}
+
+#[NeverInline]
+function counted(uint $limit): uint {
+  $sum = 0u;
+  for ($index = 0u; $index < $limit; $index++) {
+    $sum += $index;
+  }
+
+  return $sum;
+}
+
+#[NeverInline]
+function failed_write(uint $value, uint $operand, int $operation): uint {
+  $before = $value;
+  $caught = false;
+  try {
+    match ($operation) {
+      0 => $value += $operand,
+      1 => $value -= $operand,
+      2 => $value *= $operand,
+      3 => $value %= $operand,
+      4 => $value++,
+      5 => $value--,
+      _ => $value <<= $operand,
+    };
+  } catch (ArithmeticError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+  assert!($value == $before);
+  return $value;
+}
+
+#[NeverInline]
+function counter_overflow(uint $value, uint $limit): uint {
+  $caught = false;
+  try {
+    for (; $value <= $limit; $value++) {
+      assert!($value == $limit);
+    }
+  } catch (OverflowError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+  return $value;
+}
+
+#[NeverInline]
+function keyed(dict<uint, uint> $values, uint $key): uint {
+  $before = $values[$key] ?? 0u;
+  $values[$key] = $before + 1u;
+  assert!($values[$key] == $before + 1u);
+  $values[$key] ??= 2u;
+  return $values[$key];
+}
+
+#[NeverInline]
+function collected(vec<uint> $vector, dict<uint, uint> $dictionary): uint {
+  $sum = 0u;
+  foreach ($vector as $value) {
+    $sum += $value;
+  }
+
+  foreach ($dictionary as $key => $value) {
+    $sum += $key + $value;
+  }
+
+  for ($index = 0; $index < length!($vector); $index++) {
+    $sum += $vector[$index];
+  }
+
+  return $sum;
+}
+
+function expect_error<T: Throwable>(fn $operation): void {
+  $caught = false;
+  try {
+    $operation();
+  } catch (Throwable $error) {
+    assert!($error is T);
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+assert!(MAXIMUM == Math\UINT_MAX);
+assert!(Math\UINT_MIN == 0u);
+assert!(0xFFFF_FFFF_FFFF_FFFFu == MAXIMUM);
+assert!(0b1111U == 15u);
+assert!(0o77u == 63U);
+assert!(23U == 23u);
+assert!(23I == 23i);
+assert!(23i == 23);
+assert!(-0u == 0u);
+assert!(-24i == -24);
+assert!(unsigned() == 0u);
+assert!(unsigned(MAXIMUM) == MAXIMUM);
+assert!(bounded::<uint>(MAXIMUM) == MAXIMUM);
+expect_error::<TypeError>(fn() => bounded::<uint>(1));
+assert!(1u is uint);
+assert!(!(1u is int));
+assert!(!(1 is uint));
+assert!(1u != 1);
+assert!(1u != 1.0);
+assert!(MAXIMUM is UpperHalf);
+assert!(20u is SmallUnsigned);
+assert!(!(20 is SmallUnsigned));
+assert!(!(21u is SmallUnsigned));
+assert!(0u is ..=0u);
+assert!(!(0u is ..0u));
+assert!(!(1u is 20u..=1u));
+assert!(1u is !int);
+assert!(!(1u is int&uint));
+
+assert!((42 as uint) == 42u);
+assert!((42u as int) == 42);
+assert!((42u as float) == 42.0);
+assert!((42 as float) == 42.0);
+assert!((42.0 as uint) == 42u);
+assert!((42.0 as int) == 42);
+assert!(((-0.0) as uint) == 0u);
+assert!((42u as (int|uint)) is uint);
+assert!((42 as (uint|int)) is int);
+assert!((42.0 as (uint|float)) is float);
+assert!((42.0 as (uint|int)) == 42u);
+assert!((42.0 as (int|uint)) == 42);
+assert!((3.0 as OrderedCast) == 3);
+assert!((3.0 as (1u..=5u&!2u)) == 3u);
+assert!((2.0 ?as (1u..=5u&!2u)) == null);
+assert!((42.0 as (0u..=10u|int)) == 42);
+assert!(convert::<uint>(42) == 42u);
+assert!(convert::<int>(42u) == 42);
+assert!((MAXIMUM as float) == 18_446_744_073_709_551_616.0);
+assert!((18_446_744_073_709_551_616.0 ?as uint) == null);
+assert!((18_446_744_073_709_549_568.0 as uint) == 18_446_744_073_709_549_568u);
+assert!((9_223_372_036_854_775_808.0 ?as int) == null);
+assert!(((-9_223_372_036_854_775_808.0) as int) == Math\INT_MIN);
+assert!((MAXIMUM ?as int) == null);
+assert!(((-1) ?as uint) == null);
+assert!((1.5 ?as uint) == null);
+assert!((Math\NAN ?as uint) == null);
+assert!((Math\INF ?as uint) == null);
+assert!(((-Math\INF) ?as int) == null);
+assert!(('42' ?as uint) == null);
+assert!((true ?as uint) == null);
+assert!((vec[1] ?as vec<uint>) == null);
+expect_error::<TypeError>(fn() => MAXIMUM as int);
+expect_error::<TypeError>(fn() => unsigned(1));
+expect_error::<TypeError>(fn() => signed(1u));
+expect_error::<TypeError>(fn(): int => 1u);
+expect_error::<TypeError>(fn(): uint => 1);
+
+assert!(
+  calculate(6u, 2u) == vec[
+    8u,
+    4u,
+    12u,
+    0u,
+    36u,
+    2u,
+    6u,
+    4u,
+    24u,
+    1u,
+    6u,
+    MAXIMUM - 2u,
+  ],
+);
+
+assert!(6u + 2u == 8u);
+assert!(shifted(MAXIMUM, 63) == (9_223_372_036_854_775_808u, 1u));
+assert!(shifted(MAXIMUM, 0) == (MAXIMUM, MAXIMUM));
+expect_error::<ArithmeticError>(fn() => shifted(1u, -1));
+expect_error::<ArithmeticError>(fn() => shifted(1u, 64));
+expect_error::<ArithmeticError>(fn() => shifted(1u, Math\INT_MIN));
+assert!(immediate(10u) == vec[65545u, 8u, 30u, 2u]);
+assert!(order(MAXIMUM, 0u) == 1);
+assert!(order(0u, MAXIMUM) == -1);
+assert!(order(MAXIMUM, MAXIMUM) == 0);
+assert!(in_range(MAXIMUM));
+assert!(!in_range(Math\INT_MAX));
+assert!(!in_range(9_223_372_036_854_775_807u));
+assert!(!in_range('9223372036854775808'));
+assert!(counted(10u) == 45u);
+assert!(counted(0u) == 0u);
+assert!(failed_write(MAXIMUM, 1u, 0) == MAXIMUM);
+assert!(failed_write(0u, 1u, 1) == 0u);
+assert!(failed_write(MAXIMUM, 2u, 2) == MAXIMUM);
+assert!(failed_write(MAXIMUM, 0u, 3) == MAXIMUM);
+assert!(failed_write(MAXIMUM, 0u, 4) == MAXIMUM);
+assert!(failed_write(0u, 0u, 5) == 0u);
+assert!(failed_write(MAXIMUM, 64u, 6) == MAXIMUM);
+assert!(counter_overflow(MAXIMUM, MAXIMUM) == MAXIMUM);
+assert!(keyed(dict[], MAXIMUM) == 1u);
+assert!(keyed(dict[MAXIMUM => 4u], MAXIMUM) == 5u);
+assert!(collected(vec[1u, 2u, 3u], dict[4u => 5u]) == 21u);
+assert!(6u - 2u == 4u);
+assert!(6u * 2u == 12u);
+assert!(7u % 2u == 1u);
+assert!(6u ** 2u == 36u);
+assert!(0u ** 0u == 1u);
+assert!(0u ** MAXIMUM == 0u);
+assert!(1u ** MAXIMUM == 1u);
+assert!(2u ** 63u == 9_223_372_036_854_775_808u);
+assert!(6u / 2u == 3.0);
+assert!(6u / 2 == 3.0);
+assert!(6 / 2u == 3.0);
+assert!(2u + 0.5 == 2.5);
+assert!(0.5 + 2u == 2.5);
+assert!(2u - 0.5 == 1.5);
+assert!(0.5 - 2u == -1.5);
+assert!(2u * 0.5 == 1.0);
+assert!(0.5 * 2u == 1.0);
+assert!(2u ** -1.0 == 0.5);
+assert!(2.0 ** 2u == 4.0);
+assert!(~0u == MAXIMUM);
+assert!(MAXIMUM << 1 == MAXIMUM - 1u);
+assert!(MAXIMUM >> 63u == 1u);
+assert!(-1 >> 63u == -1);
+assert!(-1 << 63u == Math\INT_MIN);
+assert!(0u == -unsigned(0u));
+expect_error::<OverflowError>(fn() => unsigned(MAXIMUM) + 1u);
+expect_error::<OverflowError>(fn() => MAXIMUM * 2u);
+expect_error::<OverflowError>(fn() => 2u ** MAXIMUM);
+expect_error::<UnderflowError>(fn() => 0u - 1u);
+expect_error::<UnderflowError>(fn() => -unsigned(1u));
+expect_error::<DivisionByZeroError>(fn() => 1u / 0u);
+expect_error::<DivisionByZeroError>(fn() => 1u % 0u);
+expect_error::<IncompatibleOperandsError>(fn() => 1u + 1);
+expect_error::<IncompatibleOperandsError>(fn() => 1 + 1u);
+expect_error::<IncompatibleOperandsError>(fn() => 1u - 1);
+expect_error::<IncompatibleOperandsError>(fn() => 1u * 1);
+expect_error::<IncompatibleOperandsError>(fn() => 1u % 0);
+expect_error::<IncompatibleOperandsError>(fn() => 1u ** 1);
+expect_error::<IncompatibleOperandsError>(fn() => 1u & 1);
+expect_error::<IncompatibleOperandsError>(fn() => 1u | 1);
+expect_error::<IncompatibleOperandsError>(fn() => 1u ^ 1);
+expect_error::<ArithmeticError>(fn() => 1u << -1);
+expect_error::<ArithmeticError>(fn() => 1u >> 64u);
+expect_error::<ArithmeticError>(fn() => 1 << MAXIMUM);
+
+$counter = new Counter();
+assert!($counter->value++ == 0u);
+assert!(++$counter->value == 2u);
+assert!($counter->value-- == 2u);
+assert!(--$counter->value == 0u);
+expect_error::<UnderflowError>(fn() => $counter->value--);
+assert!($counter->value == 0u);
+$counter->value = MAXIMUM;
+expect_error::<OverflowError>(fn() => ++$counter->value);
+assert!($counter->value == MAXIMUM);
+expect_error::<OverflowError>(fn() => $counter->value += 1u);
+assert!($counter->value == MAXIMUM);
+expect_error::<TypeError>(fn() => $counter->value = 1);
+assert!($counter->value == MAXIMUM);
+expect_error::<IncompatibleOperandsError>(fn() => $counter->value += 1);
+assert!($counter->value == MAXIMUM);
+expect_error::<OverflowError>(fn() => Counter::$maximum++);
+assert!(Counter::$maximum == MAXIMUM);
+expect_error::<TypeError>(fn() => $counter->values[0]++);
+assert!($counter->values[0] == 10u);
+expect_error::<TypeError>(fn() => $counter->values[0] = 1);
+assert!($counter->values[0] == 10u);
+expect_error::<TypeError>(fn() => $counter->value /= 1u);
+assert!($counter->value == MAXIMUM);
+
+assert!(1u <= 1);
+assert!(1u >= 1.0);
+assert!(MAXIMUM > Math\INT_MAX);
+assert!(0u > -1);
+assert!(9_007_199_254_740_993u > 9_007_199_254_740_992.0);
+assert!(9_007_199_254_740_992.0 < 9_007_199_254_740_993u);
+assert!(MAXIMUM < 18_446_744_073_709_551_616.0);
+assert!(!(1u < Math\NAN));
+assert!(!(1u > Math\NAN));
+expect_error::<IncompatibleOperandsError>(fn() => 1u <=> Math\NAN);
+assert!((1u <=> 1) == 0);
+assert!('value=' . MAXIMUM == 'value=18446744073709551615');
+assert!("value={MAXIMUM}" == 'value=18446744073709551615');
+
+$keys = dict[
+  1 => 'int',
+  1u => 'uint',
+  '1' => 'string',
+  true => 'bool',
+  MAXIMUM => 'max',
+];
+
+assert!(length!($keys) == 5);
+assert!($keys[1u] == 'uint');
+assert!($keys[MAXIMUM] == 'max');
+assert!(
+  $keys is dict[1 => string, 1u => string, '1' => string, true => string, 18446744073709551615u => string],
+);
+
+assert!(
+  match ($keys) {
+    dict[1u => $value, ...] => $value,
+  }
+  == 'uint',
+);
+
+assert!(
+  match (unsigned(MAXIMUM)) {
+    1 => 'int',
+    1u..20u => 'small',
+    UpperHalf => 'large',
+  }
+  == 'large',
+);
+
+assert!(
+  match (1u) {
+    1 => 'int',
+    1U => 'uint',
+  }
+  == 'uint',
+);
+
+assert!(
+  match (MAXIMUM) {
+    18446744073709551615u => 'max',
+    _ => 'other',
+  }
+  == 'max',
+);
+
+assert!(length!(Whim\Vec\unique::<int|uint|float>(vec[1, 1u, 1.0, 1u])) == 3);
+expect_error::<TypeError>(fn() => vec['one'][0u]);
+expect_error::<TypeError>(fn() => 'one'[0u]);
+
+$identifier = Identifier(MAXIMUM);
+assert!($identifier is Identifier);
+assert!($identifier is uint);
+assert!(($identifier as uint) == MAXIMUM);
+assert!((1u as Identifier) is Identifier);
+expect_error::<TypeError>(fn() => 1 as Identifier);
+expect_error::<TypeError>(fn() => Identifier(1));
+assert!($identifier - 1u == MAXIMUM - 1u);
+assert!(UnsignedCode::from(MAXIMUM) == UnsignedCode::Maximum);
+assert!(UnsignedCode::tryFrom(0) == null);
+assert!(UnsignedCode::Zero->value == 0u);
+assert!(Type\of(1u) == Type\id::<uint>());
+assert!(Type\of(1u) != Type\of(1));
+$type = Reflection\reflect_type::<uint>();
+assert!($type->getKind() == Reflection\Type\TypeKind::Uint);
+assert!($type->toString() == 'uint');
+assert!($type->accepts(1u));
+assert!(!$type->accepts(1));
+$literal = Reflection\reflect_type::<18446744073709551615u>();
+assert!($literal->getValue() == MAXIMUM);
+$range = Reflection\reflect_type::<2u..=18446744073709551615u>();
+assert!($range->getLowerBound() == 2u);
+assert!($range->getUpperBound() == MAXIMUM);
+assert!($range->isSubtypeOf($type));
+
+$sum = 0u;
+for ($index = 0u; $index < 10u; $index++) {
+  $sum += $index;
+}
+
+assert!($sum == 45u);
+while ($index > 0u) {
+  $index--;
+}
+
+assert!($index == 0u);
+$values = vec[vec[1u]];
+assert!($values[0][0]++ == 1u);
+assert!($values[0][0] == 2u);
+$number = 0u;
+$number ??= 1;
+assert!($number == 0u);
+assert!((0u ?? 1) == 0u);
+assert!(
+  match (0u) {
+    -0u => true,
+    _ => false,
+  },
+);
+
+expect_error::<TypeError>(fn() => !unsigned(0u));
+expect_error::<TypeError>(fn() => vec[1][0u] ?? 2);
+expect_error::<TypeError>(fn() => contains_key!(vec[1], 0u));
+assert!(contains_key!($keys, MAXIMUM));
+assert!(contains!(vec[1u], 1u));
+assert!(!contains!(vec[1u], 1));
+discard!(remove!($keys, MAXIMUM));
+assert!(!contains_key!($keys, MAXIMUM));

@@ -98,6 +98,10 @@ impl VirtualMachine<'_> {
             TypeSpec::Never => false,
             TypeSpec::Bool => value.is_bool(),
             TypeSpec::Int => value.is_int(),
+            TypeSpec::Uint => value.is_uint(),
+            TypeSpec::UintRange(min, max) => value.as_uint().is_some_and(|value| {
+                min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
+            }),
             TypeSpec::IntRange(min, max) => value.as_int().is_some_and(|value| {
                 min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
             }),

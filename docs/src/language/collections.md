@@ -66,7 +66,7 @@ A dict cannot spread into a vec.
 
 ## Dicts
 
-A dict accepts bool, int, and string keys. It keeps insertion order:
+A dict accepts bool, int, uint, and string keys. It keeps insertion order:
 
 ```whim
 $scores = dict['Ada' => 10, 'Grace' => 12];
@@ -77,7 +77,10 @@ assert!($scores['Ada'] == 11);
 assert!(length!($scores) == 3);
 ```
 
-Keys do not convert. `1`, `'1'`, and `true` are three different keys.
+Keys do not convert. `1`, `1u`, `'1'`, and `true` are four different keys.
+The unsigned maximum is a valid key. Vec, tuple, and string positions still
+require `int`, including coalescing and containment checks; cast a uint position
+explicitly. Collection lengths and iteration keys for vecs and tuples remain int.
 
 Replacing a value keeps the key's place. Removing a key and adding it again
 moves it to the end.

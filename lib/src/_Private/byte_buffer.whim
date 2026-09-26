@@ -20,7 +20,11 @@ final class ByteBuffer {
   #[MustUse]
   public function read(int $offset, int $length): string {}
 
-  public function appendInteger(int $value, int $width, bool $little): void {}
+  public function appendInteger(
+    int|uint $value,
+    int $width,
+    bool $little,
+  ): void {}
 
   public function appendFloat(float $value, int $width, bool $little): void {}
 

@@ -231,6 +231,34 @@ fn invert_forward_branch(instruction: Instruction, index: usize) -> Option<(usiz
                 offset: ShortJumpOffset::new(1),
             },
         )),
+        Instruction::UintJumpUnless {
+            comparison,
+            left,
+            right,
+            offset,
+        } => Some((
+            relative_target(index, i32::from(offset.offset())),
+            Instruction::UintJumpUnless {
+                comparison: comparison.negated(),
+                left,
+                right,
+                offset: ShortJumpOffset::new(1),
+            },
+        )),
+        Instruction::UintJumpUnlessImmediate {
+            comparison,
+            source,
+            immediate,
+            offset,
+        } => Some((
+            relative_target(index, i32::from(offset.offset())),
+            Instruction::UintJumpUnlessImmediate {
+                comparison: comparison.negated(),
+                source,
+                immediate,
+                offset: ShortJumpOffset::new(1),
+            },
+        )),
         Instruction::StringJumpUnless {
             comparison,
             left,
@@ -386,6 +414,7 @@ fn hard_terminator(instruction: Instruction) -> bool {
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }

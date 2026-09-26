@@ -9,6 +9,7 @@ use crate::cst::atom::Keyword;
 use crate::cst::atom::Literal;
 use crate::cst::atom::LiteralFloat;
 use crate::cst::atom::LiteralInteger;
+use crate::cst::atom::LiteralIntegerSuffix;
 use crate::cst::atom::LiteralString;
 use crate::cst::atom::LiteralStringKind;
 use crate::cst::atom::LocalIdentifier;
@@ -136,19 +137,32 @@ where
     }
 
     pub(crate) fn parse_integer_literal(&mut self) -> Result<LiteralInteger<'arena>, ParseError> {
-        let token = self.expect(TokenKind::LiteralInteger)?;
+        let token = self.consume()?;
         let span = token.compute_span();
-        let value =
-            parse_literal_integer(token.value.as_bytes()).ok_or(ParseError::UnexpectedToken(
-                Expected::Description("a valid integer literal"),
-                token.kind,
-                span,
-            ))?;
+        let suffix = match token.kind {
+            TokenKind::LiteralInteger => None,
+            TokenKind::LiteralUnsignedInteger => Some(LiteralIntegerSuffix::Unsigned),
+            TokenKind::LiteralSignedInteger => Some(LiteralIntegerSuffix::Signed),
+            _ => {
+                return Err(ParseError::UnexpectedToken(
+                    Expected::Description("an integer literal"),
+                    token.kind,
+                    span,
+                ));
+            }
+        };
 
         Ok(LiteralInteger {
             span,
             raw: self.arena.alloc_str(token.value),
-            value,
+            value: parse_literal_integer(token.value.as_bytes()).ok_or(
+                ParseError::UnexpectedToken(
+                    Expected::Description("a valid integer literal"),
+                    token.kind,
+                    span,
+                ),
+            )?,
+            suffix,
         })
     }
 
@@ -203,6 +217,31 @@ where
                         span,
                     ),
                 )?,
+                suffix: None,
+            }),
+            TokenKind::LiteralUnsignedInteger => Literal::Integer(LiteralInteger {
+                span,
+                raw,
+                value: parse_literal_integer(token.value.as_bytes()).ok_or(
+                    ParseError::UnexpectedToken(
+                        Expected::Description("a valid integer literal"),
+                        token.kind,
+                        span,
+                    ),
+                )?,
+                suffix: Some(LiteralIntegerSuffix::Unsigned),
+            }),
+            TokenKind::LiteralSignedInteger => Literal::Integer(LiteralInteger {
+                span,
+                raw,
+                value: parse_literal_integer(token.value.as_bytes()).ok_or(
+                    ParseError::UnexpectedToken(
+                        Expected::Description("a valid integer literal"),
+                        token.kind,
+                        span,
+                    ),
+                )?,
+                suffix: Some(LiteralIntegerSuffix::Signed),
             }),
             TokenKind::LiteralFloat => Literal::Float(LiteralFloat {
                 span,

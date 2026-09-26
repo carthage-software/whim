@@ -4,7 +4,7 @@ use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
 
-/** Decodes one fixed-width integer, or null on short input or overflow. */
+/** Decodes one fixed-width integer, or null on short input. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
@@ -14,10 +14,10 @@ function binary_decode(
   int $width,
   bool $signed,
   bool $little,
-): null|int {}
+): null|int|uint {}
 
 /** Encodes the low bytes of an integer at a fixed width. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function binary_encode(int $value, int $width, bool $little): string {}
+function binary_encode(int|uint $value, int $width, bool $little): string {}

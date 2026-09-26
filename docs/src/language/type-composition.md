@@ -103,7 +103,8 @@ type Ordering = -1|0|1;
 function enabled(true $value): void {}
 ```
 
-Integer and float literal types remain distinct. `1` does not contain `1.0`.
+Signed integer, unsigned integer, and float literal types remain distinct.
+`1`, `1u`, and `1.0` each accept only their own kind.
 
 ## Integer range types
 
@@ -130,6 +131,12 @@ function connect(Port $port): void {}
 Both bounds may be negative. A reversed or equal exclusive range is empty.
 `1..=1` contains only `1`.
 
+Unsigned bounds select an unsigned range: `1u..=20u`, `1u..`, and `..=20u`
+accept only uints. Missing bounds extend to zero or the unsigned maximum.
+Both written bounds must have the same kind; `1..=20u` is a compile error.
+`0u..` is the whole unsigned domain, while `..0u` is empty. Signed ranges such
+as `0..` continue to reject uints.
+
 Ranges work as generic bounds and type arguments:
 
 ```whim
@@ -151,7 +158,8 @@ Square brackets after `string` limit its byte length:
 | `string[..64]` | fewer than 64 bytes |
 | `string[1..=64]` | one through 64 bytes |
 
-These types follow integer range rules. Empty ranges accept no value.
+These types use signed integer bounds. Unsigned bounds such as `string[4u]`
+are compile errors. Empty ranges accept no value.
 
 ```whim
 type Name = string[1..=64];

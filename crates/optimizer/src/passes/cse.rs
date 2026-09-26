@@ -147,6 +147,9 @@ fn read_key(chunk: &Chunk, instruction: Instruction) -> Option<ReadKey> {
         Instruction::DictIndexGetIntKey {
             container, index, ..
         } => Some(ReadKey::Index(2, container, index)),
+        Instruction::DictIndexGetUintKey {
+            container, index, ..
+        } => Some(ReadKey::Index(5, container, index)),
         Instruction::DictIndexGetStringKey {
             container, index, ..
         } => Some(ReadKey::Index(3, container, index)),
@@ -193,6 +196,12 @@ fn pure_read(instruction: Instruction) -> Option<PureRead> {
             ..
         }
         | Instruction::DictIndexGetIntKey {
+            destination,
+            container,
+            index,
+            ..
+        }
+        | Instruction::DictIndexGetUintKey {
             destination,
             container,
             index,
@@ -305,6 +314,18 @@ fn same_read(chunk: &Chunk, left: Instruction, right: Instruction) -> bool {
                 ..
             },
             Instruction::DictIndexGetStringKey {
+                container: right_container,
+                index: right_index,
+                ..
+            },
+        )
+        | (
+            Instruction::DictIndexGetUintKey {
+                container: left_container,
+                index: left_index,
+                ..
+            },
+            Instruction::DictIndexGetUintKey {
                 container: right_container,
                 index: right_index,
                 ..
@@ -498,6 +519,7 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInt { .. }
+            | Instruction::LoadUint { .. }
             | Instruction::Add { .. }
             | Instruction::Subtract { .. }
             | Instruction::Multiply { .. }
@@ -507,6 +529,7 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::Negate { .. }
             | Instruction::UnaryPlus { .. }
             | Instruction::AddImmediate { .. }
+            | Instruction::Step { .. }
             | Instruction::SubtractImmediate { .. }
             | Instruction::IntAdd { .. }
             | Instruction::IntSubtract { .. }
@@ -514,6 +537,22 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::IntModulo { .. }
             | Instruction::IntMultiplyImmediate { .. }
             | Instruction::IntModuloImmediate { .. }
+            | Instruction::UintAdd { .. }
+            | Instruction::UintSubtract { .. }
+            | Instruction::UintMultiply { .. }
+            | Instruction::UintModulo { .. }
+            | Instruction::UintBitwiseAnd { .. }
+            | Instruction::UintBitwiseOr { .. }
+            | Instruction::UintBitwiseXor { .. }
+            | Instruction::UintBitwiseNot { .. }
+            | Instruction::UintShiftLeft { .. }
+            | Instruction::UintShiftRight { .. }
+            | Instruction::UintStep { .. }
+            | Instruction::UintAddAssign { .. }
+            | Instruction::UintAddImmediate { .. }
+            | Instruction::UintSubtractImmediate { .. }
+            | Instruction::UintMultiplyImmediate { .. }
+            | Instruction::UintModuloImmediate { .. }
             | Instruction::Equal { .. }
             | Instruction::NotEqual { .. }
             | Instruction::LessThan { .. }
@@ -529,10 +568,12 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::JumpIfNotNull { .. }
             | Instruction::JumpUnless { .. }
             | Instruction::IntJumpUnless { .. }
+            | Instruction::UintJumpUnless { .. }
             | Instruction::StringJumpUnless { .. }
             | Instruction::StringByteJumpUnlessEqual { .. }
             | Instruction::StringByteJumpUnlessNotEqual { .. }
             | Instruction::IntJumpUnlessImmediate { .. }
+            | Instruction::UintJumpUnlessImmediate { .. }
             | Instruction::JumpUnlessConstant { .. }
             | Instruction::PropertyGet { .. }
             | Instruction::PropertyGetUnchecked { .. }
@@ -543,6 +584,7 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::ReturnPairUnchecked { .. }
             | Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
     )

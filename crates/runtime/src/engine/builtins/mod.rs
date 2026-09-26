@@ -160,6 +160,7 @@ fn constant_spec_value(heap: &Heap, value: &ConstantValue) -> Value {
     match value {
         ConstantValue::Bool(value) => Value::bool(*value),
         ConstantValue::Int(value) => Value::int(*value),
+        ConstantValue::Uint(value) => Value::uint(*value),
         ConstantValue::Float(value) => Value::float(*value),
         ConstantValue::String(value) => Value::string(heap.intern(value.as_bytes()).to_handle()),
     }
@@ -214,6 +215,7 @@ fn parameter_default(heap: &Heap, default: &ParameterDefaultSpec) -> Literal {
         ParameterDefaultSpec::Null => Literal::Null,
         ParameterDefaultSpec::Bool(value) => Literal::Bool(*value),
         ParameterDefaultSpec::Int(value) => Literal::Int(*value),
+        ParameterDefaultSpec::Uint(value) => Literal::Uint(*value),
         ParameterDefaultSpec::Float(value) => Literal::Float(*value),
         ParameterDefaultSpec::String(value) => Literal::String(heap.intern(value)),
     }
@@ -231,6 +233,7 @@ pub(in crate::engine) fn text_of(value: &Value) -> String {
                 .into_owned()
         }
         ValueView::Int(value) => value.to_string(),
+        ValueView::Uint(value) => format!("{value}u"),
         ValueView::Float(value) => value.to_string(),
         _ => value.kind_name().to_string(),
     }

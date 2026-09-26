@@ -96,9 +96,11 @@ fn scalar_write_to(instruction: Instruction, register: Register) -> bool {
             | Instruction::LoadTrue { destination }
             | Instruction::LoadFalse { destination }
             | Instruction::LoadInt { destination, .. }
+            | Instruction::LoadUint { destination, .. }
             | Instruction::Negate { destination, .. }
             | Instruction::UnaryPlus { destination, .. }
             | Instruction::AddImmediate { destination, .. }
+            | Instruction::Step { destination, .. }
             | Instruction::SubtractImmediate { destination, .. }
             | Instruction::BitwiseNot { destination, .. }
             | Instruction::Not { destination, .. }
@@ -110,6 +112,21 @@ fn scalar_write_to(instruction: Instruction, register: Register) -> bool {
             | Instruction::IntModulo { destination, .. }
             | Instruction::IntMultiplyImmediate { destination, .. }
             | Instruction::IntModuloImmediate { destination, .. }
+            | Instruction::UintAdd { destination, .. }
+            | Instruction::UintSubtract { destination, .. }
+            | Instruction::UintMultiply { destination, .. }
+            | Instruction::UintModulo { destination, .. }
+            | Instruction::UintBitwiseAnd { destination, .. }
+            | Instruction::UintBitwiseOr { destination, .. }
+            | Instruction::UintBitwiseXor { destination, .. }
+            | Instruction::UintBitwiseNot { destination, .. }
+            | Instruction::UintShiftLeft { destination, .. }
+            | Instruction::UintShiftRight { destination, .. }
+            | Instruction::UintStep { destination, .. }
+            | Instruction::UintAddImmediate { destination, .. }
+            | Instruction::UintSubtractImmediate { destination, .. }
+            | Instruction::UintMultiplyImmediate { destination, .. }
+            | Instruction::UintModuloImmediate { destination, .. }
             | Instruction::FloatAdd { destination, .. }
             | Instruction::FloatSubtract { destination, .. }
             | Instruction::FloatMultiply { destination, .. }

@@ -40,6 +40,7 @@ where
             TypeDescriptor::Null => "null".to_string(),
             TypeDescriptor::Bool => "bool".to_string(),
             TypeDescriptor::Int => "int".to_string(),
+            TypeDescriptor::Uint => "uint".to_string(),
             TypeDescriptor::Float => "float".to_string(),
             TypeDescriptor::String => "string".to_string(),
             TypeDescriptor::StringLength { min, max } => match max {
@@ -51,6 +52,13 @@ where
             TypeDescriptor::TrueLiteral => "true".to_string(),
             TypeDescriptor::FalseLiteral => "false".to_string(),
             TypeDescriptor::IntLiteral(value) => value.to_string(),
+            TypeDescriptor::UintLiteral(value) => format!("{value}u"),
+            TypeDescriptor::UintRange { min, max } => match (min, max) {
+                (Some(min), Some(max)) => format!("{min}u..={max}u"),
+                (Some(min), None) => format!("{min}u.."),
+                (None, Some(max)) => format!("..={max}u"),
+                (None, None) => "uint".to_string(),
+            },
             TypeDescriptor::IntRange { min, max } => match (min, max) {
                 (Some(min), Some(max)) => format!("{min}..={max}"),
                 (Some(min), None) => format!("{min}.."),
@@ -125,6 +133,7 @@ where
                         let key = match key {
                             ShapeKey::Bool(key) => key.to_string(),
                             ShapeKey::Int(key) => key.to_string(),
+                            ShapeKey::Uint(key) => format!("{key}u"),
                             ShapeKey::String(key) => {
                                 format!("'{}'", key.to_string_lossy())
                             }

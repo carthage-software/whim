@@ -22,6 +22,7 @@ use crate::type_flow::OBJECT;
 use crate::type_flow::STRING;
 use crate::type_flow::THIS_ORIGIN;
 use crate::type_flow::TUPLE;
+use crate::type_flow::UINT;
 use crate::type_flow::VECTOR;
 use crate::type_flow::descriptor_mask;
 use crate::type_flow::unary_numeric_result;
@@ -109,6 +110,14 @@ pub(crate) fn transfer(
             destination,
             Fact::integer(i64::from(immediate.value()), origin),
         ),
+        instructions!(LoadUint | UintAdd | UintSubtract | UintMultiply | UintModulo | UintBitwiseAnd | UintBitwiseOr | UintBitwiseXor | UintBitwiseNot | UintShiftLeft | UintShiftRight | UintAddImmediate | UintSubtractImmediate | UintMultiplyImmediate | UintModuloImmediate | UintStep; { destination, .. }) =>
+        {
+            write(destination, Fact::with_origin(UINT, origin));
+        }
+        Instruction::UintAddAssign { target, .. } => write(target, Fact::with_origin(UINT, origin)),
+        Instruction::UintCounterLoop { counter, .. } => {
+            write(counter, Fact::with_origin(UINT, origin))
+        }
         Instruction::Add {
             destination,
             left,
@@ -141,7 +150,7 @@ pub(crate) fn transfer(
             let exponent = read(right);
             let mut fact = numeric_result(read(left), exponent);
             if fact.mask == INT && !exponent.non_negative {
-                fact = Fact::known(NUMERIC);
+                fact = Fact::known(INT | FLOAT);
             }
 
             write(destination, with_origin(fact, origin));
@@ -170,9 +179,6 @@ pub(crate) fn transfer(
             write(destination, with_origin(fact, origin));
         }
         Instruction::IntModulo {
-            destination, left, ..
-        }
-        | Instruction::Modulo {
             destination, left, ..
         } => {
             let mut fact = Fact::known(INT);
@@ -204,14 +210,40 @@ pub(crate) fn transfer(
         | Instruction::IntBitwiseNot { destination, .. }
         | Instruction::IntShiftLeft { destination, .. }
         | Instruction::IntShiftRight { destination, .. }
-        | Instruction::BitwiseAnd { destination, .. }
-        | Instruction::BitwiseOr { destination, .. }
-        | Instruction::BitwiseXor { destination, .. }
-        | Instruction::BitwiseNot { destination, .. }
-        | Instruction::ShiftLeft { destination, .. }
-        | Instruction::ShiftRight { destination, .. }
         | Instruction::Compare { destination, .. } => {
             write(destination, Fact::with_origin(INT, origin))
+        }
+        Instruction::Modulo {
+            destination, left, ..
+        }
+        | Instruction::BitwiseAnd {
+            destination, left, ..
+        }
+        | Instruction::BitwiseOr {
+            destination, left, ..
+        }
+        | Instruction::BitwiseXor {
+            destination, left, ..
+        }
+        | Instruction::ShiftLeft {
+            destination, left, ..
+        }
+        | Instruction::ShiftRight {
+            destination, left, ..
+        } => {
+            write(
+                destination,
+                Fact::with_origin(read(left).mask & (INT | UINT), origin),
+            );
+        }
+        Instruction::BitwiseNot {
+            destination,
+            source,
+        } => {
+            write(
+                destination,
+                Fact::with_origin(read(source).mask & (INT | UINT), origin),
+            );
         }
         Instruction::IntAddAssign { target, .. } => write(target, Fact::with_origin(INT, origin)),
         Instruction::Length { destination, .. } | Instruction::StringLength { destination, .. } => {
@@ -236,6 +268,16 @@ pub(crate) fn transfer(
             with_origin(unary_numeric_result(read(source)), origin),
         ),
         Instruction::AddImmediate {
+            destination,
+            source,
+            immediate,
+        } => {
+            let source = read(source);
+            let mut fact = unary_numeric_result(source);
+            fact.non_negative = source.non_negative && immediate.value() >= 0;
+            write(destination, with_origin(fact, origin));
+        }
+        Instruction::Step {
             destination,
             source,
             immediate,
@@ -359,6 +401,8 @@ pub(crate) fn transfer(
         | Instruction::IndexCoalesce { destination, .. }
         | Instruction::VecIndexCoalesce { destination, .. }
         | Instruction::DictIndexCoalesceIntKey { destination, .. }
+        | Instruction::DictIndexCoalesceUintKey { destination, .. }
+        | Instruction::DictIndexGetUintKeyOrNull { destination, .. }
         | Instruction::DictIndexCoalesceStringKey { destination, .. }
         | Instruction::StringIndexCoalesce { destination, .. }
         | Instruction::PropertyCoalesce { destination, .. }
@@ -391,6 +435,11 @@ pub(crate) fn transfer(
             ..
         }
         | Instruction::DictIndexGetIntKey {
+            destination,
+            container,
+            ..
+        }
+        | Instruction::DictIndexGetUintKey {
             destination,
             container,
             ..
@@ -497,6 +546,9 @@ pub(crate) fn transfer(
         | Instruction::DictIndexSetIntKey {
             container, value, ..
         }
+        | Instruction::DictIndexSetUintKey {
+            container, value, ..
+        }
         | Instruction::DictIndexSetStringKey {
             container, value, ..
         }
@@ -566,6 +618,7 @@ pub(crate) fn transfer(
             let array = read(iterator).array;
             let mask = match value_mode {
                 ArrayValueMode::Int => INT,
+                ArrayValueMode::Uint => UINT,
                 ArrayValueMode::Float => FLOAT,
                 ArrayValueMode::Generic => array_elements
                     .and_then(|elements| elements.get(array as usize))
@@ -588,11 +641,12 @@ pub(crate) fn transfer(
                     .and_then(|keys| keys.get(array as usize))
                     .copied()
                     .filter(|_| array != NO_ORIGIN)
-                    .unwrap_or(INT | STRING);
+                    .unwrap_or(INT | UINT | BOOL | STRING);
                 write(key_destination, Fact::with_origin(mask, origin));
             }
             let mask = match value_mode {
                 ArrayValueMode::Int => INT,
+                ArrayValueMode::Uint => UINT,
                 ArrayValueMode::Float => FLOAT,
                 ArrayValueMode::Generic => array_elements
                     .and_then(|elements| elements.get(array as usize))
@@ -686,6 +740,11 @@ pub(crate) fn transfer(
         | Instruction::SwitchPattern { .. }
         | Instruction::SwitchTuplePattern { .. }
         | Instruction::IntRangeJumpIf { .. }
+        | Instruction::UintRangeJumpIf { .. }
+        | Instruction::UintRangeJumpUnless { .. }
+        | Instruction::UintJumpUnless { .. }
+        | Instruction::UintJumpUnlessImmediate { .. }
+        | Instruction::ReturnUintUnchecked { .. }
         | Instruction::IntRangeJumpUnless { .. }
         | Instruction::BoolPatternBranch { .. }
         | Instruction::CheckDefined { .. }
@@ -757,6 +816,8 @@ pub(crate) fn transfer(
 pub(crate) fn numeric_result(left: Fact, right: Fact) -> Fact {
     if left.mask & !INT == 0 && right.mask & !INT == 0 {
         Fact::known(INT)
+    } else if left.mask & !UINT == 0 && right.mask & !UINT == 0 {
+        Fact::known(UINT)
     } else if left.mask & !FLOAT == 0 || right.mask & !FLOAT == 0 {
         Fact::known(FLOAT)
     } else {
@@ -769,6 +830,7 @@ pub(crate) fn literal_mask(literal: &Literal) -> u16 {
         Literal::Null => NULL,
         Literal::Bool(_) => BOOL,
         Literal::Int(_) => INT,
+        Literal::Uint(_) => UINT,
         Literal::Float(_) => FLOAT,
         Literal::String(_) => STRING,
     }

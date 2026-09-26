@@ -470,6 +470,7 @@ pub(crate) fn specialized_instruction(
     specialize_with(
         instruction,
         |register| flow.proves(index, register, &TypeDescriptor::Int),
+        |register| flow.proves(index, register, &TypeDescriptor::Uint),
         |register| flow.proves(index, register, &TypeDescriptor::String),
     )
 }
@@ -477,6 +478,7 @@ pub(crate) fn specialized_instruction(
 pub(super) fn specialize_with(
     instruction: Instruction,
     is_int: impl Fn(Register) -> bool,
+    is_uint: impl Fn(Register) -> bool,
     is_string: impl Fn(Register) -> bool,
 ) -> Option<Instruction> {
     match instruction {
@@ -486,6 +488,17 @@ pub(super) fn specialize_with(
             right,
             offset,
         } if is_int(left) && is_int(right) => Some(Instruction::IntJumpUnless {
+            comparison,
+            left,
+            right,
+            offset,
+        }),
+        Instruction::JumpUnless {
+            comparison,
+            left,
+            right,
+            offset,
+        } if is_uint(left) && is_uint(right) => Some(Instruction::UintJumpUnless {
             comparison,
             left,
             right,

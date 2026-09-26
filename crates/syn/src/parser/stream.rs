@@ -135,6 +135,12 @@ where
         Ok(self.peek_kind()? == Some(kind))
     }
 
+    /// Whether the next significant token is any of `kinds`. `false` at EOF.
+    #[inline]
+    pub(super) fn is_at_any(&mut self, kinds: &[TokenKind]) -> Result<bool, ParseError> {
+        Ok(self.peek_kind()?.is_some_and(|kind| kinds.contains(&kind)))
+    }
+
     /// Whether the next token can close a type-argument or type-parameter
     /// list, i.e. it begins with `>` (`>`, `>=`, `>>`, or `>>=`).
     #[inline]

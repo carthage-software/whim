@@ -1181,6 +1181,7 @@ impl Node<'_, '_> {
                 Type::Tuple(inner) => f(Node::TupleType(inner)),
                 Type::String(inner)
                 | Type::Int(inner)
+                | Type::Uint(inner)
                 | Type::Float(inner)
                 | Type::Bool(inner)
                 | Type::Void(inner)

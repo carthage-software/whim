@@ -1,5 +1,7 @@
 use Whim\Float;
 use Whim\Int;
+use Whim\Math;
+use Whim\UInt;
 
 assert!(Int\try_parse('42') == 42);
 assert!(Int\try_parse('-42') == -42);
@@ -12,6 +14,45 @@ assert!(Int\try_parse('') == null);
 assert!(Int\try_parse(' 42') == null);
 assert!(Int\try_parse('42.0') == null);
 assert!(Int\try_parse("\xff") == null);
+
+assert!(UInt\try_parse('0') == 0u);
+assert!(UInt\try_parse('+42') == 42u);
+assert!(UInt\try_parse('00042') == 42u);
+assert!(UInt\try_parse('9223372036854775808') == 9_223_372_036_854_775_808u);
+assert!(UInt\try_parse('18446744073709551615') == Math\UINT_MAX);
+foreach (vec[
+  '',
+  '-',
+  '+',
+  '-0',
+  '-42',
+  ' 42',
+  '42 ',
+  '4_2',
+  '42u',
+  '0x42',
+  '0b10',
+  '0o10',
+  '42.0',
+  '42e0',
+  '18446744073709551616',
+  "\xff",
+  "42\0",
+] as $invalid) {
+  assert!(UInt\try_parse($invalid) == null);
+}
+
+assert!(UInt\div(Math\UINT_MAX, 2u) == 9_223_372_036_854_775_807u);
+assert!(UInt\div(1u, Math\UINT_MAX) == 0u);
+assert!(UInt\div(Math\UINT_MAX, Math\UINT_MAX) == 1u);
+$caught = false;
+try {
+  UInt\div(1u, 0u);
+} catch (Whim\Unwind\DivisionByZeroError $error) {
+  $caught = true;
+}
+
+assert!($caught);
 
 assert!(Float\try_parse('1.5') == 1.5);
 assert!(Float\try_parse('.5') == 0.5);

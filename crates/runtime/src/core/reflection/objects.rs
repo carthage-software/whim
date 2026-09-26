@@ -177,6 +177,7 @@ fn type_class_name(context: &Context<'_, '_, '_>, descriptor: &TypeDescriptor) -
         | TypeDescriptor::Null
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
+        | TypeDescriptor::Uint
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::Object => "Whim\\Reflection\\Type\\PrimitiveTypeReflection",
@@ -184,9 +185,12 @@ fn type_class_name(context: &Context<'_, '_, '_>, descriptor: &TypeDescriptor) -
         TypeDescriptor::TrueLiteral
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
+        | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::FloatLiteral(_)
         | TypeDescriptor::StringLiteral(_) => "Whim\\Reflection\\Type\\LiteralTypeReflection",
-        TypeDescriptor::IntRange { .. } => "Whim\\Reflection\\Type\\IntegerRangeTypeReflection",
+        TypeDescriptor::IntRange { .. } | TypeDescriptor::UintRange { .. } => {
+            "Whim\\Reflection\\Type\\IntegerRangeTypeReflection"
+        }
         TypeDescriptor::Named { name, .. } => context.vm.engine.tables.symbols.get(name).map_or(
             "Whim\\Reflection\\Type\\SymbolTypeReflection",
             |entry| {

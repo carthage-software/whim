@@ -48,6 +48,12 @@ impl TypeFlow<'_> {
                 right,
                 offset,
             }
+            | Instruction::UintJumpUnless {
+                comparison,
+                left,
+                right,
+                offset,
+            }
             | Instruction::StringJumpUnless {
                 comparison,
                 left,
@@ -80,6 +86,19 @@ impl TypeFlow<'_> {
                     comparison,
                     &value(source)?,
                     &ConstantValue::Int(i64::from(immediate.value())),
+                )?,
+                i32::from(offset.offset()),
+            ),
+            Instruction::UintJumpUnlessImmediate {
+                comparison,
+                source,
+                immediate,
+                offset,
+            } => (
+                !constant_comparison(
+                    comparison,
+                    &value(source)?,
+                    &ConstantValue::Uint(u64::from(immediate.value())),
                 )?,
                 i32::from(offset.offset()),
             ),
@@ -129,6 +148,9 @@ impl TypeFlow<'_> {
                     offset: back_edge, ..
                 }
                 | Instruction::IntCounterLoop {
+                    offset: back_edge, ..
+                }
+                | Instruction::UintCounterLoop {
                     offset: back_edge, ..
                 },
             ) = self.chunk.code.get(relative_target(index, offset) - 1)
@@ -186,6 +208,7 @@ fn runtime_value(value: ConstantValue) -> Value {
         ConstantValue::Null => Value::null(),
         ConstantValue::Bool(value) => Value::bool(value),
         ConstantValue::Int(value) => Value::int(value),
+        ConstantValue::Uint(value) => Value::uint(value),
         ConstantValue::Float(value) => Value::float(value),
         ConstantValue::String(value) => Value::string(value.to_handle()),
     }

@@ -80,9 +80,9 @@ rejects(
 
 rejects(
   $work,
-  'backing-type-is-not-int-or-string',
+  'backing-type-is-not-int-uint-or-string',
   'enum Level: float {' . "\n" . '    case Low = 1.0;' . "\n" . '}' . "\n",
-  'an enum backing type must be `int` or `string`',
+  'an enum backing type must be `int`, `uint`, or `string`',
 );
 
 rejects(
@@ -90,6 +90,13 @@ rejects(
   'duplicate-backing-value',
   'enum E: string { case A = "x"; case B = "x"; }' . "\n",
   'is already used by another case',
+);
+
+rejects(
+  $work,
+  'duplicate-unsigned-backing-constant',
+  'const VALUE = 18446744073709551615u; enum E: uint { case A = VALUE; case B = VALUE; }',
+  'is already used by',
 );
 
 rejects(

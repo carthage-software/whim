@@ -63,13 +63,14 @@ fn constant_value(type_string: &LitStr, identifier: &syn::Ident) -> syn::Result<
     let path = quote!(crate::builtin::spec::ConstantValue);
     let value = match parsed {
         Type::Int(_) => quote!(#path::Int(#identifier)),
+        Type::Uint(_) => quote!(#path::Uint(#identifier)),
         Type::Float(_) => quote!(#path::Float(#identifier)),
         Type::Bool(_) => quote!(#path::Bool(#identifier)),
         Type::String(_) => quote!(#path::String(#identifier)),
         _ => {
             return Err(syn::Error::new(
                 type_string.span(),
-                "a built-in constant is int, float, bool, or string",
+                "a built-in constant is int, uint, float, bool, or string",
             ));
         }
     };

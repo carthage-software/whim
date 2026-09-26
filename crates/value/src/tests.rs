@@ -41,6 +41,7 @@ fn cloning_preserves_tags_and_owns_one_reference() {
         Value::null(),
         Value::bool(true),
         Value::int(i64::MIN),
+        Value::uint(u64::MAX),
         Value::float(-0.0),
         Value::from_string_bytes(&heap, b"short"),
         Value::from_string_bytes(&heap, b"a heap string"),
@@ -54,6 +55,7 @@ fn cloning_preserves_tags_and_owns_one_reference() {
         assert_eq!(alias.newtype_id(), value.newtype_id());
         assert_eq!(alias.as_bool(), value.as_bool());
         assert_eq!(alias.as_int(), value.as_int());
+        assert_eq!(alias.as_uint(), value.as_uint());
         assert_eq!(
             alias.as_float().map(f64::to_bits),
             value.as_float().map(f64::to_bits)

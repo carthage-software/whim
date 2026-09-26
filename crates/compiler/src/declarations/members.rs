@@ -623,6 +623,9 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
         )?;
 
         let value = match (&case.value, self.is_external, self.output.enum_backing) {
+            (Some(_), true, Some(EnumBacking::Uint)) => {
+                Some(ConstantInitializer::Literal(BytecodeLiteral::Uint(0)))
+            }
             (Some(_), true, Some(EnumBacking::Int)) => {
                 Some(ConstantInitializer::Literal(BytecodeLiteral::Int(0)))
             }
@@ -645,11 +648,13 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
         {
             let satisfied = match backing {
                 EnumBacking::Int => matches!(literal, BytecodeLiteral::Int(_)),
+                EnumBacking::Uint => matches!(literal, BytecodeLiteral::Uint(_)),
                 EnumBacking::String => matches!(literal, BytecodeLiteral::String(_)),
             };
             if !satisfied {
                 let expected = match backing {
                     EnumBacking::Int => "int",
+                    EnumBacking::Uint => "uint",
                     EnumBacking::String => "string",
                 };
                 return Err(CompileError::new(
@@ -722,6 +727,13 @@ fn literal_satisfies_in<'a>(
         TypeDescriptor::Null => matches!(literal, BytecodeLiteral::Null),
         TypeDescriptor::Bool => matches!(literal, BytecodeLiteral::Bool(_)),
         TypeDescriptor::Int => matches!(literal, BytecodeLiteral::Int(_)),
+        TypeDescriptor::Uint => matches!(literal, BytecodeLiteral::Uint(_)),
+        TypeDescriptor::UintLiteral(expected) => {
+            matches!(literal, BytecodeLiteral::Uint(value) if value == expected)
+        }
+        TypeDescriptor::UintRange { min, max } => {
+            matches!(literal, BytecodeLiteral::Uint(value) if min.is_none_or(|min| *value >= min) && max.is_none_or(|max| *value <= max))
+        }
         TypeDescriptor::Float => matches!(literal, BytecodeLiteral::Float(_)),
         TypeDescriptor::String => matches!(literal, BytecodeLiteral::String(_)),
         TypeDescriptor::StringLength { min, max } => matches!(

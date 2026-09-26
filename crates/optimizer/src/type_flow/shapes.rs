@@ -97,6 +97,7 @@ impl TypeFlow<'_> {
             let key = match key {
                 ShapeKey::Bool(value) => ConstantDictionaryKey::Bool(*value),
                 ShapeKey::Int(value) => ConstantDictionaryKey::Int(*value),
+                ShapeKey::Uint(value) => ConstantDictionaryKey::Uint(*value),
                 ShapeKey::String(value) => ConstantDictionaryKey::String(value.clone()),
             };
             let Some(actual) = values.remove(&key) else {
@@ -115,6 +116,7 @@ impl TypeFlow<'_> {
                 ConstantDictionaryKey::Bool(true) => TypeDescriptor::TrueLiteral,
                 ConstantDictionaryKey::Bool(false) => TypeDescriptor::FalseLiteral,
                 ConstantDictionaryKey::Int(value) => TypeDescriptor::IntLiteral(value),
+                ConstantDictionaryKey::Uint(value) => TypeDescriptor::UintLiteral(value),
                 ConstantDictionaryKey::String(value) => TypeDescriptor::StringLiteral(value),
             };
             self.descriptor_proves(&key, expected_key, depth + 1)

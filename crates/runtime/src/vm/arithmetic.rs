@@ -31,9 +31,14 @@ pub(in crate::vm) fn arithmetic_add(
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => integer_add(*a, *b).map(Value::int),
+        (ValueView::Uint(a), ValueView::Uint(b)) => {
+            a.checked_add(*b).map(Value::uint).ok_or(Fault::Overflow)
+        }
         (ValueView::Float(a), ValueView::Float(b)) => Ok(Value::float(a + b)),
         (ValueView::Int(a), ValueView::Float(b)) => Ok(Value::float(*a as f64 + b)),
         (ValueView::Float(a), ValueView::Int(b)) => Ok(Value::float(a + *b as f64)),
+        (ValueView::Uint(a), ValueView::Float(b)) => Ok(Value::float(*a as f64 + b)),
+        (ValueView::Float(a), ValueView::Uint(b)) => Ok(Value::float(a + *b as f64)),
         _ => Err(Fault::Incompatible),
     }
 }
@@ -47,9 +52,14 @@ pub(in crate::vm) fn arithmetic_subtract(
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => integer_subtract(*a, *b).map(Value::int),
+        (ValueView::Uint(a), ValueView::Uint(b)) => {
+            a.checked_sub(*b).map(Value::uint).ok_or(Fault::Underflow)
+        }
         (ValueView::Float(a), ValueView::Float(b)) => Ok(Value::float(a - b)),
         (ValueView::Int(a), ValueView::Float(b)) => Ok(Value::float(*a as f64 - b)),
         (ValueView::Float(a), ValueView::Int(b)) => Ok(Value::float(a - *b as f64)),
+        (ValueView::Uint(a), ValueView::Float(b)) => Ok(Value::float(*a as f64 - b)),
+        (ValueView::Float(a), ValueView::Uint(b)) => Ok(Value::float(a - *b as f64)),
         _ => Err(Fault::Incompatible),
     }
 }
@@ -63,9 +73,14 @@ pub(in crate::vm) fn arithmetic_multiply(
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => integer_multiply(*a, *b).map(Value::int),
+        (ValueView::Uint(a), ValueView::Uint(b)) => {
+            a.checked_mul(*b).map(Value::uint).ok_or(Fault::Overflow)
+        }
         (ValueView::Float(a), ValueView::Float(b)) => Ok(Value::float(a * b)),
         (ValueView::Int(a), ValueView::Float(b)) => Ok(Value::float(*a as f64 * b)),
         (ValueView::Float(a), ValueView::Int(b)) => Ok(Value::float(a * *b as f64)),
+        (ValueView::Uint(a), ValueView::Float(b)) => Ok(Value::float(*a as f64 * b)),
+        (ValueView::Float(a), ValueView::Uint(b)) => Ok(Value::float(a * *b as f64)),
         _ => Err(Fault::Incompatible),
     }
 }
@@ -90,6 +105,7 @@ pub(in crate::vm) fn arithmetic_divide(
 fn numeric_operand(value: &Value) -> Result<f64, Fault> {
     match value.transparent() {
         ValueView::Int(value) => Ok(*value as f64),
+        ValueView::Uint(value) => Ok(*value as f64),
         ValueView::Float(value) => Ok(*value),
         _ => Err(Fault::Incompatible),
     }
@@ -104,6 +120,10 @@ pub(in crate::vm) fn arithmetic_modulo(
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => integer_modulo(*a, *b).map(Value::int),
+        (ValueView::Uint(a), ValueView::Uint(b)) => a
+            .checked_rem(*b)
+            .map(Value::uint)
+            .ok_or(Fault::DivisionByZero),
         _ => Err(Fault::Incompatible),
     }
 }
@@ -144,6 +164,26 @@ pub(in crate::vm) fn integer_modulo(left: i64, right: i64) -> Result<i64, Fault>
     Ok(left.checked_rem(right).unwrap_or(0))
 }
 
+#[inline(always)]
+pub(in crate::vm) fn unsigned_add(left: u64, right: u64) -> Result<u64, Fault> {
+    left.checked_add(right).ok_or(Fault::Overflow)
+}
+
+#[inline(always)]
+pub(in crate::vm) fn unsigned_subtract(left: u64, right: u64) -> Result<u64, Fault> {
+    left.checked_sub(right).ok_or(Fault::Underflow)
+}
+
+#[inline(always)]
+pub(in crate::vm) fn unsigned_multiply(left: u64, right: u64) -> Result<u64, Fault> {
+    left.checked_mul(right).ok_or(Fault::Overflow)
+}
+
+#[inline(always)]
+pub(in crate::vm) fn unsigned_modulo(left: u64, right: u64) -> Result<u64, Fault> {
+    left.checked_rem(right).ok_or(Fault::DivisionByZero)
+}
+
 /// `**` per the arithmetic table: an int base with a non-negative int
 /// exponent stays int with overflow checks. A negative int exponent produces
 /// a float unless the base is zero, which is division by zero. Every other
@@ -155,6 +195,15 @@ pub(in crate::vm) fn arithmetic_power(
     right: &Value,
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
+        (ValueView::Uint(base), ValueView::Uint(exponent)) => {
+            let result = match (*base, *exponent) {
+                (_, 0) | (1, _) => 1,
+                (0, _) => 0,
+                (_, 64..) => return Err(Fault::Overflow),
+                (base, exponent) => base.checked_pow(exponent as u32).ok_or(Fault::Overflow)?,
+            };
+            Ok(Value::uint(result))
+        }
         (ValueView::Int(base), ValueView::Int(exponent)) => {
             if *exponent >= 0 {
                 integer_power(*base, *exponent as u64)
@@ -171,6 +220,12 @@ pub(in crate::vm) fn arithmetic_power(
             Ok(Value::float((*base as f64).powf(*exponent)))
         }
         (ValueView::Float(base), ValueView::Int(exponent)) => {
+            Ok(Value::float(base.powf(*exponent as f64)))
+        }
+        (ValueView::Uint(base), ValueView::Float(exponent)) => {
+            Ok(Value::float((*base as f64).powf(*exponent)))
+        }
+        (ValueView::Float(base), ValueView::Uint(exponent)) => {
             Ok(Value::float(base.powf(*exponent as f64)))
         }
         _ => Err(Fault::Incompatible),
@@ -220,7 +275,25 @@ pub(in crate::vm) fn step_by(value: &Value, step: i64) -> Result<Value, Fault> {
             }),
         },
         ValueView::Float(current) => Ok(Value::float(current + step as f64)),
+        ValueView::Uint(current) => {
+            current
+                .checked_add_signed(step)
+                .map(Value::uint)
+                .ok_or(if step < 0 {
+                    Fault::Underflow
+                } else {
+                    Fault::Overflow
+                })
+        }
         _ => Err(Fault::Incompatible),
+    }
+}
+
+pub(in crate::vm) fn arithmetic_immediate(value: &Value, step: i64) -> Result<Value, Fault> {
+    if value.is_uint() {
+        Err(Fault::Incompatible)
+    } else {
+        step_by(value, step)
     }
 }
 
@@ -233,6 +306,13 @@ pub(in crate::vm) fn negate(value: &Value) -> Result<Value, Fault> {
             None => Err(Fault::Overflow),
         },
         ValueView::Float(operand) => Ok(Value::float(-operand)),
+        ValueView::Uint(operand) => {
+            if *operand == 0 {
+                Ok(Value::uint(0))
+            } else {
+                Err(Fault::Underflow)
+            }
+        }
         _ => Err(Fault::Incompatible),
     }
 }
@@ -246,6 +326,7 @@ pub(in crate::vm) fn bitwise_and(
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => Ok(Value::int(a & b)),
+        (ValueView::Uint(a), ValueView::Uint(b)) => Ok(Value::uint(a & b)),
         _ => Err(Fault::Incompatible),
     }
 }
@@ -255,6 +336,7 @@ pub(in crate::vm) fn bitwise_and(
 pub(in crate::vm) fn bitwise_or(_heap: &Heap, left: &Value, right: &Value) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => Ok(Value::int(a | b)),
+        (ValueView::Uint(a), ValueView::Uint(b)) => Ok(Value::uint(a | b)),
         _ => Err(Fault::Incompatible),
     }
 }
@@ -268,6 +350,7 @@ pub(in crate::vm) fn bitwise_xor(
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => Ok(Value::int(a ^ b)),
+        (ValueView::Uint(a), ValueView::Uint(b)) => Ok(Value::uint(a ^ b)),
         _ => Err(Fault::Incompatible),
     }
 }
@@ -278,6 +361,27 @@ pub(in crate::vm) fn bitwise_xor(
 pub(in crate::vm) fn shift_left(_heap: &Heap, left: &Value, right: &Value) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => integer_shift_left(*a, *b).map(Value::int),
+        (ValueView::Int(a), ValueView::Uint(b)) => {
+            if *b >= 64 {
+                return Err(Fault::ShiftRange);
+            }
+
+            Ok(Value::int(*a << *b as u32))
+        }
+        (ValueView::Uint(a), ValueView::Int(b)) => {
+            if !(0..=63).contains(b) {
+                return Err(Fault::ShiftRange);
+            }
+
+            Ok(Value::uint(*a << *b as u32))
+        }
+        (ValueView::Uint(a), ValueView::Uint(b)) => {
+            if *b >= 64 {
+                return Err(Fault::ShiftRange);
+            }
+
+            Ok(Value::uint(*a << *b as u32))
+        }
         _ => Err(Fault::Incompatible),
     }
 }
@@ -301,6 +405,27 @@ pub(in crate::vm) fn shift_right(
 ) -> Result<Value, Fault> {
     match (left.transparent(), right.transparent()) {
         (ValueView::Int(a), ValueView::Int(b)) => integer_shift_right(*a, *b).map(Value::int),
+        (ValueView::Int(a), ValueView::Uint(b)) => {
+            if *b >= 64 {
+                return Err(Fault::ShiftRange);
+            }
+
+            Ok(Value::int(*a >> *b as u32))
+        }
+        (ValueView::Uint(a), ValueView::Int(b)) => {
+            if !(0..=63).contains(b) {
+                return Err(Fault::ShiftRange);
+            }
+
+            Ok(Value::uint(*a >> *b as u32))
+        }
+        (ValueView::Uint(a), ValueView::Uint(b)) => {
+            if *b >= 64 {
+                return Err(Fault::ShiftRange);
+            }
+
+            Ok(Value::uint(*a >> *b as u32))
+        }
         _ => Err(Fault::Incompatible),
     }
 }

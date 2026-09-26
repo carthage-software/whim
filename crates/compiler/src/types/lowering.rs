@@ -10,6 +10,7 @@ use whim_span::HasSpan;
 use whim_span::Span;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::atom::Literal;
+use whim_syn::cst::atom::LiteralInteger;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::r#type::ArrayType;
 use whim_syn::cst::r#type::ClassnameType;
@@ -37,6 +38,7 @@ use whim_syn::cst::walker::Visitor;
 use whim_syn::cst::walker::walk;
 use whim_value::heap::Heap;
 
+use crate::emit::unsigned_integer_gate;
 use crate::error::CompileError;
 use crate::error::CompileErrorKind;
 use crate::limits::check_sequence;
@@ -1009,6 +1011,7 @@ fn lower_dict_shape_type(
                 Literal::True(_) => ShapeKey::Bool(true),
                 Literal::False(_) => ShapeKey::Bool(false),
                 Literal::String(string) => ShapeKey::String(scope.heap.intern(string.value)),
+                Literal::Integer(integer) if integer.is_unsigned() => ShapeKey::Uint(integer.value),
                 Literal::Integer(integer) => {
                     ShapeKey::Int(i64::try_from(integer.value).map_err(|_| {
                         CompileError::new(
@@ -1045,6 +1048,7 @@ fn lower_dict_shape_type(
                     Box::new(TypeDescriptor::Union(vec![
                         TypeDescriptor::String,
                         TypeDescriptor::Int,
+                        TypeDescriptor::Uint,
                         TypeDescriptor::Bool,
                     ])),
                     Box::new(TypeDescriptor::Mixed),
@@ -1187,6 +1191,7 @@ fn lower_type_inner(
         Type::Mixed(_) => Ok(TypeDescriptor::Mixed),
         Type::Bool(_) => Ok(TypeDescriptor::Bool),
         Type::Int(_) => Ok(TypeDescriptor::Int),
+        Type::Uint(_) => Ok(TypeDescriptor::Uint),
         Type::Float(_) => Ok(TypeDescriptor::Float),
         Type::String(_) => Ok(TypeDescriptor::String),
         Type::StringLength(string) => lower_string_length_type(scope.heap, string),
@@ -1244,6 +1249,7 @@ fn descriptor_may_be_class_like(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Null
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
+        | TypeDescriptor::Uint
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -1251,6 +1257,8 @@ fn descriptor_may_be_class_like(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
         | TypeDescriptor::IntRange { .. }
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::FloatLiteral(_)
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Array(_)
@@ -1321,6 +1329,7 @@ fn descriptor_has_parameter(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Null
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
+        | TypeDescriptor::Uint
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -1329,6 +1338,8 @@ fn descriptor_has_parameter(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::FalseLiteral
         | TypeDescriptor::IntLiteral(_)
         | TypeDescriptor::IntRange { .. }
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::FloatLiteral(_)
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Member { .. }
@@ -1342,6 +1353,9 @@ fn lower_literal(heap: &Heap, literal: &Literal<'_>) -> Result<TypeDescriptor, C
         Literal::Null(_) => Ok(TypeDescriptor::Null),
         Literal::True(_) => Ok(TypeDescriptor::TrueLiteral),
         Literal::False(_) => Ok(TypeDescriptor::FalseLiteral),
+        Literal::Integer(integer) if integer.is_unsigned() => {
+            Ok(TypeDescriptor::UintLiteral(integer.value))
+        }
         Literal::Integer(integer) => {
             let value = i64::try_from(integer.value).map_err(|_| {
                 CompileError::new(
@@ -1363,6 +1377,10 @@ fn lower_negative_literal(
 ) -> Result<TypeDescriptor, CompileError> {
     match literal {
         NegativeLiteralType::Integer { minus, literal } => {
+            if literal.is_unsigned() {
+                return unsigned_integer_gate(literal.value, true, minus.join(literal.span))
+                    .map(TypeDescriptor::UintLiteral);
+            }
             let magnitude = literal.value;
             let value = if magnitude == (i64::MAX as u64) + 1 {
                 i64::MIN
@@ -1387,6 +1405,43 @@ fn lower_negative_literal(
 }
 
 fn lower_integer_range(range: &IntegerRangeType<'_>) -> Result<TypeDescriptor, CompileError> {
+    let unsigned = range
+        .lower
+        .as_ref()
+        .or(range.upper.as_ref())
+        .is_some_and(|bound| range_literal(bound).is_unsigned());
+    if range
+        .lower
+        .iter()
+        .chain(range.upper.iter())
+        .any(|bound| range_literal(bound).is_unsigned() != unsigned)
+    {
+        return Err(CompileError::new(
+            CompileErrorKind::MixedIntegerRangeBounds,
+            "range bounds must have the same integer type",
+            range.span(),
+        ));
+    }
+    if unsigned {
+        let bound = |bound: &IntegerRangeBound<'_>| {
+            unsigned_integer_gate(
+                range_literal(bound).value,
+                matches!(bound, IntegerRangeBound::Negative { .. }),
+                bound.span(),
+            )
+        };
+        let min = range.lower.as_ref().map(bound).transpose()?;
+        let mut max = range.upper.as_ref().map(bound).transpose()?;
+        if matches!(range.operator, IntegerRangeOperator::Exclusive(_))
+            && let Some(upper) = max
+        {
+            let Some(inclusive) = upper.checked_sub(1) else {
+                return Ok(TypeDescriptor::Never);
+            };
+            max = Some(inclusive);
+        }
+        return Ok(TypeDescriptor::unsigned_integer_range(min, max));
+    }
     let min = range
         .lower
         .as_ref()
@@ -1416,6 +1471,7 @@ fn lower_string_length_type(
 ) -> Result<TypeDescriptor, CompileError> {
     let (min, max) = match &string.length {
         StringLength::Exact(length) => {
+            reject_unsigned_length(length.is_unsigned(), length.span)?;
             let length = i64::try_from(length.value).map_err(|_| {
                 CompileError::new(
                     CompileErrorKind::IntegerLiteralOutOfRange,
@@ -1426,6 +1482,9 @@ fn lower_string_length_type(
             (length, Some(length))
         }
         StringLength::Range(range) => {
+            for bound in range.lower.iter().chain(range.upper.iter()) {
+                reject_unsigned_length(range_literal(bound).is_unsigned(), bound.span())?;
+            }
             let min = range
                 .lower
                 .as_ref()
@@ -1476,5 +1535,27 @@ fn lower_integer_range_bound(bound: &IntegerRangeBound<'_>) -> Result<i64, Compi
                     )
                 })
         }
+    }
+}
+
+const fn range_literal<'a, 'arena>(
+    bound: &'a IntegerRangeBound<'arena>,
+) -> &'a LiteralInteger<'arena> {
+    match bound {
+        IntegerRangeBound::Positive(literal) | IntegerRangeBound::Negative { literal, .. } => {
+            literal
+        }
+    }
+}
+
+fn reject_unsigned_length(unsigned: bool, span: Span) -> Result<(), CompileError> {
+    if unsigned {
+        Err(CompileError::new(
+            CompileErrorKind::TypeNotRuntimeCheckable,
+            "string length bounds must be signed integers",
+            span,
+        ))
+    } else {
+        Ok(())
     }
 }

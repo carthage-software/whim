@@ -73,6 +73,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | LoadTrue
                 | LoadFalse
                 | LoadInt
+                | LoadUint
                 | NewStatic
                 | NewTyped
                 | StaticPropertyGetOrNull
@@ -115,6 +116,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | ReturnNull
                 | ReturnNullUnchecked
                 | ReturnIntUnchecked
+                | ReturnUintUnchecked
                 | Rethrow
         ) => Some(&[]),
         instruction_kinds!(
@@ -145,17 +147,33 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | ConcatenateRightConstant
                 | ConcatenateLeftConstant
                 | IntBitwiseNot
+                | UintBitwiseNot
+                | UintAddImmediate
+                | UintSubtractImmediate
+                | UintMultiplyImmediate
+                | UintModuloImmediate
+                | UintStep
                 | AddImmediate
+                | Step
                 | SubtractImmediate
                 | IntMultiplyImmediate
                 | IntModuloImmediate
         ) => Some(&[R3, W1]),
         InstructionKind::MoveOwned => Some(&[R3, W3, W1]),
-        InstructionKind::IntAddAssign => Some(&[R1, R3, W1]),
+        InstructionKind::IntAddAssign | InstructionKind::UintAddAssign => Some(&[R1, R3, W1]),
         instruction_kinds!(
             Add | Subtract
                 | Multiply
                 | IntAdd
+                | UintAdd
+                | UintSubtract
+                | UintMultiply
+                | UintModulo
+                | UintBitwiseAnd
+                | UintBitwiseOr
+                | UintBitwiseXor
+                | UintShiftLeft
+                | UintShiftRight
                 | IntSubtract
                 | IntMultiply
                 | IntModulo
@@ -183,11 +201,13 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | IndexGetOrNull
                 | VecIndexGetOrNull
                 | DictIndexGetIntKeyOrNull
+                | DictIndexGetUintKeyOrNull
                 | DictIndexGetStringKeyOrNull
                 | StringIndexGetOrNull
                 | IndexCoalesce
                 | VecIndexCoalesce
                 | DictIndexCoalesceIntKey
+                | DictIndexCoalesceUintKey
                 | DictIndexCoalesceStringKey
                 | StringIndexCoalesce
                 | IndexGet
@@ -221,6 +241,8 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | SwitchFloat
                 | SwitchPattern
                 | IntRangeJumpIf
+                | UintRangeJumpIf
+                | UintRangeJumpUnless
                 | IntRangeJumpUnless
                 | BoolPatternBranch
                 | SwitchTuplePattern
@@ -241,9 +263,17 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | Panic
         ) => Some(&[R1]),
         instruction_kinds!(
-            JumpUnless | IntJumpUnless | StringJumpUnless | NumericLoop | IntNumericLoop | Assert
+            JumpUnless
+                | IntJumpUnless
+                | UintJumpUnless
+                | StringJumpUnless
+                | NumericLoop
+                | IntNumericLoop
+                | Assert
         ) => Some(&[R2, R4]),
-        InstructionKind::CounterLoop | InstructionKind::IntCounterLoop => Some(&[R2, R4, W2]),
+        InstructionKind::CounterLoop
+        | InstructionKind::IntCounterLoop
+        | InstructionKind::UintCounterLoop => Some(&[R2, R4, W2]),
         instruction_kinds!(
             StringByteJumpUnlessEqual
                 | StringByteJumpUnlessNotEqual
@@ -262,12 +292,17 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | PropertyAddUnchecked
                 | ReturnPairUnchecked
         ) => Some(&[R1, R3]),
-        InstructionKind::JumpUnlessConstant | InstructionKind::IntJumpUnlessImmediate => {
-            Some(&[R2])
-        }
+        InstructionKind::JumpUnlessConstant
+        | InstructionKind::IntJumpUnlessImmediate
+        | InstructionKind::UintJumpUnlessImmediate => Some(&[R2]),
         InstructionKind::IncrementJump => Some(&[R1, W1]),
         instruction_kinds!(
-            IndexSet | VecIndexSet | DictIndexSetIntKey | DictIndexSetStringKey | DictIndexSet
+            IndexSet
+                | VecIndexSet
+                | DictIndexSetIntKey
+                | DictIndexSetUintKey
+                | DictIndexSetStringKey
+                | DictIndexSet
         ) => Some(&[R1, R3, R5]),
         InstructionKind::PropertyRemove | InstructionKind::PropertyRemoveUnchecked => {
             Some(&[R1, W3])

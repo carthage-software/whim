@@ -238,6 +238,7 @@ fn same_shape_key(left: &ShapeKey, right: &ShapeKey) -> bool {
     match (left, right) {
         (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
         (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
+        (ShapeKey::Uint(left), ShapeKey::Uint(right)) => left == right,
         (ShapeKey::String(left), ShapeKey::String(right)) => left.as_bytes() == right.as_bytes(),
         _ => false,
     }
@@ -325,9 +326,11 @@ fn collect_match_keys(heap: &Heap, pattern: &Pattern<'_>, keys: &mut Vec<MatchKe
                 keys.push(MatchKey::Bool(false));
                 true
             }
-            Type::Literal(Literal::Integer(integer)) => i64::try_from(integer.value)
-                .map(|value| keys.push(MatchKey::Int(value)))
-                .is_ok(),
+            Type::Literal(Literal::Integer(integer)) if integer.is_signed() => {
+                i64::try_from(integer.value)
+                    .map(|value| keys.push(MatchKey::Int(value)))
+                    .is_ok()
+            }
             Type::Literal(Literal::Float(float)) => {
                 keys.push(MatchKey::Float(float.value));
                 true
@@ -336,7 +339,9 @@ fn collect_match_keys(heap: &Heap, pattern: &Pattern<'_>, keys: &mut Vec<MatchKe
                 keys.push(MatchKey::String(heap.intern(string.value)));
                 true
             }
-            Type::NegativeLiteral(NegativeLiteralType::Integer { literal, .. }) => {
+            Type::NegativeLiteral(NegativeLiteralType::Integer { literal, .. })
+                if literal.is_signed() =>
+            {
                 let Ok(value) = i64::try_from(-i128::from(literal.value)) else {
                     return false;
                 };
@@ -2392,6 +2397,9 @@ impl BodyCompiler<'_, '_> {
 
     fn lower_dict_pattern_key(&self, key: &DictPatternKey<'_>) -> Result<ShapeKey, CompileError> {
         Ok(match key {
+            DictPatternKey::Integer { minus, literal } if literal.is_unsigned() => ShapeKey::Uint(
+                super::unsigned_integer_gate(literal.value, minus.is_some(), key.span())?,
+            ),
             DictPatternKey::True(_) => ShapeKey::Bool(true),
             DictPatternKey::False(_) => ShapeKey::Bool(false),
             DictPatternKey::String(string) => ShapeKey::String(self.heap.intern(string.value)),
@@ -2409,6 +2417,20 @@ impl BodyCompiler<'_, '_> {
 
     fn pattern_dict_key(&mut self, key: &DictPatternKey<'_>) -> Result<Register, CompileError> {
         match key {
+            DictPatternKey::Integer { minus, literal } if literal.is_unsigned() => {
+                let value =
+                    super::unsigned_integer_gate(literal.value, minus.is_some(), key.span())?;
+                let destination = self.allocate(key.span())?;
+                let constant = self.add_constant(BytecodeLiteral::Uint(value), key.span())?;
+                self.chunk.emit(
+                    Instruction::LoadConstant {
+                        destination,
+                        constant,
+                    },
+                    key.span(),
+                );
+                Ok(destination)
+            }
             DictPatternKey::True(_) | DictPatternKey::False(_) => {
                 let destination = self.allocate(key.span())?;
                 let instruction = if matches!(key, DictPatternKey::True(_)) {
@@ -2865,8 +2887,16 @@ fn same_dict_pattern_key(left: &DictPatternKey<'_>, right: &DictPatternKey<'_>) 
                 dict_pattern_integer(left_minus.is_some(), left),
                 dict_pattern_integer(right_minus.is_some(), right),
             ) {
-                (Some(left), Some(right)) => left == right,
-                _ => false,
+                (Some(left_value), Some(right_value)) => {
+                    left_value == right_value && left.is_unsigned() == right.is_unsigned()
+                }
+                _ => {
+                    left.is_unsigned()
+                        && right.is_unsigned()
+                        && left.value == right.value
+                        && left_minus.is_none()
+                        && right_minus.is_none()
+                }
             }
         }
         (DictPatternKey::String(left), DictPatternKey::String(right)) => left.value == right.value,

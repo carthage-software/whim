@@ -159,6 +159,10 @@ fn lower_parameter_default(default: &ParameterDefault<'_>) -> syn::Result<TokenS
         Expression::Literal(Literal::False(_)) => {
             quote!(crate::builtin::spec::ParameterDefaultSpec::Bool(false))
         }
+        Expression::Literal(Literal::Integer(integer)) if integer.is_unsigned() => {
+            let value = integer.value;
+            quote!(crate::builtin::spec::ParameterDefaultSpec::Uint(#value))
+        }
         Expression::Literal(Literal::Integer(integer)) => {
             let value = i64::try_from(integer.value).map_err(|_| {
                 syn::Error::new(
@@ -198,6 +202,16 @@ fn lower_parameter_default(default: &ParameterDefault<'_>) -> syn::Result<TokenS
 fn lower_signed_parameter_default(prefix: &UnaryPrefix<'_>) -> syn::Result<TokenStream> {
     let negative = matches!(prefix.operator, UnaryPrefixOperator::Negation(_));
     match prefix.operand.unparenthesized() {
+        Expression::Literal(Literal::Integer(integer)) if integer.is_unsigned() => {
+            if negative && integer.value != 0 {
+                return Err(syn::Error::new(
+                    Span::call_site(),
+                    "an unsigned literal cannot be negative",
+                ));
+            }
+            let value = integer.value;
+            Ok(quote!(crate::builtin::spec::ParameterDefaultSpec::Uint(#value)))
+        }
         Expression::Literal(Literal::Integer(integer)) => {
             let magnitude = i128::from(integer.value);
             let value =

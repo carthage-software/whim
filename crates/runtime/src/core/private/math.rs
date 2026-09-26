@@ -19,7 +19,7 @@ use whim_macros::whim_function;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::dict::DictIter;
-use whim_value::ops::compare_int_float;
+use whim_value::ops;
 use whim_value::string::short::ShortString;
 
 use crate::builtin::Context;
@@ -214,15 +214,22 @@ fn div<'call>(
         .map_or_else(Value::null, Value::int))
 }
 
-#[whim_function("Whim\\Math\\to_base((0..) $number, 2..=36 $base): string[1..]")]
+#[whim_function("Whim\\Math\\to_base((0..)|uint $number, 2..=36 $base): string[1..]")]
 #[inline(always)]
 fn to_base<'call>(
     context: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
-    let number = arguments.int(0);
+    let value = arguments.local(0);
+    let number = match value.transparent() {
+        ValueView::Int(value) => value.cast_unsigned(),
+        ValueView::Uint(value) => *value,
+        // SAFETY: dispatch requires a non-negative int or uint.
+        _ => unsafe { unreachable_invariant("a validated base conversion input is an integer") },
+    };
+
     let base = arguments.int(1);
-    if number < 0 || !(2..=36).contains(&base) {
+    if !(2..=36).contains(&base) {
         let class = context.vm.intern(b"Whim\\Unwind\\ValueError");
         return Err(context.vm.throw(
             class,
@@ -231,13 +238,6 @@ fn to_base<'call>(
         ));
     }
 
-    // SAFETY: the surrounding invariant proves this result is successful.
-    let number = unsafe {
-        unwrap_result_invariant(
-            u64::try_from(number),
-            "a validated non-negative integer fits u64",
-        )
-    };
     // SAFETY: the surrounding invariant proves this result is successful.
     let base = unsafe { unwrap_result_invariant(u64::try_from(base), "a validated base fits u64") };
 
@@ -594,43 +594,14 @@ mod tests {
     }
 }
 
-#[derive(Clone, Copy)]
-enum Number {
-    Int(i64),
-    Float(f64),
-}
-
-fn number(value: &Value) -> Number {
-    value.as_int().map_or_else(
-        || {
-            // SAFETY: the surrounding invariant proves this option contains a value.
-            Number::Float(unsafe {
-                unwrap_option_invariant(value.as_float(), "a numeric value is an int or float")
-            })
-        },
-        Number::Int,
-    )
-}
-
-fn compare_numbers(left: Number, right: Number) -> Option<Ordering> {
-    match (left, right) {
-        (Number::Int(left), Number::Int(right)) => left.partial_cmp(&right),
-        (Number::Float(left), Number::Float(right)) => left.partial_cmp(&right),
-        (Number::Int(left), Number::Float(right)) => compare_int_float(left, right),
-        (Number::Float(left), Number::Int(right)) => {
-            compare_int_float(right, left).map(Ordering::reverse)
-        }
-    }
-}
-
-#[whim_function("Whim\\_Private\\math_compare(int|float $left, int|float $right): int")]
+#[whim_function("Whim\\_Private\\math_compare(int|uint|float $left, int|uint|float $right): int")]
 fn compare(arguments: Arguments<'_>) -> Value {
     let left = arguments.local(0);
     let right = arguments.local(1);
-    let result = match compare_numbers(number(&left), number(&right)) {
-        Some(Ordering::Less) => -1,
-        Some(Ordering::Equal) | None => 0,
-        Some(Ordering::Greater) => 1,
+    let result = match ops::compare(&left, &right) {
+        Ok(Some(Ordering::Less)) => -1,
+        Ok(Some(Ordering::Greater)) => 1,
+        _ => 0,
     };
 
     Value::int(result)
@@ -719,6 +690,12 @@ const INT_MAX: i64 = i64::MAX;
 
 #[whim_constant("Whim\\Math\\INT_MIN", "int")]
 const INT_MIN: i64 = i64::MIN;
+
+#[whim_constant("Whim\\Math\\UINT_MIN", "uint")]
+const UINT_MIN: u64 = u64::MIN;
+
+#[whim_constant("Whim\\Math\\UINT_MAX", "uint")]
+const UINT_MAX: u64 = u64::MAX;
 
 #[whim_constant("Whim\\Math\\FLOAT_MAX", "float")]
 const FLOAT_MAX: f64 = f64::MAX;

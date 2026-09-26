@@ -6,9 +6,9 @@ This page covers small contracts used throughout the standard library.
 
 `Whim\Refine` names common types:
 
-- `ArrayKey` is `string|int|bool`.
-- `Numeric` is `int|float`.
-- `Scalar` is `int|float|string|bool`.
+- `ArrayKey` is `string|int|uint|bool`.
+- `Numeric` is `int|uint|float`.
+- `Scalar` is `int|uint|float|string|bool`.
 - `Nullable<T>` is `T|null`.
 - `NonNull`, `NonEmptyString`, `NonEmptyVec<T>`, and `NonEmptyDict<K, V>`
   exclude empty values.
@@ -100,7 +100,7 @@ runs. Do not store them in files or send them over a network.
 returns its `SymbolKind` or throws when absent.
 
 Every enum implements `Enum\UnitEnum`; a backed enum also implements
-`BackedEnum<int|string>`. Unit enums expose `name`; backed cases also expose
+`BackedEnum<int|uint|string>`. Unit enums expose `name`; backed cases also expose
 `value`.
 
 ## Garbage collection

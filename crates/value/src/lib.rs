@@ -60,6 +60,7 @@ pub enum ValueKind {
     Null,
     Bool,
     Int,
+    Uint,
     Float,
     ShortString,
     String,
@@ -102,6 +103,7 @@ pub enum ValueView<'a> {
     Null,
     Bool(&'a bool),
     Int(&'a i64),
+    Uint(&'a u64),
     Float(&'a f64),
     String(&'a ManagedRef<ByteStringObject>),
     ShortString(&'a ShortString),
@@ -137,6 +139,7 @@ impl ValueView<'_> {
             Self::Null => "null",
             Self::Bool(_) => "bool",
             Self::Int(_) => "int",
+            Self::Uint(_) => "uint",
             Self::Float(_) => "float",
             Self::String(_) | Self::ShortString(_) => "string",
             Self::Vec(_) => "vec",
@@ -224,6 +227,15 @@ impl Value {
         Self {
             payload: ValuePayload { integer: value },
             kind: ValueKind::Int,
+            newtype: NO_NEWTYPE,
+        }
+    }
+
+    #[must_use]
+    pub const fn uint(value: u64) -> Self {
+        Self {
+            payload: ValuePayload { raw: value },
+            kind: ValueKind::Uint,
             newtype: NO_NEWTYPE,
         }
     }
@@ -391,6 +403,7 @@ impl Value {
                 ValueKind::Null => ValueView::Null,
                 ValueKind::Bool => ValueView::Bool(&self.payload.boolean),
                 ValueKind::Int => ValueView::Int(&self.payload.integer),
+                ValueKind::Uint => ValueView::Uint(&self.payload.raw),
                 ValueKind::Float => ValueView::Float(&self.payload.float),
                 ValueKind::String => ValueView::String(&self.payload.string),
                 ValueKind::ShortString => ValueView::ShortString(&self.payload.short_string),
@@ -448,6 +461,12 @@ impl Value {
     #[inline(always)]
     pub fn is_int(&self) -> bool {
         self.kind == ValueKind::Int
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn is_uint(&self) -> bool {
+        self.kind == ValueKind::Uint
     }
 
     #[must_use]
@@ -527,6 +546,7 @@ impl Value {
             | ValueView::Null
             | ValueView::Bool(_)
             | ValueView::Int(_)
+            | ValueView::Uint(_)
             | ValueView::Float(_)
             | ValueView::ShortString(_) => false,
         }
@@ -574,6 +594,56 @@ impl Value {
         } else {
             None
         }
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn as_uint(&self) -> Option<u64> {
+        if self.kind == ValueKind::Uint {
+            // SAFETY: the unsigned tag holds a fully initialized u64 payload.
+            Some(unsafe { self.payload.raw })
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn as_uint_mut(&mut self) -> Option<&mut u64> {
+        if self.kind == ValueKind::Uint {
+            // SAFETY: the unsigned tag holds a fully initialized u64 payload.
+            Some(unsafe { &mut self.payload.raw })
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    ///
+    /// This value must be a uint.
+    #[must_use]
+    #[inline(always)]
+    pub unsafe fn as_uint_unchecked(&self) -> u64 {
+        if self.kind != ValueKind::Uint {
+            // SAFETY: the caller guarantees the unsigned tag.
+            unsafe { hint::unreachable_unchecked() }
+        }
+        // SAFETY: uint stores all 64 payload bits.
+        unsafe { self.payload.raw }
+    }
+
+    /// # Safety
+    ///
+    /// This value must be an int or uint. Negative ints retain their sign bit.
+    #[must_use]
+    #[inline(always)]
+    pub const unsafe fn as_integer_bits_unchecked(&self) -> u64 {
+        if !matches!(self.kind, ValueKind::Int | ValueKind::Uint) {
+            // SAFETY: the caller guarantees an integer tag.
+            unsafe { hint::unreachable_unchecked() }
+        }
+        // SAFETY: both integer kinds store all 64 payload bits.
+        unsafe { self.payload.raw }
     }
 
     /// Returns the integer payload without checking the variant.
@@ -805,6 +875,7 @@ impl Value {
             | ValueView::Null
             | ValueView::Bool(_)
             | ValueView::Int(_)
+            | ValueView::Uint(_)
             | ValueView::Float(_)
             | ValueView::String(_)
             | ValueView::ShortString(_)
@@ -823,6 +894,7 @@ impl Value {
             ValueKind::Null => "null",
             ValueKind::Bool => "bool",
             ValueKind::Int => "int",
+            ValueKind::Uint => "uint",
             ValueKind::Float => "float",
             ValueKind::String | ValueKind::ShortString => "string",
             ValueKind::Vec => "vec",

@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::operands::PropertyRemoveMode;
+use whim_bytecode::instruction::operands::PropertyStepMode;
 use whim_value::Value;
 use whim_value::dict::keys::Key;
 use whim_value::heap::Heap;
@@ -13,6 +14,7 @@ use crate::vm::Fault;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::append_value;
+use crate::vm::arithmetic::arithmetic_immediate;
 use crate::vm::arithmetic_add;
 use crate::vm::index_get;
 use crate::vm::index_replace_existing;
@@ -342,9 +344,14 @@ impl VirtualMachine<'_> {
         chunk: &Chunk,
         site: usize,
         step: i64,
+        mode: PropertyStepMode,
     ) -> Result<(), VirtualMachineControl> {
         self.update_property(object, chunk, site, |_, previous| {
-            step_by(previous, step).map_err(|fault| UpdateFault {
+            let operation = match mode {
+                PropertyStepMode::Increment => step_by,
+                PropertyStepMode::Add => arithmetic_immediate,
+            };
+            operation(previous, step).map_err(|fault| UpdateFault {
                 fault,
                 operator: "+",
                 right_kind: "int",
@@ -357,9 +364,14 @@ impl VirtualMachine<'_> {
         receiver: &ManagedRef<InstanceObject>,
         slot: u32,
         step: i64,
+        mode: PropertyStepMode,
     ) -> Result<(), VirtualMachineControl> {
         self.update_property_unchecked(receiver, slot, |_, previous| {
-            step_by(previous, step).map_err(|fault| UpdateFault {
+            let operation = match mode {
+                PropertyStepMode::Increment => step_by,
+                PropertyStepMode::Add => arithmetic_immediate,
+            };
+            operation(previous, step).map_err(|fault| UpdateFault {
                 fault,
                 operator: "+",
                 right_kind: "int",

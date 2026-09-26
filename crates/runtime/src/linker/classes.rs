@@ -75,12 +75,14 @@ struct ClassLink<'a> {
 #[derive(Default)]
 struct EnumBackings {
     integers: HashMap<i64, Atom>,
+    unsigned_integers: HashMap<u64, Atom>,
     strings: HashMap<Vec<u8>, Atom>,
 }
 
 impl EnumBackings {
     fn insert(&mut self, backing: &Value, case: &Atom) -> Option<Atom> {
         match backing.transparent() {
+            ValueView::Uint(value) => self.unsigned_integers.insert(*value, case.clone()),
             ValueView::Int(value) => match self.integers.entry(*value) {
                 Entry::Occupied(entry) => Some(entry.get().clone()),
                 Entry::Vacant(entry) => {
@@ -512,6 +514,10 @@ impl Engine {
         }
 
         let (protocol, type_arguments) = match link.compiled.enum_backing {
+            Some(EnumBacking::Uint) => (
+                self.tables.enum_classes.backed,
+                Some(vec![TypeDescriptor::Uint]),
+            ),
             Some(EnumBacking::Int) => (
                 self.tables.enum_classes.backed,
                 Some(vec![TypeDescriptor::Int]),
@@ -1187,6 +1193,7 @@ impl Engine {
             default: None,
             declared_type: Some(match backing {
                 EnumBacking::Int => TypeDescriptor::Int,
+                EnumBacking::Uint => TypeDescriptor::Uint,
                 EnumBacking::String => TypeDescriptor::String,
             }),
         });
@@ -1253,6 +1260,7 @@ impl Engine {
         };
 
         let (satisfied, expected_name) = match expected {
+            EnumBacking::Uint => (value.is_uint(), "uint"),
             EnumBacking::Int => (value.is_int(), "int"),
             EnumBacking::String => (value.is_string(), "string"),
         };

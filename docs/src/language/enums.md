@@ -45,7 +45,7 @@ All enums implement `Whim\Enum\UnitEnum`.
 
 ## Backed enums
 
-A backed enum uses `int` or `string`. A type alias that resolves to one of those
+A backed enum uses `int`, `uint`, or `string`. A type alias that resolves to one of those
 types also works.
 
 ```whim
@@ -63,7 +63,8 @@ enum Code: int {
 Every case must have a value, and no two cases may have the same value. A backed
 case has a public readonly `value` property.
 
-Backed enums also implement `Whim\Enum\BackedEnum<int>` or
+Backed enums also implement `Whim\Enum\BackedEnum<int>`,
+`Whim\Enum\BackedEnum<uint>`, or
 `Whim\Enum\BackedEnum<string>`.
 
 ## Looking up backed cases
@@ -72,6 +73,9 @@ Backed enums also implement `Whim\Enum\BackedEnum<int>` or
 `Whim\Unwind\ValueError` when no case has that value.
 
 `tryFrom` returns the case or `null`.
+
+Backing values retain their kind. A uint-backed enum requires unsigned case
+values, and a signed lookup does not find an unsigned case of the same magnitude.
 
 ```whim
 enum Status: string {

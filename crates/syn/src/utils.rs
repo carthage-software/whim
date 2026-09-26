@@ -221,7 +221,13 @@ pub(super) fn parse_literal_float_in<A: Arena>(arena: &A, value: &[u8]) -> Optio
 /// Parses a literal integer with support for binary, octal, decimal, and hex.
 #[inline]
 #[must_use]
-pub(super) fn parse_literal_integer(bytes: &[u8]) -> Option<u64> {
+pub(super) fn parse_literal_integer(mut bytes: &[u8]) -> Option<u64> {
+    if bytes.len() > 1
+        && let Some(b'u' | b'U' | b'i' | b'I') = bytes.last()
+    {
+        bytes = &bytes[..bytes.len() - 1];
+    }
+
     if bytes.is_empty() {
         return None;
     }

@@ -36,6 +36,7 @@ use whim_syn::cst::r#type::Type;
 
 use crate::emit::analysis::closure_has_captures;
 use crate::emit::integer_gate;
+use crate::emit::unsigned_integer_gate;
 use crate::error::CompileError;
 use crate::error::CompileErrorKind;
 use crate::limits::check_count;
@@ -819,6 +820,7 @@ fn check_enum_shape(declaration: &Enum<'_>) -> Result<(), CompileError> {
 #[derive(PartialEq, Eq, Hash)]
 enum EnumBackingKey<'source> {
     Int(i64),
+    Uint(u64),
     String(&'source [u8]),
 }
 
@@ -829,6 +831,9 @@ fn literal_key<'source>(
     expression: &'source Expression<'_>,
 ) -> Result<Option<EnumBackingKey<'source>>, CompileError> {
     match expression.unparenthesized() {
+        Expression::Literal(Literal::Integer(integer)) if integer.is_unsigned() => {
+            Ok(Some(EnumBackingKey::Uint(integer.value)))
+        }
         Expression::Literal(Literal::Integer(integer)) => Ok(Some(EnumBackingKey::Int(
             integer_gate(integer.value, false, integer.span)?,
         ))),
@@ -839,6 +844,13 @@ fn literal_key<'source>(
             if matches!(unary.operator, UnaryPrefixOperator::Negation(_)) =>
         {
             match unary.operand.unparenthesized() {
+                Expression::Literal(Literal::Integer(integer)) if integer.is_unsigned() => {
+                    Ok(Some(EnumBackingKey::Uint(unsigned_integer_gate(
+                        integer.value,
+                        true,
+                        unary.span(),
+                    )?)))
+                }
                 Expression::Literal(Literal::Integer(integer)) => Ok(Some(EnumBackingKey::Int(
                     integer_gate(integer.value, true, unary.span())?,
                 ))),

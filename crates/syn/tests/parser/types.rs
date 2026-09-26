@@ -1,6 +1,8 @@
 use whim_syn::arena::LocalArena;
 use whim_syn::cst::atom::Literal;
 
+use whim_syn::cst::atom::LiteralInteger;
+use whim_syn::cst::atom::LiteralIntegerSuffix;
 use whim_syn::cst::call::Call;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::statement::TopLevelStatement;
@@ -30,6 +32,34 @@ fn dictionary_shapes_accept_boolean_keys() {
     assert!(matches!(entries[0].key, Literal::True(_)));
     assert!(matches!(entries[1].key, Literal::False(_)));
     assert!(matches!(entries[2].key, Literal::Integer(_)));
+}
+
+#[test]
+fn dictionary_shapes_accept_all_int_keys() {
+    let arena = LocalArena::new();
+    let Type::DictShape(shape) = aliased_type(&arena, "dict[1 => int, 2u => string, 1i => bool]")
+    else {
+        panic!("expected a dict shape");
+    };
+    let entries = shape.entries.as_slice();
+    assert!(matches!(
+        entries[0].key,
+        Literal::Integer(LiteralInteger { suffix: None, .. })
+    ));
+    assert!(matches!(
+        entries[1].key,
+        Literal::Integer(LiteralInteger {
+            suffix: Some(LiteralIntegerSuffix::Unsigned),
+            ..
+        })
+    ));
+    assert!(matches!(
+        entries[2].key,
+        Literal::Integer(LiteralInteger {
+            suffix: Some(LiteralIntegerSuffix::Signed),
+            ..
+        })
+    ));
 }
 
 #[test]

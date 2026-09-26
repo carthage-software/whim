@@ -336,6 +336,7 @@ pub(super) fn unchecked_terminal(chunk: &Chunk) -> Option<usize> {
             | Instruction::ReturnReferenceUnchecked { .. }
             | Instruction::ReturnUnchecked { .. }
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::ReturnNullUnchecked
     )
     .then_some(terminal)
@@ -366,6 +367,7 @@ pub(super) fn method_body_inlinable(chunk: &Chunk, parameters: u16, force: bool)
                     | Instruction::ReturnReferenceUnchecked { .. }
                     | Instruction::ReturnUnchecked { .. }
                     | Instruction::ReturnIntUnchecked { .. }
+                    | Instruction::ReturnUintUnchecked { .. }
                     | Instruction::ReturnNullUnchecked
                     | Instruction::ThrowUnhandledMatch { .. }
             )
@@ -415,6 +417,7 @@ pub(super) fn generic_body_inlinable(chunk: &Chunk, parameters: u16, force: bool
                     | Instruction::ReturnReferenceUnchecked { .. }
                     | Instruction::ReturnUnchecked { .. }
                     | Instruction::ReturnIntUnchecked { .. }
+                    | Instruction::ReturnUintUnchecked { .. }
                     | Instruction::ReturnNullUnchecked
             )
             || matches!(

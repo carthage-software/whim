@@ -239,6 +239,9 @@ impl<'call, 'vm, 'engine: 'vm> Context<'call, 'vm, 'engine> {
                 (Some(left), right) if left.is_string() && right.is_string() => {
                     left.as_string_bytes() == right.as_string_bytes()
                 }
+                (Some(left), right) if left.is_uint() && right.is_uint() => {
+                    left.as_uint() == right.as_uint()
+                }
                 _ => false,
             })?
             .name

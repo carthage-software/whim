@@ -195,6 +195,8 @@ where
             TokenKind::StringPart => self.interpolated_string_expression()?,
             TokenKind::LiteralString
             | TokenKind::LiteralInteger
+            | TokenKind::LiteralSignedInteger
+            | TokenKind::LiteralUnsignedInteger
             | TokenKind::LiteralFloat
             | TokenKind::True
             | TokenKind::False
@@ -226,7 +228,11 @@ where
             TokenKind::New => Expression::Instantiation(self.parse_instantiation()?),
             TokenKind::Break => {
                 let r#break = self.expect_keyword(TokenKind::Break)?;
-                let level = if self.is_at(TokenKind::LiteralInteger)? {
+                let level = if self.is_at_any(&[
+                    TokenKind::LiteralInteger,
+                    TokenKind::LiteralSignedInteger,
+                    TokenKind::LiteralUnsignedInteger,
+                ])? {
                     Some(self.parse_integer_literal()?)
                 } else {
                     None
@@ -236,7 +242,11 @@ where
             }
             TokenKind::Continue => {
                 let r#continue = self.expect_keyword(TokenKind::Continue)?;
-                let level = if self.is_at(TokenKind::LiteralInteger)? {
+                let level = if self.is_at_any(&[
+                    TokenKind::LiteralInteger,
+                    TokenKind::LiteralSignedInteger,
+                    TokenKind::LiteralUnsignedInteger,
+                ])? {
                     Some(self.parse_integer_literal()?)
                 } else {
                     None
@@ -326,6 +336,8 @@ where
             TokenKind::StringPart
                 | TokenKind::LiteralString
                 | TokenKind::LiteralInteger
+                | TokenKind::LiteralSignedInteger
+                | TokenKind::LiteralUnsignedInteger
                 | TokenKind::LiteralFloat
                 | TokenKind::True
                 | TokenKind::False

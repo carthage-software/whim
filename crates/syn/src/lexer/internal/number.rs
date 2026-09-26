@@ -32,27 +32,30 @@ pub(in crate::lexer) fn scan(input: &Input<'_>) -> (TokenKind, usize) {
     };
 
     length = read_digits_of_base(input, length, base);
-
     if base != 10 {
-        return (TokenKind::LiteralInteger, length);
+        return match input.peek(length, 1) {
+            [b'u' | b'U'] => (TokenKind::LiteralUnsignedInteger, length + 1),
+            [b'i' | b'I'] => (TokenKind::LiteralSignedInteger, length + 1),
+            _ => (TokenKind::LiteralInteger, length),
+        };
     }
 
-    if matches!(input.peek(length, 2), [b'.', b'.']) {
-        return (TokenKind::LiteralInteger, length);
-    }
+    match input.peek(length, 3) {
+        [b'u' | b'U', ..] => (TokenKind::LiteralUnsignedInteger, length + 1),
+        [b'i' | b'I', ..] => (TokenKind::LiteralSignedInteger, length + 1),
+        [b'.', b'.', ..] => (TokenKind::LiteralInteger, length),
+        next @ float_separator!() => {
+            if let [b'.', ..] = next {
+                length += 1;
+                if matches!(input.peek(length, 1), [b'0'..=b'9']) {
+                    length = read_digits_of_base(input, length, 10);
+                }
+            }
 
-    if !matches!(input.peek(length, 3), float_separator!()) {
-        return (TokenKind::LiteralInteger, length);
-    }
-
-    if let [b'.'] = input.peek(length, 1) {
-        length += 1;
-        if matches!(input.peek(length, 1), [b'0'..=b'9']) {
-            length = read_digits_of_base(input, length, 10);
+            (TokenKind::LiteralFloat, scan_exponent(input, length))
         }
+        _ => (TokenKind::LiteralInteger, length),
     }
-
-    (TokenKind::LiteralFloat, scan_exponent(input, length))
 }
 
 #[inline]

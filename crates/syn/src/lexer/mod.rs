@@ -185,6 +185,7 @@ where
                     let raw = self.input.consume(length);
                     return Some(Ok(Token::new(TokenKind::LiteralString, raw, start)));
                 }
+
                 self.input.consume_remaining();
 
                 return Some(Err(SyntaxError::UnclosedStringLiteral(start)));
@@ -205,11 +206,19 @@ where
                 }
 
                 let (kind, length) = internal::number::scan(&self.input);
+                let integer_with_leading_zero = match kind {
+                    TokenKind::LiteralInteger if length > 1 => {
+                        matches!(self.input.read(2), [b'0', b'0'..=b'9' | b'_'])
+                    }
+                    TokenKind::LiteralUnsignedInteger | TokenKind::LiteralSignedInteger
+                        if length > 2 =>
+                    {
+                        matches!(self.input.read(2), [b'0', b'0'..=b'9' | b'_'])
+                    }
+                    _ => false,
+                };
 
-                if matches!(kind, TokenKind::LiteralInteger)
-                    && length > 1
-                    && matches!(self.input.read(2), [b'0', b'0'..=b'9' | b'_'])
-                {
+                if integer_with_leading_zero {
                     self.input.skip(length);
 
                     return Some(Err(SyntaxError::LeadingZeroInIntegerLiteral(start)));
@@ -647,6 +656,44 @@ mod tests {
                 TokenKind::LiteralInteger,
                 TokenKind::DotDotEqual,
                 TokenKind::LiteralInteger,
+            ],
+        );
+    }
+
+    #[test]
+    fn signed_integer_ranges_do_not_lex_as_floats() {
+        assert_eq!(
+            kinds("1i..10i 1i..=10i ..10i ..=10i"),
+            vec![
+                TokenKind::LiteralSignedInteger,
+                TokenKind::DotDot,
+                TokenKind::LiteralSignedInteger,
+                TokenKind::LiteralSignedInteger,
+                TokenKind::DotDotEqual,
+                TokenKind::LiteralSignedInteger,
+                TokenKind::DotDot,
+                TokenKind::LiteralSignedInteger,
+                TokenKind::DotDotEqual,
+                TokenKind::LiteralSignedInteger,
+            ],
+        );
+    }
+
+    #[test]
+    fn unsigned_integer_ranges_do_not_lex_as_floats() {
+        assert_eq!(
+            kinds("1u..10u 1u..=10u ..10u ..=10u"),
+            vec![
+                TokenKind::LiteralUnsignedInteger,
+                TokenKind::DotDot,
+                TokenKind::LiteralUnsignedInteger,
+                TokenKind::LiteralUnsignedInteger,
+                TokenKind::DotDotEqual,
+                TokenKind::LiteralUnsignedInteger,
+                TokenKind::DotDot,
+                TokenKind::LiteralUnsignedInteger,
+                TokenKind::DotDotEqual,
+                TokenKind::LiteralUnsignedInteger,
             ],
         );
     }

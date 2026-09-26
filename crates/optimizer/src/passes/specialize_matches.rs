@@ -114,6 +114,11 @@ pub(crate) fn optimize_unit(
                     subject,
                     descriptor,
                     ..
+                }
+                | Instruction::UintRangeJumpUnless {
+                    subject,
+                    descriptor,
+                    ..
                 } => {
                     let descriptor =
                         &analyzed.chunk.type_descriptors[usize::from(descriptor.index())];
@@ -290,7 +295,9 @@ struct StringChainChanges {
 
 fn returns_without_reading(instruction: Instruction, register: Register) -> bool {
     match instruction {
-        Instruction::ReturnIntUnchecked { .. } | Instruction::ReturnNullUnchecked => true,
+        Instruction::ReturnIntUnchecked { .. }
+        | Instruction::ReturnUintUnchecked { .. }
+        | Instruction::ReturnNullUnchecked => true,
         Instruction::ReturnUnchecked { source }
         | Instruction::ReturnReferenceUnchecked { source }
         | Instruction::ReturnScalarUnchecked { source } => source != register,

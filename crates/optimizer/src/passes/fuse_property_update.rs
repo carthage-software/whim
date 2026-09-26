@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::PropertyStepMode;
 use whim_bytecode::rewrite::control_flow_targets;
 
 use crate::OptimizationConfiguration;
@@ -52,7 +53,7 @@ pub(in crate::passes) fn optimize_chunk(
         }
 
         let replacement = match chunk.code[start + 1] {
-            Instruction::AddImmediate {
+            Instruction::Step {
                 destination,
                 source,
                 immediate,
@@ -60,6 +61,7 @@ pub(in crate::passes) fn optimize_chunk(
                 object,
                 cache,
                 immediate,
+                mode: PropertyStepMode::Increment,
             },
             Instruction::Add {
                 destination,

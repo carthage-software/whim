@@ -153,6 +153,9 @@ pub enum AsMode {
 integer_operand!(
     ImmediateInt(i16) => value
 );
+integer_operand!(
+    ImmediateUint(u16) => value
+);
 
 /// An element or argument count, occupying the byte after the tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,6 +179,7 @@ pub enum ArrayValueMode {
     /// The element may be any value.
     Generic,
     Int,
+    Uint,
     Float,
 }
 
@@ -192,6 +196,13 @@ pub enum PropertyIndexUpdateMode {
     Increment,
     Remove,
     Append,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum PropertyStepMode {
+    Increment,
+    Add,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

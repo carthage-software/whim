@@ -46,6 +46,11 @@ pub(crate) fn optimize_chunk(
                 destination,
                 source,
                 immediate,
+            }
+            | Instruction::Step {
+                destination,
+                source,
+                immediate,
             } if previous != container
                 && previous != index
                 && destination != container

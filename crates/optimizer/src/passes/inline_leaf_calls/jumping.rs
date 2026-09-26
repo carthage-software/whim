@@ -67,6 +67,7 @@ pub(super) fn self_inline_function(
             | Instruction::ReturnReferenceUnchecked { .. }
             | Instruction::ReturnUnchecked { .. }
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::ReturnNullUnchecked
     ) {
         return false;
@@ -88,6 +89,7 @@ pub(super) fn self_inline_function(
                     | Instruction::ReturnReferenceUnchecked { .. }
                     | Instruction::ReturnUnchecked { .. }
                     | Instruction::ReturnIntUnchecked { .. }
+                    | Instruction::ReturnUintUnchecked { .. }
                     | Instruction::ReturnNullUnchecked
             )
             || body_jump_targets_are_forward(&snapshot, instruction, index, terminal);
@@ -161,6 +163,10 @@ pub(super) fn body_jump_target(instruction: Instruction, index: usize) -> Option
         | Instruction::JumpIfNotNull { offset, .. } => offset.offset(),
         Instruction::JumpUnless { offset, .. }
         | Instruction::IntJumpUnless { offset, .. }
+        | Instruction::UintJumpUnless { offset, .. }
+        | Instruction::UintJumpUnlessImmediate { offset, .. }
+        | Instruction::UintRangeJumpIf { offset, .. }
+        | Instruction::UintRangeJumpUnless { offset, .. }
         | Instruction::StringJumpUnless { offset, .. }
         | Instruction::StringByteJumpUnlessEqual { offset, .. }
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
@@ -291,6 +297,7 @@ pub(super) fn build_jumping_replacement_bound(
                 | Instruction::ReturnReferenceUnchecked { .. }
                 | Instruction::ReturnUnchecked { .. }
                 | Instruction::ReturnIntUnchecked { .. }
+                | Instruction::ReturnUintUnchecked { .. }
                 | Instruction::ReturnNullUnchecked
         );
 
@@ -318,6 +325,10 @@ pub(super) fn build_jumping_replacement_bound(
                 source: remap(source),
             }),
             Instruction::ReturnIntUnchecked { immediate } => Some(Instruction::LoadInt {
+                destination,
+                immediate,
+            }),
+            Instruction::ReturnUintUnchecked { immediate } => Some(Instruction::LoadUint {
                 destination,
                 immediate,
             }),
@@ -498,7 +509,11 @@ fn rebase_body_jump(instruction: Instruction, relative: i64) -> Option<Instructi
         | Instruction::IntJumpUnlessImmediate { offset, .. }
         | Instruction::JumpUnlessConstant { offset, .. }
         | Instruction::IntRangeJumpIf { offset, .. }
-        | Instruction::IntRangeJumpUnless { offset, .. } => {
+        | Instruction::IntRangeJumpUnless { offset, .. }
+        | Instruction::UintJumpUnless { offset, .. }
+        | Instruction::UintJumpUnlessImmediate { offset, .. }
+        | Instruction::UintRangeJumpIf { offset, .. }
+        | Instruction::UintRangeJumpUnless { offset, .. } => {
             *offset = ShortJumpOffset::new(i16::try_from(relative).ok()?);
         }
         _ => return None,

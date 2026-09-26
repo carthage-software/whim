@@ -52,14 +52,17 @@ fn specialized_instruction(
     index: usize,
     instruction: Instruction,
 ) -> Option<Instruction> {
-    specialize_with(instruction, |register| {
-        flow.proves(index, register, &TypeDescriptor::Int)
-    })
+    specialize_with(
+        instruction,
+        |register| flow.proves(index, register, &TypeDescriptor::Int),
+        |register| flow.proves(index, register, &TypeDescriptor::Uint),
+    )
 }
 
 pub(super) fn specialize_with(
     instruction: Instruction,
     is_int: impl Fn(Register) -> bool,
+    is_uint: impl Fn(Register) -> bool,
 ) -> Option<Instruction> {
     let Instruction::CounterLoop {
         comparison,
@@ -71,14 +74,21 @@ pub(super) fn specialize_with(
         return None;
     };
 
-    if !is_int(counter) || !is_int(limit) {
-        return None;
+    if is_int(counter) && is_int(limit) {
+        Some(Instruction::IntCounterLoop {
+            comparison,
+            counter,
+            limit,
+            offset,
+        })
+    } else if is_uint(counter) && is_uint(limit) {
+        Some(Instruction::UintCounterLoop {
+            comparison,
+            counter,
+            limit,
+            offset,
+        })
+    } else {
+        None
     }
-
-    Some(Instruction::IntCounterLoop {
-        comparison,
-        counter,
-        limit,
-        offset,
-    })
 }

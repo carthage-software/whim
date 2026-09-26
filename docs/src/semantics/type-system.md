@@ -84,20 +84,55 @@ or `array`.
 
 ## `as`
 
-`$value as T` checks `T` and returns the same value. It throws `TypeError` on a
-failed check.
+`$value as T` first checks the whole destination type. If the value already
+fits, it keeps its value and numeric kind. Otherwise it tries numeric
+conversion and throws `TypeError` if no valid conversion fits.
 
 ```whim
 $value = 42 as int;
 ```
 
-The cast does not convert scalar values. `1 as float` fails.
+Numeric conversions follow these rules:
+
+| From | To | Requirement |
+| --- | --- | --- |
+| `int` | `uint` | zero or greater |
+| `uint` | `int` | at most `Whim\Math\INT_MAX` |
+| `int` or `uint` | `float` | rounds to the nearest binary64 value |
+| `float` | `int` | finite, whole, and in `[-2^63, 2^63)` |
+| `float` | `uint` | finite, whole, and in `[0, 2^64)` |
+
+Casts never wrap or truncate a fractional float. They do not parse strings,
+convert booleans, or convert the elements of a collection.
+
+```whim
+assert!((42 as uint) == 42u);
+assert!((42u as int) == 42);
+assert!((42u as float) == 42.0);
+assert!((42.0 as uint) == 42u);
+assert!((42u as (int|uint)) is uint);
+assert!((42.0 as (uint|int)) == 42u);
+assert!((42.0 as (int|uint)) == 42);
+assert!((1.5 ?as uint) == null);
+```
+
+When conversion is needed, a union tries its numeric branches in source order.
+Aliases and type parameters follow the types they name. Each result must fit
+its branch, including range and literal limits. Intersections retain all their
+constraints; a negated type alone does not choose a numeric conversion.
+For example, `42.0 as (0u..=10u|int)` produces signed `42`.
+
+Float conversion can lose integer precision. `Whim\Math\UINT_MAX as float`
+rounds to `2^64`, which cannot convert back to `uint`.
 
 A cast to a newtype adds that newtype's tag after checking the backing type.
+It does not convert an incompatible backing value: convert to `uint` before
+tagging a signed value with a uint-backed newtype.
 
 ## `?as`
 
-`$value ?as T` returns the checked value or `null`.
+`$value ?as T` follows the same checks and numeric conversions, returning
+`null` when they fail.
 
 ```whim
 $raw = 'not an integer';

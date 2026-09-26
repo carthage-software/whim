@@ -105,10 +105,12 @@ pub(crate) fn optimize_unit(
                 object,
                 cache: _,
                 immediate,
+                mode,
             } => Instruction::PropertyStepUnchecked {
                 object,
                 slot: site.slot,
                 immediate,
+                mode,
             },
             Instruction::PropertyAdd {
                 object,

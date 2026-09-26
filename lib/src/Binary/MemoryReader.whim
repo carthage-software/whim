@@ -121,11 +121,10 @@ final class MemoryReader implements BufferedReader {
    * Reads an unsigned 64-bit integer.
    *
    * @throws UnderflowException when fewer bytes remain than the value needs.
-   * @throws OverflowException when the value does not fit in a signed 64-bit integer.
    */
   #[MustUse]
   #[TrackCaller]
-  public function u64(null|Endianness $endianness = null): NonNegativeInt {
+  public function u64(null|Endianness $endianness = null): uint {
     $endianness ??= $this->endianness;
     $value = Whim\_Private\binary_decode(
       $this->buffer,

@@ -55,6 +55,7 @@ pub(crate) fn specialized_instruction(
     specialize_with(
         instruction,
         |register| flow.proves(index, register, &TypeDescriptor::Int),
+        |register| flow.proves(index, register, &TypeDescriptor::Uint),
         |register| flow.proves(index, register, &TypeDescriptor::Float),
     )
 }
@@ -62,6 +63,7 @@ pub(crate) fn specialized_instruction(
 pub(super) fn specialize_with(
     instruction: Instruction,
     is_int: impl Fn(Register) -> bool,
+    is_uint: impl Fn(Register) -> bool,
     is_float: impl Fn(Register) -> bool,
 ) -> Option<Instruction> {
     if let Instruction::BitwiseNot {
@@ -69,9 +71,31 @@ pub(super) fn specialize_with(
         source,
     } = instruction
     {
-        return is_int(source).then_some(Instruction::IntBitwiseNot {
+        return if is_int(source) {
+            Some(Instruction::IntBitwiseNot {
+                destination,
+                source,
+            })
+        } else if is_uint(source) {
+            Some(Instruction::UintBitwiseNot {
+                destination,
+                source,
+            })
+        } else {
+            None
+        };
+    }
+
+    if let Instruction::Step {
+        destination,
+        source,
+        immediate,
+    } = instruction
+    {
+        return is_uint(source).then_some(Instruction::UintStep {
             destination,
             source,
+            immediate,
         });
     }
 
@@ -230,9 +254,108 @@ pub(super) fn specialize_with(
     };
     if is_int(left) && is_int(right) {
         integer
+    } else if is_uint(left)
+        && (is_uint(right)
+            || (is_int(right)
+                && matches!(
+                    instruction,
+                    Instruction::ShiftLeft { .. } | Instruction::ShiftRight { .. }
+                )))
+    {
+        unsigned_instruction(integer?)
     } else if is_float(left) && is_float(right) {
         float
     } else {
         None
     }
+}
+
+fn unsigned_instruction(instruction: Instruction) -> Option<Instruction> {
+    Some(match instruction {
+        Instruction::IntAdd {
+            destination,
+            left,
+            right,
+        } => Instruction::UintAdd {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntAddAssign { target, source } => {
+            Instruction::UintAddAssign { target, source }
+        }
+        Instruction::IntSubtract {
+            destination,
+            left,
+            right,
+        } => Instruction::UintSubtract {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntMultiply {
+            destination,
+            left,
+            right,
+        } => Instruction::UintMultiply {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntModulo {
+            destination,
+            left,
+            right,
+        } => Instruction::UintModulo {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntBitwiseAnd {
+            destination,
+            left,
+            right,
+        } => Instruction::UintBitwiseAnd {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntBitwiseOr {
+            destination,
+            left,
+            right,
+        } => Instruction::UintBitwiseOr {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntBitwiseXor {
+            destination,
+            left,
+            right,
+        } => Instruction::UintBitwiseXor {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntShiftLeft {
+            destination,
+            left,
+            right,
+        } => Instruction::UintShiftLeft {
+            destination,
+            left,
+            right,
+        },
+        Instruction::IntShiftRight {
+            destination,
+            left,
+            right,
+        } => Instruction::UintShiftRight {
+            destination,
+            left,
+            right,
+        },
+        _ => return None,
+    })
 }

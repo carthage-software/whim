@@ -9,6 +9,7 @@ use whim_bytecode::instruction::operands::Register;
 use whim_value::atom::Atom;
 use whim_value::heap::Heap;
 use whim_value::ops::compare_int_float;
+use whim_value::ops::compare_uint_float;
 
 use crate::type_flow::BytecodeComparison;
 use crate::type_flow::ConstantValue;
@@ -23,6 +24,7 @@ use crate::type_flow::instruction_index;
 pub(super) enum ConstantDictionaryKey {
     Bool(bool),
     Int(i64),
+    Uint(u64),
     String(Atom),
 }
 
@@ -31,6 +33,7 @@ impl ConstantDictionaryKey {
         match value {
             ConstantValue::Bool(value) => Some(Self::Bool(value)),
             ConstantValue::Int(value) => Some(Self::Int(value)),
+            ConstantValue::Uint(value) => Some(Self::Uint(value)),
             ConstantValue::String(value) => Some(Self::String(value)),
             _ => None,
         }
@@ -122,12 +125,24 @@ impl TypeFlow<'_> {
                 destination,
                 ConstantValue::Int(i64::from(immediate.value())),
             )),
+            Instruction::LoadUint {
+                destination,
+                immediate,
+            } => Some((
+                destination,
+                ConstantValue::Uint(u64::from(immediate.value())),
+            )),
             Instruction::Add {
                 destination,
                 left,
                 right,
             }
             | Instruction::IntAdd {
+                destination,
+                left,
+                right,
+            }
+            | Instruction::UintAdd {
                 destination,
                 left,
                 right,
@@ -147,6 +162,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
+            | Instruction::UintSubtract {
+                destination,
+                left,
+                right,
+            }
             | Instruction::FloatSubtract {
                 destination,
                 left,
@@ -158,6 +178,11 @@ impl TypeFlow<'_> {
                 right,
             }
             | Instruction::IntMultiply {
+                destination,
+                left,
+                right,
+            }
+            | Instruction::UintMultiply {
                 destination,
                 left,
                 right,
@@ -192,6 +217,11 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
+            }
+            | Instruction::UintModulo {
+                destination,
+                left,
+                right,
             } => Some((destination, constant_modulo(value(left)?, value(right)?)?)),
             Instruction::Power {
                 destination,
@@ -217,6 +247,26 @@ impl TypeFlow<'_> {
                     ConstantValue::Int(i64::from(immediate.value())),
                 )?,
             )),
+            Instruction::Step {
+                destination,
+                source,
+                immediate,
+            }
+            | Instruction::UintStep {
+                destination,
+                source,
+                immediate,
+            } => {
+                let step = i64::from(immediate.value());
+                let source = value(source)?;
+                let result = match source {
+                    ConstantValue::Uint(value) => {
+                        ConstantValue::Uint(value.checked_add_signed(step)?)
+                    }
+                    source => constant_add(source, ConstantValue::Int(step))?,
+                };
+                Some((destination, result))
+            }
             Instruction::SubtractImmediate {
                 destination,
                 source,
@@ -248,6 +298,50 @@ impl TypeFlow<'_> {
                 constant_modulo(
                     value(source)?,
                     ConstantValue::Int(i64::from(immediate.value())),
+                )?,
+            )),
+            Instruction::UintAddImmediate {
+                destination,
+                source,
+                immediate,
+            } => Some((
+                destination,
+                constant_add(
+                    value(source)?,
+                    ConstantValue::Uint(u64::from(immediate.value())),
+                )?,
+            )),
+            Instruction::UintSubtractImmediate {
+                destination,
+                source,
+                immediate,
+            } => Some((
+                destination,
+                constant_subtract(
+                    value(source)?,
+                    ConstantValue::Uint(u64::from(immediate.value())),
+                )?,
+            )),
+            Instruction::UintMultiplyImmediate {
+                destination,
+                source,
+                immediate,
+            } => Some((
+                destination,
+                constant_multiply(
+                    value(source)?,
+                    ConstantValue::Uint(u64::from(immediate.value())),
+                )?,
+            )),
+            Instruction::UintModuloImmediate {
+                destination,
+                source,
+                immediate,
+            } => Some((
+                destination,
+                constant_modulo(
+                    value(source)?,
+                    ConstantValue::Uint(u64::from(immediate.value())),
                 )?,
             )),
             Instruction::Concatenate {
@@ -303,6 +397,11 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
+            }
+            | Instruction::UintBitwiseAnd {
+                destination,
+                left,
+                right,
             } => Some((
                 destination,
                 constant_int_binary(value(left)?, value(right)?, |left, right| left & right)?,
@@ -313,6 +412,11 @@ impl TypeFlow<'_> {
                 right,
             }
             | Instruction::IntBitwiseOr {
+                destination,
+                left,
+                right,
+            }
+            | Instruction::UintBitwiseOr {
                 destination,
                 left,
                 right,
@@ -329,6 +433,11 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
+            }
+            | Instruction::UintBitwiseXor {
+                destination,
+                left,
+                right,
             } => Some((
                 destination,
                 constant_int_binary(value(left)?, value(right)?, |left, right| left ^ right)?,
@@ -340,11 +449,17 @@ impl TypeFlow<'_> {
             | Instruction::IntBitwiseNot {
                 destination,
                 source,
+            }
+            | Instruction::UintBitwiseNot {
+                destination,
+                source,
             } => {
-                let ConstantValue::Int(value) = value(source)? else {
-                    return None;
+                let result = match value(source)? {
+                    ConstantValue::Int(value) => ConstantValue::Int(!value),
+                    ConstantValue::Uint(value) => ConstantValue::Uint(!value),
+                    _ => return None,
                 };
-                Some((destination, ConstantValue::Int(!value)))
+                Some((destination, result))
             }
             Instruction::ShiftLeft {
                 destination,
@@ -352,6 +467,11 @@ impl TypeFlow<'_> {
                 right,
             }
             | Instruction::IntShiftLeft {
+                destination,
+                left,
+                right,
+            }
+            | Instruction::UintShiftLeft {
                 destination,
                 left,
                 right,
@@ -365,6 +485,11 @@ impl TypeFlow<'_> {
                 right,
             }
             | Instruction::IntShiftRight {
+                destination,
+                left,
+                right,
+            }
+            | Instruction::UintShiftRight {
                 destination,
                 left,
                 right,
@@ -532,7 +657,12 @@ impl TypeFlow<'_> {
                 let key = first_pair.index() + (pair * 2) as u16;
                 matches!(
                     self.constant_value_fact(self.fact(index, Register::new(key)), 0),
-                    Some(ConstantValue::Int(_) | ConstantValue::String(_))
+                    Some(
+                        ConstantValue::Int(_)
+                            | ConstantValue::Uint(_)
+                            | ConstantValue::Bool(_)
+                            | ConstantValue::String(_)
+                    )
                 ) && self.fact_is_constant(self.fact(index, Register::new(key + 1)), 0)
             }) =>
             {
@@ -631,6 +761,7 @@ impl TypeFlow<'_> {
                 TypeDescriptor::TrueLiteral => Some(ConstantValue::Bool(true)),
                 TypeDescriptor::FalseLiteral => Some(ConstantValue::Bool(false)),
                 TypeDescriptor::IntLiteral(value) => Some(ConstantValue::Int(*value)),
+                TypeDescriptor::UintLiteral(value) => Some(ConstantValue::Uint(*value)),
                 TypeDescriptor::FloatLiteral(value) => Some(ConstantValue::Float(*value)),
                 TypeDescriptor::StringLiteral(value) => Some(ConstantValue::String(value.clone())),
                 _ => None,
@@ -675,7 +806,12 @@ impl TypeFlow<'_> {
                 let key = first_pair.index() + (pair * 2) as u16;
                 matches!(
                     self.constant_value_fact(self.fact(index, Register::new(key)), depth + 1,),
-                    Some(ConstantValue::Int(_) | ConstantValue::String(_))
+                    Some(
+                        ConstantValue::Int(_)
+                            | ConstantValue::Uint(_)
+                            | ConstantValue::Bool(_)
+                            | ConstantValue::String(_)
+                    )
                 ) && self.fact_is_constant(self.fact(index, Register::new(key + 1)), depth + 1)
             }),
             _ => false,
@@ -742,6 +878,14 @@ impl TypeFlow<'_> {
 
 pub(crate) fn constant_power(left: ConstantValue, right: ConstantValue) -> Option<ConstantValue> {
     match (left, right) {
+        (ConstantValue::Uint(base), ConstantValue::Uint(exponent)) => {
+            let value = match base {
+                0 => u64::from(exponent == 0),
+                1 => 1,
+                _ => base.checked_pow(u32::try_from(exponent).ok()?)?,
+            };
+            Some(ConstantValue::Uint(value))
+        }
         (ConstantValue::Int(base), ConstantValue::Int(exponent)) if exponent >= 0 => {
             let exponent = u64::try_from(exponent).ok()?;
             let value = match base {
@@ -765,11 +909,11 @@ pub(crate) fn constant_power(left: ConstantValue, right: ConstantValue) -> Optio
         (ConstantValue::Float(base), ConstantValue::Float(exponent)) => {
             Some(ConstantValue::Float(base.powf(exponent)))
         }
-        (ConstantValue::Int(base), ConstantValue::Float(exponent)) => {
-            Some(ConstantValue::Float((base as f64).powf(exponent)))
+        (base, ConstantValue::Float(exponent)) => {
+            Some(ConstantValue::Float(constant_numeric(base)?.powf(exponent)))
         }
-        (ConstantValue::Float(base), ConstantValue::Int(exponent)) => {
-            Some(ConstantValue::Float(base.powf(exponent as f64)))
+        (ConstantValue::Float(base), exponent) => {
+            Some(ConstantValue::Float(base.powf(constant_numeric(exponent)?)))
         }
         _ => None,
     }
@@ -778,6 +922,7 @@ pub(crate) fn constant_power(left: ConstantValue, right: ConstantValue) -> Optio
 pub(crate) fn constant_negate(value: ConstantValue) -> Option<ConstantValue> {
     match value {
         ConstantValue::Int(value) => value.checked_neg().map(ConstantValue::Int),
+        ConstantValue::Uint(0) => Some(ConstantValue::Uint(0)),
         ConstantValue::Float(value) => Some(ConstantValue::Float(-value)),
         _ => None,
     }
@@ -785,7 +930,7 @@ pub(crate) fn constant_negate(value: ConstantValue) -> Option<ConstantValue> {
 
 pub(crate) fn constant_unary_plus(value: ConstantValue) -> Option<ConstantValue> {
     match value {
-        ConstantValue::Int(_) | ConstantValue::Float(_) => Some(value),
+        ConstantValue::Int(_) | ConstantValue::Uint(_) | ConstantValue::Float(_) => Some(value),
         _ => None,
     }
 }
@@ -795,10 +940,15 @@ pub(crate) fn constant_int_binary(
     right: ConstantValue,
     operation: impl FnOnce(i64, i64) -> i64,
 ) -> Option<ConstantValue> {
-    let (ConstantValue::Int(left), ConstantValue::Int(right)) = (left, right) else {
-        return None;
-    };
-    Some(ConstantValue::Int(operation(left, right)))
+    match (left, right) {
+        (ConstantValue::Int(left), ConstantValue::Int(right)) => {
+            Some(ConstantValue::Int(operation(left, right)))
+        }
+        (ConstantValue::Uint(left), ConstantValue::Uint(right)) => Some(ConstantValue::Uint(
+            operation(left as i64, right as i64) as u64,
+        )),
+        _ => None,
+    }
 }
 
 pub(crate) fn constant_shift(
@@ -806,22 +956,33 @@ pub(crate) fn constant_shift(
     right: ConstantValue,
     shift_left: bool,
 ) -> Option<ConstantValue> {
-    let (ConstantValue::Int(left), ConstantValue::Int(right)) = (left, right) else {
-        return None;
+    let right = match right {
+        ConstantValue::Int(value) => u32::try_from(value).ok()?,
+        ConstantValue::Uint(value) => u32::try_from(value).ok()?,
+        _ => return None,
     };
-    if !(0..=63).contains(&right) {
+    if right > 63 {
         return None;
     }
-    Some(ConstantValue::Int(if shift_left {
-        ((left as u64) << right as u32) as i64
-    } else {
-        left >> right as u32
-    }))
+    match left {
+        ConstantValue::Int(left) => Some(ConstantValue::Int(if shift_left {
+            left << right
+        } else {
+            left >> right
+        })),
+        ConstantValue::Uint(left) => Some(ConstantValue::Uint(if shift_left {
+            left << right
+        } else {
+            left >> right
+        })),
+        _ => None,
+    }
 }
 
 pub(crate) fn constant_numeric(value: ConstantValue) -> Option<f64> {
     match value {
         ConstantValue::Int(value) => Some(value as f64),
+        ConstantValue::Uint(value) => Some(value as f64),
         ConstantValue::Float(value) => Some(value),
         _ => None,
     }
@@ -832,6 +993,7 @@ pub(crate) fn constant_equals(left: &ConstantValue, right: &ConstantValue) -> bo
         (ConstantValue::Null, ConstantValue::Null) => true,
         (ConstantValue::Bool(left), ConstantValue::Bool(right)) => left == right,
         (ConstantValue::Int(left), ConstantValue::Int(right)) => left == right,
+        (ConstantValue::Uint(left), ConstantValue::Uint(right)) => left == right,
         (ConstantValue::Float(left), ConstantValue::Float(right)) => left == right,
         (ConstantValue::String(left), ConstantValue::String(right)) => {
             left.as_bytes() == right.as_bytes()
@@ -869,6 +1031,23 @@ pub(super) fn constant_comparison(
 
 fn constant_compare(left: &ConstantValue, right: &ConstantValue) -> Option<ConstantOrdering> {
     match (left, right) {
+        (ConstantValue::Uint(left), ConstantValue::Uint(right)) => {
+            Some(ConstantOrdering::Ordered(left.cmp(right)))
+        }
+        (ConstantValue::Int(left), ConstantValue::Uint(right)) => Some(ConstantOrdering::Ordered(
+            i128::from(*left).cmp(&i128::from(*right)),
+        )),
+        (ConstantValue::Uint(left), ConstantValue::Int(right)) => Some(ConstantOrdering::Ordered(
+            i128::from(*left).cmp(&i128::from(*right)),
+        )),
+        (ConstantValue::Uint(left), ConstantValue::Float(right)) => Some(
+            ConstantOrdering::from_partial(compare_uint_float(*left, *right)),
+        ),
+        (ConstantValue::Float(left), ConstantValue::Uint(right)) => {
+            Some(ConstantOrdering::from_partial(
+                compare_uint_float(*right, *left).map(Ordering::reverse),
+            ))
+        }
         (ConstantValue::Int(left), ConstantValue::Int(right)) => {
             Some(ConstantOrdering::Ordered(left.cmp(right)))
         }
@@ -893,6 +1072,7 @@ pub(crate) fn constant_from_literal(literal: &Literal) -> ConstantValue {
         Literal::Null => ConstantValue::Null,
         Literal::Bool(value) => ConstantValue::Bool(*value),
         Literal::Int(value) => ConstantValue::Int(*value),
+        Literal::Uint(value) => ConstantValue::Uint(*value),
         Literal::Float(value) => ConstantValue::Float(*value),
         Literal::String(value) => ConstantValue::String(value.clone()),
     }
@@ -900,17 +1080,20 @@ pub(crate) fn constant_from_literal(literal: &Literal) -> ConstantValue {
 
 pub(crate) fn constant_add(left: ConstantValue, right: ConstantValue) -> Option<ConstantValue> {
     match (left, right) {
+        (ConstantValue::Uint(left), ConstantValue::Uint(right)) => {
+            left.checked_add(right).map(ConstantValue::Uint)
+        }
         (ConstantValue::Int(left), ConstantValue::Int(right)) => {
             left.checked_add(right).map(ConstantValue::Int)
         }
         (ConstantValue::Float(left), ConstantValue::Float(right)) => {
             Some(ConstantValue::Float(left + right))
         }
-        (ConstantValue::Int(left), ConstantValue::Float(right)) => {
-            Some(ConstantValue::Float(left as f64 + right))
+        (left, ConstantValue::Float(right)) => {
+            Some(ConstantValue::Float(constant_numeric(left)? + right))
         }
-        (ConstantValue::Float(left), ConstantValue::Int(right)) => {
-            Some(ConstantValue::Float(left + right as f64))
+        (ConstantValue::Float(left), right) => {
+            Some(ConstantValue::Float(left + constant_numeric(right)?))
         }
         _ => None,
     }
@@ -921,17 +1104,20 @@ pub(crate) fn constant_subtract(
     right: ConstantValue,
 ) -> Option<ConstantValue> {
     match (left, right) {
+        (ConstantValue::Uint(left), ConstantValue::Uint(right)) => {
+            left.checked_sub(right).map(ConstantValue::Uint)
+        }
         (ConstantValue::Int(left), ConstantValue::Int(right)) => {
             left.checked_sub(right).map(ConstantValue::Int)
         }
         (ConstantValue::Float(left), ConstantValue::Float(right)) => {
             Some(ConstantValue::Float(left - right))
         }
-        (ConstantValue::Int(left), ConstantValue::Float(right)) => {
-            Some(ConstantValue::Float(left as f64 - right))
+        (left, ConstantValue::Float(right)) => {
+            Some(ConstantValue::Float(constant_numeric(left)? - right))
         }
-        (ConstantValue::Float(left), ConstantValue::Int(right)) => {
-            Some(ConstantValue::Float(left - right as f64))
+        (ConstantValue::Float(left), right) => {
+            Some(ConstantValue::Float(left - constant_numeric(right)?))
         }
         _ => None,
     }
@@ -942,17 +1128,20 @@ pub(crate) fn constant_multiply(
     right: ConstantValue,
 ) -> Option<ConstantValue> {
     match (left, right) {
+        (ConstantValue::Uint(left), ConstantValue::Uint(right)) => {
+            left.checked_mul(right).map(ConstantValue::Uint)
+        }
         (ConstantValue::Int(left), ConstantValue::Int(right)) => {
             left.checked_mul(right).map(ConstantValue::Int)
         }
         (ConstantValue::Float(left), ConstantValue::Float(right)) => {
             Some(ConstantValue::Float(left * right))
         }
-        (ConstantValue::Int(left), ConstantValue::Float(right)) => {
-            Some(ConstantValue::Float(left as f64 * right))
+        (left, ConstantValue::Float(right)) => {
+            Some(ConstantValue::Float(constant_numeric(left)? * right))
         }
-        (ConstantValue::Float(left), ConstantValue::Int(right)) => {
-            Some(ConstantValue::Float(left * right as f64))
+        (ConstantValue::Float(left), right) => {
+            Some(ConstantValue::Float(left * constant_numeric(right)?))
         }
         _ => None,
     }
@@ -976,11 +1165,13 @@ pub(crate) fn constant_divide(left: ConstantValue, right: ConstantValue) -> Opti
 }
 
 pub(crate) fn constant_modulo(left: ConstantValue, right: ConstantValue) -> Option<ConstantValue> {
-    let (ConstantValue::Int(left), ConstantValue::Int(right)) = (left, right) else {
-        return None;
-    };
-    if right == 0 {
-        return None;
+    match (left, right) {
+        (ConstantValue::Int(left), ConstantValue::Int(right)) if right != 0 => {
+            Some(ConstantValue::Int(left.checked_rem(right).unwrap_or(0)))
+        }
+        (ConstantValue::Uint(left), ConstantValue::Uint(right)) => {
+            left.checked_rem(right).map(ConstantValue::Uint)
+        }
+        _ => None,
     }
-    Some(ConstantValue::Int(left.checked_rem(right).unwrap_or(0)))
 }

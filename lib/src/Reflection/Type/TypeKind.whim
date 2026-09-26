@@ -12,6 +12,7 @@ enum TypeKind implements UnitEnum {
   case Null;
   case Bool;
   case Int;
+  case Uint;
   case Float;
   case String;
   case StringLength;

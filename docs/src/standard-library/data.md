@@ -61,8 +61,23 @@ assert!(Unicode\is_punctuation(0x3001));
 
 ## Integers and floats
 
-`Int\try_parse($text)` and `Float\try_parse($text)` return `null` for invalid
-input. They do not accept a partial number.
+`Int\try_parse($text)`, `UInt\try_parse($text)`, and `Float\try_parse($text)`
+return `null` for invalid input. They do not accept a partial number.
+
+`UInt\try_parse` accepts decimal digits, an optional leading `+`, and leading
+zeros. It rejects a minus sign, whitespace, underscores, base prefixes, source
+suffixes, fractions, exponents, and values above the unsigned maximum.
+`UInt\div(uint $numerator, uint $denominator): uint` returns the exact integer
+quotient and throws `DivisionByZeroError` for a zero denominator.
+
+```whim
+use Whim\Math;
+use Whim\UInt;
+
+assert!(UInt\try_parse('18446744073709551615') == Math\UINT_MAX);
+assert!(UInt\try_parse('42u') == null);
+assert!(UInt\div(Math\UINT_MAX, 2u) == 9_223_372_036_854_775_807u);
+```
 
 `Float` also tests NaN, finite, and infinite values. `to_bits` and `from_bits`
 convert a 64-bit float to its integer bit pattern. `to_bytes` and `from_bytes`
@@ -89,10 +104,18 @@ return `null` for no input. `mean` and `median` accept arrays because they need
 their size or more than one pass.
 
 `to_base`, `from_base`, and `base_convert` support bases 2 through 36.
+`to_base` accepts non-negative ints and the full uint range. Numeric comparison
+and aggregate helpers such as `min`, `max`, `mean`, and `median` accept uints.
+`sum` keeps its signed inputs; float-only functions still require float.
 
 The namespace defines integer and float limits plus `NAN`, `INF`, `E`, and
 `PI`. Read each limit by its full name: positive minima and lowest signed
 values use different constants.
+`UINT_MIN` and `UINT_MAX` are `0u` and `18_446_744_073_709_551_615u`.
+
+The existing `Whim\Refine\Uint8`, `Uint16`, `Uint32`, and `Uint64` aliases
+remain signed ranges. They do not accept uint values. Use unsigned bounds such
+as `0u..=255u` for an unsigned range.
 
 ## Ranges
 
@@ -113,6 +136,13 @@ One-shot `encode_*` functions return bytes; `decode_*` functions read bytes and
 check their exact width. `MemoryReader`, `MemoryWriter`, `HandleReader`, and
 `HandleWriter` provide moving cursors. Buffered readers report remaining data;
 buffered writers return their bytes through `toString()`.
+
+`decode_u64` and reader `u64` methods always return `uint`, including for zero
+and small values. They accept every 64-bit pattern. Cast the result to `int`
+when a signed API requires it; values above `INT_MAX` fail that cast.
+Unsigned 8-, 16-, and 32-bit decoders still return signed ints.
+Unsigned encoders and writer methods accept both their old non-negative signed
+range and uints within the chosen width. They reject values that do not fit.
 
 Use binary APIs for protocol fields and file formats. Do not reverse byte
 strings by hand.

@@ -33,6 +33,9 @@ pub(super) fn expand(attribute: TokenStream, item: TokenStream) -> syn::Result<T
         Some("int") => quote!(::core::option::Option::Some(
             whim_bytecode::unit::EnumBacking::Int
         )),
+        Some("uint") => quote!(::core::option::Option::Some(
+            whim_bytecode::unit::EnumBacking::Uint
+        )),
         Some("string") => {
             quote!(::core::option::Option::Some(
                 whim_bytecode::unit::EnumBacking::String
@@ -41,7 +44,7 @@ pub(super) fn expand(attribute: TokenStream, item: TokenStream) -> syn::Result<T
         Some(other) => {
             return Err(syn::Error::new(
                 Span::call_site(),
-                format!("enum backing must be \"int\" or \"string\", found {other:?}"),
+                format!("enum backing must be \"int\", \"uint\", or \"string\", found {other:?}"),
             ));
         }
     };

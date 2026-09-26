@@ -37,6 +37,7 @@ pub enum Type<'arena> {
     String(Keyword<'arena>),
     StringLength(StringLengthType<'arena>),
     Int(Keyword<'arena>),
+    Uint(Keyword<'arena>),
     Float(Keyword<'arena>),
     Bool(Keyword<'arena>),
     Void(Keyword<'arena>),
@@ -93,7 +94,7 @@ pub enum StringLength<'arena> {
     Range(IntegerRangeType<'arena>),
 }
 
-/// One signed integer-literal endpoint of an [`IntegerRangeType`].
+/// One integer-literal endpoint of an [`IntegerRangeType`].
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum IntegerRangeBound<'arena> {
     Positive(LiteralInteger<'arena>),
@@ -408,6 +409,7 @@ impl HasSpan for Type<'_> {
             Type::Tuple(tuple) => tuple.span(),
             Type::String(keyword)
             | Type::Int(keyword)
+            | Type::Uint(keyword)
             | Type::Float(keyword)
             | Type::Bool(keyword)
             | Type::Void(keyword)

@@ -77,7 +77,7 @@ unless it begins `#[`, `#![`, or `#{`.
 
 ## Number literals
 
-Integers use signed 64-bit values. The source forms are:
+Unsuffixed integers use signed 64-bit values. The source forms are:
 
 ```whim
 assert!(42 == 4_2);
@@ -88,6 +88,26 @@ assert!(0o755 == 493);
 
 Underscores may split digits. A decimal integer cannot start with `0` unless it
 is zero. Write `0o` for octal.
+
+Append `u` or `U` for an unsigned 64-bit integer. Both spellings have the same
+meaning in every base. The optional `i` or `I` suffix marks a signed integer;
+it has the same meaning as no suffix.
+
+```whim
+assert!(42u == 42U);
+assert!(42 == 42i);
+assert!(42i == 42I);
+assert!(0xffu == 255u);
+assert!(0b1010U == 10u);
+assert!(0o755u == 493u);
+assert!(18_446_744_073_709_551_615u == Whim\Math\UINT_MAX);
+```
+
+A suffix follows the digits without a gap. Float literals cannot take an
+integer suffix. An out-of-range literal is a compile error; an unsuffixed
+literal does not become unsigned when it exceeds the signed maximum.
+The compiler rejects a negated nonzero unsigned literal such as `-24u`.
+`-0u` is valid and equals `0u`.
 
 Floats use decimal digits and may use an exponent. A decimal point may have
 digits on only one side:

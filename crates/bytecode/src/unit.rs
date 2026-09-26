@@ -128,6 +128,7 @@ pub fn literal_value(literal: &Literal) -> Value {
         Literal::Null => Value::null(),
         Literal::Bool(value) => Value::bool(*value),
         Literal::Int(value) => Value::int(*value),
+        Literal::Uint(value) => Value::uint(*value),
         Literal::Float(value) => Value::float(*value),
         Literal::String(atom) => Value::string(atom.to_handle()),
     }
@@ -147,6 +148,7 @@ pub fn literal_return(function: &CompiledFunction) -> Option<Literal> {
                 | Instruction::ReturnPairUnchecked { .. }
                 | Instruction::ReturnScalarUnchecked { .. }
                 | Instruction::ReturnIntUnchecked { .. }
+                | Instruction::ReturnUintUnchecked { .. }
                 | Instruction::ReturnNull
                 | Instruction::ReturnNullUnchecked
         )
@@ -168,6 +170,9 @@ pub fn literal_return(function: &CompiledFunction) -> Option<Literal> {
         Instruction::ReturnIntUnchecked { immediate } if return_index == 0 => {
             Some(Literal::Int(i64::from(immediate.value())))
         }
+        Instruction::ReturnUintUnchecked { immediate } if return_index == 0 => {
+            Some(Literal::Uint(u64::from(immediate.value())))
+        }
         Instruction::Return { source }
         | Instruction::ReturnUnchecked { source }
         | Instruction::ReturnReferenceUnchecked { source }
@@ -188,6 +193,10 @@ pub fn literal_return(function: &CompiledFunction) -> Option<Literal> {
                     destination,
                     immediate,
                 } if destination == source => Some(Literal::Int(i64::from(immediate.value()))),
+                Instruction::LoadUint {
+                    destination,
+                    immediate,
+                } if destination == source => Some(Literal::Uint(u64::from(immediate.value()))),
                 Instruction::LoadConstant {
                     destination,
                     constant,
@@ -445,10 +454,10 @@ pub struct CompiledWhereConstraint {
     pub span: Span,
 }
 
-/// `int` or `string`, the only two the language allows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnumBacking {
     Int,
+    Uint,
     String,
 }
 

@@ -250,6 +250,22 @@ pub(crate) fn integer_gate(value: u64, negated: bool, span: Span) -> Result<i64,
     })
 }
 
+pub(crate) fn unsigned_integer_gate(
+    value: u64,
+    negated: bool,
+    span: Span,
+) -> Result<u64, CompileError> {
+    if negated && value != 0 {
+        Err(CompileError::new(
+            CompileErrorKind::NegativeUnsignedLiteral,
+            "an unsigned integer literal cannot be negative",
+            span,
+        ))
+    } else {
+        Ok(value)
+    }
+}
+
 fn argument_gate(count: usize, span: Span) -> Result<u8, CompileError> {
     check_count(
         CompileErrorKind::TooManyArguments,
@@ -816,13 +832,14 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
         self.chunk.patch_jump(jump, target);
         if let Some((
             index,
-            Instruction::AddImmediate {
+            Instruction::Step {
                 destination,
                 source,
-                ..
+                immediate,
             },
         )) = candidate
             && destination == source
+            && immediate.value() >= 0
             && i16::try_from(i64::from(target) - wide_code_position(index)).is_ok()
         {
             self.loop_backedge_fusions.push(index);
@@ -1019,7 +1036,7 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
             if targets.contains(&jump) || remove[increment] || remove[jump] {
                 continue;
             }
-            let Instruction::AddImmediate {
+            let Instruction::Step {
                 destination,
                 source,
                 immediate,

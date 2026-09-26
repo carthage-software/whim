@@ -5,10 +5,10 @@ use Whim\Iterate\ToIterator;
 use Whim\Iterate\Iterator;
 
 /** A type accepted as a dictionary key. */
-type ArrayKey = string|int|bool;
+type ArrayKey = string|int|uint|bool;
 
 /** Any integer or floating-point number. */
-type Numeric = int|float;
+type Numeric = int|uint|float;
 
 /** Any scalar value. */
 type Scalar = Numeric|string|bool;
@@ -50,7 +50,7 @@ type Exclude<T, N> = T&!N;
 type Extract<T, U> = T&U;
 
 /** A numeric value other than zero. */
-type NonZero<T: Numeric> = Exclude<T, 0|0.0>;
+type NonZero<T: Numeric> = Exclude<T, 0|0u|0.0>;
 
 /** A vec containing at least one element. */
 type NonEmptyVec<T> = Exclude<vec<T>, vec<never>>;
@@ -76,25 +76,25 @@ type NonPositiveInt = ..=0;
 /** Any value other than null. */
 type NonNull = Exclude<mixed, null>;
 
-/** An unsigned 8-bit integer. */
+/** A signed int in the unsigned 8-bit range. */
 type Uint8 = 0..=255;
 
 /** A signed 8-bit integer. */
 type Int8 = -128..=127;
 
-/** An unsigned 16-bit integer. */
+/** A signed int in the unsigned 16-bit range. */
 type Uint16 = 0..=65_535;
 
 /** A signed 16-bit integer. */
 type Int16 = -32_768..=32_767;
 
-/** An unsigned 32-bit integer. */
+/** A signed int in the unsigned 32-bit range. */
 type Uint32 = 0..=4_294_967_295;
 
 /** A signed 32-bit integer. */
 type Int32 = -2_147_483_648..=2_147_483_647;
 
-/** An unsigned 64-bit integer. */
+/** A non-negative signed int; use uint for the full unsigned 64-bit range. */
 type Uint64 = 0..;
 
 /** A value from zero to one hundred, such as a percentage. */
@@ -103,8 +103,8 @@ type Percent = 0..=100;
 /** A single base-10 digit. */
 type Digit = 0..=9;
 
-/** The null, false, zero, and empty-string values PHP considers falsy. */
-type Falsy = null|false|0|0.0|'';
+/** Null, false, numeric zeros, and the empty string. */
+type Falsy = null|false|0|0u|0.0|'';
 
 /** Values outside Falsy, using PHP terminology; Whim conditions require bool. */
 type Truthy = Exclude<mixed, Falsy>;

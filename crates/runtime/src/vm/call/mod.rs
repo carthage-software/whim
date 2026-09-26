@@ -73,11 +73,16 @@ pub(in crate::vm) fn guard_allows(guard: &ArgumentGuard, value: &Value) -> bool 
         ArgumentGuard::Null => value.is_null(),
         ArgumentGuard::Bool => value.is_bool(),
         ArgumentGuard::Int => value.is_int(),
+        ArgumentGuard::Uint => value.is_uint(),
         ArgumentGuard::Float => value.is_float(),
         ArgumentGuard::String => value.is_string(),
         ArgumentGuard::Object => value.is_object(),
         ArgumentGuard::ExactBool(expected) => value.as_bool() == Some(*expected),
         ArgumentGuard::ExactInt(expected) => value.as_int() == Some(*expected),
+        ArgumentGuard::ExactUint(expected) => value.as_uint() == Some(*expected),
+        ArgumentGuard::UintRange { min, max } => value.as_uint().is_some_and(|value| {
+            min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
+        }),
         ArgumentGuard::IntRange { min, max } => value.as_int().is_some_and(|value| {
             min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)
         }),
@@ -109,6 +114,7 @@ fn scalar_union_mask(descriptor: &TypeDescriptor) -> Option<u16> {
         TypeDescriptor::Null => 1 << ValueKind::Null as u16,
         TypeDescriptor::Bool => 1 << ValueKind::Bool as u16,
         TypeDescriptor::Int => 1 << ValueKind::Int as u16,
+        TypeDescriptor::Uint => 1 << ValueKind::Uint as u16,
         TypeDescriptor::Float => 1 << ValueKind::Float as u16,
         TypeDescriptor::String => {
             (1 << ValueKind::String as u16) | (1 << ValueKind::ShortString as u16)
@@ -135,6 +141,7 @@ pub(in crate::vm) fn argument_guard(
         TypeDescriptor::Null => ArgumentGuard::Null,
         TypeDescriptor::Bool => ArgumentGuard::Bool,
         TypeDescriptor::Int => ArgumentGuard::Int,
+        TypeDescriptor::Uint => ArgumentGuard::Uint,
         TypeDescriptor::Float => ArgumentGuard::Float,
         TypeDescriptor::String => ArgumentGuard::String,
         TypeDescriptor::StringLength { min, max } => ArgumentGuard::StringLength {
@@ -145,6 +152,11 @@ pub(in crate::vm) fn argument_guard(
         TypeDescriptor::TrueLiteral => ArgumentGuard::ExactBool(true),
         TypeDescriptor::FalseLiteral => ArgumentGuard::ExactBool(false),
         TypeDescriptor::IntLiteral(expected) => ArgumentGuard::ExactInt(*expected),
+        TypeDescriptor::UintLiteral(expected) => ArgumentGuard::ExactUint(*expected),
+        TypeDescriptor::UintRange { min, max } => ArgumentGuard::UintRange {
+            min: *min,
+            max: *max,
+        },
         TypeDescriptor::IntRange { min, max } => ArgumentGuard::IntRange {
             min: *min,
             max: *max,

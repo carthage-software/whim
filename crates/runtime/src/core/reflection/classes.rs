@@ -472,7 +472,7 @@ reflection_class! {
     implements ["Whim\\Reflection\\Member\\MemberReflection"]
     with [declaration, member] {
         get_enum: "getEnum(): Whim\\Reflection\\Symbol\\EnumReflection" => Enum;
-        get_backing_value: "getBackingValue(): null|int|string" => BackingValue;
+        get_backing_value: "getBackingValue(): null|int|uint|string" => BackingValue;
         get_value: "getValue(): object" => Value;
         get_type: "getType(): Whim\\Reflection\\Type\\MemberTypeReflection" => Type;
     }
@@ -705,7 +705,7 @@ reflection_class! {
     LiteralTypeReflection = "Whim\\Reflection\\Type\\LiteralTypeReflection"
     implements ["Whim\\Reflection\\Type\\TypeReflection"]
     with [type_reflection] {
-        get_value: "getValue(): null|bool|int|float|string" => Value;
+        get_value: "getValue(): null|bool|int|uint|float|string" => Value;
     }
 }
 
@@ -713,8 +713,8 @@ reflection_class! {
     IntegerRangeTypeReflection = "Whim\\Reflection\\Type\\IntegerRangeTypeReflection"
     implements ["Whim\\Reflection\\Type\\TypeReflection"]
     with [type_reflection] {
-        get_lower_bound: "getLowerBound(): null|int" => LowerBound;
-        get_upper_bound: "getUpperBound(): null|int" => UpperBound;
+        get_lower_bound: "getLowerBound(): null|int|uint" => LowerBound;
+        get_upper_bound: "getUpperBound(): null|int|uint" => UpperBound;
     }
 }
 
@@ -871,7 +871,7 @@ reflection_class! {
 
 reflection_class! {
     DictShapeEntryReflection = "Whim\\Reflection\\Type\\DictShapeEntryReflection" {
-        get_key: "getKey(): bool|int|string" => Key;
+        get_key: "getKey(): bool|int|uint|string" => Key;
         get_type: "getType(): Whim\\Reflection\\Type\\TypeReflection" => Type;
     }
 }

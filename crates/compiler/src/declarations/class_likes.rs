@@ -482,11 +482,12 @@ pub(in crate::declarations) fn compile_enum<'arena>(
         let descriptor = types::lowering::lower_type(&type_scope, backing.r#type)?;
         output.enum_backing = Some(match expand_aliases(&descriptor, &unit.type_aliases) {
             TypeDescriptor::Int => EnumBacking::Int,
+            TypeDescriptor::Uint => EnumBacking::Uint,
             TypeDescriptor::String => EnumBacking::String,
             _ => {
                 return Err(CompileError::new(
                     CompileErrorKind::InvalidEnumBacking,
-                    "an enum backing type must be `int` or `string`",
+                    "an enum backing type must be `int`, `uint`, or `string`",
                     backing.r#type.span(),
                 ));
             }

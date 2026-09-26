@@ -216,11 +216,17 @@ pub(crate) enum ArgumentGuard {
     Null,
     Bool,
     Int,
+    Uint,
     Float,
     String,
     Object,
     ExactBool(bool),
     ExactInt(i64),
+    ExactUint(u64),
+    UintRange {
+        min: Option<u64>,
+        max: Option<u64>,
+    },
     IntRange {
         min: Option<i64>,
         max: Option<i64>,

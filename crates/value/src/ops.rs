@@ -38,6 +38,7 @@ pub fn equals(a: &Value, b: &Value) -> bool {
         (ValueView::Null, ValueView::Null) => return true,
         (ValueView::Bool(left), ValueView::Bool(right)) => return left == right,
         (ValueView::Int(left), ValueView::Int(right)) => return left == right,
+        (ValueView::Uint(left), ValueView::Uint(right)) => return left == right,
         (ValueView::Float(left), ValueView::Float(right)) => return left == right,
         (left, right) if left.is_string() && right.is_string() => {
             return left.as_string_bytes() == right.as_string_bytes();
@@ -111,6 +112,7 @@ pub fn structural_hash(value: &Value, heap: &Heap) -> u64 {
                 ValueView::Null => completed.push(HASH_NULL),
                 ValueView::Bool(value) => completed.push(state.hash_bool(*value)),
                 ValueView::Int(value) => completed.push(state.hash_int(*value)),
+                ValueView::Uint(value) => completed.push(state.hash_uint(*value)),
                 ValueView::Float(value) => {
                     let bits = if *value == 0.0 { 0 } else { value.to_bits() };
                     completed.push(mix_hash(HASH_FLOAT ^ bits));
@@ -219,6 +221,7 @@ fn equals_shallow<'a>(
         (ValueView::Null, ValueView::Null) => true,
         (ValueView::Bool(left), ValueView::Bool(right)) => left == right,
         (ValueView::Int(left), ValueView::Int(right)) => left == right,
+        (ValueView::Uint(left), ValueView::Uint(right)) => left == right,
         (ValueView::Float(left), ValueView::Float(right)) => left == right,
         (left, right) if left.is_string() && right.is_string() => {
             left.as_string_bytes() == right.as_string_bytes()
@@ -306,10 +309,21 @@ impl<'a> EqualityCursor<'a> {
 pub fn compare(a: &Value, b: &Value) -> Result<Option<Ordering>, Incomparable> {
     match (a.transparent(), b.transparent()) {
         (ValueView::Int(left), ValueView::Int(right)) => Ok(Some(left.cmp(right))),
+        (ValueView::Uint(left), ValueView::Uint(right)) => Ok(Some(left.cmp(right))),
+        (ValueView::Int(left), ValueView::Uint(right)) => {
+            Ok(Some(i128::from(*left).cmp(&i128::from(*right))))
+        }
+        (ValueView::Uint(left), ValueView::Int(right)) => {
+            Ok(Some(i128::from(*left).cmp(&i128::from(*right))))
+        }
         (ValueView::Float(left), ValueView::Float(right)) => Ok(left.partial_cmp(right)),
         (ValueView::Int(left), ValueView::Float(right)) => Ok(compare_int_float(*left, *right)),
         (ValueView::Float(left), ValueView::Int(right)) => {
             Ok(compare_int_float(*right, *left).map(Ordering::reverse))
+        }
+        (ValueView::Uint(left), ValueView::Float(right)) => Ok(compare_uint_float(*left, *right)),
+        (ValueView::Float(left), ValueView::Uint(right)) => {
+            Ok(compare_uint_float(*right, *left).map(Ordering::reverse))
         }
         (left, right) if left.is_string() && right.is_string() => Ok(Some(
             // SAFETY: the value's tag proves this projection is valid.
@@ -354,6 +368,36 @@ pub fn render_int(heap: &Heap, value: i64) -> ManagedRef<ByteStringObject> {
     ByteStringObject::from_bytes(heap, buffer.format(value).as_bytes())
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "the preceding bounds checks restrict the float to the unsigned domain"
+)]
+#[inline]
+#[must_use]
+pub fn compare_uint_float(integer: u64, float: f64) -> Option<Ordering> {
+    if float.is_nan() {
+        return None;
+    }
+    if float >= 18_446_744_073_709_551_616.0 {
+        return Some(Ordering::Less);
+    }
+    if float < 0.0 {
+        return Some(Ordering::Greater);
+    }
+
+    Some(match integer.cmp(&(float.trunc() as u64)) {
+        Ordering::Equal if float.fract() > 0.0 => Ordering::Less,
+        ordering => ordering,
+    })
+}
+
+#[must_use]
+pub fn render_uint(heap: &Heap, value: u64) -> ManagedRef<ByteStringObject> {
+    let mut buffer = itoa::Buffer::new();
+    ByteStringObject::from_bytes(heap, buffer.format(value).as_bytes())
+}
+
 /// Renders a float in its canonical form on `heap`.
 ///
 /// Uses the shortest decimal that
@@ -387,6 +431,7 @@ pub fn stringify_for_concat(heap: &Heap, value: &Value) -> Option<ManagedRef<Byt
             Some(ByteStringObject::from_bytes(heap, string.as_bytes()))
         }
         ValueView::Int(int) => Some(render_int(heap, *int)),
+        ValueView::Uint(uint) => Some(render_uint(heap, *uint)),
         ValueView::Float(float) => Some(render_float(heap, *float)),
         _ => None,
     }

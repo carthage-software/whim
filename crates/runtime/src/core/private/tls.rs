@@ -1258,7 +1258,7 @@ fn key_text(cx: &mut Context<'_, '_, '_>, key: KeyRef<'_>) -> Result<String, Thr
         }
         KeyRef::ShortString(string) => from_utf8(string.as_bytes()).map(str::to_owned),
         // SAFETY: the surrounding invariant makes this path unreachable.
-        KeyRef::Int(_) | KeyRef::Bool(_) => unsafe {
+        KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) => unsafe {
             unreachable_invariant("validated TLS server identity keys are strings")
         },
     };

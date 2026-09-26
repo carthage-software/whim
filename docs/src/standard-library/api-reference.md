@@ -45,6 +45,7 @@ Attributes](../core-library/attributes.md).
 | `Whim\Dict`    | eager keyed collection functions                  |
 | `Whim\Float`   | float parsing, bit forms, and checks              |
 | `Whim\Int`     | integer parsing                                   |
+| `Whim\UInt`    | unsigned integer parsing and exact division        |
 | `Whim\Iterate` | iterators and lazy collection functions           |
 | `Whim\Math`    | arithmetic, statistics, bases, and math constants |
 | `Whim\Range`   | runtime integer range objects                     |

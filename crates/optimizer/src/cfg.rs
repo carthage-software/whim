@@ -18,6 +18,11 @@ pub(crate) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize
         | Instruction::StaticPropertyCoalesce { offset, .. }
         | Instruction::CounterLoop { offset, .. }
         | Instruction::IntCounterLoop { offset, .. }
+        | Instruction::UintCounterLoop { offset, .. }
+        | Instruction::UintJumpUnless { offset, .. }
+        | Instruction::UintJumpUnlessImmediate { offset, .. }
+        | Instruction::UintRangeJumpIf { offset, .. }
+        | Instruction::UintRangeJumpUnless { offset, .. }
         | Instruction::IntStepLoop { offset, .. }
         | Instruction::NumericLoop { offset, .. }
         | Instruction::IntNumericLoop { offset, .. }
@@ -37,6 +42,7 @@ pub(crate) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize
         Instruction::IndexCoalesce { offset, .. }
         | Instruction::VecIndexCoalesce { offset, .. }
         | Instruction::DictIndexCoalesceIntKey { offset, .. }
+        | Instruction::DictIndexCoalesceUintKey { offset, .. }
         | Instruction::DictIndexCoalesceStringKey { offset, .. }
         | Instruction::StringIndexCoalesce { offset, .. }
         | Instruction::PropertyCoalesce { offset, .. }
@@ -112,6 +118,7 @@ pub(crate) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize
         | Instruction::ReturnNull
         | Instruction::ReturnNullUnchecked
         | Instruction::ReturnIntUnchecked { .. }
+        | Instruction::ReturnUintUnchecked { .. }
         | Instruction::Throw { .. }
         | Instruction::Rethrow
         | Instruction::ThrowUnhandledMatch { .. }
@@ -148,6 +155,7 @@ pub(crate) fn branches_or_terminates(instruction: Instruction) -> bool {
             | Instruction::IndexCoalesce { .. }
             | Instruction::VecIndexCoalesce { .. }
             | Instruction::DictIndexCoalesceIntKey { .. }
+            | Instruction::DictIndexCoalesceUintKey { .. }
             | Instruction::DictIndexCoalesceStringKey { .. }
             | Instruction::StringIndexCoalesce { .. }
             | Instruction::PropertyCoalesce { .. }
@@ -156,6 +164,11 @@ pub(crate) fn branches_or_terminates(instruction: Instruction) -> bool {
             | Instruction::Coalesce { .. }
             | Instruction::JumpUnless { .. }
             | Instruction::IntJumpUnless { .. }
+            | Instruction::UintJumpUnless { .. }
+            | Instruction::UintJumpUnlessImmediate { .. }
+            | Instruction::UintRangeJumpIf { .. }
+            | Instruction::UintRangeJumpUnless { .. }
+            | Instruction::UintCounterLoop { .. }
             | Instruction::StringJumpUnless { .. }
             | Instruction::StringByteJumpUnlessEqual { .. }
             | Instruction::StringByteJumpUnlessNotEqual { .. }
@@ -186,6 +199,7 @@ pub(crate) fn branches_or_terminates(instruction: Instruction) -> bool {
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }
@@ -351,6 +365,11 @@ pub(crate) fn is_block_boundary(instruction: Instruction) -> bool {
     matches!(
         instruction,
         Instruction::Jump { .. }
+            | Instruction::UintJumpUnless { .. }
+            | Instruction::UintJumpUnlessImmediate { .. }
+            | Instruction::UintRangeJumpIf { .. }
+            | Instruction::UintRangeJumpUnless { .. }
+            | Instruction::UintCounterLoop { .. }
             | Instruction::NumericRegionJump { .. }
             | Instruction::JumpIfFalse { .. }
             | Instruction::JumpIfTrue { .. }
@@ -359,6 +378,7 @@ pub(crate) fn is_block_boundary(instruction: Instruction) -> bool {
             | Instruction::IndexCoalesce { .. }
             | Instruction::VecIndexCoalesce { .. }
             | Instruction::DictIndexCoalesceIntKey { .. }
+            | Instruction::DictIndexCoalesceUintKey { .. }
             | Instruction::DictIndexCoalesceStringKey { .. }
             | Instruction::StringIndexCoalesce { .. }
             | Instruction::PropertyCoalesce { .. }
@@ -379,6 +399,7 @@ pub(crate) fn is_block_boundary(instruction: Instruction) -> bool {
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
             | Instruction::ReturnIntUnchecked { .. }
+            | Instruction::ReturnUintUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }

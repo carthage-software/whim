@@ -222,15 +222,9 @@ try {
 }
 
 assert!($assertion_error_27 is TypeError);
-$assertion_value_28 = fn(): mixed => 1 as float;
-$assertion_error_28 = null;
-try {
-  $assertion_value_28();
-} catch (TypeError $assertion_caught_28) {
-  $assertion_error_28 = $assertion_caught_28;
-}
-
-assert!($assertion_error_28 is TypeError);
+assert!((1 as float) == 1.0);
+assert!((1.0 as int) == 1);
+assert!((1.5 ?as int) == null);
 
 $rawTimeout = 'nope';
 assert!((($rawTimeout ?as int) ?? 30) == 30);

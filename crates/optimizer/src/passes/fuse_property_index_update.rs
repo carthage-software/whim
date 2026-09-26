@@ -67,7 +67,7 @@ fn fuse_increment(
     else {
         return None;
     };
-    let Instruction::AddImmediate {
+    let Instruction::Step {
         destination: incremented,
         source,
         immediate,

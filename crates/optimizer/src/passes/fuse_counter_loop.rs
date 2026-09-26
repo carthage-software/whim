@@ -21,12 +21,18 @@ pub(in crate::passes) fn optimize_chunk(
     }
 
     for header in 0..chunk.code.len() - 2 {
-        let Instruction::JumpUnless {
+        let (Instruction::JumpUnless {
             comparison,
             left: counter,
             right: limit,
             offset,
-        } = chunk.code[header]
+        }
+        | Instruction::UintJumpUnless {
+            comparison,
+            left: counter,
+            right: limit,
+            offset,
+        }) = chunk.code[header]
         else {
             continue;
         };

@@ -3,14 +3,14 @@ namespace Whim\Enum;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\Stub;
 
-/** Describes an enum whose cases carry int or string values. */
+/** Describes an enum whose cases carry int, uint, or string values. */
 #[Stub]
-interface BackedEnum<T: int|string> extends UnitEnum {
+interface BackedEnum<T: int|uint|string> extends UnitEnum {
   public readonly T $value;
 
   #[TrackCaller]
-  public static function from(int|string $value): static;
+  public static function from(int|uint|string $value): static;
 
   #[TrackCaller]
-  public static function tryFrom(int|string $value): static|null;
+  public static function tryFrom(int|uint|string $value): static|null;
 }
