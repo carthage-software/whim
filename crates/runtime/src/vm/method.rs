@@ -3,6 +3,7 @@
 use std::mem;
 
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::PropertyReadMode;
 use whim_value::Value;
@@ -17,6 +18,7 @@ use crate::engine::builtins;
 use crate::engine::builtins::BuiltInCallable;
 use crate::symbols::CachedExactMethodFrame;
 use crate::symbols::GuardedMethodWays;
+use crate::vm::ArgumentGuard;
 use crate::vm::CacheEntry;
 use crate::vm::CachedExactMethod;
 use crate::vm::CachedGuardedMethod;
@@ -1005,7 +1007,7 @@ impl VirtualMachine<'_> {
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let entries = unsafe { &mut *cache.as_ref().polymorphic_guarded_methods() };
         if entries.len() <= site {
-            entries.resize(site + 1, GuardedMethodWays::EMPTY);
+            entries.resize_with(site + 1, || GuardedMethodWays::EMPTY);
         }
         entries[site].record(entry);
     }
@@ -1265,14 +1267,11 @@ impl VirtualMachine<'_> {
             is_constructor,
         };
 
-        let type_environment = self
-            .environment_for_class(
-                receiver_class,
-                receiver_environment,
-                entry.declaring_class,
-                0,
-            )?
-            .unwrap_or_else(TypeEnvironmentId::default);
+        let type_environment = self.exact_method_environment(
+            receiver_class,
+            receiver_environment,
+            entry.declaring_class,
+        )?;
 
         let turbofish_bound = site_type_arguments(chunk, site).is_some();
         let type_environment = self.bind_site_turbofish(
@@ -1285,7 +1284,7 @@ impl VirtualMachine<'_> {
         )?;
         match entry.body {
             MethodBodyKind::Bytecode(function) => {
-                let arguments_proven = arguments_proven
+                let arguments_checked = arguments_proven
                     || self.cached_argument_guards_match(
                         caller_cache,
                         site,
@@ -1319,12 +1318,12 @@ impl VirtualMachine<'_> {
                     None,
                     type_environment,
                     turbofish_bound,
-                    arguments_proven,
+                    arguments_checked,
                     discard_result,
                     false,
                 );
 
-                if outcome.is_ok() && !arguments_proven {
+                if outcome.is_ok() && !arguments_checked {
                     self.cache_argument_guards(
                         caller_cache,
                         site,
@@ -1349,6 +1348,46 @@ impl VirtualMachine<'_> {
                             )
                         })
                 {
+                    let arguments = if arguments_proven || argument_count == 0 {
+                        CachedMethodArguments::Proven
+                    } else if let Some(guard) = Self::cached_single_argument_guard(
+                        caller_cache,
+                        site,
+                        function,
+                        type_environment,
+                    )
+                    .or_else(|| {
+                        if argument_count != 1 {
+                            return None;
+                        }
+                        let parameter = self.engine.tables.functions[function.0 as usize]
+                            .parameters()
+                            .first()?;
+                        Some(match parameter.declared_type.as_ref() {
+                            None | Some(TypeDescriptor::Wildcard | TypeDescriptor::Mixed) => {
+                                ArgumentGuard::Any
+                            }
+                            Some(TypeDescriptor::Null) => ArgumentGuard::Null,
+                            Some(TypeDescriptor::Bool) => ArgumentGuard::Bool,
+                            Some(TypeDescriptor::Int) => ArgumentGuard::Int,
+                            Some(TypeDescriptor::Uint) => ArgumentGuard::Uint,
+                            Some(TypeDescriptor::Float) => ArgumentGuard::Float,
+                            Some(TypeDescriptor::String) => ArgumentGuard::String,
+                            Some(TypeDescriptor::Object) => ArgumentGuard::Object,
+                            _ => return None,
+                        })
+                    }) {
+                        CachedMethodArguments::One(guard)
+                    } else {
+                        // SAFETY: the caller's retained chunk owns this cache across call setup.
+                        if !unsafe { &*caller_cache.as_ref().argument_guards() }
+                            .get(site)
+                            .is_some_and(|ways| ways.get(function, type_environment).is_some())
+                        {
+                            return outcome;
+                        }
+                        CachedMethodArguments::General
+                    };
                     let exact_entry = self.exact_method_frame_entry(
                         chunk,
                         entry,
@@ -1356,31 +1395,19 @@ impl VirtualMachine<'_> {
                         is_constructor,
                         destination,
                     );
-                    let mut cached = CachedGuardedMethod {
+                    let cached = CachedGuardedMethod {
                         receiver_class,
                         receiver_environment,
                         caller_environment,
                         caller_class,
                         method_environment: type_environment,
                         entry: exact_entry,
-                        arguments: CachedMethodArguments::General,
+                        arguments,
                         trivial_constructor_parameters: Self::trivial_constructor_parameter_count(
                             &exact_entry,
                             argument_count,
                         ),
                         fast_path: self.cached_method_fast_path(&exact_entry, argument_count),
-                    };
-                    cached.arguments = if arguments_proven || argument_count == 0 {
-                        CachedMethodArguments::Proven
-                    } else if let Some(guard) = Self::cached_single_argument_guard(
-                        caller_cache,
-                        site,
-                        function,
-                        type_environment,
-                    ) {
-                        CachedMethodArguments::One(guard)
-                    } else {
-                        CachedMethodArguments::General
                     };
                     Self::cache_polymorphic_guarded_method(caller_cache, site, cached);
                 }

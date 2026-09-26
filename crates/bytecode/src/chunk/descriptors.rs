@@ -168,6 +168,60 @@ pub enum TypeDescriptor {
 
 impl TypeDescriptor {
     #[must_use]
+    pub fn is_resolved(&self) -> bool {
+        match self {
+            Self::Parameter(_) | Self::StaticClass => false,
+            Self::Named { arguments, .. } => arguments
+                .as_ref()
+                .is_none_or(|arguments| arguments.iter().all(Self::is_resolved)),
+            Self::Member {
+                class_arguments,
+                member_arguments,
+                ..
+            } => {
+                class_arguments
+                    .as_ref()
+                    .is_none_or(|arguments| arguments.iter().all(Self::is_resolved))
+                    && member_arguments
+                        .as_ref()
+                        .is_none_or(|arguments| arguments.iter().all(Self::is_resolved))
+            }
+            Self::Array(arguments) | Self::Dictionary(arguments) => arguments
+                .as_ref()
+                .is_none_or(|(key, value)| key.is_resolved() && value.is_resolved()),
+            Self::Vector(value) => value.as_deref().is_none_or(Self::is_resolved),
+            Self::VectorShape { elements, rest } => {
+                elements.iter().all(Self::is_resolved)
+                    && rest.as_deref().is_none_or(Self::is_resolved)
+            }
+            Self::ObjectShape { entries, .. } => {
+                entries.iter().all(|(_, value)| value.is_resolved())
+            }
+            Self::DictionaryShape { entries, rest } => {
+                entries.iter().all(|(_, value)| value.is_resolved())
+                    && rest
+                        .as_ref()
+                        .is_none_or(|(key, value)| key.is_resolved() && value.is_resolved())
+            }
+            Self::Callable(signature) => signature.as_ref().is_none_or(|signature| {
+                signature
+                    .parameters
+                    .iter()
+                    .all(|parameter| parameter.r#type.is_resolved())
+                    && signature.return_type.is_resolved()
+            }),
+            Self::Classname(inner) | Self::Negated(inner) => inner.is_resolved(),
+            Self::Tuple(types) | Self::Union(types) | Self::Intersection(types) => {
+                types.iter().all(Self::is_resolved)
+            }
+            Self::TupleRest { elements, rest } => {
+                elements.iter().all(Self::is_resolved) && rest.is_resolved()
+            }
+            _ => true,
+        }
+    }
+
+    #[must_use]
     pub fn unsigned_integer_range(min: Option<u64>, max: Option<u64>) -> Self {
         if min.zip(max).is_some_and(|(min, max)| min > max) {
             Self::Never

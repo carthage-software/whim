@@ -279,6 +279,14 @@ const ARGUMENT_GUARD_WAYS: usize = 4;
 impl ArgumentGuardWays {
     pub(crate) const EMPTY: Self = Self([const { None }; ARGUMENT_GUARD_WAYS]);
 
+    pub(crate) fn can_record(&self, function: FuncId, environment: TypeEnvironmentId) -> bool {
+        self.0.iter().any(|entry| {
+            entry
+                .as_ref()
+                .is_none_or(|entry| entry.function == function && entry.environment == environment)
+        })
+    }
+
     pub(crate) fn get(
         &self,
         function: FuncId,
@@ -482,13 +490,18 @@ pub(crate) enum CachedMethodFastPath {
 }
 
 /// A small polymorphic cache for late-bound instance method sites.
-#[derive(Clone, Copy)]
-pub(crate) struct GuardedMethodWays([Option<CachedGuardedMethod>; GUARDED_METHOD_WAYS]);
+pub(crate) struct GuardedMethodWays {
+    inline: [Option<CachedGuardedMethod>; GUARDED_METHOD_WAYS],
+    overflow: Option<Box<[Option<CachedGuardedMethod>; GUARDED_METHOD_WAYS]>>,
+}
 
 const GUARDED_METHOD_WAYS: usize = 4;
 
 impl GuardedMethodWays {
-    pub(crate) const EMPTY: Self = Self([None; GUARDED_METHOD_WAYS]);
+    pub(crate) const EMPTY: Self = Self {
+        inline: [None; GUARDED_METHOD_WAYS],
+        overflow: None,
+    };
 
     pub(crate) fn can_record(
         &self,
@@ -497,14 +510,19 @@ impl GuardedMethodWays {
         caller_environment: TypeEnvironmentId,
         caller_class: Option<NonZeroU32>,
     ) -> bool {
-        self.0.iter().any(|entry| {
-            entry.as_ref().is_none_or(|entry| {
-                entry.receiver_class == receiver_class
-                    && entry.receiver_environment == receiver_environment
-                    && entry.caller_environment == caller_environment
-                    && entry.caller_class == caller_class
-            })
-        })
+        self.overflow.is_none()
+            || self
+                .inline
+                .iter()
+                .chain(self.overflow.iter().flat_map(|ways| ways.iter()))
+                .any(|entry| {
+                    entry.as_ref().is_none_or(|entry| {
+                        entry.receiver_class == receiver_class
+                            && entry.receiver_environment == receiver_environment
+                            && entry.caller_environment == caller_environment
+                            && entry.caller_class == caller_class
+                    })
+                })
     }
 
     pub(crate) fn get(
@@ -514,25 +532,38 @@ impl GuardedMethodWays {
         caller_environment: TypeEnvironmentId,
         caller_class: Option<NonZeroU32>,
     ) -> Option<CachedGuardedMethod> {
-        self.0
+        let matches = |entry: &&CachedGuardedMethod| {
+            entry.receiver_class == receiver_class
+                && entry.receiver_environment == receiver_environment
+                && entry.caller_environment == caller_environment
+                && entry.caller_class == caller_class
+        };
+        self.inline
             .iter()
             .flatten()
-            .find(|entry| {
-                entry.receiver_class == receiver_class
-                    && entry.receiver_environment == receiver_environment
-                    && entry.caller_environment == caller_environment
-                    && entry.caller_class == caller_class
-            })
+            .find(matches)
+            .or_else(|| self.overflow.as_ref()?.iter().flatten().find(matches))
             .copied()
     }
 
     pub(crate) fn record(&mut self, entry: CachedGuardedMethod) {
-        record_stable_way(&mut self.0, entry, |existing, entry| {
+        let equivalent = |existing: &CachedGuardedMethod, entry: &CachedGuardedMethod| {
             existing.receiver_class == entry.receiver_class
                 && existing.receiver_environment == entry.receiver_environment
                 && existing.caller_environment == entry.caller_environment
                 && existing.caller_class == entry.caller_class
-        });
+        };
+        if let Some(way) = self.inline.iter_mut().find(|way| {
+            way.as_ref()
+                .is_none_or(|existing| equivalent(existing, &entry))
+        }) {
+            *way = Some(entry);
+            return;
+        }
+        let overflow = self
+            .overflow
+            .get_or_insert_with(|| Box::new([None; GUARDED_METHOD_WAYS]));
+        record_stable_way(overflow, entry, equivalent);
     }
 }
 

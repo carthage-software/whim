@@ -384,6 +384,123 @@ impl TypeFlow<'_> {
     fn argument_proves(&self, index: usize, register: Register, expected: &TypeDescriptor) -> bool {
         self.proves(index, register, expected)
             || self.proves_constructed_array(index, register, expected)
+            || self.nested_array_element_proves(index, register, expected)
+    }
+
+    fn nested_array_element_proves(
+        &self,
+        index: usize,
+        register: Register,
+        expected: &TypeDescriptor,
+    ) -> bool {
+        let scalar = |descriptor: &TypeDescriptor| {
+            exact_descriptor_mask(descriptor)
+                .is_some_and(|mask| mask & !(NULL | BOOL | INT | UINT | FLOAT | STRING) == 0)
+        };
+
+        let kind = match expected {
+            TypeDescriptor::Vector(Some(element)) if scalar(element) => VECTOR,
+            TypeDescriptor::Dictionary(Some((key, value))) if scalar(key) && scalar(value) => {
+                DICTIONARY
+            }
+            _ => return false,
+        };
+
+        let fact = self.fact(index, register);
+        if fact.mask != kind {
+            return false;
+        }
+
+        let Some(producer) = instruction_index(fact.origin) else {
+            return false;
+        };
+
+        let container = match self.chunk.code[producer] {
+            Instruction::IndexGet { container, .. }
+            | Instruction::VecIndexGet { container, .. }
+            | Instruction::DictIndexGetIntKey { container, .. }
+            | Instruction::DictIndexGetUintKey { container, .. }
+            | Instruction::DictIndexGetStringKey { container, .. } => container,
+            Instruction::ForeachNext { iterator, .. }
+            | Instruction::VecForeachNext { iterator, .. }
+            | Instruction::DictForeachNext { iterator, .. } => iterator,
+            _ => return false,
+        };
+
+        let array = self.fact(producer, container).array;
+        let Some(initializer) = instruction_index(array) else {
+            return false;
+        };
+
+        if self.array_elements.get(array as usize).copied() != Some(kind) {
+            return false;
+        }
+
+        let proves = |at, value| self.fact_proves(self.fact(at, value), expected, 0);
+        match self.chunk.code[initializer] {
+            Instruction::NewArray {
+                kind,
+                count,
+                first_element,
+                ..
+            } => {
+                let (stride, offset) = if kind == ArrayKind::Dict {
+                    (2, 1)
+                } else {
+                    (1, 0)
+                };
+
+                for element in 0..u16::from(count.value()) {
+                    if !proves(
+                        initializer,
+                        Register::new(first_element.index() + element * stride + offset),
+                    ) {
+                        return false;
+                    }
+                }
+            }
+            Instruction::NewFilledVec { value, .. } if proves(initializer, value) => {}
+            _ => return false,
+        }
+
+        for (at, instruction) in self.chunk.code.iter().copied().enumerate() {
+            if !self.reachable[at] {
+                continue;
+            }
+
+            match instruction {
+                Instruction::IndexSet {
+                    container, value, ..
+                }
+                | Instruction::VecIndexSet {
+                    container, value, ..
+                }
+                | Instruction::DictIndexSet {
+                    container, value, ..
+                }
+                | Instruction::DictIndexSetIntegerKey {
+                    container, value, ..
+                }
+                | Instruction::DictIndexSetStringKey {
+                    container, value, ..
+                }
+                | Instruction::Append { container, value }
+                | Instruction::VecAppend { container, value }
+                    if self.fact(at, container).array == array && !proves(at, value) =>
+                {
+                    return false;
+                }
+                Instruction::Spread { container, .. }
+                | Instruction::IndexAddAssign { container, .. }
+                    if self.fact(at, container).array == array =>
+                {
+                    return false;
+                }
+                _ => {}
+            }
+        }
+
+        true
     }
 
     pub(crate) fn destructure_proven(

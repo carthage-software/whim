@@ -285,13 +285,18 @@ fn polymorphic_methods_preserve_checks_after_cache_saturation() {
 use Whim\Marker\NeverInline;
 class Target<T> {
     public function identity(T $value): T { return $value; }
+    public function integer(int $value): int { return $value; }
 }
 #[NeverInline]
 function invoke(object $target, mixed $value): mixed { return $target->identity($value); }
+#[NeverInline]
+function invoke_integer(object $target, mixed $value): int { return $target->integer($value); }
 $targets = vec[
     (new Target::<int>(), 42), (new Target::<string>(), 'retained'),
     (new Target::<bool>(), true), (new Target::<float>(), 2.5),
     (new Target::<uint>(), 42u), (new Target::<vec<int>>(), vec[1, 2]),
+    (new Target::<dict<string, int>>(), dict['answer' => 42]),
+    (new Target::<(int, string)>(), (42, 'answer')), (new Target::<'literal'>(), 'literal'),
 ];
 for ($round = 0; $round < 3; $round++) {
     foreach ($targets as ($target, $value)) {
@@ -301,6 +306,12 @@ for ($round = 0; $round < 3; $round++) {
         catch (Whim\Unwind\TypeError $_) { $failed = true; }
         assert!($failed);
         assert!(invoke($target, $value) == $value);
+        assert!(invoke_integer($target, 42) == 42);
+        $failed = false;
+        try { invoke_integer($target, 'wrong'); }
+        catch (Whim\Unwind\TypeError $_) { $failed = true; }
+        assert!($failed);
+        assert!(invoke_integer($target, 43) == 43);
     }
 }
 ";
@@ -323,12 +334,29 @@ class Caller {
 }
 class First extends Caller {}
 class Second extends Caller {}
+class Third extends Caller {}
+class Fourth extends Caller {}
+class Fifth extends Caller {}
+class Sixth extends Caller {}
+class Seventh extends Caller {}
+class Eighth extends Caller {}
+class Ninth extends Caller {}
 $target = new Target();
 for ($round = 0; $round < 3; $round++) {
     assert!(First::matches($target, new First()));
     assert!(Second::matches($target, new Second()));
+    assert!(Third::matches($target, new Third()));
+    assert!(Fourth::matches($target, new Fourth()));
+    assert!(Fifth::matches($target, new Fifth()));
+    assert!(Sixth::matches($target, new Sixth()));
+    assert!(Seventh::matches($target, new Seventh()));
+    assert!(Eighth::matches($target, new Eighth()));
+    assert!(Ninth::matches($target, new Ninth()));
     assert!(!Second::matches($target, new First()));
     assert!(!First::matches($target, new Second()));
+    assert!(!Fifth::matches($target, new First()));
+    assert!(!Ninth::matches($target, new First()));
+    assert!(!First::matches($target, new Ninth()));
 }
 ";
     run_both_modes(source, "/polymorphic-method-static.whim");
@@ -438,6 +466,93 @@ assert!(Capture::$drops == 2);
         let result = engine.run_source(source, Path::new("/borrowed-captures.whim"));
         assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
     }
+}
+
+#[test]
+fn inherited_method_cache_keeps_argument_guards() {
+    let source = r"
+use Whim\Marker\NeverInline;
+class Base {
+    public function accept(int $unused): bool { return true; }
+    public function accepts((static) $unused): bool { return true; }
+}
+class First extends Base {}
+class Second extends Base {}
+#[NeverInline]
+function invoke(object $target, mixed $value): bool { return $target->accept($value); }
+#[NeverInline]
+function invoke_static(object $target, object $value): bool { return $target->accepts($value); }
+$first = new First();
+$second = new Second();
+assert!(invoke($first, 1));
+assert!(invoke($second, 1));
+assert!(invoke_static($first, $first));
+for ($round = 0; $round < 3; $round++) {
+    $caught = false;
+    try { invoke($second, 'wrong'); }
+    catch (Whim\Unwind\TypeError $_) { $caught = true; }
+    assert!($caught);
+    assert!(invoke($second, 2));
+    $caught = false;
+    try { invoke_static($second, $first); }
+    catch (Whim\Unwind\TypeError $_) { $caught = true; }
+    assert!($caught);
+    assert!(invoke_static($second, $second));
+    assert!(invoke_static($first, $first));
+}
+";
+    run_both_modes(source, "/inherited-method-argument-guards.whim");
+}
+
+#[test]
+fn inherited_method_cache_checks_nested_static_types() {
+    let source = r"
+use Whim\Marker\NeverInline;
+use Whim\Unwind\TypeError;
+class Box<T> { public int $number = 7; }
+class Base {
+    #[NeverInline]
+    public static function factory(): Box<static> { return new Box::<static>(); }
+    #[NeverInline]
+    public function accepts_box(Box<static> $value): int { return $value->number; }
+    #[NeverInline]
+    public function accepts_callable(fn(): Box<static> $value): int { return $value()->number; }
+    #[NeverInline]
+    public function accepts_factory(fn(): Box<First> $value): int { return $value()->number; }
+    #[NeverInline]
+    public function invoke_box(object $target, object $value): int {
+        return $target->accepts_box($value);
+    }
+    #[NeverInline]
+    public function invoke_callable(object $target, fn $value): int {
+        return $target->accepts_callable($value);
+    }
+    #[NeverInline]
+    public function invoke_factory(object $target, fn $value): int {
+        return $target->accepts_factory($value);
+    }
+}
+class First extends Base {}
+class Second extends Base {}
+$first = new First();
+$second = new Second();
+$box = new Box::<First>();
+$callback = fn(): Box<First> => new Box::<First>();
+$factory = First::factory(...);
+for ($round = 0; $round < 3; $round++) {
+    assert!($first->invoke_box($first, $box) == 7);
+    assert!($first->invoke_callable($first, $callback) == 7);
+    assert!($first->invoke_factory($first, $factory) == 7);
+    $caught = 0;
+    try { $second->invoke_box($second, $box); } catch (TypeError $_) { $caught++; }
+    try { $second->invoke_callable($second, $callback); } catch (TypeError $_) { $caught++; }
+    try { $second->invoke_factory($second, $factory); } catch (TypeError $_) { $caught++; }
+    assert!($caught == 3);
+    assert!($second->invoke_box($second, new Box::<Second>()) == 7);
+    assert!($second->invoke_callable($second, fn(): Box<Second> => new Box::<Second>()) == 7);
+}
+";
+    run_both_modes(source, "/inherited-method-nested-static.whim");
 }
 
 fn run_both_modes(source: &str, path: &str) {

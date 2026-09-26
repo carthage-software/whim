@@ -104,6 +104,7 @@ pub(in crate::vm) fn guard_allows(guard: &ArgumentGuard, value: &Value) -> bool 
         } => value.as_function().is_some_and(|function| {
             function.target() == *target
                 && function.type_environment() == *environment
+                && function.scope().is_none()
                 && function.this().is_none()
                 && function.presets().is_empty()
         }),
@@ -163,8 +164,8 @@ pub(in crate::vm) fn argument_guard(
             max: *max,
         },
         TypeDescriptor::FloatLiteral(expected) => ArgumentGuard::ExactFloat(expected.to_bits()),
-        TypeDescriptor::Named { .. } | TypeDescriptor::StaticClass => {
-            if value.newtype_id().is_some() {
+        TypeDescriptor::Named { .. } => {
+            if !descriptor.is_resolved() || value.newtype_id().is_some() {
                 return None;
             }
             let value = value.as_object()?;
@@ -174,8 +175,14 @@ pub(in crate::vm) fn argument_guard(
             }
         }
         TypeDescriptor::Callable(Some(_)) => {
+            if !descriptor.is_resolved() {
+                return None;
+            }
             let function = value.as_function()?;
-            if function.this().is_some() || !function.presets().is_empty() {
+            if function.scope().is_some()
+                || function.this().is_some()
+                || !function.presets().is_empty()
+            {
                 return None;
             }
             ArgumentGuard::Callable {
@@ -189,6 +196,7 @@ pub(in crate::vm) fn argument_guard(
         }
         TypeDescriptor::Void
         | TypeDescriptor::Never
+        | TypeDescriptor::StaticClass
         | TypeDescriptor::StringLiteral(_)
         | TypeDescriptor::Member { .. }
         | TypeDescriptor::Parameter(_)
@@ -362,6 +370,14 @@ impl VirtualMachine<'_> {
         frame_start: usize,
         count: usize,
     ) {
+        // SAFETY: the caller's retained chunk owns this cache across call setup.
+        if unsafe { &*cache.as_ref().argument_guards() }
+            .get(site)
+            .is_some_and(|ways| !ways.can_record(function, environment))
+        {
+            return;
+        }
+
         let mut guards = {
             let parameters = self.engine.tables.functions[function.0 as usize].parameters();
             let mut guards = Vec::with_capacity(count);

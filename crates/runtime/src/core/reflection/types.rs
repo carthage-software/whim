@@ -35,7 +35,7 @@ pub(crate) fn dispatch(
 ) -> Result<Value, Throw> {
     match operation {
         Operation::TypeKind => type_kind(context, &reflected.descriptor),
-        Operation::IsResolved => Ok(Value::bool(is_resolved(&reflected.descriptor))),
+        Operation::IsResolved => Ok(Value::bool(reflected.descriptor.is_resolved())),
         Operation::TypeId => {
             require_resolved(context, reflected)?;
             Ok(objects::type_id(context, &reflected.descriptor))
@@ -981,63 +981,11 @@ pub(crate) fn resolve_type(
     }
 }
 
-pub(crate) fn is_resolved(descriptor: &TypeDescriptor) -> bool {
-    match descriptor {
-        TypeDescriptor::Parameter(_) | TypeDescriptor::StaticClass => false,
-        TypeDescriptor::Named { arguments, .. } => arguments
-            .as_ref()
-            .is_none_or(|arguments| arguments.iter().all(is_resolved)),
-        TypeDescriptor::Member {
-            class_arguments,
-            member_arguments,
-            ..
-        } => {
-            class_arguments
-                .as_ref()
-                .is_none_or(|arguments| arguments.iter().all(is_resolved))
-                && member_arguments
-                    .as_ref()
-                    .is_none_or(|arguments| arguments.iter().all(is_resolved))
-        }
-        TypeDescriptor::Array(arguments) | TypeDescriptor::Dictionary(arguments) => arguments
-            .as_ref()
-            .is_none_or(|(key, value)| is_resolved(key) && is_resolved(value)),
-        TypeDescriptor::Vector(value) => value.as_deref().is_none_or(is_resolved),
-        TypeDescriptor::VectorShape { elements, rest } => {
-            elements.iter().all(is_resolved) && rest.as_deref().is_none_or(is_resolved)
-        }
-        TypeDescriptor::ObjectShape { entries, .. } => {
-            entries.iter().all(|(_, value)| is_resolved(value))
-        }
-        TypeDescriptor::DictionaryShape { entries, rest } => {
-            entries.iter().all(|(_, value)| is_resolved(value))
-                && rest
-                    .as_ref()
-                    .is_none_or(|(key, value)| is_resolved(key) && is_resolved(value))
-        }
-        TypeDescriptor::Callable(signature) => signature.as_ref().is_none_or(|signature| {
-            signature
-                .parameters
-                .iter()
-                .all(|parameter| is_resolved(&parameter.r#type))
-                && is_resolved(&signature.return_type)
-        }),
-        TypeDescriptor::Classname(inner) | TypeDescriptor::Negated(inner) => is_resolved(inner),
-        TypeDescriptor::Tuple(types)
-        | TypeDescriptor::Union(types)
-        | TypeDescriptor::Intersection(types) => types.iter().all(is_resolved),
-        TypeDescriptor::TupleRest { elements, rest } => {
-            elements.iter().all(is_resolved) && is_resolved(rest)
-        }
-        _ => true,
-    }
-}
-
 fn require_resolved(
     context: &mut Context<'_, '_, '_>,
     reflected: &ReflectedType,
 ) -> Result<(), Throw> {
-    if is_resolved(&reflected.descriptor) {
+    if reflected.descriptor.is_resolved() {
         Ok(())
     } else {
         Err(context.type_error("the reflected type is not resolved"))
