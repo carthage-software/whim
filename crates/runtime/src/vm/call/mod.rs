@@ -240,6 +240,22 @@ impl VirtualMachine<'_> {
             if entry.guards.len() != count {
                 return Ok(false);
             }
+
+            let mut complete = true;
+            for (guard, value) in entry.guards.iter().zip(&self.stack[window.clone()]) {
+                let CachedParameterGuard::Cheap(guard) = guard else {
+                    complete = false;
+                    break;
+                };
+
+                if !guard_allows(guard, value) {
+                    return Ok(false);
+                }
+            }
+
+            if complete {
+                return Ok(true);
+            }
         }
 
         for position in 0..count {

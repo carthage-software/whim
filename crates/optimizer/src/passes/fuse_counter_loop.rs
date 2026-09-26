@@ -28,6 +28,12 @@ pub(in crate::passes) fn optimize_chunk(
             right: limit,
             offset,
         }
+        | Instruction::IntJumpUnless {
+            comparison,
+            left: counter,
+            right: limit,
+            offset,
+        }
         | Instruction::UintJumpUnless {
             comparison,
             left: counter,
@@ -54,6 +60,7 @@ pub(in crate::passes) fn optimize_chunk(
         };
 
         if target != counter
+            || counter == limit
             || immediate.value() != 1
             || relative_target(tail, i32::from(back_edge.offset())) != header
         {
@@ -64,11 +71,19 @@ pub(in crate::passes) fn optimize_chunk(
             continue;
         };
 
-        chunk.code[tail] = Instruction::CounterLoop {
-            comparison,
-            counter,
-            limit,
-            offset: ShortJumpOffset::new(body_offset),
+        chunk.code[tail] = match chunk.code[header] {
+            Instruction::IntJumpUnless { .. } => Instruction::IntCounterLoop {
+                comparison,
+                counter,
+                limit,
+                offset: ShortJumpOffset::new(body_offset),
+            },
+            _ => Instruction::CounterLoop {
+                comparison,
+                counter,
+                limit,
+                offset: ShortJumpOffset::new(body_offset),
+            },
         };
     }
 

@@ -879,6 +879,7 @@ impl VirtualMachine<'_> {
 
     /// Pushes an exact recursive frame without consulting a symbol or inline
     /// cache.
+    #[inline(always)]
     pub(in crate::vm) fn call_exact_self(
         &mut self,
         destination: u16,

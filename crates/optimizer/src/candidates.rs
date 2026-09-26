@@ -85,6 +85,9 @@ fn instruction_candidates(
                 | Instruction::BitwiseNot { kind: None, .. }
                 | Instruction::ShiftLeft { kind: None, .. }
                 | Instruction::ShiftRight { kind: None, .. }
+                | Instruction::AddImmediate { kind: None, .. }
+                | Instruction::SubtractImmediate { kind: None, .. }
+                | Instruction::Step { kind: None, .. }
                 | Instruction::Add {
                     kind: Some(IntegerKind::I64),
                     ..
@@ -101,11 +104,16 @@ fn instruction_candidates(
     if configuration.strength_reduction
         && matches!(
             instruction,
-            Instruction::AddImmediate { kind: None, .. }
-                | Instruction::IntegerMultiplyImmediate {
-                    kind: IntegerKind::I64,
-                    ..
-                }
+            Instruction::AddImmediate {
+                kind: None | Some(IntegerKind::I64),
+                ..
+            } | Instruction::SubtractImmediate {
+                kind: None | Some(IntegerKind::I64),
+                ..
+            } | Instruction::IntegerMultiplyImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
         )
     {
         candidates.insert(CandidateSet::ARITHMETIC);
@@ -124,6 +132,9 @@ fn instruction_candidates(
                 | Instruction::BitwiseNot { kind: None, .. }
                 | Instruction::ShiftLeft { kind: None, .. }
                 | Instruction::ShiftRight { kind: None, .. }
+                | Instruction::AddImmediate { kind: None, .. }
+                | Instruction::SubtractImmediate { kind: None, .. }
+                | Instruction::Step { kind: None, .. }
         )
     {
         candidates.insert(CandidateSet::EARLY_OPERATION);

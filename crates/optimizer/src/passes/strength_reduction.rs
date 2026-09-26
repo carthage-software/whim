@@ -78,13 +78,13 @@ fn reduced_instruction(
 ) -> Option<Instruction> {
     match instruction {
         Instruction::AddImmediate {
-            kind: None,
+            kind: None | Some(IntegerKind::I64),
             destination,
             source,
             immediate,
         }
         | Instruction::SubtractImmediate {
-            kind: None,
+            kind: None | Some(IntegerKind::I64),
             destination,
             source,
             immediate,
@@ -110,14 +110,14 @@ fn reduced_instruction(
             right,
         } => immediate(flow, index, right)
             .map(|immediate| Instruction::AddImmediate {
-                kind: None,
+                kind: Some(IntegerKind::I64),
                 destination,
                 source: left,
                 immediate,
             })
             .or_else(|| {
                 immediate(flow, index, left).map(|immediate| Instruction::AddImmediate {
-                    kind: None,
+                    kind: Some(IntegerKind::I64),
                     destination,
                     source: right,
                     immediate,
@@ -129,7 +129,7 @@ fn reduced_instruction(
             left,
             right,
         } => immediate(flow, index, right).map(|immediate| Instruction::SubtractImmediate {
-            kind: None,
+            kind: Some(IntegerKind::I64),
             destination,
             source: left,
             immediate,

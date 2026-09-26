@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertyStepMode;
 use whim_bytecode::rewrite::control_flow_targets;
 
@@ -54,7 +55,7 @@ pub(in crate::passes) fn optimize_chunk(
 
         let replacement = match chunk.code[start + 1] {
             Instruction::Step {
-                kind: None,
+                kind: None | Some(IntegerKind::I64),
                 destination,
                 source,
                 immediate,

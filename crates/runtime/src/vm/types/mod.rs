@@ -38,18 +38,32 @@ struct ActiveAliases {
 }
 
 impl VirtualMachine<'_> {
+    pub(in crate::vm) fn descriptor_check_is_cacheable(
+        &self,
+        descriptor: &TypeDescriptor,
+        return_guard: bool,
+    ) -> bool {
+        let mut aliases = ActiveAliases {
+            indices: [0; MAX_TYPE_DEPTH_U32 as usize + 1],
+            len: 0,
+        };
+
+        self.array_type_check_cacheable(descriptor, 0, &mut aliases, return_guard)
+    }
+
     fn array_type_check_cacheable(
         &self,
         descriptor: &TypeDescriptor,
         depth: u32,
         aliases: &mut ActiveAliases,
+        return_guard: bool,
     ) -> bool {
         if depth > MAX_TYPE_DEPTH_U32 {
             return false;
         }
 
         let cacheable = |child: &TypeDescriptor, aliases: &mut ActiveAliases| {
-            self.array_type_check_cacheable(child, depth + 1, aliases)
+            self.array_type_check_cacheable(child, depth + 1, aliases, return_guard)
         };
 
         match descriptor {
@@ -96,6 +110,39 @@ impl VirtualMachine<'_> {
                 let Some(symbol) = self.engine.tables.symbols.get(name) else {
                     return false;
                 };
+
+                if return_guard {
+                    let parameters = match symbol.kind {
+                        SymbolKind::Class | SymbolKind::Enum | SymbolKind::Interface
+                            if arguments.is_some() =>
+                        {
+                            self.engine.tables.classes[symbol.index as usize]
+                                .type_parameters
+                                .as_ref()
+                        }
+                        SymbolKind::TypeAlias
+                            if !self.engine.tables.type_aliases[symbol.index as usize]
+                                .type_parameters
+                                .is_empty() =>
+                        {
+                            return false;
+                        }
+                        SymbolKind::Newtype if arguments.is_some() => self.engine.tables.newtypes
+                            [symbol.index as usize]
+                            .type_parameters
+                            .as_ref(),
+                        _ => &[],
+                    };
+
+                    if arguments.as_ref().map_or(0, Vec::len) < parameters.len()
+                        || parameters
+                            .iter()
+                            .any(|parameter| !parameter.bounds.is_empty())
+                    {
+                        return false;
+                    }
+                }
+
                 if symbol.kind == SymbolKind::TypeAlias
                     && !aliases.indices[..aliases.len].contains(&symbol.index)
                 {
@@ -157,12 +204,7 @@ impl VirtualMachine<'_> {
         &mut self,
         descriptor: &TypeDescriptor,
     ) -> Option<ArrayTypeCheckId> {
-        let mut aliases = ActiveAliases {
-            indices: [0; MAX_TYPE_DEPTH_U32 as usize + 1],
-            len: 0,
-        };
-
-        if !self.array_type_check_cacheable(descriptor, 0, &mut aliases) {
+        if !self.descriptor_check_is_cacheable(descriptor, false) {
             return None;
         }
 

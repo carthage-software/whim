@@ -217,6 +217,16 @@ pub(crate) fn transfer(
             fact.non_negative = read(source).non_negative && immediate.as_int() >= 0;
             write(destination, with_origin(fact, origin));
         }
+        Instruction::Step {
+            kind: Some(IntegerKind::I64),
+            destination,
+            source,
+            immediate,
+        } => {
+            let mut fact = Fact::known(INT);
+            fact.non_negative = read(source).non_negative && immediate.value() >= 0;
+            write(destination, with_origin(fact, origin));
+        }
         Instruction::IntegerModuloImmediate {
             kind: IntegerKind::I64,
             destination,
@@ -233,11 +243,6 @@ pub(crate) fn transfer(
             ..
         }
         | Instruction::SubtractImmediate {
-            kind: Some(IntegerKind::I64),
-            destination,
-            ..
-        }
-        | Instruction::Step {
             kind: Some(IntegerKind::I64),
             destination,
             ..

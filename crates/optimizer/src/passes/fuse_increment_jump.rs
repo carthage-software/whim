@@ -2,6 +2,8 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
 use whim_bytecode::rewrite::control_flow_targets;
 
@@ -21,14 +23,20 @@ pub(in crate::passes) fn optimize_chunk(
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
     for index in 0..chunk.code.len() - 1 {
-        let Instruction::Step {
-            destination,
-            source,
-            immediate,
-            ..
-        } = chunk.code[index]
-        else {
-            continue;
+        let (destination, source, immediate) = match chunk.code[index] {
+            Instruction::Step {
+                destination,
+                source,
+                immediate,
+                ..
+            } => (destination, source, immediate),
+            Instruction::AddImmediate {
+                kind: Some(IntegerKind::I64),
+                destination,
+                source,
+                immediate,
+            } => (destination, source, ImmediateInt::new(immediate.as_int())),
+            _ => continue,
         };
 
         let Instruction::Jump { offset } = chunk.code[index + 1] else {

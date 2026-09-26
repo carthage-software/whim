@@ -46,13 +46,13 @@ pub(crate) fn optimize_chunk(
         let next = chunk.code[start + 1];
         let immediate = match next {
             Instruction::AddImmediate {
-                kind: None,
+                kind: None | Some(IntegerKind::I64),
                 destination,
                 source,
                 immediate,
             } => Some((destination, source, immediate.as_int())),
             Instruction::Step {
-                kind: None,
+                kind: None | Some(IntegerKind::I64),
                 destination,
                 source,
                 immediate,

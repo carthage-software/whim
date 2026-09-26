@@ -207,6 +207,13 @@ pub(crate) struct CachedCallEnvironment {
     pub(crate) environment: TypeEnvironmentId,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct CachedReturnGuard {
+    pub(crate) environment: TypeEnvironmentId,
+    pub(crate) called: Option<ClassId>,
+    pub(crate) guard: Option<ArgumentGuard>,
+}
+
 /// One cheap runtime fact that is sufficient to repeat a successful
 /// parameter check without walking its descriptor again.
 #[derive(Clone, Copy)]
@@ -773,6 +780,7 @@ pub(crate) struct RuntimeFunction {
     /// The runtime-enforced return type, boxed so checks may keep its address
     /// while re-entrant loading grows the function store.
     pub return_type: Option<Box<TypeDescriptor>>,
+    pub(crate) return_guards: Vec<CachedReturnGuard>,
     /// Whether the body captures `$this` as its leading capture, expecting
     /// it at register zero before the parameters.
     pub captures_this: bool,

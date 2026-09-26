@@ -119,9 +119,10 @@ pub(in crate::passes) fn optimize_chunk(
             || has_external_entry(chunk, header, tail)
             || writes_pinned_container(chunk, header, tail)
             || (matches!(shape, TailShape::Counted { .. })
-                && chunk.code[header + 1..tail]
-                    .iter()
-                    .any(|instruction| effect_on(chunk, *instruction, left).writes()))
+                && chunk.code[header + 1..tail].iter().any(|instruction| {
+                    effect_on(chunk, *instruction, left).writes()
+                        || effect_on(chunk, *instruction, right).writes()
+                }))
         {
             continue;
         }

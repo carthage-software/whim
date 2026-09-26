@@ -6,6 +6,7 @@ use std::rc::Rc;
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::function::BuiltInId;
@@ -605,11 +606,25 @@ impl VirtualMachine<'_> {
             let type_parameters_empty = self.engine.tables.functions[id.0 as usize]
                 .type_parameters()
                 .is_empty();
-            if arguments_proven
-                && function.this().is_none()
+
+            if function.this().is_none()
                 && function.captures().is_empty()
                 && function.scope().is_none()
                 && (type_arguments_bound || type_parameters_empty)
+                && (arguments_proven || {
+                    let runtime = &self.engine.tables.functions[id.0 as usize];
+                    usize::from(runtime.required_parameters) <= count
+                        && count <= usize::from(runtime.declared_parameters)
+                        && runtime.parameters()[..count]
+                            .iter()
+                            .zip(&self.stack[window_start..window_start + count])
+                            .all(|(parameter, value)| {
+                                value.is_uninitialized()
+                                    || parameter.declared_type.as_ref().is_none_or(|descriptor| {
+                                        check_trivial_descriptor(descriptor, value) == Some(true)
+                                    })
+                            })
+                })
             {
                 return self.push_exact_generic_function_frame::<false>(
                     id,

@@ -10,6 +10,7 @@ use std::slice;
 
 use whim_base::unwrap_option_invariant;
 use whim_bytecode::REFERENCE_REGISTER_LIMIT;
+use whim_bytecode::aliases::expand_aliases_using as expand_aliases;
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::FloatPairUpdateDescriptor;
 use whim_bytecode::chunk::descriptors::FloatSquaresSumBranchDescriptor;
@@ -58,6 +59,7 @@ use whim_value::vec::VecObject;
 
 use crate::core::private::syscall::StandardStream;
 use crate::engine::Engine;
+use crate::symbols::CachedReturnGuard;
 use crate::vm::CachedIsCheck;
 use crate::vm::Fault;
 use crate::vm::FrameTeardown;
@@ -103,6 +105,8 @@ use crate::vm::arrays::vec_index_get_or_null;
 use crate::vm::bitwise_and;
 use crate::vm::bitwise_or;
 use crate::vm::bitwise_xor;
+use crate::vm::call::argument_guard;
+use crate::vm::call::guard_allows;
 use crate::vm::class_member_names;
 use crate::vm::compare_greater;
 use crate::vm::compare_greater_or_equal;
@@ -629,6 +633,10 @@ impl VirtualMachine<'_> {
         site: RegionSite,
     ) -> NumericLoopTransition {
         debug_assert_eq!(site.chunk, NonNull::from(chunk));
+        if self.heap.has_finalizable_objects() || self.heap.has_pending_finalizers() {
+            return NumericLoopTransition::Next(body);
+        }
+
         if !self.region_jump_strikes.is_empty()
             && self
                 .region_jump_strikes
@@ -6480,9 +6488,52 @@ impl VirtualMachine<'_> {
             NonNull::from(descriptor)
         };
 
-        // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
+        let cached = self.engine.tables.functions[function.0 as usize]
+            .return_guards
+            .iter()
+            .find(|entry| entry.environment == environment && entry.called == called)
+            .copied();
+        if cached
+            .and_then(|entry| entry.guard)
+            .is_some_and(|guard| guard_allows(&guard, result))
+        {
+            return Ok(true);
+        }
+
+        // SAFETY: the boxed descriptor stays valid if type checks load another unit.
         let descriptor = unsafe { descriptor.as_ref() };
-        self.check_descriptor(descriptor, result, called, environment, 0)
+        let valid = self.check_descriptor(descriptor, result, called, environment, 0)?;
+        if valid
+            && cached.is_none()
+            && self.engine.tables.functions[function.0 as usize]
+                .return_guards
+                .len()
+                < 4
+        {
+            let substituted = self.substitute_descriptor(descriptor, environment, 0);
+            let concrete = expand_aliases(&substituted, self.engine.tables.type_aliases.as_slice());
+            let guard = (self.descriptor_check_is_cacheable(&substituted, true)
+                && self.is_check_shape_cacheable(&concrete, environment, 0)
+                && self.descriptor_check_is_cacheable(&concrete, true))
+            .then(|| argument_guard(&concrete, result))
+            .flatten();
+            let entry = CachedReturnGuard {
+                environment,
+                called,
+                guard,
+            };
+
+            let guards = &mut self.engine.tables.functions[function.0 as usize].return_guards;
+            if guards.len() < 4
+                && !guards
+                    .iter()
+                    .any(|entry| entry.environment == environment && entry.called == called)
+            {
+                guards.push(entry);
+            }
+        }
+
+        Ok(valid)
     }
 
     /// Builds the return mismatch after dispatch has synchronized the precise

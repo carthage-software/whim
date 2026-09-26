@@ -12,6 +12,7 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::NUMERIC_LOOP_REGISTER_LIMIT;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
+use whim_bytecode::instruction::operands::IndexAddMode;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::word::InstructionKind;
@@ -735,10 +736,11 @@ impl VirtualMachine<'_> {
                     } else if matches!(tail.kind(), InstructionKind::AddImmediate | InstructionKind::Step) {
                         // SAFETY: dispatch matched the instruction tag.
                         let step = match unsafe { tail.decode() } {
-                            Instruction::AddImmediate { kind: None, destination, source, immediate } => Some((destination, source, immediate.as_int())),
-                            Instruction::Step { kind: None, destination, source, immediate } => Some((destination, source, immediate.value())),
+                            Instruction::AddImmediate { kind: None | Some(IntegerKind::I64), destination, source, immediate } => Some((destination, source, immediate.as_int())),
+                            Instruction::Step { kind: None | Some(IntegerKind::I64), destination, source, immediate } => Some((destination, source, immediate.value())),
                             _ => None,
                         };
+
                         if let Some((destination, source, amount)) = step
                             && destination != source
                             && values.kind(source.index() as usize) == NumericKind::Int
@@ -2734,7 +2736,11 @@ unsafe fn try_int_body_burst(
 
     for at in body..tail {
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-        if !int_burst_instruction_ready(unsafe { word(at).decode() }, values) {
+        let instruction = unsafe { word(at).decode() };
+        if !int_burst_instruction_ready(instruction, values)
+            || int_burst_destination(instruction)
+                .is_none_or(|destination| destination == counter || destination == limit)
+        {
             return None;
         }
     }
@@ -2860,6 +2866,12 @@ fn int_burst_instruction_ready(instruction: Instruction, values: &NumericRegiste
             source,
             ..
         }
+        | Instruction::Step {
+            kind: Some(IntegerKind::I64),
+            destination,
+            source,
+            ..
+        }
         | Instruction::IntegerMultiplyImmediate {
             kind: IntegerKind::I64,
             destination,
@@ -2907,6 +2919,11 @@ fn int_burst_destination(instruction: Instruction) -> Option<Register> {
             ..
         }
         | Instruction::SubtractImmediate {
+            kind: Some(IntegerKind::I64),
+            destination,
+            ..
+        }
+        | Instruction::Step {
             kind: Some(IntegerKind::I64),
             destination,
             ..
@@ -2960,6 +2977,7 @@ fn int_burst_operation(
     instruction: Instruction,
     values: &NumericRegisters,
 ) -> Option<(Register, Result<i64, Fault>)> {
+    debug_assert!(int_burst_instruction_ready(instruction, values));
     Some(match instruction {
         Instruction::Add {
             kind: Some(IntegerKind::I64),
@@ -3031,6 +3049,18 @@ fn int_burst_operation(
             integer_subtract(
                 values.int(source.index() as usize),
                 i64::from(immediate.as_int()),
+            ),
+        ),
+        Instruction::Step {
+            kind: Some(IntegerKind::I64),
+            destination,
+            source,
+            immediate,
+        } => (
+            destination,
+            integer_add(
+                values.int(source.index() as usize),
+                i64::from(immediate.value()),
             ),
         ),
         Instruction::IntegerMultiplyImmediate {
@@ -3435,15 +3465,15 @@ unsafe fn try_dict_accumulate_burst(
     marker_exit: usize,
 ) -> Option<usize> {
     let body = marker + 1;
-    if body + 5 >= chunk.code.len() {
+    if body + 3 >= chunk.code.len() {
         return None;
     }
 
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let word = |at: usize| unsafe { InstructionWord::read(chunk.code.as_ptr().add(at)) };
     let Instruction::DictIndexGetIntKey {
-        destination: first_value,
-        container: target,
+        destination: first_read,
+        container: first_container,
         index: first_index,
         value_mode: _,
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
@@ -3452,73 +3482,79 @@ unsafe fn try_dict_accumulate_burst(
         return None;
     };
 
-    let Instruction::DictIndexGetIntKey {
-        destination: second_value,
-        container: source,
-        index: second_index,
-        value_mode: _,
-        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    } = (unsafe { word(body + 1).decode() })
-    else {
-        return None;
-    };
+    // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
+    let (target, source, first_value, second_value, sum, tail) =
+        match unsafe { word(body + 1).decode() } {
+            Instruction::IndexAddAssign {
+                container,
+                index,
+                value,
+                mode: IndexAddMode::DictAnyKeyIntValue,
+            } if index == left && value == first_read => {
+                (container, first_container, None, first_read, None, body + 3)
+            }
+            Instruction::DictIndexGetIntKey {
+                destination: second_read,
+                container: source,
+                index: second_index,
+                ..
+            } if body + 5 < chunk.code.len() && second_index == left => {
+                // SAFETY: the complete six-instruction sequence is in the chunk.
+                let Instruction::Add {
+                    kind: None | Some(IntegerKind::I64),
+                    destination: sum,
+                    left: add_left,
+                    right: add_right,
+                } = (unsafe { word(body + 2).decode() })
+                else {
+                    return None;
+                };
+
+                // SAFETY: the complete six-instruction sequence is in the chunk.
+                let Instruction::DictIndexSetIntegerKey {
+                    kind: IntegerKind::I64,
+                    container: store_target,
+                    index: store_index,
+                    value: store_value,
+                } = (unsafe { word(body + 3).decode() })
+                else {
+                    return None;
+                };
+
+                if add_left != first_read
+                    || add_right != second_read
+                    || store_target != first_container
+                    || store_index != left
+                    || store_value != sum
+                    || first_read == second_read
+                {
+                    return None;
+                }
+                (
+                    first_container,
+                    source,
+                    Some(first_read),
+                    second_read,
+                    Some(sum),
+                    body + 5,
+                )
+            }
+            _ => return None,
+        };
 
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    let (sum, add_left, add_right) = match unsafe { word(body + 2).decode() } {
-        Instruction::Add {
-            kind: None,
-            destination,
-            left,
-            right,
-        }
-        | Instruction::Add {
-            kind: Some(IntegerKind::I64),
-            destination,
-            left,
-            right,
-        } => (destination, left, right),
-        _ => return None,
-    };
-
-    let Instruction::DictIndexSetIntegerKey {
-        kind: IntegerKind::I64,
-        container: store_target,
-        index: store_index,
-        value: store_value,
-        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    } = (unsafe { word(body + 3).decode() })
-    else {
-        return None;
-    };
-
-    let Instruction::SubtractImmediate {
-        kind: None,
-        destination: step_destination,
-        source: step_source,
-        immediate,
-        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    } = (unsafe { word(body + 4).decode() })
-    else {
-        return None;
-    };
+    let (step_destination, step_source, step) = int_decrement(unsafe { word(tail - 1).decode() })?;
 
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    let Instruction::Jump { offset: back } = (unsafe { word(body + 5).decode() }) else {
+    let Instruction::Jump { offset: back } = (unsafe { word(tail).decode() }) else {
         return None;
     };
 
-    let step = i64::from(immediate.as_int());
     if first_index != left
-        || second_index != left
-        || add_left != first_value
-        || add_right != second_value
-        || store_target != target
-        || store_index != left
-        || store_value != sum
         || step_destination != left
         || step_source != left
         || step < 1
-        || relative_target(body + 5, back.offset()) != marker
+        || relative_target(tail, back.offset()) != marker
         || !matches!(
             comparison,
             BytecodeComparison::LessThan
@@ -3528,12 +3564,11 @@ unsafe fn try_dict_accumulate_burst(
         )
         || values.kind(left.index() as usize) != NumericKind::Int
         || values.kind(right.index() as usize) != NumericKind::Int
-        || first_value == second_value
     {
         return None;
     }
 
-    for temp in [first_value, second_value, sum] {
+    for temp in first_value.into_iter().chain([second_value]).chain(sum) {
         if temp == left || temp == right || temp == target || temp == source {
             return None;
         }
@@ -3602,14 +3637,17 @@ unsafe fn try_dict_accumulate_burst(
     assign_existing_int(values, dirty, left, cursor_value);
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     unsafe {
-        assign(
-            registers,
-            values,
-            dirty,
-            pins,
-            first_value,
-            NumericValue::int(last_first),
-        );
+        if let Some(first_value) = first_value {
+            assign(
+                registers,
+                values,
+                dirty,
+                pins,
+                first_value,
+                NumericValue::int(last_first),
+            );
+        }
+
         assign(
             registers,
             values,
@@ -3618,14 +3656,17 @@ unsafe fn try_dict_accumulate_burst(
             second_value,
             NumericValue::int(last_second),
         );
-        assign(
-            registers,
-            values,
-            dirty,
-            pins,
-            sum,
-            NumericValue::int(last_sum),
-        );
+
+        if let Some(sum) = sum {
+            assign(
+                registers,
+                values,
+                dirty,
+                pins,
+                sum,
+                NumericValue::int(last_sum),
+            );
+        }
     }
 
     if finished {
@@ -3699,13 +3740,13 @@ unsafe fn try_dict_build_burst(
         let tail = unsafe { word(at + 1).decode() };
         let increment = match tail {
             Instruction::AddImmediate {
-                kind: None,
+                kind: None | Some(IntegerKind::I64),
                 destination,
                 source,
                 immediate,
             } => Some((destination, source, immediate.as_int())),
             Instruction::Step {
-                kind: None,
+                kind: None | Some(IntegerKind::I64),
                 destination,
                 source,
                 immediate,
@@ -3818,6 +3859,24 @@ unsafe fn try_dict_build_burst(
     }
 }
 
+fn int_decrement(instruction: Instruction) -> Option<(Register, Register, i64)> {
+    match instruction {
+        Instruction::SubtractImmediate {
+            kind: None | Some(IntegerKind::I64),
+            destination,
+            source,
+            immediate,
+        } => Some((destination, source, i64::from(immediate.as_int()))),
+        Instruction::Step {
+            kind: None | Some(IntegerKind::I64),
+            destination,
+            source,
+            immediate,
+        } => Some((destination, source, -i64::from(immediate.value()))),
+        _ => None,
+    }
+}
+
 /// A dict copy loop run directly: the body is one or more triplets that
 /// read a pinned packed dict at the counter, insert into another dict, and
 /// step the counter down. The destination is pre-sized from the counted
@@ -3861,15 +3920,7 @@ unsafe fn try_dict_copy_burst(
         return None;
     };
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    let Instruction::SubtractImmediate {
-        kind: None,
-        immediate,
-        ..
-    } = (unsafe { word(body + 2).decode() })
-    else {
-        return None;
-    };
-    let step = i64::from(immediate.as_int());
+    let (_, _, step) = int_decrement(unsafe { word(body + 2).decode() })?;
     if first_index != left
         || target == source
         || step < 1
@@ -3920,16 +3971,10 @@ unsafe fn try_dict_copy_burst(
         else {
             return None;
         };
-        let Instruction::SubtractImmediate {
-            kind: None,
-            destination: step_destination,
-            source: step_source,
-            immediate: step_immediate,
-            // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-        } = (unsafe { word(at + 2).decode() })
-        else {
-            return None;
-        };
+
+        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
+        let (step_destination, step_source, step_immediate) =
+            int_decrement(unsafe { word(at + 2).decode() })?;
         if destination != temp
             || container != source
             || index != left
@@ -3938,7 +3983,7 @@ unsafe fn try_dict_copy_burst(
             || value != temp
             || step_destination != left
             || step_source != left
-            || i64::from(step_immediate.as_int()) != step
+            || step_immediate != step
         {
             return None;
         }
@@ -3954,6 +3999,7 @@ unsafe fn try_dict_copy_burst(
 
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let (source_elements, source_length) = (unsafe { pins.for_read_dict(registers, source) })?;
+    pins.invalidate(target.index() as usize);
     // SAFETY: the register window is live; the target register was proven a
     // dict at this site and is distinct from every register written here.
     let target_dict = (unsafe { &mut *registers.add(target.index() as usize) }).as_dict_mut()?;
@@ -4375,19 +4421,9 @@ unsafe fn try_concat_burst(
     else {
         return None;
     };
-    if word(header + 1).kind() != InstructionKind::SubtractImmediate {
-        return None;
-    }
-    let Instruction::SubtractImmediate {
-        kind: None,
-        destination: stepped,
-        source: step_source,
-        immediate,
-        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    } = (unsafe { word(header + 1).decode() })
-    else {
-        return None;
-    };
+
+    // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
+    let (stepped, step_source, step) = int_decrement(unsafe { word(header + 1).decode() })?;
     if stepped != counter || step_source != counter {
         return None;
     }
@@ -4433,7 +4469,6 @@ unsafe fn try_concat_burst(
         return None;
     }
 
-    let step = i64::from(immediate.as_int());
     let mut count = values.int(counter.index() as usize);
     let mut probe_value;
     let mut budget: u32 = BATCH_ITERATION_LIMIT;

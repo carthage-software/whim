@@ -1,6 +1,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IndexAddMode;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 
@@ -87,12 +88,14 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
             Instruction::Concatenate {
                 destination, left, ..
             } if destination == left => return true,
-            Instruction::AddImmediate { kind: None, .. }
-            | Instruction::AddImmediate {
-                kind: Some(IntegerKind::I64),
+            Instruction::AddImmediate {
+                kind: None | Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::Step { kind: None, .. }
+            | Instruction::Step {
+                kind: None | Some(IntegerKind::I64),
+                ..
+            }
             | Instruction::IntegerAddAssign {
                 kind: IntegerKind::I64,
                 ..
@@ -279,13 +282,13 @@ fn dict_build_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
         } else {
             let (destination, source, immediate) = match instruction {
                 Instruction::AddImmediate {
-                    kind: None,
+                    kind: None | Some(IntegerKind::I64),
                     destination,
                     source,
                     immediate,
                 } => (destination, source, immediate.as_int()),
                 Instruction::Step {
-                    kind: None,
+                    kind: None | Some(IntegerKind::I64),
                     destination,
                     source,
                     immediate,
@@ -348,14 +351,20 @@ fn dict_copy_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
             return false;
         };
 
-        let Instruction::SubtractImmediate {
-            kind: None,
-            destination: step_destination,
-            source: step_source,
-            ..
-        } = triplet[2]
-        else {
-            return false;
+        let (step_destination, step_source) = match triplet[2] {
+            Instruction::SubtractImmediate {
+                kind: None | Some(IntegerKind::I64),
+                destination,
+                source,
+                ..
+            }
+            | Instruction::Step {
+                kind: None | Some(IntegerKind::I64),
+                destination,
+                source,
+                ..
+            } => (destination, source),
+            _ => return false,
         };
 
         if destination != temp
@@ -375,6 +384,39 @@ fn dict_copy_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
     }
 
     true
+}
+
+fn dict_accumulate_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
+    matches!(
+        &chunk.code[header + 1..=tail],
+        [
+            Instruction::DictIndexGetIntKey { destination, container: source, index, .. },
+            Instruction::IndexAddAssign {
+                container: target,
+                index: target_index,
+                value,
+                mode: IndexAddMode::DictAnyKeyIntValue,
+            },
+            Instruction::Step {
+                kind: None | Some(IntegerKind::I64),
+                destination: step_destination,
+                source: step_source,
+                ..
+            } | Instruction::SubtractImmediate {
+                kind: None | Some(IntegerKind::I64),
+                destination: step_destination,
+                source: step_source,
+                ..
+            },
+            Instruction::Jump { .. },
+        ] if destination == value
+            && index == target_index
+            && index == step_destination
+            && index == step_source
+            && destination != source
+            && destination != target
+            && destination != index
+    )
 }
 
 pub(super) fn ordered(comparison: BytecodeComparison) -> bool {
@@ -401,6 +443,10 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
 
     for index in header + 1..=tail {
         match chunk.code[index] {
+            Instruction::IndexAddAssign {
+                mode: IndexAddMode::DictAnyKeyIntValue,
+                ..
+            } if dict_accumulate_shape(chunk, header, tail) => {}
             Instruction::LoadConstant { constant, .. } => {
                 if !matches!(
                     chunk.constants[constant.index() as usize],
@@ -485,7 +531,10 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::FloatScaleProductAdd { .. }
             | Instruction::FloatPairUpdate { .. }
             | Instruction::AddImmediate { kind: None, .. }
-            | Instruction::Step { kind: None, .. }
+            | Instruction::Step {
+                kind: None | Some(IntegerKind::I64),
+                ..
+            }
             | Instruction::SubtractImmediate { kind: None, .. }
             | Instruction::Squares { .. }
             | Instruction::FloatSquares { .. }

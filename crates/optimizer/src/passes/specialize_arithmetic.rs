@@ -97,12 +97,49 @@ pub(super) fn specialize_with(
         immediate,
     } = instruction
     {
-        return is_uint(source).then_some(Instruction::Step {
-            kind: Some(IntegerKind::U64),
+        let kind = if is_int(source) {
+            IntegerKind::I64
+        } else if is_uint(source) {
+            IntegerKind::U64
+        } else {
+            return None;
+        };
+        return Some(Instruction::Step {
+            kind: Some(kind),
             destination,
             source,
             immediate,
         });
+    }
+
+    match instruction {
+        Instruction::AddImmediate {
+            kind: None,
+            destination,
+            source,
+            immediate,
+        } if is_int(source) => {
+            return Some(Instruction::AddImmediate {
+                kind: Some(IntegerKind::I64),
+                destination,
+                source,
+                immediate,
+            });
+        }
+        Instruction::SubtractImmediate {
+            kind: None,
+            destination,
+            source,
+            immediate,
+        } if is_int(source) => {
+            return Some(Instruction::SubtractImmediate {
+                kind: Some(IntegerKind::I64),
+                destination,
+                source,
+                immediate,
+            });
+        }
+        _ => {}
     }
 
     let (left, right, integer, float) = match instruction {

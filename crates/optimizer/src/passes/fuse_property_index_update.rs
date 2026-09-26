@@ -5,6 +5,7 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
 use whim_bytecode::rewrite::control_flow_targets;
 
@@ -68,7 +69,7 @@ fn fuse_increment(
         return None;
     };
     let Instruction::Step {
-        kind: None,
+        kind: None | Some(IntegerKind::I64),
         destination: incremented,
         source,
         immediate,

@@ -124,6 +124,7 @@ pub(crate) fn runtime_function(
         attributes: NonNull::from(function.attributes.as_slice()),
         frameless_literal: frameless_literal(function),
         return_type: function.return_type.clone().map(Box::new),
+        return_guards: Vec::new(),
         captures_this: function.captures_this,
         declaring_class,
         required_parameters: required,

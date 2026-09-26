@@ -351,14 +351,140 @@ fn neutral_integer_arithmetic_is_removed() {
     assert!(!normalize.chunk.code.iter().any(|instruction| {
         matches!(
             instruction,
-            Instruction::AddImmediate { kind: None, .. }
-                | Instruction::SubtractImmediate { kind: None, .. }
+            Instruction::AddImmediate { .. }
+                | Instruction::SubtractImmediate { .. }
                 | Instruction::IntegerMultiplyImmediate {
                     kind: IntegerKind::I64,
                     ..
                 }
         )
     }));
+}
+
+#[test]
+fn integer_immediate_operations_keep_their_proven_kind() {
+    let unit = compile(
+        r"
+        function advance(int $value): int {
+            $value++;
+            $value--;
+            return ($value + 3) - 2;
+        }
+
+        function advance_mixed(int|float $value): int|float {
+            $value++;
+            $value--;
+            return ($value + 3) - 2;
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    for (name, expected) in [
+        (b"advance".as_slice(), Some(IntegerKind::I64)),
+        (b"advance_mixed".as_slice(), None),
+    ] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name)
+            .unwrap();
+        let kinds: Vec<_> = function
+            .chunk
+            .code
+            .iter()
+            .filter_map(|instruction| match instruction {
+                Instruction::AddImmediate { kind, .. }
+                | Instruction::SubtractImmediate { kind, .. }
+                | Instruction::Step { kind, .. } => Some(*kind),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(kinds, vec![expected; 4], "{:#?}", function.chunk.code);
+    }
+}
+
+#[test]
+fn explicit_integer_increment_uses_counter_loop() {
+    let unit = compile(
+        r"
+        function run(int $limit): void {
+            for ($index = 0; $index < $limit; $index = $index + 1) {
+                write_line!($index);
+            }
+        }
+
+        function shrinking(int $limit): int {
+            $result = 0;
+            for ($index = 0; $index < $limit; $index = $index + 1) {
+                $result += $index * $index % 17;
+                $limit--;
+            }
+            return $result;
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    let function = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"run")
+        .unwrap();
+    assert!(
+        function
+            .chunk
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::IntCounterLoop { .. })),
+        "{:#?}",
+        function.chunk.code,
+    );
+
+    let shrinking = unit
+        .functions
+        .iter()
+        .find(|function| function.name.as_bytes() == b"shrinking")
+        .unwrap();
+    assert!(shrinking.chunk.code.iter().all(|instruction| !matches!(
+        instruction,
+        Instruction::IntNumericLoop { .. } | Instruction::PreparedIntNumericLoop { .. }
+    )));
+}
+
+#[test]
+fn descending_dictionary_copy_uses_numeric_execution() {
+    let unit = compile(
+        r"
+        function copy(dict<int, int> $source, int $count): dict<int, int> {
+            $copy = dict[];
+            for ($index = $count - 1; $index >= 0; $index--) {
+                $copy[$index] = $source[$index];
+            }
+            return $copy;
+        }
+
+        function accumulate(dict<int, int> $source, dict<int, int> $target, int $count): dict<int, int> {
+            for ($index = $count - 1; $index >= 0; $index--) {
+                $target[$index] += $source[$index];
+            }
+            return $target;
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    for function in &unit.functions {
+        assert!(
+            function
+                .chunk
+                .code
+                .iter()
+                .any(|instruction| matches!(instruction, Instruction::IntNumericLoop { .. })),
+            "{:#?}",
+            function.chunk.code,
+        );
+    }
 }
 
 #[test]

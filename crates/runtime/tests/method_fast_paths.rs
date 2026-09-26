@@ -194,6 +194,44 @@ for ($round = 0; $round < 4; $round++) {
     run_both_modes(source, "/method-fast-path-inheritance.whim");
 }
 
+#[test]
+fn plain_callable_frames_preserve_checks_defaults_and_lexical_context() {
+    let source = r"
+use Whim\Marker\NeverInline;
+use Whim\Unwind\{ArgumentCountError, TypeError};
+#[NeverInline]
+function invoke(fn $callback, mixed $value): mixed { return $callback($value); }
+#[NeverInline]
+function constrained<T>(): fn {
+    return fn(int $value): int where T: int => $value;
+}
+class Scope {
+    private static int $value = 40;
+    #[NeverInline]
+    public static function callback(): fn {
+        return fn(int $extra): int => self::$value + $extra;
+    }
+}
+$defaulted = fn(int $value, int $offset = 2): int => $value + $offset;
+$captured = 40;
+$capture = fn(int $value): int => $value + $captured;
+for ($round = 0; $round < 4; $round++) {
+    assert!(invoke($defaulted, 40) == 42);
+    assert!(invoke($capture, 2) == 42);
+    assert!(invoke(Scope::callback(), 2) == 42);
+    assert!(invoke(constrained::<int>(), 42) == 42);
+    $failures = 0;
+    try { invoke($defaulted, 'wrong'); } catch (TypeError $_) { $failures++; }
+    try { invoke(fn(): int => 42, 1); } catch (ArgumentCountError $_) { $failures++; }
+    try { invoke(fn(int $a, int $b): int => $a + $b, 1); }
+    catch (ArgumentCountError $_) { $failures++; }
+    try { invoke(constrained::<string>(), 42); } catch (TypeError $_) { $failures++; }
+    assert!($failures == 4);
+}
+";
+    run_both_modes(source, "/plain-callable-fast-path.whim");
+}
+
 fn run_both_modes(source: &str, path: &str) {
     for optimize in [false, true] {
         let mut engine = Engine::new(EngineConfiguration {
