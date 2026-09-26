@@ -1,6 +1,8 @@
 //! The instruction tag enumeration and the packed instruction word.
 
+use std::fmt;
 use std::mem;
+use std::mem::MaybeUninit;
 use std::ptr;
 
 use crate::instruction::Instruction;
@@ -27,9 +29,29 @@ impl Instruction {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct InstructionWord(u64);
+pub struct InstructionWord(MaybeUninit<u64>);
+
+impl fmt::Debug for InstructionWord {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // SAFETY: every word preserves the tag and fields of a live instruction.
+        let instruction = unsafe { self.decode() };
+        formatter
+            .debug_tuple("InstructionWord")
+            .field(&instruction)
+            .finish()
+    }
+}
+
+impl PartialEq for InstructionWord {
+    fn eq(&self, other: &Self) -> bool {
+        // SAFETY: both words preserve the tags and fields of live instructions.
+        unsafe { self.decode() == other.decode() }
+    }
+}
+
+impl Eq for InstructionWord {}
 
 impl InstructionWord {
     /// Fetches one packed instruction from verified bytecode.
@@ -39,23 +61,24 @@ impl InstructionWord {
     /// `instruction` must point to a live [`Instruction`].
     #[must_use]
     pub const unsafe fn read(instruction: *const Instruction) -> Self {
-        // SAFETY: the caller provides a live, fully initialized instruction.
-        let bytes = unsafe { instruction.cast::<[u8; 8]>().read_unaligned() };
-        Self(u64::from_le_bytes(bytes))
+        // SAFETY: MaybeUninit permits instruction padding; the source has alignment one.
+        Self(unsafe { instruction.cast::<MaybeUninit<u64>>().read_unaligned() })
     }
 
     #[must_use]
-    pub fn kind(self) -> InstructionKind {
-        // SAFETY: this word came from a live instruction with a valid tag.
-        unsafe { mem::transmute::<u8, InstructionKind>(self.0.to_le_bytes()[0]) }
+    pub const fn kind(self) -> InstructionKind {
+        // SAFETY: only the initialized repr(u8) tag is read.
+        let tag = unsafe { self.0.as_ptr().cast::<u8>().read() };
+        // SAFETY: every word retains a valid instruction tag.
+        unsafe { mem::transmute::<u8, InstructionKind>(tag) }
     }
 
     /// # Safety
     ///
-    /// The caller must have selected the variant returned by [`Self::kind`].
+    /// The word must retain the tag and operands of a live [`Instruction`].
     #[must_use]
-    pub unsafe fn decode(self) -> Instruction {
-        // SAFETY: the selected tag matches the preserved instruction bytes.
-        unsafe { mem::transmute::<[u8; 8], Instruction>(self.0.to_le_bytes()) }
+    pub const unsafe fn decode(self) -> Instruction {
+        // SAFETY: active fields remain initialized; Instruction permits the unused padding.
+        unsafe { mem::transmute::<MaybeUninit<u64>, Instruction>(self.0) }
     }
 }

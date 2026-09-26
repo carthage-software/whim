@@ -196,9 +196,33 @@ fn write_operands_preserve_flags_and_register_windows() {
     }
 }
 
+#[test]
+fn short_instructions_preserve_tags_and_operands() {
+    for instruction in [
+        Instruction::ReturnNull,
+        Instruction::Clear {
+            target: Register::new(u16::MAX),
+        },
+        Instruction::Jump {
+            offset: JumpOffset::new(i32::MIN),
+        },
+    ] {
+        assert_round_trip(instruction);
+    }
+}
+
 fn assert_round_trip(instruction: Instruction) {
     // SAFETY: the word comes from a live instruction and retains its tag.
-    let decoded = unsafe { InstructionWord::read(&instruction).decode() };
+    let word = unsafe { InstructionWord::read(&instruction) };
+    assert_eq!(instruction.kind(), word.kind());
+    // SAFETY: the word's tag matches this instruction.
+    let decoded = unsafe { word.decode() };
+    // SAFETY: the decoded instruction is live.
+    assert_eq!(word, unsafe { InstructionWord::read(&decoded) });
+    assert_eq!(
+        format!("{word:?}"),
+        format!("InstructionWord({instruction:?})")
+    );
     assert_eq!(instruction, decoded);
     assert_eq!(instruction.kind(), decoded.kind());
     let encoded = bincode::serialize(&instruction).unwrap();
