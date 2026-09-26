@@ -263,7 +263,7 @@ fn compiler_emits_canonical_bytecode_without_optimization() {
     );
     assert!(
         code.iter()
-            .any(|instruction| matches!(instruction, Instruction::AddImmediate { .. }))
+            .any(|instruction| matches!(instruction, Instruction::AddImmediate { kind: None, .. }))
     );
     assert!(
         code.iter()
@@ -348,8 +348,8 @@ fn neutral_integer_arithmetic_is_removed() {
     assert!(!normalize.chunk.code.iter().any(|instruction| {
         matches!(
             instruction,
-            Instruction::AddImmediate { .. }
-                | Instruction::SubtractImmediate { .. }
+            Instruction::AddImmediate { kind: None, .. }
+                | Instruction::SubtractImmediate { kind: None, .. }
                 | Instruction::IntegerMultiplyImmediate {
                     kind: IntegerKind::I64,
                     ..
@@ -1403,7 +1403,7 @@ fn specialized_float_constants_continue_folding() {
     assert!(function.chunk.code.iter().all(|instruction| {
         !matches!(
             instruction,
-            Instruction::Multiply { .. }
+            Instruction::Multiply { kind: None, .. }
                 | Instruction::FloatMultiply { .. }
                 | Instruction::FloatMultiplyConstant { .. }
                 | Instruction::Divide { .. }
@@ -2383,7 +2383,7 @@ fn non_null_branches_specialize_integer_arithmetic() {
             .chunk
             .code
             .iter()
-            .all(|instruction| !matches!(instruction, Instruction::Add { .. }))
+            .all(|instruction| !matches!(instruction, Instruction::Add { kind: None, .. }))
     );
 }
 

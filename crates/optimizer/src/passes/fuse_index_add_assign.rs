@@ -43,17 +43,25 @@ pub(crate) fn optimize_chunk(
             continue;
         };
 
-        let (result, left, increment, integer, immediate) = match chunk.code[start + 1] {
+        let next = chunk.code[start + 1];
+        let immediate = match next {
             Instruction::AddImmediate {
+                kind: None,
                 destination,
                 source,
                 immediate,
-            }
-            | Instruction::Step {
+            } => Some((destination, source, immediate.as_int())),
+            Instruction::Step {
+                kind: None,
                 destination,
                 source,
                 immediate,
-            } if previous != container
+            } => Some((destination, source, immediate.value())),
+            _ => None,
+        };
+        let (result, left, increment, integer, immediate) =
+            if let Some((destination, source, immediate)) = immediate
+                && previous != container
                 && previous != index
                 && destination != container
                 && destination != index
@@ -66,18 +74,15 @@ pub(crate) fn optimize_chunk(
                         value_mode: ArrayValueMode::Int,
                         ..
                     }
-                ) =>
+                )
             {
                 (destination, source, previous, true, Some(immediate))
-            }
-            instruction => {
-                let Some((result, left, increment, integer)) = addition(instruction) else {
+            } else {
+                let Some((result, left, increment, integer)) = addition(next) else {
                     continue;
                 };
-
                 (result, left, increment, integer, None)
-            }
-        };
+            };
 
         let Some((written_container, written_index, value, specialized_mode)) =
             indexed_write(chunk.code[start + 2])
@@ -152,7 +157,7 @@ pub(crate) fn optimize_chunk(
             chunk.code[start] = Instruction::LoadInteger {
                 kind: IntegerKind::I64,
                 destination: previous,
-                immediate: ImmediateInteger::signed(immediate.value()),
+                immediate: ImmediateInteger::signed(immediate),
             };
             chunk.code[start + 1] = fused;
         } else {
@@ -198,12 +203,13 @@ fn indexed_read(instruction: Instruction) -> Option<(Register, Register, Registe
 fn addition(instruction: Instruction) -> Option<(Register, Register, Register, bool)> {
     match instruction {
         Instruction::Add {
+            kind: None,
             destination,
             left,
             right,
         } => Some((destination, left, right, false)),
-        Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,

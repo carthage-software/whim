@@ -757,10 +757,19 @@ impl VirtualMachine<'_> {
 
         macro_rules! signed_immediate {
             (positive, $immediate:expr) => {
-                i64::from($immediate.value())
+                i64::from($immediate.as_int())
             };
             (negative, $immediate:expr) => {
-                -i64::from($immediate.value())
+                -i64::from($immediate.as_int())
+            };
+        }
+
+        macro_rules! unsigned_immediate {
+            (positive, $value:expr, $immediate:expr) => {
+                unsigned_add($value, $immediate)
+            };
+            (negative, $value:expr, $immediate:expr) => {
+                unsigned_subtract($value, $immediate)
             };
         }
 
@@ -793,13 +802,13 @@ impl VirtualMachine<'_> {
                         $($binary_variant:ident => $binary_operation:path, $binary_operator:literal;)*
                     }
                     integer {
-                        $($integer_variant:ident => $integer_signed:path, $integer_unsigned:path, $integer_operator:literal;)*
+                        $($integer_variant:ident => $integer_signed:path, $integer_unsigned:path, $integer_generic:path, $integer_operator:literal;)*
                     }
                     integer_immediate {
                         $($immediate_variant:ident => $immediate_signed:path, $immediate_unsigned:path, $immediate_operator:literal;)*
                     }
                     integer_bitwise {
-                        $($bitwise_variant:ident => $bitwise_operator:tt;)*
+                        $($bitwise_variant:ident => $bitwise_operator:tt, $bitwise_generic:path, $bitwise_name:literal;)*
                     }
                     float {
                         $($float_variant:ident => $float_operator:tt;)*
@@ -856,11 +865,15 @@ impl VirtualMachine<'_> {
                     $(
                         Instruction::$integer_variant { destination, left, right, kind } => {
                             match kind {
-                                IntegerKind::I64 => integer_arithmetic!(
+                                None => binary_arithmetic!(
+                                    $vm, $registers, $ip, $floor, $dispatch, destination,
+                                    left, right, $integer_generic, $integer_operator
+                                ),
+                                Some(IntegerKind::I64) => integer_arithmetic!(
                                     $vm, $registers, $ip, $floor, $dispatch, destination,
                                     left, right, int_register, int, $integer_signed, $integer_operator
                                 ),
-                                IntegerKind::U64 => integer_arithmetic!(
+                                Some(IntegerKind::U64) => integer_arithmetic!(
                                     $vm, $registers, $ip, $floor, $dispatch, destination,
                                     left, right, uint_register, uint, $integer_unsigned, $integer_operator
                                 ),
@@ -885,7 +898,7 @@ impl VirtualMachine<'_> {
                                     write_register!($registers, destination, value);
                                 }
                                 Err(fault) => {
-                                    let name = match kind { IntegerKind::I64 => "int", IntegerKind::U64 => "uint" };
+                                    let name = borrow_register!($registers, source).kind_name();
                                     fail!(
                                         $vm,
                                         $ip,
@@ -904,6 +917,13 @@ impl VirtualMachine<'_> {
                     )*
                     $(
                         Instruction::$bitwise_variant { destination, left, right, kind } => {
+                            let Some(kind) = kind else {
+                                binary_arithmetic!(
+                                    $vm, $registers, $ip, $floor, $dispatch, destination,
+                                    left, right, $bitwise_generic, $bitwise_name
+                                );
+                                continue;
+                            };
                             // SAFETY: type flow proves both operands have the selected integer kind.
                             let value = unsafe {
                                 match kind {
@@ -929,41 +949,31 @@ impl VirtualMachine<'_> {
                             destination,
                             source,
                             immediate,
+                            kind,
                         } => {
                             let outcome = {
                                 // SAFETY: verified bytecode keeps the source in the active frame.
-                                let value = unsafe {
-                                    &*$registers.add(source.index() as usize)
-                                };
-                                arithmetic_immediate(
-                                    value,
-                                    signed_immediate!(
-                                        $immediate_step_direction,
-                                        immediate
-                                    ),
-                                )
+                                let value = unsafe { &*$registers.add(source.index() as usize) };
+                                match kind {
+                                    None => arithmetic_immediate(value, signed_immediate!($immediate_step_direction, immediate)),
+                                    Some(IntegerKind::I64) => {
+                                        // SAFETY: type flow proves an int source.
+                                        let source = unsafe { int_register($registers, source) };
+                                        integer_add(source, signed_immediate!($immediate_step_direction, immediate)).map(Value::int)
+                                    }
+                                    Some(IntegerKind::U64) => {
+                                        // SAFETY: type flow proves a uint source.
+                                        let source = unsafe { uint_register($registers, source) };
+                                        unsigned_immediate!($immediate_step_direction, source, u64::from(immediate.as_uint())).map(Value::uint)
+                                    }
+                                }
                             };
                             match outcome {
-                                Ok(value) => {
-                                    write_register!($registers, destination, value);
-                                }
+                                Ok(value) => write_register!($registers, destination, value),
                                 Err(fault) => {
-                                    // SAFETY: verified bytecode keeps the source in the active frame.
-                                    let kind = unsafe {
-                                        (*$registers.add(source.index() as usize)).kind_name()
-                                    };
-                                    fail!(
-                                        $vm,
-                                        $ip,
-                                        $floor,
-                                        $dispatch,
-                                        $vm.binary_fault(
-                                            fault,
-                                            $immediate_step_operator,
-                                            kind,
-                                            "int",
-                                        )
-                                    );
+                                    let left = borrow_register!($registers, source).kind_name();
+                                    let right = if kind == Some(IntegerKind::U64) { "uint" } else { "int" };
+                                    fail!($vm, $ip, $floor, $dispatch, $vm.binary_fault(fault, $immediate_step_operator, left, right));
                                 }
                             }
                         }
@@ -1149,38 +1159,27 @@ impl VirtualMachine<'_> {
 
                 execute_dispatch!(instruction, self, registers, ip, floor, 'dispatch {
                     binary {
-                        Add => arithmetic_add, "+";
-                        Subtract => arithmetic_subtract, "-";
-                        Multiply => arithmetic_multiply, "*";
                         Divide => arithmetic_divide, "/";
-                        Modulo => arithmetic_modulo, "%";
                         Power => arithmetic_power, "**";
-                        BitwiseAnd => bitwise_and, "&";
-                        BitwiseOr => bitwise_or, "|";
-                        BitwiseXor => bitwise_xor, "^";
-                        ShiftLeft => shift_left, "<<";
-                        ShiftRight => shift_right, ">>";
                         LessThan => compare_less, "<";
                         LessThanOrEqual => compare_less_or_equal, "<=";
                         GreaterThan => compare_greater, ">";
                         GreaterThanOrEqual => compare_greater_or_equal, ">=";
                     }
                     integer {
-                        IntegerAdd => integer_add, unsigned_add, "+";
-                        IntegerSubtract => integer_subtract, unsigned_subtract, "-";
-                        IntegerMultiply => integer_multiply, unsigned_multiply, "*";
-                        IntegerModulo => integer_modulo, unsigned_modulo, "%";
+                        Add => integer_add, unsigned_add, arithmetic_add, "+";
+                        Subtract => integer_subtract, unsigned_subtract, arithmetic_subtract, "-";
+                        Multiply => integer_multiply, unsigned_multiply, arithmetic_multiply, "*";
+                        Modulo => integer_modulo, unsigned_modulo, arithmetic_modulo, "%";
                     }
                     integer_immediate {
-                        IntegerAddImmediate => integer_add, unsigned_add, "+";
-                        IntegerSubtractImmediate => integer_subtract, unsigned_subtract, "-";
                         IntegerMultiplyImmediate => integer_multiply, unsigned_multiply, "*";
                         IntegerModuloImmediate => integer_modulo, unsigned_modulo, "%";
                     }
                     integer_bitwise {
-                        IntegerBitwiseAnd => &;
-                        IntegerBitwiseOr => |;
-                        IntegerBitwiseXor => ^;
+                        BitwiseAnd => &, bitwise_and, "&";
+                        BitwiseOr => |, bitwise_or, "|";
+                        BitwiseXor => ^, bitwise_xor, "^";
                     }
                     float {
                         FloatAdd => +;
@@ -1194,7 +1193,6 @@ impl VirtualMachine<'_> {
                     unary {
                         Negate => negate, "-";
                         UnaryPlus => plus, "+";
-                        BitwiseNot => bitwise_not, "~";
                     }
                     equality {
                         Equal => identity;
@@ -1723,33 +1721,45 @@ impl VirtualMachine<'_> {
                             }
                         }
                     }
-                    Instruction::IntegerBitwiseNot { destination, source, kind } => {
+                    Instruction::BitwiseNot { destination, source, kind } => {
                         // SAFETY: type flow proves the source has the selected integer kind.
                         let value = unsafe {
                             match kind {
-                                IntegerKind::I64 => Value::int(!int_register(registers, source)),
-                                IntegerKind::U64 => Value::uint(!uint_register(registers, source)),
+                                Some(IntegerKind::I64) => Value::int(!int_register(registers, source)),
+                                Some(IntegerKind::U64) => Value::uint(!uint_register(registers, source)),
+                                None => {
+                                    let source = &*registers.add(source.index() as usize);
+                                    match unary_outcome!(bitwise_not, source) {
+                                        Ok(value) => value,
+                                        Err(fault) => fail!(self, ip, floor, 'dispatch, self.unary_fault(fault, "~", source.kind_name())),
+                                    }
+                                }
                             }
                         };
                         write_register!(registers, destination, value);
                     }
-                    Instruction::IntegerShiftLeft { destination, left, right, kind }
-                    | Instruction::IntegerShiftRight { destination, left, right, kind } => {
-                        let shift_left = instruction.kind() == InstructionKind::IntegerShiftLeft;
-                        let operator = if shift_left { "<<" } else { ">>" };
+                    Instruction::ShiftLeft { destination, left, right, kind }
+                    | Instruction::ShiftRight { destination, left, right, kind } => {
+                        let is_left = instruction.kind() == InstructionKind::ShiftLeft;
+                        let operator = if is_left { "<<" } else { ">>" };
                         let result = match kind {
-                            IntegerKind::I64 => {
+                            None => {
+                                let left = borrow_register!(registers, left);
+                                let right = borrow_register!(registers, right);
+                                if is_left { shift_left(&self.heap, left, right) } else { shift_right(&self.heap, left, right) }
+                            }
+                            Some(IntegerKind::I64) => {
                                 // SAFETY: type flow proves both active-frame operands are ints.
                                 let (value, count) = unsafe {
                                     (int_register(registers, left), int_register(registers, right))
                                 };
-                                if shift_left {
+                                if is_left {
                                     integer_shift_left(value, count)
                                 } else {
                                     integer_shift_right(value, count)
                                 }.map(Value::int)
                             }
-                            IntegerKind::U64 => {
+                            Some(IntegerKind::U64) => {
                                 // SAFETY: type flow proves a uint value and an int or uint count.
                                 let (value, count) = unsafe {
                                     (
@@ -1760,7 +1770,7 @@ impl VirtualMachine<'_> {
                                 if count >= 64 {
                                     Err(Fault::ShiftRange)
                                 } else {
-                                    Ok(Value::uint(if shift_left { value << count } else { value >> count }))
+                                    Ok(Value::uint(if is_left { value << count } else { value >> count }))
                                 }
                             }
                         };
@@ -1773,13 +1783,14 @@ impl VirtualMachine<'_> {
                             }
                         }
                     }
-                    Instruction::IntegerStep { destination, source, immediate, kind } => {
+                    Instruction::Step { destination, source, immediate, kind } => {
                         let step = i64::from(immediate.value());
                         // SAFETY: type flow proves the source has the selected integer kind.
                         let result = unsafe {
                             match kind {
-                                IntegerKind::I64 => integer_add(int_register(registers, source), step).map(Value::int),
-                                IntegerKind::U64 => uint_register(registers, source).checked_add_signed(step)
+                                None => step_by(&*registers.add(source.index() as usize), step),
+                                Some(IntegerKind::I64) => integer_add(int_register(registers, source), step).map(Value::int),
+                                Some(IntegerKind::U64) => uint_register(registers, source).checked_add_signed(step)
                                     .map(Value::uint)
                                     .ok_or(if step < 0 { Fault::Underflow } else { Fault::Overflow }),
                             }
@@ -1787,8 +1798,9 @@ impl VirtualMachine<'_> {
                         match result {
                             Ok(value) => write_register!(registers, destination, value),
                             Err(fault) => {
-                                let name = match kind { IntegerKind::I64 => "int", IntegerKind::U64 => "uint" };
-                                fail!(self, ip, floor, 'dispatch, self.binary_fault(fault, "+", name, "int"));
+                                let name = borrow_register!(registers, source).kind_name();
+                                let right = if kind.is_none() { name } else { "int" };
+                                fail!(self, ip, floor, 'dispatch, self.binary_fault(fault, "+", name, right));
                             }
                         }
                     }
@@ -2205,14 +2217,6 @@ impl VirtualMachine<'_> {
                                     self.binary_fault(fault, ".", "string", source_kind)
                                 );
                             }
-                        }
-                    }
-                    Instruction::Step { destination, source, immediate } => {
-                        // SAFETY: verified bytecode keeps the source in the active frame.
-                        let value = unsafe { &*registers.add(source.index() as usize) };
-                        match step_by(value, i64::from(immediate.value())) {
-                            Ok(value) => write_register!(registers, destination, value),
-                            Err(fault) => fail!(self, ip, floor, 'dispatch, self.binary_fault(fault, "+", value.kind_name(), value.kind_name())),
                         }
                     }
                     Instruction::IncrementJump {

@@ -54,6 +54,7 @@ pub(in crate::passes) fn optimize_chunk(
 
         let replacement = match chunk.code[start + 1] {
             Instruction::Step {
+                kind: None,
                 destination,
                 source,
                 immediate,
@@ -64,6 +65,7 @@ pub(in crate::passes) fn optimize_chunk(
                 mode: PropertyStepMode::Increment,
             },
             Instruction::Add {
+                kind: None,
                 destination,
                 left,
                 right,

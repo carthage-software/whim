@@ -3,7 +3,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
-use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_value::heap::Heap;
@@ -78,15 +78,17 @@ fn reduced_instruction(
 ) -> Option<Instruction> {
     match instruction {
         Instruction::AddImmediate {
+            kind: None,
             destination,
             source,
             immediate,
         }
         | Instruction::SubtractImmediate {
+            kind: None,
             destination,
             source,
             immediate,
-        } if immediate.value() == 0 && flow.proves(index, source, &TypeDescriptor::Int) => {
+        } if immediate.as_int() == 0 && flow.proves(index, source, &TypeDescriptor::Int) => {
             Some(Instruction::Move {
                 destination,
                 source,
@@ -101,30 +103,33 @@ fn reduced_instruction(
             destination,
             source,
         }),
-        Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         } => immediate(flow, index, right)
             .map(|immediate| Instruction::AddImmediate {
+                kind: None,
                 destination,
                 source: left,
                 immediate,
             })
             .or_else(|| {
                 immediate(flow, index, left).map(|immediate| Instruction::AddImmediate {
+                    kind: None,
                     destination,
                     source: right,
                     immediate,
                 })
             }),
-        Instruction::IntegerSubtract {
-            kind: IntegerKind::I64,
+        Instruction::Subtract {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         } => immediate(flow, index, right).map(|immediate| Instruction::SubtractImmediate {
+            kind: None,
             destination,
             source: left,
             immediate,
@@ -133,10 +138,10 @@ fn reduced_instruction(
     }
 }
 
-fn immediate(flow: &TypeFlow<'_>, index: usize, register: Register) -> Option<ImmediateInt> {
+fn immediate(flow: &TypeFlow<'_>, index: usize, register: Register) -> Option<ImmediateInteger> {
     let ConstantValue::Int(value) = flow.constant_value(index, register)? else {
         return None;
     };
 
-    Some(ImmediateInt::new(i16::try_from(value).ok()?))
+    Some(ImmediateInteger::signed(i16::try_from(value).ok()?))
 }

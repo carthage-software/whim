@@ -834,6 +834,7 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
         if let Some((
             index,
             Instruction::Step {
+                kind: None,
                 destination,
                 source,
                 immediate,
@@ -1039,7 +1040,9 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
             if targets.contains(&jump) || remove[increment] || remove[jump] {
                 continue;
             }
+
             let Instruction::Step {
+                kind: None,
                 destination,
                 source,
                 immediate,
@@ -1047,12 +1050,15 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
             else {
                 continue;
             };
+
             let Instruction::Jump { offset } = self.chunk.code[jump] else {
                 continue;
             };
+
             if destination != source {
                 continue;
             }
+
             let target = wide_code_position(jump) + i64::from(offset.offset());
             let Ok(relative) = i16::try_from(target - wide_code_position(increment)) else {
                 continue;
@@ -1063,6 +1069,7 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
                 immediate,
                 offset: ShortJumpOffset::new(relative),
             };
+
             remove[jump] = true;
         }
     }

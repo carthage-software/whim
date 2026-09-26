@@ -38,7 +38,7 @@ function mixed(uint $value): uint { return $value + 1; }
     );
     assert!(!folded.chunk.code.iter().any(|instruction| matches!(
         instruction,
-        Instruction::Add { .. } | Instruction::ShiftLeft { .. }
+        Instruction::Add { kind: None, .. } | Instruction::ShiftLeft { kind: None, .. }
     )));
     assert!(
         !function(b"unsigned")
@@ -75,11 +75,11 @@ function mixed(uint $value): uint { return $value + 1; }
             .iter()
             .any(|instruction| matches!(
                 instruction,
-                Instruction::IntegerAddImmediate {
-                    kind: IntegerKind::U64,
+                Instruction::AddImmediate {
+                    kind: Some(IntegerKind::U64),
                     ..
-                } | Instruction::IntegerAdd {
-                    kind: IntegerKind::U64,
+                } | Instruction::Add {
+                    kind: Some(IntegerKind::U64),
                     ..
                 }
             ))
@@ -91,7 +91,7 @@ function mixed(uint $value): uint { return $value + 1; }
             .iter()
             .any(|instruction| matches!(
                 instruction,
-                Instruction::AddImmediate { .. } | Instruction::Add { .. }
+                Instruction::AddImmediate { kind: None, .. } | Instruction::Add { kind: None, .. }
             ))
     );
 }
@@ -121,40 +121,34 @@ function mixed(uint $a, int $b): uint { return $a + $b; }
         (
             "arithmetic",
             vec![
-                InstructionKind::IntegerAdd,
-                InstructionKind::IntegerSubtract,
-                InstructionKind::IntegerMultiply,
-                InstructionKind::IntegerModulo,
-                InstructionKind::IntegerBitwiseAnd,
-                InstructionKind::IntegerBitwiseOr,
-                InstructionKind::IntegerBitwiseXor,
-                InstructionKind::IntegerBitwiseNot,
-                InstructionKind::IntegerShiftLeft,
-                InstructionKind::IntegerShiftRight,
+                InstructionKind::Add,
+                InstructionKind::Subtract,
+                InstructionKind::Multiply,
+                InstructionKind::Modulo,
+                InstructionKind::BitwiseAnd,
+                InstructionKind::BitwiseOr,
+                InstructionKind::BitwiseXor,
+                InstructionKind::BitwiseNot,
+                InstructionKind::ShiftLeft,
+                InstructionKind::ShiftRight,
             ],
         ),
         (
             "shifts",
-            vec![
-                InstructionKind::IntegerShiftLeft,
-                InstructionKind::IntegerShiftRight,
-            ],
+            vec![InstructionKind::ShiftLeft, InstructionKind::ShiftRight],
         ),
         (
             "immediate",
             vec![
-                InstructionKind::IntegerAddImmediate,
-                InstructionKind::IntegerSubtractImmediate,
+                InstructionKind::AddImmediate,
+                InstructionKind::SubtractImmediate,
                 InstructionKind::IntegerMultiplyImmediate,
                 InstructionKind::IntegerModuloImmediate,
             ],
         ),
         (
             "steps",
-            vec![
-                InstructionKind::IntegerAddAssign,
-                InstructionKind::IntegerStep,
-            ],
+            vec![InstructionKind::IntegerAddAssign, InstructionKind::Step],
         ),
         (
             "compare",
@@ -186,11 +180,34 @@ function mixed(uint $a, int $b): uint { return $a + $b; }
             .unwrap();
         for kind in kinds {
             assert!(
-                function
-                    .chunk
-                    .code
-                    .iter()
-                    .any(|instruction| instruction.kind() == kind),
+                function.chunk.code.iter().any(|instruction| {
+                    if instruction.kind() != kind {
+                        return false;
+                    }
+                    match instruction {
+                        Instruction::Add { kind, .. }
+                        | Instruction::Subtract { kind, .. }
+                        | Instruction::Multiply { kind, .. }
+                        | Instruction::Modulo { kind, .. }
+                        | Instruction::BitwiseAnd { kind, .. }
+                        | Instruction::BitwiseOr { kind, .. }
+                        | Instruction::BitwiseXor { kind, .. }
+                        | Instruction::BitwiseNot { kind, .. }
+                        | Instruction::ShiftLeft { kind, .. }
+                        | Instruction::ShiftRight { kind, .. }
+                        | Instruction::AddImmediate { kind, .. }
+                        | Instruction::SubtractImmediate { kind, .. }
+                        | Instruction::Step { kind, .. } => {
+                            *kind
+                                == if name == "mixed" {
+                                    None
+                                } else {
+                                    Some(IntegerKind::U64)
+                                }
+                        }
+                        _ => true,
+                    }
+                }),
                 "{name} lacks {kind:?}: {:?}",
                 function.chunk.code
             );
@@ -222,8 +239,8 @@ function fallback(): uint { return calculate(0u); }
         assert!(function.chunk.code.iter().any(|instruction| matches!(instruction, Instruction::ReturnIntegerUnchecked { kind: IntegerKind::U64, immediate } if immediate.as_uint() == expected)), "{name}: {:?}", function.chunk.code);
         assert!(!function.chunk.code.iter().any(|instruction| matches!(
             instruction,
-            Instruction::IntegerAddImmediate {
-                kind: IntegerKind::U64,
+            Instruction::AddImmediate {
+                kind: Some(IntegerKind::U64),
                 ..
             } | Instruction::UintJumpUnlessImmediate { .. }
                 | Instruction::CallNamed { .. }

@@ -68,6 +68,7 @@ fn fuse_increment(
         return None;
     };
     let Instruction::Step {
+        kind: None,
         destination: incremented,
         source,
         immediate,

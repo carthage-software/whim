@@ -136,11 +136,6 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::IntegerAdd {
-                destination,
-                left,
-                right,
                 ..
             }
             | Instruction::FloatAdd {
@@ -152,11 +147,6 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::IntegerSubtract {
-                destination,
-                left,
-                right,
                 ..
             }
             | Instruction::FloatSubtract {
@@ -165,11 +155,6 @@ impl TypeFlow<'_> {
                 right,
             } => Some((destination, constant_subtract(value(left)?, value(right)?)?)),
             Instruction::Multiply {
-                destination,
-                left,
-                right,
-            }
-            | Instruction::IntegerMultiply {
                 destination,
                 left,
                 right,
@@ -200,11 +185,6 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::IntegerModulo {
-                destination,
-                left,
-                right,
                 ..
             } => Some((destination, constant_modulo(value(left)?, value(right)?)?)),
             Instruction::Power {
@@ -220,23 +200,7 @@ impl TypeFlow<'_> {
                 destination,
                 source,
             } => Some((destination, constant_unary_plus(value(source)?)?)),
-            Instruction::AddImmediate {
-                destination,
-                source,
-                immediate,
-            } => Some((
-                destination,
-                constant_add(
-                    value(source)?,
-                    ConstantValue::Int(i64::from(immediate.value())),
-                )?,
-            )),
             Instruction::Step {
-                destination,
-                source,
-                immediate,
-            }
-            | Instruction::IntegerStep {
                 destination,
                 source,
                 immediate,
@@ -252,7 +216,20 @@ impl TypeFlow<'_> {
                 };
                 Some((destination, result))
             }
+            Instruction::AddImmediate {
+                kind,
+                destination,
+                source,
+                immediate,
+            } => Some((
+                destination,
+                constant_add(
+                    value(source)?,
+                    integer_constant(immediate, kind.unwrap_or(IntegerKind::I64)),
+                )?,
+            )),
             Instruction::SubtractImmediate {
+                kind,
                 destination,
                 source,
                 immediate,
@@ -260,26 +237,8 @@ impl TypeFlow<'_> {
                 destination,
                 constant_subtract(
                     value(source)?,
-                    ConstantValue::Int(i64::from(immediate.value())),
+                    integer_constant(immediate, kind.unwrap_or(IntegerKind::I64)),
                 )?,
-            )),
-            Instruction::IntegerAddImmediate {
-                kind,
-                destination,
-                source,
-                immediate,
-            } => Some((
-                destination,
-                constant_add(value(source)?, integer_constant(immediate, kind))?,
-            )),
-            Instruction::IntegerSubtractImmediate {
-                kind,
-                destination,
-                source,
-                immediate,
-            } => Some((
-                destination,
-                constant_subtract(value(source)?, integer_constant(immediate, kind))?,
             )),
             Instruction::IntegerMultiplyImmediate {
                 kind,
@@ -347,22 +306,12 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::IntegerBitwiseAnd {
-                destination,
-                left,
-                right,
                 ..
             } => Some((
                 destination,
                 constant_int_binary(value(left)?, value(right)?, |left, right| left & right)?,
             )),
             Instruction::BitwiseOr {
-                destination,
-                left,
-                right,
-            }
-            | Instruction::IntegerBitwiseOr {
                 destination,
                 left,
                 right,
@@ -375,21 +324,12 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::IntegerBitwiseXor {
-                destination,
-                left,
-                right,
                 ..
             } => Some((
                 destination,
                 constant_int_binary(value(left)?, value(right)?, |left, right| left ^ right)?,
             )),
             Instruction::BitwiseNot {
-                destination,
-                source,
-            }
-            | Instruction::IntegerBitwiseNot {
                 destination,
                 source,
                 ..
@@ -405,22 +345,12 @@ impl TypeFlow<'_> {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::IntegerShiftLeft {
-                destination,
-                left,
-                right,
                 ..
             } => Some((
                 destination,
                 constant_shift(value(left)?, value(right)?, true)?,
             )),
             Instruction::ShiftRight {
-                destination,
-                left,
-                right,
-            }
-            | Instruction::IntegerShiftRight {
                 destination,
                 left,
                 right,

@@ -100,33 +100,26 @@ fn scalar_write_to(instruction: Instruction, register: Register) -> bool {
 
             | Instruction::Negate { destination, .. }
             | Instruction::UnaryPlus { destination, .. }
-            | Instruction::AddImmediate { destination, .. }
-            | Instruction::Step { destination, .. }
-            | Instruction::SubtractImmediate { destination, .. }
-            | Instruction::BitwiseNot { destination, .. }
+            | Instruction::BitwiseNot { kind: None, destination, .. }
             | Instruction::Not { destination, .. }
             | Instruction::Length { destination, .. }
             | Instruction::StringLength { destination, .. }
-            | Instruction::IntegerAdd { destination, .. }
-            | Instruction::IntegerSubtract { destination, .. }
-            | Instruction::IntegerMultiply { destination, .. }
-            | Instruction::IntegerModulo { destination, .. }
+            | Instruction::Add { destination, .. }
+            | Instruction::Subtract { destination, .. }
+            | Instruction::Multiply { destination, .. }
+            | Instruction::Modulo { destination, .. }
             | Instruction::IntegerMultiplyImmediate { destination, .. }
             | Instruction::IntegerModuloImmediate { destination, .. }
 
-
-
-
-            | Instruction::IntegerBitwiseAnd { kind: IntegerKind::U64, destination, .. }
-            | Instruction::IntegerBitwiseOr { kind: IntegerKind::U64, destination, .. }
-            | Instruction::IntegerBitwiseXor { kind: IntegerKind::U64, destination, .. }
-            | Instruction::IntegerBitwiseNot { kind: IntegerKind::U64, destination, .. }
-            | Instruction::IntegerShiftLeft { kind: IntegerKind::U64, destination, .. }
-            | Instruction::IntegerShiftRight { kind: IntegerKind::U64, destination, .. }
-            | Instruction::IntegerStep { destination, .. }
-            | Instruction::IntegerAddImmediate { destination, .. }
-            | Instruction::IntegerSubtractImmediate { destination, .. }
-
+            | Instruction::BitwiseAnd { kind: Some(IntegerKind::U64), destination, .. }
+            | Instruction::BitwiseOr { kind: Some(IntegerKind::U64), destination, .. }
+            | Instruction::BitwiseXor { kind: Some(IntegerKind::U64), destination, .. }
+            | Instruction::BitwiseNot { kind: Some(IntegerKind::U64), destination, .. }
+            | Instruction::ShiftLeft { kind: Some(IntegerKind::U64), destination, .. }
+            | Instruction::ShiftRight { kind: Some(IntegerKind::U64), destination, .. }
+            | Instruction::Step { destination, .. }
+            | Instruction::AddImmediate { destination, .. }
+            | Instruction::SubtractImmediate { destination, .. }
 
             | Instruction::FloatAdd { destination, .. }
             | Instruction::FloatSubtract { destination, .. }

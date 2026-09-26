@@ -35,20 +35,20 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
                 kind: IntegerKind::I64,
                 ..
             } => return true,
-            Instruction::IntegerAdd {
-                kind: IntegerKind::I64,
+            Instruction::Add {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerSubtract {
-                kind: IntegerKind::I64,
+            | Instruction::Subtract {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerMultiply {
-                kind: IntegerKind::I64,
+            | Instruction::Multiply {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerModulo {
-                kind: IntegerKind::I64,
+            | Instruction::Modulo {
+                kind: Some(IntegerKind::I64),
                 ..
             }
             | Instruction::IntegerMultiplyImmediate {
@@ -59,24 +59,24 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
                 kind: IntegerKind::I64,
                 ..
             }
-            | Instruction::IntegerBitwiseAnd {
-                kind: IntegerKind::I64,
+            | Instruction::BitwiseAnd {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerBitwiseOr {
-                kind: IntegerKind::I64,
+            | Instruction::BitwiseOr {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerBitwiseXor {
-                kind: IntegerKind::I64,
+            | Instruction::BitwiseXor {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerShiftLeft {
-                kind: IntegerKind::I64,
+            | Instruction::ShiftLeft {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerShiftRight {
-                kind: IntegerKind::I64,
+            | Instruction::ShiftRight {
+                kind: Some(IntegerKind::I64),
                 ..
             } => {
                 integer_operations += 1;
@@ -87,12 +87,12 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
             Instruction::Concatenate {
                 destination, left, ..
             } if destination == left => return true,
-            Instruction::AddImmediate { .. }
-            | Instruction::IntegerAddImmediate {
-                kind: IntegerKind::I64,
+            Instruction::AddImmediate { kind: None, .. }
+            | Instruction::AddImmediate {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::Step { .. }
+            | Instruction::Step { kind: None, .. }
             | Instruction::IntegerAddAssign {
                 kind: IntegerKind::I64,
                 ..
@@ -277,18 +277,20 @@ fn dict_build_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
                 return false;
             }
         } else {
-            let (Instruction::AddImmediate {
-                destination,
-                source,
-                immediate,
-            }
-            | Instruction::Step {
-                destination,
-                source,
-                immediate,
-            }) = instruction
-            else {
-                return false;
+            let (destination, source, immediate) = match instruction {
+                Instruction::AddImmediate {
+                    kind: None,
+                    destination,
+                    source,
+                    immediate,
+                } => (destination, source, immediate.as_int()),
+                Instruction::Step {
+                    kind: None,
+                    destination,
+                    source,
+                    immediate,
+                } => (destination, source, immediate.value()),
+                _ => return false,
             };
 
             if destination != counter
@@ -347,6 +349,7 @@ fn dict_copy_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
         };
 
         let Instruction::SubtractImmediate {
+            kind: None,
             destination: step_destination,
             source: step_source,
             ..
@@ -415,31 +418,31 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::LoadFalse { .. }
             | Instruction::Move { .. }
             | Instruction::MoveOwned { .. }
-            | Instruction::Add { .. }
-            | Instruction::Subtract { .. }
-            | Instruction::Multiply { .. }
-            | Instruction::IntegerAdd {
-                kind: IntegerKind::I64,
+            | Instruction::Add { kind: None, .. }
+            | Instruction::Subtract { kind: None, .. }
+            | Instruction::Multiply { kind: None, .. }
+            | Instruction::Add {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerSubtract {
-                kind: IntegerKind::I64,
+            | Instruction::Subtract {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerMultiply {
-                kind: IntegerKind::I64,
+            | Instruction::Multiply {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerModulo {
-                kind: IntegerKind::I64,
+            | Instruction::Modulo {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerAddImmediate {
-                kind: IntegerKind::I64,
+            | Instruction::AddImmediate {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerSubtractImmediate {
-                kind: IntegerKind::I64,
+            | Instruction::SubtractImmediate {
+                kind: Some(IntegerKind::I64),
                 ..
             }
             | Instruction::IntegerMultiplyImmediate {
@@ -450,24 +453,24 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
                 kind: IntegerKind::I64,
                 ..
             }
-            | Instruction::IntegerBitwiseAnd {
-                kind: IntegerKind::I64,
+            | Instruction::BitwiseAnd {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerBitwiseOr {
-                kind: IntegerKind::I64,
+            | Instruction::BitwiseOr {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerBitwiseXor {
-                kind: IntegerKind::I64,
+            | Instruction::BitwiseXor {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerShiftLeft {
-                kind: IntegerKind::I64,
+            | Instruction::ShiftLeft {
+                kind: Some(IntegerKind::I64),
                 ..
             }
-            | Instruction::IntegerShiftRight {
-                kind: IntegerKind::I64,
+            | Instruction::ShiftRight {
+                kind: Some(IntegerKind::I64),
                 ..
             }
             | Instruction::IntegerAddAssign {
@@ -481,9 +484,9 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::FloatDifferenceAdd { .. }
             | Instruction::FloatScaleProductAdd { .. }
             | Instruction::FloatPairUpdate { .. }
-            | Instruction::AddImmediate { .. }
-            | Instruction::Step { .. }
-            | Instruction::SubtractImmediate { .. }
+            | Instruction::AddImmediate { kind: None, .. }
+            | Instruction::Step { kind: None, .. }
+            | Instruction::SubtractImmediate { kind: None, .. }
             | Instruction::Squares { .. }
             | Instruction::FloatSquares { .. }
             | Instruction::FloatSquaresSum { .. }
@@ -494,11 +497,11 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::Equal { .. }
             | Instruction::NotEqual { .. }
             | Instruction::CheckDefined { .. }
-            | Instruction::ShiftLeft { .. }
-            | Instruction::ShiftRight { .. }
-            | Instruction::BitwiseAnd { .. }
-            | Instruction::BitwiseOr { .. }
-            | Instruction::BitwiseXor { .. }
+            | Instruction::ShiftLeft { kind: None, .. }
+            | Instruction::ShiftRight { kind: None, .. }
+            | Instruction::BitwiseAnd { kind: None, .. }
+            | Instruction::BitwiseOr { kind: None, .. }
+            | Instruction::BitwiseXor { kind: None, .. }
             | Instruction::IndexGet { .. }
             | Instruction::IndexSet { .. }
             | Instruction::VecIndexGet { .. }

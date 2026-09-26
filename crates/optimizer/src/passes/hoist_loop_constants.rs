@@ -247,66 +247,21 @@ fn replace_binary_read(
     }
 
     match instruction {
-        Instruction::Add {
-            destination,
-            left,
-            right,
-        } => replace!(Add, destination, left, right),
         Instruction::Concatenate {
             destination,
             left,
             right,
         } => replace!(Concatenate, destination, left, right),
-        Instruction::Subtract {
-            destination,
-            left,
-            right,
-        } => replace!(Subtract, destination, left, right),
-        Instruction::Multiply {
-            destination,
-            left,
-            right,
-        } => replace!(Multiply, destination, left, right),
         Instruction::Divide {
             destination,
             left,
             right,
         } => replace!(Divide, destination, left, right),
-        Instruction::Modulo {
-            destination,
-            left,
-            right,
-        } => replace!(Modulo, destination, left, right),
         Instruction::Power {
             destination,
             left,
             right,
         } => replace!(Power, destination, left, right),
-        Instruction::BitwiseAnd {
-            destination,
-            left,
-            right,
-        } => replace!(BitwiseAnd, destination, left, right),
-        Instruction::BitwiseOr {
-            destination,
-            left,
-            right,
-        } => replace!(BitwiseOr, destination, left, right),
-        Instruction::BitwiseXor {
-            destination,
-            left,
-            right,
-        } => replace!(BitwiseXor, destination, left, right),
-        Instruction::ShiftLeft {
-            destination,
-            left,
-            right,
-        } => replace!(ShiftLeft, destination, left, right),
-        Instruction::ShiftRight {
-            destination,
-            left,
-            right,
-        } => replace!(ShiftRight, destination, left, right),
         Instruction::Equal {
             destination,
             left,
@@ -342,60 +297,60 @@ fn replace_binary_read(
             left,
             right,
         } => replace!(Compare, destination, left, right),
-        Instruction::IntegerAdd {
+        Instruction::Add {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerAdd, destination, left, right, kind),
-        Instruction::IntegerSubtract {
+        } => replace!(Add, destination, left, right, kind),
+        Instruction::Subtract {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerSubtract, destination, left, right, kind),
-        Instruction::IntegerMultiply {
+        } => replace!(Subtract, destination, left, right, kind),
+        Instruction::Multiply {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerMultiply, destination, left, right, kind),
-        Instruction::IntegerModulo {
+        } => replace!(Multiply, destination, left, right, kind),
+        Instruction::Modulo {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerModulo, destination, left, right, kind),
-        Instruction::IntegerBitwiseAnd {
+        } => replace!(Modulo, destination, left, right, kind),
+        Instruction::BitwiseAnd {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerBitwiseAnd, destination, left, right, kind),
-        Instruction::IntegerBitwiseOr {
+        } => replace!(BitwiseAnd, destination, left, right, kind),
+        Instruction::BitwiseOr {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerBitwiseOr, destination, left, right, kind),
-        Instruction::IntegerBitwiseXor {
+        } => replace!(BitwiseOr, destination, left, right, kind),
+        Instruction::BitwiseXor {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerBitwiseXor, destination, left, right, kind),
-        Instruction::IntegerShiftLeft {
+        } => replace!(BitwiseXor, destination, left, right, kind),
+        Instruction::ShiftLeft {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerShiftLeft, destination, left, right, kind),
-        Instruction::IntegerShiftRight {
+        } => replace!(ShiftLeft, destination, left, right, kind),
+        Instruction::ShiftRight {
             destination,
             left,
             right,
             kind,
-        } => replace!(IntegerShiftRight, destination, left, right, kind),
+        } => replace!(ShiftRight, destination, left, right, kind),
         Instruction::FloatAdd {
             destination,
             left,

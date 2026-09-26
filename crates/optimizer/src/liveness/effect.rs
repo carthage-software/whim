@@ -62,11 +62,7 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
 
     match instruction {
         instructions!(
-            Coalesce | Move | Negate | UnaryPlus | BitwiseNot | IntegerBitwiseNot | Not | Length | StringLength
-                | CloneObject | AddImmediate | SubtractImmediate | Step | IntegerMultiplyImmediate
-                | IntegerModuloImmediate | FloatMultiplyConstant | ConcatenateRightConstant
-                | ConcatenateLeftConstant | Is | AsCheck | AsOrNull
-                | IntegerAddImmediate | IntegerSubtractImmediate | IntegerStep;
+            Coalesce | Move | Negate | UnaryPlus | BitwiseNot | Not | Length | StringLength | CloneObject | AddImmediate | SubtractImmediate | Step | IntegerMultiplyImmediate | IntegerModuloImmediate | FloatMultiplyConstant | ConcatenateRightConstant | ConcatenateLeftConstant | Is | AsCheck | AsOrNull;
             { destination, source, .. }
         ) => read_then_write(reads(source), writes(destination)),
         Instruction::MoveOwned {
@@ -90,12 +86,7 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             ..
         } => read_then_write(window(first_operand, 3), writes(destination)),
         instructions!(
-            Add | Subtract | Multiply | IntegerAdd | IntegerSubtract | IntegerMultiply | IntegerModulo
-                | IntegerBitwiseAnd | IntegerBitwiseOr | IntegerBitwiseXor | IntegerShiftLeft | IntegerShiftRight
-                | FloatAdd | FloatSubtract | FloatMultiply | Divide | Modulo | Power
-                | Concatenate | BitwiseAnd | BitwiseOr | BitwiseXor | ShiftLeft | ShiftRight
-                | Equal | NotEqual | LessThan | LessThanOrEqual | GreaterThan
-                | GreaterThanOrEqual | Compare;
+            Add | Subtract | Multiply | Modulo | BitwiseAnd | BitwiseOr | BitwiseXor | ShiftLeft | ShiftRight | FloatAdd | FloatSubtract | FloatMultiply | Divide | Power | Concatenate | Equal | NotEqual | LessThan | LessThanOrEqual | GreaterThan | GreaterThanOrEqual | Compare;
             { destination, left, right, .. }
         ) => read_then_write(reads(left) || reads(right), writes(destination)),
         Instruction::LoadConstant { destination, .. }
@@ -117,7 +108,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(Jump | NumericRegionJump | ReturnIntegerUnchecked; { .. })
+        instructions!(
+            Jump | NumericRegionJump | ReturnIntegerUnchecked; { .. })
         | instructions!(
             ReturnNull | ReturnNullUnchecked | Rethrow | DrainFinalizers | CheckWhereConstraints
         ) => Effect::None,
@@ -202,7 +194,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(StringByteJumpUnlessEqual | StringByteJumpUnlessNotEqual; {
+        instructions!(
+            StringByteJumpUnlessEqual | StringByteJumpUnlessNotEqual; {
             container, index, ..
         }) => {
             if reads(container) || reads(index) {
@@ -212,10 +205,12 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             }
         }
         Instruction::IncrementJump { target, .. } => read_then_write(reads(target), writes(target)),
-        instructions!(CounterLoop | IntCounterLoop | UintCounterLoop; { counter, limit, .. }) => {
+        instructions!(
+            CounterLoop | IntCounterLoop | UintCounterLoop; { counter, limit, .. }) => {
             read_then_write(reads(counter) || reads(limit), writes(counter))
         }
-        instructions!(Squares | FloatSquares; {
+        instructions!(
+            Squares | FloatSquares; {
             first_destination,
             first_source,
             second_source,
@@ -260,7 +255,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 writes(descriptor.first_destination) || writes(descriptor.second_destination),
             )
         }
-        instructions!(NewVec | NewTuple; {
+        instructions!(
+            NewVec | NewTuple; {
             element_count,
             destination,
             first_element,
@@ -277,12 +273,11 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             writes(destination),
         ),
         instructions!(
-            IndexGetOrNull | VecIndexGetOrNull | DictIndexGetIntegerKeyOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceUintKey | DictIndexCoalesceStringKey | StringIndexCoalesce | IndexGet | VecIndexGet | DictIndexGetIntKey | DictIndexGetUintKey | DictIndexGetStringKey | StringIndexGet
-                | StringByteEqual | StringByteNotEqual | StringByteLessThan
-                | StringByteLessThanOrEqual | StringByteGreaterThan | StringByteGreaterThanOrEqual;
+            IndexGetOrNull | VecIndexGetOrNull | DictIndexGetIntegerKeyOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceUintKey | DictIndexCoalesceStringKey | StringIndexCoalesce | IndexGet | VecIndexGet | DictIndexGetIntKey | DictIndexGetUintKey | DictIndexGetStringKey | StringIndexGet | StringByteEqual | StringByteNotEqual | StringByteLessThan | StringByteLessThanOrEqual | StringByteGreaterThan | StringByteGreaterThanOrEqual;
             { destination, container, index, .. }
         ) => read_then_write(reads(container) || reads(index), writes(destination)),
-        instructions!(IndexSet | VecIndexSet | DictIndexSetIntegerKey | DictIndexSetStringKey | DictIndexSet; {
+        instructions!(
+            IndexSet | VecIndexSet | DictIndexSetIntegerKey | DictIndexSetStringKey | DictIndexSet; {
             container,
             index,
             value,
@@ -300,7 +295,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(PropertyIndexUpdate | PropertyIndexUpdateUnchecked; {
+        instructions!(
+            PropertyIndexUpdate | PropertyIndexUpdateUnchecked; {
             object, operand, ..
         }) => {
             if reads(object) || reads(operand) {
@@ -309,7 +305,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(PropertyRemove | PropertyRemoveUnchecked; {
+        instructions!(
+            PropertyRemove | PropertyRemoveUnchecked; {
             object,
             destination,
             mode,
@@ -318,7 +315,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             reads(object) || (mode.uses_operand() && reads(Register::new(destination.index() + 1))),
             writes(destination),
         ),
-        instructions!(PropertyIndexSet | PropertyIndexSetUnchecked | PropertyFillIntRange; {
+        instructions!(
+            PropertyIndexSet | PropertyIndexSetUnchecked | PropertyFillIntRange; {
             object,
             first_operand,
             ..
@@ -329,14 +327,16 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(PropertyStep | PropertyStepUnchecked; { object, .. }) => {
+        instructions!(
+            PropertyStep | PropertyStepUnchecked; { object, .. }) => {
             if reads(object) {
                 Effect::Read
             } else {
                 Effect::None
             }
         }
-        instructions!(PropertyAdd | PropertyAddUnchecked; { object, source, .. }) => {
+        instructions!(
+            PropertyAdd | PropertyAddUnchecked; { object, source, .. }) => {
             if reads(object) || reads(source) {
                 Effect::Read
             } else {
@@ -422,7 +422,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             container,
             index,
         } => read_then_write(reads(container) || reads(index), writes(destination)),
-        instructions!(RemoveFirst | RemoveLast; {
+        instructions!(
+            RemoveFirst | RemoveLast; {
             destination,
             container,
         }) => read_then_write(reads(container), writes(destination)),
@@ -430,7 +431,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             destination,
             class_name,
         } => read_then_write(reads(class_name), writes(destination)),
-        instructions!(PropertyGetOrNull | PropertyGetOrNullUnchecked | PropertyCoalesce | PropertyCoalesceUnchecked | PropertyGet | PropertyGetUnchecked; {
+        instructions!(
+            PropertyGetOrNull | PropertyGetOrNullUnchecked | PropertyCoalesce | PropertyCoalesceUnchecked | PropertyGet | PropertyGetUnchecked; {
             destination,
             object,
             ..
@@ -442,7 +444,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(CallValue | CallValueUnchecked | CallValueDiscarded; {
+        instructions!(
+            CallValue | CallValueUnchecked | CallValueDiscarded; {
             argument_count,
             destination,
             callee,
@@ -452,8 +455,7 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             writes(destination) || window(first_argument, usize::from(argument_count.value())),
         ),
         instructions!(
-            CallNamed | CallNamedDiscarded | CallNamedUnchecked | CallMethod
-                | CallMethodDiscarded | CallMethodUnchecked | CallStatic | CallStaticDiscarded;
+            CallNamed | CallNamedDiscarded | CallNamedUnchecked | CallMethod | CallMethodDiscarded | CallMethodUnchecked | CallStatic | CallStaticDiscarded;
             {
             argument_count,
             destination,
@@ -484,7 +486,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             window(first_argument, usize::from(argument_count.value())),
             writes(destination),
         ),
-        instructions!(CallWithNames | CallWithNamesDiscarded; {
+        instructions!(
+            CallWithNames | CallWithNamesDiscarded; {
             destination,
             callee,
             descriptor,
@@ -503,7 +506,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+        instructions!(
+            Write | WriteLine | WriteError | WriteErrorLine | Debug; {
             value_count,
             first_value,
         }) => {

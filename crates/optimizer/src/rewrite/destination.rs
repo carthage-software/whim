@@ -9,8 +9,8 @@ pub(crate) fn with_destination(
     destination: Register,
     expected: Register,
 ) -> Option<Instruction> {
-    if let Instruction::IntegerAdd {
-        kind,
+    if let Instruction::Add {
+        kind: Some(kind),
         destination: current,
         left,
         right,
@@ -33,8 +33,8 @@ pub(crate) fn with_destination(
                 source: left,
             }
         } else {
-            Instruction::IntegerAdd {
-                kind,
+            Instruction::Add {
+                kind: Some(kind),
                 destination,
                 left,
                 right,
@@ -63,9 +63,9 @@ pub(crate) fn with_destination(
             value_mode,
             ..
         } if *value_mode != ArrayValueMode::Generic => destination,
-        Instruction::IntegerAddImmediate { destination, .. }
-        | Instruction::IntegerSubtractImmediate { destination, .. }
-        | Instruction::IntegerStep { destination, .. }
+        Instruction::AddImmediate { destination, .. }
+        | Instruction::SubtractImmediate { destination, .. }
+        | Instruction::Step { destination, .. }
         | Instruction::IndexGetOrNull { destination, .. }
         | Instruction::VecIndexGetOrNull { destination, .. }
         | Instruction::DictIndexGetIntegerKeyOrNull { destination, .. }
@@ -83,20 +83,14 @@ pub(crate) fn with_destination(
         | Instruction::Add { destination, .. }
         | Instruction::Subtract { destination, .. }
         | Instruction::Multiply { destination, .. }
-        | Instruction::IntegerSubtract { destination, .. }
-        | Instruction::IntegerMultiply { destination, .. }
-        | Instruction::IntegerModulo { destination, .. }
+        | Instruction::Modulo { destination, .. }
         | Instruction::FloatAdd { destination, .. }
         | Instruction::FloatSubtract { destination, .. }
         | Instruction::FloatMultiply { destination, .. }
         | Instruction::Divide { destination, .. }
-        | Instruction::Modulo { destination, .. }
         | Instruction::Power { destination, .. }
         | Instruction::Negate { destination, .. }
         | Instruction::UnaryPlus { destination, .. }
-        | Instruction::AddImmediate { destination, .. }
-        | Instruction::Step { destination, .. }
-        | Instruction::SubtractImmediate { destination, .. }
         | Instruction::IntegerMultiplyImmediate { destination, .. }
         | Instruction::IntegerModuloImmediate { destination, .. }
         | Instruction::FloatMultiplyConstant { destination, .. }
@@ -106,17 +100,11 @@ pub(crate) fn with_destination(
         | Instruction::ConcatenateRightConstant { destination, .. }
         | Instruction::ConcatenateLeftConstant { destination, .. }
         | Instruction::BitwiseAnd { destination, .. }
-        | Instruction::IntegerBitwiseAnd { destination, .. }
         | Instruction::BitwiseOr { destination, .. }
-        | Instruction::IntegerBitwiseOr { destination, .. }
         | Instruction::BitwiseXor { destination, .. }
-        | Instruction::IntegerBitwiseXor { destination, .. }
         | Instruction::BitwiseNot { destination, .. }
-        | Instruction::IntegerBitwiseNot { destination, .. }
         | Instruction::ShiftLeft { destination, .. }
-        | Instruction::IntegerShiftLeft { destination, .. }
         | Instruction::ShiftRight { destination, .. }
-        | Instruction::IntegerShiftRight { destination, .. }
         | Instruction::Equal { destination, .. }
         | Instruction::NotEqual { destination, .. }
         | Instruction::LessThan { destination, .. }

@@ -55,8 +55,8 @@ pub(crate) fn optimize_chunk(
             continue;
         };
         let consumes_temporary = match replacement {
-            Instruction::IntegerAddImmediate { destination, .. }
-            | Instruction::IntegerSubtractImmediate { destination, .. }
+            Instruction::AddImmediate { destination, .. }
+            | Instruction::SubtractImmediate { destination, .. }
             | Instruction::IntegerMultiplyImmediate { destination, .. }
             | Instruction::IntegerModuloImmediate { destination, .. } => destination == temporary,
             Instruction::ReturnIntegerUnchecked { .. } => true,
@@ -139,45 +139,45 @@ fn consumer(
         {
             Instruction::ReturnIntegerUnchecked { immediate, kind }
         }
-        Instruction::IntegerAdd {
+        Instruction::Add {
             destination,
             left,
             right,
             kind: operand_kind,
-        } if operand_kind == kind => Instruction::IntegerAddImmediate {
+        } if operand_kind == Some(kind) => Instruction::AddImmediate {
             destination,
             source: other_operand(left, right, temporary, true)?,
             immediate,
-            kind,
+            kind: Some(kind),
         },
-        Instruction::IntegerSubtract {
+        Instruction::Subtract {
             destination,
             left,
             right,
             kind: operand_kind,
-        } if operand_kind == kind => Instruction::IntegerSubtractImmediate {
+        } if operand_kind == Some(kind) => Instruction::SubtractImmediate {
             destination,
             source: other_operand(left, right, temporary, false)?,
             immediate,
-            kind,
+            kind: Some(kind),
         },
-        Instruction::IntegerMultiply {
+        Instruction::Multiply {
             destination,
             left,
             right,
             kind: operand_kind,
-        } if operand_kind == kind => Instruction::IntegerMultiplyImmediate {
+        } if operand_kind == Some(kind) => Instruction::IntegerMultiplyImmediate {
             destination,
             source: other_operand(left, right, temporary, true)?,
             immediate,
             kind,
         },
-        Instruction::IntegerModulo {
+        Instruction::Modulo {
             destination,
             left,
             right,
             kind: operand_kind,
-        } if operand_kind == kind => Instruction::IntegerModuloImmediate {
+        } if operand_kind == Some(kind) => Instruction::IntegerModuloImmediate {
             destination,
             source: other_operand(left, right, temporary, false)?,
             immediate,

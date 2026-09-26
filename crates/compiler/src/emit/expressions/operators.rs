@@ -6,6 +6,7 @@ use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
 use whim_bytecode::instruction::operands::PropertyStepMode;
@@ -94,16 +95,19 @@ pub(in crate::emit) fn binary_instruction(
 ) -> Instruction {
     match operator {
         BinaryOperator::Addition(_) => Instruction::Add {
+            kind: None,
             destination,
             left,
             right,
         },
         BinaryOperator::Subtraction(_) => Instruction::Subtract {
+            kind: None,
             destination,
             left,
             right,
         },
         BinaryOperator::Multiplication(_) => Instruction::Multiply {
+            kind: None,
             destination,
             left,
             right,
@@ -114,6 +118,7 @@ pub(in crate::emit) fn binary_instruction(
             right,
         },
         BinaryOperator::Modulo(_) => Instruction::Modulo {
+            kind: None,
             destination,
             left,
             right,
@@ -124,26 +129,31 @@ pub(in crate::emit) fn binary_instruction(
             right,
         },
         BinaryOperator::BitwiseAnd(_) => Instruction::BitwiseAnd {
+            kind: None,
             destination,
             left,
             right,
         },
         BinaryOperator::BitwiseOr(_) => Instruction::BitwiseOr {
+            kind: None,
             destination,
             left,
             right,
         },
         BinaryOperator::BitwiseXor(_) => Instruction::BitwiseXor {
+            kind: None,
             destination,
             left,
             right,
         },
         BinaryOperator::LeftShift(_) => Instruction::ShiftLeft {
+            kind: None,
             destination,
             left,
             right,
         },
         BinaryOperator::RightShift(_) => Instruction::ShiftRight {
+            kind: None,
             destination,
             left,
             right,
@@ -206,16 +216,19 @@ pub(in crate::emit) fn compound_instruction(
 ) -> Instruction {
     match operator {
         AssignmentOperator::Addition(_) => Instruction::Add {
+            kind: None,
             destination,
             left,
             right,
         },
         AssignmentOperator::Subtraction(_) => Instruction::Subtract {
+            kind: None,
             destination,
             left,
             right,
         },
         AssignmentOperator::Multiplication(_) => Instruction::Multiply {
+            kind: None,
             destination,
             left,
             right,
@@ -226,6 +239,7 @@ pub(in crate::emit) fn compound_instruction(
             right,
         },
         AssignmentOperator::Modulo(_) => Instruction::Modulo {
+            kind: None,
             destination,
             left,
             right,
@@ -241,26 +255,31 @@ pub(in crate::emit) fn compound_instruction(
             right,
         },
         AssignmentOperator::BitwiseAnd(_) => Instruction::BitwiseAnd {
+            kind: None,
             destination,
             left,
             right,
         },
         AssignmentOperator::BitwiseOr(_) => Instruction::BitwiseOr {
+            kind: None,
             destination,
             left,
             right,
         },
         AssignmentOperator::BitwiseXor(_) => Instruction::BitwiseXor {
+            kind: None,
             destination,
             left,
             right,
         },
         AssignmentOperator::LeftShift(_) => Instruction::ShiftLeft {
+            kind: None,
             destination,
             left,
             right,
         },
         AssignmentOperator::RightShift(_) => Instruction::ShiftRight {
+            kind: None,
             destination,
             left,
             right,
@@ -276,6 +295,7 @@ pub(in crate::emit) fn compound_instruction(
 
 const fn step_instruction(destination: Register, source: Register, step: i16) -> Instruction {
     Instruction::Step {
+        kind: None,
         destination,
         source,
         immediate: ImmediateInt::new(step),
@@ -292,15 +312,17 @@ impl ImmediateStep {
     const fn instruction(self, destination: Register, source: Register) -> Instruction {
         if self.subtract {
             Instruction::SubtractImmediate {
+                kind: None,
                 destination,
                 source,
-                immediate: self.immediate,
+                immediate: ImmediateInteger::signed(self.immediate.value()),
             }
         } else {
             Instruction::AddImmediate {
+                kind: None,
                 destination,
                 source,
-                immediate: self.immediate,
+                immediate: ImmediateInteger::signed(self.immediate.value()),
             }
         }
     }
@@ -327,9 +349,11 @@ fn immediate_step(
         }
         _ => return Ok(None),
     };
+
     let Ok(value) = i16::try_from(value) else {
         return Ok(None);
     };
+
     let (subtract, magnitude) = match operator {
         BinaryOperator::Addition(_) if value >= 0 => (false, value),
         BinaryOperator::Addition(_) => {
@@ -347,6 +371,7 @@ fn immediate_step(
         }
         _ => return Ok(None),
     };
+
     Ok(Some(ImmediateStep {
         subtract,
         immediate: ImmediateInt::new(magnitude),
@@ -364,6 +389,7 @@ impl BodyCompiler<'_, '_> {
         if matches!(binary.operator, BinaryOperator::NullCoalesce(_)) {
             return self.coalesce(scope, binary);
         }
+
         let mut spine = Vec::new();
         let mut link = binary;
         loop {
@@ -426,6 +452,7 @@ impl BodyCompiler<'_, '_> {
                             },
                             span,
                         );
+
                         self.registers.release_to(mark);
                         destination
                     } else if let Some(step) = immediate_step(link.operator, link.rhs)? {
@@ -464,6 +491,7 @@ impl BodyCompiler<'_, '_> {
                         unsigned_integer_gate(integer.value, true, unary.span())?;
                         return self.literal(&Literal::Integer(*integer));
                     }
+
                     let value = integer_gate(integer.value, true, unary.span())?;
                     let destination = self.allocate(unary.span())?;
                     self.load_integer(destination, value, span.join(integer.span))?;
@@ -513,6 +541,7 @@ impl BodyCompiler<'_, '_> {
                 let destination = self.allocate(unary.span())?;
                 self.chunk.emit(
                     Instruction::BitwiseNot {
+                        kind: None,
                         destination,
                         source,
                     },
@@ -558,6 +587,7 @@ impl BodyCompiler<'_, '_> {
             UnaryPostfixOperator::PostIncrement(_) => 1,
             UnaryPostfixOperator::PostDecrement(_) => -1,
         };
+
         self.step_target(scope, unary.operand, step, unary.span(), StepResult::Old)
     }
 
@@ -570,6 +600,7 @@ impl BodyCompiler<'_, '_> {
             UnaryPostfixOperator::PostIncrement(_) => 1,
             UnaryPostfixOperator::PostDecrement(_) => -1,
         };
+
         self.step_target_discarded(scope, unary.operand, step, unary.span())
     }
 
@@ -590,6 +621,7 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 )?;
+
                 self.chunk.emit(
                     Instruction::PropertyStep {
                         object,
@@ -599,6 +631,7 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 );
+
                 Ok(())
             }
             Expression::ArrayAccess(access) if step == 1 => {
@@ -607,6 +640,7 @@ impl BodyCompiler<'_, '_> {
                     self.step_target(scope, operand, step, span, StepResult::New)?;
                     return Ok(());
                 };
+
                 let object = self.expression(scope, property.object)?;
                 let cache = self.add_ic_descriptor(
                     IcDescriptor::Member {
@@ -615,6 +649,7 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 )?;
+
                 let index = self.expression(scope, access.index)?;
                 self.chunk.emit(
                     Instruction::PropertyIndexUpdate {
@@ -625,6 +660,7 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 );
+
                 Ok(())
             }
             _ => {
@@ -691,6 +727,7 @@ impl BodyCompiler<'_, '_> {
             },
             span,
         )?;
+
         let current = self.allocate(span)?;
         self.chunk.emit(
             Instruction::PropertyGet {
@@ -700,6 +737,7 @@ impl BodyCompiler<'_, '_> {
             },
             span,
         );
+
         let stepped = self.allocate(span)?;
         self.chunk
             .emit(step_instruction(stepped, current, step), span);
@@ -711,6 +749,7 @@ impl BodyCompiler<'_, '_> {
             },
             span,
         );
+
         Ok(step_result(result, current, stepped))
     }
 
@@ -733,6 +772,7 @@ impl BodyCompiler<'_, '_> {
             levels: None,
             steps,
         };
+
         self.materialize_place(&mut place, span)?;
         let current = self.read_place(&place, span)?;
         let stepped = self.allocate(span)?;
@@ -759,6 +799,7 @@ impl BodyCompiler<'_, '_> {
             },
             span,
         );
+
         let stepped = self.allocate(span)?;
         self.chunk
             .emit(step_instruction(stepped, current, step), span);
@@ -769,6 +810,7 @@ impl BodyCompiler<'_, '_> {
             },
             span,
         );
+
         Ok(step_result(result, current, stepped))
     }
 }

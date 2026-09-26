@@ -51,11 +51,17 @@ fn reading_a_negative_branch_target_panics() {
 fn integer_instructions_preserve_kind_and_operand_bits() {
     for kind in [IntegerKind::I64, IntegerKind::U64] {
         for instruction in [
-            Instruction::IntegerAdd {
+            Instruction::Add {
                 destination: Register::new(0x1234),
                 left: Register::new(0x5678),
                 right: Register::new(0xabcd),
-                kind,
+                kind: Some(kind),
+            },
+            Instruction::Add {
+                destination: Register::new(0x1234),
+                left: Register::new(0x5678),
+                right: Register::new(0xabcd),
+                kind: None,
             },
             Instruction::LoadInteger {
                 destination: Register::new(0x1234),

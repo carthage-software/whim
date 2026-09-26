@@ -54,11 +54,13 @@ fn instruction(register_bound: u16, constant_bound: u16) -> impl Strategy<Value 
         reg().prop_map(|destination| Instruction::LoadTrue { destination }),
         reg().prop_map(|destination| Instruction::LoadFalse { destination }),
         (reg(), reg(), reg()).prop_map(|(destination, left, right)| Instruction::Add {
+            kind: None,
             destination,
             left,
             right
         }),
         (reg(), reg(), reg()).prop_map(|(destination, left, right)| Instruction::Subtract {
+            kind: None,
             destination,
             left,
             right

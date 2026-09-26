@@ -112,7 +112,8 @@ pub(crate) fn transfer(
             destination,
             Fact::integer(i64::from(immediate.as_int()), origin),
         ),
-        instructions!(LoadInteger | IntegerAdd | IntegerSubtract | IntegerMultiply | IntegerModulo | IntegerBitwiseAnd | IntegerBitwiseOr | IntegerBitwiseXor | IntegerBitwiseNot | IntegerShiftLeft | IntegerShiftRight | IntegerAddImmediate | IntegerSubtractImmediate | IntegerMultiplyImmediate | IntegerModuloImmediate | IntegerStep; { destination, kind: IntegerKind::U64, .. }) =>
+        instructions!(LoadInteger | IntegerMultiplyImmediate | IntegerModuloImmediate; { destination, kind: IntegerKind::U64, .. })
+        | instructions!(Add | Subtract | Multiply | Modulo | BitwiseAnd | BitwiseOr | BitwiseXor | BitwiseNot | ShiftLeft | ShiftRight | AddImmediate | SubtractImmediate | Step; { destination, kind: Some(IntegerKind::U64), .. }) =>
         {
             write(destination, Fact::with_origin(UINT, origin));
         }
@@ -125,11 +126,13 @@ pub(crate) fn transfer(
             write(counter, Fact::with_origin(UINT, origin))
         }
         Instruction::Add {
+            kind: None,
             destination,
             left,
             right,
         }
         | Instruction::Multiply {
+            kind: None,
             destination,
             left,
             right,
@@ -141,6 +144,7 @@ pub(crate) fn transfer(
             write(destination, with_origin(fact, origin));
         }
         Instruction::Subtract {
+            kind: None,
             destination,
             left,
             right,
@@ -170,14 +174,14 @@ pub(crate) fn transfer(
         | Instruction::Divide { destination, .. } => {
             write(destination, Fact::with_origin(FLOAT, origin))
         }
-        Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerMultiply {
-            kind: IntegerKind::I64,
+        | Instruction::Multiply {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -186,8 +190,8 @@ pub(crate) fn transfer(
             fact.non_negative = read(left).non_negative && read(right).non_negative;
             write(destination, with_origin(fact, origin));
         }
-        Instruction::IntegerModulo {
-            kind: IntegerKind::I64,
+        Instruction::Modulo {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             ..
@@ -196,8 +200,8 @@ pub(crate) fn transfer(
             fact.non_negative = read(left).non_negative;
             write(destination, with_origin(fact, origin));
         }
-        Instruction::IntegerAddImmediate {
-            kind: IntegerKind::I64,
+        Instruction::AddImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             source,
             immediate,
@@ -222,48 +226,48 @@ pub(crate) fn transfer(
             fact.non_negative = read(source).non_negative;
             write(destination, with_origin(fact, origin));
         }
-        Instruction::IntegerSubtract {
-            kind: IntegerKind::I64,
+        Instruction::Subtract {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerSubtractImmediate {
-            kind: IntegerKind::I64,
+        | Instruction::SubtractImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerStep {
-            kind: IntegerKind::I64,
+        | Instruction::Step {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseAnd {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseAnd {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseOr {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseOr {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseXor {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseXor {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseNot {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseNot {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftLeft {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftLeft {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftRight {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftRight {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
@@ -271,22 +275,40 @@ pub(crate) fn transfer(
             write(destination, Fact::with_origin(INT, origin))
         }
         Instruction::Modulo {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::BitwiseAnd {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::BitwiseOr {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::BitwiseXor {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::ShiftLeft {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::ShiftRight {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         } => {
             write(
                 destination,
@@ -294,6 +316,7 @@ pub(crate) fn transfer(
             );
         }
         Instruction::BitwiseNot {
+            kind: None,
             destination,
             source,
         } => {
@@ -321,6 +344,7 @@ pub(crate) fn transfer(
             source,
         }
         | Instruction::SubtractImmediate {
+            kind: None,
             destination,
             source,
             ..
@@ -329,16 +353,18 @@ pub(crate) fn transfer(
             with_origin(unary_numeric_result(read(source)), origin),
         ),
         Instruction::AddImmediate {
+            kind: None,
             destination,
             source,
             immediate,
         } => {
             let source = read(source);
             let mut fact = unary_numeric_result(source);
-            fact.non_negative = source.non_negative && immediate.value() >= 0;
+            fact.non_negative = source.non_negative && immediate.as_int() >= 0;
             write(destination, with_origin(fact, origin));
         }
         Instruction::Step {
+            kind: None,
             destination,
             source,
             immediate,

@@ -734,22 +734,17 @@ impl VirtualMachine<'_> {
                         }
                     } else if matches!(tail.kind(), InstructionKind::AddImmediate | InstructionKind::Step) {
                         // SAFETY: dispatch matched the instruction tag.
-                        let (Instruction::AddImmediate {
-                            destination,
-                            source,
-                            immediate,
-                            // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                        } | Instruction::Step { destination, source, immediate }) = (unsafe { tail.decode() })
-                        else {
-                            // SAFETY: `decode` must return the variant selected by the tag.
-                            unsafe {
-                                unreachable_invariant("an instruction tag selects its own payload")
-                            }
+                        let step = match unsafe { tail.decode() } {
+                            Instruction::AddImmediate { kind: None, destination, source, immediate } => Some((destination, source, immediate.as_int())),
+                            Instruction::Step { kind: None, destination, source, immediate } => Some((destination, source, immediate.value())),
+                            _ => None,
                         };
-                        let source_index = source.index() as usize;
-                        if destination != source && values.kind(source_index) == NumericKind::Int {
-                            let current_value = values.int(source_index);
-                            let amount = i64::from(immediate.value());
+                        if let Some((destination, source, amount)) = step
+                            && destination != source
+                            && values.kind(source.index() as usize) == NumericKind::Int
+                        {
+                            let current_value = values.int(source.index() as usize);
+                            let amount = i64::from(amount);
                             let Some(next) = current_value.checked_add(amount) else {
                                 // SAFETY: `dirty` contains only active-frame numeric registers.
                                 unsafe { flush(registers, &values, dirty) };
@@ -794,11 +789,76 @@ impl VirtualMachine<'_> {
             };
         }
 
+        macro_rules! numeric_step {
+            ($current:ident, $destination:ident, $source:ident, $amount:expr, $kind:ident, $operator:literal) => {{
+                if $kind == Some(IntegerKind::U64) {
+                    // SAFETY: `dirty` contains only active-frame numeric registers.
+                    unsafe { flush(registers, &values, dirty) };
+                    return NumericLoopOutcome::Deoptimize($current);
+                }
+                let amount = $amount;
+                if $destination == $source
+                    && values.kind($source.index() as usize) == NumericKind::Int
+                {
+                    let current_value = values.int($source.index() as usize);
+                    let Some(next) = current_value.checked_add(amount) else {
+                        // SAFETY: `dirty` contains only active-frame numeric registers.
+                        unsafe { flush(registers, &values, dirty) };
+                        return NumericLoopOutcome::Fault {
+                            resume_ip: cursor,
+                            fault: if current_value >= 0 {
+                                Fault::Overflow
+                            } else {
+                                Fault::Underflow
+                            },
+                            operator: $operator,
+                            left: $source,
+                            right: None,
+                        };
+                    };
+                    assign_existing_int(
+                        &mut values,
+                        &mut dirty,
+                        $destination,
+                        next,
+                    );
+                    fused_counter_tail!($current, $destination);
+                    continue;
+                }
+                let result = if $kind == Some(IntegerKind::I64) {
+                    Some(integer_add(values.int($source.index() as usize), amount).map(NumericValue::int))
+                } else {
+                    add(values.get($source.index() as usize), NumericValue::int(amount))
+                };
+                let Some(result) = result else {
+                    // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
+                    unsafe { flush(registers, &values, dirty) };
+                    return NumericLoopOutcome::Deoptimize($current);
+                };
+                let value = match result {
+                    Ok(value) => value,
+                    Err(fault) => {
+                        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
+                        unsafe { flush(registers, &values, dirty) };
+                        return NumericLoopOutcome::Fault {
+                            resume_ip: cursor,
+                            fault,
+                            operator: $operator,
+                            left: $source,
+                            right: None,
+                        };
+                    }
+                };
+                // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
+                unsafe { assign(registers, &mut values, &mut dirty, &mut pins, $destination, value) };
+            }};
+        }
+
         macro_rules! numeric_dispatch {
             (
                 $word:ident, $current:ident {
                     generic_binary {
-                        $($generic_variant:ident => $generic_operation:path, $generic_operator:literal;)*
+                        $($generic_variant:ident => $generic_operation:path, $generic_integer:path, $generic_operator:literal;)*
                     }
                     int_binary {
                         $($int_variant:ident => $int_operation:path, $int_operator:literal;)*
@@ -813,18 +873,20 @@ impl VirtualMachine<'_> {
                         $($comparison_variant:ident => $comparison:ident;)*
                     }
                     checked_int {
-                        $($checked_variant:ident $([$checked_kind:ident])? => $checked_operator:literal, $checked_operation:expr;)*
+                        $($checked_variant:ident => $checked_operator:literal, $checked_operation:expr;)*
                     }
                     $($rest:tt)*
                 }
             ) => {
                 dispatch_instruction!($word {
                     $(
-                        Instruction::$generic_variant { destination, left, right } => {
-                            let Some(result) = $generic_operation(
-                                values.get(left.index() as usize),
-                                values.get(right.index() as usize),
-                            ) else {
+                        Instruction::$generic_variant { destination, left, right, kind } => {
+                            let result = match kind {
+                                None => $generic_operation(values.get(left.index() as usize), values.get(right.index() as usize)),
+                                Some(IntegerKind::I64) => Some($generic_integer(values.int(left.index() as usize), values.int(right.index() as usize)).map(NumericValue::int)),
+                                Some(IntegerKind::U64) => None,
+                            };
+                            let Some(result) = result else {
                                 // SAFETY: `dirty` contains only active-frame numeric registers.
                                 unsafe { flush(registers, &values, dirty) };
                                 return NumericLoopOutcome::Deoptimize($current);
@@ -858,7 +920,11 @@ impl VirtualMachine<'_> {
                     )*
                     $(
                         Instruction::$int_variant { destination, left, right, kind } => {
-                            require_int_kind!(kind, $current);
+                            if kind != Some(IntegerKind::I64) {
+                                // SAFETY: `dirty` contains only active-frame numeric registers.
+                                unsafe { flush(registers, &values, dirty) };
+                                return NumericLoopOutcome::Deoptimize($current);
+                            }
                             let result = $int_operation(
                                 values.int(left.index() as usize),
                                 values.int(right.index() as usize),
@@ -953,8 +1019,12 @@ impl VirtualMachine<'_> {
                         }
                     )*
                     $(
-                        Instruction::$checked_variant { destination, left, right, $(kind: $checked_kind,)? } => {
-                            $(require_int_kind!($checked_kind, $current);)?
+                        Instruction::$checked_variant { destination, left, right, kind } => {
+                            if kind == Some(IntegerKind::U64) {
+                                // SAFETY: `dirty` contains only active-frame numeric registers.
+                                unsafe { flush(registers, &values, dirty) };
+                                return NumericLoopOutcome::Deoptimize($current);
+                            }
                             int_binary_operation!(
                                 $current,
                                 destination,
@@ -1054,19 +1124,14 @@ impl VirtualMachine<'_> {
             let instruction = unsafe { InstructionWord::read(chunk.code.as_ptr().add(current)) };
             numeric_dispatch!(instruction, current {
                 generic_binary {
-                    Add => add, "+";
-                    Subtract => subtract, "-";
-                    Multiply => multiply, "*";
+                    Add => add, integer_add, "+";
+                    Subtract => subtract, integer_subtract, "-";
+                    Multiply => multiply, integer_multiply, "*";
                 }
                 int_binary {
-                    IntegerAdd => integer_add, "+";
-                    IntegerSubtract => integer_subtract, "-";
-                    IntegerMultiply => integer_multiply, "*";
-                    IntegerModulo => integer_modulo, "%";
+                    Modulo => integer_modulo, "%";
                 }
                 int_immediate {
-                    IntegerAddImmediate => integer_add, "+";
-                    IntegerSubtractImmediate => integer_subtract, "-";
                     IntegerMultiplyImmediate => integer_multiply, "*";
                     IntegerModuloImmediate => integer_modulo, "%";
                 }
@@ -1089,13 +1154,6 @@ impl VirtualMachine<'_> {
                             Ok(((a as u64) << b as u32) as i64)
                         }
                     };
-                    IntegerShiftLeft[kind] => "<<", |a: i64, b: i64| {
-                        if !(0..=63).contains(&b) {
-                            Err(Fault::ShiftRange)
-                        } else {
-                            Ok(((a as u64) << b as u32) as i64)
-                        }
-                    };
                     ShiftRight => ">>", |a: i64, b: i64| {
                         if !(0..=63).contains(&b) {
                             Err(Fault::ShiftRange)
@@ -1103,19 +1161,9 @@ impl VirtualMachine<'_> {
                             Ok(a >> b as u32)
                         }
                     };
-                    IntegerShiftRight[kind] => ">>", |a: i64, b: i64| {
-                        if !(0..=63).contains(&b) {
-                            Err(Fault::ShiftRange)
-                        } else {
-                            Ok(a >> b as u32)
-                        }
-                    };
                     BitwiseAnd => "&", |a: i64, b: i64| Ok::<i64, Fault>(a & b);
-                    IntegerBitwiseAnd[kind] => "&", |a: i64, b: i64| Ok::<i64, Fault>(a & b);
                     BitwiseOr => "|", |a: i64, b: i64| Ok::<i64, Fault>(a | b);
-                    IntegerBitwiseOr[kind] => "|", |a: i64, b: i64| Ok::<i64, Fault>(a | b);
                     BitwiseXor => "^", |a: i64, b: i64| Ok::<i64, Fault>(a ^ b);
-                    IntegerBitwiseXor[kind] => "^", |a: i64, b: i64| Ok::<i64, Fault>(a ^ b);
                 }
                 Instruction::LoadConstant {
                     destination,
@@ -1263,115 +1311,14 @@ impl VirtualMachine<'_> {
                     );
                     fused_counter_tail!(current, target);
                 }
-                Instruction::AddImmediate {
-                    destination,
-                    source,
-                    immediate,
-                } | Instruction::Step { destination, source, immediate } => {
-                    let amount = i64::from(immediate.value());
-                    if destination == source
-                        && values.kind(source.index() as usize) == NumericKind::Int
-                    {
-                        let current_value = values.int(source.index() as usize);
-                        let Some(next) = current_value.checked_add(amount) else {
-                            // SAFETY: `dirty` contains only active-frame numeric registers.
-                            unsafe { flush(registers, &values, dirty) };
-                            return NumericLoopOutcome::Fault {
-                                resume_ip: cursor,
-                                fault: if current_value >= 0 {
-                                    Fault::Overflow
-                                } else {
-                                    Fault::Underflow
-                                },
-                                operator: "+",
-                                left: source,
-                                right: None,
-                            };
-                        };
-                        assign_existing_int(
-                            &mut values,
-                            &mut dirty,
-                            destination,
-                            next,
-                        );
-                        fused_counter_tail!(current, destination);
-                        continue;
-                    }
-                    let Some(result) =
-                        add(values.get(source.index() as usize), NumericValue::int(amount))
-                    else {
-                        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                        unsafe { flush(registers, &values, dirty) };
-                        return NumericLoopOutcome::Deoptimize(current);
-                    };
-                    let value = match result {
-                        Ok(value) => value,
-                        Err(fault) => {
-                            // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                            unsafe { flush(registers, &values, dirty) };
-                            return NumericLoopOutcome::Fault {
-                                resume_ip: cursor,
-                                fault,
-                                operator: "+",
-                                left: source,
-                                right: None,
-                            };
-                        }
-                    };
-                    // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                    unsafe { assign(registers, &mut values, &mut dirty, &mut pins, destination, value) };
+                Instruction::AddImmediate { destination, source, immediate, kind } => {
+                    numeric_step!(current, destination, source, i64::from(immediate.as_int()), kind, "+");
                 }
-                Instruction::SubtractImmediate {
-                    destination,
-                    source,
-                    immediate,
-                } => {
-                    let amount = -i64::from(immediate.value());
-                    if destination == source
-                        && values.kind(source.index() as usize) == NumericKind::Int
-                    {
-                        let current_value = values.int(source.index() as usize);
-                        let Some(next) = current_value.checked_add(amount) else {
-                            // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                            unsafe { flush(registers, &values, dirty) };
-                            return NumericLoopOutcome::Fault {
-                                resume_ip: cursor,
-                                fault: if current_value >= 0 {
-                                    Fault::Overflow
-                                } else {
-                                    Fault::Underflow
-                                },
-                                operator: "-",
-                                left: source,
-                                right: None,
-                            };
-                        };
-                        assign_existing_int(&mut values, &mut dirty, destination, next);
-                        continue;
-                    }
-                    let Some(result) =
-                        add(values.get(source.index() as usize), NumericValue::int(amount))
-                    else {
-                        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                        unsafe { flush(registers, &values, dirty) };
-                        return NumericLoopOutcome::Deoptimize(current);
-                    };
-                    let value = match result {
-                        Ok(value) => value,
-                        Err(fault) => {
-                            // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                            unsafe { flush(registers, &values, dirty) };
-                            return NumericLoopOutcome::Fault {
-                                resume_ip: cursor,
-                                fault,
-                                operator: "-",
-                                left: source,
-                                right: None,
-                            };
-                        }
-                    };
-                    // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                    unsafe { assign(registers, &mut values, &mut dirty, &mut pins, destination, value) };
+                Instruction::SubtractImmediate { destination, source, immediate, kind } => {
+                    numeric_step!(current, destination, source, -i64::from(immediate.as_int()), kind, "-");
+                }
+                Instruction::Step { destination, source, immediate, kind } => {
+                    numeric_step!(current, destination, source, i64::from(immediate.value()), kind, "+");
                 }
                 Instruction::Squares {
                     first_destination,
@@ -2838,56 +2785,56 @@ unsafe fn try_int_body_burst(
 #[inline(always)]
 fn int_burst_instruction_ready(instruction: Instruction, values: &NumericRegisters) -> bool {
     match instruction {
-        Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerSubtract {
-            kind: IntegerKind::I64,
+        | Instruction::Subtract {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerMultiply {
-            kind: IntegerKind::I64,
+        | Instruction::Multiply {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerModulo {
-            kind: IntegerKind::I64,
+        | Instruction::Modulo {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerBitwiseAnd {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseAnd {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerBitwiseOr {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseOr {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerBitwiseXor {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseXor {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerShiftLeft {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftLeft {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         }
-        | Instruction::IntegerShiftRight {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftRight {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -2896,19 +2843,19 @@ fn int_burst_instruction_ready(instruction: Instruction, values: &NumericRegiste
                 && values.kind(left.index() as usize) == NumericKind::Int
                 && values.kind(right.index() as usize) == NumericKind::Int
         }
-        Instruction::IntegerBitwiseNot {
-            kind: IntegerKind::I64,
+        Instruction::BitwiseNot {
+            kind: Some(IntegerKind::I64),
             destination,
             source,
         }
-        | Instruction::IntegerAddImmediate {
-            kind: IntegerKind::I64,
+        | Instruction::AddImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             source,
             ..
         }
-        | Instruction::IntegerSubtractImmediate {
-            kind: IntegerKind::I64,
+        | Instruction::SubtractImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             source,
             ..
@@ -2934,33 +2881,33 @@ fn int_burst_instruction_ready(instruction: Instruction, values: &NumericRegiste
 
 fn int_burst_destination(instruction: Instruction) -> Option<Register> {
     match instruction {
-        Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerSubtract {
-            kind: IntegerKind::I64,
+        | Instruction::Subtract {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerMultiply {
-            kind: IntegerKind::I64,
+        | Instruction::Multiply {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerModulo {
-            kind: IntegerKind::I64,
+        | Instruction::Modulo {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerAddImmediate {
-            kind: IntegerKind::I64,
+        | Instruction::AddImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerSubtractImmediate {
-            kind: IntegerKind::I64,
+        | Instruction::SubtractImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
@@ -2974,33 +2921,33 @@ fn int_burst_destination(instruction: Instruction) -> Option<Register> {
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseAnd {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseAnd {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseOr {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseOr {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseXor {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseXor {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftLeft {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftLeft {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftRight {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftRight {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseNot {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseNot {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         } => Some(destination),
@@ -3014,8 +2961,8 @@ fn int_burst_operation(
     values: &NumericRegisters,
 ) -> Option<(Register, Result<i64, Fault>)> {
     Some(match instruction {
-        Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3026,8 +2973,8 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntegerSubtract {
-            kind: IntegerKind::I64,
+        Instruction::Subtract {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3038,8 +2985,8 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntegerMultiply {
-            kind: IntegerKind::I64,
+        Instruction::Multiply {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3050,8 +2997,8 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntegerModulo {
-            kind: IntegerKind::I64,
+        Instruction::Modulo {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3062,8 +3009,8 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntegerAddImmediate {
-            kind: IntegerKind::I64,
+        Instruction::AddImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             source,
             immediate,
@@ -3074,8 +3021,8 @@ fn int_burst_operation(
                 i64::from(immediate.as_int()),
             ),
         ),
-        Instruction::IntegerSubtractImmediate {
-            kind: IntegerKind::I64,
+        Instruction::SubtractImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             source,
             immediate,
@@ -3110,8 +3057,8 @@ fn int_burst_operation(
                 i64::from(immediate.as_int()),
             ),
         ),
-        Instruction::IntegerBitwiseAnd {
-            kind: IntegerKind::I64,
+        Instruction::BitwiseAnd {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3119,8 +3066,8 @@ fn int_burst_operation(
             destination,
             Ok(values.int(left.index() as usize) & values.int(right.index() as usize)),
         ),
-        Instruction::IntegerBitwiseOr {
-            kind: IntegerKind::I64,
+        Instruction::BitwiseOr {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3128,8 +3075,8 @@ fn int_burst_operation(
             destination,
             Ok(values.int(left.index() as usize) | values.int(right.index() as usize)),
         ),
-        Instruction::IntegerBitwiseXor {
-            kind: IntegerKind::I64,
+        Instruction::BitwiseXor {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3137,13 +3084,13 @@ fn int_burst_operation(
             destination,
             Ok(values.int(left.index() as usize) ^ values.int(right.index() as usize)),
         ),
-        Instruction::IntegerBitwiseNot {
-            kind: IntegerKind::I64,
+        Instruction::BitwiseNot {
+            kind: Some(IntegerKind::I64),
             destination,
             source,
         } => (destination, Ok(!values.int(source.index() as usize))),
-        Instruction::IntegerShiftLeft {
-            kind: IntegerKind::I64,
+        Instruction::ShiftLeft {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3159,8 +3106,8 @@ fn int_burst_operation(
                 },
             )
         }
-        Instruction::IntegerShiftRight {
-            kind: IntegerKind::I64,
+        Instruction::ShiftRight {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3519,12 +3466,13 @@ unsafe fn try_dict_accumulate_burst(
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let (sum, add_left, add_right) = match unsafe { word(body + 2).decode() } {
         Instruction::Add {
+            kind: None,
             destination,
             left,
             right,
         }
-        | Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        | Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
@@ -3544,6 +3492,7 @@ unsafe fn try_dict_accumulate_burst(
     };
 
     let Instruction::SubtractImmediate {
+        kind: None,
         destination: step_destination,
         source: step_source,
         immediate,
@@ -3558,7 +3507,7 @@ unsafe fn try_dict_accumulate_burst(
         return None;
     };
 
-    let step = i64::from(immediate.value());
+    let step = i64::from(immediate.as_int());
     if first_index != left
         || second_index != left
         || add_left != first_value
@@ -3747,24 +3696,32 @@ unsafe fn try_dict_build_burst(
             return None;
         }
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-        match unsafe { word(at + 1).decode() } {
+        let tail = unsafe { word(at + 1).decode() };
+        let increment = match tail {
             Instruction::AddImmediate {
+                kind: None,
                 destination,
                 source,
                 immediate,
-            }
-            | Instruction::Step {
+            } => Some((destination, source, immediate.as_int())),
+            Instruction::Step {
+                kind: None,
                 destination,
                 source,
                 immediate,
-            } => {
-                let increment = i64::from(immediate.value());
-                if destination != left || source != left || (repeats > 1 && increment != step) {
-                    return None;
-                }
-                step = increment;
-                at += 2;
+            } => Some((destination, source, immediate.value())),
+            _ => None,
+        };
+        if let Some((destination, source, increment)) = increment {
+            let increment = i64::from(increment);
+            if destination != left || source != left || (repeats > 1 && increment != step) {
+                return None;
             }
+            step = increment;
+            at += 2;
+            continue;
+        }
+        match tail {
             Instruction::IntCounterLoop {
                 comparison: tail_comparison,
                 counter,
@@ -3904,11 +3861,15 @@ unsafe fn try_dict_copy_burst(
         return None;
     };
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    let Instruction::SubtractImmediate { immediate, .. } = (unsafe { word(body + 2).decode() })
+    let Instruction::SubtractImmediate {
+        kind: None,
+        immediate,
+        ..
+    } = (unsafe { word(body + 2).decode() })
     else {
         return None;
     };
-    let step = i64::from(immediate.value());
+    let step = i64::from(immediate.as_int());
     if first_index != left
         || target == source
         || step < 1
@@ -3960,6 +3921,7 @@ unsafe fn try_dict_copy_burst(
             return None;
         };
         let Instruction::SubtractImmediate {
+            kind: None,
             destination: step_destination,
             source: step_source,
             immediate: step_immediate,
@@ -3976,7 +3938,7 @@ unsafe fn try_dict_copy_burst(
             || value != temp
             || step_destination != left
             || step_source != left
-            || i64::from(step_immediate.value()) != step
+            || i64::from(step_immediate.as_int()) != step
         {
             return None;
         }
@@ -4417,6 +4379,7 @@ unsafe fn try_concat_burst(
         return None;
     }
     let Instruction::SubtractImmediate {
+        kind: None,
         destination: stepped,
         source: step_source,
         immediate,
@@ -4470,7 +4433,7 @@ unsafe fn try_concat_burst(
         return None;
     }
 
-    let step = i64::from(immediate.value());
+    let step = i64::from(immediate.as_int());
     let mut count = values.int(counter.index() as usize);
     let mut probe_value;
     let mut budget: u32 = BATCH_ITERATION_LIMIT;

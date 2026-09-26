@@ -131,7 +131,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             )
         }
         instructions!(
-            Move | MoveOwned | Negate | UnaryPlus | BitwiseNot | Not | Length
+            Move | MoveOwned | Negate | UnaryPlus | Not | Length
                 | StringLength | CloneObject;
             { destination, source }
         ) => format!(" {}, {}", register(destination), register(source)),
@@ -147,14 +147,14 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
                 register(source)
             )
         }
-        Instruction::IntegerBitwiseNot {
+        Instruction::BitwiseNot {
             destination,
             source,
             kind,
         } => {
             format!(
                 ".{} {}, {}",
-                kind.name(),
+                kind.map_or("unknown", IntegerKind::name),
                 register(destination),
                 register(source)
             )
@@ -181,9 +181,8 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             integer_immediate(immediate, kind)
         ),
         instructions!(
-            Add | Subtract | Multiply
-                | FloatAdd | FloatSubtract | FloatMultiply | Divide | Modulo | Power
-                | Concatenate | BitwiseAnd | BitwiseOr | BitwiseXor | ShiftLeft | ShiftRight
+            FloatAdd | FloatSubtract | FloatMultiply | Divide | Power
+                | Concatenate
                 | Equal | NotEqual | LessThan | LessThanOrEqual | GreaterThan
                 | GreaterThanOrEqual | Compare;
             { destination, left, right }
@@ -194,31 +193,27 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(right)
         ),
         instructions!(
-            IntegerAdd | IntegerSubtract | IntegerMultiply | IntegerModulo
-                | IntegerBitwiseAnd | IntegerBitwiseOr | IntegerBitwiseXor
-                | IntegerShiftLeft | IntegerShiftRight;
+            Add | Subtract | Multiply | Modulo
+                | BitwiseAnd | BitwiseOr | BitwiseXor
+                | ShiftLeft | ShiftRight;
             { destination, left, right, kind }
         ) => format!(
             ".{} {}, {}, {}",
-            kind.name(),
+            kind.map_or("unknown", IntegerKind::name),
             register(destination),
             register(left),
             register(right)
         ),
-        instructions!(
-            AddImmediate | SubtractImmediate | Step;
-            {
-                destination,
-                source,
-                immediate,
-            }
+        instructions!(AddImmediate | SubtractImmediate;
+            { destination, source, immediate, kind }
         ) => format!(
-            " {}, {}, {}",
+            ".{} {}, {}, {}",
+            kind.map_or("unknown", IntegerKind::name),
             register(destination),
             register(source),
-            immediate.value()
+            integer_immediate(immediate, kind.unwrap_or(IntegerKind::I64))
         ),
-        instructions!(IntegerAddImmediate | IntegerSubtractImmediate | IntegerMultiplyImmediate | IntegerModuloImmediate;
+        instructions!(IntegerMultiplyImmediate | IntegerModuloImmediate;
             { destination, source, immediate, kind }
         ) => format!(
             ".{} {}, {}, {}",
@@ -227,14 +222,14 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(source),
             integer_immediate(immediate, kind)
         ),
-        Instruction::IntegerStep {
+        Instruction::Step {
             destination,
             source,
             immediate,
             kind,
         } => format!(
             ".{} {}, {}, {}",
-            kind.name(),
+            kind.map_or("unknown", IntegerKind::name),
             register(destination),
             register(source),
             immediate.value()

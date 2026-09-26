@@ -63,6 +63,7 @@ pub(in crate::passes) fn optimize_chunk(
 fn square(instruction: Instruction) -> Option<(Register, Register, bool)> {
     match instruction {
         Instruction::Multiply {
+            kind: None,
             destination,
             left,
             right,

@@ -22,14 +22,14 @@ fn callable_bounds_specialize_bodies_and_proven_calls() {
         if name == b"inline_bound" || name == b"where_bound" || name.starts_with(b"{closure:") {
             assert!(function.chunk.code.iter().any(|instruction| matches!(
                 instruction,
-                Instruction::IntegerAdd {
-                    kind: IntegerKind::I64,
+                Instruction::Add {
+                    kind: Some(IntegerKind::I64),
                     ..
                 }
             )));
             assert!(!function.chunk.code.iter().any(|instruction| matches!(
                 instruction,
-                Instruction::Add { .. } | Instruction::Return { .. }
+                Instruction::Add { kind: None, .. } | Instruction::Return { .. }
             )));
         }
     }
@@ -118,7 +118,7 @@ fn where_bounds_specialize_parameters_properties_and_collection_elements() {
         );
         assert!(!code.iter().any(|instruction| matches!(
             instruction,
-            Instruction::Add { .. } | Instruction::Return { .. }
+            Instruction::Add { kind: None, .. } | Instruction::Return { .. }
         )));
 
         assert!(
@@ -148,13 +148,13 @@ fn where_bounds_specialize_parameters_properties_and_collection_elements() {
     assert!(
         method(&unit, b"Vector::plain")
             .iter()
-            .any(|instruction| matches!(instruction, Instruction::Add { .. }))
+            .any(|instruction| matches!(instruction, Instruction::Add { kind: None, .. }))
     );
     let widened = method(&unit, b"Vector::widen");
     assert!(
         widened
             .iter()
-            .any(|instruction| matches!(instruction, Instruction::Add { .. }))
+            .any(|instruction| matches!(instruction, Instruction::Add { kind: None, .. }))
     );
     assert!(!widened.iter().any(|instruction| matches!(
         instruction,

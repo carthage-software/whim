@@ -71,27 +71,26 @@ fn instruction_candidates(
         || configuration.const_fold)
         && matches!(
             instruction,
-            Instruction::Add { .. }
-                | Instruction::Subtract { .. }
-                | Instruction::Multiply { .. }
+            Instruction::Add { kind: None, .. }
+                | Instruction::Subtract { kind: None, .. }
+                | Instruction::Multiply { kind: None, .. }
                 | Instruction::Divide { .. }
-                | Instruction::Modulo { .. }
+                | Instruction::Modulo { kind: None, .. }
                 | Instruction::Power { .. }
-                | Instruction::Step { .. }
                 | Instruction::Negate { .. }
                 | Instruction::UnaryPlus { .. }
-                | Instruction::BitwiseAnd { .. }
-                | Instruction::BitwiseOr { .. }
-                | Instruction::BitwiseXor { .. }
-                | Instruction::BitwiseNot { .. }
-                | Instruction::ShiftLeft { .. }
-                | Instruction::ShiftRight { .. }
-                | Instruction::IntegerAdd {
-                    kind: IntegerKind::I64,
+                | Instruction::BitwiseAnd { kind: None, .. }
+                | Instruction::BitwiseOr { kind: None, .. }
+                | Instruction::BitwiseXor { kind: None, .. }
+                | Instruction::BitwiseNot { kind: None, .. }
+                | Instruction::ShiftLeft { kind: None, .. }
+                | Instruction::ShiftRight { kind: None, .. }
+                | Instruction::Add {
+                    kind: Some(IntegerKind::I64),
                     ..
                 }
-                | Instruction::IntegerSubtract {
-                    kind: IntegerKind::I64,
+                | Instruction::Subtract {
+                    kind: Some(IntegerKind::I64),
                     ..
                 }
         )
@@ -102,8 +101,7 @@ fn instruction_candidates(
     if configuration.strength_reduction
         && matches!(
             instruction,
-            Instruction::AddImmediate { .. }
-                | Instruction::SubtractImmediate { .. }
+            Instruction::AddImmediate { kind: None, .. }
                 | Instruction::IntegerMultiplyImmediate {
                     kind: IntegerKind::I64,
                     ..
@@ -116,16 +114,16 @@ fn instruction_candidates(
     if configuration.specialize_arithmetic
         && matches!(
             instruction,
-            Instruction::Add { .. }
-                | Instruction::Subtract { .. }
-                | Instruction::Multiply { .. }
-                | Instruction::Modulo { .. }
-                | Instruction::BitwiseAnd { .. }
-                | Instruction::BitwiseOr { .. }
-                | Instruction::BitwiseXor { .. }
-                | Instruction::BitwiseNot { .. }
-                | Instruction::ShiftLeft { .. }
-                | Instruction::ShiftRight { .. }
+            Instruction::Add { kind: None, .. }
+                | Instruction::Subtract { kind: None, .. }
+                | Instruction::Multiply { kind: None, .. }
+                | Instruction::Modulo { kind: None, .. }
+                | Instruction::BitwiseAnd { kind: None, .. }
+                | Instruction::BitwiseOr { kind: None, .. }
+                | Instruction::BitwiseXor { kind: None, .. }
+                | Instruction::BitwiseNot { kind: None, .. }
+                | Instruction::ShiftLeft { kind: None, .. }
+                | Instruction::ShiftRight { kind: None, .. }
         )
     {
         candidates.insert(CandidateSet::EARLY_OPERATION);
@@ -275,20 +273,20 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::NewVec { .. }
             | Instruction::NewDict { .. }
             | Instruction::NewTuple { .. }
-            | Instruction::Add { .. }
-            | Instruction::Subtract { .. }
-            | Instruction::Multiply { .. }
+            | Instruction::Add { kind: None, .. }
+            | Instruction::Subtract { kind: None, .. }
+            | Instruction::Multiply { kind: None, .. }
             | Instruction::Divide { .. }
-            | Instruction::Modulo { .. }
+            | Instruction::Modulo { kind: None, .. }
             | Instruction::Power { .. }
             | Instruction::Negate { .. }
             | Instruction::UnaryPlus { .. }
-            | Instruction::BitwiseAnd { .. }
-            | Instruction::BitwiseOr { .. }
-            | Instruction::BitwiseXor { .. }
-            | Instruction::BitwiseNot { .. }
-            | Instruction::ShiftLeft { .. }
-            | Instruction::ShiftRight { .. }
+            | Instruction::BitwiseAnd { kind: None, .. }
+            | Instruction::BitwiseOr { kind: None, .. }
+            | Instruction::BitwiseXor { kind: None, .. }
+            | Instruction::BitwiseNot { kind: None, .. }
+            | Instruction::ShiftLeft { kind: None, .. }
+            | Instruction::ShiftRight { kind: None, .. }
             | Instruction::Equal { .. }
             | Instruction::NotEqual { .. }
             | Instruction::LessThan { .. }
@@ -304,25 +302,22 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::StringLength { .. }
             | Instruction::IndexGet { .. }
             | Instruction::ElementGet { .. }
-            | Instruction::IntegerAdd { .. }
-            | Instruction::IntegerSubtract { .. }
-            | Instruction::IntegerMultiply { .. }
-            | Instruction::IntegerModulo { .. }
-            | Instruction::IntegerBitwiseAnd { .. }
-            | Instruction::IntegerBitwiseOr { .. }
-            | Instruction::IntegerBitwiseXor { .. }
-            | Instruction::IntegerBitwiseNot { .. }
-            | Instruction::IntegerShiftLeft { .. }
-            | Instruction::IntegerShiftRight { .. }
-            | Instruction::IntegerStep { .. }
-            | Instruction::IntegerAddImmediate { .. }
-            | Instruction::IntegerSubtractImmediate { .. }
+            | Instruction::Add { .. }
+            | Instruction::Subtract { .. }
+            | Instruction::Multiply { .. }
+            | Instruction::Modulo { .. }
+            | Instruction::BitwiseAnd { .. }
+            | Instruction::BitwiseOr { .. }
+            | Instruction::BitwiseXor { .. }
+            | Instruction::BitwiseNot { .. }
+            | Instruction::ShiftLeft { .. }
+            | Instruction::ShiftRight { .. }
+            | Instruction::Step { .. }
+            | Instruction::AddImmediate { .. }
+            | Instruction::SubtractImmediate { .. }
             | Instruction::FloatAdd { .. }
             | Instruction::FloatSubtract { .. }
             | Instruction::FloatMultiply { .. }
-            | Instruction::AddImmediate { .. }
-            | Instruction::Step { .. }
-            | Instruction::SubtractImmediate { .. }
             | Instruction::IntegerMultiplyImmediate { .. }
             | Instruction::IntegerModuloImmediate { .. }
             | Instruction::JumpIfFalse { .. }
@@ -377,6 +372,7 @@ mod tests {
     fn arithmetic_candidates_request_only_their_needed_domains() {
         let candidates = instruction_candidates(
             Instruction::Add {
+                kind: None,
                 destination: Register::new(2),
                 left: Register::new(0),
                 right: Register::new(1),

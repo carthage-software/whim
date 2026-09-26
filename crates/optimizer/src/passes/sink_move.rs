@@ -89,26 +89,26 @@ fn pure_scalar_inputs(instruction: Instruction) -> Option<([Register; 3], usize)
         Instruction::FloatAdd { left, right, .. }
         | Instruction::FloatSubtract { left, right, .. }
         | Instruction::FloatMultiply { left, right, .. }
-        | Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        | Instruction::Add {
+            kind: Some(IntegerKind::I64),
             left,
             right,
             ..
         }
-        | Instruction::IntegerSubtract {
-            kind: IntegerKind::I64,
+        | Instruction::Subtract {
+            kind: Some(IntegerKind::I64),
             left,
             right,
             ..
         }
-        | Instruction::IntegerMultiply {
-            kind: IntegerKind::I64,
+        | Instruction::Multiply {
+            kind: Some(IntegerKind::I64),
             left,
             right,
             ..
         }
-        | Instruction::IntegerModulo {
-            kind: IntegerKind::I64,
+        | Instruction::Modulo {
+            kind: Some(IntegerKind::I64),
             left,
             right,
             ..

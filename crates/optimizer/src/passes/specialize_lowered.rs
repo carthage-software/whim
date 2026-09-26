@@ -465,9 +465,15 @@ fn transfer(
         }
         Instruction::Negate { source, .. }
         | Instruction::UnaryPlus { source, .. }
-        | Instruction::AddImmediate { source, .. }
-        | Instruction::Step { source, .. }
-        | Instruction::SubtractImmediate { source, .. }
+        | Instruction::AddImmediate {
+            kind: None, source, ..
+        }
+        | Instruction::Step {
+            kind: None, source, ..
+        }
+        | Instruction::SubtractImmediate {
+            kind: None, source, ..
+        }
         | Instruction::IncrementJump { target: source, .. }
         | Instruction::CounterLoop {
             counter: source, ..
@@ -517,68 +523,68 @@ fn transfer(
             destination,
             ..
         }
-        | Instruction::IntegerAdd {
-            kind: IntegerKind::I64,
+        | Instruction::Add {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerSubtract {
-            kind: IntegerKind::I64,
+        | Instruction::Subtract {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerMultiply {
-            kind: IntegerKind::I64,
+        | Instruction::Multiply {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerModulo {
-            kind: IntegerKind::I64,
+        | Instruction::Modulo {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerAddImmediate {
-            kind: IntegerKind::I64,
+        | Instruction::AddImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerSubtractImmediate {
-            kind: IntegerKind::I64,
+        | Instruction::SubtractImmediate {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerStep {
-            kind: IntegerKind::I64,
+        | Instruction::Step {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseAnd {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseAnd {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseOr {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseOr {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseXor {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseXor {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseNot {
-            kind: IntegerKind::I64,
+        | Instruction::BitwiseNot {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftLeft {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftLeft {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftRight {
-            kind: IntegerKind::I64,
+        | Instruction::ShiftRight {
+            kind: Some(IntegerKind::I64),
             destination,
             ..
         }
@@ -600,63 +606,63 @@ fn transfer(
             destination,
             ..
         }
-        | Instruction::IntegerAdd {
-            kind: IntegerKind::U64,
+        | Instruction::Add {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerSubtract {
-            kind: IntegerKind::U64,
+        | Instruction::Subtract {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerMultiply {
-            kind: IntegerKind::U64,
+        | Instruction::Multiply {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerModulo {
-            kind: IntegerKind::U64,
+        | Instruction::Modulo {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseAnd {
-            kind: IntegerKind::U64,
+        | Instruction::BitwiseAnd {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseOr {
-            kind: IntegerKind::U64,
+        | Instruction::BitwiseOr {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseXor {
-            kind: IntegerKind::U64,
+        | Instruction::BitwiseXor {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerBitwiseNot {
-            kind: IntegerKind::U64,
+        | Instruction::BitwiseNot {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftLeft {
-            kind: IntegerKind::U64,
+        | Instruction::ShiftLeft {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerShiftRight {
-            kind: IntegerKind::U64,
+        | Instruction::ShiftRight {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerAddImmediate {
-            kind: IntegerKind::U64,
+        | Instruction::AddImmediate {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
-        | Instruction::IntegerSubtractImmediate {
-            kind: IntegerKind::U64,
+        | Instruction::SubtractImmediate {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
@@ -670,8 +676,8 @@ fn transfer(
             destination,
             ..
         }
-        | Instruction::IntegerStep {
-            kind: IntegerKind::U64,
+        | Instruction::Step {
+            kind: Some(IntegerKind::U64),
             destination,
             ..
         }
@@ -685,24 +691,43 @@ fn transfer(
             ..
         } => (destination, KnownKind::Uint),
         Instruction::Modulo {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::BitwiseAnd {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::BitwiseOr {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::BitwiseXor {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::ShiftLeft {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         }
         | Instruction::ShiftRight {
-            destination, left, ..
+            kind: None,
+            destination,
+            left,
+            ..
         } => (destination, facts.get(left)),
         Instruction::BitwiseNot {
+            kind: None,
             destination,
             source,
         } => (destination, facts.get(source)),
@@ -712,16 +737,19 @@ fn transfer(
         | Instruction::FloatMultiplyConstant { destination, .. }
         | Instruction::Divide { destination, .. } => (destination, KnownKind::Float),
         Instruction::Add {
+            kind: None,
             destination,
             left,
             right,
         }
         | Instruction::Subtract {
+            kind: None,
             destination,
             left,
             right,
         }
         | Instruction::Multiply {
+            kind: None,
             destination,
             left,
             right,
@@ -743,9 +771,21 @@ fn transfer(
         ),
         Instruction::Negate { destination, .. }
         | Instruction::UnaryPlus { destination, .. }
-        | Instruction::AddImmediate { destination, .. }
-        | Instruction::Step { destination, .. }
-        | Instruction::SubtractImmediate { destination, .. } => (destination, moved),
+        | Instruction::AddImmediate {
+            kind: None,
+            destination,
+            ..
+        }
+        | Instruction::Step {
+            kind: None,
+            destination,
+            ..
+        }
+        | Instruction::SubtractImmediate {
+            kind: None,
+            destination,
+            ..
+        } => (destination, moved),
         Instruction::Concatenate { destination, .. }
         | Instruction::ConcatenateRightConstant { destination, .. }
         | Instruction::ConcatenateLeftConstant { destination, .. }

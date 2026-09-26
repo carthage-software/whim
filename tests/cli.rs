@@ -234,8 +234,8 @@ fn runtime_config_and_environment_control_disassembly() {
 
     assert!(unoptimized.status.success(), "{}", stderr_of(&unoptimized));
     assert!(optimized.status.success(), "{}", stderr_of(&optimized));
-    assert!(stdout_of(&unoptimized).contains(" AddImmediate "));
-    assert!(!stdout_of(&optimized).contains(" AddImmediate "));
+    assert!(stdout_of(&unoptimized).contains(" AddImmediate.unknown "));
+    assert!(!stdout_of(&optimized).contains(" AddImmediate."));
 }
 
 #[test]

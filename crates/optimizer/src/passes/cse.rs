@@ -520,54 +520,47 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInteger { .. }
-            | Instruction::Add { .. }
-            | Instruction::Subtract { .. }
-            | Instruction::Multiply { .. }
             | Instruction::Divide { .. }
-            | Instruction::Modulo { .. }
             | Instruction::Power { .. }
             | Instruction::Negate { .. }
             | Instruction::UnaryPlus { .. }
-            | Instruction::AddImmediate { .. }
-            | Instruction::Step { .. }
-            | Instruction::SubtractImmediate { .. }
-            | Instruction::IntegerAdd { .. }
-            | Instruction::IntegerSubtract { .. }
-            | Instruction::IntegerMultiply { .. }
-            | Instruction::IntegerModulo { .. }
+            | Instruction::Add { .. }
+            | Instruction::Subtract { .. }
+            | Instruction::Multiply { .. }
+            | Instruction::Modulo { .. }
             | Instruction::IntegerMultiplyImmediate { .. }
             | Instruction::IntegerModuloImmediate { .. }
-            | Instruction::IntegerBitwiseAnd {
-                kind: IntegerKind::U64,
+            | Instruction::BitwiseAnd {
+                kind: Some(IntegerKind::U64),
                 ..
             }
-            | Instruction::IntegerBitwiseOr {
-                kind: IntegerKind::U64,
+            | Instruction::BitwiseOr {
+                kind: Some(IntegerKind::U64),
                 ..
             }
-            | Instruction::IntegerBitwiseXor {
-                kind: IntegerKind::U64,
+            | Instruction::BitwiseXor {
+                kind: Some(IntegerKind::U64),
                 ..
             }
-            | Instruction::IntegerBitwiseNot {
-                kind: IntegerKind::U64,
+            | Instruction::BitwiseNot {
+                kind: Some(IntegerKind::U64),
                 ..
             }
-            | Instruction::IntegerShiftLeft {
-                kind: IntegerKind::U64,
+            | Instruction::ShiftLeft {
+                kind: Some(IntegerKind::U64),
                 ..
             }
-            | Instruction::IntegerShiftRight {
-                kind: IntegerKind::U64,
+            | Instruction::ShiftRight {
+                kind: Some(IntegerKind::U64),
                 ..
             }
-            | Instruction::IntegerStep { .. }
+            | Instruction::Step { .. }
             | Instruction::IntegerAddAssign {
                 kind: IntegerKind::U64,
                 ..
             }
-            | Instruction::IntegerAddImmediate { .. }
-            | Instruction::IntegerSubtractImmediate { .. }
+            | Instruction::AddImmediate { .. }
+            | Instruction::SubtractImmediate { .. }
             | Instruction::Equal { .. }
             | Instruction::NotEqual { .. }
             | Instruction::LessThan { .. }

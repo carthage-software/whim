@@ -113,26 +113,26 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInteger { .. }
-            | Instruction::Add { .. }
-            | Instruction::Subtract { .. }
-            | Instruction::Multiply { .. }
+            | Instruction::Add { kind: None, .. }
+            | Instruction::Subtract { kind: None, .. }
+            | Instruction::Multiply { kind: None, .. }
             | Instruction::Divide { .. }
-            | Instruction::Modulo { .. }
+            | Instruction::Modulo { kind: None, .. }
             | Instruction::Power { .. }
             | Instruction::Negate { .. }
             | Instruction::UnaryPlus { .. }
-            | Instruction::AddImmediate { .. }
-            | Instruction::Step { .. }
-            | Instruction::SubtractImmediate { .. }
+            | Instruction::AddImmediate { kind: None, .. }
+            | Instruction::Step { kind: None, .. }
+            | Instruction::SubtractImmediate { kind: None, .. }
             | Instruction::Concatenate { .. }
             | Instruction::ConcatenateRightConstant { .. }
             | Instruction::ConcatenateLeftConstant { .. }
-            | Instruction::BitwiseAnd { .. }
-            | Instruction::BitwiseOr { .. }
-            | Instruction::BitwiseXor { .. }
-            | Instruction::BitwiseNot { .. }
-            | Instruction::ShiftLeft { .. }
-            | Instruction::ShiftRight { .. }
+            | Instruction::BitwiseAnd { kind: None, .. }
+            | Instruction::BitwiseOr { kind: None, .. }
+            | Instruction::BitwiseXor { kind: None, .. }
+            | Instruction::BitwiseNot { kind: None, .. }
+            | Instruction::ShiftLeft { kind: None, .. }
+            | Instruction::ShiftRight { kind: None, .. }
             | Instruction::Equal { .. }
             | Instruction::NotEqual { .. }
             | Instruction::LessThan { .. }
@@ -140,22 +140,22 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::GreaterThan { .. }
             | Instruction::GreaterThanOrEqual { .. }
             | Instruction::Not { .. }
-            | Instruction::IntegerAdd { .. }
-            | Instruction::IntegerSubtract { .. }
-            | Instruction::IntegerMultiply { .. }
-            | Instruction::IntegerModulo { .. }
+            | Instruction::Add { .. }
+            | Instruction::Subtract { .. }
+            | Instruction::Multiply { .. }
+            | Instruction::Modulo { .. }
             | Instruction::IntegerMultiplyImmediate { .. }
             | Instruction::IntegerModuloImmediate { .. }
-            | Instruction::IntegerBitwiseAnd { .. }
-            | Instruction::IntegerBitwiseOr { .. }
-            | Instruction::IntegerBitwiseXor { .. }
-            | Instruction::IntegerBitwiseNot { .. }
+            | Instruction::BitwiseAnd { .. }
+            | Instruction::BitwiseOr { .. }
+            | Instruction::BitwiseXor { .. }
+            | Instruction::BitwiseNot { .. }
             | Instruction::IntegerAddAssign { .. }
-            | Instruction::IntegerShiftLeft { .. }
-            | Instruction::IntegerShiftRight { .. }
-            | Instruction::IntegerStep { .. }
-            | Instruction::IntegerAddImmediate { .. }
-            | Instruction::IntegerSubtractImmediate { .. }
+            | Instruction::ShiftLeft { .. }
+            | Instruction::ShiftRight { .. }
+            | Instruction::Step { .. }
+            | Instruction::AddImmediate { .. }
+            | Instruction::SubtractImmediate { .. }
             | Instruction::FloatAdd { .. }
             | Instruction::FloatSubtract { .. }
             | Instruction::FloatMultiply { .. }
@@ -704,25 +704,26 @@ pub(super) fn remap_instruction(
             source,
         }
         | Instruction::BitwiseNot {
+            kind: None,
             destination,
             source,
         }
-        | Instruction::IntegerBitwiseNot {
-            destination,
-            source,
-            ..
-        }
-        | Instruction::IntegerStep {
+        | Instruction::BitwiseNot {
             destination,
             source,
             ..
         }
-        | Instruction::IntegerAddImmediate {
+        | Instruction::Step {
             destination,
             source,
             ..
         }
-        | Instruction::IntegerSubtractImmediate {
+        | Instruction::AddImmediate {
+            destination,
+            source,
+            ..
+        }
+        | Instruction::SubtractImmediate {
             destination,
             source,
             ..
@@ -738,21 +739,6 @@ pub(super) fn remap_instruction(
         | Instruction::Length {
             destination,
             source,
-        }
-        | Instruction::AddImmediate {
-            destination,
-            source,
-            ..
-        }
-        | Instruction::Step {
-            destination,
-            source,
-            ..
-        }
-        | Instruction::SubtractImmediate {
-            destination,
-            source,
-            ..
         }
         | Instruction::IntegerMultiplyImmediate {
             destination,
@@ -778,16 +764,19 @@ pub(super) fn remap_instruction(
             *source = remap(*source);
         }
         Instruction::Add {
+            kind: None,
             destination,
             left,
             right,
         }
         | Instruction::Subtract {
+            kind: None,
             destination,
             left,
             right,
         }
         | Instruction::Multiply {
+            kind: None,
             destination,
             left,
             right,
@@ -798,6 +787,7 @@ pub(super) fn remap_instruction(
             right,
         }
         | Instruction::Modulo {
+            kind: None,
             destination,
             left,
             right,
@@ -813,55 +803,60 @@ pub(super) fn remap_instruction(
             right,
         }
         | Instruction::BitwiseAnd {
+            kind: None,
             destination,
             left,
             right,
         }
-        | Instruction::IntegerBitwiseAnd {
+        | Instruction::BitwiseAnd {
             destination,
             left,
             right,
             ..
         }
         | Instruction::BitwiseOr {
+            kind: None,
             destination,
             left,
             right,
         }
-        | Instruction::IntegerBitwiseOr {
+        | Instruction::BitwiseOr {
             destination,
             left,
             right,
             ..
         }
         | Instruction::BitwiseXor {
+            kind: None,
             destination,
             left,
             right,
         }
-        | Instruction::IntegerBitwiseXor {
+        | Instruction::BitwiseXor {
             destination,
             left,
             right,
             ..
         }
         | Instruction::ShiftLeft {
+            kind: None,
             destination,
             left,
             right,
         }
-        | Instruction::IntegerShiftLeft {
+        | Instruction::ShiftLeft {
             destination,
             left,
             right,
             ..
         }
         | Instruction::ShiftRight {
+            kind: None,
             destination,
             left,
             right,
         }
-        | Instruction::IntegerShiftRight {
+        | Instruction::ShiftRight {
             destination,
             left,
             right,
@@ -897,25 +892,25 @@ pub(super) fn remap_instruction(
             left,
             right,
         }
-        | Instruction::IntegerAdd {
+        | Instruction::Add {
             destination,
             left,
             right,
             ..
         }
-        | Instruction::IntegerSubtract {
+        | Instruction::Subtract {
             destination,
             left,
             right,
             ..
         }
-        | Instruction::IntegerMultiply {
+        | Instruction::Multiply {
             destination,
             left,
             right,
             ..
         }
-        | Instruction::IntegerModulo {
+        | Instruction::Modulo {
             destination,
             left,
             right,

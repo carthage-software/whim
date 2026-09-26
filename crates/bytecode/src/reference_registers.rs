@@ -168,44 +168,31 @@ pub fn mask_with_classification(
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInteger { .. }
-            | Instruction::IntegerAdd { .. }
-            | Instruction::IntegerSubtract { .. }
-            | Instruction::IntegerMultiply { .. }
-            | Instruction::IntegerModulo { .. }
-            | Instruction::IntegerAddAssign { .. }
-            | Instruction::IntegerBitwiseAnd { .. }
-            | Instruction::IntegerBitwiseOr { .. }
-            | Instruction::IntegerBitwiseXor { .. }
-            | Instruction::IntegerBitwiseNot { .. }
-            | Instruction::IntegerShiftLeft { .. }
-            | Instruction::IntegerShiftRight { .. }
-            | Instruction::IntegerAddImmediate { .. }
-            | Instruction::IntegerSubtractImmediate { .. }
-            | Instruction::IntegerMultiplyImmediate { .. }
-            | Instruction::IntegerModuloImmediate { .. }
-            | Instruction::UintJumpUnless { .. }
-            | Instruction::UintJumpUnlessImmediate { .. }
-            | Instruction::ReturnIntegerUnchecked { .. }
-            | Instruction::UintCounterLoop { .. }
-            | Instruction::IntegerStep { .. }
-            | Instruction::DictIndexSetIntegerKey { .. }
             | Instruction::Add { .. }
             | Instruction::Subtract { .. }
             | Instruction::Multiply { .. }
-            | Instruction::Divide { .. }
             | Instruction::Modulo { .. }
-            | Instruction::Power { .. }
-            | Instruction::Negate { .. }
-            | Instruction::UnaryPlus { .. }
-            | Instruction::AddImmediate { .. }
-            | Instruction::Step { .. }
-            | Instruction::SubtractImmediate { .. }
+            | Instruction::IntegerAddAssign { .. }
             | Instruction::BitwiseAnd { .. }
             | Instruction::BitwiseOr { .. }
             | Instruction::BitwiseXor { .. }
             | Instruction::BitwiseNot { .. }
             | Instruction::ShiftLeft { .. }
             | Instruction::ShiftRight { .. }
+            | Instruction::AddImmediate { .. }
+            | Instruction::SubtractImmediate { .. }
+            | Instruction::IntegerMultiplyImmediate { .. }
+            | Instruction::IntegerModuloImmediate { .. }
+            | Instruction::UintJumpUnless { .. }
+            | Instruction::UintJumpUnlessImmediate { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
+            | Instruction::UintCounterLoop { .. }
+            | Instruction::Step { .. }
+            | Instruction::DictIndexSetIntegerKey { .. }
+            | Instruction::Divide { .. }
+            | Instruction::Power { .. }
+            | Instruction::Negate { .. }
+            | Instruction::UnaryPlus { .. }
             | Instruction::Equal { .. }
             | Instruction::StringByteEqual { .. }
             | Instruction::StringByteNotEqual { .. }

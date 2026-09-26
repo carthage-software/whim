@@ -21,17 +21,12 @@ pub(in crate::passes) fn optimize_chunk(
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
     for index in 0..chunk.code.len() - 1 {
-        let (Instruction::Step {
-            destination,
-            source,
-            immediate,
-        }
-        | Instruction::IntegerStep {
+        let Instruction::Step {
             destination,
             source,
             immediate,
             ..
-        }) = chunk.code[index]
+        } = chunk.code[index]
         else {
             continue;
         };

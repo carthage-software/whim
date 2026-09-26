@@ -144,39 +144,26 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | FloatMultiplyConstant
                 | ConcatenateRightConstant
                 | ConcatenateLeftConstant
-                | IntegerBitwiseNot
-                | IntegerAddImmediate
-                | IntegerSubtractImmediate
+                | AddImmediate
+                | SubtractImmediate
                 | IntegerMultiplyImmediate
                 | IntegerModuloImmediate
-                | IntegerStep
-                | AddImmediate
                 | Step
-                | SubtractImmediate
         ) => Some(&[R3, W1]),
         InstructionKind::MoveOwned => Some(&[R3, W3, W1]),
         InstructionKind::IntegerAddAssign => Some(&[R1, R3, W1]),
         instruction_kinds!(
             Add | Subtract
                 | Multiply
-                | IntegerAdd
-                | IntegerSubtract
-                | IntegerMultiply
-                | IntegerModulo
-                | IntegerBitwiseAnd
-                | IntegerBitwiseOr
-                | IntegerBitwiseXor
-                | IntegerShiftLeft
-                | IntegerShiftRight
-                | Divide
                 | Modulo
-                | Power
-                | Concatenate
                 | BitwiseAnd
                 | BitwiseOr
                 | BitwiseXor
                 | ShiftLeft
                 | ShiftRight
+                | Divide
+                | Power
+                | Concatenate
                 | Equal
                 | NotEqual
                 | LessThan
@@ -307,9 +294,7 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
             usize::from(operand_count.value()),
         )),
         instructions!(
-            CallNamed | CallNamedDiscarded | CallMethod | CallMethodDiscarded
-                | CallMethodUnchecked | CallMethodDirect | CallNamedDirect | CallStatic | CallStaticDiscarded
-                | CallValue | CallValueUnchecked | CallValueDiscarded;
+            CallNamed | CallNamedDiscarded | CallMethod | CallMethodDiscarded | CallMethodUnchecked | CallMethodDirect | CallNamedDirect | CallStatic | CallStaticDiscarded | CallValue | CallValueUnchecked | CallValueDiscarded;
             {
             argument_count,
             first_argument,
@@ -318,7 +303,8 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
         ) if argument_count.value() != 0 => {
             Some((first_argument, usize::from(argument_count.value())))
         }
-        instructions!(CallNamedUnchecked | CallSelfUnchecked; {
+        instructions!(
+            CallNamedUnchecked | CallSelfUnchecked; {
             argument_count,
             first_argument,
             ..
@@ -326,7 +312,8 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
             Register::new(first_argument.index() + 1),
             usize::from(argument_count.value() - 1),
         )),
-        instructions!(NewVec | NewTuple; {
+        instructions!(
+            NewVec | NewTuple; {
             element_count,
             first_element,
             ..
@@ -352,14 +339,17 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
         } if capture_count.value() != 0 => {
             Some((first_capture, usize::from(capture_count.value())))
         }
-        instructions!(Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+        instructions!(
+            Write | WriteLine | WriteError | WriteErrorLine | Debug; {
             value_count,
             first_value,
         }) if value_count.value() != 0 => Some((first_value, usize::from(value_count.value()))),
-        instructions!(PropertyIndexSet | PropertyIndexSetUnchecked; { first_operand, .. }) => {
+        instructions!(
+            PropertyIndexSet | PropertyIndexSetUnchecked; { first_operand, .. }) => {
             Some((Register::new(first_operand.index() + 1), 1))
         }
-        instructions!(PropertyRemove | PropertyRemoveUnchecked; {
+        instructions!(
+            PropertyRemove | PropertyRemoveUnchecked; {
             destination,
             mode,
             ..
@@ -466,7 +456,8 @@ pub(crate) fn replace_read_register(
     from: Register,
     to: Register,
 ) -> Option<Instruction> {
-    if let instructions!(Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+    if let instructions!(
+            Write | WriteLine | WriteError | WriteErrorLine | Debug; {
         value_count,
         first_value,
     }) = &mut instruction

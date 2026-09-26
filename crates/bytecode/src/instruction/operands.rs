@@ -164,6 +164,9 @@ pub enum IntegerKind {
     U64,
 }
 
+const _: () = assert!(size_of::<Option<IntegerKind>>() == 1);
+const _: () = assert!(align_of::<Option<IntegerKind>>() == 1);
+
 impl IntegerKind {
     #[must_use]
     pub const fn name(self) -> &'static str {
