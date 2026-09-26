@@ -9,6 +9,7 @@ use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::chunk::descriptors::string_length_matches;
 use whim_value::Value;
 use whim_value::ValueKind;
+use whim_value::array::ArrayTypeCheck;
 use whim_value::function::FuncId;
 use whim_value::object::ClassId;
 use whim_value::object::TypeEnvironmentId;
@@ -244,6 +245,23 @@ impl VirtualMachine<'_> {
             let mut complete = true;
             for (guard, value) in entry.guards.iter().zip(&self.stack[window.clone()]) {
                 let CachedParameterGuard::Cheap(guard) = guard else {
+                    if let CachedParameterGuard::Descriptor {
+                        scalar_mask,
+                        array_id,
+                        ..
+                    } = guard
+                        && (value.kind_bit() & scalar_mask != 0
+                            || array_id.is_some_and(|id| {
+                                value
+                                    .as_vec()
+                                    .map(|array| array.type_check(id))
+                                    .or_else(|| value.as_dict().map(|array| array.type_check(id)))
+                                    .or_else(|| value.as_tuple().map(|array| array.type_check(id)))
+                                    == Some(ArrayTypeCheck::Clean(id))
+                            }))
+                    {
+                        continue;
+                    }
                     complete = false;
                     break;
                 };
@@ -258,7 +276,20 @@ impl VirtualMachine<'_> {
             }
         }
 
-        for position in 0..count {
+        self.check_cached_argument_guards(cache, site, function, environment, window, called)
+    }
+
+    #[inline(never)]
+    fn check_cached_argument_guards(
+        &mut self,
+        cache: NonNull<InlineCache>,
+        site: usize,
+        function: FuncId,
+        environment: TypeEnvironmentId,
+        window: Range<usize>,
+        called: Option<ClassId>,
+    ) -> Result<bool, VirtualMachineControl> {
+        for position in 0..window.len() {
             let guard = {
                 // SAFETY: the surrounding invariant keeps this index in bounds.
                 let guards = unsafe { &*cache.as_ref().argument_guards() };

@@ -57,6 +57,16 @@ impl VirtualMachine<'_> {
             return self.new_instance_in_environment(cached.class, cached.environment);
         }
 
+        self.new_uncached_static_site(site, chunk, outer)
+    }
+
+    #[inline(never)]
+    fn new_uncached_static_site(
+        &mut self,
+        site: usize,
+        chunk: &Chunk,
+        outer: TypeEnvironmentId,
+    ) -> Result<Value, VirtualMachineControl> {
         let (name, written_arguments) = match &chunk.ic_descriptors[site] {
             IcDescriptor::Member {
                 name,
@@ -161,6 +171,7 @@ impl VirtualMachine<'_> {
     }
 
     /// Returns the hot cached class and environment of a named `new` site.
+    #[inline(always)]
     pub(in crate::vm) fn cached_instantiation_environment(
         &self,
         site: usize,

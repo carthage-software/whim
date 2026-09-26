@@ -740,15 +740,15 @@ impl Value {
     /// This value must hold a heap string.
     #[must_use]
     #[inline(always)]
-    pub unsafe fn into_string_unchecked(mut self) -> ManagedRef<ByteStringObject> {
+    pub unsafe fn into_string_unchecked(self) -> ManagedRef<ByteStringObject> {
         if self.kind != ValueKind::String {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
         }
 
-        self.kind = ValueKind::Null;
+        let mut value = ManuallyDrop::new(self);
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
-        unsafe { ManuallyDrop::take(&mut self.payload.string) }
+        unsafe { ManuallyDrop::take(&mut value.payload.string) }
     }
 
     #[must_use]
@@ -846,15 +846,15 @@ impl Value {
     ///
     /// This value must be an object.
     #[must_use]
-    pub unsafe fn into_object_unchecked(mut self) -> ManagedRef<InstanceObject> {
+    pub unsafe fn into_object_unchecked(self) -> ManagedRef<InstanceObject> {
         if self.kind != ValueKind::Object {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { hint::unreachable_unchecked() }
         }
 
-        self.kind = ValueKind::Null;
+        let mut value = ManuallyDrop::new(self);
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
-        unsafe { ManuallyDrop::take(&mut self.payload.object) }
+        unsafe { ManuallyDrop::take(&mut value.payload.object) }
     }
 
     #[must_use]

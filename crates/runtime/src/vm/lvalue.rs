@@ -366,6 +366,17 @@ impl VirtualMachine<'_> {
         receiver: &ManagedRef<InstanceObject>,
         slot: u32,
     ) -> Result<(), VirtualMachineControl> {
+        let frame = self.current_frame();
+        let constructor_initialization = frame.in_constructor()
+            && receiver.slot_is_uninitialized(slot as usize)
+            && self
+                .current_this()
+                .is_some_and(|this| this.ptr_eq(receiver));
+
+        if constructor_initialization {
+            return Ok(());
+        }
+
         let class = receiver.class();
         let (is_readonly, visibility, declaring) = {
             let runtime_class = &self.engine.tables.classes[class.0 as usize];
@@ -378,17 +389,6 @@ impl VirtualMachine<'_> {
         };
 
         if !is_readonly {
-            return Ok(());
-        }
-
-        let frame = self.current_frame();
-        let constructor_initialization = receiver.slot_is_uninitialized(slot as usize)
-            && frame.in_constructor()
-            && self
-                .current_this()
-                .is_some_and(|this| this.ptr_eq(receiver));
-
-        if constructor_initialization {
             return Ok(());
         }
 
@@ -470,6 +470,7 @@ impl VirtualMachine<'_> {
     /// Checks a property write at a cache site, answering from the site's own
     /// guard when the receiver's specialization and the written value's shape
     /// are the ones the site already proved.
+    #[inline(always)]
     pub(in crate::vm) fn check_instance_property_value_at_site(
         &mut self,
         site: usize,
@@ -482,17 +483,32 @@ impl VirtualMachine<'_> {
         let guards = unsafe { &*cache.as_ref().property_guards() };
         let class = receiver.class();
         let environment = receiver.type_environment();
-        if let Some(ways) = guards.get(site)
-            && ways.iter().flatten().any(|entry| {
-                entry.slot == slot
+        if let Some(ways) = guards.get(site) {
+            for entry in ways.iter() {
+                let Some(entry) = entry else { continue };
+                if entry.slot == slot
                     && entry.class == class
                     && entry.environment == environment
                     && guard_allows(&entry.guard, value)
-            })
-        {
-            return Ok(());
+                {
+                    return Ok(());
+                }
+            }
         }
 
+        self.check_uncached_instance_property_value_at_site(cache, site, receiver, slot, value)
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn check_uncached_instance_property_value_at_site(
+        &mut self,
+        cache: NonNull<InlineCache>,
+        site: usize,
+        receiver: &ManagedRef<InstanceObject>,
+        slot: u32,
+        value: &Value,
+    ) -> Result<(), VirtualMachineControl> {
         self.check_instance_property_value(receiver, slot, value)?;
         self.cache_property_guard(cache, site, receiver, slot, value);
         Ok(())

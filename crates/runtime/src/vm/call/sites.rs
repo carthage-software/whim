@@ -297,6 +297,7 @@ impl VirtualMachine<'_> {
         }
     }
 
+    #[inline(never)]
     fn construct_newtype_from_stack(
         &mut self,
         site: usize,
@@ -602,15 +603,13 @@ impl VirtualMachine<'_> {
             && function.presets().is_empty()
             && let CallTarget::User(id) = function.target()
         {
-            let type_arguments_bound = function.type_arguments_bound();
-            let type_parameters_empty = self.engine.tables.functions[id.0 as usize]
-                .type_parameters()
-                .is_empty();
-
             if function.this().is_none()
                 && function.captures().is_empty()
                 && function.scope().is_none()
-                && (type_arguments_bound || type_parameters_empty)
+                && (function.type_arguments_bound()
+                    || self.engine.tables.functions[id.0 as usize]
+                        .type_parameters()
+                        .is_empty())
                 && (arguments_proven || {
                     let runtime = &self.engine.tables.functions[id.0 as usize];
                     usize::from(runtime.required_parameters) <= count
@@ -664,9 +663,8 @@ impl VirtualMachine<'_> {
         outcome
     }
 
-    /// Calls a value whose arguments were proven by type flow, borrowing a
-    /// plain function value from the caller register instead of retaining and
-    /// releasing its handle on every invocation.
+    /// Calls a value whose arguments were proven by type flow, borrowing the
+    /// callable when its caller register stays live during frame setup.
     pub(in crate::vm) fn call_proven_value_site(
         &mut self,
         callee_register: usize,
@@ -678,24 +676,48 @@ impl VirtualMachine<'_> {
             ValueView::Function(function)
                 if function.presets().is_empty()
                     && function.this().is_none()
-                    && function.captures().is_empty()
                     && function.scope().is_none() =>
             {
                 match function.target() {
                     CallTarget::User(function_id) => {
-                        let type_parameters_empty = self.engine.tables.functions
-                            [function_id.0 as usize]
-                            .type_parameters()
-                            .is_empty();
-                        (function.type_arguments_bound() || type_parameters_empty)
-                            .then_some((function_id, function.type_environment()))
+                        let runtime = &self.engine.tables.functions[function_id.0 as usize];
+                        ((function.type_arguments_bound() || runtime.type_parameters().is_empty())
+                            && (function.captures().is_empty()
+                                || (runtime.frameless_literal.is_none()
+                                    && !(window_start..window_start + count)
+                                        .contains(&callee_register))))
+                        .then_some((
+                            function_id,
+                            function.type_environment(),
+                            NonNull::from(function.captures()),
+                        ))
                     }
                     CallTarget::BuiltIn(_) => None,
                 }
             }
             _ => None,
         };
-        if let Some((function, environment)) = direct {
+        if let Some((function, environment, captures)) = direct {
+            if !captures.is_empty() {
+                return self.push_user_frame(
+                    function,
+                    destination,
+                    None,
+                    // SAFETY: the caller owns the heap capture buffer outside the moved
+                    // argument window. This ordinary frame cannot replace that owner.
+                    unsafe { captures.as_ref() },
+                    window_start,
+                    count,
+                    None,
+                    None,
+                    None,
+                    environment,
+                    true,
+                    true,
+                    false,
+                    false,
+                );
+            }
             return self.push_exact_generic_function_frame::<false>(
                 function,
                 destination,

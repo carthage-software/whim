@@ -10,7 +10,6 @@ use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::compact;
 use whim_bytecode::rewrite::relative_target;
-use whim_span::Span;
 
 use crate::OptimizationConfiguration;
 use crate::cfg::is_block_boundary;
@@ -44,9 +43,10 @@ fn hoist_one_loop(chunk: &mut Chunk) -> bool {
         }
 
         let mut candidates = Vec::new();
+        let mut loads = Vec::new();
         let available = usize::from(u16::MAX - chunk.register_count);
         for index in header..tail {
-            if candidates.len() == available || index + 1 >= tail {
+            if index + 1 >= tail {
                 break;
             }
             let Some((destination, load)) = scalar_load(chunk, chunk.code[index]) else {
@@ -56,12 +56,18 @@ fn hoist_one_loop(chunk: &mut Chunk) -> bool {
                 continue;
             }
 
+            let existing = loads.iter().position(|(previous, _, _)| *previous == load);
+            let position = existing.unwrap_or(loads.len());
+            if position == available {
+                continue;
+            }
+
             // SAFETY: register capacity caps the count at `u16`.
             let invariant = Register::new(
                 chunk.register_count
                     + unsafe {
                         unwrap_result_invariant(
-                            u16::try_from(candidates.len()),
+                            u16::try_from(position),
                             "candidate count was bounded by register capacity",
                         )
                     },
@@ -73,24 +79,24 @@ fn hoist_one_loop(chunk: &mut Chunk) -> bool {
             if is_join_point(chunk, index + 1) {
                 continue;
             }
-            candidates.push(Candidate {
-                index,
-                load: load.with_destination(invariant),
-                consumer,
-                span: chunk.spans[index],
-            });
+            if existing.is_none() {
+                loads.push((load, invariant, chunk.spans[index]));
+            }
+            candidates.push(Candidate { index, consumer });
         }
         if candidates.is_empty() {
             continue;
         }
 
         let mut remove = vec![false; chunk.code.len()];
-        let mut preheader = Vec::with_capacity(candidates.len());
         for candidate in candidates {
             chunk.code[candidate.index + 1] = candidate.consumer;
             remove[candidate.index] = true;
-            preheader.push((candidate.load, candidate.span));
         }
+        let preheader = loads
+            .into_iter()
+            .map(|(load, destination, span)| (load.with_destination(destination), span))
+            .collect::<Vec<_>>();
         // SAFETY: the preheader count is bounded by register capacity, so it fits u16.
         chunk.register_count += unsafe {
             unwrap_result_invariant(
@@ -169,12 +175,10 @@ fn has_external_entry(chunk: &Chunk, header: usize, tail: usize) -> bool {
 #[derive(Clone, Copy)]
 struct Candidate {
     index: usize,
-    load: Instruction,
     consumer: Instruction,
-    span: Span,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ScalarLoad {
     Integer(ImmediateInteger, IntegerKind),
     Constant(ConstantIndex),

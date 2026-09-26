@@ -269,7 +269,7 @@ impl VirtualMachine<'_> {
                     "the compiled unit declares more captures than the frame reserves".to_string(),
                 ));
             }
-            self.stack[slot] = capture.clone();
+            self.stack[slot] = capture.clone_inline_scalar();
         }
         let receiver_class = has_this.then(|| {
             let Some(receiver) = self.stack[base].as_object() else {

@@ -163,6 +163,11 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::StringLength { .. }
             | Instruction::Length { .. }
             | Instruction::IndexGet { .. }
+            | Instruction::VecIndexGet { .. }
+            | Instruction::DictIndexGetIntKey { .. }
+            | Instruction::DictIndexGetUintKey { .. }
+            | Instruction::DictIndexGetStringKey { .. }
+            | Instruction::ElementGet { .. }
             | Instruction::StringIndexGet { .. }
             | Instruction::IndexGetOrNull { .. }
             | Instruction::VecIndexGetOrNull { .. }
@@ -937,6 +942,30 @@ pub(super) fn remap_instruction(
             container,
             index,
         }
+        | Instruction::VecIndexGet {
+            destination,
+            container,
+            index,
+            ..
+        }
+        | Instruction::DictIndexGetIntKey {
+            destination,
+            container,
+            index,
+            ..
+        }
+        | Instruction::DictIndexGetUintKey {
+            destination,
+            container,
+            index,
+            ..
+        }
+        | Instruction::DictIndexGetStringKey {
+            destination,
+            container,
+            index,
+            ..
+        }
         | Instruction::StringIndexGet {
             destination,
             container,
@@ -971,6 +1000,14 @@ pub(super) fn remap_instruction(
             *destination = remap(*destination);
             *container = remap(*container);
             *index = remap(*index);
+        }
+        Instruction::ElementGet {
+            destination,
+            subject,
+            ..
+        } => {
+            *destination = remap(*destination);
+            *subject = remap(*subject);
         }
         Instruction::Jump { .. } => {}
         Instruction::JumpIfFalse { condition, .. } | Instruction::JumpIfTrue { condition, .. } => {

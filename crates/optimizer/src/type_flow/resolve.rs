@@ -24,16 +24,20 @@ use whim_value::atom::Atom;
 
 use crate::liveness::effect::changes_value;
 use crate::liveness::effect::effect_on;
+use crate::type_flow::BOOL;
 use crate::type_flow::CAPTURE_ORIGIN;
 use crate::type_flow::ConstantValue;
 use crate::type_flow::ExactClass;
+use crate::type_flow::FLOAT;
 use crate::type_flow::Fact;
+use crate::type_flow::INT;
 use crate::type_flow::NULL;
 use crate::type_flow::PARAMETER_ORIGIN;
 use crate::type_flow::ResolvedProperty;
 use crate::type_flow::STRING;
 use crate::type_flow::THIS_ORIGIN;
 use crate::type_flow::TypeFlow;
+use crate::type_flow::UINT;
 use crate::type_flow::array_shape;
 use crate::type_flow::callable_signature;
 use crate::type_flow::descriptors::descriptor_mask;
@@ -100,7 +104,17 @@ impl<'a> TypeFlow<'a> {
     }
 
     fn origin_type_matching_mask(&self, fact: Fact, depth: usize) -> Option<TypeDescriptor> {
-        let descriptor = self.origin_type(fact.origin, depth + 1)?;
+        let descriptor = self
+            .origin_type(fact.origin, depth + 1)
+            .or_else(|| match fact.mask {
+                NULL => Some(TypeDescriptor::Null),
+                BOOL => Some(TypeDescriptor::Bool),
+                INT => Some(TypeDescriptor::Int),
+                UINT => Some(TypeDescriptor::Uint),
+                FLOAT => Some(TypeDescriptor::Float),
+                STRING => Some(TypeDescriptor::String),
+                _ => None,
+            })?;
         let descriptor = self.expand_aliases_owned(descriptor);
 
         self.descriptor_matching_mask(descriptor, fact.mask)

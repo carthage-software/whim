@@ -297,11 +297,31 @@ pub(in crate::passes) fn optimize_chunk(
 /// literal strings, so preserving the temporary string at the join only to
 /// measure it would perform avoidable runtime work.
 fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationStatistics) {
-    if chunk.code.len() < 7 {
+    if chunk.code.len() < 5
+        || !chunk.catch_table.is_empty()
+        || !chunk.code.iter().any(|instruction| {
+            matches!(
+                instruction,
+                Instruction::StringLength { .. } | Instruction::Length { .. }
+            )
+        })
+    {
         return;
     }
 
-    for consumer in 6..chunk.code.len() {
+    let mut predecessors = vec![0; chunk.code.len() + 1];
+    let mut edges = Vec::new();
+    for index in 0..chunk.code.len() {
+        edges.clear();
+        successors(chunk, index, &mut edges);
+        edges.sort_unstable();
+        edges.dedup();
+        for target in &edges {
+            predecessors[*target] += 1;
+        }
+    }
+
+    for consumer in 4..chunk.code.len() {
         let (Instruction::StringLength {
             destination,
             source,
@@ -314,7 +334,16 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
             continue;
         };
 
-        let (join, joined) = match chunk.code[consumer - 1] {
+        let mut join = consumer;
+        while join > 0
+            && matches!(chunk.code[join - 1], Instruction::Clear { target } if target != source)
+        {
+            join -= 1;
+        }
+        if join == 0 {
+            continue;
+        }
+        let (join, joined) = match chunk.code[join - 1] {
             Instruction::Move {
                 destination: moved,
                 source: joined,
@@ -322,18 +351,36 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
             | Instruction::MoveOwned {
                 destination: moved,
                 source: joined,
-            } if moved == source => (consumer - 1, joined),
-            _ => (consumer, source),
+            } if moved == source => (join - 1, joined),
+            _ => (join, source),
         };
-        if join < 5
-            || !register_is_dead_after(chunk, joined, consumer + 1)
-            || !register_is_dead_after(chunk, source, consumer + 1)
+        if join == 0
+            || [joined, source].iter().any(|register| {
+                register
+                    .index()
+                    .wrapping_sub(chunk.parameter_register_start)
+                    < chunk.parameter_register_count
+                    || chunk.trace_argument_registers.contains(register)
+                    || (*register != destination
+                        && !register_is_dead_after(chunk, *register, consumer + 1))
+            })
         {
             continue;
         }
 
-        let first = join - 4;
-        let second = join - 2;
+        let second_jumps = matches!(chunk.code[join - 1], Instruction::Jump { .. });
+        let arm_size = if second_jumps { 2 } else { 1 };
+        if join < arm_size + 3 {
+            continue;
+        }
+        let second = join - arm_size;
+        let first = second - 2;
+        if predecessors[join] != 2
+            || (first..join).any(|index| predecessors[index] != 1)
+            || (join + 1..=consumer).any(|index| predecessors[index] != 1)
+        {
+            continue;
+        }
         let (
             Instruction::LoadConstant {
                 destination: first_destination,
@@ -344,13 +391,7 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
                 destination: second_destination,
                 constant: second_constant,
             },
-            Instruction::Jump { .. },
-        ) = (
-            chunk.code[first],
-            chunk.code[first + 1],
-            chunk.code[second],
-            chunk.code[second + 1],
-        )
+        ) = (chunk.code[first], chunk.code[first + 1], chunk.code[second])
         else {
             continue;
         };
@@ -371,8 +412,10 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
             continue;
         };
 
-        let mut edges = Vec::new();
+        edges.clear();
         successors(chunk, first - 1, &mut edges);
+        edges.sort_unstable();
+        edges.dedup();
         if edges.len() != 2 || !edges.contains(&first) || !edges.contains(&second) {
             continue;
         }
@@ -382,7 +425,7 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
             continue;
         }
         edges.clear();
-        successors(chunk, second + 1, &mut edges);
+        successors(chunk, join - 1, &mut edges);
         if edges.as_slice() != [join] {
             continue;
         }

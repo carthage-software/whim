@@ -369,14 +369,17 @@ pub(in crate::vm) fn vec_index_get(
 }
 
 /// Reads an integer element through optimizer-proven vec and element types.
-pub(in crate::vm) fn vec_int_index_get(container: &Value, index: i64) -> Result<i64, ArrayFault> {
+pub(in crate::vm) fn vec_int_index_get(container: &Value, index: i64) -> Result<Value, ArrayFault> {
     let Some(vec) = container.as_vec() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec read has a vec container") }
     };
     let position = int_position(index, vec.len())?;
-    // SAFETY: the value's tag proves this projection is valid.
-    Ok(unsafe { vec.get_unchecked(position).as_int_unchecked() })
+    // SAFETY: the position check bounds the index.
+    Ok(array_value(
+        unsafe { vec.get_unchecked(position) },
+        ArrayValueMode::Int,
+    ))
 }
 
 /// Writes a vec through optimizer-proven container and index types.
@@ -425,15 +428,14 @@ pub(in crate::vm) fn dict_index_get_int_key(
 pub(in crate::vm) fn dict_index_get_int_key_int_value(
     container: &Value,
     index: i64,
-) -> Result<i64, ArrayFault> {
+) -> Result<Value, ArrayFault> {
     let Some(dict) = container.as_dict() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized dict read has a dict container") }
     };
     dict.get_int(index)
         .ok_or_else(|| ArrayFault::out_of_bounds(format!("the dict key {index} is not present")))
-        // SAFETY: the value's tag proves this projection is valid.
-        .map(|value| unsafe { value.as_int_unchecked() })
+        .map(|value| array_value(value, ArrayValueMode::Int))
 }
 
 /// Writes a dict through an optimizer-proven integer key.
@@ -486,10 +488,14 @@ pub(in crate::vm) fn dict_index_set_uint_key(container: &mut Value, index: u64, 
 #[inline(always)]
 pub(in crate::vm) fn array_value(value: &Value, value_mode: ArrayValueMode) -> Value {
     match value_mode {
-        // SAFETY: type flow proves the array's value type.
-        ArrayValueMode::Int => Value::int(unsafe { value.as_int_unchecked() }),
-        // SAFETY: type flow proves the array's value type.
-        ArrayValueMode::Uint => Value::uint(unsafe { value.as_uint_unchecked() }),
+        ArrayValueMode::Int => {
+            // SAFETY: type flow proves the array's value type.
+            Value::int(unsafe { value.as_int_unchecked() }).with_newtype(value.newtype_id())
+        }
+        ArrayValueMode::Uint => {
+            // SAFETY: type flow proves the array's value type.
+            Value::uint(unsafe { value.as_uint_unchecked() }).with_newtype(value.newtype_id())
+        }
         ArrayValueMode::Generic | ArrayValueMode::Float => value.clone(),
     }
 }
@@ -772,36 +778,7 @@ pub(in crate::vm) fn dict_add_assign_string_key_int_value(
     index: &Value,
     increment: i64,
 ) -> Result<(), IndexAddFault> {
-    let Some(dict) = container.as_dict_mut() else {
-        // SAFETY: the surrounding invariant makes this path unreachable.
-        unsafe { unreachable_invariant("a specialized indexed add has a dict container") }
-    };
-
-    let dictionary = match dict.get_mut() {
-        Some(dictionary) => dictionary,
-        None => dict.make_mut(),
-    };
-
-    let current = match index.transparent() {
-        ValueView::String(key) => dictionary.get_int_mut_string(key),
-        ValueView::ShortString(key) => dictionary.get_int_mut_short_string(*key),
-        // SAFETY: the surrounding invariant makes this path unreachable.
-        _ => unsafe { unreachable_invariant("a specialized indexed add has a string key") },
-    }
-    .ok_or_else(|| {
-        IndexAddFault::Array(ArrayFault::out_of_bounds(format!(
-            "the dict key {} is not present",
-            debug_render(heap, index, 0)
-        )))
-    })?;
-
-    *current = integer_add(*current, increment).map_err(|fault| IndexAddFault::Arithmetic {
-        fault,
-        left_kind: "int",
-        right_kind: "int",
-    })?;
-
-    Ok(())
+    dict_add_assign_any_key_int_value(heap, container, index, increment)
 }
 
 /// Adds a proven integer to a proven integer under an arbitrary dict key.
@@ -1071,7 +1048,7 @@ pub(in crate::vm) fn advance_vec_cursor(
 }
 
 /// Advances a proven vec cursor whose elements are all integers.
-pub(in crate::vm) fn advance_vec_int_cursor(cursor: &mut Value) -> Option<(i64, i64)> {
+pub(in crate::vm) fn advance_vec_int_cursor(cursor: &mut Value) -> Option<(i64, Value)> {
     let Some((vec, index)) = cursor.as_vec_cursor_mut() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec cursor traverses a vec") }
@@ -1082,8 +1059,8 @@ pub(in crate::vm) fn advance_vec_int_cursor(cursor: &mut Value) -> Option<(i64, 
         return None;
     }
 
-    // SAFETY: the value's tag proves this projection is valid.
-    let value = unsafe { vec.get_unchecked(position).as_int_unchecked() };
+    // SAFETY: the cursor position is below the vec length.
+    let value = array_value(unsafe { vec.get_unchecked(position) }, ArrayValueMode::Int);
     *index = next_index(position);
     Some((position as i64, value))
 }
@@ -1122,7 +1099,7 @@ pub(in crate::vm) fn advance_dict_cursor(
 pub(in crate::vm) fn advance_dict_cursor_int_values(
     cursor: &mut Value,
     include_key: bool,
-) -> Option<(Option<Value>, i64)> {
+) -> Option<(Option<Value>, Value)> {
     let Some((dict, cursor_position)) = cursor.as_dict_cursor_mut() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized dict cursor traverses a dict") }
@@ -1141,8 +1118,7 @@ pub(in crate::vm) fn advance_dict_cursor_int_values(
                     KeyRef::ShortString(value) => Value::short_string(value),
                 });
 
-                // SAFETY: the value's tag proves this projection is valid.
-                let value = unsafe { value.as_int_unchecked() };
+                let value = array_value(value, ArrayValueMode::Int);
                 *cursor_position = next_index(position);
                 return Some((key, value));
             }

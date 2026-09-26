@@ -1,3 +1,7 @@
+mod bitwise_masks;
+mod collection_inlining;
+mod computed_captures;
+mod joined_lengths;
 mod matching;
 mod return_proofs;
 mod uint;
@@ -18,6 +22,7 @@ use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
 use whim_bytecode::instruction::operands::PropertyRemoveMode;
 use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::rewrite::relative_target;
 use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::verify::verify_unit;
 use whim_compiler::CompileConfiguration;
@@ -2726,6 +2731,54 @@ fn discarded_dict_increments_use_one_lookup() {
 }
 
 #[test]
+fn counted_loops_reuse_only_unchanged_string_lengths() {
+    let unit = compile(
+        r"
+        function stable(string $value, int $count): int {
+            $sum = 0;
+            for ($index = 0; $index < $count; $index++) {
+                $sum += length!($value);
+            }
+            return $sum;
+        }
+        function changed(string $value, int $count): int {
+            $sum = 0;
+            for ($index = 0; $index < $count; $index++) {
+                $sum += length!($value);
+                $value .= 'x';
+            }
+            return $sum;
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+    for function in &unit.functions {
+        let code = &function.chunk.code;
+        let length = code
+            .iter()
+            .position(|instruction| matches!(instruction, Instruction::StringLength { .. }))
+            .unwrap();
+        let target = code
+            .iter()
+            .enumerate()
+            .find_map(|(position, instruction)| match instruction {
+                Instruction::IntCounterLoop { offset, .. } => {
+                    Some(relative_target(position, i32::from(offset.offset())))
+                }
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            target > length,
+            function.name.as_bytes() == b"stable",
+            "{:?}: {code:?}",
+            function.name,
+        );
+    }
+    verify_unit(&unit).unwrap();
+}
+
+#[test]
 fn three_integer_operations_use_the_numeric_loop_executor() {
     let unit = compile(
         r"
@@ -3853,6 +3906,69 @@ fn collection_elements_use_known_property_slots() {
                 .iter()
                 .any(|instruction| matches!(instruction, Instruction::PropertyGet { .. }))
         );
+    }
+    verify_unit(&unit).unwrap();
+}
+
+#[test]
+fn repeated_loop_literals_share_one_invariant_register() {
+    let unit = compile(
+        r"
+        function scramble(int $value, int $rounds): int {
+            while ($rounds > 0) {
+                $value = ($value * 33) & 2147483647;
+                $value = ($value ^ ($value >> 3)) & 2147483647;
+                $rounds--;
+            }
+            return $value;
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+    let chunk = &unit.functions[0].chunk;
+    let loads = chunk
+        .code
+        .iter()
+        .filter(|instruction| {
+            let Instruction::LoadConstant { constant, .. } = instruction else {
+                return false;
+            };
+            matches!(
+                chunk.constants[usize::from(constant.index())],
+                Literal::Int(2147483647)
+            )
+        })
+        .count();
+    assert_eq!(loads, 1, "{:?}", chunk.code);
+    verify_unit(&unit).unwrap();
+}
+
+#[test]
+fn scalar_recursive_calls_inline_two_bounded_levels() {
+    let unit = compile(
+        r"
+        function fibonacci(int $number): int {
+            if ($number < 2) { return 1; }
+            return fibonacci($number - 2) + fibonacci($number - 1);
+        }
+
+        #[Whim\Marker\NeverInline]
+        function unchanged(int $number): int {
+            if ($number < 2) { return 1; }
+            return unchanged($number - 2) + unchanged($number - 1);
+        }
+        ",
+        OptimizationConfiguration::default(),
+    );
+    for (function, expected) in unit.functions.iter().zip([8, 2]) {
+        let calls = function
+            .chunk
+            .code
+            .iter()
+            .filter(|instruction| matches!(instruction, Instruction::CallSelfUnchecked { .. }))
+            .count();
+        assert_eq!(calls, expected, "{:?}", function.chunk.code);
+        assert!(function.chunk.register_count <= 192);
     }
     verify_unit(&unit).unwrap();
 }

@@ -8,6 +8,7 @@
 
 use std::array::from_fn;
 use std::cell::UnsafeCell;
+use std::num::NonZeroU32;
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::rc::Rc;
@@ -455,7 +456,7 @@ pub(crate) struct CachedGuardedMethod {
     /// different bindings reach different method environments through the same
     /// receiver and must not share a cache entry.
     pub(crate) caller_environment: TypeEnvironmentId,
-    pub(crate) caller_class: Option<ClassId>,
+    pub(crate) caller_class: Option<NonZeroU32>,
     pub(crate) method_environment: TypeEnvironmentId,
     pub(crate) entry: ExactMethodEntry,
     pub(crate) arguments: CachedMethodArguments,
@@ -489,11 +490,29 @@ const GUARDED_METHOD_WAYS: usize = 4;
 impl GuardedMethodWays {
     pub(crate) const EMPTY: Self = Self([None; GUARDED_METHOD_WAYS]);
 
+    pub(crate) fn can_record(
+        &self,
+        receiver_class: ClassId,
+        receiver_environment: TypeEnvironmentId,
+        caller_environment: TypeEnvironmentId,
+        caller_class: Option<NonZeroU32>,
+    ) -> bool {
+        self.0.iter().any(|entry| {
+            entry.as_ref().is_none_or(|entry| {
+                entry.receiver_class == receiver_class
+                    && entry.receiver_environment == receiver_environment
+                    && entry.caller_environment == caller_environment
+                    && entry.caller_class == caller_class
+            })
+        })
+    }
+
     pub(crate) fn get(
         &self,
         receiver_class: ClassId,
         receiver_environment: TypeEnvironmentId,
         caller_environment: TypeEnvironmentId,
+        caller_class: Option<NonZeroU32>,
     ) -> Option<CachedGuardedMethod> {
         self.0
             .iter()
@@ -502,6 +521,7 @@ impl GuardedMethodWays {
                 entry.receiver_class == receiver_class
                     && entry.receiver_environment == receiver_environment
                     && entry.caller_environment == caller_environment
+                    && entry.caller_class == caller_class
             })
             .copied()
     }
@@ -511,6 +531,7 @@ impl GuardedMethodWays {
             existing.receiver_class == entry.receiver_class
                 && existing.receiver_environment == entry.receiver_environment
                 && existing.caller_environment == entry.caller_environment
+                && existing.caller_class == entry.caller_class
         });
     }
 }

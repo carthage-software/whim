@@ -642,23 +642,23 @@ impl VirtualMachine<'_> {
             debug_assert!(usize::from(runtime.required_parameters) <= argc);
             debug_assert!(usize::from(runtime.declared_parameters) >= argc);
         }
-        let entry = self.finalized_function_entry(function, false)?;
-
-        let chunk = entry.chunk;
-        let cache = entry.cache;
-        let unit = entry.unit;
-        let function = entry.function;
-        let reference_parameter_mask = entry.reference_parameter_mask;
-        let declared = usize::from(
+        self.engine.optimize_callable_once(function)?;
+        let (chunk, cache, unit, reference_parameter_mask, declared) = {
             // SAFETY: call setup keeps the chunk and reserved stack window live.
-            unsafe {
+            let runtime = unsafe {
                 self.engine
                     .tables
                     .functions
                     .get_unchecked(function.0 as usize)
-            }
-            .declared_parameters,
-        );
+            };
+            (
+                runtime.chunk,
+                NonNull::from(&*runtime.cache),
+                NonNull::from(&*runtime.unit),
+                runtime.reference_parameter_mask,
+                usize::from(runtime.declared_parameters),
+            )
+        };
         if frameless {
             self.execute_frameless_call(
                 function,
@@ -722,9 +722,7 @@ impl VirtualMachine<'_> {
                 stack_floor_offset: 0,
                 reference_register_mask,
                 return_register,
-                flags: FrameFlags::new(false, false, false)
-                    .with_scalar_return_target(entry.scalar_return_target)
-                    .with_discard_result(discard_result),
+                flags: FrameFlags::new(false, false, false).with_discard_result(discard_result),
                 type_environment,
             });
         }

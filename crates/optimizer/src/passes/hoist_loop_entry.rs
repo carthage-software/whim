@@ -31,14 +31,18 @@ pub(in crate::passes) fn optimize_chunk(
         }
 
         let entry = header + 1;
-        let Instruction::VecIndexGet {
-            destination,
-            container,
-            index,
-            ..
-        } = chunk.code[entry]
-        else {
-            continue;
+        let (destination, source, index) = match chunk.code[entry] {
+            Instruction::VecIndexGet {
+                destination,
+                container,
+                index,
+                ..
+            } => (destination, container, Some(index)),
+            Instruction::StringLength {
+                destination,
+                source,
+            } => (destination, source, None),
+            _ => continue,
         };
         let tail = exit - 1;
         let (Instruction::CounterLoop { offset, .. } | Instruction::IntCounterLoop { offset, .. }) =
@@ -47,8 +51,9 @@ pub(in crate::passes) fn optimize_chunk(
             continue;
         };
         if relative_target(tail, i32::from(offset.offset())) != entry
-            || !register_is_untouched_between(chunk, container, entry + 1, exit)
-            || !register_is_untouched_between(chunk, index, entry + 1, exit)
+            || !register_is_untouched_between(chunk, source, entry + 1, exit)
+            || index
+                .is_some_and(|index| !register_is_untouched_between(chunk, index, entry + 1, exit))
             || chunk.code[entry + 1..exit]
                 .iter()
                 .any(|instruction| effect_on(chunk, *instruction, destination).writes())

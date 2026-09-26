@@ -286,7 +286,7 @@ impl VirtualMachine<'_> {
                 receiver_class,
                 receiver_environment,
                 caller_environment,
-                caller_class: self.current_frame().called_class.get(),
+                caller_class: self.current_frame().called_class.0,
                 method_environment,
                 entry,
                 arguments: CachedMethodArguments::Proven,
@@ -345,9 +345,29 @@ impl VirtualMachine<'_> {
             let receiver = self.stack[window_start]
                 .as_object()
                 .expect("a direct method call has a proven object receiver");
-            let fast_path = self.cached_exact_method_fast_path(site, receiver.class());
-            if self.call_direct_method_fast_path(fast_path, destination, window_start) {
-                return Ok(());
+            let receiver_class = receiver.class();
+            let receiver_environment = receiver.type_environment();
+            if let Some(cached) = self
+                .cached_exact_method_frame(site, receiver_class)
+                .copied()
+            {
+                if self.call_direct_method_fast_path(cached.fast_path, destination, window_start) {
+                    return Ok(());
+                }
+
+                let environment = self.exact_method_environment(
+                    receiver_class,
+                    receiver_environment,
+                    cached.entry.scope,
+                )?;
+
+                return self.push_direct_method_frame(
+                    cached.entry,
+                    destination,
+                    window_start,
+                    count - 1,
+                    environment,
+                );
             }
         }
 
@@ -435,7 +455,7 @@ impl VirtualMachine<'_> {
                     receiver_class,
                     receiver_environment,
                     caller_environment,
-                    caller_class: self.current_frame().called_class.get(),
+                    caller_class: self.current_frame().called_class.0,
                     method_environment,
                     entry,
                     arguments: CachedMethodArguments::Proven,
@@ -514,16 +534,6 @@ impl VirtualMachine<'_> {
             .get(site)
             .and_then(Option::as_ref)
             .filter(|cached| cached.entry.called == receiver_class)
-    }
-
-    #[inline(always)]
-    fn cached_exact_method_fast_path(
-        &self,
-        site: usize,
-        receiver_class: ClassId,
-    ) -> CachedMethodFastPath {
-        self.cached_exact_method_frame(site, receiver_class)
-            .map_or(CachedMethodFastPath::None, |cached| cached.fast_path)
     }
 
     /// Returns the compact frame metadata for an exact direct method site,
@@ -965,8 +975,8 @@ impl VirtualMachine<'_> {
         (entry.receiver_class == receiver_class
             && entry.receiver_environment == receiver_environment
             && entry.caller_environment == self.current_frame().type_environment
-            && entry.caller_class == self.current_frame().called_class.get())
-        .then_some(entry)
+            && entry.caller_class == self.current_frame().called_class.0)
+            .then_some(entry)
     }
 
     #[inline(always)]
@@ -983,6 +993,7 @@ impl VirtualMachine<'_> {
             receiver_class,
             receiver_environment,
             self.current_frame().type_environment,
+            self.current_frame().called_class.0,
         )
     }
 
@@ -1181,6 +1192,39 @@ impl VirtualMachine<'_> {
             );
         }
 
+        self.call_uncached_method_site(
+            site,
+            chunk,
+            destination,
+            window_start,
+            count,
+            arguments_proven,
+            discard_result,
+            receiver,
+        )
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the uncached path takes the call state without allocating a context"
+    )]
+    #[inline(never)]
+    fn call_uncached_method_site(
+        &mut self,
+        site: usize,
+        chunk: &Chunk,
+        destination: u16,
+        window_start: usize,
+        count: usize,
+        arguments_proven: bool,
+        discard_result: bool,
+        receiver: ManagedRef<InstanceObject>,
+    ) -> Result<(), VirtualMachineControl> {
+        let caller_cache = self.current_frame().cache;
+        let receiver_class = receiver.class();
+        let receiver_environment = receiver.type_environment();
+        let argument_start = window_start + 1;
+        let argument_count = count - 1;
         let name = name_atom(chunk, site);
         if *name == self.engine.tables.constructor_name
             && self.engine.tables.classes[receiver.class().0 as usize]
@@ -1262,7 +1306,7 @@ impl VirtualMachine<'_> {
                 };
 
                 let frame_start = self.stack.len();
-                let caller_class = self.current_frame().called_class.get();
+                let caller_class = self.current_frame().called_class.0;
                 let outcome = self.push_user_frame(
                     function,
                     destination,
@@ -1293,6 +1337,17 @@ impl VirtualMachine<'_> {
 
                 if outcome.is_ok()
                     && let Some(caller_environment) = caller_environment
+                    // SAFETY: the caller's retained chunk owns this cache across call setup.
+                    && unsafe { &*caller_cache.as_ref().polymorphic_guarded_methods() }
+                        .get(site)
+                        .is_none_or(|ways| {
+                            ways.can_record(
+                                receiver_class,
+                                receiver_environment,
+                                caller_environment,
+                                caller_class,
+                            )
+                        })
                 {
                     let exact_entry = self.exact_method_frame_entry(
                         chunk,
@@ -1530,7 +1585,7 @@ impl VirtualMachine<'_> {
         let (class_atom, member) = class_member_atoms(chunk, site);
         let caller_cache = self.current_frame().cache;
         let caller_environment = self.current_frame().type_environment;
-        let caller_class = self.current_frame().called_class.get();
+        let caller_class = self.current_frame().called_class.0;
         {
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
             let entries = unsafe { &*caller_cache.as_ref().guarded_methods() };

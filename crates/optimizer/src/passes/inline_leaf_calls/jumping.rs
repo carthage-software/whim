@@ -29,7 +29,7 @@ use crate::passes::inline_leaf_calls::leaf::straight_line_body_instruction;
 use crate::passes::inline_leaf_calls::splice_replace;
 
 /// Splices a pristine snapshot of a recursive function's own body into its
-/// self-call sites, halving the call depth of tight recursion.
+/// self-call sites, reducing recursive frame traffic.
 pub(super) fn self_inline_function(
     function: &mut CompiledFunction,
     statistics: &mut OptimizationStatistics,
@@ -104,47 +104,63 @@ pub(super) fn self_inline_function(
         }
     }
 
+    let rounds = 1 + usize::from(
+        snapshot.reference_register_mask == 0
+            && function.parameters.iter().all(|parameter| {
+                parameter
+                    .declared_type
+                    .as_ref()
+                    .is_some_and(|descriptor| !descriptor.may_hold_reference())
+            }),
+    );
     let mut changed = false;
-    let mut index = function.chunk.code.len();
-    while index > 0 {
-        index -= 1;
-        if function.chunk.code.len() >= CALLER_CODE_LIMIT {
+    for _ in 0..rounds {
+        let mut round_changed = false;
+        let mut index = function.chunk.code.len();
+        while index > 0 {
+            index -= 1;
+            if function.chunk.code.len() >= CALLER_CODE_LIMIT {
+                break;
+            }
+
+            let Instruction::CallSelfUnchecked {
+                argument_count,
+                destination,
+                first_argument,
+            } = function.chunk.code[index]
+            else {
+                continue;
+            };
+
+            if usize::from(argument_count.value()) != usize::from(parameters) {
+                continue;
+            }
+
+            let owned = owned_register_mask(
+                &function.chunk,
+                index,
+                first_argument,
+                function,
+                false,
+                parameters,
+            );
+            if let Some(replacement) = build_jumping_replacement(
+                &mut function.chunk,
+                &snapshot,
+                terminal,
+                parameters,
+                destination,
+                first_argument,
+                owned,
+            ) {
+                splice_replace(&mut function.chunk, index, &replacement);
+                statistics.calls_inlined += 1;
+                round_changed = true;
+                changed = true;
+            }
+        }
+        if !round_changed {
             break;
-        }
-
-        let Instruction::CallSelfUnchecked {
-            argument_count,
-            destination,
-            first_argument,
-        } = function.chunk.code[index]
-        else {
-            continue;
-        };
-
-        if usize::from(argument_count.value()) != usize::from(parameters) {
-            continue;
-        }
-
-        let owned = owned_register_mask(
-            &function.chunk,
-            index,
-            first_argument,
-            function,
-            false,
-            parameters,
-        );
-        if let Some(replacement) = build_jumping_replacement(
-            &mut function.chunk,
-            &snapshot,
-            terminal,
-            parameters,
-            destination,
-            first_argument,
-            owned,
-        ) {
-            splice_replace(&mut function.chunk, index, &replacement);
-            statistics.calls_inlined += 1;
-            changed = true;
         }
     }
 

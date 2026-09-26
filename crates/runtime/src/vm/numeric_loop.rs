@@ -78,7 +78,7 @@ impl NumericRegisters {
     unsafe fn from_registers(
         registers: *mut Value,
         register_count: u16,
-    ) -> (NumericRegisters, u64) {
+    ) -> Option<(NumericRegisters, u64)> {
         let mut shadow = NumericRegisters {
             bits: [MaybeUninit::uninit(); NUMERIC_LOOP_REGISTER_LIMIT as usize],
             kinds: [MaybeUninit::uninit(); NUMERIC_LOOP_REGISTER_LIMIT as usize],
@@ -86,7 +86,13 @@ impl NumericRegisters {
         let mut numeric = 0u64;
         for index in 0..usize::from(register_count) {
             // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-            let value = NumericValue::from_value(unsafe { &*registers.add(index) });
+            let value = unsafe { &*registers.add(index) };
+            // The shadow cannot preserve newtype tags when it writes values back.
+            if value.newtype_id().is_some() {
+                return None;
+            }
+
+            let value = NumericValue::from_value(value);
             shadow.bits[index].write(value.bits);
             shadow.kinds[index].write(value.kind);
             if value.kind != NumericKind::Other {
@@ -94,7 +100,7 @@ impl NumericRegisters {
             }
         }
 
-        (shadow, numeric)
+        Some((shadow, numeric))
     }
 
     #[inline(always)]
@@ -246,8 +252,11 @@ impl VirtualMachine<'_> {
     ) -> NumericLoopOutcome {
         debug_assert!(chunk.register_count <= NUMERIC_LOOP_REGISTER_LIMIT);
         // SAFETY: the caller provides the active frame's verified register window.
-        let (mut values, numeric_registers) =
-            unsafe { NumericRegisters::from_registers(registers, chunk.register_count) };
+        let Some((mut values, numeric_registers)) =
+            (unsafe { NumericRegisters::from_registers(registers, chunk.register_count) })
+        else {
+            return NumericLoopOutcome::Deoptimize(body);
+        };
         if PREPARED_FLOATS {
             let mut remaining = float_registers;
             while remaining != 0 {
@@ -306,6 +315,11 @@ impl VirtualMachine<'_> {
 
                 // SAFETY: `position` is bounded by the pinned length.
                 let element = unsafe { &*elements.add(position) };
+                if element.newtype_id().is_some() {
+                    // SAFETY: `dirty` contains only active-frame numeric registers.
+                    unsafe { flush(registers, &values, dirty) };
+                    return NumericLoopOutcome::Deoptimize($current);
+                }
                 match $value_mode {
                     ArrayValueMode::Int => {
                         // SAFETY: the specialized mode proves the element is an int.
@@ -387,6 +401,11 @@ impl VirtualMachine<'_> {
 
                 // SAFETY: `position` is bounded by the pinned length.
                 let target = unsafe { &mut *elements.add(position) };
+                if target.newtype_id().is_some() {
+                    // SAFETY: `dirty` contains only active-frame numeric registers.
+                    unsafe { flush(registers, &values, dirty) };
+                    return NumericLoopOutcome::Deoptimize($current);
+                }
                 let value = values.get(value_index);
                 match value.kind {
                     NumericKind::Int if target.is_int() => {
@@ -426,6 +445,11 @@ impl VirtualMachine<'_> {
 
                 // SAFETY: `position` is bounded by the pinned length.
                 let element = unsafe { &*elements.add(position) };
+                if element.newtype_id().is_some() {
+                    // SAFETY: `dirty` contains only active-frame numeric registers.
+                    unsafe { flush(registers, &values, dirty) };
+                    return NumericLoopOutcome::Deoptimize($current);
+                }
                 match $value_mode {
                     ArrayValueMode::Int => {
                         // SAFETY: the specialized mode proves the element is an int.
@@ -2978,55 +3002,34 @@ fn int_burst_operation(
     values: &NumericRegisters,
 ) -> Option<(Register, Result<i64, Fault>)> {
     debug_assert!(int_burst_instruction_ready(instruction, values));
-    Some(match instruction {
+    let read = |register: Register| {
+        values.int(usize::from(register.index() % NUMERIC_LOOP_REGISTER_LIMIT))
+    };
+    let (destination, result) = match instruction {
         Instruction::Add {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
-        } => (
-            destination,
-            integer_add(
-                values.int(left.index() as usize),
-                values.int(right.index() as usize),
-            ),
-        ),
+        } => (destination, integer_add(read(left), read(right))),
         Instruction::Subtract {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
-        } => (
-            destination,
-            integer_subtract(
-                values.int(left.index() as usize),
-                values.int(right.index() as usize),
-            ),
-        ),
+        } => (destination, integer_subtract(read(left), read(right))),
         Instruction::Multiply {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
-        } => (
-            destination,
-            integer_multiply(
-                values.int(left.index() as usize),
-                values.int(right.index() as usize),
-            ),
-        ),
+        } => (destination, integer_multiply(read(left), read(right))),
         Instruction::Modulo {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
-        } => (
-            destination,
-            integer_modulo(
-                values.int(left.index() as usize),
-                values.int(right.index() as usize),
-            ),
-        ),
+        } => (destination, integer_modulo(read(left), read(right))),
         Instruction::AddImmediate {
             kind: Some(IntegerKind::I64),
             destination,
@@ -3034,10 +3037,7 @@ fn int_burst_operation(
             immediate,
         } => (
             destination,
-            integer_add(
-                values.int(source.index() as usize),
-                i64::from(immediate.as_int()),
-            ),
+            integer_add(read(source), i64::from(immediate.as_int())),
         ),
         Instruction::SubtractImmediate {
             kind: Some(IntegerKind::I64),
@@ -3046,10 +3046,7 @@ fn int_burst_operation(
             immediate,
         } => (
             destination,
-            integer_subtract(
-                values.int(source.index() as usize),
-                i64::from(immediate.as_int()),
-            ),
+            integer_subtract(read(source), i64::from(immediate.as_int())),
         ),
         Instruction::Step {
             kind: Some(IntegerKind::I64),
@@ -3058,10 +3055,7 @@ fn int_burst_operation(
             immediate,
         } => (
             destination,
-            integer_add(
-                values.int(source.index() as usize),
-                i64::from(immediate.value()),
-            ),
+            integer_add(read(source), i64::from(immediate.value())),
         ),
         Instruction::IntegerMultiplyImmediate {
             kind: IntegerKind::I64,
@@ -3070,10 +3064,7 @@ fn int_burst_operation(
             immediate,
         } => (
             destination,
-            integer_multiply(
-                values.int(source.index() as usize),
-                i64::from(immediate.as_int()),
-            ),
+            integer_multiply(read(source), i64::from(immediate.as_int())),
         ),
         Instruction::IntegerModuloImmediate {
             kind: IntegerKind::I64,
@@ -3082,51 +3073,39 @@ fn int_burst_operation(
             immediate,
         } => (
             destination,
-            integer_modulo(
-                values.int(source.index() as usize),
-                i64::from(immediate.as_int()),
-            ),
+            integer_modulo(read(source), i64::from(immediate.as_int())),
         ),
         Instruction::BitwiseAnd {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
-        } => (
-            destination,
-            Ok(values.int(left.index() as usize) & values.int(right.index() as usize)),
-        ),
+        } => (destination, Ok(read(left) & read(right))),
         Instruction::BitwiseOr {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
-        } => (
-            destination,
-            Ok(values.int(left.index() as usize) | values.int(right.index() as usize)),
-        ),
+        } => (destination, Ok(read(left) | read(right))),
         Instruction::BitwiseXor {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
-        } => (
-            destination,
-            Ok(values.int(left.index() as usize) ^ values.int(right.index() as usize)),
-        ),
+        } => (destination, Ok(read(left) ^ read(right))),
         Instruction::BitwiseNot {
             kind: Some(IntegerKind::I64),
             destination,
             source,
-        } => (destination, Ok(!values.int(source.index() as usize))),
+        } => (destination, Ok(!read(source))),
         Instruction::ShiftLeft {
             kind: Some(IntegerKind::I64),
             destination,
             left,
             right,
         } => {
-            let left = values.int(left.index() as usize);
-            let right = values.int(right.index() as usize);
+            let left = read(left);
+            let right = read(right);
             (
                 destination,
                 if (0..=63).contains(&right) {
@@ -3142,8 +3121,8 @@ fn int_burst_operation(
             left,
             right,
         } => {
-            let left = values.int(left.index() as usize);
-            let right = values.int(right.index() as usize);
+            let left = read(left);
+            let right = read(right);
             (
                 destination,
                 if (0..=63).contains(&right) {
@@ -3154,7 +3133,11 @@ fn int_burst_operation(
             )
         }
         _ => return None,
-    })
+    };
+    Some((
+        Register::new(destination.index() % NUMERIC_LOOP_REGISTER_LIMIT),
+        result,
+    ))
 }
 
 #[expect(
@@ -3383,10 +3366,12 @@ unsafe fn try_indexed_int_body_burst(
         if position as u64 >= length as u64 {
             return Some(body);
         }
-        let ValueView::Int(element_value) =
-            // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-            (unsafe { &*elements.add(position as usize) }).transparent()
-        else {
+        // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
+        let value = unsafe { &*elements.add(position as usize) };
+        if value.newtype_id().is_some() {
+            return Some(body);
+        }
+        let ValueView::Int(element_value) = value.transparent() else {
             return Some(body);
         };
         assign_existing_int(values, dirty, element, *element_value);
@@ -3596,6 +3581,9 @@ unsafe fn try_dict_accumulate_burst(
         let first = unsafe { &*target_elements.add(cursor_value as usize) };
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
         let second = unsafe { &*source_elements.add(cursor_value as usize) };
+        if first.newtype_id().is_some() || second.newtype_id().is_some() {
+            break false;
+        }
         let (ValueView::Int(first), ValueView::Int(second)) =
             (first.transparent(), second.transparent())
         else {
@@ -4030,8 +4018,12 @@ unsafe fn try_dict_copy_burst(
             }
             // SAFETY: the position is bounded by the pinned length; the
             // source dict is a distinct object from the separated target.
-            let element = unsafe { (*source_elements.add(cursor_value as usize)).clone() };
-            target_dict.insert(Key::Int(cursor_value), element);
+            let element = unsafe { &*source_elements.add(cursor_value as usize) };
+            if element.newtype_id().is_some() {
+                resume = Some(body + repeat * 3);
+                break 'copy false;
+            }
+            target_dict.insert(Key::Int(cursor_value), element.clone());
             last_read = cursor_value;
             cursor_value -= step;
             budget -= 1;
@@ -4186,6 +4178,10 @@ unsafe fn try_scan_burst(
         }
         // SAFETY: bounded above.
         let element = unsafe { &*elements.add(index_value as usize) };
+        if element.newtype_id().is_some() {
+            assign_existing_int(values, dirty, counter, index_value);
+            return Some(body);
+        }
         let ValueView::Int(element_value) = element.transparent() else {
             assign_existing_int(values, dirty, counter, index_value);
             return Some(body);
@@ -4469,6 +4465,19 @@ unsafe fn try_concat_burst(
         return None;
     }
 
+    // SAFETY: other-kind shadows keep these live registers unchanged throughout the burst.
+    let target = unsafe { &*registers.add(accumulator.index() as usize) };
+    let ValueView::String(target) = target.transparent() else {
+        return None;
+    };
+    // SAFETY: the right register is distinct from all registers written by the burst.
+    let extra = unsafe { &*registers.add(right.index() as usize) };
+    let extra = match extra.transparent() {
+        ValueView::String(extra) => extra.flatten(),
+        ValueView::ShortString(extra) => extra.as_bytes(),
+        _ => return None,
+    };
+
     let mut count = values.int(counter.index() as usize);
     let mut probe_value;
     let mut budget: u32 = BATCH_ITERATION_LIMIT;
@@ -4485,24 +4494,8 @@ unsafe fn try_concat_burst(
             assign_existing_int(values, dirty, probe, probe_value);
             return Some(tail + 1);
         }
-        let appended = {
-            // SAFETY: other-kind shadows never shadow their live register.
-            let target = unsafe { &*registers.add(accumulator.index() as usize) };
-            // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-            let extra = unsafe { &*registers.add(right.index() as usize) };
-            match (target.transparent(), extra.transparent()) {
-                // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                (ValueView::String(target), ValueView::String(extra)) => unsafe {
-                    ByteStringObject::append_unique(target, extra.flatten())
-                },
-                // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-                (ValueView::String(target), ValueView::ShortString(extra)) => unsafe {
-                    ByteStringObject::append_unique(target, extra.as_bytes())
-                },
-                _ => false,
-            }
-        };
-        if !appended {
+        // SAFETY: any source alias keeps the target shared, so append_unique rejects it.
+        if !unsafe { ByteStringObject::append_unique(target, extra) } {
             assign_existing_int(values, dirty, counter, count);
             assign_existing_int(values, dirty, probe, probe_value);
             return Some(header + 3);

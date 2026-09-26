@@ -4892,7 +4892,7 @@ impl VirtualMachine<'_> {
                                 vec_index_get(container, index, value_mode)
                             }
                             ArrayValueMode::Int => {
-                                vec_int_index_get(container, index).map(Value::int)
+                                vec_int_index_get(container, index)
                             }
                         };
 
@@ -4926,7 +4926,7 @@ impl VirtualMachine<'_> {
                                 dict_index_get_int_key(container, index, value_mode)
                             }
                             ArrayValueMode::Int => {
-                                dict_index_get_int_key_int_value(container, index).map(Value::int)
+                                dict_index_get_int_key_int_value(container, index)
                             }
                         };
 
@@ -5865,7 +5865,7 @@ impl VirtualMachine<'_> {
                                     write_register!(
                                         registers,
                                         value_destination,
-                                        Value::int(value)
+                                        value
                                     );
                                     ip += 1;
                                 }
@@ -5928,7 +5928,7 @@ impl VirtualMachine<'_> {
                                     write_register!(
                                         registers,
                                         value_destination,
-                                        Value::int(value)
+                                        value
                                     );
                                     ip += 1;
                                 }

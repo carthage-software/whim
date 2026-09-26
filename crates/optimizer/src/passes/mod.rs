@@ -303,13 +303,13 @@ fn optimize_chunk_before_numeric_loop_with_context(
 ) {
     if analyze_locally {
         const_fold::optimize_chunk(chunk, allocator, configuration, statistics);
-    } else {
-        const_fold::prepare_chunk(chunk, configuration, statistics);
     }
     if analyze_locally {
         strength_reduction::optimize_chunk(chunk, allocator, configuration, statistics);
     }
     move_coalescing::optimize_chunk(chunk, configuration, statistics);
+    const_fold::prepare_chunk(chunk, configuration, statistics);
+    strength_reduction::reduce_bitwise_masks(chunk, configuration, statistics);
     copy_propagation::optimize_chunk(chunk, configuration, statistics);
     fuse_index_add_assign::optimize_chunk(chunk, configuration, statistics);
     fuse_property_index_update::optimize_chunk(chunk, configuration, statistics);
