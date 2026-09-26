@@ -14,6 +14,7 @@ use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
 use whim_bytecode::instruction::operands::IndexAddMode;
@@ -884,13 +885,9 @@ impl<'a> TypeFlow<'a> {
                     };
                     (array, descriptor_mask(element).unwrap_or(ALL), keys)
                 }
-                Instruction::NewVec {
-                    element_count,
-                    first_element,
-                    ..
-                }
-                | Instruction::NewTuple {
-                    element_count,
+                Instruction::NewArray {
+                    kind: ArrayKind::Vec | ArrayKind::Tuple,
+                    count: element_count,
                     first_element,
                     ..
                 } => {
@@ -906,9 +903,10 @@ impl<'a> TypeFlow<'a> {
                 Instruction::NewFilledVec { value, .. } => {
                     (index as u32 + 1, self.fact(index, value).mask, INT)
                 }
-                Instruction::NewDict {
-                    pair_count,
-                    first_pair,
+                Instruction::NewArray {
+                    kind: ArrayKind::Dict,
+                    count: pair_count,
+                    first_element: first_pair,
                     ..
                 } => {
                     let first = usize::from(first_pair.index());

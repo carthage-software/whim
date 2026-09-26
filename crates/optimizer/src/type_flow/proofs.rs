@@ -8,6 +8,7 @@ use whim_bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledParameter;
@@ -452,16 +453,17 @@ impl TypeFlow<'_> {
             self.typed_array_initializer(index, register, &expected, |instruction| {
                 matches!(
                     instruction,
-                    Instruction::NewDict { destination, .. } if destination == register
+                    Instruction::NewArray { kind: ArrayKind::Dict, destination, .. } if destination == register
                 )
             })
         else {
             return false;
         };
         if fresh {
-            let Instruction::NewDict {
-                pair_count,
-                first_pair,
+            let Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: pair_count,
+                first_element: first_pair,
                 ..
             } = self.chunk.code[initializer]
             else {
@@ -538,15 +540,16 @@ impl TypeFlow<'_> {
             self.typed_array_initializer(index, register, &expected, |instruction| {
                 matches!(
                     instruction,
-                    Instruction::NewVec { destination, .. } if destination == register
+                    Instruction::NewArray { kind: ArrayKind::Vec, destination, .. } if destination == register
                 )
             })
         else {
             return false;
         };
         if fresh {
-            let Instruction::NewVec {
-                element_count,
+            let Instruction::NewArray {
+                kind: ArrayKind::Vec,
+                count: element_count,
                 first_element,
                 ..
             } = self.chunk.code[initializer]
@@ -852,8 +855,9 @@ impl TypeFlow<'_> {
                     let Some(index) = instruction_index(fact.origin) else {
                         return false;
                     };
-                    let Instruction::NewTuple {
-                        element_count,
+                    let Instruction::NewArray {
+                        kind: ArrayKind::Tuple,
+                        count: element_count,
                         first_element,
                         ..
                     } = self.chunk.code[index]
@@ -980,14 +984,16 @@ impl TypeFlow<'_> {
         };
         let instruction = self.chunk.code[index];
         let (count, first, stride, offset) = match instruction {
-            Instruction::NewVec {
-                element_count,
+            Instruction::NewArray {
+                kind: ArrayKind::Vec,
+                count: element_count,
                 first_element,
                 ..
             } if !dictionary_values => (usize::from(element_count.value()), first_element, 1, 0),
-            Instruction::NewDict {
-                pair_count,
-                first_pair,
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: pair_count,
+                first_element: first_pair,
                 ..
             } if dictionary_values => (usize::from(pair_count.value()), first_pair, 2, 1),
             _ => return false,
@@ -1042,9 +1048,10 @@ impl TypeFlow<'_> {
         let Some(index) = instruction_index(fact.origin) else {
             return false;
         };
-        let Instruction::NewDict {
-            pair_count,
-            first_pair,
+        let Instruction::NewArray {
+            kind: ArrayKind::Dict,
+            count: pair_count,
+            first_element: first_pair,
             ..
         } = self.chunk.code[index]
         else {
@@ -1070,8 +1077,9 @@ impl TypeFlow<'_> {
         let Some(index) = instruction_index(fact.origin) else {
             return false;
         };
-        let Instruction::NewTuple {
-            element_count,
+        let Instruction::NewArray {
+            kind: ArrayKind::Tuple,
+            count: element_count,
             first_element,
             ..
         } = self.chunk.code[index]

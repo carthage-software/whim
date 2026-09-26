@@ -11,6 +11,7 @@ use whim_base::u32_index;
 use whim_base::unwrap_option_invariant;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::unit::CONSISTENT_CONSTRUCTOR_ATTRIBUTE;
 use whim_bytecode::unit::CONSISTENT_GENERICS_ATTRIBUTE;
 use whim_bytecode::unit::ClassLikeKind;
@@ -1361,13 +1362,15 @@ fn property_default_template(heap: &Heap, initializer: &ConstantInitializer) -> 
     };
 
     let (destination, value) = match *creation {
-        Instruction::NewVec {
-            element_count,
+        Instruction::NewArray {
+            kind: ArrayKind::Vec,
+            count: element_count,
             destination,
             ..
         } if element_count.value() == 0 => (destination, Value::vec(VecObject::new(heap))),
-        Instruction::NewDict {
-            pair_count,
+        Instruction::NewArray {
+            kind: ArrayKind::Dict,
+            count: pair_count,
             destination,
             ..
         } if pair_count.value() == 0 => (destination, Value::dict(DictObject::new(heap))),

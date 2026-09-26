@@ -687,9 +687,13 @@ assert!($assertion_error_75 is TypeError);
 
 File\write(
   $work . '/write-error.whim',
-  'write_error!(\'e1\');'
+  'write_error!();'
   . "\n"
-  . 'write_error_line!(\'e2\');'
+  . 'write_error_line!();'
+  . "\n"
+  . 'write_error!(\'e1\');'
+  . "\n"
+  . 'write_error_line!(\'e2\', \'e3\');'
   . "\n"
   . 'write_line!(\'stdout untouched\');'
   . "\n",
@@ -698,7 +702,7 @@ File\write(
 $writeError = Command\run($binary, vec[$work . '/write-error.whim']);
 assert!($writeError->isSuccess());
 assert!($writeError->standardOutput == 'stdout untouched' . "\n");
-assert!($writeError->standardError == 'e1e2' . "\n");
+assert!($writeError->standardError == "\n" . 'e1e2e3' . "\n");
 
 File\write(
   $work . '/debug.whim',

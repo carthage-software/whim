@@ -340,30 +340,16 @@ pub(in crate::verify) fn verify_instruction(
                 }
             }
         }
-        Instruction::NewVec {
-            element_count,
+        Instruction::NewArray {
+            count,
             first_element,
-            ..
-        }
-        | Instruction::NewTuple {
-            element_count,
-            first_element,
+            kind,
             ..
         } => check_window(
             chunk,
             at,
             u32::from(first_element.index()),
-            usize::from(element_count.value()),
-        ),
-        Instruction::NewDict {
-            pair_count,
-            first_pair,
-            ..
-        } => check_window(
-            chunk,
-            at,
-            u32::from(first_pair.index()),
-            2 * usize::from(pair_count.value()),
+            usize::from(kind.register_count(count)),
         ),
         Instruction::CallValue {
             argument_count,
@@ -488,20 +474,9 @@ pub(in crate::verify) fn verify_instruction(
         | Instruction::VecForeachNext { .. }
         | Instruction::DictForeachNext { .. } => verify_foreach_next(chunk, at),
         Instruction::Write {
-            value_count,
-            first_value,
-        }
-        | Instruction::WriteLine {
-            value_count,
-            first_value,
-        }
-        | Instruction::WriteError {
-            value_count,
-            first_value,
-        }
-        | Instruction::WriteErrorLine {
-            value_count,
-            first_value,
+            count: value_count,
+            register: first_value,
+            ..
         }
         | Instruction::Debug {
             value_count,

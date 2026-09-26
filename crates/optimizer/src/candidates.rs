@@ -270,9 +270,7 @@ fn constant_candidate(instruction: Instruction) -> bool {
         instruction,
         Instruction::Move { .. }
             | Instruction::MoveOwned { .. }
-            | Instruction::NewVec { .. }
-            | Instruction::NewDict { .. }
-            | Instruction::NewTuple { .. }
+            | Instruction::NewArray { .. }
             | Instruction::Add { kind: None, .. }
             | Instruction::Subtract { kind: None, .. }
             | Instruction::Multiply { kind: None, .. }

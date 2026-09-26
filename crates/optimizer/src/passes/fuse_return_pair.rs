@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
@@ -48,8 +49,9 @@ fn optimize_chunk(chunk: &mut Chunk, statistics: &mut OptimizationStatistics) {
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
     for index in 0..chunk.code.len() - 1 {
-        let Instruction::NewTuple {
-            element_count,
+        let Instruction::NewArray {
+            kind: ArrayKind::Tuple,
+            count: element_count,
             destination,
             first_element,
         } = chunk.code[index]

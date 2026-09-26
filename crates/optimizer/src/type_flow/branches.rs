@@ -2,6 +2,7 @@ use whim_bytecode::chunk::descriptors::SwitchTable;
 use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
 use whim_bytecode::chunk::descriptors::string_switch_lookup;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::relative_target;
@@ -170,9 +171,10 @@ impl TypeFlow<'_> {
             return Some(runtime_value(value));
         }
         let producer = instruction_index(self.fact(index, register).origin)?;
-        let Instruction::NewTuple {
+        let Instruction::NewArray {
+            kind: ArrayKind::Tuple,
             first_element,
-            element_count,
+            count: element_count,
             ..
         } = self.chunk.code[producer]
         else {

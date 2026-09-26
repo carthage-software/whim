@@ -23,6 +23,7 @@ use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
 use whim_bytecode::chunk::descriptors::string_switch_lookup;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::AsMode;
 use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
@@ -3429,52 +3430,15 @@ impl VirtualMachine<'_> {
                         continue 'dispatch;
                     }
                     Instruction::Write {
-                        value_count,
-                        first_value,
+                        count,
+                        register,
+                        new_line,
+                        stderr,
                     } => {
                         self.sync_ip(ip);
-                        let start = self.current_base() + first_value.index() as usize;
+                        let start = self.current_base() + register.index() as usize;
                         if let Err(control) =
-                            self.write_values(start, usize::from(value_count.value()), false, false)
-                        {
-                            self.handle_control(control, floor)?;
-                            continue 'dispatch;
-                        }
-                    }
-                    Instruction::WriteLine {
-                        value_count,
-                        first_value,
-                    } => {
-                        self.sync_ip(ip);
-                        let start = self.current_base() + first_value.index() as usize;
-                        if let Err(control) =
-                            self.write_values(start, usize::from(value_count.value()), false, true)
-                        {
-                            self.handle_control(control, floor)?;
-                            continue 'dispatch;
-                        }
-                    }
-                    Instruction::WriteError {
-                        value_count,
-                        first_value,
-                    } => {
-                        self.sync_ip(ip);
-                        let start = self.current_base() + first_value.index() as usize;
-                        if let Err(control) =
-                            self.write_values(start, usize::from(value_count.value()), true, false)
-                        {
-                            self.handle_control(control, floor)?;
-                            continue 'dispatch;
-                        }
-                    }
-                    Instruction::WriteErrorLine {
-                        value_count,
-                        first_value,
-                    } => {
-                        self.sync_ip(ip);
-                        let start = self.current_base() + first_value.index() as usize;
-                        if let Err(control) =
-                            self.write_values(start, usize::from(value_count.value()), true, true)
+                            self.write_values(start, usize::from(count.value()), stderr, new_line)
                         {
                             self.handle_control(control, floor)?;
                             continue 'dispatch;
@@ -4742,23 +4706,54 @@ impl VirtualMachine<'_> {
 
                         continue 'dispatch;
                     }
-                    Instruction::NewVec {
-                        element_count,
+                    Instruction::NewArray {
+                        count,
                         destination,
                         first_element,
+                        kind,
                     } => {
-                        let count = usize::from(element_count.value());
+                        let count = usize::from(count.value());
                         let start = self.current_base() + first_element.index() as usize;
-                        let mut elements = Vec::with_capacity(count);
-                        for position in 0..count {
-                            elements.push(self.stack[start + position].clone());
-                        }
+                        let value = match kind {
+                            ArrayKind::Vec => {
+                                let mut elements = Vec::with_capacity(count);
+                                for position in 0..count {
+                                    elements.push(self.stack[start + position].clone());
+                                }
+                                Value::vec(VecObject::with_elements(&self.heap, elements))
+                            }
+                            ArrayKind::Tuple => {
+                                let elements = self.stack[start..start + count].iter().cloned();
+                                Value::tuple(TupleObject::with_elements(&self.heap, elements))
+                            }
+                            ArrayKind::Dict => {
+                                let mut dict = DictObject::new(&self.heap);
+                                let mut fault = None;
+                                let Some(entries) = dict.get_mut() else {
+                                    // SAFETY: a fresh dict handle has no other owners.
+                                    unsafe { unreachable_invariant("a fresh dict handle is unique") }
+                                };
+                                for pair in 0..count {
+                                    let key_value = &self.stack[start + pair * 2];
+                                    match dict_key(key_value) {
+                                        Ok(key) => {
+                                            let value = self.stack[start + pair * 2 + 1].clone();
+                                            entries.insert(key, value);
+                                        }
+                                        Err(found) => {
+                                            fault = Some(found);
+                                            break;
+                                        }
+                                    }
+                                }
+                                if let Some(fault) = fault {
+                                    fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                                }
+                                Value::dict(dict)
+                            }
+                        };
 
-                        write_register!(
-                            registers,
-                            destination,
-                            Value::vec(VecObject::with_elements(&self.heap, elements))
-                        );
+                        write_register!(registers, destination, value);
                     }
                     Instruction::NewFilledVec {
                         destination,
@@ -4819,58 +4814,6 @@ impl VirtualMachine<'_> {
                             destination,
                             Value::vec(VecObject::with_elements(&self.heap, elements))
                         );
-                    }
-                    Instruction::NewTuple {
-                        element_count,
-                        destination,
-                        first_element,
-                    } => {
-                        let count = usize::from(element_count.value());
-                        let start = self.current_base() + first_element.index() as usize;
-                        let elements = self.stack[start..start + count].iter().cloned();
-
-                        write_register!(
-                            registers,
-                            destination,
-                            Value::tuple(TupleObject::with_elements(&self.heap, elements))
-                        );
-                    }
-                    Instruction::NewDict {
-                        pair_count,
-                        destination,
-                        first_pair,
-                    } => {
-                        let count = usize::from(pair_count.value());
-                        let start = self.current_base() + first_pair.index() as usize;
-                        let mut dict = DictObject::new(&self.heap);
-                        let mut fault = None;
-
-                        let Some(entries) = dict.get_mut() else {
-                            // SAFETY: the surrounding invariant makes this path unreachable.
-                            unsafe {
-                                unreachable_invariant("a fresh dict handle is unique")
-                            }
-                        };
-
-                        for pair in 0..count {
-                            let key_value = &self.stack[start + pair * 2];
-                            match dict_key(key_value) {
-                                Ok(key) => {
-                                    let value = self.stack[start + pair * 2 + 1].clone();
-                                    entries.insert(key, value);
-                                }
-                                Err(found) => {
-                                    fault = Some(found);
-                                    break;
-                                }
-                            }
-                        }
-
-                        if let Some(fault) = fault {
-                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
-                        }
-
-                        write_register!(registers, destination, Value::dict(dict));
                     }
                     Instruction::IndexGet {
                         destination,

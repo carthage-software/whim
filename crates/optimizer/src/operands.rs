@@ -84,9 +84,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | Clear
         ) => Some(&[W1]),
         instruction_kinds!(
-            NewVec
-                | NewDict
-                | NewTuple
+            NewArray
                 | MakeClosure
                 | CallNamed
                 | CallNamedDiscarded
@@ -106,9 +104,6 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
         | InstructionKind::CallValueDiscarded => Some(&[W2, R4]),
         instruction_kinds!(
             Jump | Write
-                | WriteLine
-                | WriteError
-                | WriteErrorLine
                 | Debug
                 | DrainFinalizers
                 | CheckWhereConstraints
@@ -312,14 +307,12 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
             Register::new(first_argument.index() + 1),
             usize::from(argument_count.value() - 1),
         )),
-        instructions!(
-            NewVec | NewTuple; {
-            element_count,
+        Instruction::NewArray {
+            count,
             first_element,
+            kind,
             ..
-        }) if element_count.value() != 0 => {
-            Some((first_element, usize::from(element_count.value())))
-        }
+        } if count.value() != 0 => Some((first_element, usize::from(kind.register_count(count)))),
         Instruction::SwitchTuplePattern {
             first_element,
             element_count,
@@ -327,11 +320,6 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
         } if element_count.value() != 0 => {
             Some((first_element, usize::from(element_count.value())))
         }
-        Instruction::NewDict {
-            pair_count,
-            first_pair,
-            ..
-        } if pair_count.value() != 0 => Some((first_pair, usize::from(pair_count.value()) * 2)),
         Instruction::MakeClosure {
             capture_count,
             first_capture,
@@ -339,11 +327,15 @@ pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usiz
         } if capture_count.value() != 0 => {
             Some((first_capture, usize::from(capture_count.value())))
         }
-        instructions!(
-            Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+        Instruction::Write {
+            count: value_count,
+            register: first_value,
+            ..
+        }
+        | Instruction::Debug {
             value_count,
             first_value,
-        }) if value_count.value() != 0 => Some((first_value, usize::from(value_count.value()))),
+        } if value_count.value() != 0 => Some((first_value, usize::from(value_count.value()))),
         instructions!(
             PropertyIndexSet | PropertyIndexSetUnchecked; { first_operand, .. }) => {
             Some((Register::new(first_operand.index() + 1), 1))
@@ -456,11 +448,15 @@ pub(crate) fn replace_read_register(
     from: Register,
     to: Register,
 ) -> Option<Instruction> {
-    if let instructions!(
-            Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+    if let Instruction::Write {
+        count: value_count,
+        register: first_value,
+        ..
+    }
+    | Instruction::Debug {
         value_count,
         first_value,
-    }) = &mut instruction
+    } = &mut instruction
         && value_count.value() == 1
         && *first_value == from
     {

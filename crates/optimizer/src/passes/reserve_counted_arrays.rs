@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Comparison;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
@@ -123,13 +124,9 @@ fn fresh_array_before(chunk: &Chunk, container: Register, header: usize) -> bool
         }
         if effect.writes() {
             return match chunk.code[index] {
-                Instruction::NewVec {
-                    element_count,
-                    destination,
-                    ..
-                }
-                | Instruction::NewDict {
-                    pair_count: element_count,
+                Instruction::NewArray {
+                    kind: ArrayKind::Vec | ArrayKind::Dict,
+                    count: element_count,
                     destination,
                     ..
                 } => destination == container && element_count.value() == 0,

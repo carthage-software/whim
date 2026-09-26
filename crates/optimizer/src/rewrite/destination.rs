@@ -113,9 +113,7 @@ pub(crate) fn with_destination(
         | Instruction::GreaterThanOrEqual { destination, .. }
         | Instruction::Compare { destination, .. }
         | Instruction::Not { destination, .. }
-        | Instruction::NewVec { destination, .. }
-        | Instruction::NewDict { destination, .. }
-        | Instruction::NewTuple { destination, .. }
+        | Instruction::NewArray { destination, .. }
         | Instruction::IndexGet { destination, .. }
         | Instruction::StringIndexGet { destination, .. }
         | Instruction::StringByteEqual { destination, .. }

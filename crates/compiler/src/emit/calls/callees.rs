@@ -6,6 +6,7 @@ use whim_bytecode::chunk::descriptors::PresetDescriptor;
 use whim_bytecode::chunk::descriptors::PresetSlot;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::call::PartialArgumentList;
@@ -198,8 +199,9 @@ impl BodyCompiler<'_, '_> {
                 );
 
                 self.chunk.emit(
-                    Instruction::NewTuple {
-                        element_count: Count::new(2),
+                    Instruction::NewArray {
+                        kind: ArrayKind::Tuple,
+                        count: Count::new(2),
                         destination,
                         first_element: first,
                     },

@@ -3,6 +3,7 @@ use whim_bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use whim_bytecode::chunk::descriptors::ShapeKey;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Register;
 
 use crate::type_flow::Fact;
@@ -22,13 +23,9 @@ impl TypeFlow<'_> {
             return false;
         };
         let (element_count, first_element) = match self.chunk.code[index] {
-            Instruction::NewVec {
-                element_count,
-                first_element,
-                ..
-            }
-            | Instruction::NewTuple {
-                element_count,
+            Instruction::NewArray {
+                kind: ArrayKind::Vec | ArrayKind::Tuple,
+                count: element_count,
                 first_element,
                 ..
             } => (usize::from(element_count.value()), first_element),
@@ -62,9 +59,10 @@ impl TypeFlow<'_> {
         let Some(index) = instruction_index(fact.origin) else {
             return false;
         };
-        let Instruction::NewDict {
-            pair_count,
-            first_pair,
+        let Instruction::NewArray {
+            kind: ArrayKind::Dict,
+            count: pair_count,
+            first_element: first_pair,
             ..
         } = self.chunk.code[index]
         else {

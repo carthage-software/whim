@@ -498,23 +498,16 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(subject),
             constant_reference(chunk, name)
         ),
-        instructions!(NewVec | NewTuple; {
-            element_count,
+        Instruction::NewArray {
+            count,
             destination,
             first_element,
-        }) => format!(
-            " {}, {}",
-            register(destination),
-            window(first_element, u32::from(element_count.value()))
-        ),
-        Instruction::NewDict {
-            pair_count,
-            destination,
-            first_pair,
+            kind,
         } => format!(
-            " {}, {}",
+            ".{} {}, {}",
+            kind.name(),
             register(destination),
-            window(first_pair, 2 * u32::from(pair_count.value()))
+            window(first_element, u32::from(kind.register_count(count)))
         ),
         instructions!(IndexGetOrNull | VecIndexGetOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexGet | StringIndexGet; {
             destination,
@@ -1036,10 +1029,21 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
                 ArrayValueMode::Uint => ", uint",
             }
         ),
-        instructions!(Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+        Instruction::Write {
+            count,
+            register: first_value,
+            new_line,
+            stderr,
+        } => format!(
+            ".{}{} {}",
+            if stderr { "stderr" } else { "stdout" },
+            if new_line { ".line" } else { "" },
+            window(first_value, u32::from(count.value()))
+        ),
+        Instruction::Debug {
             value_count,
             first_value,
-        }) => format!(" {}", window(first_value, u32::from(value_count.value()))),
+        } => format!(" {}", window(first_value, u32::from(value_count.value()))),
         Instruction::Assert {
             operand_count,
             first_value,

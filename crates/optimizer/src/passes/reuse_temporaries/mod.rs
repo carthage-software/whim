@@ -373,41 +373,21 @@ fn pinned_window_registers(chunk: &Chunk) -> HashSet<u16> {
             } if argument_count.value() != 1 => {
                 Some((first_argument, usize::from(argument_count.value())))
             }
-            Instruction::NewVec {
-                element_count,
+            Instruction::NewArray {
+                count,
                 first_element,
+                kind,
                 ..
-            }
-            | Instruction::NewTuple {
-                element_count,
-                first_element,
-                ..
-            } => Some((first_element, usize::from(element_count.value()))),
-            Instruction::NewDict {
-                pair_count,
-                first_pair,
-                ..
-            } => Some((first_pair, usize::from(pair_count.value()) * 2)),
+            } => Some((first_element, usize::from(kind.register_count(count)))),
             Instruction::MakeClosure {
                 capture_count,
                 first_capture,
                 ..
             } => Some((first_capture, usize::from(capture_count.value()))),
             Instruction::Write {
-                value_count,
-                first_value,
-            }
-            | Instruction::WriteLine {
-                value_count,
-                first_value,
-            }
-            | Instruction::WriteError {
-                value_count,
-                first_value,
-            }
-            | Instruction::WriteErrorLine {
-                value_count,
-                first_value,
+                count: value_count,
+                register: first_value,
+                ..
             }
             | Instruction::Debug {
                 value_count,
@@ -431,11 +411,7 @@ fn pinned_window_registers(chunk: &Chunk) -> HashSet<u16> {
         if count == 1
             && matches!(
                 instruction,
-                Instruction::Write { .. }
-                    | Instruction::WriteLine { .. }
-                    | Instruction::WriteError { .. }
-                    | Instruction::WriteErrorLine { .. }
-                    | Instruction::Debug { .. }
+                Instruction::Write { .. } | Instruction::Debug { .. }
             )
         {
             continue;
@@ -451,32 +427,15 @@ fn remap_registers(instruction: Instruction, mapping: &[Register]) -> Instructio
     let remapped = remap_operands(instruction, mapping);
     match remapped {
         Instruction::Write {
-            value_count,
-            first_value,
-        } if value_count.value() == 1 => Instruction::Write {
-            value_count,
-            first_value: mapping[usize::from(first_value.index())],
-        },
-        Instruction::WriteLine {
-            value_count,
-            first_value,
-        } if value_count.value() == 1 => Instruction::WriteLine {
-            value_count,
-            first_value: mapping[usize::from(first_value.index())],
-        },
-        Instruction::WriteError {
-            value_count,
-            first_value,
-        } if value_count.value() == 1 => Instruction::WriteError {
-            value_count,
-            first_value: mapping[usize::from(first_value.index())],
-        },
-        Instruction::WriteErrorLine {
-            value_count,
-            first_value,
-        } if value_count.value() == 1 => Instruction::WriteErrorLine {
-            value_count,
-            first_value: mapping[usize::from(first_value.index())],
+            count,
+            register,
+            new_line,
+            stderr,
+        } if count.value() == 1 => Instruction::Write {
+            count,
+            register: mapping[usize::from(register.index())],
+            new_line,
+            stderr,
         },
         Instruction::Debug {
             value_count,
@@ -501,21 +460,11 @@ fn normalize_empty_window_starts(chunk: &mut Chunk) {
     let placeholder = Register::new(chunk.register_count.saturating_sub(1));
     for instruction in &mut chunk.code {
         match instruction {
-            Instruction::NewVec {
-                element_count,
+            Instruction::NewArray {
+                count,
                 first_element,
                 ..
-            }
-            | Instruction::NewTuple {
-                element_count,
-                first_element,
-                ..
-            } if element_count.value() == 0 => *first_element = placeholder,
-            Instruction::NewDict {
-                pair_count,
-                first_pair,
-                ..
-            } if pair_count.value() == 0 => *first_pair = placeholder,
+            } if count.value() == 0 => *first_element = placeholder,
             Instruction::MakeClosure {
                 capture_count,
                 first_capture,
@@ -592,20 +541,9 @@ fn normalize_empty_window_starts(chunk: &mut Chunk) {
                 ..
             } if argument_count.value() == 0 => *first_argument = placeholder,
             Instruction::Write {
-                value_count,
-                first_value,
-            }
-            | Instruction::WriteLine {
-                value_count,
-                first_value,
-            }
-            | Instruction::WriteError {
-                value_count,
-                first_value,
-            }
-            | Instruction::WriteErrorLine {
-                value_count,
-                first_value,
+                count: value_count,
+                register: first_value,
+                ..
             }
             | Instruction::Debug {
                 value_count,

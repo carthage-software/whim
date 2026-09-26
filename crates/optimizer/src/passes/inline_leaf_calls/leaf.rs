@@ -170,9 +170,6 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::DictIndexGetStringKeyOrNull { .. }
             | Instruction::StringIndexGetOrNull { .. }
             | Instruction::Write { .. }
-            | Instruction::WriteLine { .. }
-            | Instruction::WriteError { .. }
-            | Instruction::WriteErrorLine { .. }
     )
 }
 
@@ -1007,20 +1004,9 @@ pub(super) fn remap_instruction(
                 .ok()?;
         }
         Instruction::Write {
-            value_count,
-            first_value,
-        }
-        | Instruction::WriteLine {
-            value_count,
-            first_value,
-        }
-        | Instruction::WriteError {
-            value_count,
-            first_value,
-        }
-        | Instruction::WriteErrorLine {
-            value_count,
-            first_value,
+            count: value_count,
+            register: first_value,
+            ..
         } => {
             *first_value = remap_window(*first_value, *value_count, remap)?;
         }

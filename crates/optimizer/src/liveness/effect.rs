@@ -255,21 +255,13 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 writes(descriptor.first_destination) || writes(descriptor.second_destination),
             )
         }
-        instructions!(
-            NewVec | NewTuple; {
-            element_count,
+        Instruction::NewArray {
+            count,
             destination,
             first_element,
-        }) => read_then_write(
-            window(first_element, usize::from(element_count.value())),
-            writes(destination),
-        ),
-        Instruction::NewDict {
-            pair_count,
-            destination,
-            first_pair,
+            kind,
         } => read_then_write(
-            window(first_pair, usize::from(pair_count.value()) * 2),
+            window(first_element, usize::from(kind.register_count(count))),
             writes(destination),
         ),
         instructions!(
@@ -506,11 +498,15 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(
-            Write | WriteLine | WriteError | WriteErrorLine | Debug; {
+        Instruction::Write {
+            count: value_count,
+            register: first_value,
+            ..
+        }
+        | Instruction::Debug {
             value_count,
             first_value,
-        }) => {
+        } => {
             if window(first_value, usize::from(value_count.value())) {
                 Effect::Read
             } else {

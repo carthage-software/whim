@@ -6,6 +6,7 @@ use whim_base::unwrap_result_invariant;
 use whim_bytecode::chunk::descriptors::Literal as BytecodeLiteral;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::AsMode;
 use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::Count;
@@ -168,8 +169,9 @@ impl BodyCompiler<'_, '_> {
                 vector.span(),
             )?;
             self.chunk.emit(
-                Instruction::NewVec {
-                    element_count: Count::new(element_count),
+                Instruction::NewArray {
+                    kind: ArrayKind::Vec,
+                    count: Count::new(element_count),
                     destination,
                     first_element: first,
                 },
@@ -177,8 +179,9 @@ impl BodyCompiler<'_, '_> {
             );
         } else {
             self.chunk.emit(
-                Instruction::NewVec {
-                    element_count: Count::new(0),
+                Instruction::NewArray {
+                    kind: ArrayKind::Vec,
+                    count: Count::new(0),
                     destination,
                     first_element: Register::new(self.registers.mark()),
                 },
@@ -286,10 +289,11 @@ impl BodyCompiler<'_, '_> {
         }
         let first = first.unwrap_or_else(|| Register::new(self.registers.mark()));
         self.chunk.emit(
-            Instruction::NewDict {
-                pair_count: Count::new(pair_count),
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: Count::new(pair_count),
                 destination,
-                first_pair: first,
+                first_element: first,
             },
             dictionary.span(),
         );
@@ -304,10 +308,11 @@ impl BodyCompiler<'_, '_> {
         destination: Register,
     ) -> Result<(), CompileError> {
         self.chunk.emit(
-            Instruction::NewDict {
-                pair_count: Count::new(0),
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: Count::new(0),
                 destination,
-                first_pair: Register::new(self.registers.mark()),
+                first_element: Register::new(self.registers.mark()),
             },
             dictionary.span(),
         );
@@ -411,8 +416,9 @@ impl BodyCompiler<'_, '_> {
         let mark = self.registers.mark();
         let first = self.window(scope, values.iter().copied(), values.len(), tuple.span())?;
         self.chunk.emit(
-            Instruction::NewTuple {
-                element_count: Count::new(tuple_window_gate(tuple.elements.len(), tuple.span())?),
+            Instruction::NewArray {
+                kind: ArrayKind::Tuple,
+                count: Count::new(tuple_window_gate(tuple.elements.len(), tuple.span())?),
                 destination,
                 first_element: first,
             },

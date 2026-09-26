@@ -8,6 +8,7 @@ use whim_bytecode::chunk::descriptors::LiteralKey;
 use whim_bytecode::chunk::descriptors::PropertyInitializationDescriptor;
 use whim_bytecode::chunk::descriptors::literal_key;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertySlot;
 use whim_bytecode::instruction::operands::Register;
@@ -355,10 +356,11 @@ fn scalar_replace_dicts(chunk: &mut Chunk, statistics: &mut OptimizationStatisti
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
     for index in 0..chunk.code.len() - 1 {
-        let Instruction::NewDict {
-            pair_count,
+        let Instruction::NewArray {
+            kind: ArrayKind::Dict,
+            count: pair_count,
             destination,
-            first_pair,
+            first_element: first_pair,
         } = chunk.code[index]
         else {
             continue;

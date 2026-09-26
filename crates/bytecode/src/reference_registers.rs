@@ -67,10 +67,8 @@ pub fn mask_with_classification(
             | Instruction::Concatenate { destination, .. }
             | Instruction::ConcatenateRightConstant { destination, .. }
             | Instruction::ConcatenateLeftConstant { destination, .. }
-            | Instruction::NewVec { destination, .. }
+            | Instruction::NewArray { destination, .. }
             | Instruction::NewFilledVec { destination, .. }
-            | Instruction::NewDict { destination, .. }
-            | Instruction::NewTuple { destination, .. }
             | Instruction::IndexGet { destination, .. }
             | Instruction::Rest { destination, .. }
             | Instruction::Remove { destination, .. }
@@ -237,9 +235,6 @@ pub fn mask_with_classification(
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }
             | Instruction::Write { .. }
-            | Instruction::WriteLine { .. }
-            | Instruction::WriteError { .. }
-            | Instruction::WriteErrorLine { .. }
             | Instruction::Debug { .. }
             | Instruction::Assert { .. }
             | Instruction::Exit { .. }

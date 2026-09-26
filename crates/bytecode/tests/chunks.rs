@@ -1,6 +1,8 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
+use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::DescriptorIndex;
 use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::IntegerKind;
@@ -75,12 +77,7 @@ fn integer_instructions_preserve_kind_and_operand_bits() {
                 kind,
             },
         ] {
-            // SAFETY: the word comes from a live instruction and retains its tag.
-            let decoded = unsafe { InstructionWord::read(&instruction).decode() };
-            assert_eq!(instruction, decoded);
-            assert_eq!(instruction.kind(), decoded.kind());
-            let encoded = bincode::serialize(&instruction).unwrap();
-            assert_eq!(instruction, bincode::deserialize(&encoded).unwrap());
+            assert_round_trip(instruction);
         }
     }
     assert_eq!(ImmediateInteger::signed(-1).as_uint(), u16::MAX);
@@ -139,4 +136,71 @@ fn integer_range_branches_require_a_descriptor_of_their_kind() {
             }
         }
     }
+}
+
+#[test]
+fn array_operands_preserve_kind_and_register_windows() {
+    for (kind, width) in [
+        (ArrayKind::Vec, 1),
+        (ArrayKind::Dict, 2),
+        (ArrayKind::Tuple, 1),
+    ] {
+        for count in [0, 1, u8::MAX] {
+            let mut chunk = Chunk::new();
+            chunk.register_count = 1 + u16::from(count) * width;
+            let instruction = Instruction::NewArray {
+                count: Count::new(count),
+                destination: Register::new(0),
+                first_element: Register::new(1),
+                kind,
+            };
+            assert_round_trip(instruction);
+            chunk.emit(instruction, Span::zero());
+            chunk.emit(Instruction::ReturnNull, Span::zero());
+            verify(&chunk).unwrap();
+            if count != 0 {
+                chunk.register_count -= 1;
+                assert!(matches!(
+                    verify(&chunk),
+                    Err(VerifyError::RegisterWindowOutOfRange { .. })
+                ));
+            }
+        }
+    }
+}
+
+#[test]
+fn write_operands_preserve_flags_and_register_windows() {
+    for (new_line, stderr) in [(false, false), (true, false), (false, true), (true, true)] {
+        for count in [0, 1, u8::MAX] {
+            let mut chunk = Chunk::new();
+            chunk.register_count = 1 + u16::from(count);
+            let instruction = Instruction::Write {
+                count: Count::new(count),
+                register: Register::new(1),
+                new_line,
+                stderr,
+            };
+            assert_round_trip(instruction);
+            chunk.emit(instruction, Span::zero());
+            chunk.emit(Instruction::ReturnNull, Span::zero());
+            verify(&chunk).unwrap();
+            if count != 0 {
+                chunk.register_count -= 1;
+                assert!(matches!(
+                    verify(&chunk),
+                    Err(VerifyError::RegisterWindowOutOfRange { .. })
+                ));
+            }
+        }
+    }
+}
+
+fn assert_round_trip(instruction: Instruction) {
+    // SAFETY: the word comes from a live instruction and retains its tag.
+    let decoded = unsafe { InstructionWord::read(&instruction).decode() };
+    assert_eq!(instruction, decoded);
+    assert_eq!(instruction.kind(), decoded.kind());
+    let encoded = bincode::serialize(&instruction).unwrap();
+    assert_eq!(instruction, bincode::deserialize(&encoded).unwrap());
 }

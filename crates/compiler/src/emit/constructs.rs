@@ -85,25 +85,15 @@ impl BinaryConstruct {
 impl WriteTarget {
     const fn instruction(self, value_count: Count, first_value: Register) -> Instruction {
         match self {
-            Self::Output => Instruction::Write {
-                value_count,
-                first_value,
-            },
-            Self::OutputLine => Instruction::WriteLine {
-                value_count,
-                first_value,
-            },
-            Self::Error => Instruction::WriteError {
-                value_count,
-                first_value,
-            },
-            Self::ErrorLine => Instruction::WriteErrorLine {
-                value_count,
-                first_value,
-            },
             Self::Diagnostic => Instruction::Debug {
                 value_count,
                 first_value,
+            },
+            _ => Instruction::Write {
+                count: value_count,
+                register: first_value,
+                new_line: matches!(self, Self::OutputLine | Self::ErrorLine),
+                stderr: matches!(self, Self::Error | Self::ErrorLine),
             },
         }
     }

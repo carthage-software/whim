@@ -16,6 +16,7 @@ use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::chunk::descriptors::descriptor_is_trivial;
 use whim_bytecode::chunk::descriptors::string_switch_buckets;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::AsMode;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::ImmediateInt;
@@ -990,11 +991,9 @@ impl BodyCompiler<'_, '_> {
                 unsafe { unreachable_invariant("a non-exhaustive tuple match keeps its subject") }
             };
             self.chunk.emit(
-                Instruction::NewTuple {
-                    element_count: Count::new(tuple_window_gate(
-                        tuple.elements.len(),
-                        tuple.span(),
-                    )?),
+                Instruction::NewArray {
+                    kind: ArrayKind::Tuple,
+                    count: Count::new(tuple_window_gate(tuple.elements.len(), tuple.span())?),
                     destination: subject,
                     first_element: first,
                 },
@@ -1153,8 +1152,9 @@ impl BodyCompiler<'_, '_> {
             self.move_into(slot, *element, tuple.span());
         }
         self.chunk.emit(
-            Instruction::NewTuple {
-                element_count: Count::new(tuple_window_gate(tuple.elements.len(), tuple.span())?),
+            Instruction::NewArray {
+                kind: ArrayKind::Tuple,
+                count: Count::new(tuple_window_gate(tuple.elements.len(), tuple.span())?),
                 destination: subject,
                 first_element: first,
             },
@@ -2226,10 +2226,11 @@ impl BodyCompiler<'_, '_> {
         let remainder = self.allocate(span)?;
         let mark = self.registers.mark();
         self.chunk.emit(
-            Instruction::NewDict {
-                pair_count: Count::new(0),
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: Count::new(0),
                 destination: remainder,
-                first_pair: Register::new(mark),
+                first_element: Register::new(mark),
             },
             span,
         );

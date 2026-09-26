@@ -144,6 +144,30 @@ pub enum IndexAddMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
+pub enum ArrayKind {
+    Vec,
+    Dict,
+    Tuple,
+}
+
+impl ArrayKind {
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Vec => "vec",
+            Self::Dict => "dict",
+            Self::Tuple => "tuple",
+        }
+    }
+
+    #[must_use]
+    pub const fn register_count(self, count: Count) -> u16 {
+        count.value() as u16 * if matches!(self, Self::Dict) { 2 } else { 1 }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum AsMode {
     /// Preserve the value after checking that it already satisfies the type.
     Boundary,

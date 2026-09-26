@@ -5,6 +5,7 @@ use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
@@ -493,13 +494,9 @@ impl TypeFlow<'_> {
                 destination,
                 source,
             } if self.fact_is_constant(self.fact(index, source), 0) => Some(destination),
-            Instruction::NewVec {
-                element_count,
-                destination,
-                first_element,
-            }
-            | Instruction::NewTuple {
-                element_count,
+            Instruction::NewArray {
+                kind: ArrayKind::Vec | ArrayKind::Tuple,
+                count: element_count,
                 destination,
                 first_element,
             } if (0..usize::from(element_count.value())).all(|offset| {
@@ -511,10 +508,11 @@ impl TypeFlow<'_> {
             {
                 Some(destination)
             }
-            Instruction::NewDict {
-                pair_count,
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: pair_count,
                 destination,
-                first_pair,
+                first_element: first_pair,
             } if (0..usize::from(pair_count.value())).all(|pair| {
                 let key = first_pair.index() + (pair * 2) as u16;
                 matches!(
@@ -556,11 +554,15 @@ impl TypeFlow<'_> {
                 };
                 i64::try_from(value.as_bytes().len()).ok()
             }
-            Instruction::NewVec { element_count, .. }
-            | Instruction::NewTuple { element_count, .. } => Some(i64::from(element_count.value())),
-            Instruction::NewDict {
-                pair_count,
-                first_pair,
+            Instruction::NewArray {
+                kind: ArrayKind::Vec | ArrayKind::Tuple,
+                count: element_count,
+                ..
+            } => Some(i64::from(element_count.value())),
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: pair_count,
+                first_element: first_pair,
                 ..
             } => {
                 if pair_count.value() <= 1 {
@@ -645,13 +647,9 @@ impl TypeFlow<'_> {
             return false;
         };
         match self.chunk.code[index] {
-            Instruction::NewVec {
-                element_count,
-                first_element,
-                ..
-            }
-            | Instruction::NewTuple {
-                element_count,
+            Instruction::NewArray {
+                kind: ArrayKind::Vec | ArrayKind::Tuple,
+                count: element_count,
                 first_element,
                 ..
             } => (0..usize::from(element_count.value())).all(|offset| {
@@ -660,9 +658,10 @@ impl TypeFlow<'_> {
                     depth + 1,
                 )
             }),
-            Instruction::NewDict {
-                pair_count,
-                first_pair,
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: pair_count,
+                first_element: first_pair,
                 ..
             } => (0..usize::from(pair_count.value())).all(|pair| {
                 let key = first_pair.index() + (pair * 2) as u16;
@@ -691,13 +690,9 @@ impl TypeFlow<'_> {
         }
         let index = instruction_index(container.origin)?;
         match self.chunk.code[index] {
-            Instruction::NewVec {
-                element_count,
-                first_element,
-                ..
-            }
-            | Instruction::NewTuple {
-                element_count,
+            Instruction::NewArray {
+                kind: ArrayKind::Vec | ArrayKind::Tuple,
+                count: element_count,
                 first_element,
                 ..
             } => {
@@ -713,9 +708,10 @@ impl TypeFlow<'_> {
                     depth + 1,
                 )
             }
-            Instruction::NewDict {
-                pair_count,
-                first_pair,
+            Instruction::NewArray {
+                kind: ArrayKind::Dict,
+                count: pair_count,
+                first_element: first_pair,
                 ..
             } => {
                 for pair in (0..usize::from(pair_count.value())).rev() {

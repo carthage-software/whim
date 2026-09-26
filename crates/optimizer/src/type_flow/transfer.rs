@@ -3,6 +3,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::Comparison;
 use whim_bytecode::instruction::operands::IntegerKind;
@@ -379,25 +380,24 @@ pub(crate) fn transfer(
         | Instruction::ConcatenateLeftConstant { destination, .. } => {
             write(destination, Fact::with_origin(STRING, origin))
         }
-        instruction @ (Instruction::NewVec {
-            element_count,
+        Instruction::NewArray {
+            kind,
+            count,
             destination,
             first_element,
-        }
-        | Instruction::NewTuple {
-            element_count,
-            destination,
-            first_element,
-        }) => {
+        } => {
             let first = usize::from(first_element.index());
-            let count = usize::from(element_count.value());
-            let observable_release =
-                (first..first + count).any(|register| state[register].get().observable_release);
-            let mask = if matches!(instruction, Instruction::NewVec { .. }) {
-                VECTOR
-            } else {
-                TUPLE
+            let count = usize::from(count.value());
+            let (mask, width) = match kind {
+                ArrayKind::Vec => (VECTOR, 1),
+                ArrayKind::Dict => (DICTIONARY, 2),
+                ArrayKind::Tuple => (TUPLE, 1),
             };
+            let observable_release = (0..count).any(|index| {
+                state[first + index * width + width - 1]
+                    .get()
+                    .observable_release
+            });
             write(destination, Fact::array(mask, origin, observable_release));
         }
         Instruction::NewFilledVec {
@@ -406,20 +406,6 @@ pub(crate) fn transfer(
             destination,
             Fact::array(VECTOR, origin, read(value).observable_release),
         ),
-        Instruction::NewDict {
-            pair_count,
-            destination,
-            first_pair,
-        } => {
-            let first = usize::from(first_pair.index());
-            let count = usize::from(pair_count.value());
-            let observable_release =
-                (0..count).any(|pair| state[first + pair * 2 + 1].get().observable_release);
-            write(
-                destination,
-                Fact::array(DICTIONARY, origin, observable_release),
-            );
-        }
         Instruction::Rest {
             destination,
             subject,
@@ -845,9 +831,6 @@ pub(crate) fn transfer(
         | Instruction::Rethrow
         | Instruction::ThrowUnhandledMatch { .. }
         | Instruction::Write { .. }
-        | Instruction::WriteLine { .. }
-        | Instruction::WriteError { .. }
-        | Instruction::WriteErrorLine { .. }
         | Instruction::Debug { .. }
         | Instruction::Assert { .. }
         | Instruction::Exit { .. }

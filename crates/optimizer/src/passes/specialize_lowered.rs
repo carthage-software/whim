@@ -4,6 +4,7 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
@@ -790,11 +791,23 @@ fn transfer(
         | Instruction::ConcatenateRightConstant { destination, .. }
         | Instruction::ConcatenateLeftConstant { destination, .. }
         | Instruction::StringIndexGet { destination, .. } => (destination, KnownKind::String),
-        Instruction::NewVec { destination, .. }
+        Instruction::NewArray {
+            kind: ArrayKind::Vec,
+            destination,
+            ..
+        }
         | Instruction::NewFilledVec { destination, .. }
         | Instruction::Rest { destination, .. } => (destination, KnownKind::Vec),
-        Instruction::NewDict { destination, .. } => (destination, KnownKind::Dict),
-        Instruction::NewTuple { destination, .. } => (destination, KnownKind::Tuple),
+        Instruction::NewArray {
+            kind: ArrayKind::Dict,
+            destination,
+            ..
+        } => (destination, KnownKind::Dict),
+        Instruction::NewArray {
+            kind: ArrayKind::Tuple,
+            destination,
+            ..
+        } => (destination, KnownKind::Tuple),
         Instruction::NewStatic { destination, .. }
         | Instruction::NewDynamic { destination, .. }
         | Instruction::NewTyped { destination, .. }

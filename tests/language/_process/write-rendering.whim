@@ -1,3 +1,4 @@
+write!();
 write!('a', 1, 2.5);
-write_line!('');
+write_line!();
 write_line!('x', 'y');

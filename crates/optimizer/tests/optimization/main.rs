@@ -11,6 +11,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::SwitchTable;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Comparison;
 use whim_bytecode::instruction::operands::IndexAddMode;
 use whim_bytecode::instruction::operands::IntegerKind;
@@ -137,9 +138,11 @@ fn removes_dead_initial_writes_to_fresh_locals() {
         assert!(
             chunk.code.iter().any(|instruction| matches!(
                 instruction,
-                Instruction::WriteLine {
-                    value_count,
-                    first_value,
+                Instruction::Write {
+                    count: value_count,
+                    register: first_value,
+                    new_line: true,
+                    stderr: false,
                 } if value_count.value() == 1 && *first_value == destination
             )),
             "{:?}",
@@ -420,8 +423,10 @@ fn nonescaping_static_dict_reads_are_replaced() {
         !select.chunk.code.iter().any(|instruction| {
             matches!(
                 instruction,
-                Instruction::NewDict { .. }
-                    | Instruction::IndexGet { .. }
+                Instruction::NewArray {
+                    kind: ArrayKind::Dict,
+                    ..
+                } | Instruction::IndexGet { .. }
                     | Instruction::DictIndexGetIntKey { .. }
                     | Instruction::DictIndexGetStringKey { .. }
             )
@@ -3166,13 +3171,15 @@ fn literal_matches_use_specialized_dispatch() {
             }
         )
     }));
-    assert!(
-        function(b"tupled")
-            .chunk
-            .code
-            .iter()
-            .all(|instruction| { !matches!(instruction, Instruction::NewTuple { .. }) })
-    );
+    assert!(function(b"tupled").chunk.code.iter().all(|instruction| {
+        !matches!(
+            instruction,
+            Instruction::NewArray {
+                kind: ArrayKind::Tuple,
+                ..
+            }
+        )
+    }));
 
     assert!(matches!(
         function(b"floating").chunk.switch_tables.first(),
