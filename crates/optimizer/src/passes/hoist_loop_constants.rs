@@ -5,8 +5,8 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ConstantIndex;
-use whim_bytecode::instruction::operands::ImmediateInt;
-use whim_bytecode::instruction::operands::ImmediateUint;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::compact;
 use whim_bytecode::rewrite::relative_target;
@@ -176,19 +176,15 @@ struct Candidate {
 
 #[derive(Clone, Copy)]
 enum ScalarLoad {
-    Int(ImmediateInt),
-    Uint(ImmediateUint),
+    Integer(ImmediateInteger, IntegerKind),
     Constant(ConstantIndex),
 }
 
 impl ScalarLoad {
     fn with_destination(self, destination: Register) -> Instruction {
         match self {
-            Self::Int(immediate) => Instruction::LoadInt {
-                destination,
-                immediate,
-            },
-            Self::Uint(immediate) => Instruction::LoadUint {
+            Self::Integer(immediate, kind) => Instruction::LoadInteger {
+                kind,
                 destination,
                 immediate,
             },
@@ -202,14 +198,11 @@ impl ScalarLoad {
 
 fn scalar_load(chunk: &Chunk, instruction: Instruction) -> Option<(Register, ScalarLoad)> {
     match instruction {
-        Instruction::LoadInt {
+        Instruction::LoadInteger {
+            kind,
             destination,
             immediate,
-        } => Some((destination, ScalarLoad::Int(immediate))),
-        Instruction::LoadUint {
-            destination,
-            immediate,
-        } => Some((destination, ScalarLoad::Uint(immediate))),
+        } => Some((destination, ScalarLoad::Integer(immediate, kind))),
         Instruction::LoadConstant {
             destination,
             constant,
@@ -235,9 +228,10 @@ fn replace_binary_read(
     replacement: Register,
 ) -> Option<Instruction> {
     macro_rules! replace {
-        ($variant:ident, $destination:ident, $left:ident, $right:ident) => {
+        ($variant:ident, $destination:ident, $left:ident, $right:ident $(, $kind:expr)?) => {
             (($left == expected) || ($right == expected)).then_some(Instruction::$variant {
                 destination: $destination,
+                $(kind: $kind,)?
                 left: if $left == expected {
                     replacement
                 } else {
@@ -348,96 +342,60 @@ fn replace_binary_read(
             left,
             right,
         } => replace!(Compare, destination, left, right),
-        Instruction::IntAdd {
+        Instruction::IntegerAdd {
             destination,
             left,
             right,
-        } => replace!(IntAdd, destination, left, right),
-        Instruction::IntSubtract {
+            kind,
+        } => replace!(IntegerAdd, destination, left, right, kind),
+        Instruction::IntegerSubtract {
             destination,
             left,
             right,
-        } => replace!(IntSubtract, destination, left, right),
-        Instruction::IntMultiply {
+            kind,
+        } => replace!(IntegerSubtract, destination, left, right, kind),
+        Instruction::IntegerMultiply {
             destination,
             left,
             right,
-        } => replace!(IntMultiply, destination, left, right),
-        Instruction::IntModulo {
+            kind,
+        } => replace!(IntegerMultiply, destination, left, right, kind),
+        Instruction::IntegerModulo {
             destination,
             left,
             right,
-        } => replace!(IntModulo, destination, left, right),
-        Instruction::IntBitwiseAnd {
+            kind,
+        } => replace!(IntegerModulo, destination, left, right, kind),
+        Instruction::IntegerBitwiseAnd {
             destination,
             left,
             right,
-        } => replace!(IntBitwiseAnd, destination, left, right),
-        Instruction::IntBitwiseOr {
+            kind,
+        } => replace!(IntegerBitwiseAnd, destination, left, right, kind),
+        Instruction::IntegerBitwiseOr {
             destination,
             left,
             right,
-        } => replace!(IntBitwiseOr, destination, left, right),
-        Instruction::IntBitwiseXor {
+            kind,
+        } => replace!(IntegerBitwiseOr, destination, left, right, kind),
+        Instruction::IntegerBitwiseXor {
             destination,
             left,
             right,
-        } => replace!(IntBitwiseXor, destination, left, right),
-        Instruction::IntShiftLeft {
+            kind,
+        } => replace!(IntegerBitwiseXor, destination, left, right, kind),
+        Instruction::IntegerShiftLeft {
             destination,
             left,
             right,
-        } => replace!(IntShiftLeft, destination, left, right),
-        Instruction::IntShiftRight {
+            kind,
+        } => replace!(IntegerShiftLeft, destination, left, right, kind),
+        Instruction::IntegerShiftRight {
             destination,
             left,
             right,
-        } => replace!(IntShiftRight, destination, left, right),
-        Instruction::UintAdd {
-            destination,
-            left,
-            right,
-        } => replace!(UintAdd, destination, left, right),
-        Instruction::UintSubtract {
-            destination,
-            left,
-            right,
-        } => replace!(UintSubtract, destination, left, right),
-        Instruction::UintMultiply {
-            destination,
-            left,
-            right,
-        } => replace!(UintMultiply, destination, left, right),
-        Instruction::UintModulo {
-            destination,
-            left,
-            right,
-        } => replace!(UintModulo, destination, left, right),
-        Instruction::UintBitwiseAnd {
-            destination,
-            left,
-            right,
-        } => replace!(UintBitwiseAnd, destination, left, right),
-        Instruction::UintBitwiseOr {
-            destination,
-            left,
-            right,
-        } => replace!(UintBitwiseOr, destination, left, right),
-        Instruction::UintBitwiseXor {
-            destination,
-            left,
-            right,
-        } => replace!(UintBitwiseXor, destination, left, right),
-        Instruction::UintShiftLeft {
-            destination,
-            left,
-            right,
-        } => replace!(UintShiftLeft, destination, left, right),
-        Instruction::UintShiftRight {
-            destination,
-            left,
-            right,
-        } => replace!(UintShiftRight, destination, left, right),
+            kind,
+        } => replace!(IntegerShiftRight, destination, left, right, kind),
         Instruction::FloatAdd {
             destination,
             left,

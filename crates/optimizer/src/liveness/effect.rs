@@ -11,8 +11,7 @@ pub(crate) fn changes_value(chunk: &Chunk, instruction: Instruction, register: R
     match instruction {
         Instruction::IndexSet { container, .. }
         | Instruction::VecIndexSet { container, .. }
-        | Instruction::DictIndexSetIntKey { container, .. }
-        | Instruction::DictIndexSetUintKey { container, .. }
+        | Instruction::DictIndexSetIntegerKey { container, .. }
         | Instruction::DictIndexSetStringKey { container, .. }
         | Instruction::DictIndexSet { container, .. }
         | Instruction::IndexAddAssign { container, .. }
@@ -63,18 +62,18 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
 
     match instruction {
         instructions!(
-            Coalesce | Move | Negate | UnaryPlus | BitwiseNot | IntBitwiseNot | Not | Length | StringLength
-                | CloneObject | AddImmediate | SubtractImmediate | Step | IntMultiplyImmediate
-                | IntModuloImmediate | FloatMultiplyConstant | ConcatenateRightConstant
-                | ConcatenateLeftConstant | Is | AsCheck | AsOrNull | UintBitwiseNot
-                | UintAddImmediate | UintSubtractImmediate | UintMultiplyImmediate | UintModuloImmediate | UintStep;
+            Coalesce | Move | Negate | UnaryPlus | BitwiseNot | IntegerBitwiseNot | Not | Length | StringLength
+                | CloneObject | AddImmediate | SubtractImmediate | Step | IntegerMultiplyImmediate
+                | IntegerModuloImmediate | FloatMultiplyConstant | ConcatenateRightConstant
+                | ConcatenateLeftConstant | Is | AsCheck | AsOrNull
+                | IntegerAddImmediate | IntegerSubtractImmediate | IntegerStep;
             { destination, source, .. }
         ) => read_then_write(reads(source), writes(destination)),
         Instruction::MoveOwned {
             destination,
             source,
         } => read_then_write(reads(source), writes(source) || writes(destination)),
-        instructions!(IntAddAssign | UintAddAssign; { target, source }) => {
+        Instruction::IntegerAddAssign { target, source, .. } => {
             read_then_write(reads(target) || reads(source), writes(target))
         }
         Instruction::FloatDifferenceAdd {
@@ -91,21 +90,19 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             ..
         } => read_then_write(window(first_operand, 3), writes(destination)),
         instructions!(
-            Add | Subtract | Multiply | IntAdd | IntSubtract | IntMultiply | IntModulo
-                | IntBitwiseAnd | IntBitwiseOr | IntBitwiseXor | IntShiftLeft | IntShiftRight
+            Add | Subtract | Multiply | IntegerAdd | IntegerSubtract | IntegerMultiply | IntegerModulo
+                | IntegerBitwiseAnd | IntegerBitwiseOr | IntegerBitwiseXor | IntegerShiftLeft | IntegerShiftRight
                 | FloatAdd | FloatSubtract | FloatMultiply | Divide | Modulo | Power
                 | Concatenate | BitwiseAnd | BitwiseOr | BitwiseXor | ShiftLeft | ShiftRight
                 | Equal | NotEqual | LessThan | LessThanOrEqual | GreaterThan
-                | GreaterThanOrEqual | Compare | UintAdd | UintSubtract | UintMultiply | UintModulo
-                | UintBitwiseAnd | UintBitwiseOr | UintBitwiseXor | UintShiftLeft | UintShiftRight;
-            { destination, left, right }
+                | GreaterThanOrEqual | Compare;
+            { destination, left, right, .. }
         ) => read_then_write(reads(left) || reads(right), writes(destination)),
         Instruction::LoadConstant { destination, .. }
         | Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
-        | Instruction::LoadInt { destination, .. }
-        | Instruction::LoadUint { destination, .. }
+        | Instruction::LoadInteger { destination, .. }
         | Instruction::NewStatic { destination, .. }
         | Instruction::NewTyped { destination, .. }
         | Instruction::StaticPropertyGetOrNull { destination, .. }
@@ -120,7 +117,7 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
                 Effect::None
             }
         }
-        instructions!(Jump | NumericRegionJump | ReturnIntUnchecked | ReturnUintUnchecked; { .. })
+        instructions!(Jump | NumericRegionJump | ReturnIntegerUnchecked; { .. })
         | instructions!(
             ReturnNull | ReturnNullUnchecked | Rethrow | DrainFinalizers | CheckWhereConstraints
         ) => Effect::None,
@@ -138,10 +135,8 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
         | Instruction::SwitchBool { subject, .. }
         | Instruction::SwitchFloat { subject, .. }
         | Instruction::SwitchPattern { subject, .. }
-        | Instruction::IntRangeJumpIf { subject, .. }
-        | Instruction::IntRangeJumpUnless { subject, .. }
-        | Instruction::UintRangeJumpIf { subject, .. }
-        | Instruction::UintRangeJumpUnless { subject, .. }
+        | Instruction::IntegerRangeJumpIf { subject, .. }
+        | Instruction::IntegerRangeJumpUnless { subject, .. }
         | Instruction::BoolPatternBranch { subject, .. }
         | Instruction::CheckDefined { subject, .. }
         | Instruction::CheckDestructure { subject, .. }
@@ -282,15 +277,16 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
             writes(destination),
         ),
         instructions!(
-            IndexGetOrNull | VecIndexGetOrNull | DictIndexGetIntKeyOrNull | DictIndexGetUintKeyOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceUintKey | DictIndexCoalesceStringKey | StringIndexCoalesce | IndexGet | VecIndexGet | DictIndexGetIntKey | DictIndexGetUintKey | DictIndexGetStringKey | StringIndexGet
+            IndexGetOrNull | VecIndexGetOrNull | DictIndexGetIntegerKeyOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexCoalesce | VecIndexCoalesce | DictIndexCoalesceIntKey | DictIndexCoalesceUintKey | DictIndexCoalesceStringKey | StringIndexCoalesce | IndexGet | VecIndexGet | DictIndexGetIntKey | DictIndexGetUintKey | DictIndexGetStringKey | StringIndexGet
                 | StringByteEqual | StringByteNotEqual | StringByteLessThan
                 | StringByteLessThanOrEqual | StringByteGreaterThan | StringByteGreaterThanOrEqual;
             { destination, container, index, .. }
         ) => read_then_write(reads(container) || reads(index), writes(destination)),
-        instructions!(IndexSet | VecIndexSet | DictIndexSetIntKey | DictIndexSetUintKey | DictIndexSetStringKey | DictIndexSet; {
+        instructions!(IndexSet | VecIndexSet | DictIndexSetIntegerKey | DictIndexSetStringKey | DictIndexSet; {
             container,
             index,
             value,
+            ..
         })
         | Instruction::IndexAddAssign {
             container,

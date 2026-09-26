@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 
 use crate::OptimizationConfiguration;
 
@@ -85,8 +86,14 @@ fn instruction_candidates(
                 | Instruction::BitwiseNot { .. }
                 | Instruction::ShiftLeft { .. }
                 | Instruction::ShiftRight { .. }
-                | Instruction::IntAdd { .. }
-                | Instruction::IntSubtract { .. }
+                | Instruction::IntegerAdd {
+                    kind: IntegerKind::I64,
+                    ..
+                }
+                | Instruction::IntegerSubtract {
+                    kind: IntegerKind::I64,
+                    ..
+                }
         )
     {
         candidates.insert(CandidateSet::ARITHMETIC);
@@ -97,7 +104,10 @@ fn instruction_candidates(
             instruction,
             Instruction::AddImmediate { .. }
                 | Instruction::SubtractImmediate { .. }
-                | Instruction::IntMultiplyImmediate { .. }
+                | Instruction::IntegerMultiplyImmediate {
+                    kind: IntegerKind::I64,
+                    ..
+                }
         )
     {
         candidates.insert(CandidateSet::ARITHMETIC);
@@ -182,8 +192,7 @@ fn instruction_candidates(
                 | Instruction::StringJumpUnless { .. }
                 | Instruction::Is { .. }
                 | Instruction::SwitchPattern { .. }
-                | Instruction::IntRangeJumpUnless { .. }
-                | Instruction::UintRangeJumpUnless { .. }
+                | Instruction::IntegerRangeJumpUnless { .. }
         )
     {
         candidates.insert(CandidateSet::COMPARISON);
@@ -295,39 +304,27 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::StringLength { .. }
             | Instruction::IndexGet { .. }
             | Instruction::ElementGet { .. }
-            | Instruction::IntAdd { .. }
-            | Instruction::IntSubtract { .. }
-            | Instruction::IntMultiply { .. }
-            | Instruction::IntModulo { .. }
-            | Instruction::IntBitwiseAnd { .. }
-            | Instruction::IntBitwiseOr { .. }
-            | Instruction::IntBitwiseXor { .. }
-            | Instruction::IntBitwiseNot { .. }
-            | Instruction::IntShiftLeft { .. }
-            | Instruction::IntShiftRight { .. }
-            | Instruction::UintAdd { .. }
-            | Instruction::UintSubtract { .. }
-            | Instruction::UintMultiply { .. }
-            | Instruction::UintModulo { .. }
-            | Instruction::UintBitwiseAnd { .. }
-            | Instruction::UintBitwiseOr { .. }
-            | Instruction::UintBitwiseXor { .. }
-            | Instruction::UintBitwiseNot { .. }
-            | Instruction::UintShiftLeft { .. }
-            | Instruction::UintShiftRight { .. }
-            | Instruction::UintStep { .. }
-            | Instruction::UintAddImmediate { .. }
-            | Instruction::UintSubtractImmediate { .. }
-            | Instruction::UintMultiplyImmediate { .. }
-            | Instruction::UintModuloImmediate { .. }
+            | Instruction::IntegerAdd { .. }
+            | Instruction::IntegerSubtract { .. }
+            | Instruction::IntegerMultiply { .. }
+            | Instruction::IntegerModulo { .. }
+            | Instruction::IntegerBitwiseAnd { .. }
+            | Instruction::IntegerBitwiseOr { .. }
+            | Instruction::IntegerBitwiseXor { .. }
+            | Instruction::IntegerBitwiseNot { .. }
+            | Instruction::IntegerShiftLeft { .. }
+            | Instruction::IntegerShiftRight { .. }
+            | Instruction::IntegerStep { .. }
+            | Instruction::IntegerAddImmediate { .. }
+            | Instruction::IntegerSubtractImmediate { .. }
             | Instruction::FloatAdd { .. }
             | Instruction::FloatSubtract { .. }
             | Instruction::FloatMultiply { .. }
             | Instruction::AddImmediate { .. }
             | Instruction::Step { .. }
             | Instruction::SubtractImmediate { .. }
-            | Instruction::IntMultiplyImmediate { .. }
-            | Instruction::IntModuloImmediate { .. }
+            | Instruction::IntegerMultiplyImmediate { .. }
+            | Instruction::IntegerModuloImmediate { .. }
             | Instruction::JumpIfFalse { .. }
             | Instruction::JumpIfTrue { .. }
             | Instruction::JumpIfNull { .. }
@@ -358,8 +355,7 @@ fn instruction_may_be_a_dead_store(instruction: Instruction) -> bool {
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
-            | Instruction::LoadInt { .. }
-            | Instruction::LoadUint { .. }
+            | Instruction::LoadInteger { .. }
             | Instruction::Clear { .. }
             | Instruction::VecIndexGet { .. }
             | Instruction::DictIndexGetIntKey { .. }

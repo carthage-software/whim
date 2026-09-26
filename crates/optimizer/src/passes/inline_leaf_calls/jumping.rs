@@ -6,6 +6,7 @@ use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::PropertyValueMode;
 use whim_bytecode::instruction::operands::Register;
@@ -66,8 +67,7 @@ pub(super) fn self_inline_function(
         Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnReferenceUnchecked { .. }
             | Instruction::ReturnUnchecked { .. }
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::ReturnNullUnchecked
     ) {
         return false;
@@ -88,8 +88,7 @@ pub(super) fn self_inline_function(
                     | Instruction::ReturnScalarUnchecked { .. }
                     | Instruction::ReturnReferenceUnchecked { .. }
                     | Instruction::ReturnUnchecked { .. }
-                    | Instruction::ReturnIntUnchecked { .. }
-                    | Instruction::ReturnUintUnchecked { .. }
+                    | Instruction::ReturnIntegerUnchecked { .. }
                     | Instruction::ReturnNullUnchecked
             )
             || body_jump_targets_are_forward(&snapshot, instruction, index, terminal);
@@ -165,15 +164,13 @@ pub(super) fn body_jump_target(instruction: Instruction, index: usize) -> Option
         | Instruction::IntJumpUnless { offset, .. }
         | Instruction::UintJumpUnless { offset, .. }
         | Instruction::UintJumpUnlessImmediate { offset, .. }
-        | Instruction::UintRangeJumpIf { offset, .. }
-        | Instruction::UintRangeJumpUnless { offset, .. }
         | Instruction::StringJumpUnless { offset, .. }
         | Instruction::StringByteJumpUnlessEqual { offset, .. }
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
         | Instruction::IntJumpUnlessImmediate { offset, .. }
         | Instruction::JumpUnlessConstant { offset, .. }
-        | Instruction::IntRangeJumpIf { offset, .. }
-        | Instruction::IntRangeJumpUnless { offset, .. } => i32::from(offset.offset()),
+        | Instruction::IntegerRangeJumpIf { offset, .. }
+        | Instruction::IntegerRangeJumpUnless { offset, .. } => i32::from(offset.offset()),
         _ => return None,
     };
 
@@ -296,8 +293,7 @@ pub(super) fn build_jumping_replacement_bound(
             Instruction::ReturnScalarUnchecked { .. }
                 | Instruction::ReturnReferenceUnchecked { .. }
                 | Instruction::ReturnUnchecked { .. }
-                | Instruction::ReturnIntUnchecked { .. }
-                | Instruction::ReturnUintUnchecked { .. }
+                | Instruction::ReturnIntegerUnchecked { .. }
                 | Instruction::ReturnNullUnchecked
         );
 
@@ -324,11 +320,19 @@ pub(super) fn build_jumping_replacement_bound(
                 destination,
                 source: remap(source),
             }),
-            Instruction::ReturnIntUnchecked { immediate } => Some(Instruction::LoadInt {
+            Instruction::ReturnIntegerUnchecked {
+                kind: IntegerKind::I64,
+                immediate,
+            } => Some(Instruction::LoadInteger {
+                kind: IntegerKind::I64,
                 destination,
                 immediate,
             }),
-            Instruction::ReturnUintUnchecked { immediate } => Some(Instruction::LoadUint {
+            Instruction::ReturnIntegerUnchecked {
+                kind: IntegerKind::U64,
+                immediate,
+            } => Some(Instruction::LoadInteger {
+                kind: IntegerKind::U64,
                 destination,
                 immediate,
             }),
@@ -508,12 +512,10 @@ fn rebase_body_jump(instruction: Instruction, relative: i64) -> Option<Instructi
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
         | Instruction::IntJumpUnlessImmediate { offset, .. }
         | Instruction::JumpUnlessConstant { offset, .. }
-        | Instruction::IntRangeJumpIf { offset, .. }
-        | Instruction::IntRangeJumpUnless { offset, .. }
+        | Instruction::IntegerRangeJumpIf { offset, .. }
+        | Instruction::IntegerRangeJumpUnless { offset, .. }
         | Instruction::UintJumpUnless { offset, .. }
-        | Instruction::UintJumpUnlessImmediate { offset, .. }
-        | Instruction::UintRangeJumpIf { offset, .. }
-        | Instruction::UintRangeJumpUnless { offset, .. } => {
+        | Instruction::UintJumpUnlessImmediate { offset, .. } => {
             *offset = ShortJumpOffset::new(i16::try_from(relative).ok()?);
         }
         _ => return None,

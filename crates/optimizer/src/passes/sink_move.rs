@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
 
@@ -88,13 +89,41 @@ fn pure_scalar_inputs(instruction: Instruction) -> Option<([Register; 3], usize)
         Instruction::FloatAdd { left, right, .. }
         | Instruction::FloatSubtract { left, right, .. }
         | Instruction::FloatMultiply { left, right, .. }
-        | Instruction::IntAdd { left, right, .. }
-        | Instruction::IntSubtract { left, right, .. }
-        | Instruction::IntMultiply { left, right, .. }
-        | Instruction::IntModulo { left, right, .. } => Some(([left, right, none], 2)),
+        | Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
+            left,
+            right,
+            ..
+        }
+        | Instruction::IntegerSubtract {
+            kind: IntegerKind::I64,
+            left,
+            right,
+            ..
+        }
+        | Instruction::IntegerMultiply {
+            kind: IntegerKind::I64,
+            left,
+            right,
+            ..
+        }
+        | Instruction::IntegerModulo {
+            kind: IntegerKind::I64,
+            left,
+            right,
+            ..
+        } => Some(([left, right, none], 2)),
         Instruction::FloatMultiplyConstant { source, .. }
-        | Instruction::IntMultiplyImmediate { source, .. }
-        | Instruction::IntModuloImmediate { source, .. } => Some(([source, none, none], 1)),
+        | Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::I64,
+            source,
+            ..
+        }
+        | Instruction::IntegerModuloImmediate {
+            kind: IntegerKind::I64,
+            source,
+            ..
+        } => Some(([source, none, none], 1)),
         Instruction::FloatDifferenceAdd {
             first_operand,
             addend,

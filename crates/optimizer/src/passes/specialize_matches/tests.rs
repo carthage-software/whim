@@ -3,7 +3,8 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::SwitchTable;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Comparison;
-use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
@@ -61,9 +62,10 @@ fn string_chain(heap: &Heap, input: &[u8], literals: &[&[u8]]) -> Chunk {
 
 fn emit_exit(chunk: &mut Chunk, code: i16) {
     chunk.emit(
-        Instruction::LoadInt {
+        Instruction::LoadInteger {
+            kind: IntegerKind::I64,
             destination: RESULT,
-            immediate: ImmediateInt::new(code),
+            immediate: ImmediateInteger::signed(code),
         },
         Span::zero(),
     );
@@ -90,16 +92,18 @@ fn entry_string_chain(heap: &Heap) -> Chunk {
                 right: TEMPORARY,
                 offset: ShortJumpOffset::new(2),
             },
-            Instruction::ReturnIntUnchecked {
-                immediate: ImmediateInt::new(value),
+            Instruction::ReturnIntegerUnchecked {
+                kind: IntegerKind::I64,
+                immediate: ImmediateInteger::signed(value),
             },
         ] {
             chunk.emit(instruction, Span::zero());
         }
     }
     chunk.emit(
-        Instruction::ReturnIntUnchecked {
-            immediate: ImmediateInt::new(90),
+        Instruction::ReturnIntegerUnchecked {
+            kind: IntegerKind::I64,
+            immediate: ImmediateInteger::signed(90),
         },
         Span::zero(),
     );
@@ -229,7 +233,7 @@ fn string_chain_rebases_all_switch_targets_after_pruning() {
     for (target, code) in [(arms[0].1, 1), (arms[1].1, 2), (*default, 90)] {
         assert!(matches!(
             chunk.code[usize::try_from(2 + target).unwrap()],
-            Instruction::LoadInt { immediate, .. } if immediate.value() == code
+            Instruction::LoadInteger { kind: IntegerKind::I64, immediate, .. } if immediate.as_int() == code
         ));
     }
     verify(&chunk).expect("all compacted switch targets verify");
@@ -259,7 +263,7 @@ fn fresh_entry_string_chain_removes_first_load_and_rebases_return_targets() {
     for (target, expected) in [(arms[0].1, 1), (arms[1].1, 2), (*default, 90)] {
         assert!(matches!(
             chunk.code[usize::try_from(target).unwrap()],
-            Instruction::ReturnIntUnchecked { immediate } if immediate.value() == expected
+            Instruction::ReturnIntegerUnchecked { kind: IntegerKind::I64, immediate } if immediate.as_int() == expected
         ));
     }
     verify(&chunk).expect("the compacted entry-switch targets verify");

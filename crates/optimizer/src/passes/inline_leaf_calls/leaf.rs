@@ -73,8 +73,7 @@ pub(super) fn leaf_callee(function: &CompiledFunction) -> Option<LeafCallee> {
         Instruction::ReturnScalarUnchecked { .. }
         | Instruction::ReturnReferenceUnchecked { .. }
         | Instruction::ReturnUnchecked { .. }
-        | Instruction::ReturnIntUnchecked { .. }
-        | Instruction::ReturnUintUnchecked { .. }
+        | Instruction::ReturnIntegerUnchecked { .. }
         | Instruction::ReturnNullUnchecked => {}
         _ => return None,
     }
@@ -113,8 +112,7 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
-            | Instruction::LoadInt { .. }
-            | Instruction::LoadUint { .. }
+            | Instruction::LoadInteger { .. }
             | Instruction::Add { .. }
             | Instruction::Subtract { .. }
             | Instruction::Multiply { .. }
@@ -142,35 +140,22 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::GreaterThan { .. }
             | Instruction::GreaterThanOrEqual { .. }
             | Instruction::Not { .. }
-            | Instruction::IntAdd { .. }
-            | Instruction::IntSubtract { .. }
-            | Instruction::IntMultiply { .. }
-            | Instruction::IntModulo { .. }
-            | Instruction::IntMultiplyImmediate { .. }
-            | Instruction::IntModuloImmediate { .. }
-            | Instruction::IntBitwiseAnd { .. }
-            | Instruction::IntBitwiseOr { .. }
-            | Instruction::IntBitwiseXor { .. }
-            | Instruction::IntBitwiseNot { .. }
-            | Instruction::IntAddAssign { .. }
-            | Instruction::IntShiftLeft { .. }
-            | Instruction::IntShiftRight { .. }
-            | Instruction::UintAdd { .. }
-            | Instruction::UintSubtract { .. }
-            | Instruction::UintMultiply { .. }
-            | Instruction::UintModulo { .. }
-            | Instruction::UintBitwiseAnd { .. }
-            | Instruction::UintBitwiseOr { .. }
-            | Instruction::UintBitwiseXor { .. }
-            | Instruction::UintBitwiseNot { .. }
-            | Instruction::UintShiftLeft { .. }
-            | Instruction::UintShiftRight { .. }
-            | Instruction::UintStep { .. }
-            | Instruction::UintAddAssign { .. }
-            | Instruction::UintAddImmediate { .. }
-            | Instruction::UintSubtractImmediate { .. }
-            | Instruction::UintMultiplyImmediate { .. }
-            | Instruction::UintModuloImmediate { .. }
+            | Instruction::IntegerAdd { .. }
+            | Instruction::IntegerSubtract { .. }
+            | Instruction::IntegerMultiply { .. }
+            | Instruction::IntegerModulo { .. }
+            | Instruction::IntegerMultiplyImmediate { .. }
+            | Instruction::IntegerModuloImmediate { .. }
+            | Instruction::IntegerBitwiseAnd { .. }
+            | Instruction::IntegerBitwiseOr { .. }
+            | Instruction::IntegerBitwiseXor { .. }
+            | Instruction::IntegerBitwiseNot { .. }
+            | Instruction::IntegerAddAssign { .. }
+            | Instruction::IntegerShiftLeft { .. }
+            | Instruction::IntegerShiftRight { .. }
+            | Instruction::IntegerStep { .. }
+            | Instruction::IntegerAddImmediate { .. }
+            | Instruction::IntegerSubtractImmediate { .. }
             | Instruction::FloatAdd { .. }
             | Instruction::FloatSubtract { .. }
             | Instruction::FloatMultiply { .. }
@@ -181,8 +166,7 @@ pub(super) fn straight_line_body_instruction(instruction: Instruction) -> bool {
             | Instruction::StringIndexGet { .. }
             | Instruction::IndexGetOrNull { .. }
             | Instruction::VecIndexGetOrNull { .. }
-            | Instruction::DictIndexGetIntKeyOrNull { .. }
-            | Instruction::DictIndexGetUintKeyOrNull { .. }
+            | Instruction::DictIndexGetIntegerKeyOrNull { .. }
             | Instruction::DictIndexGetStringKeyOrNull { .. }
             | Instruction::StringIndexGetOrNull { .. }
             | Instruction::Write { .. }
@@ -533,14 +517,13 @@ fn build_replacement(
                     destination,
                     source: remap(source),
                 },
-                Instruction::ReturnIntUnchecked { immediate } => Instruction::LoadInt {
-                    destination,
-                    immediate,
-                },
-                Instruction::ReturnUintUnchecked { immediate } => Instruction::LoadUint {
-                    destination,
-                    immediate,
-                },
+                Instruction::ReturnIntegerUnchecked { kind, immediate } => {
+                    Instruction::LoadInteger {
+                        kind,
+                        destination,
+                        immediate,
+                    }
+                }
                 Instruction::ReturnNullUnchecked => Instruction::LoadNull { destination },
                 _ => return None,
             };
@@ -724,35 +707,22 @@ pub(super) fn remap_instruction(
             destination,
             source,
         }
-        | Instruction::IntBitwiseNot {
-            destination,
-            source,
-        }
-        | Instruction::UintBitwiseNot {
-            destination,
-            source,
-        }
-        | Instruction::UintStep {
+        | Instruction::IntegerBitwiseNot {
             destination,
             source,
             ..
         }
-        | Instruction::UintAddImmediate {
+        | Instruction::IntegerStep {
             destination,
             source,
             ..
         }
-        | Instruction::UintSubtractImmediate {
+        | Instruction::IntegerAddImmediate {
             destination,
             source,
             ..
         }
-        | Instruction::UintMultiplyImmediate {
-            destination,
-            source,
-            ..
-        }
-        | Instruction::UintModuloImmediate {
+        | Instruction::IntegerSubtractImmediate {
             destination,
             source,
             ..
@@ -784,12 +754,12 @@ pub(super) fn remap_instruction(
             source,
             ..
         }
-        | Instruction::IntMultiplyImmediate {
+        | Instruction::IntegerMultiplyImmediate {
             destination,
             source,
             ..
         }
-        | Instruction::IntModuloImmediate {
+        | Instruction::IntegerModuloImmediate {
             destination,
             source,
             ..
@@ -800,12 +770,10 @@ pub(super) fn remap_instruction(
         Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
-        | Instruction::LoadInt { destination, .. }
-        | Instruction::LoadUint { destination, .. } => {
+        | Instruction::LoadInteger { destination, .. } => {
             *destination = remap(*destination);
         }
-        Instruction::IntAddAssign { target, source }
-        | Instruction::UintAddAssign { target, source } => {
+        Instruction::IntegerAddAssign { target, source, .. } => {
             *target = remap(*target);
             *source = remap(*source);
         }
@@ -849,50 +817,55 @@ pub(super) fn remap_instruction(
             left,
             right,
         }
-        | Instruction::IntBitwiseAnd {
+        | Instruction::IntegerBitwiseAnd {
             destination,
             left,
             right,
+            ..
         }
         | Instruction::BitwiseOr {
             destination,
             left,
             right,
         }
-        | Instruction::IntBitwiseOr {
+        | Instruction::IntegerBitwiseOr {
             destination,
             left,
             right,
+            ..
         }
         | Instruction::BitwiseXor {
             destination,
             left,
             right,
         }
-        | Instruction::IntBitwiseXor {
+        | Instruction::IntegerBitwiseXor {
             destination,
             left,
             right,
+            ..
         }
         | Instruction::ShiftLeft {
             destination,
             left,
             right,
         }
-        | Instruction::IntShiftLeft {
+        | Instruction::IntegerShiftLeft {
             destination,
             left,
             right,
+            ..
         }
         | Instruction::ShiftRight {
             destination,
             left,
             right,
         }
-        | Instruction::IntShiftRight {
+        | Instruction::IntegerShiftRight {
             destination,
             left,
             right,
+            ..
         }
         | Instruction::Equal {
             destination,
@@ -924,70 +897,29 @@ pub(super) fn remap_instruction(
             left,
             right,
         }
-        | Instruction::IntAdd {
+        | Instruction::IntegerAdd {
             destination,
             left,
             right,
+            ..
         }
-        | Instruction::UintAdd {
+        | Instruction::IntegerSubtract {
             destination,
             left,
             right,
+            ..
         }
-        | Instruction::UintSubtract {
+        | Instruction::IntegerMultiply {
             destination,
             left,
             right,
+            ..
         }
-        | Instruction::UintMultiply {
+        | Instruction::IntegerModulo {
             destination,
             left,
             right,
-        }
-        | Instruction::UintModulo {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::UintBitwiseAnd {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::UintBitwiseOr {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::UintBitwiseXor {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::UintShiftLeft {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::UintShiftRight {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::IntSubtract {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::IntMultiply {
-            destination,
-            left,
-            right,
-        }
-        | Instruction::IntModulo {
-            destination,
-            left,
-            right,
+            ..
         }
         | Instruction::FloatAdd {
             destination,
@@ -1028,15 +960,11 @@ pub(super) fn remap_instruction(
             container,
             index,
         }
-        | Instruction::DictIndexGetIntKeyOrNull {
+        | Instruction::DictIndexGetIntegerKeyOrNull {
             destination,
             container,
             index,
-        }
-        | Instruction::DictIndexGetUintKeyOrNull {
-            destination,
-            container,
-            index,
+            ..
         }
         | Instruction::DictIndexGetStringKeyOrNull {
             destination,
@@ -1127,22 +1055,12 @@ pub(super) fn remap_instruction(
             *source = remap(*source);
             *constant = remap_constant(chunk, *constant)?;
         }
-        Instruction::IntRangeJumpIf {
+        Instruction::IntegerRangeJumpIf {
             subject,
             descriptor,
             ..
         }
-        | Instruction::IntRangeJumpUnless {
-            subject,
-            descriptor,
-            ..
-        }
-        | Instruction::UintRangeJumpIf {
-            subject,
-            descriptor,
-            ..
-        }
-        | Instruction::UintRangeJumpUnless {
+        | Instruction::IntegerRangeJumpUnless {
             subject,
             descriptor,
             ..

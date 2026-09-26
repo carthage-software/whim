@@ -1,6 +1,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 
 use crate::passes::fuse_numeric_loop::BytecodeComparison;
@@ -30,18 +31,54 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
             | Instruction::VecIndexSet { .. }
             | Instruction::VecAppend { .. }
             | Instruction::DictIndexGetIntKey { .. }
-            | Instruction::DictIndexSetIntKey { .. } => return true,
-            Instruction::IntAdd { .. }
-            | Instruction::IntSubtract { .. }
-            | Instruction::IntMultiply { .. }
-            | Instruction::IntModulo { .. }
-            | Instruction::IntMultiplyImmediate { .. }
-            | Instruction::IntModuloImmediate { .. }
-            | Instruction::IntBitwiseAnd { .. }
-            | Instruction::IntBitwiseOr { .. }
-            | Instruction::IntBitwiseXor { .. }
-            | Instruction::IntShiftLeft { .. }
-            | Instruction::IntShiftRight { .. } => {
+            | Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::I64,
+                ..
+            } => return true,
+            Instruction::IntegerAdd {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerSubtract {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerMultiply {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerModulo {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerMultiplyImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerModuloImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerBitwiseAnd {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerBitwiseOr {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerBitwiseXor {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerShiftLeft {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerShiftRight {
+                kind: IntegerKind::I64,
+                ..
+            } => {
                 integer_operations += 1;
                 if integer_operations >= 3 {
                     return true;
@@ -51,10 +88,16 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
                 destination, left, ..
             } if destination == left => return true,
             Instruction::AddImmediate { .. }
+            | Instruction::IntegerAddImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
             | Instruction::Step { .. }
-            | Instruction::IntAddAssign { .. }
-                if index < tail
-                    && matches!(chunk.code[index + 1], Instruction::IntCounterLoop { .. }) =>
+            | Instruction::IntegerAddAssign {
+                kind: IntegerKind::I64,
+                ..
+            } if index < tail
+                && matches!(chunk.code[index + 1], Instruction::IntCounterLoop { .. }) =>
             {
                 return true;
             }
@@ -74,7 +117,11 @@ pub(super) fn writes_pinned_container(chunk: &Chunk, header: usize, tail: usize)
             | Instruction::VecIndexGet { container, .. }
             | Instruction::VecIndexSet { container, .. }
             | Instruction::DictIndexGetIntKey { container, .. }
-            | Instruction::DictIndexSetIntKey { container, .. } => {
+            | Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::I64,
+                container,
+                ..
+            } => {
                 containers |= 1u64 << u32::from(container.index());
             }
             _ => {}
@@ -174,7 +221,11 @@ fn dict_writes_covered(chunk: &Chunk, header: usize, tail: usize) -> bool {
     let mut read = 0u64;
     for instruction in chunk.code[header + 1..=tail].iter().copied() {
         match instruction {
-            Instruction::DictIndexSetIntKey { container, .. } => {
+            Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::I64,
+                container,
+                ..
+            } => {
                 written |= 1u64 << u32::from(container.index());
             }
             Instruction::DictIndexGetIntKey { container, .. } => {
@@ -199,8 +250,11 @@ fn dict_build_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
         return false;
     }
 
-    let Instruction::DictIndexSetIntKey {
-        container, value, ..
+    let Instruction::DictIndexSetIntegerKey {
+        kind: IntegerKind::I64,
+        container,
+        value,
+        ..
     } = body[0]
     else {
         return false;
@@ -209,7 +263,8 @@ fn dict_build_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
     let mut step = None;
     for (position, instruction) in body.iter().copied().enumerate() {
         if position % 2 == 0 {
-            let Instruction::DictIndexSetIntKey {
+            let Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::I64,
                 container: store_container,
                 index,
                 value: store_value,
@@ -281,7 +336,8 @@ fn dict_copy_shape(chunk: &Chunk, header: usize, tail: usize) -> bool {
             return false;
         };
 
-        let Instruction::DictIndexSetIntKey {
+        let Instruction::DictIndexSetIntegerKey {
+            kind: IntegerKind::I64,
             container: target,
             index: store_index,
             value,
@@ -351,7 +407,10 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
                 }
             }
             Instruction::StringLength { .. }
-            | Instruction::LoadInt { .. }
+            | Instruction::LoadInteger {
+                kind: IntegerKind::I64,
+                ..
+            }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::Move { .. }
@@ -359,18 +418,62 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::Add { .. }
             | Instruction::Subtract { .. }
             | Instruction::Multiply { .. }
-            | Instruction::IntAdd { .. }
-            | Instruction::IntSubtract { .. }
-            | Instruction::IntMultiply { .. }
-            | Instruction::IntModulo { .. }
-            | Instruction::IntMultiplyImmediate { .. }
-            | Instruction::IntModuloImmediate { .. }
-            | Instruction::IntBitwiseAnd { .. }
-            | Instruction::IntBitwiseOr { .. }
-            | Instruction::IntBitwiseXor { .. }
-            | Instruction::IntShiftLeft { .. }
-            | Instruction::IntShiftRight { .. }
-            | Instruction::IntAddAssign { .. }
+            | Instruction::IntegerAdd {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerSubtract {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerMultiply {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerModulo {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerAddImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerSubtractImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerMultiplyImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerModuloImmediate {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerBitwiseAnd {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerBitwiseOr {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerBitwiseXor {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerShiftLeft {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerShiftRight {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerAddAssign {
+                kind: IntegerKind::I64,
+                ..
+            }
             | Instruction::FloatAdd { .. }
             | Instruction::FloatSubtract { .. }
             | Instruction::FloatMultiply { .. }
@@ -402,15 +505,17 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             | Instruction::VecIndexSet { .. }
             | Instruction::VecAppend { .. }
             | Instruction::DictIndexGetIntKey { .. }
-            | Instruction::DictIndexSetIntKey { .. }
+            | Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::I64,
+                ..
+            }
             | Instruction::Concatenate { .. }
             | Instruction::Return { .. }
             | Instruction::ReturnUnchecked { .. }
             | Instruction::ReturnReferenceUnchecked { .. }
             | Instruction::ReturnPairUnchecked { .. }
             | Instruction::ReturnScalarUnchecked { .. }
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked => {}
             Instruction::JumpIfFalse { offset, .. }

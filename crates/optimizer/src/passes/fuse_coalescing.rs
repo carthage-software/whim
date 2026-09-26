@@ -3,6 +3,7 @@ use std::mem;
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::NearJumpOffset;
 use whim_bytecode::instruction::operands::Register;
@@ -84,7 +85,8 @@ fn fused(instruction: Instruction, subject: Register, relative: i32) -> Option<I
             index,
             offset: NearJumpOffset::new(relative.try_into().ok()?),
         },
-        Instruction::DictIndexGetUintKeyOrNull {
+        Instruction::DictIndexGetIntegerKeyOrNull {
+            kind: IntegerKind::U64,
             destination,
             container,
             index,
@@ -94,7 +96,8 @@ fn fused(instruction: Instruction, subject: Register, relative: i32) -> Option<I
             index,
             offset: NearJumpOffset::new(relative.try_into().ok()?),
         },
-        Instruction::DictIndexGetIntKeyOrNull {
+        Instruction::DictIndexGetIntegerKeyOrNull {
+            kind: IntegerKind::I64,
             destination,
             container,
             index,
@@ -259,7 +262,8 @@ fn split(instruction: Instruction) -> Option<(Instruction, Register, i32)> {
             index,
             offset,
         } => (
-            Instruction::DictIndexGetUintKeyOrNull {
+            Instruction::DictIndexGetIntegerKeyOrNull {
+                kind: IntegerKind::U64,
                 destination,
                 container,
                 index,
@@ -273,7 +277,8 @@ fn split(instruction: Instruction) -> Option<(Instruction, Register, i32)> {
             index,
             offset,
         } => (
-            Instruction::DictIndexGetIntKeyOrNull {
+            Instruction::DictIndexGetIntegerKeyOrNull {
+                kind: IntegerKind::I64,
                 destination,
                 container,
                 index,

@@ -2,7 +2,10 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::ImmediateUint;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertyStepMode;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
@@ -40,163 +43,23 @@ pub(crate) fn optimize_chunk(
             continue;
         }
 
-        let (temporary, replacement) = match chunk.code[index] {
-            Instruction::LoadUint {
-                destination,
-                immediate,
-            } => (
-                destination,
-                unsigned_consumer(chunk.code[index + 1], destination, immediate),
-            ),
-            Instruction::LoadInt {
-                destination: temporary,
-                immediate,
-            } => (
-                temporary,
-                match chunk.code[index + 1] {
-                    Instruction::PropertyAdd {
-                        object,
-                        source,
-                        cache,
-                    } if source == temporary && object != temporary => {
-                        Some(Instruction::PropertyStep {
-                            object,
-                            cache,
-                            immediate,
-                            mode: PropertyStepMode::Add,
-                        })
-                    }
-                    Instruction::PropertyAddUnchecked {
-                        object,
-                        source,
-                        slot,
-                    } if source == temporary && object != temporary => {
-                        Some(Instruction::PropertyStepUnchecked {
-                            object,
-                            slot,
-                            immediate,
-                            mode: PropertyStepMode::Add,
-                        })
-                    }
-                    Instruction::IntJumpUnless {
-                        comparison,
-                        left,
-                        right,
-                        offset,
-                    } if right == temporary && left != temporary => {
-                        Some(Instruction::IntJumpUnlessImmediate {
-                            comparison,
-                            source: left,
-                            immediate,
-                            offset,
-                        })
-                    }
-                    Instruction::IntJumpUnless {
-                        comparison,
-                        left,
-                        right,
-                        offset,
-                    } if left == temporary && right != temporary => {
-                        Some(Instruction::IntJumpUnlessImmediate {
-                            comparison: comparison.reversed(),
-                            source: right,
-                            immediate,
-                            offset,
-                        })
-                    }
-                    Instruction::ReturnUnchecked { source }
-                    | Instruction::ReturnScalarUnchecked { source }
-                        if source == temporary =>
-                    {
-                        Some(Instruction::ReturnIntUnchecked { immediate })
-                    }
-                    Instruction::IntAdd {
-                        destination,
-                        left,
-                        right,
-                    } if right == temporary && left != temporary => {
-                        Some(Instruction::AddImmediate {
-                            destination,
-                            source: left,
-                            immediate,
-                        })
-                    }
-                    Instruction::IntAdd {
-                        destination,
-                        left,
-                        right,
-                    } if left == temporary && right != temporary => {
-                        Some(Instruction::AddImmediate {
-                            destination,
-                            source: right,
-                            immediate,
-                        })
-                    }
-                    Instruction::IntSubtract {
-                        destination,
-                        left,
-                        right,
-                    } if right == temporary && left != temporary => {
-                        Some(Instruction::SubtractImmediate {
-                            destination,
-                            source: left,
-                            immediate,
-                        })
-                    }
-                    Instruction::IntMultiply {
-                        destination,
-                        left,
-                        right,
-                    } if right == temporary && left != temporary => {
-                        Some(Instruction::IntMultiplyImmediate {
-                            destination,
-                            source: left,
-                            immediate,
-                        })
-                    }
-                    Instruction::IntMultiply {
-                        destination,
-                        left,
-                        right,
-                    } if left == temporary && right != temporary => {
-                        Some(Instruction::IntMultiplyImmediate {
-                            destination,
-                            source: right,
-                            immediate,
-                        })
-                    }
-                    Instruction::IntModulo {
-                        destination,
-                        left,
-                        right,
-                    } if right == temporary && left != temporary => {
-                        Some(Instruction::IntModuloImmediate {
-                            destination,
-                            source: left,
-                            immediate,
-                        })
-                    }
-                    _ => None,
-                },
-            ),
-            _ => continue,
+        let Instruction::LoadInteger {
+            destination: temporary,
+            immediate,
+            kind,
+        } = chunk.code[index]
+        else {
+            continue;
         };
-
-        let Some(replacement) = replacement else {
+        let Some(replacement) = consumer(chunk.code[index + 1], temporary, immediate, kind) else {
             continue;
         };
         let consumes_temporary = match replacement {
-            Instruction::AddImmediate { destination, .. }
-            | Instruction::SubtractImmediate { destination, .. }
-            | Instruction::IntMultiplyImmediate { destination, .. }
-            | Instruction::IntModuloImmediate { destination, .. }
-            | Instruction::UintAddImmediate { destination, .. }
-            | Instruction::UintSubtractImmediate { destination, .. }
-            | Instruction::UintMultiplyImmediate { destination, .. }
-            | Instruction::UintModuloImmediate { destination, .. } => destination == temporary,
-            Instruction::ReturnIntUnchecked { .. } | Instruction::ReturnUintUnchecked { .. } => {
-                true
-            }
+            Instruction::IntegerAddImmediate { destination, .. }
+            | Instruction::IntegerSubtractImmediate { destination, .. }
+            | Instruction::IntegerMultiplyImmediate { destination, .. }
+            | Instruction::IntegerModuloImmediate { destination, .. } => destination == temporary,
+            Instruction::ReturnIntegerUnchecked { .. } => true,
             _ => false,
         };
         if !consumes_temporary && !register_is_dead_after(chunk, temporary, index + 2) {
@@ -210,21 +73,50 @@ pub(crate) fn optimize_chunk(
     compact_removed_instructions(chunk, &remove, statistics);
 }
 
-fn unsigned_consumer(
+fn consumer(
     instruction: Instruction,
     temporary: Register,
-    immediate: ImmediateUint,
+    immediate: ImmediateInteger,
+    kind: IntegerKind,
 ) -> Option<Instruction> {
     Some(match instruction {
-        Instruction::UintJumpUnless {
+        Instruction::PropertyAdd {
+            object,
+            source,
+            cache,
+        } if kind == IntegerKind::I64 && source == temporary && object != temporary => {
+            Instruction::PropertyStep {
+                object,
+                cache,
+                immediate: ImmediateInt::new(immediate.as_int()),
+                mode: PropertyStepMode::Add,
+            }
+        }
+        Instruction::PropertyAddUnchecked {
+            object,
+            source,
+            slot,
+        } if kind == IntegerKind::I64 && source == temporary && object != temporary => {
+            Instruction::PropertyStepUnchecked {
+                object,
+                slot,
+                immediate: ImmediateInt::new(immediate.as_int()),
+                mode: PropertyStepMode::Add,
+            }
+        }
+        Instruction::IntJumpUnless {
             comparison,
             left,
             right,
             offset,
-        } if right == temporary && left != temporary => Instruction::UintJumpUnlessImmediate {
-            comparison,
-            source: left,
-            immediate,
+        } if kind == IntegerKind::I64 => Instruction::IntJumpUnlessImmediate {
+            comparison: if right == temporary {
+                comparison
+            } else {
+                comparison.reversed()
+            },
+            source: other_operand(left, right, temporary, true)?,
+            immediate: ImmediateInt::new(immediate.as_int()),
             offset,
         },
         Instruction::UintJumpUnless {
@@ -232,71 +124,80 @@ fn unsigned_consumer(
             left,
             right,
             offset,
-        } if left == temporary && right != temporary => Instruction::UintJumpUnlessImmediate {
-            comparison: comparison.reversed(),
-            source: right,
-            immediate,
+        } if kind == IntegerKind::U64 => Instruction::UintJumpUnlessImmediate {
+            comparison: if right == temporary {
+                comparison
+            } else {
+                comparison.reversed()
+            },
+            source: other_operand(left, right, temporary, true)?,
+            immediate: ImmediateUint::new(immediate.as_uint()),
             offset,
         },
         Instruction::ReturnUnchecked { source } | Instruction::ReturnScalarUnchecked { source }
             if source == temporary =>
         {
-            Instruction::ReturnUintUnchecked { immediate }
+            Instruction::ReturnIntegerUnchecked { immediate, kind }
         }
-        Instruction::UintAdd {
+        Instruction::IntegerAdd {
             destination,
             left,
             right,
-        } if right == temporary && left != temporary => Instruction::UintAddImmediate {
+            kind: operand_kind,
+        } if operand_kind == kind => Instruction::IntegerAddImmediate {
             destination,
-            source: left,
+            source: other_operand(left, right, temporary, true)?,
             immediate,
+            kind,
         },
-        Instruction::UintAdd {
+        Instruction::IntegerSubtract {
             destination,
             left,
             right,
-        } if left == temporary && right != temporary => Instruction::UintAddImmediate {
+            kind: operand_kind,
+        } if operand_kind == kind => Instruction::IntegerSubtractImmediate {
             destination,
-            source: right,
+            source: other_operand(left, right, temporary, false)?,
             immediate,
+            kind,
         },
-        Instruction::UintSubtract {
+        Instruction::IntegerMultiply {
             destination,
             left,
             right,
-        } if right == temporary && left != temporary => Instruction::UintSubtractImmediate {
+            kind: operand_kind,
+        } if operand_kind == kind => Instruction::IntegerMultiplyImmediate {
             destination,
-            source: left,
+            source: other_operand(left, right, temporary, true)?,
             immediate,
+            kind,
         },
-        Instruction::UintMultiply {
+        Instruction::IntegerModulo {
             destination,
             left,
             right,
-        } if right == temporary && left != temporary => Instruction::UintMultiplyImmediate {
+            kind: operand_kind,
+        } if operand_kind == kind => Instruction::IntegerModuloImmediate {
             destination,
-            source: left,
+            source: other_operand(left, right, temporary, false)?,
             immediate,
-        },
-        Instruction::UintMultiply {
-            destination,
-            left,
-            right,
-        } if left == temporary && right != temporary => Instruction::UintMultiplyImmediate {
-            destination,
-            source: right,
-            immediate,
-        },
-        Instruction::UintModulo {
-            destination,
-            left,
-            right,
-        } if right == temporary && left != temporary => Instruction::UintModuloImmediate {
-            destination,
-            source: left,
-            immediate,
+            kind,
         },
         _ => return None,
     })
+}
+
+fn other_operand(
+    left: Register,
+    right: Register,
+    temporary: Register,
+    commutative: bool,
+) -> Option<Register> {
+    if right == temporary && left != temporary {
+        Some(left)
+    } else if commutative && left == temporary && right != temporary {
+        Some(right)
+    } else {
+        None
+    }
 }

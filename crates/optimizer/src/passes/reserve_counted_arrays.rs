@@ -3,6 +3,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::relative_target;
 use whim_span::Span;
@@ -62,7 +63,11 @@ pub(crate) fn optimize_chunk(chunk: &mut Chunk, configuration: OptimizationConfi
             let container = match *instruction {
                 Instruction::VecAppend { container, .. }
                 | Instruction::VecIndexSet { container, .. }
-                | Instruction::DictIndexSetIntKey { container, .. }
+                | Instruction::DictIndexSetIntegerKey {
+                    kind: IntegerKind::I64,
+                    container,
+                    ..
+                }
                 | Instruction::DictIndexSetStringKey { container, .. }
                 | Instruction::DictIndexSet { container, .. } => container,
                 _ => continue,

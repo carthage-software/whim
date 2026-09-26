@@ -4,8 +4,8 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
-use whim_bytecode::instruction::operands::ImmediateInt;
-use whim_bytecode::instruction::operands::ImmediateUint;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledAttribute;
 use whim_bytecode::unit::CompiledUnit;
@@ -172,9 +172,10 @@ fn literal_instruction(
         Literal::Bool(false) => Some(Instruction::LoadFalse { destination }),
         Literal::Int(value) => {
             if let Ok(immediate) = i16::try_from(value) {
-                Some(Instruction::LoadInt {
+                Some(Instruction::LoadInteger {
+                    kind: IntegerKind::I64,
                     destination,
-                    immediate: ImmediateInt::new(immediate),
+                    immediate: ImmediateInteger::signed(immediate),
                 })
             } else {
                 let constant = chunk.add_constant(Literal::Int(value)).ok()?;
@@ -184,9 +185,10 @@ fn literal_instruction(
                 })
             }
         }
-        Literal::Uint(value) if u16::try_from(value).is_ok() => Some(Instruction::LoadUint {
+        Literal::Uint(value) if u16::try_from(value).is_ok() => Some(Instruction::LoadInteger {
+            kind: IntegerKind::U64,
             destination,
-            immediate: ImmediateUint::new(value as u16),
+            immediate: ImmediateInteger::unsigned(value as u16),
         }),
         literal @ (Literal::Uint(_) | Literal::Float(_) | Literal::String(_)) => {
             let constant = chunk.add_constant(literal).ok()?;

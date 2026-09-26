@@ -2,6 +2,7 @@ use super::compile;
 use super::method;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_optimizer::OptimizationConfiguration;
 
 #[test]
@@ -19,13 +20,13 @@ fn callable_bounds_specialize_bodies_and_proven_calls() {
     for function in &unit.functions {
         let name = function.name.as_bytes();
         if name == b"inline_bound" || name == b"where_bound" || name.starts_with(b"{closure:") {
-            assert!(
-                function
-                    .chunk
-                    .code
-                    .iter()
-                    .any(|instruction| matches!(instruction, Instruction::IntAdd { .. }))
-            );
+            assert!(function.chunk.code.iter().any(|instruction| matches!(
+                instruction,
+                Instruction::IntegerAdd {
+                    kind: IntegerKind::I64,
+                    ..
+                }
+            )));
             assert!(!function.chunk.code.iter().any(|instruction| matches!(
                 instruction,
                 Instruction::Add { .. } | Instruction::Return { .. }

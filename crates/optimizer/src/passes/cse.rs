@@ -4,6 +4,7 @@ use hashbrown::HashMap;
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::compact;
 use whim_bytecode::unit::CompiledUnit;
@@ -518,8 +519,7 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
-            | Instruction::LoadInt { .. }
-            | Instruction::LoadUint { .. }
+            | Instruction::LoadInteger { .. }
             | Instruction::Add { .. }
             | Instruction::Subtract { .. }
             | Instruction::Multiply { .. }
@@ -531,28 +531,43 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::AddImmediate { .. }
             | Instruction::Step { .. }
             | Instruction::SubtractImmediate { .. }
-            | Instruction::IntAdd { .. }
-            | Instruction::IntSubtract { .. }
-            | Instruction::IntMultiply { .. }
-            | Instruction::IntModulo { .. }
-            | Instruction::IntMultiplyImmediate { .. }
-            | Instruction::IntModuloImmediate { .. }
-            | Instruction::UintAdd { .. }
-            | Instruction::UintSubtract { .. }
-            | Instruction::UintMultiply { .. }
-            | Instruction::UintModulo { .. }
-            | Instruction::UintBitwiseAnd { .. }
-            | Instruction::UintBitwiseOr { .. }
-            | Instruction::UintBitwiseXor { .. }
-            | Instruction::UintBitwiseNot { .. }
-            | Instruction::UintShiftLeft { .. }
-            | Instruction::UintShiftRight { .. }
-            | Instruction::UintStep { .. }
-            | Instruction::UintAddAssign { .. }
-            | Instruction::UintAddImmediate { .. }
-            | Instruction::UintSubtractImmediate { .. }
-            | Instruction::UintMultiplyImmediate { .. }
-            | Instruction::UintModuloImmediate { .. }
+            | Instruction::IntegerAdd { .. }
+            | Instruction::IntegerSubtract { .. }
+            | Instruction::IntegerMultiply { .. }
+            | Instruction::IntegerModulo { .. }
+            | Instruction::IntegerMultiplyImmediate { .. }
+            | Instruction::IntegerModuloImmediate { .. }
+            | Instruction::IntegerBitwiseAnd {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerBitwiseOr {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerBitwiseXor {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerBitwiseNot {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerShiftLeft {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerShiftRight {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerStep { .. }
+            | Instruction::IntegerAddAssign {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerAddImmediate { .. }
+            | Instruction::IntegerSubtractImmediate { .. }
             | Instruction::Equal { .. }
             | Instruction::NotEqual { .. }
             | Instruction::LessThan { .. }
@@ -583,8 +598,7 @@ fn transparent(instruction: Instruction) -> bool {
             | Instruction::ReturnReferenceUnchecked { .. }
             | Instruction::ReturnPairUnchecked { .. }
             | Instruction::ReturnScalarUnchecked { .. }
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
     )

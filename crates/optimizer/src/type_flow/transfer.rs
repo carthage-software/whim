@@ -5,6 +5,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 
 use crate::type_flow::ALL;
@@ -103,18 +104,23 @@ pub(crate) fn transfer(
         | Instruction::ContainsKey { destination, .. } => {
             write(destination, Fact::with_origin(BOOL, origin))
         }
-        Instruction::LoadInt {
+        Instruction::LoadInteger {
+            kind: IntegerKind::I64,
             destination,
             immediate,
         } => write(
             destination,
-            Fact::integer(i64::from(immediate.value()), origin),
+            Fact::integer(i64::from(immediate.as_int()), origin),
         ),
-        instructions!(LoadUint | UintAdd | UintSubtract | UintMultiply | UintModulo | UintBitwiseAnd | UintBitwiseOr | UintBitwiseXor | UintBitwiseNot | UintShiftLeft | UintShiftRight | UintAddImmediate | UintSubtractImmediate | UintMultiplyImmediate | UintModuloImmediate | UintStep; { destination, .. }) =>
+        instructions!(LoadInteger | IntegerAdd | IntegerSubtract | IntegerMultiply | IntegerModulo | IntegerBitwiseAnd | IntegerBitwiseOr | IntegerBitwiseXor | IntegerBitwiseNot | IntegerShiftLeft | IntegerShiftRight | IntegerAddImmediate | IntegerSubtractImmediate | IntegerMultiplyImmediate | IntegerModuloImmediate | IntegerStep; { destination, kind: IntegerKind::U64, .. }) =>
         {
             write(destination, Fact::with_origin(UINT, origin));
         }
-        Instruction::UintAddAssign { target, .. } => write(target, Fact::with_origin(UINT, origin)),
+        Instruction::IntegerAddAssign {
+            kind: IntegerKind::U64,
+            target,
+            ..
+        } => write(target, Fact::with_origin(UINT, origin)),
         Instruction::UintCounterLoop { counter, .. } => {
             write(counter, Fact::with_origin(UINT, origin))
         }
@@ -164,12 +170,14 @@ pub(crate) fn transfer(
         | Instruction::Divide { destination, .. } => {
             write(destination, Fact::with_origin(FLOAT, origin))
         }
-        Instruction::IntAdd {
+        Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntMultiply {
+        | Instruction::IntegerMultiply {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -178,23 +186,34 @@ pub(crate) fn transfer(
             fact.non_negative = read(left).non_negative && read(right).non_negative;
             write(destination, with_origin(fact, origin));
         }
-        Instruction::IntModulo {
-            destination, left, ..
+        Instruction::IntegerModulo {
+            kind: IntegerKind::I64,
+            destination,
+            left,
+            ..
         } => {
             let mut fact = Fact::known(INT);
             fact.non_negative = read(left).non_negative;
             write(destination, with_origin(fact, origin));
         }
-        Instruction::IntMultiplyImmediate {
+        Instruction::IntegerAddImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            source,
+            immediate,
+        }
+        | Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::I64,
             destination,
             source,
             immediate,
         } => {
             let mut fact = Fact::known(INT);
-            fact.non_negative = read(source).non_negative && immediate.value() >= 0;
+            fact.non_negative = read(source).non_negative && immediate.as_int() >= 0;
             write(destination, with_origin(fact, origin));
         }
-        Instruction::IntModuloImmediate {
+        Instruction::IntegerModuloImmediate {
+            kind: IntegerKind::I64,
             destination,
             source,
             ..
@@ -203,13 +222,51 @@ pub(crate) fn transfer(
             fact.non_negative = read(source).non_negative;
             write(destination, with_origin(fact, origin));
         }
-        Instruction::IntSubtract { destination, .. }
-        | Instruction::IntBitwiseAnd { destination, .. }
-        | Instruction::IntBitwiseOr { destination, .. }
-        | Instruction::IntBitwiseXor { destination, .. }
-        | Instruction::IntBitwiseNot { destination, .. }
-        | Instruction::IntShiftLeft { destination, .. }
-        | Instruction::IntShiftRight { destination, .. }
+        Instruction::IntegerSubtract {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerSubtractImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerStep {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseAnd {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseOr {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseXor {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseNot {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftLeft {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftRight {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
         | Instruction::Compare { destination, .. } => {
             write(destination, Fact::with_origin(INT, origin))
         }
@@ -245,7 +302,11 @@ pub(crate) fn transfer(
                 Fact::with_origin(read(source).mask & (INT | UINT), origin),
             );
         }
-        Instruction::IntAddAssign { target, .. } => write(target, Fact::with_origin(INT, origin)),
+        Instruction::IntegerAddAssign {
+            kind: IntegerKind::I64,
+            target,
+            ..
+        } => write(target, Fact::with_origin(INT, origin)),
         Instruction::Length { destination, .. } | Instruction::StringLength { destination, .. } => {
             let mut fact = Fact::known(INT);
             fact.non_negative = true;
@@ -392,7 +453,7 @@ pub(crate) fn transfer(
         } => write(destination, read(source)),
         Instruction::IndexGetOrNull { destination, .. }
         | Instruction::VecIndexGetOrNull { destination, .. }
-        | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+        | Instruction::DictIndexGetIntegerKeyOrNull { destination, .. }
         | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
         | Instruction::StringIndexGetOrNull { destination, .. }
         | Instruction::PropertyGetOrNull { destination, .. }
@@ -402,7 +463,6 @@ pub(crate) fn transfer(
         | Instruction::VecIndexCoalesce { destination, .. }
         | Instruction::DictIndexCoalesceIntKey { destination, .. }
         | Instruction::DictIndexCoalesceUintKey { destination, .. }
-        | Instruction::DictIndexGetUintKeyOrNull { destination, .. }
         | Instruction::DictIndexCoalesceStringKey { destination, .. }
         | Instruction::StringIndexCoalesce { destination, .. }
         | Instruction::PropertyCoalesce { destination, .. }
@@ -543,10 +603,7 @@ pub(crate) fn transfer(
         | Instruction::VecIndexSet {
             container, value, ..
         }
-        | Instruction::DictIndexSetIntKey {
-            container, value, ..
-        }
-        | Instruction::DictIndexSetUintKey {
+        | Instruction::DictIndexSetIntegerKey {
             container, value, ..
         }
         | Instruction::DictIndexSetStringKey {
@@ -739,13 +796,11 @@ pub(crate) fn transfer(
         | Instruction::SwitchFloat { .. }
         | Instruction::SwitchPattern { .. }
         | Instruction::SwitchTuplePattern { .. }
-        | Instruction::IntRangeJumpIf { .. }
-        | Instruction::UintRangeJumpIf { .. }
-        | Instruction::UintRangeJumpUnless { .. }
+        | Instruction::IntegerRangeJumpIf { .. }
         | Instruction::UintJumpUnless { .. }
         | Instruction::UintJumpUnlessImmediate { .. }
-        | Instruction::ReturnUintUnchecked { .. }
-        | Instruction::IntRangeJumpUnless { .. }
+        | Instruction::ReturnIntegerUnchecked { .. }
+        | Instruction::IntegerRangeJumpUnless { .. }
         | Instruction::BoolPatternBranch { .. }
         | Instruction::CheckDefined { .. }
         | Instruction::CheckDestructure { .. }
@@ -760,7 +815,6 @@ pub(crate) fn transfer(
         | Instruction::ReturnPairUnchecked { .. }
         | Instruction::ReturnScalarUnchecked { .. }
         | Instruction::ReturnNullUnchecked
-        | Instruction::ReturnIntUnchecked { .. }
         | Instruction::Throw { .. }
         | Instruction::Rethrow
         | Instruction::ThrowUnhandledMatch { .. }

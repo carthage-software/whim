@@ -1,5 +1,6 @@
 //! Everything the compiler produces for one source file.
 
+use crate::instruction::operands::IntegerKind;
 use std::borrow::Cow;
 
 use serde::Deserialize;
@@ -147,8 +148,7 @@ pub fn literal_return(function: &CompiledFunction) -> Option<Literal> {
                 | Instruction::ReturnReferenceUnchecked { .. }
                 | Instruction::ReturnPairUnchecked { .. }
                 | Instruction::ReturnScalarUnchecked { .. }
-                | Instruction::ReturnIntUnchecked { .. }
-                | Instruction::ReturnUintUnchecked { .. }
+                | Instruction::ReturnIntegerUnchecked { .. }
                 | Instruction::ReturnNull
                 | Instruction::ReturnNullUnchecked
         )
@@ -167,12 +167,14 @@ pub fn literal_return(function: &CompiledFunction) -> Option<Literal> {
         Instruction::ReturnNull | Instruction::ReturnNullUnchecked if return_index == 0 => {
             Some(Literal::Null)
         }
-        Instruction::ReturnIntUnchecked { immediate } if return_index == 0 => {
-            Some(Literal::Int(i64::from(immediate.value())))
-        }
-        Instruction::ReturnUintUnchecked { immediate } if return_index == 0 => {
-            Some(Literal::Uint(u64::from(immediate.value())))
-        }
+        Instruction::ReturnIntegerUnchecked {
+            kind: IntegerKind::I64,
+            immediate,
+        } if return_index == 0 => Some(Literal::Int(i64::from(immediate.as_int()))),
+        Instruction::ReturnIntegerUnchecked {
+            kind: IntegerKind::U64,
+            immediate,
+        } if return_index == 0 => Some(Literal::Uint(u64::from(immediate.as_uint()))),
         Instruction::Return { source }
         | Instruction::ReturnUnchecked { source }
         | Instruction::ReturnReferenceUnchecked { source }
@@ -189,14 +191,16 @@ pub fn literal_return(function: &CompiledFunction) -> Option<Literal> {
                 Instruction::LoadFalse { destination } if destination == source => {
                     Some(Literal::Bool(false))
                 }
-                Instruction::LoadInt {
+                Instruction::LoadInteger {
+                    kind: IntegerKind::I64,
                     destination,
                     immediate,
-                } if destination == source => Some(Literal::Int(i64::from(immediate.value()))),
-                Instruction::LoadUint {
+                } if destination == source => Some(Literal::Int(i64::from(immediate.as_int()))),
+                Instruction::LoadInteger {
+                    kind: IntegerKind::U64,
                     destination,
                     immediate,
-                } if destination == source => Some(Literal::Uint(u64::from(immediate.value()))),
+                } if destination == source => Some(Literal::Uint(u64::from(immediate.as_uint()))),
                 Instruction::LoadConstant {
                     destination,
                     constant,

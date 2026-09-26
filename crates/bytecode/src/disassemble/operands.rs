@@ -13,10 +13,19 @@ use crate::disassemble::render::short_jump;
 use crate::disassemble::render::table_reference;
 use crate::disassemble::render::window;
 use crate::instruction::operands::ArrayValueMode;
+use crate::instruction::operands::ImmediateInteger;
+use crate::instruction::operands::IntegerKind;
 use crate::instruction::operands::PropertyIndexUpdateMode;
 use crate::instruction::operands::PropertyReadMode;
 use crate::instruction::operands::PropertyRemoveMode;
 use crate::instruction::operands::ShortJumpOffset;
+
+fn integer_immediate(immediate: ImmediateInteger, kind: IntegerKind) -> String {
+    match kind {
+        IntegerKind::I64 => immediate.as_int().to_string(),
+        IntegerKind::U64 => immediate.as_uint().to_string(),
+    }
+}
 
 macro_rules! instructions {
     ($($name:ident)|+ ; $fields:tt) => {
@@ -33,6 +42,30 @@ macro_rules! instructions {
 )]
 pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) -> String {
     match instruction {
+        Instruction::DictIndexGetIntegerKeyOrNull {
+            destination,
+            container,
+            index,
+            kind,
+        } => format!(
+            ".{} {}, {}, {}",
+            kind.name(),
+            register(destination),
+            register(container),
+            register(index)
+        ),
+        Instruction::DictIndexSetIntegerKey {
+            container,
+            index,
+            value,
+            kind,
+        } => format!(
+            ".{} {}, {}, {}",
+            kind.name(),
+            register(container),
+            register(index),
+            register(value)
+        ),
         Instruction::PropertyGetOrNullUnchecked {
             destination,
             object,
@@ -98,12 +131,33 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             )
         }
         instructions!(
-            Move | MoveOwned | Negate | UnaryPlus | BitwiseNot | IntBitwiseNot | UintBitwiseNot | Not | Length
+            Move | MoveOwned | Negate | UnaryPlus | BitwiseNot | Not | Length
                 | StringLength | CloneObject;
             { destination, source }
         ) => format!(" {}, {}", register(destination), register(source)),
-        instructions!(IntAddAssign | UintAddAssign; { target, source }) => {
-            format!(" {}, {}", register(target), register(source))
+        Instruction::IntegerAddAssign {
+            target,
+            source,
+            kind,
+        } => {
+            format!(
+                ".{} {}, {}",
+                kind.name(),
+                register(target),
+                register(source)
+            )
+        }
+        Instruction::IntegerBitwiseNot {
+            destination,
+            source,
+            kind,
+        } => {
+            format!(
+                ".{} {}, {}",
+                kind.name(),
+                register(destination),
+                register(source)
+            )
         }
         Instruction::LoadConstant {
             destination,
@@ -116,25 +170,22 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
         instructions!(LoadNull | LoadTrue | LoadFalse; { destination }) => {
             format!(" {}", register(destination))
         }
-        Instruction::LoadInt {
+        Instruction::LoadInteger {
+            kind,
             destination,
             immediate,
-        } => format!(" {}, {}", register(destination), immediate.value()),
-        Instruction::LoadUint {
-            destination,
-            immediate,
-        } => {
-            format!(" {}, {}u", register(destination), immediate.value())
-        }
+        } => format!(
+            ".{} {}, {}",
+            kind.name(),
+            register(destination),
+            integer_immediate(immediate, kind)
+        ),
         instructions!(
-            Add | Subtract | Multiply | IntAdd | IntSubtract | IntMultiply | IntModulo
+            Add | Subtract | Multiply
                 | FloatAdd | FloatSubtract | FloatMultiply | Divide | Modulo | Power
-                | Concatenate | BitwiseAnd | IntBitwiseAnd | BitwiseOr | IntBitwiseOr
-                | BitwiseXor | IntBitwiseXor | ShiftLeft | IntShiftLeft | ShiftRight
-                | IntShiftRight | Equal | NotEqual | LessThan | LessThanOrEqual | GreaterThan
-                | GreaterThanOrEqual | Compare | UintAdd | UintSubtract | UintMultiply
-                | UintModulo | UintBitwiseAnd | UintBitwiseOr | UintBitwiseXor
-                | UintShiftLeft | UintShiftRight;
+                | Concatenate | BitwiseAnd | BitwiseOr | BitwiseXor | ShiftLeft | ShiftRight
+                | Equal | NotEqual | LessThan | LessThanOrEqual | GreaterThan
+                | GreaterThanOrEqual | Compare;
             { destination, left, right }
         ) => format!(
             " {}, {}, {}",
@@ -143,7 +194,19 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(right)
         ),
         instructions!(
-            AddImmediate | SubtractImmediate | Step | UintStep | IntMultiplyImmediate | IntModuloImmediate;
+            IntegerAdd | IntegerSubtract | IntegerMultiply | IntegerModulo
+                | IntegerBitwiseAnd | IntegerBitwiseOr | IntegerBitwiseXor
+                | IntegerShiftLeft | IntegerShiftRight;
+            { destination, left, right, kind }
+        ) => format!(
+            ".{} {}, {}, {}",
+            kind.name(),
+            register(destination),
+            register(left),
+            register(right)
+        ),
+        instructions!(
+            AddImmediate | SubtractImmediate | Step;
             {
                 destination,
                 source,
@@ -155,10 +218,23 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(source),
             immediate.value()
         ),
-        instructions!(UintAddImmediate | UintSubtractImmediate | UintMultiplyImmediate | UintModuloImmediate;
-            { destination, source, immediate }
+        instructions!(IntegerAddImmediate | IntegerSubtractImmediate | IntegerMultiplyImmediate | IntegerModuloImmediate;
+            { destination, source, immediate, kind }
         ) => format!(
-            " {}, {}, {}u",
+            ".{} {}, {}, {}",
+            kind.name(),
+            register(destination),
+            register(source),
+            integer_immediate(immediate, kind)
+        ),
+        Instruction::IntegerStep {
+            destination,
+            source,
+            immediate,
+            kind,
+        } => format!(
+            ".{} {}, {}, {}",
+            kind.name(),
             register(destination),
             register(source),
             immediate.value()
@@ -238,12 +314,14 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             constant_reference(chunk, constant),
             short_jump(index, offset)
         ),
-        instructions!(IntRangeJumpIf | IntRangeJumpUnless | UintRangeJumpIf | UintRangeJumpUnless; {
+        instructions!(IntegerRangeJumpIf | IntegerRangeJumpUnless; {
             subject,
             descriptor,
             offset,
+            kind,
         }) => format!(
-            " {}, {} {}",
+            ".{} {}, {} {}",
+            kind.name(),
             register(subject),
             descriptor_reference(chunk, descriptor),
             short_jump(index, offset)
@@ -443,7 +521,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(destination),
             window(first_pair, 2 * u32::from(pair_count.value()))
         ),
-        instructions!(IndexGetOrNull | VecIndexGetOrNull | DictIndexGetIntKeyOrNull | DictIndexGetUintKeyOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexGet | StringIndexGet; {
+        instructions!(IndexGetOrNull | VecIndexGetOrNull | DictIndexGetStringKeyOrNull | StringIndexGetOrNull | IndexGet | StringIndexGet; {
             destination,
             container,
             index: subscript,
@@ -483,7 +561,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             }
         ),
         instructions!(
-            IndexSet | VecIndexSet | DictIndexSetIntKey | DictIndexSetUintKey | DictIndexSetStringKey | DictIndexSet;
+            IndexSet | VecIndexSet | DictIndexSetStringKey | DictIndexSet;
             {
             container,
             index: subscript,
@@ -881,10 +959,9 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
         Instruction::ReturnPairUnchecked { first, second } => {
             format!(" {}, {}", register(first), register(second))
         }
-        Instruction::ReturnIntUnchecked { immediate } => {
-            format!(" {}", immediate.value())
+        Instruction::ReturnIntegerUnchecked { immediate, kind } => {
+            format!(".{} {}", kind.name(), integer_immediate(immediate, kind))
         }
-        Instruction::ReturnUintUnchecked { immediate } => format!(" {}u", immediate.value()),
         instructions!(
             ReturnNull | ReturnNullUnchecked | Rethrow | DrainFinalizers | CheckWhereConstraints
         ) => String::new(),

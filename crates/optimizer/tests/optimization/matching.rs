@@ -1,5 +1,6 @@
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::verify::verify_unit;
 use whim_optimizer::OptimizationConfiguration;
 
@@ -76,7 +77,7 @@ fn equivalent_string_dispatches_have_unchecked_literal_returns() {
         );
         assert_eq!(function.chunk.register_count, 1, "{name:?}: {code:?}");
         for value in [1, 2, 3] {
-            assert!(code.iter().any(|i| matches!(i, Instruction::ReturnIntUnchecked { immediate } if immediate.value() == value)), "{name:?}: {code:?}");
+            assert!(code.iter().any(|i| matches!(i, Instruction::ReturnIntegerUnchecked { kind: IntegerKind::I64, immediate } if immediate.as_int() == value)), "{name:?}: {code:?}");
         }
     }
     for name in [b"invalid_return".as_slice(), b"incomplete"] {

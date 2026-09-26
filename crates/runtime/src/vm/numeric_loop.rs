@@ -12,6 +12,7 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::NUMERIC_LOOP_REGISTER_LIMIT;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::word::InstructionKind;
 use whim_bytecode::instruction::word::InstructionWord;
@@ -783,6 +784,16 @@ impl VirtualMachine<'_> {
             }};
         }
 
+        macro_rules! require_int_kind {
+            ($kind:expr, $current:expr) => {
+                if $kind != IntegerKind::I64 {
+                    // SAFETY: `dirty` contains only active-frame numeric registers.
+                    unsafe { flush(registers, &values, dirty) };
+                    return NumericLoopOutcome::Deoptimize($current);
+                }
+            };
+        }
+
         macro_rules! numeric_dispatch {
             (
                 $word:ident, $current:ident {
@@ -802,7 +813,7 @@ impl VirtualMachine<'_> {
                         $($comparison_variant:ident => $comparison:ident;)*
                     }
                     checked_int {
-                        $($checked_variant:ident => $checked_operator:literal, $checked_operation:expr;)*
+                        $($checked_variant:ident $([$checked_kind:ident])? => $checked_operator:literal, $checked_operation:expr;)*
                     }
                     $($rest:tt)*
                 }
@@ -846,7 +857,8 @@ impl VirtualMachine<'_> {
                         }
                     )*
                     $(
-                        Instruction::$int_variant { destination, left, right } => {
+                        Instruction::$int_variant { destination, left, right, kind } => {
+                            require_int_kind!(kind, $current);
                             let result = $int_operation(
                                 values.int(left.index() as usize),
                                 values.int(right.index() as usize),
@@ -879,10 +891,11 @@ impl VirtualMachine<'_> {
                         }
                     )*
                     $(
-                        Instruction::$immediate_variant { destination, source, immediate } => {
+                        Instruction::$immediate_variant { destination, source, immediate, kind } => {
+                            require_int_kind!(kind, $current);
                             let result = $immediate_operation(
                                 values.int(source.index() as usize),
-                                i64::from(immediate.value()),
+                                i64::from(immediate.as_int()),
                             );
                             let value = match result {
                                 Ok(value) => value,
@@ -940,7 +953,8 @@ impl VirtualMachine<'_> {
                         }
                     )*
                     $(
-                        Instruction::$checked_variant { destination, left, right } => {
+                        Instruction::$checked_variant { destination, left, right, $(kind: $checked_kind,)? } => {
+                            $(require_int_kind!($checked_kind, $current);)?
                             int_binary_operation!(
                                 $current,
                                 destination,
@@ -1045,14 +1059,16 @@ impl VirtualMachine<'_> {
                     Multiply => multiply, "*";
                 }
                 int_binary {
-                    IntAdd => integer_add, "+";
-                    IntSubtract => integer_subtract, "-";
-                    IntMultiply => integer_multiply, "*";
-                    IntModulo => integer_modulo, "%";
+                    IntegerAdd => integer_add, "+";
+                    IntegerSubtract => integer_subtract, "-";
+                    IntegerMultiply => integer_multiply, "*";
+                    IntegerModulo => integer_modulo, "%";
                 }
                 int_immediate {
-                    IntMultiplyImmediate => integer_multiply, "*";
-                    IntModuloImmediate => integer_modulo, "%";
+                    IntegerAddImmediate => integer_add, "+";
+                    IntegerSubtractImmediate => integer_subtract, "-";
+                    IntegerMultiplyImmediate => integer_multiply, "*";
+                    IntegerModuloImmediate => integer_modulo, "%";
                 }
                 float_binary {
                     FloatAdd => +;
@@ -1073,7 +1089,7 @@ impl VirtualMachine<'_> {
                             Ok(((a as u64) << b as u32) as i64)
                         }
                     };
-                    IntShiftLeft => "<<", |a: i64, b: i64| {
+                    IntegerShiftLeft[kind] => "<<", |a: i64, b: i64| {
                         if !(0..=63).contains(&b) {
                             Err(Fault::ShiftRange)
                         } else {
@@ -1087,7 +1103,7 @@ impl VirtualMachine<'_> {
                             Ok(a >> b as u32)
                         }
                     };
-                    IntShiftRight => ">>", |a: i64, b: i64| {
+                    IntegerShiftRight[kind] => ">>", |a: i64, b: i64| {
                         if !(0..=63).contains(&b) {
                             Err(Fault::ShiftRange)
                         } else {
@@ -1095,11 +1111,11 @@ impl VirtualMachine<'_> {
                         }
                     };
                     BitwiseAnd => "&", |a: i64, b: i64| Ok::<i64, Fault>(a & b);
-                    IntBitwiseAnd => "&", |a: i64, b: i64| Ok::<i64, Fault>(a & b);
+                    IntegerBitwiseAnd[kind] => "&", |a: i64, b: i64| Ok::<i64, Fault>(a & b);
                     BitwiseOr => "|", |a: i64, b: i64| Ok::<i64, Fault>(a | b);
-                    IntBitwiseOr => "|", |a: i64, b: i64| Ok::<i64, Fault>(a | b);
+                    IntegerBitwiseOr[kind] => "|", |a: i64, b: i64| Ok::<i64, Fault>(a | b);
                     BitwiseXor => "^", |a: i64, b: i64| Ok::<i64, Fault>(a ^ b);
-                    IntBitwiseXor => "^", |a: i64, b: i64| Ok::<i64, Fault>(a ^ b);
+                    IntegerBitwiseXor[kind] => "^", |a: i64, b: i64| Ok::<i64, Fault>(a ^ b);
                 }
                 Instruction::LoadConstant {
                     destination,
@@ -1164,10 +1180,11 @@ impl VirtualMachine<'_> {
                         return NumericLoopOutcome::Deoptimize(current);
                     }
                 }
-                Instruction::LoadInt {
+                Instruction::LoadInteger { kind,
                     destination,
                     immediate,
                 } => {
+                    require_int_kind!(kind, current);
                     // SAFETY: the destination is in the active numeric register window.
                     unsafe {
                         assign(
@@ -1176,7 +1193,7 @@ impl VirtualMachine<'_> {
                             &mut dirty,
                             &mut pins,
                             destination,
-                            NumericValue::int(i64::from(immediate.value())),
+                            NumericValue::int(i64::from(immediate.as_int())),
                         )
                     }
                 }
@@ -1218,7 +1235,8 @@ impl VirtualMachine<'_> {
                         )
                     };
                 }
-                Instruction::IntAddAssign { target, source } => {
+                Instruction::IntegerAddAssign { kind, target, source } => {
+                    require_int_kind!(kind, current);
                     let result = integer_add(
                         values.int(target.index() as usize),
                         values.int(source.index() as usize),
@@ -1963,11 +1981,12 @@ impl VirtualMachine<'_> {
                     dict_element_read!(current, destination, container, index_value, value_mode);
                     fused_array_comparison_tail!(destination, value_mode);
                 }
-                Instruction::DictIndexSetIntKey {
+                Instruction::DictIndexSetIntegerKey { kind,
                     container,
                     index,
                     value,
                 } => {
+                    require_int_kind!(kind, current);
                     let index_value = values.int(index.index() as usize);
                     dict_element_write!(current, container, index_value, value);
                 }
@@ -2230,10 +2249,11 @@ unsafe fn try_fill_burst(
     let body = marker + 1;
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let first = unsafe { InstructionWord::read(chunk.code.as_ptr().add(body)) };
-    if first.kind() != InstructionKind::LoadInt {
+    if first.kind() != InstructionKind::LoadInteger {
         return None;
     }
-    let Instruction::LoadInt {
+    let Instruction::LoadInteger {
+        kind: IntegerKind::I64,
         destination: fill_register,
         immediate,
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
@@ -2275,11 +2295,16 @@ unsafe fn try_fill_burst(
     }
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let third = unsafe { InstructionWord::read(chunk.code.as_ptr().add(body + 2)) };
-    if third.kind() != InstructionKind::IntAddAssign {
+    if third.kind() != InstructionKind::IntegerAddAssign {
         return None;
     }
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    let Instruction::IntAddAssign { target, source } = (unsafe { third.decode() }) else {
+    let Instruction::IntegerAddAssign {
+        kind: IntegerKind::I64,
+        target,
+        source,
+    } = (unsafe { third.decode() })
+    else {
         return None;
     };
     if target != left {
@@ -2304,7 +2329,7 @@ unsafe fn try_fill_burst(
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let (elements, length) = (unsafe { pins.for_write(registers, container) })?;
 
-    let fill_value = i64::from(immediate.value());
+    let fill_value = i64::from(immediate.as_int());
     let step = values.int(source.index() as usize);
     let limit_value = values.int(right.index() as usize);
     let mut position = values.int(left.index() as usize);
@@ -2494,7 +2519,7 @@ unsafe fn attempt_marker_bursts(
     let first_kind = unsafe { InstructionWord::read(chunk.code.as_ptr().add(marker + 1)) }.kind();
     match first_kind {
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-        InstructionKind::LoadInt => unsafe {
+        InstructionKind::LoadInteger => unsafe {
             try_fill_burst(
                 chunk,
                 registers,
@@ -2544,7 +2569,7 @@ unsafe fn attempt_marker_bursts(
             }
         }
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-        InstructionKind::DictIndexSetIntKey => unsafe {
+        InstructionKind::DictIndexSetIntegerKey => unsafe {
             try_dict_build_burst(
                 chunk,
                 registers,
@@ -2599,7 +2624,8 @@ unsafe fn try_vec_append_step_burst(
     let update = jump - 1;
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let word = |at: usize| unsafe { InstructionWord::read(chunk.code.as_ptr().add(at)) };
-    let Instruction::IntAddAssign {
+    let Instruction::IntegerAddAssign {
+        kind: IntegerKind::I64,
         target: update_target,
         source: step,
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
@@ -2812,47 +2838,56 @@ unsafe fn try_int_body_burst(
 #[inline(always)]
 fn int_burst_instruction_ready(instruction: Instruction, values: &NumericRegisters) -> bool {
     match instruction {
-        Instruction::IntAdd {
+        Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntSubtract {
+        | Instruction::IntegerSubtract {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntMultiply {
+        | Instruction::IntegerMultiply {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntModulo {
+        | Instruction::IntegerModulo {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntBitwiseAnd {
+        | Instruction::IntegerBitwiseAnd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntBitwiseOr {
+        | Instruction::IntegerBitwiseOr {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntBitwiseXor {
+        | Instruction::IntegerBitwiseXor {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntShiftLeft {
+        | Instruction::IntegerShiftLeft {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
         }
-        | Instruction::IntShiftRight {
+        | Instruction::IntegerShiftRight {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2861,16 +2896,31 @@ fn int_burst_instruction_ready(instruction: Instruction, values: &NumericRegiste
                 && values.kind(left.index() as usize) == NumericKind::Int
                 && values.kind(right.index() as usize) == NumericKind::Int
         }
-        Instruction::IntBitwiseNot {
+        Instruction::IntegerBitwiseNot {
+            kind: IntegerKind::I64,
             destination,
             source,
         }
-        | Instruction::IntMultiplyImmediate {
+        | Instruction::IntegerAddImmediate {
+            kind: IntegerKind::I64,
             destination,
             source,
             ..
         }
-        | Instruction::IntModuloImmediate {
+        | Instruction::IntegerSubtractImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            source,
+            ..
+        }
+        | Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            source,
+            ..
+        }
+        | Instruction::IntegerModuloImmediate {
+            kind: IntegerKind::I64,
             destination,
             source,
             ..
@@ -2884,18 +2934,76 @@ fn int_burst_instruction_ready(instruction: Instruction, values: &NumericRegiste
 
 fn int_burst_destination(instruction: Instruction) -> Option<Register> {
     match instruction {
-        Instruction::IntAdd { destination, .. }
-        | Instruction::IntSubtract { destination, .. }
-        | Instruction::IntMultiply { destination, .. }
-        | Instruction::IntModulo { destination, .. }
-        | Instruction::IntMultiplyImmediate { destination, .. }
-        | Instruction::IntModuloImmediate { destination, .. }
-        | Instruction::IntBitwiseAnd { destination, .. }
-        | Instruction::IntBitwiseOr { destination, .. }
-        | Instruction::IntBitwiseXor { destination, .. }
-        | Instruction::IntShiftLeft { destination, .. }
-        | Instruction::IntShiftRight { destination, .. }
-        | Instruction::IntBitwiseNot { destination, .. } => Some(destination),
+        Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerSubtract {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerMultiply {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerModulo {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerAddImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerSubtractImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerModuloImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseAnd {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseOr {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseXor {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftLeft {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftRight {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseNot {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        } => Some(destination),
         _ => None,
     }
 }
@@ -2906,7 +3014,8 @@ fn int_burst_operation(
     values: &NumericRegisters,
 ) -> Option<(Register, Result<i64, Fault>)> {
     Some(match instruction {
-        Instruction::IntAdd {
+        Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2917,7 +3026,8 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntSubtract {
+        Instruction::IntegerSubtract {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2928,7 +3038,8 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntMultiply {
+        Instruction::IntegerMultiply {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2939,7 +3050,8 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntModulo {
+        Instruction::IntegerModulo {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2950,7 +3062,32 @@ fn int_burst_operation(
                 values.int(right.index() as usize),
             ),
         ),
-        Instruction::IntMultiplyImmediate {
+        Instruction::IntegerAddImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            source,
+            immediate,
+        } => (
+            destination,
+            integer_add(
+                values.int(source.index() as usize),
+                i64::from(immediate.as_int()),
+            ),
+        ),
+        Instruction::IntegerSubtractImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            source,
+            immediate,
+        } => (
+            destination,
+            integer_subtract(
+                values.int(source.index() as usize),
+                i64::from(immediate.as_int()),
+            ),
+        ),
+        Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::I64,
             destination,
             source,
             immediate,
@@ -2958,10 +3095,11 @@ fn int_burst_operation(
             destination,
             integer_multiply(
                 values.int(source.index() as usize),
-                i64::from(immediate.value()),
+                i64::from(immediate.as_int()),
             ),
         ),
-        Instruction::IntModuloImmediate {
+        Instruction::IntegerModuloImmediate {
+            kind: IntegerKind::I64,
             destination,
             source,
             immediate,
@@ -2969,10 +3107,11 @@ fn int_burst_operation(
             destination,
             integer_modulo(
                 values.int(source.index() as usize),
-                i64::from(immediate.value()),
+                i64::from(immediate.as_int()),
             ),
         ),
-        Instruction::IntBitwiseAnd {
+        Instruction::IntegerBitwiseAnd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2980,7 +3119,8 @@ fn int_burst_operation(
             destination,
             Ok(values.int(left.index() as usize) & values.int(right.index() as usize)),
         ),
-        Instruction::IntBitwiseOr {
+        Instruction::IntegerBitwiseOr {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2988,7 +3128,8 @@ fn int_burst_operation(
             destination,
             Ok(values.int(left.index() as usize) | values.int(right.index() as usize)),
         ),
-        Instruction::IntBitwiseXor {
+        Instruction::IntegerBitwiseXor {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -2996,11 +3137,13 @@ fn int_burst_operation(
             destination,
             Ok(values.int(left.index() as usize) ^ values.int(right.index() as usize)),
         ),
-        Instruction::IntBitwiseNot {
+        Instruction::IntegerBitwiseNot {
+            kind: IntegerKind::I64,
             destination,
             source,
         } => (destination, Ok(!values.int(source.index() as usize))),
-        Instruction::IntShiftLeft {
+        Instruction::IntegerShiftLeft {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -3016,7 +3159,8 @@ fn int_burst_operation(
                 },
             )
         }
-        Instruction::IntShiftRight {
+        Instruction::IntegerShiftRight {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -3379,7 +3523,8 @@ unsafe fn try_dict_accumulate_burst(
             left,
             right,
         }
-        | Instruction::IntAdd {
+        | Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -3387,7 +3532,8 @@ unsafe fn try_dict_accumulate_burst(
         _ => return None,
     };
 
-    let Instruction::DictIndexSetIntKey {
+    let Instruction::DictIndexSetIntegerKey {
+        kind: IntegerKind::I64,
         container: store_target,
         index: store_index,
         value: store_value,
@@ -3562,7 +3708,8 @@ unsafe fn try_dict_build_burst(
     let body = marker + 1;
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let word = |at: usize| unsafe { InstructionWord::read(chunk.code.as_ptr().add(at)) };
-    let Instruction::DictIndexSetIntKey {
+    let Instruction::DictIndexSetIntegerKey {
+        kind: IntegerKind::I64,
         container: target,
         index: first_index,
         value: value_register,
@@ -3582,7 +3729,8 @@ unsafe fn try_dict_build_burst(
         if at + 1 >= chunk.code.len() {
             return None;
         }
-        let Instruction::DictIndexSetIntKey {
+        let Instruction::DictIndexSetIntegerKey {
+            kind: IntegerKind::I64,
             container,
             index,
             value,
@@ -3748,7 +3896,7 @@ unsafe fn try_dict_copy_burst(
     else {
         return None;
     };
-    let Instruction::DictIndexSetIntKey {
+    let Instruction::DictIndexSetIntegerKey { kind: IntegerKind::I64,
         container: target, ..
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     } = (unsafe { word(body + 1).decode() })
@@ -3801,7 +3949,8 @@ unsafe fn try_dict_copy_burst(
         else {
             return None;
         };
-        let Instruction::DictIndexSetIntKey {
+        let Instruction::DictIndexSetIntegerKey {
+            kind: IntegerKind::I64,
             container: store_target,
             index: store_index,
             value,
@@ -3983,10 +4132,11 @@ unsafe fn try_scan_burst(
     }
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let second = unsafe { InstructionWord::read(chunk.code.as_ptr().add(body + 1)) };
-    if second.kind() != InstructionKind::LoadInt {
+    if second.kind() != InstructionKind::LoadInteger {
         return None;
     }
-    let Instruction::LoadInt {
+    let Instruction::LoadInteger {
+        kind: IntegerKind::I64,
         destination: threshold_register,
         immediate,
         // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
@@ -4018,7 +4168,7 @@ unsafe fn try_scan_burst(
     // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
     let (elements, length) = (unsafe { pins.for_read(registers, container) })?;
 
-    let threshold = i64::from(immediate.value());
+    let threshold = i64::from(immediate.as_int());
     let limit_value = values.int(limit.index() as usize);
     let mut index_value = values.int(counter.index() as usize);
     loop {

@@ -9,8 +9,8 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::AsMode;
 use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::Count;
-use whim_bytecode::instruction::operands::ImmediateInt;
-use whim_bytecode::instruction::operands::ImmediateUint;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::array::DictExpression;
@@ -785,9 +785,10 @@ impl BodyCompiler<'_, '_> {
     ) -> Result<(), CompileError> {
         if let Ok(immediate) = i16::try_from(value) {
             self.chunk.emit(
-                Instruction::LoadInt {
+                Instruction::LoadInteger {
+                    kind: IntegerKind::I64,
                     destination,
-                    immediate: ImmediateInt::new(immediate),
+                    immediate: ImmediateInteger::signed(immediate),
                 },
                 span,
             );
@@ -812,9 +813,10 @@ impl BodyCompiler<'_, '_> {
         span: Span,
     ) -> Result<(), CompileError> {
         let instruction = if let Ok(immediate) = u16::try_from(value) {
-            Instruction::LoadUint {
+            Instruction::LoadInteger {
+                kind: IntegerKind::U64,
                 destination,
-                immediate: ImmediateUint::new(immediate),
+                immediate: ImmediateInteger::unsigned(immediate),
             }
         } else {
             Instruction::LoadConstant {

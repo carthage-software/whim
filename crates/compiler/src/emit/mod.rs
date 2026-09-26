@@ -1,6 +1,7 @@
 //! Function-body emission: the compiler state, its locals, and its registers.
 
 use std::mem;
+use whim_bytecode::instruction::operands::IntegerKind;
 
 use hashbrown::HashMap;
 use hashbrown::HashSet;
@@ -1013,13 +1014,15 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
                 ) =>
             {
                 Some(if when_true {
-                    Instruction::IntRangeJumpIf {
+                    Instruction::IntegerRangeJumpIf {
+                        kind: IntegerKind::I64,
                         subject: source,
                         descriptor,
                         offset,
                     }
                 } else {
-                    Instruction::IntRangeJumpUnless {
+                    Instruction::IntegerRangeJumpUnless {
+                        kind: IntegerKind::I64,
                         subject: source,
                         descriptor,
                         offset,

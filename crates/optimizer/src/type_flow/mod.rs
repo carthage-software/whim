@@ -17,6 +17,7 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
 use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledClassLike;
 use whim_bytecode::unit::CompiledFunction;
@@ -945,15 +946,21 @@ impl<'a> TypeFlow<'a> {
                 }
                 | Instruction::Append { container, value }
                 | Instruction::VecAppend { container, value }
-                | Instruction::DictIndexSetIntKey {
-                    container, value, ..
+                | Instruction::DictIndexSetIntegerKey {
+                    kind: IntegerKind::I64,
+                    container,
+                    value,
+                    ..
                 } => (
                     self.fact(index, container).array,
                     self.fact(index, value).mask,
                     INT,
                 ),
-                Instruction::DictIndexSetUintKey {
-                    container, value, ..
+                Instruction::DictIndexSetIntegerKey {
+                    kind: IntegerKind::U64,
+                    container,
+                    value,
+                    ..
                 } => (
                     self.fact(index, container).array,
                     self.fact(index, value).mask,

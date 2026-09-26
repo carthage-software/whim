@@ -1,7 +1,16 @@
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::DescriptorIndex;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
+use whim_bytecode::instruction::word::InstructionWord;
 use whim_bytecode::rewrite::control_flow_targets;
+use whim_bytecode::verify::VerifyError;
+use whim_bytecode::verify::verify;
 use whim_span::Span;
 
 #[test]
@@ -36,4 +45,92 @@ fn reading_a_negative_branch_target_panics() {
         Span::zero(),
     );
     let _ = control_flow_targets(&chunk);
+}
+
+#[test]
+fn integer_instructions_preserve_kind_and_operand_bits() {
+    for kind in [IntegerKind::I64, IntegerKind::U64] {
+        for instruction in [
+            Instruction::IntegerAdd {
+                destination: Register::new(0x1234),
+                left: Register::new(0x5678),
+                right: Register::new(0xabcd),
+                kind,
+            },
+            Instruction::LoadInteger {
+                destination: Register::new(0x1234),
+                immediate: ImmediateInteger::unsigned(u16::MAX),
+                kind,
+            },
+            Instruction::IntegerRangeJumpUnless {
+                subject: Register::new(0x1234),
+                descriptor: DescriptorIndex::new(0x5678),
+                offset: ShortJumpOffset::new(i16::MIN),
+                kind,
+            },
+        ] {
+            // SAFETY: the word comes from a live instruction and retains its tag.
+            let decoded = unsafe { InstructionWord::read(&instruction).decode() };
+            assert_eq!(instruction, decoded);
+            assert_eq!(instruction.kind(), decoded.kind());
+            let encoded = bincode::serialize(&instruction).unwrap();
+            assert_eq!(instruction, bincode::deserialize(&encoded).unwrap());
+        }
+    }
+    assert_eq!(ImmediateInteger::signed(-1).as_uint(), u16::MAX);
+    assert_eq!(ImmediateInteger::unsigned(u16::MAX).as_int(), -1);
+}
+
+#[test]
+fn integer_range_branches_require_a_descriptor_of_their_kind() {
+    let mut chunk = Chunk::new();
+    chunk.register_count = 1;
+    chunk.type_descriptors = vec![
+        TypeDescriptor::IntRange {
+            min: Some(-1),
+            max: None,
+        },
+        TypeDescriptor::UintRange {
+            min: Some(1),
+            max: None,
+        },
+    ];
+    for (expected, kind) in [IntegerKind::I64, IntegerKind::U64].into_iter().enumerate() {
+        for descriptor in 0..2 {
+            for jump_if in [false, true] {
+                chunk.code.clear();
+                chunk.spans.clear();
+                let subject = Register::new(0);
+                let offset = ShortJumpOffset::new(1);
+                let descriptor = DescriptorIndex::new(descriptor);
+                chunk.emit(
+                    if jump_if {
+                        Instruction::IntegerRangeJumpIf {
+                            subject,
+                            descriptor,
+                            offset,
+                            kind,
+                        }
+                    } else {
+                        Instruction::IntegerRangeJumpUnless {
+                            subject,
+                            descriptor,
+                            offset,
+                            kind,
+                        }
+                    },
+                    Span::zero(),
+                );
+                chunk.emit(Instruction::ReturnNull, Span::zero());
+                if usize::from(descriptor.index()) == expected {
+                    verify(&chunk).unwrap();
+                } else {
+                    assert!(matches!(
+                        verify(&chunk),
+                        Err(VerifyError::TypeDescriptorKindInvalid { .. })
+                    ));
+                }
+            }
+        }
+    }
 }

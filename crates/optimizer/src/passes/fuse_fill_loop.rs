@@ -3,6 +3,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Comparison as BytecodeComparison;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
 use whim_bytecode::rewrite::relative_target;
@@ -84,7 +85,8 @@ pub(super) fn optimize_chunk(
             continue;
         };
 
-        let Instruction::LoadInt {
+        let Instruction::LoadInteger {
+            kind: IntegerKind::I64,
             destination: initialized_counter,
             immediate: initial,
         } = chunk.code[header - 2]
@@ -92,7 +94,8 @@ pub(super) fn optimize_chunk(
             continue;
         };
 
-        let Instruction::LoadInt {
+        let Instruction::LoadInteger {
+            kind: IntegerKind::I64,
             destination: loaded_limit,
             immediate: maximum,
         } = chunk.code[header - 1]
@@ -101,9 +104,9 @@ pub(super) fn optimize_chunk(
         };
 
         if initialized_counter != counter
-            || initial.value() != 0
+            || initial.as_int() != 0
             || loaded_limit != limit
-            || maximum.value() < 0
+            || maximum.as_int() < 0
             || indexed_container != container
             || index != counter
             || indexed_value != value
@@ -152,8 +155,7 @@ fn literal_destination(instruction: Instruction) -> Option<Register> {
         | Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
-        | Instruction::LoadInt { destination, .. }
-        | Instruction::LoadUint { destination, .. } => Some(destination),
+        | Instruction::LoadInteger { destination, .. } => Some(destination),
         _ => None,
     }
 }

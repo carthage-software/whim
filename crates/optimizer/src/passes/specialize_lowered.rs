@@ -5,6 +5,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::for_each_control_flow_target;
 use whim_bytecode::unit::CompiledFunction;
@@ -511,39 +512,171 @@ fn transfer(
         | Instruction::StringByteGreaterThanOrEqual { destination, .. } => {
             (destination, KnownKind::Bool)
         }
-        Instruction::LoadInt { destination, .. }
-        | Instruction::IntAdd { destination, .. }
-        | Instruction::IntSubtract { destination, .. }
-        | Instruction::IntMultiply { destination, .. }
-        | Instruction::IntModulo { destination, .. }
-        | Instruction::IntBitwiseAnd { destination, .. }
-        | Instruction::IntBitwiseOr { destination, .. }
-        | Instruction::IntBitwiseXor { destination, .. }
-        | Instruction::IntBitwiseNot { destination, .. }
-        | Instruction::IntShiftLeft { destination, .. }
-        | Instruction::IntShiftRight { destination, .. }
-        | Instruction::IntMultiplyImmediate { destination, .. }
-        | Instruction::IntModuloImmediate { destination, .. }
+        Instruction::LoadInteger {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerSubtract {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerMultiply {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerModulo {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerAddImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerSubtractImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerStep {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseAnd {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseOr {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseXor {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseNot {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftLeft {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftRight {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerModuloImmediate {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
         | Instruction::Length { destination, .. }
         | Instruction::StringLength { destination, .. }
         | Instruction::Compare { destination, .. } => (destination, KnownKind::Int),
-        Instruction::LoadUint { destination, .. }
-        | Instruction::UintAdd { destination, .. }
-        | Instruction::UintSubtract { destination, .. }
-        | Instruction::UintMultiply { destination, .. }
-        | Instruction::UintModulo { destination, .. }
-        | Instruction::UintBitwiseAnd { destination, .. }
-        | Instruction::UintBitwiseOr { destination, .. }
-        | Instruction::UintBitwiseXor { destination, .. }
-        | Instruction::UintBitwiseNot { destination, .. }
-        | Instruction::UintShiftLeft { destination, .. }
-        | Instruction::UintShiftRight { destination, .. }
-        | Instruction::UintAddImmediate { destination, .. }
-        | Instruction::UintSubtractImmediate { destination, .. }
-        | Instruction::UintMultiplyImmediate { destination, .. }
-        | Instruction::UintModuloImmediate { destination, .. }
-        | Instruction::UintStep { destination, .. }
-        | Instruction::UintAddAssign {
+        Instruction::LoadInteger {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerAdd {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerSubtract {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerMultiply {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerModulo {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseAnd {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseOr {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseXor {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerBitwiseNot {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftLeft {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerShiftRight {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerAddImmediate {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerSubtractImmediate {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerModuloImmediate {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerStep {
+            kind: IntegerKind::U64,
+            destination,
+            ..
+        }
+        | Instruction::IntegerAddAssign {
+            kind: IntegerKind::U64,
             target: destination,
             ..
         }
@@ -780,10 +913,8 @@ fn has_no_fallthrough(instruction: Instruction) -> bool {
             | Instruction::SwitchFloat { .. }
             | Instruction::SwitchPattern { .. }
             | Instruction::SwitchTuplePattern { .. }
-            | Instruction::IntRangeJumpIf { .. }
-            | Instruction::IntRangeJumpUnless { .. }
-            | Instruction::UintRangeJumpIf { .. }
-            | Instruction::UintRangeJumpUnless { .. }
+            | Instruction::IntegerRangeJumpIf { .. }
+            | Instruction::IntegerRangeJumpUnless { .. }
             | Instruction::BoolPatternBranch { .. }
             | Instruction::Return { .. }
             | Instruction::ReturnUnchecked { .. }
@@ -792,8 +923,7 @@ fn has_no_fallthrough(instruction: Instruction) -> bool {
             | Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }

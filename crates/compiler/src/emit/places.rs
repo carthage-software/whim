@@ -8,7 +8,9 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::AsMode;
 use whim_bytecode::instruction::operands::IcSlot;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
 use whim_bytecode::instruction::operands::Register;
@@ -942,9 +944,10 @@ impl BodyCompiler<'_, '_> {
     ) -> Result<(), CompileError> {
         let index = self.allocate(write.span)?;
         self.chunk.emit(
-            Instruction::LoadInt {
+            Instruction::LoadInteger {
+                kind: IntegerKind::I64,
                 destination: index,
-                immediate: ImmediateInt::new(tuple_index(write.position)),
+                immediate: ImmediateInteger::signed(tuple_index(write.position)),
             },
             write.span,
         );

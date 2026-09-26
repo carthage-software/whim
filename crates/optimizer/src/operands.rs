@@ -72,8 +72,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | LoadNull
                 | LoadTrue
                 | LoadFalse
-                | LoadInt
-                | LoadUint
+                | LoadInteger
                 | NewStatic
                 | NewTyped
                 | StaticPropertyGetOrNull
@@ -115,8 +114,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | CheckWhereConstraints
                 | ReturnNull
                 | ReturnNullUnchecked
-                | ReturnIntUnchecked
-                | ReturnUintUnchecked
+                | ReturnIntegerUnchecked
                 | Rethrow
         ) => Some(&[]),
         instruction_kinds!(
@@ -146,42 +144,30 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | FloatMultiplyConstant
                 | ConcatenateRightConstant
                 | ConcatenateLeftConstant
-                | IntBitwiseNot
-                | UintBitwiseNot
-                | UintAddImmediate
-                | UintSubtractImmediate
-                | UintMultiplyImmediate
-                | UintModuloImmediate
-                | UintStep
+                | IntegerBitwiseNot
+                | IntegerAddImmediate
+                | IntegerSubtractImmediate
+                | IntegerMultiplyImmediate
+                | IntegerModuloImmediate
+                | IntegerStep
                 | AddImmediate
                 | Step
                 | SubtractImmediate
-                | IntMultiplyImmediate
-                | IntModuloImmediate
         ) => Some(&[R3, W1]),
         InstructionKind::MoveOwned => Some(&[R3, W3, W1]),
-        InstructionKind::IntAddAssign | InstructionKind::UintAddAssign => Some(&[R1, R3, W1]),
+        InstructionKind::IntegerAddAssign => Some(&[R1, R3, W1]),
         instruction_kinds!(
             Add | Subtract
                 | Multiply
-                | IntAdd
-                | UintAdd
-                | UintSubtract
-                | UintMultiply
-                | UintModulo
-                | UintBitwiseAnd
-                | UintBitwiseOr
-                | UintBitwiseXor
-                | UintShiftLeft
-                | UintShiftRight
-                | IntSubtract
-                | IntMultiply
-                | IntModulo
-                | IntBitwiseAnd
-                | IntBitwiseOr
-                | IntBitwiseXor
-                | IntShiftLeft
-                | IntShiftRight
+                | IntegerAdd
+                | IntegerSubtract
+                | IntegerMultiply
+                | IntegerModulo
+                | IntegerBitwiseAnd
+                | IntegerBitwiseOr
+                | IntegerBitwiseXor
+                | IntegerShiftLeft
+                | IntegerShiftRight
                 | Divide
                 | Modulo
                 | Power
@@ -200,8 +186,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | Compare
                 | IndexGetOrNull
                 | VecIndexGetOrNull
-                | DictIndexGetIntKeyOrNull
-                | DictIndexGetUintKeyOrNull
+                | DictIndexGetIntegerKeyOrNull
                 | DictIndexGetStringKeyOrNull
                 | StringIndexGetOrNull
                 | IndexCoalesce
@@ -240,10 +225,8 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
                 | SwitchBool
                 | SwitchFloat
                 | SwitchPattern
-                | IntRangeJumpIf
-                | UintRangeJumpIf
-                | UintRangeJumpUnless
-                | IntRangeJumpUnless
+                | IntegerRangeJumpIf
+                | IntegerRangeJumpUnless
                 | BoolPatternBranch
                 | SwitchTuplePattern
                 | FillDefault
@@ -297,12 +280,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
         | InstructionKind::UintJumpUnlessImmediate => Some(&[R2]),
         InstructionKind::IncrementJump => Some(&[R1, W1]),
         instruction_kinds!(
-            IndexSet
-                | VecIndexSet
-                | DictIndexSetIntKey
-                | DictIndexSetUintKey
-                | DictIndexSetStringKey
-                | DictIndexSet
+            IndexSet | VecIndexSet | DictIndexSetIntegerKey | DictIndexSetStringKey | DictIndexSet
         ) => Some(&[R1, R3, R5]),
         InstructionKind::PropertyRemove | InstructionKind::PropertyRemoveUnchecked => {
             Some(&[R1, W3])

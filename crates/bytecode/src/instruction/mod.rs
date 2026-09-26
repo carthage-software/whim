@@ -25,9 +25,11 @@ use crate::instruction::operands::FloatPairUpdateDescriptorIndex;
 use crate::instruction::operands::FloatSquaresSumBranchDescriptorIndex;
 use crate::instruction::operands::IcSlot;
 use crate::instruction::operands::ImmediateInt;
+use crate::instruction::operands::ImmediateInteger;
 use crate::instruction::operands::ImmediateUint;
 use crate::instruction::operands::IndexAddMode;
 use crate::instruction::operands::IntStepLoopDescriptorIndex;
+use crate::instruction::operands::IntegerKind;
 use crate::instruction::operands::JumpOffset;
 use crate::instruction::operands::NearJumpOffset;
 use crate::instruction::operands::PreparedIntLoopDescriptorIndex;
@@ -46,413 +48,233 @@ use crate::instruction::operands::SwitchTableIndex;
 macro_rules! instruction_set {
     ($declaration:ident) => {
         $declaration! {
-            Move { destination: Register, source: Register, } = 0,
-            LoadConstant { destination: Register, constant: ConstantIndex, } = 1,
-            LoadNull { destination: Register, } = 2,
-            LoadTrue { destination: Register, } = 3,
-            LoadFalse { destination: Register, } = 4,
-            LoadInt { destination: Register, immediate: ImmediateInt, } = 5,
-            /// `destination = left + right`; numeric operands only.
-            Add { destination: Register, left: Register, right: Register, } = 6,
-            /// `destination = left - right`; numeric operands only.
-            Subtract { destination: Register, left: Register, right: Register, } = 7,
-            /// `destination = left * right`; numeric operands only.
-            Multiply { destination: Register, left: Register, right: Register, } = 8,
-            /// `destination = left / right`; the result is always a float.
-            Divide { destination: Register, left: Register, right: Register, } = 9,
-            /// `destination = left % right`; integer operands only.
-            Modulo { destination: Register, left: Register, right: Register, } = 10,
-            /// `destination = left ** right`; numeric operands only.
-            Power { destination: Register, left: Register, right: Register, } = 11,
-            /// `destination = -source`; numeric operand only.
-            Negate { destination: Register, source: Register, } = 12,
-            /// `destination = +source`; numeric operand only.
-            UnaryPlus { destination: Register, source: Register, } = 13,
-            AddImmediate { destination: Register, source: Register, immediate: ImmediateInt, } = 14,
-            SubtractImmediate { destination: Register, source: Register, immediate: ImmediateInt, } = 15,
-            /// `destination = left . right`; strings and numbers only.
-            Concatenate { destination: Register, left: Register, right: Register, } = 16,
-            /// `destination = left & right`; integer operands only.
-            BitwiseAnd { destination: Register, left: Register, right: Register, } = 17,
-            /// `destination = left | right`; integer operands only.
-            BitwiseOr { destination: Register, left: Register, right: Register, } = 18,
-            /// `destination = left ^ right`; integer operands only.
-            BitwiseXor { destination: Register, left: Register, right: Register, } = 19,
-            /// `destination = ~source`; integer operand only.
-            BitwiseNot { destination: Register, source: Register, } = 20,
-            /// `destination = left << right`; integer operands only.
-            ShiftLeft { destination: Register, left: Register, right: Register, } = 21,
-            /// `destination = left >> right`; integer operands only.
-            ShiftRight { destination: Register, left: Register, right: Register, } = 22,
-            /// `destination = left == right`; total, never throws.
-            Equal { destination: Register, left: Register, right: Register, } = 23,
-            /// `destination = left != right`; total, never throws.
-            NotEqual { destination: Register, left: Register, right: Register, } = 24,
-            /// `destination = left < right`; partial ordering, throws on
-            /// incomparable operands.
-            LessThan { destination: Register, left: Register, right: Register, } = 25,
-            /// `destination = left <= right`; partial ordering, throws on
-            /// incomparable operands.
-            LessThanOrEqual { destination: Register, left: Register, right: Register, } = 26,
-            /// `destination = left > right`; partial ordering, throws on
-            /// incomparable operands.
-            GreaterThan { destination: Register, left: Register, right: Register, } = 27,
-            /// `destination = left >= right`; partial ordering, throws on
-            /// incomparable operands.
-            GreaterThanOrEqual { destination: Register, left: Register, right: Register, } = 28,
-            /// `destination = left <=> right`; throws on incomparable operands and
-            /// on NaN.
-            Compare { destination: Register, left: Register, right: Register, } = 29,
-            Not { destination: Register, source: Register, } = 30,
-            Jump { offset: JumpOffset, } = 31,
-            /// Jumps when `condition` is `false`; a non-boolean condition throws.
-            JumpIfFalse { condition: Register, offset: JumpOffset, } = 32,
-            /// Jumps when `condition` is `true`; a non-boolean condition throws.
-            JumpIfTrue { condition: Register, offset: JumpOffset, } = 33,
-            JumpIfNull { subject: Register, offset: JumpOffset, } = 34,
-            JumpIfNotNull { subject: Register, offset: JumpOffset, } = 35,
-            SwitchInt { subject: Register, table: SwitchTableIndex, } = 36,
-            SwitchString { subject: Register, table: SwitchTableIndex, } = 37,
-            /// Throws `UndefinedVariableError` named by the constant at `name` when
-            /// `subject` is still uninitialized.
-            CheckDefined { subject: Register, name: ConstantIndex, } = 38,
-            NewVec { element_count: Count, destination: Register, first_element: Register, } = 39,
-            NewDict { pair_count: Count, destination: Register, first_pair: Register, } = 40,
-            NewTuple { element_count: Count, destination: Register, first_element: Register, } = 41,
-            /// `destination = container[index]`; throws on a bad index or key.
-            IndexGet { destination: Register, container: Register, index: Register, } = 42,
-            IndexSet { container: Register, index: Register, value: Register, } = 43,
-            Append { container: Register, value: Register, } = 44,
-            /// Spreads every element of `value` into `container`: a vec literal's
-            /// `...`, taking a vec or tuple, and a dict literal's, taking a vec,
-            /// tuple, or dict. A source the container does not accept throws.
-            Spread { container: Register, value: Register, } = 87,
-            /// Collects `subject`'s elements from `from` onward into a fresh vec in
-            /// `destination`: a destructuring pattern's `...$r`. The result is always
-            /// a vec, whatever the subject was, and is empty when nothing is left.
-            Rest { destination: Register, subject: Register, from: ImmediateInt, } = 88,
-            Length { destination: Register, source: Register, } = 45,
-            /// `destination = remove!(container, key)`; throws on a missing key.
-            Remove { destination: Register, container: Register, key: Register, } = 46,
-            /// `destination = remove_first!(container)`; throws on an empty vec.
-            RemoveFirst { destination: Register, container: Register, } = 47,
-            /// `destination = remove_last!(container)`; throws on an empty vec.
-            RemoveLast { destination: Register, container: Register, } = 48,
-            /// Throws `TypeError` unless `subject` is a vec or tuple with at least
-            /// `required` elements and, unless a `...` rest accepts surplus elements,
-            /// no more than `arity`. The destructuring guard.
-            CheckDestructure { subject: Register, required: ImmediateInt, arity: ImmediateInt, rest: bool, } = 49,
-            /// Reads a proven in-range element from a vec or tuple.
-            ElementGet { destination: Register, subject: Register, index: ImmediateInt, } = 50,
-            /// Instantiates the class named by the cache descriptor at `cache` into
-            /// `destination`; the slot caches the resolved class.
-            NewStatic { destination: Register, cache: IcSlot, } = 51,
-            NewDynamic { destination: Register, class_name: Register, } = 52,
-            NewTyped { destination: Register, descriptor: DescriptorIndex, } = 90,
-            /// `destination = object->property`, the property named by the cache
-            /// descriptor at `cache`; the slot caches the resolved slot index.
-            PropertyGet { destination: Register, object: Register, cache: IcSlot, } = 53,
-            /// `object->property = value`, the property named by the cache
-            /// descriptor at `cache`; enforces visibility and readonly.
-            PropertySet { object: Register, value: Register, cache: IcSlot, } = 54,
-            /// Initializes a constructor-promoted property or applies a checked
-            /// `clone!` override; named by the descriptor at `cache`.
-            PropertyInitRaw { object: Register, value: Register, cache: IcSlot, } = 55,
-            CloneObject { destination: Register, source: Register, } = 56,
-            /// Reads the static property named by the cache descriptor at `cache`
-            /// into `destination`.
-            StaticPropertyGet { destination: Register, cache: IcSlot, } = 57,
-            /// Writes `value` into the static property named by the cache descriptor
-            /// at `cache`.
-            StaticPropertySet { cache: IcSlot, value: Register, } = 58,
-            /// Reads the constant named by the cache descriptor at `cache` into
-            /// `destination`.
-            ConstantGet { destination: Register, cache: IcSlot, } = 59,
-            /// Reads the class constant named by the cache descriptor at `cache`
-            /// into `destination`.
-            ClassConstantGet { destination: Register, cache: IcSlot, } = 60,
-            CallValue { argument_count: Count, destination: Register, callee: Register, first_argument: Register, } = 61,
-            /// Calls the function named by the cache descriptor at `cache` with
-            /// `argument_count` arguments starting at `first_argument`.
-            CallNamed { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 62,
-            /// Calls the method named by the cache descriptor at `cache`; the
-            /// receiver sits at `first_argument` and is included in the count.
-            CallMethod { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 63,
-            /// Calls the static method named by the cache descriptor at `cache`
-            /// (class and method) with `argument_count` arguments starting at
-            /// `first_argument`.
-            CallStatic { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 64,
-            /// Calls the callable value in `callee` with the argument shape from the
-            /// call descriptor at `descriptor`; the argument window starts at
-            /// `callee + 1`, positionals first, then the named values in descriptor
-            /// order.
-            CallWithNames { destination: Register, callee: Register, descriptor: CallDescriptorIndex, } = 65,
-            Return { source: Register, } = 66,
-            ReturnNull = 67,
-            MakeClosure { capture_count: Count, destination: Register, prototype: ConstantIndex, first_capture: Register, } = 68,
-            /// Builds a bound or partially applied callable from the value in
-            /// `callee`, shaped by the preset descriptor at `descriptor`: the given
-            /// values follow at `callee + 1` in slot order, holes stay open. An
-            /// empty descriptor is a first-class callable, a pure binding.
-            MakeBound { destination: Register, callee: Register, descriptor: PresetDescriptorIndex, } = 69,
-            Is { destination: Register, source: Register, descriptor: DescriptorIndex, } = 70,
-            /// `destination = source as T`; throws `TypeError` when the value does
-            /// not conform to the type descriptor at `descriptor`.
-            AsCheck { destination: Register, source: Register, descriptor: DescriptorIndex, mode: AsMode, } = 71,
-            AsOrNull { destination: Register, source: Register, descriptor: DescriptorIndex, } = 72,
-            Throw { source: Register, } = 73,
-            Rethrow = 74,
-            /// Throws `UnhandledMatchError` for the unmatched `subject`.
-            ThrowUnhandledMatch { subject: Register, } = 75,
-            ForeachInit { iterator: Register, subject: Register, reserve: Register, } = 76,
-            ForeachNext { iterator: Register, key_destination: Register, value_destination: Register, } = 77,
-            Write { value_count: Count, first_value: Register, } = 78,
-            WriteLine { value_count: Count, first_value: Register, } = 79,
-            WriteError { value_count: Count, first_value: Register, } = 80,
-            WriteErrorLine { value_count: Count, first_value: Register, } = 81,
-            Debug { value_count: Count, first_value: Register, } = 82,
-            /// Throws `AssertionError` when the condition at `first_value` is
-            /// `false`. The next `operand_count` registers retain values used only
-            /// for a failure diagnostic, `message` is optional, and `text` names the
-            /// condition's source text.
-            Assert { operand_count: Count, first_value: Register, message: Register, text: ConstantIndex, } = 83,
-            Exit { code: Register, } = 84,
-            /// Loads and runs the file whose path string is in `path`, storing its
-            /// return value in `destination`; `once` makes a repeated load yield
-            /// `null` without re-running.
-            Require { once: bool, destination: Register, path: Register, } = 85,
-            /// Jumps by `offset` when `target` already holds a value; when `target`
-            /// holds the uninitialized sentinel, control falls through into the
-            /// default's evaluation, which must end by writing `target`.
-            FillDefault { target: Register, offset: JumpOffset, } = 86,
-            /// Compares `left` and `right`, jumping when the comparison is false.
-            /// Used only when the offset fits [`ShortJumpOffset`]; otherwise codegen
-            /// keeps the ordinary compare-then-jump pair.
-            JumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 91,
-            /// Adds `immediate` to `target` in place, then jumps unconditionally.
-            /// Emitted only when the jump fits [`ShortJumpOffset`] and the arithmetic
-            /// source and destination are the same register.
-            IncrementJump { target: Register, immediate: ImmediateInt, offset: ShortJumpOffset, } = 92,
-            Squares { first_destination: Register, first_source: Register, second_source: Register, } = 93,
-            CounterLoop { comparison: Comparison, counter: Register, limit: Register, offset: ShortJumpOffset, } = 94,
-            /// Executes a closed, side-effect-free numeric counted loop with unboxed
-            /// scalar registers. The body remains in the chunk immediately after this
-            /// instruction so the VM can deoptimize to ordinary dispatch at any body
-            /// instruction whose dynamic operands are not numeric.
-            NumericLoop { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 95,
-            /// Updates an array held by an object property in place.
-            PropertyIndexUpdate { object: Register, operand: Register, cache: IcSlot, mode: PropertyIndexUpdateMode, } = 96,
-            PropertyStep { object: Register, cache: IcSlot, immediate: ImmediateInt, mode: PropertyStepMode, } = 97,
-            PropertyAdd { object: Register, source: Register, cache: IcSlot, } = 98,
-            /// Returns `source` after the optimizer proved it satisfies the declared
-            /// return type on every path reaching this instruction.
-            ReturnUnchecked { source: Register, } = 99,
-            /// Returns `null` after the optimizer proved it satisfies the declared
-            /// return type.
-            ReturnNullUnchecked = 100,
-            /// Adds two values proven to be floats without repeating their type checks.
-            FloatAdd { destination: Register, left: Register, right: Register, } = 101,
-            /// Subtracts two values proven to be floats without repeating their type checks.
-            FloatSubtract { destination: Register, left: Register, right: Register, } = 102,
-            /// Multiplies two values proven to be floats without repeating their type checks.
-            FloatMultiply { destination: Register, left: Register, right: Register, } = 103,
-            FloatSquares { first_destination: Register, first_source: Register, second_source: Register, } = 104,
-            FloatMultiplyConstant { destination: Register, source: Register, constant: ConstantIndex, } = 105,
-            JumpUnlessConstant { comparison: Comparison, source: Register, constant: ConstantIndex, offset: ShortJumpOffset, } = 106,
-            PropertyFillIntRange { object: Register, first_operand: Register, cache: IcSlot, } = 107,
-            FloatSquaresSum { first_destination: Register, first_source: Register, second_source: Register, } = 108,
-            /// Computes `(left - right) + addend` with a rounding step after the
-            /// subtraction. `first_operand` names the adjacent `left` and `right`.
-            FloatDifferenceAdd { destination: Register, first_operand: Register, addend: Register, } = 109,
-            FloatScaleProductAdd { destination: Register, first_operand: Register, constant: ConstantIndex, } = 110,
-            FloatSquaresSumBranch { descriptor: FloatSquaresSumBranchDescriptorIndex, offset: JumpOffset, } = 111,
-            /// Integer-only form of [`Instruction::CounterLoop`] selected when type
-            /// flow proves both the counter and its limit are integers.
-            IntCounterLoop { comparison: Comparison, counter: Register, limit: Register, offset: ShortJumpOffset, } = 112,
-            /// Integer-header form of [`Instruction::NumericLoop`]. Its initial
-            /// comparison and counted back edge are both statically integer-only.
-            IntNumericLoop { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 113,
-            PreparedIntNumericLoop { descriptor: PreparedIntLoopDescriptorIndex, offset: ShortJumpOffset, } = 114,
-            /// Calls an exact final-class, non-generic method after whole-unit type
-            /// flow proved the receiver, arity, and every supplied argument.
-            CallMethodUnchecked { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 115,
-            FloatPairUpdate { descriptor: FloatPairUpdateDescriptorIndex, } = 116,
-            IntJumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 117,
-            /// Writes a property after whole-unit type flow proved the receiver's
-            /// exact property, its mutability, and the stored value's declared type.
-            PropertySetUnchecked { object: Register, value: Register, slot: PropertySlot, value_mode: PropertyValueMode, } = 118,
-            /// Updates a proven mutable array property in place.
-            PropertyIndexUpdateUnchecked { object: Register, operand: Register, slot: PropertySlot, mode: PropertyIndexUpdateMode, } = 119,
-            /// Steps a numeric property after whole-unit type flow proved that the
-            /// property is mutable and the result retains its declared type.
-            PropertyStepUnchecked { object: Register, slot: PropertySlot, immediate: ImmediateInt, mode: PropertyStepMode, } = 120,
-            /// Adds into a numeric property after whole-unit type flow proved that
-            /// the property is mutable and the result retains its declared type.
-            PropertyAddUnchecked { object: Register, source: Register, slot: PropertySlot, } = 121,
-            PropertyGetUnchecked { destination: Register, object: Register, slot: PropertySlot, value_mode: PropertyReadMode, } = 122,
-            IntAdd { destination: Register, left: Register, right: Register, } = 123,
-            IntSubtract { destination: Register, left: Register, right: Register, } = 124,
-            IntMultiply { destination: Register, left: Register, right: Register, } = 125,
-            IntModulo { destination: Register, left: Register, right: Register, } = 126,
-            VecIndexGet { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 127,
-            VecIndexSet { container: Register, index: Register, value: Register, } = 128,
-            VecAppend { container: Register, value: Register, } = 129,
-            DictIndexGetIntKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 130,
-            DictIndexSetIntKey { container: Register, index: Register, value: Register, } = 131,
-            DictIndexGetStringKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 132,
-            DictIndexSetStringKey { container: Register, index: Register, value: Register, } = 133,
-            IndexAddAssign { container: Register, index: Register, value: Register, mode: IndexAddMode, } = 146,
-            NumericRegionJump { offset: JumpOffset, } = 147,
-            CallNamedUnchecked { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 134,
-            CallSelfUnchecked { argument_count: Count, destination: Register, first_argument: Register, } = 135,
-            /// Calls an exact instance method directly from a proven caller-register
-            /// window, borrowing the receiver for the duration of the frame.
-            CallMethodDirect { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 136,
-            CallNamedDirect { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 218,
-            VecForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode, } = 137,
-            DictForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode, } = 138,
-            StringLength { destination: Register, source: Register, } = 139,
-            IntAddAssign { target: Register, source: Register, } = 140,
-            CallNamedConstantUnchecked {
-                destination: Register,
-                constant: ConstantIndex,
-                cache: IcSlot,
-                /// The callee only borrows the literal parameter; its constant-pool
-                /// atom keeps a string alive for the complete frame.
-                borrowed: bool,
-            } = 141,
-            IntJumpUnlessImmediate { comparison: Comparison, source: Register, immediate: ImmediateInt, offset: ShortJumpOffset, } = 142,
-            /// Returns an immediate integer after the optimizer proved it satisfies
-            /// the declared return type.
-            ReturnIntUnchecked { immediate: ImmediateInt, } = 143,
-            /// Returns a reference-counted register after the optimizer proved both
-            /// its type and ownership category.
-            ReturnReferenceUnchecked { source: Register, } = 144,
-            /// Returns a scalar register after the optimizer proved both its type and
-            /// ownership category.
-            ReturnScalarUnchecked { source: Register, } = 145,
-            MoveOwned { destination: Register, source: Register, } = 149,
-            IntBitwiseAnd { destination: Register, left: Register, right: Register, } = 150,
-            IntBitwiseOr { destination: Register, left: Register, right: Register, } = 151,
-            IntBitwiseXor { destination: Register, left: Register, right: Register, } = 152,
-            IntBitwiseNot { destination: Register, source: Register, } = 153,
-            IntShiftLeft { destination: Register, left: Register, right: Register, } = 154,
-            IntShiftRight { destination: Register, left: Register, right: Register, } = 155,
-            DrainFinalizers = 156,
-            Clear { target: Register, } = 157,
-            /// Throws when another strong reference keeps `source` alive.
-            CheckSoleReference { source: Register, message: ConstantIndex, chain_previous: bool, } = 158,
-            /// Calls a callable value whose result must either be consumed or
-            /// explicitly discarded.
-            CallValueDiscarded { argument_count: Count, destination: Register, callee: Register, first_argument: Register, } = 159,
-            CallNamedDiscarded { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 160,
-            CallMethodDiscarded { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 161,
-            CallStaticDiscarded { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot, } = 162,
-            CallWithNamesDiscarded { destination: Register, callee: Register, descriptor: CallDescriptorIndex, } = 163,
-            CheckDiscardedResult { source: Register, } = 164,
-            IntStepLoop { descriptor: IntStepLoopDescriptorIndex, offset: ShortJumpOffset, } = 165,
-            /// Calls a callable value after type flow proved its arity and argument
-            /// types against the callable's declared signature.
-            CallValueUnchecked { argument_count: Count, destination: Register, callee: Register, first_argument: Register, } = 166,
-            /// Returns a two-element tuple from two registers after the optimizer
-            /// proved the declared return type. Iterator continuations may consume
-            /// the pair directly without materializing the tuple.
-            ReturnPairUnchecked { first: Register, second: Register, } = 167,
-            IntMultiplyImmediate { destination: Register, source: Register, immediate: ImmediateInt, } = 168,
-            IntModuloImmediate { destination: Register, source: Register, immediate: ImmediateInt, } = 169,
-            DictIndexSet { container: Register, index: Register, value: Register, } = 170,
-            /// Reserves capacity in a proven fresh array before a counted fill
-            /// loop. Non-positive and excessively large hints are ignored or capped
-            /// by the VM without changing array semantics.
-            ReserveArray { container: Register, additional: Register, } = 171,
-            Contains { destination: Register, array: Register, value: Register, } = 172,
-            ContainsKey { destination: Register, array: Register, key: Register, } = 173,
-            NewFilledVec { destination: Register, value: Register, size: Register, } = 174,
-            StringIndexGet { destination: Register, container: Register, index: Register, } = 175,
-            StringJumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 176,
-            /// Reads one indexed byte from a proven string and jumps unless it equals
-            /// the immediate byte.
-            StringByteJumpUnlessEqual { container: Register, index: Register, byte: u8, offset: ShortJumpOffset, } = 177,
-            /// Reads one indexed byte from a proven string and jumps unless it differs
-            /// from the immediate byte.
-            StringByteJumpUnlessNotEqual { container: Register, index: Register, byte: u8, offset: ShortJumpOffset, } = 178,
-            StringByteEqual { destination: Register, container: Register, index: Register, byte: u8, } = 179,
-            StringByteNotEqual { destination: Register, container: Register, index: Register, byte: u8, } = 180,
-            StringByteLessThan { destination: Register, container: Register, index: Register, byte: u8, } = 181,
-            StringByteLessThanOrEqual { destination: Register, container: Register, index: Register, byte: u8, } = 182,
-            StringByteGreaterThan { destination: Register, container: Register, index: Register, byte: u8, } = 183,
-            StringByteGreaterThanOrEqual { destination: Register, container: Register, index: Register, byte: u8, } = 184,
-            /// Initializes several proven slots of one fresh object.
-            InitializeProperties { object: Register, cache: IcSlot, descriptor: PropertyInitializationDescriptorIndex, } = 185,
-            /// Sets an element of an array property in place.
-            PropertyIndexSet { object: Register, first_operand: Register, cache: IcSlot, } = 186,
-            /// Sets an element after type flow proves the property access and value.
-            PropertyIndexSetUnchecked { object: Register, first_operand: Register, slot: PropertySlot, } = 187,
-            /// Removes from a array property and returns the removed value.
-            /// For `Key`, the key follows `destination` in the register window.
-            PropertyRemove { object: Register, destination: Register, cache: IcSlot, mode: PropertyRemoveMode, } = 188,
-            /// The proven-property form of [`Instruction::PropertyRemove`].
-            PropertyRemoveUnchecked { object: Register, destination: Register, slot: PropertySlot, mode: PropertyRemoveMode, } = 189,
-            SwitchPattern { subject: Register, table: SwitchTableIndex, } = 190,
-            SwitchTuplePattern { first_element: Register, element_count: Count, table: SwitchTableIndex, } = 191,
-            SwitchBool { subject: Register, table: SwitchTableIndex, } = 192,
-            SwitchFloat { subject: Register, table: SwitchTableIndex, } = 193,
-            IntRangeJumpIf { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 194,
-            IntRangeJumpUnless { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 195,
-            BoolPatternBranch { subject: Register, false_offset: ShortJumpOffset, default_offset: ShortJumpOffset, } = 196,
-            Panic { message: Register, } = 197,
-            /// `destination = swap_remove!(container, index)`; does not preserve order.
-            SwapRemove { destination: Register, container: Register, index: Register, } = 198,
-            /// `destination = source . constants[constant]`; the constant is a string.
-            ConcatenateRightConstant { destination: Register, source: Register, constant: ConstantIndex, } = 199,
-            /// `destination = constants[constant] . source`; the constant is a string.
-            ConcatenateLeftConstant { destination: Register, source: Register, constant: ConstantIndex, } = 200,
-            IndexGetOrNull { destination: Register, container: Register, index: Register, } = 201,
-            VecIndexGetOrNull { destination: Register, container: Register, index: Register, } = 202,
-            DictIndexGetIntKeyOrNull { destination: Register, container: Register, index: Register, } = 203,
-            DictIndexGetStringKeyOrNull { destination: Register, container: Register, index: Register, } = 204,
-            StringIndexGetOrNull { destination: Register, container: Register, index: Register, } = 205,
-            PropertyGetOrNull { destination: Register, object: Register, cache: IcSlot, } = 206,
-            PropertyGetOrNullUnchecked { destination: Register, object: Register, slot: PropertySlot, } = 207,
-            StaticPropertyGetOrNull { destination: Register, cache: IcSlot, } = 208,
-            Coalesce { destination: Register, source: Register, offset: ShortJumpOffset, } = 209,
-            IndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 210,
-            VecIndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 211,
-            DictIndexCoalesceIntKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 212,
-            DictIndexCoalesceStringKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 213,
-            StringIndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 214,
-            PropertyCoalesce { destination: Register, object: Register, cache: IcSlot, offset: NearJumpOffset, } = 215,
-            PropertyCoalesceUnchecked { destination: Register, object: Register, slot: PropertySlot, offset: NearJumpOffset, } = 216,
-            StaticPropertyCoalesce { destination: Register, cache: IcSlot, offset: ShortJumpOffset, } = 217,
-            CheckWhereConstraints = 219,
-            Step { destination: Register, source: Register, immediate: ImmediateInt, } = 220,
-            LoadUint { destination: Register, immediate: ImmediateUint, } = 221,
-            UintAdd { destination: Register, left: Register, right: Register, } = 222,
-            UintSubtract { destination: Register, left: Register, right: Register, } = 223,
-            UintMultiply { destination: Register, left: Register, right: Register, } = 224,
-            UintModulo { destination: Register, left: Register, right: Register, } = 225,
-            UintAddAssign { target: Register, source: Register, } = 226,
-            UintBitwiseAnd { destination: Register, left: Register, right: Register, } = 227,
-            UintBitwiseOr { destination: Register, left: Register, right: Register, } = 228,
-            UintBitwiseXor { destination: Register, left: Register, right: Register, } = 229,
-            UintBitwiseNot { destination: Register, source: Register, } = 230,
-            UintShiftLeft { destination: Register, left: Register, right: Register, } = 231,
-            UintShiftRight { destination: Register, left: Register, right: Register, } = 232,
-            UintAddImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 233,
-            UintSubtractImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 234,
-            UintMultiplyImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 235,
-            UintModuloImmediate { destination: Register, source: Register, immediate: ImmediateUint, } = 236,
-            UintJumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset, } = 237,
-            UintJumpUnlessImmediate { comparison: Comparison, source: Register, immediate: ImmediateUint, offset: ShortJumpOffset, } = 238,
-            ReturnUintUnchecked { immediate: ImmediateUint, } = 239,
-            UintCounterLoop { comparison: Comparison, counter: Register, limit: Register, offset: ShortJumpOffset, } = 240,
-            UintRangeJumpIf { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 241,
-            UintRangeJumpUnless { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, } = 242,
-            UintStep { destination: Register, source: Register, immediate: ImmediateInt, } = 243,
-            DictIndexGetUintKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode, } = 244,
-            DictIndexSetUintKey { container: Register, index: Register, value: Register, } = 245,
-            DictIndexGetUintKeyOrNull { destination: Register, container: Register, index: Register, } = 246,
-            DictIndexCoalesceUintKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset, } = 247,
+            Move { destination: Register, source: Register } = 0,
+            MoveOwned { destination: Register, source: Register } = 1,
+            Clear { target: Register } = 2,
+            LoadConstant { destination: Register, constant: ConstantIndex } = 3,
+            LoadNull { destination: Register } = 4,
+            LoadTrue { destination: Register } = 5,
+            LoadFalse { destination: Register } = 6,
+            LoadInteger { destination: Register, immediate: ImmediateInteger, kind: IntegerKind } = 7,
+            ConstantGet { destination: Register, cache: IcSlot } = 8,
+            ClassConstantGet { destination: Register, cache: IcSlot } = 9,
+            Add { destination: Register, left: Register, right: Register } = 10,
+            IntegerAdd { destination: Register, left: Register, right: Register, kind: IntegerKind } = 11,
+            AddImmediate { destination: Register, source: Register, immediate: ImmediateInt } = 12,
+            IntegerAddImmediate { destination: Register, source: Register, immediate: ImmediateInteger, kind: IntegerKind } = 13,
+            IntegerAddAssign { target: Register, source: Register, kind: IntegerKind } = 14,
+            Subtract { destination: Register, left: Register, right: Register } = 15,
+            IntegerSubtract { destination: Register, left: Register, right: Register, kind: IntegerKind } = 16,
+            SubtractImmediate { destination: Register, source: Register, immediate: ImmediateInt } = 17,
+            IntegerSubtractImmediate { destination: Register, source: Register, immediate: ImmediateInteger, kind: IntegerKind } = 18,
+            Multiply { destination: Register, left: Register, right: Register } = 19,
+            IntegerMultiply { destination: Register, left: Register, right: Register, kind: IntegerKind } = 20,
+            IntegerMultiplyImmediate { destination: Register, source: Register, immediate: ImmediateInteger, kind: IntegerKind } = 21,
+            Divide { destination: Register, left: Register, right: Register } = 22,
+            Modulo { destination: Register, left: Register, right: Register } = 23,
+            IntegerModulo { destination: Register, left: Register, right: Register, kind: IntegerKind } = 24,
+            IntegerModuloImmediate { destination: Register, source: Register, immediate: ImmediateInteger, kind: IntegerKind } = 25,
+            Power { destination: Register, left: Register, right: Register } = 26,
+            Negate { destination: Register, source: Register } = 27,
+            UnaryPlus { destination: Register, source: Register } = 28,
+            Step { destination: Register, source: Register, immediate: ImmediateInt } = 29,
+            IntegerStep { destination: Register, source: Register, immediate: ImmediateInt, kind: IntegerKind } = 30,
+            BitwiseAnd { destination: Register, left: Register, right: Register } = 31,
+            IntegerBitwiseAnd { destination: Register, left: Register, right: Register, kind: IntegerKind } = 32,
+            BitwiseOr { destination: Register, left: Register, right: Register } = 33,
+            IntegerBitwiseOr { destination: Register, left: Register, right: Register, kind: IntegerKind } = 34,
+            BitwiseXor { destination: Register, left: Register, right: Register } = 35,
+            IntegerBitwiseXor { destination: Register, left: Register, right: Register, kind: IntegerKind } = 36,
+            BitwiseNot { destination: Register, source: Register } = 37,
+            IntegerBitwiseNot { destination: Register, source: Register, kind: IntegerKind } = 38,
+            ShiftLeft { destination: Register, left: Register, right: Register } = 39,
+            IntegerShiftLeft { destination: Register, left: Register, right: Register, kind: IntegerKind } = 40,
+            ShiftRight { destination: Register, left: Register, right: Register } = 41,
+            IntegerShiftRight { destination: Register, left: Register, right: Register, kind: IntegerKind } = 42,
+            FloatAdd { destination: Register, left: Register, right: Register } = 43,
+            FloatSubtract { destination: Register, left: Register, right: Register } = 44,
+            FloatMultiply { destination: Register, left: Register, right: Register } = 45,
+            FloatMultiplyConstant { destination: Register, source: Register, constant: ConstantIndex } = 46,
+            Squares { first_destination: Register, first_source: Register, second_source: Register } = 47,
+            FloatSquares { first_destination: Register, first_source: Register, second_source: Register } = 48,
+            FloatSquaresSum { first_destination: Register, first_source: Register, second_source: Register } = 49,
+            FloatSquaresSumBranch { descriptor: FloatSquaresSumBranchDescriptorIndex, offset: JumpOffset } = 50,
+            FloatDifferenceAdd { destination: Register, first_operand: Register, addend: Register } = 51,
+            FloatScaleProductAdd { destination: Register, first_operand: Register, constant: ConstantIndex } = 52,
+            FloatPairUpdate { descriptor: FloatPairUpdateDescriptorIndex } = 53,
+            Equal { destination: Register, left: Register, right: Register } = 54,
+            NotEqual { destination: Register, left: Register, right: Register } = 55,
+            LessThan { destination: Register, left: Register, right: Register } = 56,
+            LessThanOrEqual { destination: Register, left: Register, right: Register } = 57,
+            GreaterThan { destination: Register, left: Register, right: Register } = 58,
+            GreaterThanOrEqual { destination: Register, left: Register, right: Register } = 59,
+            Compare { destination: Register, left: Register, right: Register } = 60,
+            Not { destination: Register, source: Register } = 61,
+            Concatenate { destination: Register, left: Register, right: Register } = 62,
+            ConcatenateLeftConstant { destination: Register, source: Register, constant: ConstantIndex } = 63,
+            ConcatenateRightConstant { destination: Register, source: Register, constant: ConstantIndex } = 64,
+            StringLength { destination: Register, source: Register } = 65,
+            StringIndexGet { destination: Register, container: Register, index: Register } = 66,
+            StringIndexGetOrNull { destination: Register, container: Register, index: Register } = 67,
+            StringIndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 68,
+            StringByteEqual { destination: Register, container: Register, index: Register, byte: u8 } = 69,
+            StringByteNotEqual { destination: Register, container: Register, index: Register, byte: u8 } = 70,
+            StringByteLessThan { destination: Register, container: Register, index: Register, byte: u8 } = 71,
+            StringByteLessThanOrEqual { destination: Register, container: Register, index: Register, byte: u8 } = 72,
+            StringByteGreaterThan { destination: Register, container: Register, index: Register, byte: u8 } = 73,
+            StringByteGreaterThanOrEqual { destination: Register, container: Register, index: Register, byte: u8 } = 74,
+            StringByteJumpUnlessEqual { container: Register, index: Register, byte: u8, offset: ShortJumpOffset } = 75,
+            StringByteJumpUnlessNotEqual { container: Register, index: Register, byte: u8, offset: ShortJumpOffset } = 76,
+            Jump { offset: JumpOffset } = 77,
+            JumpIfFalse { condition: Register, offset: JumpOffset } = 78,
+            JumpIfTrue { condition: Register, offset: JumpOffset } = 79,
+            JumpIfNull { subject: Register, offset: JumpOffset } = 80,
+            JumpIfNotNull { subject: Register, offset: JumpOffset } = 81,
+            JumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset } = 82,
+            IntJumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset } = 83,
+            UintJumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset } = 84,
+            StringJumpUnless { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset } = 85,
+            JumpUnlessConstant { comparison: Comparison, source: Register, constant: ConstantIndex, offset: ShortJumpOffset } = 86,
+            IntJumpUnlessImmediate { comparison: Comparison, source: Register, immediate: ImmediateInt, offset: ShortJumpOffset } = 87,
+            UintJumpUnlessImmediate { comparison: Comparison, source: Register, immediate: ImmediateUint, offset: ShortJumpOffset } = 88,
+            Coalesce { destination: Register, source: Register, offset: ShortJumpOffset } = 89,
+            FillDefault { target: Register, offset: JumpOffset } = 90,
+            SwitchBool { subject: Register, table: SwitchTableIndex } = 91,
+            SwitchInt { subject: Register, table: SwitchTableIndex } = 92,
+            SwitchFloat { subject: Register, table: SwitchTableIndex } = 93,
+            SwitchString { subject: Register, table: SwitchTableIndex } = 94,
+            SwitchPattern { subject: Register, table: SwitchTableIndex } = 95,
+            SwitchTuplePattern { first_element: Register, element_count: Count, table: SwitchTableIndex } = 96,
+            BoolPatternBranch { subject: Register, false_offset: ShortJumpOffset, default_offset: ShortJumpOffset } = 97,
+            IntegerRangeJumpIf { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, kind: IntegerKind } = 98,
+            IntegerRangeJumpUnless { subject: Register, descriptor: DescriptorIndex, offset: ShortJumpOffset, kind: IntegerKind } = 99,
+            IncrementJump { target: Register, immediate: ImmediateInt, offset: ShortJumpOffset } = 100,
+            CounterLoop { comparison: Comparison, counter: Register, limit: Register, offset: ShortJumpOffset } = 101,
+            IntCounterLoop { comparison: Comparison, counter: Register, limit: Register, offset: ShortJumpOffset } = 102,
+            UintCounterLoop { comparison: Comparison, counter: Register, limit: Register, offset: ShortJumpOffset } = 103,
+            NumericLoop { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset } = 104,
+            IntNumericLoop { comparison: Comparison, left: Register, right: Register, offset: ShortJumpOffset } = 105,
+            PreparedIntNumericLoop { descriptor: PreparedIntLoopDescriptorIndex, offset: ShortJumpOffset } = 106,
+            IntStepLoop { descriptor: IntStepLoopDescriptorIndex, offset: ShortJumpOffset } = 107,
+            NumericRegionJump { offset: JumpOffset } = 108,
+            NewVec { element_count: Count, destination: Register, first_element: Register } = 109,
+            NewDict { pair_count: Count, destination: Register, first_pair: Register } = 110,
+            NewTuple { element_count: Count, destination: Register, first_element: Register } = 111,
+            NewFilledVec { destination: Register, value: Register, size: Register } = 112,
+            ReserveArray { container: Register, additional: Register } = 113,
+            Length { destination: Register, source: Register } = 114,
+            ElementGet { destination: Register, subject: Register, index: ImmediateInt } = 115,
+            IndexGet { destination: Register, container: Register, index: Register } = 116,
+            VecIndexGet { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode } = 117,
+            DictIndexGetIntKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode } = 118,
+            DictIndexGetUintKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode } = 119,
+            DictIndexGetStringKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode } = 120,
+            IndexGetOrNull { destination: Register, container: Register, index: Register } = 121,
+            VecIndexGetOrNull { destination: Register, container: Register, index: Register } = 122,
+            DictIndexGetIntegerKeyOrNull { destination: Register, container: Register, index: Register, kind: IntegerKind } = 123,
+            DictIndexGetStringKeyOrNull { destination: Register, container: Register, index: Register } = 124,
+            IndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 125,
+            VecIndexCoalesce { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 126,
+            DictIndexCoalesceIntKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 127,
+            DictIndexCoalesceUintKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 128,
+            DictIndexCoalesceStringKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 129,
+            IndexSet { container: Register, index: Register, value: Register } = 130,
+            VecIndexSet { container: Register, index: Register, value: Register } = 131,
+            DictIndexSet { container: Register, index: Register, value: Register } = 132,
+            DictIndexSetIntegerKey { container: Register, index: Register, value: Register, kind: IntegerKind } = 133,
+            DictIndexSetStringKey { container: Register, index: Register, value: Register } = 134,
+            IndexAddAssign { container: Register, index: Register, value: Register, mode: IndexAddMode } = 135,
+            Append { container: Register, value: Register } = 136,
+            VecAppend { container: Register, value: Register } = 137,
+            Spread { container: Register, value: Register } = 138,
+            Rest { destination: Register, subject: Register, from: ImmediateInt } = 139,
+            Contains { destination: Register, array: Register, value: Register } = 140,
+            ContainsKey { destination: Register, array: Register, key: Register } = 141,
+            Remove { destination: Register, container: Register, key: Register } = 142,
+            RemoveFirst { destination: Register, container: Register } = 143,
+            RemoveLast { destination: Register, container: Register } = 144,
+            SwapRemove { destination: Register, container: Register, index: Register } = 145,
+            CheckDestructure { subject: Register, required: ImmediateInt, arity: ImmediateInt, rest: bool } = 146,
+            ForeachInit { iterator: Register, subject: Register, reserve: Register } = 147,
+            ForeachNext { iterator: Register, key_destination: Register, value_destination: Register } = 148,
+            VecForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode } = 149,
+            DictForeachNext { iterator: Register, key_destination: Register, value_destination: Register, value_mode: ArrayValueMode } = 150,
+            NewStatic { destination: Register, cache: IcSlot } = 151,
+            NewDynamic { destination: Register, class_name: Register } = 152,
+            NewTyped { destination: Register, descriptor: DescriptorIndex } = 153,
+            CloneObject { destination: Register, source: Register } = 154,
+            InitializeProperties { object: Register, cache: IcSlot, descriptor: PropertyInitializationDescriptorIndex } = 155,
+            PropertyGet { destination: Register, object: Register, cache: IcSlot } = 156,
+            PropertyGetUnchecked { destination: Register, object: Register, slot: PropertySlot, value_mode: PropertyReadMode } = 157,
+            PropertyGetOrNull { destination: Register, object: Register, cache: IcSlot } = 158,
+            PropertyGetOrNullUnchecked { destination: Register, object: Register, slot: PropertySlot } = 159,
+            PropertyCoalesce { destination: Register, object: Register, cache: IcSlot, offset: NearJumpOffset } = 160,
+            PropertyCoalesceUnchecked { destination: Register, object: Register, slot: PropertySlot, offset: NearJumpOffset } = 161,
+            PropertySet { object: Register, value: Register, cache: IcSlot } = 162,
+            PropertySetUnchecked { object: Register, value: Register, slot: PropertySlot, value_mode: PropertyValueMode } = 163,
+            PropertyInitRaw { object: Register, value: Register, cache: IcSlot } = 164,
+            PropertyIndexSet { object: Register, first_operand: Register, cache: IcSlot } = 165,
+            PropertyIndexSetUnchecked { object: Register, first_operand: Register, slot: PropertySlot } = 166,
+            PropertyIndexUpdate { object: Register, operand: Register, cache: IcSlot, mode: PropertyIndexUpdateMode } = 167,
+            PropertyIndexUpdateUnchecked { object: Register, operand: Register, slot: PropertySlot, mode: PropertyIndexUpdateMode } = 168,
+            PropertyStep { object: Register, cache: IcSlot, immediate: ImmediateInt, mode: PropertyStepMode } = 169,
+            PropertyStepUnchecked { object: Register, slot: PropertySlot, immediate: ImmediateInt, mode: PropertyStepMode } = 170,
+            PropertyAdd { object: Register, source: Register, cache: IcSlot } = 171,
+            PropertyAddUnchecked { object: Register, source: Register, slot: PropertySlot } = 172,
+            PropertyFillIntRange { object: Register, first_operand: Register, cache: IcSlot } = 173,
+            PropertyRemove { object: Register, destination: Register, cache: IcSlot, mode: PropertyRemoveMode } = 174,
+            PropertyRemoveUnchecked { object: Register, destination: Register, slot: PropertySlot, mode: PropertyRemoveMode } = 175,
+            StaticPropertyGet { destination: Register, cache: IcSlot } = 176,
+            StaticPropertyGetOrNull { destination: Register, cache: IcSlot } = 177,
+            StaticPropertyCoalesce { destination: Register, cache: IcSlot, offset: ShortJumpOffset } = 178,
+            StaticPropertySet { cache: IcSlot, value: Register } = 179,
+            MakeClosure { capture_count: Count, destination: Register, prototype: ConstantIndex, first_capture: Register } = 180,
+            MakeBound { destination: Register, callee: Register, descriptor: PresetDescriptorIndex } = 181,
+            CallValue { argument_count: Count, destination: Register, callee: Register, first_argument: Register } = 182,
+            CallValueUnchecked { argument_count: Count, destination: Register, callee: Register, first_argument: Register } = 183,
+            CallValueDiscarded { argument_count: Count, destination: Register, callee: Register, first_argument: Register } = 184,
+            CallNamed { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 185,
+            CallNamedUnchecked { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 186,
+            CallNamedDirect { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 187,
+            CallNamedConstantUnchecked { destination: Register, constant: ConstantIndex, cache: IcSlot, borrowed: bool } = 188,
+            CallNamedDiscarded { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 189,
+            CallMethod { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 190,
+            CallMethodUnchecked { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 191,
+            CallMethodDirect { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 192,
+            CallMethodDiscarded { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 193,
+            CallStatic { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 194,
+            CallStaticDiscarded { argument_count: Count, destination: Register, first_argument: Register, cache: IcSlot } = 195,
+            CallSelfUnchecked { argument_count: Count, destination: Register, first_argument: Register } = 196,
+            CallWithNames { destination: Register, callee: Register, descriptor: CallDescriptorIndex } = 197,
+            CallWithNamesDiscarded { destination: Register, callee: Register, descriptor: CallDescriptorIndex } = 198,
+            CheckDiscardedResult { source: Register } = 199,
+            Return { source: Register } = 200,
+            ReturnUnchecked { source: Register } = 201,
+            ReturnReferenceUnchecked { source: Register } = 202,
+            ReturnScalarUnchecked { source: Register } = 203,
+            ReturnIntegerUnchecked { immediate: ImmediateInteger, kind: IntegerKind } = 204,
+            ReturnPairUnchecked { first: Register, second: Register } = 205,
+            ReturnNull = 206,
+            ReturnNullUnchecked = 207,
+            Is { destination: Register, source: Register, descriptor: DescriptorIndex } = 208,
+            AsCheck { destination: Register, source: Register, descriptor: DescriptorIndex, mode: AsMode } = 209,
+            AsOrNull { destination: Register, source: Register, descriptor: DescriptorIndex } = 210,
+            CheckDefined { subject: Register, name: ConstantIndex } = 211,
+            CheckSoleReference { source: Register, message: ConstantIndex, chain_previous: bool } = 212,
+            CheckWhereConstraints = 213,
+            Throw { source: Register } = 214,
+            Rethrow = 215,
+            ThrowUnhandledMatch { subject: Register } = 216,
+            Panic { message: Register } = 217,
+            Assert { operand_count: Count, first_value: Register, message: Register, text: ConstantIndex } = 218,
+            Exit { code: Register } = 219,
+            Write { value_count: Count, first_value: Register } = 220,
+            WriteLine { value_count: Count, first_value: Register } = 221,
+            WriteError { value_count: Count, first_value: Register } = 222,
+            WriteErrorLine { value_count: Count, first_value: Register } = 223,
+            Debug { value_count: Count, first_value: Register } = 224,
+            Require { once: bool, destination: Register, path: Register } = 225,
+            DrainFinalizers = 226,
         }
     };
 }

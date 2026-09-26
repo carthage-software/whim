@@ -165,8 +165,7 @@ fn removable_stores_with_flow(
             | Instruction::LoadNull { destination }
             | Instruction::LoadTrue { destination }
             | Instruction::LoadFalse { destination }
-            | Instruction::LoadInt { destination, .. }
-            | Instruction::LoadUint { destination, .. }
+            | Instruction::LoadInteger { destination, .. }
                 if scalar_write_is_unobservable(
                     chunk,
                     &targets,
@@ -224,8 +223,7 @@ fn dead_store_candidate(instruction: Instruction) -> bool {
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
-            | Instruction::LoadInt { .. }
-            | Instruction::LoadUint { .. }
+            | Instruction::LoadInteger { .. }
             | Instruction::Clear { .. }
     )
 }
@@ -365,8 +363,7 @@ fn writes_non_owning_value(instruction: Instruction) -> bool {
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
-            | Instruction::LoadInt { .. }
-            | Instruction::LoadUint { .. }
+            | Instruction::LoadInteger { .. }
             | Instruction::VecIndexGet {
                 value_mode: ArrayValueMode::Int,
                 ..

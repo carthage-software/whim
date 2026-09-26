@@ -8,6 +8,7 @@ use whim_bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledParameter;
 use whim_bytecode::unit::CompiledTypeParameter;
@@ -490,7 +491,8 @@ impl TypeFlow<'_> {
                     index: key,
                     value,
                 }
-                | Instruction::DictIndexSetIntKey {
+                | Instruction::DictIndexSetIntegerKey {
+                    kind: IntegerKind::I64,
                     container,
                     index: key,
                     value,
@@ -1101,8 +1103,12 @@ impl TypeFlow<'_> {
         match self.chunk.code[index] {
             Instruction::LoadTrue { .. } => matches!(expected, TypeDescriptor::TrueLiteral),
             Instruction::LoadFalse { .. } => matches!(expected, TypeDescriptor::FalseLiteral),
-            Instruction::LoadInt { immediate, .. } => descriptor_proves(
-                &TypeDescriptor::IntLiteral(i64::from(immediate.value())),
+            Instruction::LoadInteger {
+                kind: IntegerKind::I64,
+                immediate,
+                ..
+            } => descriptor_proves(
+                &TypeDescriptor::IntLiteral(i64::from(immediate.as_int())),
                 expected,
                 self.unit,
                 0,
@@ -1126,8 +1132,12 @@ impl TypeFlow<'_> {
             Instruction::LoadFalse { .. } => {
                 descriptors_disjoint(&TypeDescriptor::FalseLiteral, excluded, 0)
             }
-            Instruction::LoadInt { immediate, .. } => descriptors_disjoint(
-                &TypeDescriptor::IntLiteral(i64::from(immediate.value())),
+            Instruction::LoadInteger {
+                kind: IntegerKind::I64,
+                immediate,
+                ..
+            } => descriptors_disjoint(
+                &TypeDescriptor::IntLiteral(i64::from(immediate.as_int())),
                 excluded,
                 0,
             ),

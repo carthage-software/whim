@@ -5,8 +5,8 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::IcSlot;
-use whim_bytecode::instruction::operands::ImmediateInt;
-use whim_bytecode::instruction::operands::ImmediateUint;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
@@ -39,14 +39,11 @@ pub(in crate::passes) fn optimize_chunk(
                 destination,
                 constant,
             } => (destination, InvariantLoad::Constant { constant }),
-            Instruction::LoadInt {
+            Instruction::LoadInteger {
+                kind,
                 destination,
                 immediate,
-            } => (destination, InvariantLoad::Int { immediate }),
-            Instruction::LoadUint {
-                destination,
-                immediate,
-            } => (destination, InvariantLoad::Uint { immediate }),
+            } => (destination, InvariantLoad::Integer { immediate, kind }),
             _ => continue,
         };
 
@@ -104,11 +101,8 @@ pub(in crate::passes) fn optimize_chunk(
                 destination: invariant,
                 constant,
             },
-            InvariantLoad::Int { immediate } => Instruction::LoadInt {
-                destination: invariant,
-                immediate,
-            },
-            InvariantLoad::Uint { immediate } => Instruction::LoadUint {
+            InvariantLoad::Integer { immediate, kind } => Instruction::LoadInteger {
+                kind,
                 destination: invariant,
                 immediate,
             },
@@ -190,8 +184,10 @@ fn hoist_lengths(chunk: &mut Chunk) {
             continue;
         };
 
-        let Instruction::IntAddAssign {
-            source: consumed, ..
+        let Instruction::IntegerAddAssign {
+            kind: IntegerKind::I64,
+            source: consumed,
+            ..
         } = chunk.code[header + 2]
         else {
             continue;
@@ -244,8 +240,14 @@ fn hoist_lengths(chunk: &mut Chunk) {
 
 #[derive(Clone, Copy)]
 enum InvariantLoad {
-    ClassConstant { cache: IcSlot },
-    Constant { constant: ConstantIndex },
-    Int { immediate: ImmediateInt },
-    Uint { immediate: ImmediateUint },
+    ClassConstant {
+        cache: IcSlot,
+    },
+    Constant {
+        constant: ConstantIndex,
+    },
+    Integer {
+        immediate: ImmediateInteger,
+        kind: IntegerKind,
+    },
 }

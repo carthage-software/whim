@@ -1,5 +1,6 @@
 //! Per-instruction structural verification beyond encoded operand bounds.
 
+use crate::instruction::operands::IntegerKind;
 use whim_base::unwrap_result_invariant;
 
 use crate::chunk::descriptors::FloatPairUpdateDescriptor;
@@ -187,12 +188,19 @@ pub(in crate::verify) fn verify_instruction(
             }
             Ok(())
         }
-        Instruction::IntRangeJumpIf { descriptor, .. }
-        | Instruction::IntRangeJumpUnless { descriptor, .. }
-            if !matches!(
-                chunk.type_descriptors[usize::from(descriptor.index())],
-                TypeDescriptor::IntRange { .. }
-            ) =>
+        Instruction::IntegerRangeJumpIf {
+            kind, descriptor, ..
+        }
+        | Instruction::IntegerRangeJumpUnless {
+            kind, descriptor, ..
+        } if !matches!(
+            (
+                kind,
+                &chunk.type_descriptors[usize::from(descriptor.index())]
+            ),
+            (IntegerKind::I64, TypeDescriptor::IntRange { .. })
+                | (IntegerKind::U64, TypeDescriptor::UintRange { .. })
+        ) =>
         {
             Err(VerifyError::TypeDescriptorKindInvalid {
                 instruction: at,

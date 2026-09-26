@@ -8,6 +8,7 @@ use whim_bytecode::chunk::descriptors::LiteralKey;
 use whim_bytecode::chunk::descriptors::PropertyInitializationDescriptor;
 use whim_bytecode::chunk::descriptors::literal_key;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertySlot;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::compact;
@@ -446,8 +447,7 @@ fn has_scalar_origin(
             Instruction::LoadNull { destination }
             | Instruction::LoadTrue { destination }
             | Instruction::LoadFalse { destination }
-            | Instruction::LoadInt { destination, .. }
-            | Instruction::LoadUint { destination, .. }
+            | Instruction::LoadInteger { destination, .. }
                 if destination == register =>
             {
                 return true;
@@ -548,11 +548,12 @@ fn static_dict_key(
                 destination,
                 source,
             } if destination == register => register = source,
-            Instruction::LoadInt {
+            Instruction::LoadInteger {
+                kind: IntegerKind::I64,
                 destination,
                 immediate,
             } if destination == register => {
-                return Some(LiteralKey::Int(i64::from(immediate.value())));
+                return Some(LiteralKey::Int(i64::from(immediate.as_int())));
             }
             Instruction::LoadConstant {
                 destination,

@@ -4,8 +4,8 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ConstantIndex;
-use whim_bytecode::instruction::operands::ImmediateInt;
-use whim_bytecode::instruction::operands::ImmediateUint;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
@@ -194,8 +194,7 @@ fn literal_destination(instruction: Instruction) -> Option<Register> {
         | Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
-        | Instruction::LoadInt { destination, .. }
-        | Instruction::LoadUint { destination, .. } => Some(destination),
+        | Instruction::LoadInteger { destination, .. } => Some(destination),
         _ => None,
     }
 }
@@ -388,13 +387,15 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
             continue;
         }
 
-        chunk.code[first] = Instruction::LoadInt {
+        chunk.code[first] = Instruction::LoadInteger {
+            kind: IntegerKind::I64,
             destination: joined,
-            immediate: ImmediateInt::new(first_length),
+            immediate: ImmediateInteger::signed(first_length),
         };
-        chunk.code[second] = Instruction::LoadInt {
+        chunk.code[second] = Instruction::LoadInteger {
+            kind: IntegerKind::I64,
             destination: joined,
-            immediate: ImmediateInt::new(second_length),
+            immediate: ImmediateInteger::signed(second_length),
         };
         chunk.code[consumer] = Instruction::Move {
             destination,
@@ -411,8 +412,7 @@ fn foldable(instruction: Instruction) -> bool {
             | Instruction::LoadNull { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
-            | Instruction::LoadInt { .. }
-            | Instruction::LoadUint { .. }
+            | Instruction::LoadInteger { .. }
     )
 }
 
@@ -427,9 +427,10 @@ fn constant_instruction(
         ConstantValue::Bool(false) => Some(Instruction::LoadFalse { destination }),
         ConstantValue::Int(value) => {
             if let Ok(immediate) = i16::try_from(value) {
-                Some(Instruction::LoadInt {
+                Some(Instruction::LoadInteger {
+                    kind: IntegerKind::I64,
                     destination,
-                    immediate: ImmediateInt::new(immediate),
+                    immediate: ImmediateInteger::signed(immediate),
                 })
             } else {
                 let constant = intern(Literal::Int(value))?;
@@ -447,9 +448,10 @@ fn constant_instruction(
             })
         }
         ConstantValue::Uint(value) => Some(if let Ok(immediate) = u16::try_from(value) {
-            Instruction::LoadUint {
+            Instruction::LoadInteger {
+                kind: IntegerKind::U64,
                 destination,
-                immediate: ImmediateUint::new(immediate),
+                immediate: ImmediateInteger::unsigned(immediate),
             }
         } else {
             Instruction::LoadConstant {

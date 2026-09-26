@@ -3,6 +3,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_value::heap::Heap;
 
@@ -72,12 +73,14 @@ pub(super) fn specialize_with(
     } = instruction
     {
         return if is_int(source) {
-            Some(Instruction::IntBitwiseNot {
+            Some(Instruction::IntegerBitwiseNot {
+                kind: IntegerKind::I64,
                 destination,
                 source,
             })
         } else if is_uint(source) {
-            Some(Instruction::UintBitwiseNot {
+            Some(Instruction::IntegerBitwiseNot {
+                kind: IntegerKind::U64,
                 destination,
                 source,
             })
@@ -92,7 +95,8 @@ pub(super) fn specialize_with(
         immediate,
     } = instruction
     {
-        return is_uint(source).then_some(Instruction::UintStep {
+        return is_uint(source).then_some(Instruction::IntegerStep {
+            kind: IntegerKind::U64,
             destination,
             source,
             immediate,
@@ -108,17 +112,20 @@ pub(super) fn specialize_with(
             left,
             right,
             Some(if destination == left {
-                Instruction::IntAddAssign {
+                Instruction::IntegerAddAssign {
+                    kind: IntegerKind::I64,
                     target: destination,
                     source: right,
                 }
             } else if destination == right {
-                Instruction::IntAddAssign {
+                Instruction::IntegerAddAssign {
+                    kind: IntegerKind::I64,
                     target: destination,
                     source: left,
                 }
             } else {
-                Instruction::IntAdd {
+                Instruction::IntegerAdd {
+                    kind: IntegerKind::I64,
                     destination,
                     left,
                     right,
@@ -137,7 +144,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntSubtract {
+            Some(Instruction::IntegerSubtract {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -155,7 +163,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntMultiply {
+            Some(Instruction::IntegerMultiply {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -173,7 +182,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntModulo {
+            Some(Instruction::IntegerModulo {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -187,7 +197,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntBitwiseAnd {
+            Some(Instruction::IntegerBitwiseAnd {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -201,7 +212,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntBitwiseOr {
+            Some(Instruction::IntegerBitwiseOr {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -215,7 +227,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntBitwiseXor {
+            Some(Instruction::IntegerBitwiseXor {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -229,7 +242,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntShiftLeft {
+            Some(Instruction::IntegerShiftLeft {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -243,7 +257,8 @@ pub(super) fn specialize_with(
         } => (
             left,
             right,
-            Some(Instruction::IntShiftRight {
+            Some(Instruction::IntegerShiftRight {
+                kind: IntegerKind::I64,
                 destination,
                 left,
                 right,
@@ -270,92 +285,20 @@ pub(super) fn specialize_with(
     }
 }
 
-fn unsigned_instruction(instruction: Instruction) -> Option<Instruction> {
-    Some(match instruction {
-        Instruction::IntAdd {
-            destination,
-            left,
-            right,
-        } => Instruction::UintAdd {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntAddAssign { target, source } => {
-            Instruction::UintAddAssign { target, source }
-        }
-        Instruction::IntSubtract {
-            destination,
-            left,
-            right,
-        } => Instruction::UintSubtract {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntMultiply {
-            destination,
-            left,
-            right,
-        } => Instruction::UintMultiply {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntModulo {
-            destination,
-            left,
-            right,
-        } => Instruction::UintModulo {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntBitwiseAnd {
-            destination,
-            left,
-            right,
-        } => Instruction::UintBitwiseAnd {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntBitwiseOr {
-            destination,
-            left,
-            right,
-        } => Instruction::UintBitwiseOr {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntBitwiseXor {
-            destination,
-            left,
-            right,
-        } => Instruction::UintBitwiseXor {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntShiftLeft {
-            destination,
-            left,
-            right,
-        } => Instruction::UintShiftLeft {
-            destination,
-            left,
-            right,
-        },
-        Instruction::IntShiftRight {
-            destination,
-            left,
-            right,
-        } => Instruction::UintShiftRight {
-            destination,
-            left,
-            right,
-        },
+fn unsigned_instruction(mut instruction: Instruction) -> Option<Instruction> {
+    let kind = match &mut instruction {
+        Instruction::IntegerAdd { kind, .. }
+        | Instruction::IntegerAddAssign { kind, .. }
+        | Instruction::IntegerSubtract { kind, .. }
+        | Instruction::IntegerMultiply { kind, .. }
+        | Instruction::IntegerModulo { kind, .. }
+        | Instruction::IntegerBitwiseAnd { kind, .. }
+        | Instruction::IntegerBitwiseOr { kind, .. }
+        | Instruction::IntegerBitwiseXor { kind, .. }
+        | Instruction::IntegerShiftLeft { kind, .. }
+        | Instruction::IntegerShiftRight { kind, .. } => kind,
         _ => return None,
-    })
+    };
+    *kind = IntegerKind::U64;
+    Some(instruction)
 }

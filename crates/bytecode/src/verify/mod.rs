@@ -216,8 +216,7 @@ pub fn verify(chunk: &Chunk) -> Result<(), VerifyError> {
             | Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Exit { .. }
             | Instruction::Panic { .. },

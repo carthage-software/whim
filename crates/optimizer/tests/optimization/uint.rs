@@ -1,5 +1,6 @@
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::word::InstructionKind;
 use whim_bytecode::verify::verify_unit;
 use whim_optimizer::OptimizationConfiguration;
@@ -65,7 +66,7 @@ function mixed(uint $value): uint { return $value + 1; }
             .chunk
             .code
             .iter()
-            .any(|instruction| matches!(instruction, Instruction::ReturnUintUnchecked { immediate } | Instruction::LoadUint { immediate, .. } if immediate.value() == 20))
+            .any(|instruction| matches!(instruction, Instruction::ReturnIntegerUnchecked { kind: IntegerKind::U64, immediate } | Instruction::LoadInteger { kind: IntegerKind::U64, immediate, .. } if immediate.as_uint() == 20))
     );
     assert!(
         function(b"overflow")
@@ -74,7 +75,13 @@ function mixed(uint $value): uint { return $value + 1; }
             .iter()
             .any(|instruction| matches!(
                 instruction,
-                Instruction::UintAddImmediate { .. } | Instruction::UintAdd { .. }
+                Instruction::IntegerAddImmediate {
+                    kind: IntegerKind::U64,
+                    ..
+                } | Instruction::IntegerAdd {
+                    kind: IntegerKind::U64,
+                    ..
+                }
             ))
     );
     assert!(
@@ -114,55 +121,58 @@ function mixed(uint $a, int $b): uint { return $a + $b; }
         (
             "arithmetic",
             vec![
-                InstructionKind::UintAdd,
-                InstructionKind::UintSubtract,
-                InstructionKind::UintMultiply,
-                InstructionKind::UintModulo,
-                InstructionKind::UintBitwiseAnd,
-                InstructionKind::UintBitwiseOr,
-                InstructionKind::UintBitwiseXor,
-                InstructionKind::UintBitwiseNot,
-                InstructionKind::UintShiftLeft,
-                InstructionKind::UintShiftRight,
+                InstructionKind::IntegerAdd,
+                InstructionKind::IntegerSubtract,
+                InstructionKind::IntegerMultiply,
+                InstructionKind::IntegerModulo,
+                InstructionKind::IntegerBitwiseAnd,
+                InstructionKind::IntegerBitwiseOr,
+                InstructionKind::IntegerBitwiseXor,
+                InstructionKind::IntegerBitwiseNot,
+                InstructionKind::IntegerShiftLeft,
+                InstructionKind::IntegerShiftRight,
             ],
         ),
         (
             "shifts",
             vec![
-                InstructionKind::UintShiftLeft,
-                InstructionKind::UintShiftRight,
+                InstructionKind::IntegerShiftLeft,
+                InstructionKind::IntegerShiftRight,
             ],
         ),
         (
             "immediate",
             vec![
-                InstructionKind::UintAddImmediate,
-                InstructionKind::UintSubtractImmediate,
-                InstructionKind::UintMultiplyImmediate,
-                InstructionKind::UintModuloImmediate,
+                InstructionKind::IntegerAddImmediate,
+                InstructionKind::IntegerSubtractImmediate,
+                InstructionKind::IntegerMultiplyImmediate,
+                InstructionKind::IntegerModuloImmediate,
             ],
         ),
         (
             "steps",
-            vec![InstructionKind::UintAddAssign, InstructionKind::UintStep],
+            vec![
+                InstructionKind::IntegerAddAssign,
+                InstructionKind::IntegerStep,
+            ],
         ),
         (
             "compare",
             vec![
                 InstructionKind::UintJumpUnless,
-                InstructionKind::ReturnUintUnchecked,
+                InstructionKind::ReturnIntegerUnchecked,
             ],
         ),
         (
             "compare_literal",
             vec![InstructionKind::UintJumpUnlessImmediate],
         ),
-        ("range", vec![InstructionKind::UintRangeJumpUnless]),
+        ("range", vec![InstructionKind::IntegerRangeJumpUnless]),
         ("counted", vec![InstructionKind::UintCounterLoop]),
         (
             "keyed",
             vec![
-                InstructionKind::DictIndexSetUintKey,
+                InstructionKind::DictIndexSetIntegerKey,
                 InstructionKind::DictIndexGetUintKey,
             ],
         ),
@@ -209,11 +219,13 @@ function fallback(): uint { return calculate(0u); }
             .iter()
             .find(|function| function.name.as_bytes() == name.as_bytes())
             .unwrap();
-        assert!(function.chunk.code.iter().any(|instruction| matches!(instruction, Instruction::ReturnUintUnchecked { immediate } if immediate.value() == expected)), "{name}: {:?}", function.chunk.code);
+        assert!(function.chunk.code.iter().any(|instruction| matches!(instruction, Instruction::ReturnIntegerUnchecked { kind: IntegerKind::U64, immediate } if immediate.as_uint() == expected)), "{name}: {:?}", function.chunk.code);
         assert!(!function.chunk.code.iter().any(|instruction| matches!(
             instruction,
-            Instruction::UintAddImmediate { .. }
-                | Instruction::UintJumpUnlessImmediate { .. }
+            Instruction::IntegerAddImmediate {
+                kind: IntegerKind::U64,
+                ..
+            } | Instruction::UintJumpUnlessImmediate { .. }
                 | Instruction::CallNamed { .. }
                 | Instruction::CallNamedUnchecked { .. }
         )));

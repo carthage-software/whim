@@ -26,10 +26,11 @@ pub(in crate::passes) fn optimize_chunk(
             source,
             immediate,
         }
-        | Instruction::UintStep {
+        | Instruction::IntegerStep {
             destination,
             source,
             immediate,
+            ..
         }) = chunk.code[index]
         else {
             continue;

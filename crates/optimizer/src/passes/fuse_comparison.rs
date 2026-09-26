@@ -4,6 +4,7 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
@@ -78,25 +79,29 @@ fn fuse_int_range_result(chunk: &mut Chunk, statistics: &mut OptimizationStatist
 
         let offset = ShortJumpOffset::new(relative);
         chunk.code[index] = if unsigned && jumps_if_match {
-            Instruction::UintRangeJumpIf {
+            Instruction::IntegerRangeJumpIf {
+                kind: IntegerKind::U64,
                 subject: source,
                 descriptor,
                 offset,
             }
         } else if unsigned {
-            Instruction::UintRangeJumpUnless {
+            Instruction::IntegerRangeJumpUnless {
+                kind: IntegerKind::U64,
                 subject: source,
                 descriptor,
                 offset,
             }
         } else if jumps_if_match {
-            Instruction::IntRangeJumpIf {
+            Instruction::IntegerRangeJumpIf {
+                kind: IntegerKind::I64,
                 subject: source,
                 descriptor,
                 offset,
             }
         } else {
-            Instruction::IntRangeJumpUnless {
+            Instruction::IntegerRangeJumpUnless {
+                kind: IntegerKind::I64,
                 subject: source,
                 descriptor,
                 offset,

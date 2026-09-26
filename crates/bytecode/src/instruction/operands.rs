@@ -157,6 +157,49 @@ integer_operand!(
     ImmediateUint(u16) => value
 );
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
+pub enum IntegerKind {
+    I64,
+    U64,
+}
+
+impl IntegerKind {
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::I64 => "i64",
+            Self::U64 => "u64",
+        }
+    }
+}
+
+integer_operand!(
+    ImmediateInteger(u16) => bits
+);
+
+impl ImmediateInteger {
+    #[must_use]
+    pub const fn signed(value: i16) -> Self {
+        Self::new(value.cast_unsigned())
+    }
+
+    #[must_use]
+    pub const fn unsigned(value: u16) -> Self {
+        Self::new(value)
+    }
+
+    #[must_use]
+    pub const fn as_int(self) -> i16 {
+        self.bits().cast_signed()
+    }
+
+    #[must_use]
+    pub const fn as_uint(self) -> u16 {
+        self.bits()
+    }
+}
+
 /// An element or argument count, occupying the byte after the tag.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Count(u8);

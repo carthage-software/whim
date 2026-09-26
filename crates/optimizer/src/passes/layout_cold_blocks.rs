@@ -413,8 +413,7 @@ fn hard_terminator(instruction: Instruction) -> bool {
             | Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }

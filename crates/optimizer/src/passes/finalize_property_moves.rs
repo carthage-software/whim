@@ -2,6 +2,7 @@
 
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertyValueMode;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
@@ -95,8 +96,8 @@ fn scalar_write_to(instruction: Instruction, register: Register) -> bool {
         Instruction::LoadNull { destination }
             | Instruction::LoadTrue { destination }
             | Instruction::LoadFalse { destination }
-            | Instruction::LoadInt { destination, .. }
-            | Instruction::LoadUint { destination, .. }
+            | Instruction::LoadInteger { destination, .. }
+
             | Instruction::Negate { destination, .. }
             | Instruction::UnaryPlus { destination, .. }
             | Instruction::AddImmediate { destination, .. }
@@ -106,27 +107,27 @@ fn scalar_write_to(instruction: Instruction, register: Register) -> bool {
             | Instruction::Not { destination, .. }
             | Instruction::Length { destination, .. }
             | Instruction::StringLength { destination, .. }
-            | Instruction::IntAdd { destination, .. }
-            | Instruction::IntSubtract { destination, .. }
-            | Instruction::IntMultiply { destination, .. }
-            | Instruction::IntModulo { destination, .. }
-            | Instruction::IntMultiplyImmediate { destination, .. }
-            | Instruction::IntModuloImmediate { destination, .. }
-            | Instruction::UintAdd { destination, .. }
-            | Instruction::UintSubtract { destination, .. }
-            | Instruction::UintMultiply { destination, .. }
-            | Instruction::UintModulo { destination, .. }
-            | Instruction::UintBitwiseAnd { destination, .. }
-            | Instruction::UintBitwiseOr { destination, .. }
-            | Instruction::UintBitwiseXor { destination, .. }
-            | Instruction::UintBitwiseNot { destination, .. }
-            | Instruction::UintShiftLeft { destination, .. }
-            | Instruction::UintShiftRight { destination, .. }
-            | Instruction::UintStep { destination, .. }
-            | Instruction::UintAddImmediate { destination, .. }
-            | Instruction::UintSubtractImmediate { destination, .. }
-            | Instruction::UintMultiplyImmediate { destination, .. }
-            | Instruction::UintModuloImmediate { destination, .. }
+            | Instruction::IntegerAdd { destination, .. }
+            | Instruction::IntegerSubtract { destination, .. }
+            | Instruction::IntegerMultiply { destination, .. }
+            | Instruction::IntegerModulo { destination, .. }
+            | Instruction::IntegerMultiplyImmediate { destination, .. }
+            | Instruction::IntegerModuloImmediate { destination, .. }
+
+
+
+
+            | Instruction::IntegerBitwiseAnd { kind: IntegerKind::U64, destination, .. }
+            | Instruction::IntegerBitwiseOr { kind: IntegerKind::U64, destination, .. }
+            | Instruction::IntegerBitwiseXor { kind: IntegerKind::U64, destination, .. }
+            | Instruction::IntegerBitwiseNot { kind: IntegerKind::U64, destination, .. }
+            | Instruction::IntegerShiftLeft { kind: IntegerKind::U64, destination, .. }
+            | Instruction::IntegerShiftRight { kind: IntegerKind::U64, destination, .. }
+            | Instruction::IntegerStep { destination, .. }
+            | Instruction::IntegerAddImmediate { destination, .. }
+            | Instruction::IntegerSubtractImmediate { destination, .. }
+
+
             | Instruction::FloatAdd { destination, .. }
             | Instruction::FloatSubtract { destination, .. }
             | Instruction::FloatMultiply { destination, .. }

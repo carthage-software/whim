@@ -3,7 +3,9 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::control_flow_targets;
 use whim_bytecode::unit::CompiledUnit;
@@ -147,9 +149,10 @@ pub(crate) fn optimize_chunk(
         };
 
         if let Some(immediate) = immediate {
-            chunk.code[start] = Instruction::LoadInt {
+            chunk.code[start] = Instruction::LoadInteger {
+                kind: IntegerKind::I64,
                 destination: previous,
-                immediate,
+                immediate: ImmediateInteger::signed(immediate.value()),
             };
             chunk.code[start + 1] = fused;
         } else {
@@ -199,7 +202,8 @@ fn addition(instruction: Instruction) -> Option<(Register, Register, Register, b
             left,
             right,
         } => Some((destination, left, right, false)),
-        Instruction::IntAdd {
+        Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -227,7 +231,8 @@ fn indexed_write(
             index,
             value,
         }
-        | Instruction::DictIndexSetIntKey {
+        | Instruction::DictIndexSetIntegerKey {
+            kind: IntegerKind::I64,
             container,
             index,
             value,

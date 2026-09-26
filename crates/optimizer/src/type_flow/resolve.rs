@@ -9,6 +9,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::ClassLikeKind;
 use whim_bytecode::unit::CompiledBuiltInFunction;
@@ -194,7 +195,11 @@ impl<'a> TypeFlow<'a> {
         let origin = index as u32 + 1;
         if let Instruction::IndexGetOrNull { destination, .. }
         | Instruction::VecIndexGetOrNull { destination, .. }
-        | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
+        | Instruction::DictIndexGetIntegerKeyOrNull {
+            kind: IntegerKind::I64,
+            destination,
+            ..
+        }
         | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
         | Instruction::StringIndexGetOrNull { destination, .. }
         | Instruction::PropertyGetOrNull { destination, .. }
@@ -596,7 +601,8 @@ impl<'a> TypeFlow<'a> {
                 index: key,
                 ..
             }
-            | Instruction::DictIndexGetIntKeyOrNull {
+            | Instruction::DictIndexGetIntegerKeyOrNull {
+                kind: IntegerKind::I64,
                 container,
                 index: key,
                 ..

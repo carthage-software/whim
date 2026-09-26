@@ -4,6 +4,7 @@ use hashbrown::HashSet;
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::SwitchTable;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::rewrite::relative_target;
 
 pub(crate) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize>) {
@@ -21,8 +22,6 @@ pub(crate) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize
         | Instruction::UintCounterLoop { offset, .. }
         | Instruction::UintJumpUnless { offset, .. }
         | Instruction::UintJumpUnlessImmediate { offset, .. }
-        | Instruction::UintRangeJumpIf { offset, .. }
-        | Instruction::UintRangeJumpUnless { offset, .. }
         | Instruction::IntStepLoop { offset, .. }
         | Instruction::NumericLoop { offset, .. }
         | Instruction::IntNumericLoop { offset, .. }
@@ -34,8 +33,8 @@ pub(crate) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
         | Instruction::IntJumpUnlessImmediate { offset, .. }
         | Instruction::JumpUnlessConstant { offset, .. }
-        | Instruction::IntRangeJumpIf { offset, .. }
-        | Instruction::IntRangeJumpUnless { offset, .. } => {
+        | Instruction::IntegerRangeJumpIf { offset, .. }
+        | Instruction::IntegerRangeJumpUnless { offset, .. } => {
             successors.push(index + 1);
             successors.push(relative_target(index, i32::from(offset.offset())));
         }
@@ -117,8 +116,7 @@ pub(crate) fn successors(chunk: &Chunk, index: usize, successors: &mut Vec<usize
         | Instruction::ReturnScalarUnchecked { .. }
         | Instruction::ReturnNull
         | Instruction::ReturnNullUnchecked
-        | Instruction::ReturnIntUnchecked { .. }
-        | Instruction::ReturnUintUnchecked { .. }
+        | Instruction::ReturnIntegerUnchecked { .. }
         | Instruction::Throw { .. }
         | Instruction::Rethrow
         | Instruction::ThrowUnhandledMatch { .. }
@@ -166,16 +164,14 @@ pub(crate) fn branches_or_terminates(instruction: Instruction) -> bool {
             | Instruction::IntJumpUnless { .. }
             | Instruction::UintJumpUnless { .. }
             | Instruction::UintJumpUnlessImmediate { .. }
-            | Instruction::UintRangeJumpIf { .. }
-            | Instruction::UintRangeJumpUnless { .. }
             | Instruction::UintCounterLoop { .. }
             | Instruction::StringJumpUnless { .. }
             | Instruction::StringByteJumpUnlessEqual { .. }
             | Instruction::StringByteJumpUnlessNotEqual { .. }
             | Instruction::IntJumpUnlessImmediate { .. }
             | Instruction::JumpUnlessConstant { .. }
-            | Instruction::IntRangeJumpIf { .. }
-            | Instruction::IntRangeJumpUnless { .. }
+            | Instruction::IntegerRangeJumpIf { .. }
+            | Instruction::IntegerRangeJumpUnless { .. }
             | Instruction::BoolPatternBranch { .. }
             | Instruction::FloatSquaresSumBranch { .. }
             | Instruction::SwitchInt { .. }
@@ -198,8 +194,7 @@ pub(crate) fn branches_or_terminates(instruction: Instruction) -> bool {
             | Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }
@@ -367,8 +362,14 @@ pub(crate) fn is_block_boundary(instruction: Instruction) -> bool {
         Instruction::Jump { .. }
             | Instruction::UintJumpUnless { .. }
             | Instruction::UintJumpUnlessImmediate { .. }
-            | Instruction::UintRangeJumpIf { .. }
-            | Instruction::UintRangeJumpUnless { .. }
+            | Instruction::IntegerRangeJumpIf {
+                kind: IntegerKind::U64,
+                ..
+            }
+            | Instruction::IntegerRangeJumpUnless {
+                kind: IntegerKind::U64,
+                ..
+            }
             | Instruction::UintCounterLoop { .. }
             | Instruction::NumericRegionJump { .. }
             | Instruction::JumpIfFalse { .. }
@@ -398,8 +399,7 @@ pub(crate) fn is_block_boundary(instruction: Instruction) -> bool {
             | Instruction::ReturnScalarUnchecked { .. }
             | Instruction::ReturnNull
             | Instruction::ReturnNullUnchecked
-            | Instruction::ReturnIntUnchecked { .. }
-            | Instruction::ReturnUintUnchecked { .. }
+            | Instruction::ReturnIntegerUnchecked { .. }
             | Instruction::Throw { .. }
             | Instruction::Rethrow
             | Instruction::ThrowUnhandledMatch { .. }
@@ -416,8 +416,14 @@ pub(crate) fn is_block_boundary(instruction: Instruction) -> bool {
             | Instruction::StringByteJumpUnlessNotEqual { .. }
             | Instruction::IntJumpUnlessImmediate { .. }
             | Instruction::JumpUnlessConstant { .. }
-            | Instruction::IntRangeJumpIf { .. }
-            | Instruction::IntRangeJumpUnless { .. }
+            | Instruction::IntegerRangeJumpIf {
+                kind: IntegerKind::I64,
+                ..
+            }
+            | Instruction::IntegerRangeJumpUnless {
+                kind: IntegerKind::I64,
+                ..
+            }
             | Instruction::BoolPatternBranch { .. }
             | Instruction::IncrementJump { .. }
             | Instruction::CounterLoop { .. }

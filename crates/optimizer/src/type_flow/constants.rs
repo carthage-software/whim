@@ -5,6 +5,8 @@ use whim_base::limits::MAX_TYPE_DEPTH;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_value::atom::Atom;
 use whim_value::heap::Heap;
@@ -19,6 +21,13 @@ use crate::type_flow::Ordering;
 use crate::type_flow::TypeFlow;
 use crate::type_flow::append_constant_text;
 use crate::type_flow::instruction_index;
+
+fn integer_constant(immediate: ImmediateInteger, kind: IntegerKind) -> ConstantValue {
+    match kind {
+        IntegerKind::I64 => ConstantValue::Int(i64::from(immediate.as_int())),
+        IntegerKind::U64 => ConstantValue::Uint(u64::from(immediate.as_uint())),
+    }
+}
 
 #[derive(PartialEq, Eq, Hash)]
 pub(super) enum ConstantDictionaryKey {
@@ -118,34 +127,21 @@ impl TypeFlow<'_> {
             Instruction::LoadFalse { destination } => {
                 Some((destination, ConstantValue::Bool(false)))
             }
-            Instruction::LoadInt {
+            Instruction::LoadInteger {
+                kind,
                 destination,
                 immediate,
-            } => Some((
-                destination,
-                ConstantValue::Int(i64::from(immediate.value())),
-            )),
-            Instruction::LoadUint {
-                destination,
-                immediate,
-            } => Some((
-                destination,
-                ConstantValue::Uint(u64::from(immediate.value())),
-            )),
+            } => Some((destination, integer_constant(immediate, kind))),
             Instruction::Add {
                 destination,
                 left,
                 right,
             }
-            | Instruction::IntAdd {
+            | Instruction::IntegerAdd {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintAdd {
-                destination,
-                left,
-                right,
+                ..
             }
             | Instruction::FloatAdd {
                 destination,
@@ -157,15 +153,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntSubtract {
+            | Instruction::IntegerSubtract {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintSubtract {
-                destination,
-                left,
-                right,
+                ..
             }
             | Instruction::FloatSubtract {
                 destination,
@@ -177,15 +169,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntMultiply {
+            | Instruction::IntegerMultiply {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintMultiply {
-                destination,
-                left,
-                right,
+                ..
             }
             | Instruction::FloatMultiply {
                 destination,
@@ -213,15 +201,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntModulo {
+            | Instruction::IntegerModulo {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintModulo {
-                destination,
-                left,
-                right,
+                ..
             } => Some((destination, constant_modulo(value(left)?, value(right)?)?)),
             Instruction::Power {
                 destination,
@@ -252,10 +236,11 @@ impl TypeFlow<'_> {
                 source,
                 immediate,
             }
-            | Instruction::UintStep {
+            | Instruction::IntegerStep {
                 destination,
                 source,
                 immediate,
+                ..
             } => {
                 let step = i64::from(immediate.value());
                 let source = value(source)?;
@@ -278,71 +263,41 @@ impl TypeFlow<'_> {
                     ConstantValue::Int(i64::from(immediate.value())),
                 )?,
             )),
-            Instruction::IntMultiplyImmediate {
+            Instruction::IntegerAddImmediate {
+                kind,
                 destination,
                 source,
                 immediate,
             } => Some((
                 destination,
-                constant_multiply(
-                    value(source)?,
-                    ConstantValue::Int(i64::from(immediate.value())),
-                )?,
+                constant_add(value(source)?, integer_constant(immediate, kind))?,
             )),
-            Instruction::IntModuloImmediate {
+            Instruction::IntegerSubtractImmediate {
+                kind,
                 destination,
                 source,
                 immediate,
             } => Some((
                 destination,
-                constant_modulo(
-                    value(source)?,
-                    ConstantValue::Int(i64::from(immediate.value())),
-                )?,
+                constant_subtract(value(source)?, integer_constant(immediate, kind))?,
             )),
-            Instruction::UintAddImmediate {
+            Instruction::IntegerMultiplyImmediate {
+                kind,
                 destination,
                 source,
                 immediate,
             } => Some((
                 destination,
-                constant_add(
-                    value(source)?,
-                    ConstantValue::Uint(u64::from(immediate.value())),
-                )?,
+                constant_multiply(value(source)?, integer_constant(immediate, kind))?,
             )),
-            Instruction::UintSubtractImmediate {
+            Instruction::IntegerModuloImmediate {
+                kind,
                 destination,
                 source,
                 immediate,
             } => Some((
                 destination,
-                constant_subtract(
-                    value(source)?,
-                    ConstantValue::Uint(u64::from(immediate.value())),
-                )?,
-            )),
-            Instruction::UintMultiplyImmediate {
-                destination,
-                source,
-                immediate,
-            } => Some((
-                destination,
-                constant_multiply(
-                    value(source)?,
-                    ConstantValue::Uint(u64::from(immediate.value())),
-                )?,
-            )),
-            Instruction::UintModuloImmediate {
-                destination,
-                source,
-                immediate,
-            } => Some((
-                destination,
-                constant_modulo(
-                    value(source)?,
-                    ConstantValue::Uint(u64::from(immediate.value())),
-                )?,
+                constant_modulo(value(source)?, integer_constant(immediate, kind))?,
             )),
             Instruction::Concatenate {
                 destination,
@@ -393,15 +348,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntBitwiseAnd {
+            | Instruction::IntegerBitwiseAnd {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintBitwiseAnd {
-                destination,
-                left,
-                right,
+                ..
             } => Some((
                 destination,
                 constant_int_binary(value(left)?, value(right)?, |left, right| left & right)?,
@@ -411,15 +362,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntBitwiseOr {
+            | Instruction::IntegerBitwiseOr {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintBitwiseOr {
-                destination,
-                left,
-                right,
+                ..
             } => Some((
                 destination,
                 constant_int_binary(value(left)?, value(right)?, |left, right| left | right)?,
@@ -429,15 +376,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntBitwiseXor {
+            | Instruction::IntegerBitwiseXor {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintBitwiseXor {
-                destination,
-                left,
-                right,
+                ..
             } => Some((
                 destination,
                 constant_int_binary(value(left)?, value(right)?, |left, right| left ^ right)?,
@@ -446,13 +389,10 @@ impl TypeFlow<'_> {
                 destination,
                 source,
             }
-            | Instruction::IntBitwiseNot {
+            | Instruction::IntegerBitwiseNot {
                 destination,
                 source,
-            }
-            | Instruction::UintBitwiseNot {
-                destination,
-                source,
+                ..
             } => {
                 let result = match value(source)? {
                     ConstantValue::Int(value) => ConstantValue::Int(!value),
@@ -466,15 +406,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntShiftLeft {
+            | Instruction::IntegerShiftLeft {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintShiftLeft {
-                destination,
-                left,
-                right,
+                ..
             } => Some((
                 destination,
                 constant_shift(value(left)?, value(right)?, true)?,
@@ -484,15 +420,11 @@ impl TypeFlow<'_> {
                 left,
                 right,
             }
-            | Instruction::IntShiftRight {
+            | Instruction::IntegerShiftRight {
                 destination,
                 left,
                 right,
-            }
-            | Instruction::UintShiftRight {
-                destination,
-                left,
-                right,
+                ..
             } => Some((
                 destination,
                 constant_shift(value(left)?, value(right)?, false)?,

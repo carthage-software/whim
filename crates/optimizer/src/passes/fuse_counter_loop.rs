@@ -3,6 +3,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::IntStepLoopDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
 use whim_bytecode::rewrite::control_flow_targets;
 use whim_bytecode::rewrite::relative_target;
@@ -99,7 +100,8 @@ fn fuse_integer_step_loops(chunk: &mut Chunk, statistics: &mut OptimizationStati
 
         let jump = exit - 1;
         let update = jump - 1;
-        let Instruction::IntAddAssign {
+        let Instruction::IntegerAddAssign {
+            kind: IntegerKind::I64,
             target,
             source: step,
         } = chunk.code[update]

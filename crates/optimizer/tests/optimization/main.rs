@@ -13,6 +13,7 @@ use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Comparison;
 use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
 use whim_bytecode::instruction::operands::PropertyRemoveMode;
 use whim_bytecode::instruction::operands::Register;
@@ -349,7 +350,10 @@ fn neutral_integer_arithmetic_is_removed() {
             instruction,
             Instruction::AddImmediate { .. }
                 | Instruction::SubtractImmediate { .. }
-                | Instruction::IntMultiplyImmediate { .. }
+                | Instruction::IntegerMultiplyImmediate {
+                    kind: IntegerKind::I64,
+                    ..
+                }
         )
     }));
 }
@@ -481,7 +485,7 @@ fn dictionary_lengths_fold_distinct_constant_keys() {
             function.chunk.code.iter().any(|instruction| {
                 matches!(
                     instruction,
-                    Instruction::ReturnIntUnchecked { immediate } if immediate.value() == expected
+                    Instruction::ReturnIntegerUnchecked { kind: IntegerKind::I64, immediate } if immediate.as_int() == expected
                 )
             }),
             "{}: {:#?}",
@@ -2479,7 +2483,10 @@ fn cold_block_layout_is_configurable() {
                     | Instruction::ReturnUnchecked { .. }
                     | Instruction::ReturnReferenceUnchecked { .. }
                     | Instruction::ReturnScalarUnchecked { .. }
-                    | Instruction::ReturnIntUnchecked { .. }
+                    | Instruction::ReturnIntegerUnchecked {
+                        kind: IntegerKind::I64,
+                        ..
+                    }
             )
         })
         .expect("the hot path returns");
@@ -3150,13 +3157,15 @@ fn literal_matches_use_specialized_dispatch() {
             matches!(instruction, Instruction::IntJumpUnlessImmediate { .. })
         })
     );
-    assert!(
-        function(b"ranged")
-            .chunk
-            .code
-            .iter()
-            .any(|instruction| { matches!(instruction, Instruction::IntRangeJumpUnless { .. }) })
-    );
+    assert!(function(b"ranged").chunk.code.iter().any(|instruction| {
+        matches!(
+            instruction,
+            Instruction::IntegerRangeJumpUnless {
+                kind: IntegerKind::I64,
+                ..
+            }
+        )
+    }));
     assert!(
         function(b"tupled")
             .chunk
@@ -3202,12 +3211,15 @@ fn integer_range_matches_inline_into_callers() {
         OptimizationConfiguration::default(),
     );
 
-    assert!(
-        unit.main
-            .code
-            .iter()
-            .any(|instruction| { matches!(instruction, Instruction::IntRangeJumpUnless { .. }) })
-    );
+    assert!(unit.main.code.iter().any(|instruction| {
+        matches!(
+            instruction,
+            Instruction::IntegerRangeJumpUnless {
+                kind: IntegerKind::I64,
+                ..
+            }
+        )
+    }));
     assert!(unit.main.code.iter().all(|instruction| {
         !matches!(
             instruction,

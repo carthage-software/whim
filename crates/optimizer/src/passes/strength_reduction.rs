@@ -4,6 +4,7 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ImmediateInt;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_value::heap::Heap;
 
@@ -91,15 +92,17 @@ fn reduced_instruction(
                 source,
             })
         }
-        Instruction::IntMultiplyImmediate {
+        Instruction::IntegerMultiplyImmediate {
+            kind: IntegerKind::I64,
             destination,
             source,
             immediate,
-        } if immediate.value() == 1 => Some(Instruction::Move {
+        } if immediate.as_int() == 1 => Some(Instruction::Move {
             destination,
             source,
         }),
-        Instruction::IntAdd {
+        Instruction::IntegerAdd {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,
@@ -116,7 +119,8 @@ fn reduced_instruction(
                     immediate,
                 })
             }),
-        Instruction::IntSubtract {
+        Instruction::IntegerSubtract {
+            kind: IntegerKind::I64,
             destination,
             left,
             right,

@@ -6,6 +6,7 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::ImmediateInt;
 use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::rewrite::relative_target;
 use whim_value::heap::Heap;
@@ -229,7 +230,8 @@ pub(super) fn specialize_with(
             container,
             index,
         } if is_dictionary(container) && is_uint(index) => {
-            Some(Instruction::DictIndexGetUintKeyOrNull {
+            Some(Instruction::DictIndexGetIntegerKeyOrNull {
+                kind: IntegerKind::U64,
                 destination,
                 container,
                 index,
@@ -249,16 +251,20 @@ pub(super) fn specialize_with(
             container,
             index,
             value,
-        } if is_dictionary(container) && is_uint(index) => Some(Instruction::DictIndexSetUintKey {
-            container,
-            index,
-            value,
-        }),
+        } if is_dictionary(container) && is_uint(index) => {
+            Some(Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::U64,
+                container,
+                index,
+                value,
+            })
+        }
         Instruction::DictIndexSet {
             container,
             index,
             value,
-        } if is_uint(index) => Some(Instruction::DictIndexSetUintKey {
+        } if is_uint(index) => Some(Instruction::DictIndexSetIntegerKey {
+            kind: IntegerKind::U64,
             container,
             index,
             value,
@@ -286,7 +292,8 @@ pub(super) fn specialize_with(
             container,
             index,
         } if is_dictionary(container) && is_int(index) => {
-            Some(Instruction::DictIndexGetIntKeyOrNull {
+            Some(Instruction::DictIndexGetIntegerKeyOrNull {
+                kind: IntegerKind::I64,
                 destination,
                 container,
                 index,
@@ -364,11 +371,14 @@ pub(super) fn specialize_with(
             container,
             index,
             value,
-        } if is_dictionary(container) && is_int(index) => Some(Instruction::DictIndexSetIntKey {
-            container,
-            index,
-            value,
-        }),
+        } if is_dictionary(container) && is_int(index) => {
+            Some(Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::I64,
+                container,
+                index,
+                value,
+            })
+        }
         Instruction::IndexSet {
             container,
             index,
@@ -393,7 +403,8 @@ pub(super) fn specialize_with(
             container,
             index,
             value,
-        } if is_int(index) => Some(Instruction::DictIndexSetIntKey {
+        } if is_int(index) => Some(Instruction::DictIndexSetIntegerKey {
+            kind: IntegerKind::I64,
             container,
             index,
             value,
@@ -462,7 +473,11 @@ fn foreach_reservation_target(
         let target = match chunk.code[index] {
             Instruction::IndexSet { container, .. }
             | Instruction::VecIndexSet { container, .. }
-            | Instruction::DictIndexSetIntKey { container, .. }
+            | Instruction::DictIndexSetIntegerKey {
+                kind: IntegerKind::I64,
+                container,
+                ..
+            }
             | Instruction::DictIndexSetStringKey { container, .. }
             | Instruction::IndexAddAssign { container, .. }
             | Instruction::Append { container, .. }

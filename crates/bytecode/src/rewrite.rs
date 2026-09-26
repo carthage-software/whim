@@ -56,16 +56,14 @@ pub fn for_each_control_flow_target(chunk: &Chunk, mut visit: impl FnMut(usize))
             | Instruction::IntJumpUnless { offset, .. }
             | Instruction::UintJumpUnless { offset, .. }
             | Instruction::UintJumpUnlessImmediate { offset, .. }
-            | Instruction::UintRangeJumpIf { offset, .. }
-            | Instruction::UintRangeJumpUnless { offset, .. }
             | Instruction::UintCounterLoop { offset, .. }
             | Instruction::StringJumpUnless { offset, .. }
             | Instruction::StringByteJumpUnlessEqual { offset, .. }
             | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
             | Instruction::IntJumpUnlessImmediate { offset, .. }
             | Instruction::JumpUnlessConstant { offset, .. }
-            | Instruction::IntRangeJumpIf { offset, .. }
-            | Instruction::IntRangeJumpUnless { offset, .. }
+            | Instruction::IntegerRangeJumpIf { offset, .. }
+            | Instruction::IntegerRangeJumpUnless { offset, .. }
             | Instruction::IncrementJump { offset, .. }
             | Instruction::CounterLoop { offset, .. }
             | Instruction::IntCounterLoop { offset, .. }
@@ -225,16 +223,14 @@ pub fn rebase_targets(
         | Instruction::IntJumpUnless { offset, .. }
         | Instruction::UintJumpUnless { offset, .. }
         | Instruction::UintJumpUnlessImmediate { offset, .. }
-        | Instruction::UintRangeJumpIf { offset, .. }
-        | Instruction::UintRangeJumpUnless { offset, .. }
         | Instruction::UintCounterLoop { offset, .. }
         | Instruction::StringJumpUnless { offset, .. }
         | Instruction::StringByteJumpUnlessEqual { offset, .. }
         | Instruction::StringByteJumpUnlessNotEqual { offset, .. }
         | Instruction::IntJumpUnlessImmediate { offset, .. }
         | Instruction::JumpUnlessConstant { offset, .. }
-        | Instruction::IntRangeJumpIf { offset, .. }
-        | Instruction::IntRangeJumpUnless { offset, .. }
+        | Instruction::IntegerRangeJumpIf { offset, .. }
+        | Instruction::IntegerRangeJumpUnless { offset, .. }
         | Instruction::IncrementJump { offset, .. }
         | Instruction::CounterLoop { offset, .. }
         | Instruction::IntCounterLoop { offset, .. }

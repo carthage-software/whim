@@ -9,7 +9,8 @@ pub(crate) fn with_destination(
     destination: Register,
     expected: Register,
 ) -> Option<Instruction> {
-    if let Instruction::IntAdd {
+    if let Instruction::IntegerAdd {
+        kind,
         destination: current,
         left,
         right,
@@ -20,46 +21,20 @@ pub(crate) fn with_destination(
         }
 
         return Some(if destination == left {
-            Instruction::IntAddAssign {
+            Instruction::IntegerAddAssign {
+                kind,
                 target: destination,
                 source: right,
             }
         } else if destination == right {
-            Instruction::IntAddAssign {
+            Instruction::IntegerAddAssign {
+                kind,
                 target: destination,
                 source: left,
             }
         } else {
-            Instruction::IntAdd {
-                destination,
-                left,
-                right,
-            }
-        });
-    }
-
-    if let Instruction::UintAdd {
-        destination: current,
-        left,
-        right,
-    } = instruction
-    {
-        if current != expected {
-            return None;
-        }
-
-        return Some(if destination == left {
-            Instruction::UintAddAssign {
-                target: destination,
-                source: right,
-            }
-        } else if destination == right {
-            Instruction::UintAddAssign {
-                target: destination,
-                source: left,
-            }
-        } else {
-            Instruction::UintAdd {
+            Instruction::IntegerAdd {
+                kind,
                 destination,
                 left,
                 right,
@@ -68,21 +43,6 @@ pub(crate) fn with_destination(
     }
 
     let current = match &mut instruction {
-        Instruction::UintSubtract { destination, .. }
-        | Instruction::UintMultiply { destination, .. }
-        | Instruction::UintModulo { destination, .. }
-        | Instruction::UintBitwiseAnd { destination, .. }
-        | Instruction::UintBitwiseOr { destination, .. }
-        | Instruction::UintBitwiseXor { destination, .. }
-        | Instruction::UintBitwiseNot { destination, .. }
-        | Instruction::UintShiftLeft { destination, .. }
-        | Instruction::UintShiftRight { destination, .. }
-        | Instruction::UintAddImmediate { destination, .. }
-        | Instruction::UintSubtractImmediate { destination, .. }
-        | Instruction::UintMultiplyImmediate { destination, .. }
-        | Instruction::UintModuloImmediate { destination, .. }
-        | Instruction::UintStep { destination, .. }
-        | Instruction::LoadUint { destination, .. } => destination,
         Instruction::VecIndexGet {
             destination,
             value_mode,
@@ -103,10 +63,12 @@ pub(crate) fn with_destination(
             value_mode,
             ..
         } if *value_mode != ArrayValueMode::Generic => destination,
-        Instruction::IndexGetOrNull { destination, .. }
+        Instruction::IntegerAddImmediate { destination, .. }
+        | Instruction::IntegerSubtractImmediate { destination, .. }
+        | Instruction::IntegerStep { destination, .. }
+        | Instruction::IndexGetOrNull { destination, .. }
         | Instruction::VecIndexGetOrNull { destination, .. }
-        | Instruction::DictIndexGetIntKeyOrNull { destination, .. }
-        | Instruction::DictIndexGetUintKeyOrNull { destination, .. }
+        | Instruction::DictIndexGetIntegerKeyOrNull { destination, .. }
         | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
         | Instruction::StringIndexGetOrNull { destination, .. }
         | Instruction::PropertyGetOrNull { destination, .. }
@@ -117,13 +79,13 @@ pub(crate) fn with_destination(
         | Instruction::LoadNull { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
-        | Instruction::LoadInt { destination, .. }
+        | Instruction::LoadInteger { destination, .. }
         | Instruction::Add { destination, .. }
         | Instruction::Subtract { destination, .. }
         | Instruction::Multiply { destination, .. }
-        | Instruction::IntSubtract { destination, .. }
-        | Instruction::IntMultiply { destination, .. }
-        | Instruction::IntModulo { destination, .. }
+        | Instruction::IntegerSubtract { destination, .. }
+        | Instruction::IntegerMultiply { destination, .. }
+        | Instruction::IntegerModulo { destination, .. }
         | Instruction::FloatAdd { destination, .. }
         | Instruction::FloatSubtract { destination, .. }
         | Instruction::FloatMultiply { destination, .. }
@@ -135,8 +97,8 @@ pub(crate) fn with_destination(
         | Instruction::AddImmediate { destination, .. }
         | Instruction::Step { destination, .. }
         | Instruction::SubtractImmediate { destination, .. }
-        | Instruction::IntMultiplyImmediate { destination, .. }
-        | Instruction::IntModuloImmediate { destination, .. }
+        | Instruction::IntegerMultiplyImmediate { destination, .. }
+        | Instruction::IntegerModuloImmediate { destination, .. }
         | Instruction::FloatMultiplyConstant { destination, .. }
         | Instruction::FloatDifferenceAdd { destination, .. }
         | Instruction::FloatScaleProductAdd { destination, .. }
@@ -144,17 +106,17 @@ pub(crate) fn with_destination(
         | Instruction::ConcatenateRightConstant { destination, .. }
         | Instruction::ConcatenateLeftConstant { destination, .. }
         | Instruction::BitwiseAnd { destination, .. }
-        | Instruction::IntBitwiseAnd { destination, .. }
+        | Instruction::IntegerBitwiseAnd { destination, .. }
         | Instruction::BitwiseOr { destination, .. }
-        | Instruction::IntBitwiseOr { destination, .. }
+        | Instruction::IntegerBitwiseOr { destination, .. }
         | Instruction::BitwiseXor { destination, .. }
-        | Instruction::IntBitwiseXor { destination, .. }
+        | Instruction::IntegerBitwiseXor { destination, .. }
         | Instruction::BitwiseNot { destination, .. }
-        | Instruction::IntBitwiseNot { destination, .. }
+        | Instruction::IntegerBitwiseNot { destination, .. }
         | Instruction::ShiftLeft { destination, .. }
-        | Instruction::IntShiftLeft { destination, .. }
+        | Instruction::IntegerShiftLeft { destination, .. }
         | Instruction::ShiftRight { destination, .. }
-        | Instruction::IntShiftRight { destination, .. }
+        | Instruction::IntegerShiftRight { destination, .. }
         | Instruction::Equal { destination, .. }
         | Instruction::NotEqual { destination, .. }
         | Instruction::LessThan { destination, .. }

@@ -110,12 +110,7 @@ pub(crate) fn optimize_unit(
                         }
                     }
                 }
-                Instruction::IntRangeJumpUnless {
-                    subject,
-                    descriptor,
-                    ..
-                }
-                | Instruction::UintRangeJumpUnless {
+                Instruction::IntegerRangeJumpUnless {
                     subject,
                     descriptor,
                     ..
@@ -295,9 +290,7 @@ struct StringChainChanges {
 
 fn returns_without_reading(instruction: Instruction, register: Register) -> bool {
     match instruction {
-        Instruction::ReturnIntUnchecked { .. }
-        | Instruction::ReturnUintUnchecked { .. }
-        | Instruction::ReturnNullUnchecked => true,
+        Instruction::ReturnIntegerUnchecked { .. } | Instruction::ReturnNullUnchecked => true,
         Instruction::ReturnUnchecked { source }
         | Instruction::ReturnReferenceUnchecked { source }
         | Instruction::ReturnScalarUnchecked { source } => source != register,

@@ -5,6 +5,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
@@ -70,7 +71,11 @@ fn plan_integer_comparison_ranges(
             continue;
         };
         let second_index = match chunk.code[index + 2] {
-            Instruction::LoadInt { destination, .. }
+            Instruction::LoadInteger {
+                kind: IntegerKind::I64,
+                destination,
+                ..
+            }
             | Instruction::LoadConstant { destination, .. }
                 if destination == condition
                     || (register_is_dead_after(chunk, destination, index + 4)
