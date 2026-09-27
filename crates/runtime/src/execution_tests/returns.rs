@@ -75,3 +75,72 @@ assert!(callback_result(fn(): dict => dict['a' => 1]) == vec[dict['a' => 1]]);
     }
     run_both_modes(&source, "/return-proofs.whim");
 }
+
+#[test]
+fn incoming_capture_moves_release_after_return_and_repeated_calls() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+final class Token {
+    public static int $drops = 0;
+    public function __destruct(): void { self::$drops++; }
+}
+#[NeverInline]
+function exercise(): void {
+    $object = new Token();
+    $build = fn(int $ignored): (int, Token, int) => (1, $object, 2);
+    $before = Token::$drops;
+    for ($index = 0; $index < 4; $index++) {
+        $result = $build($index);
+        assert!($result[0] == 1 && $result[1] is Token && $result[2] == 2);
+        assert!(Token::$drops == $before);
+    }
+}
+for ($round = 0; $round < 8; $round++) {
+    exercise();
+    assert!(Token::$drops == $round + 1);
+}
+",
+        "/incoming-capture-return.whim",
+    );
+}
+
+#[test]
+fn incoming_capture_moves_release_after_unwind_and_reused_frames() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+use Whim\Reference\Weak;
+use Whim\Unwind\DivisionByZeroError;
+final class Token {
+    public static int $drops = 0;
+    public static mixed $held = null;
+    public function __destruct(): void { self::$drops++; }
+}
+#[NeverInline]
+function exercise(): Weak<Token> {
+    $object = new Token();
+    $weak = new Weak::<Token>($object);
+    $raise = fn(int $zero): float {
+        Token::$held = (1, $object, 2);
+        return $zero / $zero;
+    };
+    $before = Token::$drops;
+    for ($index = 0; $index < 4; $index++) {
+        $caught = false;
+        try { discard!($raise(0)); }
+        catch (DivisionByZeroError $_) { $caught = true; }
+        assert!($caught && Token::$held[1] is Token);
+        Token::$held = null;
+        assert!(Token::$drops == $before && $weak->get() != null);
+    }
+    return $weak;
+}
+for ($round = 0; $round < 8; $round++) {
+    $weak = exercise();
+    assert!(Token::$drops == $round + 1 && $weak->get() == null);
+}
+",
+        "/incoming-capture-unwind.whim",
+    );
+}

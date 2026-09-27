@@ -209,7 +209,10 @@ fn owned_moves_from_incoming_captures_keep_the_load() {
             chunk.emit(instruction, Span::zero());
         }
         assert_eq!(chunk.reference_register_mask, 0);
-        assert_eq!(reference_registers::mask(&chunk), 0);
+        assert_ne!(
+            reference_registers::mask(&chunk) & (1u64 << temporary.index()),
+            0
+        );
         assert_unchanged(chunk);
     }
 }

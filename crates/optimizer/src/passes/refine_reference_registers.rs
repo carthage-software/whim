@@ -29,14 +29,15 @@ pub(crate) fn optimize_unit(unit: &mut CompiledUnit, configuration: Optimization
         })
         .collect::<Vec<_>>();
 
-    refresh_chunk(&mut unit.main, None, None, &returns);
+    refresh_chunk(&mut unit.main, 0, None, None, &returns);
     let function_floor = configuration.function_floor(unit.functions.len());
     for function in &mut unit.functions[function_floor..] {
         let current = function
             .return_type
             .as_ref()
             .is_none_or(TypeDescriptor::may_hold_reference);
-        refresh_chunk(&mut function.chunk, Some(current), None, &returns);
+        let incoming = function.incoming_register_count(function.captures_this);
+        refresh_chunk(&mut function.chunk, incoming, Some(current), None, &returns);
     }
 
     let class_floor = configuration.class_floor(unit.classes.len());
@@ -48,9 +49,13 @@ pub(crate) fn optimize_unit(unit: &mut CompiledUnit, configuration: Optimization
                 .as_ref()
                 .is_none_or(TypeDescriptor::may_hold_reference);
 
+            let incoming = method
+                .function
+                .incoming_register_count(!method.is_static || method.function.captures_this);
             let properties = (!method.is_static).then_some(class.properties.as_slice());
             refresh_chunk(
                 &mut method.function.chunk,
+                incoming,
                 Some(current),
                 properties,
                 &returns,
@@ -61,13 +66,15 @@ pub(crate) fn optimize_unit(unit: &mut CompiledUnit, configuration: Optimization
 
 fn refresh_chunk(
     chunk: &mut Chunk,
+    incoming_register_count: u16,
     current: Option<bool>,
     properties: Option<&[CompiledProperty]>,
     returns: &[FunctionReturn],
 ) {
-    chunk.reference_register_mask = mask_with_classification(chunk, |instruction| {
-        result_may_reference(chunk, instruction, current, properties, returns)
-    });
+    chunk.reference_register_mask =
+        mask_with_classification(chunk, incoming_register_count, |instruction| {
+            result_may_reference(chunk, instruction, current, properties, returns)
+        });
 }
 
 fn result_may_reference(

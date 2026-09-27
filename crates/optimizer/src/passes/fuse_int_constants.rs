@@ -56,17 +56,7 @@ pub(crate) fn optimize_chunk(
         };
         if matches!(chunk.code[index + 1], Instruction::IntegerAddAssign { .. }) {
             let reference_mask = *reference_mask.get_or_insert_with(|| {
-                chunk.code.iter().fold(
-                    chunk.reference_register_mask | reference_registers::mask(chunk),
-                    |mask, instruction| match instruction {
-                        Instruction::MoveOwned { destination, .. }
-                            if destination.index() < REFERENCE_REGISTER_LIMIT =>
-                        {
-                            mask | (1u64 << destination.index())
-                        }
-                        _ => mask,
-                    },
-                )
+                chunk.reference_register_mask | reference_registers::mask(chunk)
             });
             if temporary.index() < chunk.local_register_count
                 || chunk.trace_argument_registers.contains(&temporary)

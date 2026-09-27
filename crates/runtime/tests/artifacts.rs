@@ -276,6 +276,25 @@ assert!($secondAttribute->getTarget()->getPath() == '/attributes/second.whim');
 }
 
 #[test]
+fn artifact_loading_rejects_old_reference_ownership_metadata() {
+    let mut artifact = compile("assert!(true);", "/artifact/old-ownership-mask.whim");
+    let mut engine = Engine::new(EngineConfiguration::default());
+    engine
+        .load_artifact(&artifact)
+        .expect("the current artifact loads");
+
+    artifact[8..12].copy_from_slice(&20_u32.to_le_bytes());
+    let error = engine
+        .load_artifact(&artifact)
+        .expect_err("version 20 may contain incomplete reference ownership masks");
+    assert!(
+        error
+            .to_string()
+            .contains("artifact format version 20 is unsupported")
+    );
+}
+
+#[test]
 fn artifact_loading_rejects_trailing_bytes() {
     let mut artifact = compile("", "/artifact/empty.whim");
     artifact.push(0);

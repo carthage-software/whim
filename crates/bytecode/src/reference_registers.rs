@@ -11,7 +11,7 @@ use crate::instruction::operands::Register;
 /// means use ordinary teardown for wider frames.
 #[must_use]
 pub fn mask(chunk: &Chunk) -> u64 {
-    mask_with_classification(chunk, |_| true)
+    mask_with_classification(chunk, chunk.local_register_count, |_| true)
 }
 
 #[expect(
@@ -20,6 +20,7 @@ pub fn mask(chunk: &Chunk) -> u64 {
 )]
 pub fn mask_with_classification(
     chunk: &Chunk,
+    incoming_register_count: u16,
     mut result_may_reference: impl FnMut(Instruction) -> bool,
 ) -> u64 {
     if chunk.register_count > REFERENCE_REGISTER_LIMIT {
@@ -313,7 +314,10 @@ pub fn mask_with_classification(
             else {
                 continue;
             };
-            if mask & (1u64 << source.index()) != 0 {
+            if source.index() < incoming_register_count
+                || chunk.trace_argument_registers.contains(&source)
+                || mask & (1u64 << source.index()) != 0
+            {
                 mask |= 1u64 << destination.index();
             }
         }

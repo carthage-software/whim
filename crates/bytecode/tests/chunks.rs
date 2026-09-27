@@ -10,6 +10,7 @@ use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::instruction::operands::ShortJumpOffset;
 use whim_bytecode::instruction::word::InstructionWord;
+use whim_bytecode::reference_registers;
 use whim_bytecode::rewrite::control_flow_targets;
 use whim_bytecode::verify::VerifyError;
 use whim_bytecode::verify::verify;
@@ -227,4 +228,125 @@ fn assert_round_trip(instruction: Instruction) {
     assert_eq!(instruction.kind(), decoded.kind());
     let encoded = bincode::serialize(&instruction).unwrap();
     assert_eq!(instruction, bincode::deserialize(&encoded).unwrap());
+}
+
+#[test]
+fn owned_move_destinations_keep_incoming_references_in_the_mask() {
+    let mut chunk = Chunk::new();
+    chunk.register_count = 4;
+    chunk.local_register_count = 2;
+    chunk.parameter_register_count = 1;
+    for instruction in [
+        Instruction::MoveOwned {
+            destination: Register::new(2),
+            source: Register::new(1),
+        },
+        Instruction::MoveOwned {
+            destination: Register::new(3),
+            source: Register::new(2),
+        },
+        Instruction::ReturnNull,
+    ] {
+        chunk.emit(instruction, Span::zero());
+    }
+    verify(&chunk).unwrap();
+    assert_eq!(reference_registers::mask(&chunk), 0b1100);
+    assert_eq!(
+        reference_registers::mask_with_classification(&chunk, 2, |_| false),
+        0b1100
+    );
+    chunk.refresh_runtime_metadata();
+    assert_eq!(chunk.reference_register_mask, 0b1100);
+}
+
+#[test]
+fn scalar_result_classification_keeps_its_existing_scope() {
+    let mut chunk = Chunk::new();
+    chunk.register_count = 2;
+    chunk.emit(
+        Instruction::CallSelfUnchecked {
+            argument_count: Count::new(0),
+            destination: Register::new(0),
+            first_argument: Register::new(0),
+        },
+        Span::zero(),
+    );
+    chunk.emit(Instruction::ReturnNull, Span::zero());
+    verify(&chunk).unwrap();
+    assert_eq!(reference_registers::mask(&chunk), 1);
+    assert_eq!(
+        reference_registers::mask_with_classification(&chunk, 0, |_| false),
+        0
+    );
+    chunk.code.insert(
+        1,
+        Instruction::MoveOwned {
+            destination: Register::new(1),
+            source: Register::new(0),
+        },
+    );
+    chunk.spans.insert(1, Span::zero());
+    verify(&chunk).unwrap();
+    assert_eq!(
+        reference_registers::mask_with_classification(&chunk, 0, |_| false),
+        0
+    );
+}
+
+#[test]
+fn scalar_local_owned_moves_need_no_reference_teardown() {
+    let mut chunk = Chunk::new();
+    chunk.register_count = 4;
+    chunk.local_register_count = 2;
+    for instruction in [
+        Instruction::LoadInteger {
+            destination: Register::new(1),
+            immediate: ImmediateInteger::signed(7),
+            kind: IntegerKind::I64,
+        },
+        Instruction::MoveOwned {
+            destination: Register::new(2),
+            source: Register::new(1),
+        },
+        Instruction::MoveOwned {
+            destination: Register::new(3),
+            source: Register::new(2),
+        },
+        Instruction::ReturnNull,
+    ] {
+        chunk.emit(instruction, Span::zero());
+    }
+    verify(&chunk).unwrap();
+    assert_eq!(reference_registers::mask(&chunk), 0b1100);
+    assert_eq!(
+        reference_registers::mask_with_classification(&chunk, 0, |_| true),
+        0
+    );
+}
+
+#[test]
+fn owned_moves_from_trace_slots_keep_reference_teardown() {
+    let mut chunk = Chunk::new();
+    chunk.register_count = 5;
+    chunk.local_register_count = 3;
+    chunk.parameter_register_count = 1;
+    chunk.trace_argument_registers = vec![Register::new(2)];
+    for instruction in [
+        Instruction::MoveOwned {
+            destination: Register::new(3),
+            source: Register::new(2),
+        },
+        Instruction::MoveOwned {
+            destination: Register::new(4),
+            source: Register::new(3),
+        },
+        Instruction::ReturnNull,
+    ] {
+        chunk.emit(instruction, Span::zero());
+    }
+    verify(&chunk).unwrap();
+    assert_eq!(
+        reference_registers::mask_with_classification(&chunk, 1, |_| false),
+        0b1_1000
+    );
 }

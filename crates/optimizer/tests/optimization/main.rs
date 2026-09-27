@@ -3981,3 +3981,40 @@ fn scalar_recursive_calls_inline_two_bounded_levels() {
     }
     verify_unit(&unit).unwrap();
 }
+
+#[test]
+fn incoming_capture_owned_move_destinations_are_reference_tracked() {
+    let unit = compile(
+        r"
+final class Token {}
+function build(Token $object): fn(int): (int, Token, int) {
+    return fn(int $ignored): (int, Token, int) => (1, $object, 2);
+}
+",
+        OptimizationConfiguration::default(),
+    );
+    verify_unit(&unit).unwrap();
+    let closure = unit
+        .functions
+        .iter()
+        .find(|function| !function.capture_names.is_empty())
+        .unwrap();
+    let mut found = false;
+    for instruction in &closure.chunk.code {
+        if let Instruction::MoveOwned {
+            destination,
+            source,
+        } = instruction
+            && source.index() == 1
+        {
+            found = true;
+            assert_ne!(
+                closure.chunk.reference_register_mask & (1u64 << destination.index()),
+                0,
+                "{:?}",
+                closure.chunk.code
+            );
+        }
+    }
+    assert!(found, "{:?}", closure.chunk.code);
+}
