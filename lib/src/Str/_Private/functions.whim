@@ -121,7 +121,7 @@ function mask_contains(string $mask, int $byte): bool {
 #[TrackCaller]
 #[TraceBoundary]
 function default_whitespace(): string[6] {
-  return " \t\n\r" . Str\chr(0) . Str\chr(11);
+  return " \t\n\r\x00\x0b";
 }
 
 /** Reports whether a byte belongs to a word. */

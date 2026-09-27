@@ -116,6 +116,10 @@ assert!(Str\trim('  padded  ') == 'padded');
 assert!(Str\trim_left('xxhixx', 'x') == 'hixx');
 assert!(Str\trim_right('xxhixx', 'x') == 'xxhi');
 assert!(Str\trim('aAbchixba', 'a..c') == 'Abchix');
+assert!(Str\to_bytes(Str\_Private\default_whitespace()) == vec[32, 9, 10, 13, 0, 11]);
+assert!(Str\trim(" \t\n\r\x00\x0b\ftext\f\x0b\x00\r\n\t ") == "\ftext\f");
+assert!(Str\trim_left(" \t\n\r\x00\x0b\ftext ") == "\ftext ");
+assert!(Str\trim_right(" text\f\x0b\x00\r\n\t ") == " text\f");
 
 assert!(Str\pad_left('7', 3u, '0') == '007');
 assert!(Str\pad_right('7', 3u, '.') == '7..');
