@@ -1,0 +1,139 @@
+final readonly class Event {
+  public function __construct(public int $value) {}
+}
+
+final class Receiver {
+  public int $total = 0;
+
+  public function accept(Event $event): void {
+    $this->total += $event->value;
+  }
+
+  public function transform(int $value): int {
+    return $value + $this->total;
+  }
+}
+
+function dispatch_vector(vec<fn(Event): void> $callbacks, Event $event): void {
+  foreach ($callbacks as $callback) {
+    $callback($event);
+  }
+}
+
+function dispatch_dictionary(dict<string, fn(Event): void> $callbacks, Event $event): void {
+  foreach ($callbacks as $callback) {
+    $callback($event);
+  }
+}
+
+function dispatch_tuple((fn(Event): void, fn(Event): void) $callbacks, Event $event): void {
+  foreach ($callbacks as $callback) {
+    $callback($event);
+  }
+}
+
+function sum_vector(vec<fn(int): int> $callbacks, int $value): int {
+  $total = 0;
+  foreach ($callbacks as $callback) {
+    $total += $callback($value);
+  }
+  return $total;
+}
+
+function sum_dictionary(dict<string, fn(int): int> $callbacks, int $value): int {
+  $total = 0;
+  foreach ($callbacks as $callback) {
+    $total += $callback($value);
+  }
+  return $total;
+}
+
+function sum_tuple((fn(int): int, fn(int): int) $callbacks, int $value): int {
+  $total = 0;
+  foreach ($callbacks as $callback) {
+    $total += $callback($value);
+  }
+  return $total;
+}
+
+function unknown_argument(vec<fn(Event): void> $callbacks, mixed $value): void {
+  foreach ($callbacks as $callback) {
+    $callback($value);
+  }
+}
+
+function unknown_callback(vec<fn> $callbacks, Event $event): void {
+  foreach ($callbacks as $callback) {
+    $callback($event);
+  }
+}
+
+function discard_value(vec<fn(int): int> $callbacks, int $value): void {
+  foreach ($callbacks as $callback) {
+    $callback($value);
+  }
+}
+
+function changed_callback(vec<fn(Event): void> $callbacks, fn(int): void $replacement, Event $event): void {
+  foreach ($callbacks as $callback) {
+    $callback = $replacement;
+    $callback($event);
+  }
+}
+
+function callback_from_key(dict<string, fn(int): int> $callbacks, int $input): int {
+  foreach ($callbacks as $key => $callback) {
+    $callback = $key;
+    return $callback($input);
+  }
+  return 0;
+}
+
+function dictionary_key(dict<string, int> $items): string {
+  foreach ($items as $key => $value) {
+    $value = $key;
+    return $value;
+  }
+  return '';
+}
+
+function vector_key(vec<int> $items): uint {
+  foreach ($items as $key => $value) {
+    $value = $key;
+    return $value;
+  }
+  return 0u;
+}
+
+function tuple_key((int, int) $items): uint {
+  foreach ($items as $key => $value) {
+    $value = $key;
+    return $value;
+  }
+  return 0u;
+}
+
+function generic_key(array $items): mixed {
+  foreach ($items as $key => $value) {
+    $value = $key;
+    return $value;
+  }
+  return null;
+}
+
+function dictionary_value(dict<string, int> $items): int {
+  foreach ($items as $key => $value) {
+    $key = $value;
+    return $key;
+  }
+  return 0;
+}
+
+function refined_key(dict<int, int> $items): bool {
+  foreach ($items as $key => $value) {
+    if ($key > 0) {
+      return $value is 1..;
+    }
+  }
+  return false;
+}

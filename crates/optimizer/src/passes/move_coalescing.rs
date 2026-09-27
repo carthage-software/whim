@@ -213,6 +213,7 @@ fn coalesce_foreach_assignments(chunk: &mut Chunk, targets: &HashSet<usize>, rem
         if key_destination != Register::NONE
             && let Some(destination) =
                 assignment_destination(chunk, assignment, key_destination, targets, remove)
+            && destination != value_destination
         {
             key_destination = destination;
             remove[assignment] = true;
@@ -220,6 +221,7 @@ fn coalesce_foreach_assignments(chunk: &mut Chunk, targets: &HashSet<usize>, rem
         }
         if let Some(destination) =
             assignment_destination(chunk, assignment, value_destination, targets, remove)
+            && destination != key_destination
         {
             value_destination = destination;
             remove[assignment] = true;

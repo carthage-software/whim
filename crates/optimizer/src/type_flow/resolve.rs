@@ -58,41 +58,20 @@ impl<'a> TypeFlow<'a> {
         }
         let fact = self.fact(index, register);
         if let Some(producer) = instruction_index(fact.origin) {
-            let (iterator, key_destination, value_destination) = match self.chunk.code[producer] {
-                Instruction::ForeachNext {
-                    iterator,
-                    key_destination,
-                    value_destination,
-                }
-                | Instruction::VecForeachNext {
-                    iterator,
-                    key_destination,
-                    value_destination,
-                    ..
-                }
-                | Instruction::DictForeachNext {
-                    iterator,
-                    key_destination,
-                    value_destination,
-                    ..
-                } => (iterator, key_destination, value_destination),
+            let iterator = match self.chunk.code[producer] {
+                Instruction::ForeachNext { iterator, .. }
+                | Instruction::VecForeachNext { iterator, .. }
+                | Instruction::DictForeachNext { iterator, .. } => iterator,
                 _ => {
                     return self.origin_type_matching_mask(fact, depth + 1);
                 }
             };
-            let key = register == key_destination;
-            if !key && register != value_destination {
-                let Some((position, source)) = self.moved_register_source(index, register) else {
-                    return self.origin_type(fact.origin, depth + 1);
-                };
-                return self.register_type_at(position, source, depth + 1);
-            }
             let iterator_fact = self.fact(producer, iterator);
             let descriptor = self
                 .origin_type(iterator_fact.origin, depth + 1)
                 .or_else(|| self.foreach_iterator_type(producer, iterator, depth + 1))?;
             let descriptor = self.expand_aliases_owned(descriptor);
-            return traversed_component(&descriptor, key, depth + 1);
+            return traversed_component(&descriptor, fact.foreach_key, depth + 1);
         }
 
         if let Some((position, source)) = self.moved_register_source(index, register) {
@@ -264,13 +243,17 @@ impl<'a> TypeFlow<'a> {
                 callee,
                 ..
             }
+            | Instruction::CallValueDiscarded {
+                destination,
+                callee,
+                ..
+            }
             | Instruction::CallValueUnchecked {
                 destination,
                 callee,
                 ..
             } => {
-                let fact = self.fact(index, *callee);
-                let descriptor = self.origin_type(fact.origin, 0)?;
+                let descriptor = self.register_type_at(index, *callee, 0)?;
                 let descriptor = self.expand_aliases_owned(descriptor);
                 let signature = callable_signature(&descriptor)?;
                 return Some((
@@ -321,6 +304,28 @@ impl<'a> TypeFlow<'a> {
             }
             Instruction::StringIndexGet { destination, .. } => {
                 return Some((*destination, Fact::with_origin(STRING, origin)));
+            }
+            Instruction::ForeachNext {
+                iterator,
+                value_destination,
+                ..
+            }
+            | Instruction::VecForeachNext {
+                iterator,
+                value_destination,
+                ..
+            }
+            | Instruction::DictForeachNext {
+                iterator,
+                value_destination,
+                ..
+            } => {
+                let descriptor = self
+                    .origin_type(self.fact(index, *iterator).origin, 0)
+                    .or_else(|| self.foreach_iterator_type(index, *iterator, 0))?;
+                let descriptor = self.expand_aliases_owned(descriptor);
+                let (_, element) = array_shape(&descriptor)?;
+                return Some((*value_destination, self.descriptor_fact(element, origin)));
             }
             Instruction::IndexGet {
                 destination,
@@ -742,7 +747,7 @@ impl<'a> TypeFlow<'a> {
             Instruction::CallValue { callee, .. }
             | Instruction::CallValueDiscarded { callee, .. }
             | Instruction::CallValueUnchecked { callee, .. } => {
-                let descriptor = self.origin_type(self.fact(index, callee).origin, depth + 1)?;
+                let descriptor = self.register_type_at(index, callee, depth + 1)?;
                 let descriptor = self.expand_aliases_owned(descriptor);
 
                 Some(*callable_signature(&descriptor)?.return_type)

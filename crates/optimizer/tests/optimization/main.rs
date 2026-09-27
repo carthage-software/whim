@@ -1,4 +1,5 @@
 mod bitwise_masks;
+mod callable_collections;
 mod collection_inlining;
 mod computed_captures;
 mod joined_lengths;

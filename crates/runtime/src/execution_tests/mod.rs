@@ -1,4 +1,5 @@
 mod arithmetic;
+mod callable_collections;
 mod matching;
 mod returns;
 

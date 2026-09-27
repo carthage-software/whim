@@ -62,9 +62,7 @@ impl TypeFlow<'_> {
         if callee >= usize::from(self.chunk.register_count) {
             return false;
         }
-        let Some(descriptor) =
-            self.origin_type(self.fact(index, Register::new(callee as u16)).origin, 0)
-        else {
+        let Some(descriptor) = self.register_type_at(index, Register::new(callee as u16), 0) else {
             return false;
         };
         let descriptor = self.expand_aliases_owned(descriptor);

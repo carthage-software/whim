@@ -653,6 +653,7 @@ pub(crate) fn transfer(
                     observable_release: subject.observable_release,
                     non_negative: false,
                     positive: false,
+                    foreach_key: false,
                 },
             );
         }
@@ -669,7 +670,9 @@ pub(crate) fn transfer(
                     .copied()
                     .filter(|_| array != NO_ORIGIN)
                     .unwrap_or(ALL);
-                write(key_destination, Fact::with_origin(mask, origin));
+                let mut fact = Fact::with_origin(mask, origin);
+                fact.foreach_key = true;
+                write(key_destination, fact);
             }
 
             let mask = array_elements
@@ -686,7 +689,9 @@ pub(crate) fn transfer(
             value_mode,
         } => {
             if key_destination != Register::NONE {
-                write(key_destination, Fact::with_origin(UINT, origin));
+                let mut fact = Fact::with_origin(UINT, origin);
+                fact.foreach_key = true;
+                write(key_destination, fact);
             }
 
             let array = read(iterator).array;
@@ -716,7 +721,9 @@ pub(crate) fn transfer(
                     .copied()
                     .filter(|_| array != NO_ORIGIN)
                     .unwrap_or(INT | UINT | BOOL | STRING);
-                write(key_destination, Fact::with_origin(mask, origin));
+                let mut fact = Fact::with_origin(mask, origin);
+                fact.foreach_key = true;
+                write(key_destination, fact);
             }
             let mask = match value_mode {
                 ArrayValueMode::Int => INT,

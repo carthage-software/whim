@@ -90,9 +90,12 @@ struct Fact {
     observable_release: bool,
     non_negative: bool,
     positive: bool,
+    foreach_key: bool,
     origin: u32,
     array: u32,
 }
+
+const _: () = assert!(size_of::<Fact>() == 16);
 
 #[derive(Clone)]
 pub(crate) enum ConstantValue {
@@ -122,6 +125,7 @@ impl Fact {
         observable_release: true,
         non_negative: false,
         positive: false,
+        foreach_key: false,
     };
 
     const fn known(mask: u16) -> Self {
@@ -132,6 +136,7 @@ impl Fact {
             observable_release: mask & (OBJECT | VECTOR | DICTIONARY | TUPLE | CALLABLE) != 0,
             non_negative: false,
             positive: false,
+            foreach_key: false,
         }
     }
 
@@ -143,6 +148,7 @@ impl Fact {
             observable_release: mask & (OBJECT | VECTOR | DICTIONARY | TUPLE | CALLABLE) != 0,
             non_negative: false,
             positive: false,
+            foreach_key: false,
         }
     }
 
@@ -154,6 +160,7 @@ impl Fact {
             observable_release,
             non_negative: false,
             positive: false,
+            foreach_key: false,
         }
     }
 
@@ -165,6 +172,7 @@ impl Fact {
             observable_release: false,
             non_negative: value >= 0,
             positive: value > 0,
+            foreach_key: false,
         }
     }
 
@@ -194,6 +202,7 @@ impl Fact {
             observable_release: self.observable_release,
             non_negative: self.non_negative,
             positive: self.positive,
+            foreach_key: false,
         }
     }
 
@@ -205,7 +214,7 @@ impl Fact {
     fn merge(self, other: Self) -> Self {
         Self {
             mask: self.mask | other.mask,
-            origin: if self.origin == other.origin {
+            origin: if self.origin == other.origin && self.foreach_key == other.foreach_key {
                 self.origin
             } else {
                 NO_ORIGIN
@@ -218,6 +227,7 @@ impl Fact {
             observable_release: self.observable_release || other.observable_release,
             non_negative: self.non_negative && other.non_negative,
             positive: self.positive && other.positive,
+            foreach_key: self.foreach_key && other.foreach_key,
         }
     }
 }
@@ -316,6 +326,7 @@ impl<'a> TypeFlow<'a> {
                 .unwrap_or(ALL),
             origin,
             array: NO_ORIGIN,
+            foreach_key: false,
             observable_release: descriptor_may_release_observably(descriptor),
             non_negative: matches!(
                 descriptor,
@@ -1375,6 +1386,7 @@ fn unary_numeric_result(source: Fact) -> Fact {
 
 fn with_origin(mut fact: Fact, origin: u32) -> Fact {
     fact.origin = origin;
+    fact.foreach_key = false;
     fact
 }
 
@@ -1386,8 +1398,11 @@ fn refine_aliases(
 ) {
     let register = usize::from(register.index());
     let origin = state[register].origin;
+    let foreach_key = state[register].foreach_key;
     for (index, fact) in state.iter_mut().enumerate() {
-        if index != register && (origin == NO_ORIGIN || fact.origin != origin) {
+        if index != register
+            && (origin == NO_ORIGIN || fact.origin != origin || fact.foreach_key != foreach_key)
+        {
             continue;
         }
 
@@ -1472,6 +1487,7 @@ fn fact_bits(fact: Fact) -> impl Iterator<Item = Fact> {
             observable_release: fact.observable_release,
             non_negative: fact.non_negative,
             positive: fact.positive,
+            foreach_key: fact.foreach_key,
         })
     })
 }
