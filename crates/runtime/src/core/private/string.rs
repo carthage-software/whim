@@ -381,8 +381,25 @@ pub(crate) fn string_replace<'call>(
             append_match(position);
         }
     } else if let [byte] = needle {
-        for position in find_byte_positions(*byte, haystack) {
-            append_match(position);
+        let mut positions = find_byte_positions(*byte, haystack);
+        let Some(first) = positions.next() else {
+            return arguments.local(0).with_newtype(None);
+        };
+        let second = positions.next();
+        if second.is_none() && capacity <= ByteStringObject::INLINE_CAPACITY {
+            let mut bytes = [0; ByteStringObject::INLINE_CAPACITY];
+            let end = first + replacement.len();
+            bytes[..first].copy_from_slice(&haystack[..first]);
+            bytes[first..end].copy_from_slice(replacement);
+            bytes[end..capacity].copy_from_slice(&haystack[first + 1..]);
+            return context.string(&bytes[..capacity]);
+        }
+        append_match(first);
+        if let Some(second) = second {
+            append_match(second);
+            for position in positions {
+                append_match(position);
+            }
         }
     } else {
         for position in find_bytes_positions(haystack, needle) {
@@ -675,6 +692,7 @@ mod tests {
     use whim_value::newtype::NewtypeValueId;
     use whim_value::object::TypeEnvironmentId;
     use whim_value::string::ByteStringObject;
+    use whim_value::string::short::ShortString;
 
     use crate::builtin::Context;
     use crate::builtin::arguments::Arguments;
@@ -683,11 +701,154 @@ mod tests {
     use crate::vm::VirtualMachine;
 
     use super::__whim_direct_handler_string_pad;
+    use super::__whim_direct_handler_string_replace;
     use super::__whim_direct_handler_string_trim;
     use super::join_capacity;
     use super::string_lowercase;
     use super::string_split;
     use super::string_uppercase;
+
+    #[test]
+    fn single_byte_replacements_keep_inline_boundaries_and_shared_inputs() {
+        let mut engine = Engine::new(EngineConfiguration::default());
+        let mut vm = VirtualMachine::new(&mut engine);
+        for length in [0, 1, 7, 8, 22, 23, 24, 25] {
+            for replacement in [b"".as_slice(), b"Z", b"<\0\xff>"] {
+                if length < replacement.len() {
+                    continue;
+                }
+                let unchanged = length - replacement.len();
+                for position in [0, unchanged / 2, unchanged] {
+                    let mut original = vec![b'a'; unchanged + 1];
+                    original[position] = b'#';
+                    let mut expected = vec![b'a'; length];
+                    expected[position..position + replacement.len()].copy_from_slice(replacement);
+                    for representation in 0..3 {
+                        let source = match representation {
+                            0 => Value::from_string_bytes(vm.heap(), &original),
+                            1 => Value::string(ByteStringObject::from_bytes(vm.heap(), &original)),
+                            _ => {
+                                let base = ByteStringObject::from_bytes(
+                                    vm.heap(),
+                                    &[b"prefix".as_slice(), &original, b"suffix"].concat(),
+                                );
+                                Value::string(ByteStringObject::slice(
+                                    vm.heap(),
+                                    &base,
+                                    6,
+                                    original.len(),
+                                ))
+                            }
+                        };
+                        let tag = Some(NewtypeValueId(0));
+                        let values = [
+                            source.with_newtype(tag),
+                            Value::from_string_bytes(vm.heap(), b"#").with_newtype(tag),
+                            Value::from_string_bytes(vm.heap(), replacement).with_newtype(tag),
+                            Value::bool(false),
+                        ];
+                        let alias = values[0].clone();
+                        let result =
+                            __whim_direct_handler_string_replace(&mut vm, &values).unwrap();
+                        assert_eq!(alias.as_string_bytes(), Some(original.as_slice()));
+                        assert_eq!(alias.newtype_id(), tag);
+                        assert_eq!(values[0].as_string_bytes(), Some(original.as_slice()));
+                        assert_eq!(values[2].as_string_bytes(), Some(replacement));
+                        drop(alias);
+                        drop(values);
+                        assert_eq!(result.as_string_bytes(), Some(expected.as_slice()));
+                        assert_eq!(result.newtype_id(), None);
+                        assert_eq!(
+                            result.as_short_string().is_some(),
+                            length <= ShortString::CAPACITY
+                        );
+                    }
+                }
+            }
+        }
+
+        let base = ByteStringObject::from_bytes(vm.heap(), b"left#right");
+        let replacement = ByteStringObject::slice(vm.heap(), &base, 0, 4);
+        let values = [
+            Value::string(base.clone()),
+            Value::from_string_bytes(vm.heap(), b"#"),
+            Value::string(replacement),
+            Value::bool(false),
+        ];
+        let result = __whim_direct_handler_string_replace(&mut vm, &values).unwrap();
+        assert_eq!(base.flatten(), b"left#right");
+        drop(values);
+        drop(base);
+        assert_eq!(result.as_string_bytes(), Some(b"leftleftright".as_slice()));
+    }
+
+    #[test]
+    fn single_byte_replacements_keep_fallbacks_and_no_match_sharing() {
+        let mut engine = Engine::new(EngineConfiguration::default());
+        let mut vm = VirtualMachine::new(&mut engine);
+        for (original, needle, replacement, ci, expected) in [
+            (
+                b"".as_slice(),
+                b"x".as_slice(),
+                b"y".as_slice(),
+                false,
+                b"".as_slice(),
+            ),
+            (b"a#b#c", b"#", b"<\0\xff>", false, b"a<\0\xff>b<\0\xff>c"),
+            (b"##", b"#", b"", false, b""),
+            (
+                b"a#b#c",
+                b"#",
+                b"abcdefghi",
+                false,
+                b"aabcdefghibabcdefghic",
+            ),
+            (b"missing", b"#", b"x", false, b"missing"),
+            (b"unchanged", b"", b"x", false, b"unchanged"),
+            (b"abcabc", b"ab", b"Z", false, b"ZcZc"),
+            (b"aaaaa", b"aa", b"X", false, b"XXa"),
+            (b"aA", b"a", b"<>", true, b"<><>"),
+            (b"a\0\xffb", b"\xff", b"\0", false, b"a\0\0b"),
+            (
+                b"0123456789abcdef#ghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                b"#",
+                b"@",
+                false,
+                b"0123456789abcdef@ghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            ),
+        ] {
+            let source = if original.len() > 32 {
+                let middle = original.len() / 2;
+                let left = ByteStringObject::from_bytes(vm.heap(), &original[..middle]);
+                let right = ByteStringObject::from_bytes(vm.heap(), &original[middle..]);
+                let rope = ByteStringObject::concat(vm.heap(), &left, &right);
+                assert!(!rope.is_flat());
+                rope
+            } else {
+                ByteStringObject::from_bytes(vm.heap(), original)
+            };
+            let tag = Some(NewtypeValueId(0));
+            let values = [
+                Value::string(source.clone()).with_newtype(tag),
+                Value::from_string_bytes(vm.heap(), needle).with_newtype(tag),
+                Value::from_string_bytes(vm.heap(), replacement).with_newtype(tag),
+                Value::bool(ci),
+            ];
+            let result = __whim_direct_handler_string_replace(&mut vm, &values).unwrap();
+            assert_eq!(source.flatten(), original);
+            assert_eq!(values[0].newtype_id(), tag);
+            if original == expected {
+                let ValueView::String(result) = result.transparent() else {
+                    panic!("an unchanged heap string must keep its storage");
+                };
+                assert!(source.ptr_eq(result));
+            }
+            drop(values);
+            drop(source);
+            assert_eq!(result.as_string_bytes(), Some(expected));
+            assert_eq!(result.newtype_id(), None);
+        }
+    }
 
     #[test]
     fn string_split_keeps_storage_limits_binary_bytes_and_tags() {

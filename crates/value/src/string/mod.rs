@@ -106,6 +106,9 @@ impl<'source> FlatStringSlices<'source> {
 }
 
 impl ByteStringObject {
+    /// The byte length that fits inside a flat heap string without a separate buffer.
+    pub const INLINE_CAPACITY: usize = HeapBytes::INLINE_CAPACITY;
+
     const fn flat(bytes: HeapBytes) -> Self {
         Self {
             hash: Cell::new(0),

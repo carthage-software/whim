@@ -25,7 +25,7 @@ pub(crate) enum HeapBytes {
     reason = "inline lengths are bounded by the 23-byte capacity"
 )]
 impl HeapBytes {
-    const INLINE_CAPACITY: usize = 23;
+    pub(crate) const INLINE_CAPACITY: usize = 23;
     const MINIMUM_GROWTH_CAPACITY: usize = 32;
 
     pub(crate) const fn empty() -> Self {
