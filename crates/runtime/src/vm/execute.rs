@@ -5546,6 +5546,18 @@ impl VirtualMachine<'_> {
                         };
                         if let Some(matches) = matches {
                             write_register!(registers, destination, Value::bool(matches));
+                            if !FINALIZERS {
+                                let branch = match chunk.code.get(ip) {
+                                    Some(Instruction::JumpIfFalse { condition, offset })
+                                        if *condition == destination => Some((!matches, offset.offset())),
+                                    Some(Instruction::JumpIfTrue { condition, offset })
+                                        if *condition == destination => Some((matches, offset.offset())),
+                                    _ => None,
+                                };
+                                if let Some((taken, offset)) = branch {
+                                    ip = if taken { jump_target(ip + 1, offset) } else { ip + 1 };
+                                }
+                            }
                             continue 'instructions;
                         }
 
