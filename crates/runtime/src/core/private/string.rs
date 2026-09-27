@@ -387,10 +387,9 @@ pub(crate) fn string_trim<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
-    let string = arguments.string(0);
+    let bytes = arguments.bytes(0);
     let mask = arguments.bytes(1);
     let mode = arguments.int(2);
-    let bytes = ByteStringObject::handle_bytes(&string);
     let table = byte_mask_table(mask);
     let mut start = 0usize;
     let mut end = bytes.len();
@@ -407,9 +406,14 @@ pub(crate) fn string_trim<'call>(
     }
 
     if start == 0 && end == bytes.len() {
-        return Value::string(string);
+        return arguments.local(0).with_newtype(None);
     }
 
+    if end - start <= ShortString::CAPACITY {
+        return context.string(&bytes[start..end]);
+    }
+
+    let string = arguments.string(0);
     Value::string(ByteStringObject::slice(
         context.vm.heap(),
         &string,
@@ -425,11 +429,10 @@ pub(crate) fn string_pad<'call>(
     context: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
-    let string = arguments.string(0);
+    let bytes = arguments.bytes(0);
     let length = arguments.uint(1);
     let pad = arguments.bytes(2);
     let mode = arguments.int(3);
-    let bytes = ByteStringObject::handle_bytes(&string);
     let length = usize::try_from(length).map_err(|_| {
         let class = context.vm.intern(b"Whim\\Unwind\\ValueError");
         context
@@ -437,7 +440,7 @@ pub(crate) fn string_pad<'call>(
             .throw(class, "the padded string length is too large", 0)
     })?;
     if length <= bytes.len() {
-        return Ok(Value::string(string));
+        return Ok(arguments.local(0).with_newtype(None));
     }
 
     let needed = length - bytes.len();
@@ -446,6 +449,21 @@ pub(crate) fn string_pad<'call>(
         2 => (0, needed),
         _ => (needed / 2, needed - needed / 2),
     };
+    if length <= ShortString::CAPACITY {
+        let mut result = [0; ShortString::CAPACITY];
+        for (output, byte) in result[..left].iter_mut().zip(pad.iter().cycle()) {
+            *output = *byte;
+        }
+        result[left..left + bytes.len()].copy_from_slice(bytes);
+        for (output, byte) in result[left + bytes.len()..length]
+            .iter_mut()
+            .zip(pad.iter().cycle())
+        {
+            *output = *byte;
+        }
+        return Ok(context.string(&result[..length]));
+    }
+
     let mut result = Vec::new();
     result.try_reserve_exact(length).map_err(|_| {
         let class = context.vm.intern(b"Whim\\Unwind\\ValueError");
@@ -464,10 +482,16 @@ pub(crate) fn string_lowercase<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
-    let string = arguments.string(0);
-    let bytes = ByteStringObject::handle_bytes(&string);
+    let bytes = arguments.bytes(0);
     if !bytes.iter().any(u8::is_ascii_uppercase) {
-        return Value::string(string);
+        return arguments.local(0).with_newtype(None);
+    }
+
+    if bytes.len() <= ShortString::CAPACITY {
+        let mut result = [0; ShortString::CAPACITY];
+        result[..bytes.len()].copy_from_slice(bytes);
+        result[..bytes.len()].make_ascii_lowercase();
+        return context.string(&result[..bytes.len()]);
     }
 
     context.owned_string(bytes.to_ascii_lowercase())
@@ -478,10 +502,16 @@ pub(crate) fn string_uppercase<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
-    let string = arguments.string(0);
-    let bytes = ByteStringObject::handle_bytes(&string);
+    let bytes = arguments.bytes(0);
     if !bytes.iter().any(u8::is_ascii_lowercase) {
-        return Value::string(string);
+        return arguments.local(0).with_newtype(None);
+    }
+
+    if bytes.len() <= ShortString::CAPACITY {
+        let mut result = [0; ShortString::CAPACITY];
+        result[..bytes.len()].copy_from_slice(bytes);
+        result[..bytes.len()].make_ascii_uppercase();
+        return context.string(&result[..bytes.len()]);
     }
 
     context.owned_string(bytes.iter().map(u8::to_ascii_uppercase).collect())
@@ -600,7 +630,88 @@ const fn search_result(result: Option<usize>, offset: usize) -> Value {
 
 #[cfg(test)]
 mod tests {
+    use whim_value::Value;
+    use whim_value::ValueView;
+    use whim_value::newtype::NewtypeValueId;
+    use whim_value::object::TypeEnvironmentId;
+
+    use crate::builtin::Context;
+    use crate::builtin::arguments::Arguments;
+    use crate::engine::Engine;
+    use crate::engine::EngineConfiguration;
+    use crate::vm::VirtualMachine;
+
+    use super::__whim_direct_handler_string_pad;
+    use super::__whim_direct_handler_string_trim;
     use super::join_capacity;
+    use super::string_lowercase;
+    use super::string_uppercase;
+
+    #[test]
+    fn string_transforms_keep_short_results_inline() {
+        let mut engine = Engine::new(EngineConfiguration::default());
+        let mut vm = VirtualMachine::new(&mut engine);
+        for bytes in [b"".as_slice(), b"aZ\0\xff", b"abcdefg", b"ABCDEFG"] {
+            let input =
+                Value::from_string_bytes(vm.heap(), bytes).with_newtype(Some(NewtypeValueId(0)));
+            let values = [input];
+            let arguments = Arguments::new(&values, vm.heap());
+            let context = Context::over_called(&mut vm, None, TypeEnvironmentId::default());
+            for result in [
+                string_lowercase(&context, arguments),
+                string_uppercase(&context, arguments),
+            ] {
+                assert!(result.as_short_string().is_some());
+                assert_eq!(result.newtype_id(), None);
+            }
+
+            let values = [
+                values[0].clone(),
+                Value::from_string_bytes(vm.heap(), b" "),
+                Value::int(1),
+            ];
+            let result = __whim_direct_handler_string_trim(&mut vm, &values).unwrap();
+            assert!(result.as_short_string().is_some());
+            assert_eq!(result.newtype_id(), None);
+
+            let values = [
+                values[0].clone(),
+                Value::uint(7),
+                Value::from_string_bytes(vm.heap(), b"ab"),
+                Value::int(1),
+            ];
+            let result = __whim_direct_handler_string_pad(&mut vm, &values).unwrap();
+            assert!(result.as_short_string().is_some());
+            assert_eq!(result.newtype_id(), None);
+        }
+
+        let values = [
+            Value::from_string_bytes(vm.heap(), b" 1234567 "),
+            Value::from_string_bytes(vm.heap(), b" "),
+            Value::int(1),
+        ];
+        let result = __whim_direct_handler_string_trim(&mut vm, &values).unwrap();
+        assert!(result.as_short_string().is_some());
+        assert_eq!(result.as_string_bytes(), Some(b"1234567".as_slice()));
+    }
+
+    #[test]
+    fn trimming_long_results_keeps_shared_slices() {
+        let mut engine = Engine::new(EngineConfiguration::default());
+        let mut vm = VirtualMachine::new(&mut engine);
+        let values = [
+            Value::from_string_bytes(vm.heap(), b" 12345678 "),
+            Value::from_string_bytes(vm.heap(), b" "),
+            Value::int(1),
+        ];
+        let result = __whim_direct_handler_string_trim(&mut vm, &values).unwrap();
+        let ValueView::String(string) = result.transparent() else {
+            panic!("a long trim result must be a heap string");
+        };
+        assert!(!string.is_flat());
+        drop(values);
+        assert_eq!(result.as_string_bytes(), Some(b"12345678".as_slice()));
+    }
 
     #[test]
     fn join_capacity_checks_payload_and_separator_overflow() {

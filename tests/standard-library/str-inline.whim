@@ -1,0 +1,77 @@
+use Whim\Str;
+
+newtype TaggedString = string;
+
+foreach (vec['', 'a', 'AbCdE12', 'AbCdE123', "Az\x00\xff"] as $input) {
+  $lowercase = Str\lowercase($input);
+  $uppercase = Str\uppercase($input);
+  assert!(Str\lowercase(TaggedString($input)) == $lowercase);
+  assert!(Str\uppercase(TaggedString($input)) == $uppercase);
+  assert!(!(Str\lowercase(TaggedString($input)) is TaggedString));
+  assert!(!(Str\uppercase(TaggedString($input)) is TaggedString));
+  assert!(Str\lowercase($lowercase) == $lowercase);
+  assert!(Str\uppercase($uppercase) == $uppercase);
+  assert!(Str\trim(TaggedString($input), '') == $input);
+  assert!(!(Str\trim(TaggedString($input), '') is TaggedString));
+  assert!(Str\pad_left(TaggedString($input), 0u) == $input);
+  assert!(!(Str\pad_left(TaggedString($input), 0u) is TaggedString));
+}
+
+assert!(Str\lowercase('AbCdE12') == 'abcde12');
+assert!(Str\uppercase('AbCdE12') == 'ABCDE12');
+assert!(Str\lowercase('AbCdE123') == 'abcde123');
+assert!(Str\uppercase('AbCdE123') == 'ABCDE123');
+assert!(Str\lowercase("Az\x00\xff") == "az\x00\xff");
+assert!(Str\uppercase("Az\x00\xff") == "AZ\x00\xff");
+
+foreach (vec['', 'a', '1234567', '12345678'] as $input) {
+  assert!(Str\trim('  ' . $input . '  ') == $input);
+  assert!(Str\trim_left('  ' . $input . 'x') == $input . 'x');
+  assert!(Str\trim_right('x' . $input . '  ') == 'x' . $input);
+  assert!(Str\trim("\x00\xff" . $input . "\xff\x00", "\x00\xff") == $input);
+}
+
+assert!(Str\trim('abcXcba', 'a..c') == 'X');
+assert!(Str\trim('abcXcba', 'c..a') == 'X');
+assert!(Str\trim("\x00\xff\x00", "\x00\xff") == '');
+
+$source = '  12345678  ';
+$trimmed = Str\trim($source);
+$source .= 'changed';
+assert!($trimmed == '12345678');
+assert!($source == '  12345678  changed');
+
+assert!(Str\pad_left('', 7u, 'ab') == 'abababa');
+assert!(Str\pad_right('', 8u, 'ab') == 'abababab');
+assert!(Str\pad_left('X', 7u, 'abc') == 'abcabcX');
+assert!(Str\pad_right('X', 7u, 'abc') == 'Xabcabc');
+assert!(Str\pad_left('X', 8u, 'abc') == 'abcabcaX');
+assert!(Str\pad_right('X', 8u, 'abc') == 'Xabcabca');
+assert!(Whim\_Private\string_pad('X', 6u, 'ab', 1) == 'abXaba');
+assert!(Whim\_Private\string_pad('X', 8u, 'ab', 1) == 'abaXabab');
+assert!(Str\pad_right("\x00", 7u, "\xffa") == "\x00\xffa\xffa\xffa");
+
+foreach (
+  vec[
+    ('prefix&suffix', '&', '&amp;', 'prefix&amp;suffix'),
+    ('01234567890123456789012&', '&', '&amp;', '01234567890123456789012&amp;'),
+    ('&<&', '&', '&amp;', '&amp;<&amp;'),
+    ('abcdefabcdef', 'abcdef', 'x', 'xx'),
+    ('aaaa', 'aa', '', ''),
+    ('no match', 'x', 'longer', 'no match'),
+    ('', 'x', 'longer', ''),
+    ('abc', '', 'longer', 'abc'),
+    ("\x00A\xffA", "\xff", "B\x00\xff", "\x00AB\x00\xffA"),
+  ] as ($input, $needle, $replacement, $expected)
+) {
+  $result = Str\replace(TaggedString($input), $needle, $replacement);
+  assert!($result == $expected);
+  assert!(!($result is TaggedString));
+  $result = Str\replace_ci(TaggedString($input), $needle, $replacement);
+  assert!($result == $expected);
+  assert!(!($result is TaggedString));
+}
+
+$result = Str\replace_ci(TaggedString("aB\x00\xffAb"), 'ab', '<expanded>');
+assert!($result == "<expanded>\x00\xff<expanded>");
+assert!(!($result is TaggedString));
