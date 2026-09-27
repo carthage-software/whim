@@ -326,6 +326,15 @@ impl TypeFlow<'_> {
         if self.fact_proves(fact, expected, 0) {
             return true;
         }
+        if let TypeDescriptor::StringLength { min, max } = expected
+            && fact.mask == STRING
+            && self.constant_length_fact(fact, 0).is_some_and(|length| {
+                i64::try_from(length)
+                    .is_ok_and(|length| length >= *min && max.is_none_or(|max| length <= max))
+            })
+        {
+            return true;
+        }
         if matches!(
             expected,
             TypeDescriptor::Named { .. } | TypeDescriptor::Union(_)

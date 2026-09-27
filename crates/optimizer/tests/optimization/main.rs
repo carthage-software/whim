@@ -10,6 +10,7 @@ mod nominal_refinement;
 mod return_proofs;
 mod scalar_alias_proofs;
 mod shape_indexing;
+mod string_length_proofs;
 mod uint;
 mod where_constraints;
 

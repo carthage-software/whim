@@ -19,6 +19,7 @@ use crate::type_flow::ConstantValue;
 use crate::type_flow::Fact;
 use crate::type_flow::NO_ORIGIN;
 use crate::type_flow::Ordering;
+use crate::type_flow::STRING;
 use crate::type_flow::TypeFlow;
 use crate::type_flow::append_constant_text;
 use crate::type_flow::instruction_index;
@@ -553,10 +554,19 @@ impl TypeFlow<'_> {
         if depth > MAX_TYPE_DEPTH {
             return None;
         }
-        if let Some(TypeDescriptor::StringLiteral(value)) =
-            self.origin_descriptor(fact.origin, depth + 1)
-        {
-            return u64::try_from(value.as_bytes().len()).ok();
+        if fact.mask == STRING {
+            match self.origin_type(fact.origin, depth + 1) {
+                Some(TypeDescriptor::StringLiteral(value)) => {
+                    return u64::try_from(value.as_bytes().len()).ok();
+                }
+                Some(TypeDescriptor::StringLength {
+                    min,
+                    max: Some(max),
+                }) if min == max => {
+                    return u64::try_from(min).ok();
+                }
+                _ => {}
+            }
         }
         let index = instruction_index(fact.origin)?;
         match self.chunk.code[index] {
@@ -701,7 +711,7 @@ impl TypeFlow<'_> {
         if depth > MAX_TYPE_DEPTH {
             return None;
         }
-        if container.mask == super::STRING {
+        if container.mask == STRING {
             let ConstantValue::String(value) = self.constant_value_fact(container, depth + 1)?
             else {
                 return None;
