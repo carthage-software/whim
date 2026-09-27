@@ -7,6 +7,7 @@ mod joined_lengths;
 mod matching;
 mod nested_record_proofs;
 mod nominal_refinement;
+mod nullable_dictionaries;
 mod return_proofs;
 mod scalar_alias_proofs;
 mod shape_indexing;

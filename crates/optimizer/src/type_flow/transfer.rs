@@ -468,10 +468,39 @@ pub(crate) fn transfer(
             source,
             ..
         } => write(destination, read(source)),
-        Instruction::IndexGetOrNull { destination, .. }
-        | Instruction::VecIndexGetOrNull { destination, .. }
-        | Instruction::DictIndexGetIntegerKeyOrNull { destination, .. }
-        | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
+        Instruction::IndexGetOrNull {
+            destination,
+            container,
+            ..
+        }
+        | Instruction::DictIndexGetIntegerKeyOrNull {
+            destination,
+            container,
+            ..
+        }
+        | Instruction::DictIndexGetStringKeyOrNull {
+            destination,
+            container,
+            ..
+        } => {
+            let container = read(container);
+            let elements = array_elements
+                .and_then(|elements| elements.get(container.array as usize))
+                .copied();
+            if container.mask == DICTIONARY
+                && container.array != NO_ORIGIN
+                && matches!(
+                    chunk.code.get(container.array as usize - 1),
+                    Some(Instruction::NewArray { kind: ArrayKind::Dict, count, .. }) if count.value() == 0
+                )
+                && let Some(elements) = elements
+            {
+                write(destination, Fact::with_origin(elements | NULL, origin));
+            } else {
+                write(destination, Fact::UNKNOWN);
+            }
+        }
+        Instruction::VecIndexGetOrNull { destination, .. }
         | Instruction::StringIndexGetOrNull { destination, .. }
         | Instruction::PropertyGetOrNull { destination, .. }
         | Instruction::PropertyGetOrNullUnchecked { destination, .. }

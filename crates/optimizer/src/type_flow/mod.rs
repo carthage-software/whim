@@ -56,6 +56,9 @@ mod world;
 #[cfg(test)]
 mod producer_proof_tests;
 
+#[cfg(test)]
+mod nullable_dictionary_tests;
+
 pub(crate) use descriptors::descriptor_options_equal;
 pub(crate) use descriptors::descriptor_proves;
 pub use descriptors::descriptors_equal;
@@ -793,10 +796,10 @@ impl<'a> TypeFlow<'a> {
                 return Some((subject, Fact::with_origin(NULL, fact.origin)));
             }
 
-            fact.mask &= !NULL;
             if fact.mask == 0 {
                 return None;
             }
+            fact.mask &= !NULL;
             return Some((subject, fact));
         }
 
@@ -1076,6 +1079,9 @@ impl<'a> TypeFlow<'a> {
             matches!(
                 instruction,
                 Instruction::IndexGet { .. }
+                    | Instruction::IndexGetOrNull { .. }
+                    | Instruction::DictIndexGetIntegerKeyOrNull { .. }
+                    | Instruction::DictIndexGetStringKeyOrNull { .. }
                     | Instruction::VecIndexGet { .. }
                     | Instruction::DictIndexGetIntKey { .. }
                     | Instruction::DictIndexGetUintKey { .. }
