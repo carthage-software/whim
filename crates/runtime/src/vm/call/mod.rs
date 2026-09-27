@@ -18,6 +18,7 @@ use crate::builtin::spec::FunctionSpec;
 use crate::engine::builtins::BuiltInCallable;
 use crate::engine::builtins::built_in_type_parameters;
 use crate::symbols::ArgumentGuardWays;
+use crate::symbols::SymbolKind;
 use crate::vm::ArgumentGuard;
 use crate::vm::ArgumentSlot;
 use crate::vm::CacheEntry;
@@ -42,6 +43,7 @@ use crate::vm::VirtualMachineControl;
 use crate::vm::find_double_colon;
 use crate::vm::frame_argument_count;
 use crate::vm::frame_stack_floor_offset;
+use crate::vm::is_instance_of;
 use crate::vm::reduce_signature;
 use crate::vm::unreachable_invariant;
 use crate::vm::visibility_allows;
@@ -253,6 +255,14 @@ impl VirtualMachine<'_> {
 
             let mut complete = true;
             for (guard, value) in entry.guards.iter().zip(&self.stack[window.clone()]) {
+                if let CachedParameterGuard::NominalClass(class) = guard {
+                    if !value.as_object().is_some_and(|object| {
+                        is_instance_of(&self.engine.tables.classes, object.class(), *class)
+                    }) {
+                        return Ok(false);
+                    }
+                    continue;
+                }
                 let CachedParameterGuard::Cheap(guard) = guard else {
                     if let CachedParameterGuard::Descriptor {
                         scalar_mask,
@@ -311,6 +321,16 @@ impl VirtualMachine<'_> {
                 unsafe { entry.guards.get_unchecked(position) }.clone()
             };
             match guard {
+                CachedParameterGuard::NominalClass(class) => {
+                    if !self.stack[window.start + position]
+                        .as_object()
+                        .is_some_and(|object| {
+                            is_instance_of(&self.engine.tables.classes, object.class(), class)
+                        })
+                    {
+                        return Ok(false);
+                    }
+                }
                 CachedParameterGuard::Cheap(guard) => {
                     // SAFETY: the surrounding invariant keeps this index in bounds.
                     if !guard_allows(&guard, unsafe {
@@ -395,13 +415,27 @@ impl VirtualMachine<'_> {
                             &self.substitute_descriptor(descriptor, environment, 0),
                             self.engine.tables.type_aliases.as_slice(),
                         );
-                        match argument_guard(&concrete, value) {
-                            Some(guard) => CachedParameterGuard::Cheap(guard),
-                            None => CachedParameterGuard::Descriptor {
-                                scalar_mask: scalar_union_mask(&concrete).unwrap_or(0),
-                                descriptor: Rc::new(concrete),
-                                array_id: None,
-                            },
+                        if let TypeDescriptor::Named {
+                            name,
+                            arguments: None,
+                            ..
+                        } = &concrete
+                            && let Some(entry) = self.engine.tables.symbols.get(name)
+                            && matches!(entry.kind, SymbolKind::Class | SymbolKind::Interface)
+                            && self.engine.tables.classes[entry.index as usize]
+                                .type_parameters
+                                .is_empty()
+                        {
+                            CachedParameterGuard::NominalClass(ClassId(entry.index))
+                        } else {
+                            match argument_guard(&concrete, value) {
+                                Some(guard) => CachedParameterGuard::Cheap(guard),
+                                None => CachedParameterGuard::Descriptor {
+                                    scalar_mask: scalar_union_mask(&concrete).unwrap_or(0),
+                                    descriptor: Rc::new(concrete),
+                                    array_id: None,
+                                },
+                            }
                         }
                     }
                 };

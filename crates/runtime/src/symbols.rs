@@ -257,6 +257,7 @@ pub(crate) enum ArgumentGuard {
 #[derive(Clone)]
 pub(crate) enum CachedParameterGuard {
     Cheap(ArgumentGuard),
+    NominalClass(ClassId),
     Descriptor {
         descriptor: Rc<TypeDescriptor>,
         scalar_mask: u16,

@@ -434,7 +434,7 @@ fn descriptor_is_acyclic(descriptor: &TypeDescriptor) -> bool {
 
 #[must_use]
 pub(crate) fn is_instance_of(classes: &[RuntimeClass], class: ClassId, target: ClassId) -> bool {
-    if classes[class.0 as usize].interface_set.contains(&target) {
+    if class == target || classes[class.0 as usize].interface_set.contains(&target) {
         return true;
     }
 
