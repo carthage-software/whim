@@ -2,6 +2,7 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayKind;
+use whim_bytecode::instruction::operands::ConstantIndex;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::ImmediateInt;
 use whim_bytecode::instruction::operands::ImmediateInteger;
@@ -182,7 +183,7 @@ fn nullable_only_feedback_reaches_a_fixed_point() {
                 chunk.constants.push(Literal::String(heap.intern(b"key")));
                 chunk.code[1] = Instruction::LoadConstant {
                     destination: KEY,
-                    constant: whim_bytecode::instruction::operands::ConstantIndex::new(0),
+                    constant: ConstantIndex::new(0),
                 };
             }
             _ => {}
@@ -201,7 +202,7 @@ fn provisional_null_does_not_hide_a_later_float_store() {
     let mut chunk = feedback();
     chunk.code[8] = Instruction::LoadConstant {
         destination: RESULT,
-        constant: whim_bytecode::instruction::operands::ConstantIndex::new(0),
+        constant: ConstantIndex::new(0),
     };
     chunk.constants.push(Literal::Float(0.5));
     chunk.code[9] = Instruction::IndexSet {
@@ -236,7 +237,7 @@ fn an_initially_impossible_nonnull_edge_still_contributes_writes() {
         },
         Instruction::LoadConstant {
             destination: RESULT,
-            constant: whim_bytecode::instruction::operands::ConstantIndex::new(0),
+            constant: ConstantIndex::new(0),
         },
         Instruction::IndexSet {
             container: DICT,
