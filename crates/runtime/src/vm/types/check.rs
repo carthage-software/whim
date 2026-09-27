@@ -530,7 +530,7 @@ impl VirtualMachine<'_> {
         }
 
         match descriptor {
-            TypeDescriptor::Member { .. } => false,
+            TypeDescriptor::Member { .. } | TypeDescriptor::ObjectShape { .. } => false,
             TypeDescriptor::Parameter(name) => self
                 .type_environment_binding(environment, name)
                 .is_some_and(|binding| {
@@ -575,7 +575,6 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::VectorShape { .. }
             | TypeDescriptor::Dictionary(_)
             | TypeDescriptor::DictionaryShape { .. }
-            | TypeDescriptor::ObjectShape { .. }
             | TypeDescriptor::Callable(_)
             | TypeDescriptor::Classname(_)
             | TypeDescriptor::Tuple(_)

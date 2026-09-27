@@ -2,6 +2,7 @@ mod arithmetic;
 mod callable_collections;
 mod matching;
 mod nominal_refinement;
+mod object_shape_checks;
 mod returns;
 
 use std::path::Path;
