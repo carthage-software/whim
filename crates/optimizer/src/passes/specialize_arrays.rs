@@ -96,7 +96,7 @@ pub(crate) fn specialized_instruction(
             container,
             index: subscript,
             value_mode: ArrayValueMode::Generic,
-        } => refined_array_value_mode(flow, index, container).map(|value_mode| {
+        } => refined_read_value_mode(flow, index, destination, container).map(|value_mode| {
             Instruction::VecIndexGet {
                 destination,
                 container,
@@ -109,7 +109,7 @@ pub(crate) fn specialized_instruction(
             container,
             index: subscript,
             value_mode: ArrayValueMode::Generic,
-        } => refined_array_value_mode(flow, index, container).map(|value_mode| {
+        } => refined_read_value_mode(flow, index, destination, container).map(|value_mode| {
             Instruction::DictIndexGetIntKey {
                 destination,
                 container,
@@ -122,7 +122,7 @@ pub(crate) fn specialized_instruction(
             container,
             index: subscript,
             value_mode: ArrayValueMode::Generic,
-        } => refined_array_value_mode(flow, index, container).map(|value_mode| {
+        } => refined_read_value_mode(flow, index, destination, container).map(|value_mode| {
             Instruction::DictIndexGetUintKey {
                 destination,
                 container,
@@ -135,7 +135,7 @@ pub(crate) fn specialized_instruction(
             container,
             index: subscript,
             value_mode: ArrayValueMode::Generic,
-        } => refined_array_value_mode(flow, index, container).map(|value_mode| {
+        } => refined_read_value_mode(flow, index, destination, container).map(|value_mode| {
             Instruction::DictIndexGetStringKey {
                 destination,
                 container,
@@ -512,14 +512,33 @@ fn array_value_mode(
     array: Register,
 ) -> ArrayValueMode {
     let result = index.saturating_add(1);
-    if flow.proves(result, destination, &TypeDescriptor::Int) {
+    if let Some(mode) = refined_read_value_mode(flow, index, destination, array) {
+        mode
+    } else if flow.proves(result, destination, &TypeDescriptor::Int) {
         ArrayValueMode::Int
     } else if flow.proves(result, destination, &TypeDescriptor::Uint) {
         ArrayValueMode::Uint
     } else if flow.proves(result, destination, &TypeDescriptor::Float) {
         ArrayValueMode::Float
     } else {
-        refined_array_value_mode(flow, index, array).unwrap_or(ArrayValueMode::Generic)
+        ArrayValueMode::Generic
+    }
+}
+
+fn refined_read_value_mode(
+    flow: &TypeFlow<'_>,
+    index: usize,
+    destination: Register,
+    array: Register,
+) -> Option<ArrayValueMode> {
+    if flow.result_proves(index, destination, &TypeDescriptor::Int) {
+        Some(ArrayValueMode::Int)
+    } else if flow.result_proves(index, destination, &TypeDescriptor::Uint) {
+        Some(ArrayValueMode::Uint)
+    } else if flow.result_proves(index, destination, &TypeDescriptor::Float) {
+        Some(ArrayValueMode::Float)
+    } else {
+        refined_array_value_mode(flow, index, array)
     }
 }
 

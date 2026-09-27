@@ -161,6 +161,7 @@ fn instruction_candidates(
                 | Instruction::IndexAddAssign { .. }
                 | Instruction::Append { .. }
                 | Instruction::DictIndexSet { .. }
+                | Instruction::VecIndexGet { .. }
                 | Instruction::DictIndexGetIntKey { .. }
                 | Instruction::DictIndexGetUintKey { .. }
                 | Instruction::DictIndexGetStringKey { .. }
@@ -178,6 +179,7 @@ fn instruction_candidates(
                 | Instruction::IndexGet { .. }
                 | Instruction::IndexSet { .. }
                 | Instruction::DictIndexSet { .. }
+                | Instruction::VecIndexGet { .. }
                 | Instruction::Append { .. }
         )
     {

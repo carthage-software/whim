@@ -5,6 +5,7 @@ mod computed_captures;
 mod default_parameter_checks;
 mod joined_lengths;
 mod matching;
+mod nested_record_proofs;
 mod nominal_refinement;
 mod return_proofs;
 mod scalar_alias_proofs;

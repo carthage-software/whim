@@ -40,6 +40,7 @@ use crate::type_flow::TypeFlow;
 use crate::type_flow::UINT;
 use crate::type_flow::VECTOR;
 use crate::type_flow::callable_signature;
+use crate::type_flow::descriptors::collection_descriptors_equal;
 use crate::type_flow::descriptors::descriptor_mask;
 use crate::type_flow::descriptors::descriptor_proves;
 use crate::type_flow::descriptors::descriptor_slices_equal;
@@ -334,6 +335,7 @@ impl TypeFlow<'_> {
             return true;
         }
 
+        let declared = expected;
         let expected = self.expanded_aliases(expected);
         if self.fact_proves(fact, &expected, 0) {
             return true;
@@ -345,6 +347,23 @@ impl TypeFlow<'_> {
         let actual = self.expand_aliases_owned(actual);
 
         self.descriptor_proves(&actual, &expected, 0)
+            || structural_alias_body(declared, self.unit, 0)
+                && collection_descriptors_equal(&actual, &expected, 0)
+    }
+
+    pub(crate) fn result_proves(
+        &self,
+        index: usize,
+        register: Register,
+        expected: &TypeDescriptor,
+    ) -> bool {
+        index < self.chunk.code.len()
+            && self.reachable[index]
+            && self
+                .precise_result(index)
+                .is_some_and(|(destination, fact)| {
+                    destination == register && self.fact_proves(fact, expected, 0)
+                })
     }
 
     pub(crate) fn proves_positional_index(&self, index: usize, register: Register) -> bool {
@@ -1504,6 +1523,46 @@ impl TypeFlow<'_> {
                 depth + 1,
             )
         })
+    }
+}
+
+fn structural_alias_body(
+    descriptor: &TypeDescriptor,
+    unit: Option<&IndexedUnit<'_>>,
+    depth: usize,
+) -> bool {
+    if depth > MAX_TYPE_DEPTH {
+        return false;
+    }
+    let safe = |descriptor| structural_alias_body(descriptor, unit, depth + 1);
+    match descriptor {
+        TypeDescriptor::Named {
+            name,
+            arguments: None,
+            recursive: false,
+        } => unit
+            .and_then(|unit| unit.find_alias(name))
+            .is_some_and(|alias| alias.type_parameters.is_empty() && safe(&alias.descriptor)),
+        TypeDescriptor::Array(arguments) | TypeDescriptor::Dictionary(arguments) => arguments
+            .as_ref()
+            .is_none_or(|(key, value)| safe(key) && safe(value)),
+        TypeDescriptor::Vector(element) => element.as_deref().is_none_or(safe),
+        TypeDescriptor::VectorShape { elements, rest } => {
+            elements.iter().all(safe) && rest.as_deref().is_none_or(safe)
+        }
+        TypeDescriptor::DictionaryShape { entries, rest } => {
+            entries.iter().all(|(_, value)| safe(value))
+                && rest
+                    .as_ref()
+                    .is_none_or(|(key, value)| safe(key) && safe(value))
+        }
+        TypeDescriptor::Tuple(elements)
+        | TypeDescriptor::Union(elements)
+        | TypeDescriptor::Intersection(elements) => elements.iter().all(safe),
+        TypeDescriptor::TupleRest { elements, rest } => elements.iter().all(safe) && safe(rest),
+        TypeDescriptor::Negated(inner) => safe(inner),
+        TypeDescriptor::ObjectShape { .. } => false,
+        _ => descriptor_is_trivial(descriptor),
     }
 }
 

@@ -1,0 +1,89 @@
+use Whim\Marker\NeverInline;
+use Whim\Unwind\TypeError;
+
+type Line = dict['quantity' => int, 'price' => int];
+type Order = dict[
+    'lines' => vec<Line>,
+    'shipping' => dict['price' => int],
+    'discount' => int,
+];
+
+#[NeverInline]
+function total(Order $order): int {
+    $total = 0;
+    foreach ($order['lines'] as $line) {
+        $total += $line['quantity'] * $line['price'];
+    }
+    return $total - $order['discount'] + $order['shipping']['price'];
+}
+
+#[NeverInline]
+function totals(vec<Order> $orders): int {
+    $sum = 0;
+    foreach ($orders as $order) { $sum += total($order); }
+    return $sum;
+}
+
+#[NeverInline]
+function fields(dict['a' => int, 'b' => uint, 'c' => float] $row): (int, uint, float) {
+    $a = $row['a'];
+    $b = $row['b'];
+    $c = $row['c'];
+    return ($a, $b, $c);
+}
+
+#[NeverInline]
+function positions(vec[int, uint, float] $row): (int, uint, float) {
+    $a = $row[0];
+    $b = $row[1u];
+    $c = $row[2];
+    return ($a, $b, $c);
+}
+
+#[NeverInline]
+function first(vec[dict['n' => int], ...uint] $row): int { return $row[0]['n']; }
+
+#[NeverInline]
+function forward(vec[dict['n' => int], ...uint] $row): int { return first($row); }
+
+#[NeverInline]
+function changed(dict['n' => int] $row, mixed $value): (mixed, uint) {
+    $row['n'] = $value;
+    $n = $row['n'];
+    $other = 2u;
+    return ($n, $other);
+}
+
+class Cell { public mixed $value = 1; }
+class Calls { public static int $count = 0; }
+#[NeverInline]
+function accepts_cell(dict['item' => #{ value: int }] $row): void { Calls::$count++; }
+#[NeverInline]
+function changed_cell(dict['item' => #{ value: int }] $row): void {
+    $row['item']->value = 'wrong';
+    accepts_cell($row);
+}
+
+newtype Signed = int;
+newtype Unsigned = uint;
+newtype Floating = float;
+
+$order = dict[
+    'lines' => vec[dict['quantity' => 2, 'price' => 100], dict['quantity' => 3, 'price' => 50]],
+    'shipping' => dict['price' => 20],
+    'discount' => 10,
+];
+assert!(total($order) == 360);
+assert!(totals(vec[$order, $order]) == 720);
+assert!(fields(dict['a' => -3, 'b' => 4u, 'c' => 2.5]) == (-3, 4u, 2.5));
+assert!(positions(vec[-3, 4u, 2.5]) == (-3, 4u, 2.5));
+assert!(forward(vec[dict['n' => 8], 1u, 2u]) == 8);
+assert!(changed(dict['n' => 1], 'wrong') == ('wrong', 2u));
+$tagged = fields(dict['a' => Signed(3), 'b' => Unsigned(4u), 'c' => Floating(2.5)]);
+assert!($tagged[0] is Signed);
+assert!($tagged[1] is Unsigned);
+assert!($tagged[2] is Floating);
+$caught = false;
+try { changed_cell(dict['item' => new Cell()]); } catch (TypeError $_error) { $caught = true; }
+assert!($caught);
+assert!(Calls::$count == 0);

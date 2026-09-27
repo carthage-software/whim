@@ -774,6 +774,109 @@ pub fn descriptors_equal(left: &TypeDescriptor, right: &TypeDescriptor, depth: u
     }
 }
 
+pub(crate) fn collection_descriptors_equal(
+    left: &TypeDescriptor,
+    right: &TypeDescriptor,
+    depth: usize,
+) -> bool {
+    if depth > MAX_TYPE_DEPTH {
+        return false;
+    }
+    if descriptors_equal(left, right, depth) {
+        return true;
+    }
+    let equal = |left: &TypeDescriptor, right: &TypeDescriptor| {
+        collection_descriptors_equal(left, right, depth + 1)
+    };
+    let slices_equal = |left: &[TypeDescriptor], right: &[TypeDescriptor]| {
+        left.len() == right.len()
+            && left
+                .iter()
+                .zip(right)
+                .all(|(left, right)| equal(left, right))
+    };
+    let optional_equal =
+        |left: Option<&TypeDescriptor>, right: Option<&TypeDescriptor>| match (left, right) {
+            (None, None) => true,
+            (Some(left), Some(right)) => equal(left, right),
+            _ => false,
+        };
+    match (left, right) {
+        (
+            TypeDescriptor::VectorShape {
+                elements: left,
+                rest: left_rest,
+            },
+            TypeDescriptor::VectorShape {
+                elements: right,
+                rest: right_rest,
+            },
+        ) => {
+            slices_equal(left, right) && optional_equal(left_rest.as_deref(), right_rest.as_deref())
+        }
+        (
+            TypeDescriptor::DictionaryShape {
+                entries: left,
+                rest: left_rest,
+            },
+            TypeDescriptor::DictionaryShape {
+                entries: right,
+                rest: right_rest,
+            },
+        ) => {
+            left.len() == right.len()
+                && left
+                    .iter()
+                    .zip(right)
+                    .all(|((left_key, left), (right_key, right))| {
+                        let same_key = match (left_key, right_key) {
+                            (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
+                            (ShapeKey::Int(left), ShapeKey::Int(right)) => left == right,
+                            (ShapeKey::Uint(left), ShapeKey::Uint(right)) => left == right,
+                            (ShapeKey::String(left), ShapeKey::String(right)) => {
+                                same_atom(left, right)
+                            }
+                            _ => false,
+                        };
+                        same_key && equal(left, right)
+                    })
+                && match (left_rest, right_rest) {
+                    (None, None) => true,
+                    (Some((left_key, left)), Some((right_key, right))) => {
+                        equal(left_key, right_key) && equal(left, right)
+                    }
+                    _ => false,
+                }
+        }
+        (
+            TypeDescriptor::Array(Some((left_key, left))),
+            TypeDescriptor::Array(Some((right_key, right))),
+        )
+        | (
+            TypeDescriptor::Dictionary(Some((left_key, left))),
+            TypeDescriptor::Dictionary(Some((right_key, right))),
+        ) => equal(left_key, right_key) && equal(left, right),
+        (TypeDescriptor::Vector(Some(left)), TypeDescriptor::Vector(Some(right)))
+        | (TypeDescriptor::Negated(left), TypeDescriptor::Negated(right)) => equal(left, right),
+        (TypeDescriptor::Tuple(left), TypeDescriptor::Tuple(right))
+        | (TypeDescriptor::Union(left), TypeDescriptor::Union(right))
+        | (TypeDescriptor::Intersection(left), TypeDescriptor::Intersection(right)) => {
+            slices_equal(left, right)
+        }
+        (
+            TypeDescriptor::TupleRest {
+                elements: left,
+                rest: left_rest,
+            },
+            TypeDescriptor::TupleRest {
+                elements: right,
+                rest: right_rest,
+            },
+        ) => slices_equal(left, right) && equal(left_rest, right_rest),
+        _ => false,
+    }
+}
+
 pub(crate) fn descriptor_options_equal(
     left: Option<&TypeDescriptor>,
     right: Option<&TypeDescriptor>,
