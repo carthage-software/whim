@@ -475,15 +475,31 @@ fn comparison_matches(
     left: &Value,
     right: &Value,
 ) -> Result<bool, Fault> {
-    if let (ValueView::Float(left), ValueView::Float(right)) =
-        (left.transparent(), right.transparent())
-    {
-        return Ok(float_comparison_matches(comparison, *left, *right));
-    }
-
-    if let (ValueView::Int(left), ValueView::Int(right)) = (left.transparent(), right.transparent())
-    {
-        return Ok(int_comparison_matches(comparison, *left, *right));
+    match (left.transparent(), right.transparent()) {
+        (ValueView::Float(left), ValueView::Float(right)) => {
+            return Ok(float_comparison_matches(comparison, *left, *right));
+        }
+        (ValueView::Int(left), ValueView::Int(right)) => {
+            return Ok(int_comparison_matches(comparison, *left, *right));
+        }
+        (ValueView::Uint(left), ValueView::Uint(right)) => {
+            return Ok(uint_comparison_matches(comparison, *left, *right));
+        }
+        (ValueView::Int(left), ValueView::Uint(right)) => {
+            return Ok(mixed_integer_comparison_matches(
+                comparison,
+                i128::from(*left),
+                i128::from(*right),
+            ));
+        }
+        (ValueView::Uint(left), ValueView::Int(right)) => {
+            return Ok(mixed_integer_comparison_matches(
+                comparison,
+                i128::from(*left),
+                i128::from(*right),
+            ));
+        }
+        _ => {}
     }
 
     match comparison {
@@ -537,6 +553,22 @@ fn uint_comparison_matches(comparison: BytecodeComparison, left: u64, right: u64
     match comparison {
         BytecodeComparison::Equal => left == right,
         BytecodeComparison::NotEqual => left != right,
+        BytecodeComparison::LessThan => left < right,
+        BytecodeComparison::LessThanOrEqual => left <= right,
+        BytecodeComparison::GreaterThan => left > right,
+        BytecodeComparison::GreaterThanOrEqual => left >= right,
+    }
+}
+
+#[inline(always)]
+fn mixed_integer_comparison_matches(
+    comparison: BytecodeComparison,
+    left: i128,
+    right: i128,
+) -> bool {
+    match comparison {
+        BytecodeComparison::Equal => false,
+        BytecodeComparison::NotEqual => true,
         BytecodeComparison::LessThan => left < right,
         BytecodeComparison::LessThanOrEqual => left <= right,
         BytecodeComparison::GreaterThan => left > right,
@@ -6977,6 +7009,105 @@ impl VirtualMachine<'_> {
             self.relocate_tracked_error_origin(&thrown, frame_index);
             let finished = self.pop_frame();
             self.truncate_frame_stack(&finished);
+        }
+    }
+}
+
+#[cfg(test)]
+mod comparison_tests {
+    use std::cmp::Ordering;
+
+    use whim_value::Value;
+    use whim_value::newtype::NewtypeValueId;
+    use whim_value::ops;
+
+    use super::BytecodeComparison;
+    use super::comparison_matches;
+
+    #[test]
+    fn integer_comparisons_match_value_semantics_with_tags_and_high_bits() {
+        let values = [
+            Value::int(i64::MIN),
+            Value::int(-1),
+            Value::int(0),
+            Value::int(1),
+            Value::int(i64::MAX),
+            Value::uint(0),
+            Value::uint(1),
+            Value::uint(u64::try_from(i64::MAX).unwrap()),
+            Value::uint(1 << 63),
+            Value::uint(u64::MAX),
+        ];
+        for left in &values {
+            for right in &values {
+                for left_tag in [None, Some(NewtypeValueId(0))] {
+                    for right_tag in [None, Some(NewtypeValueId(1))] {
+                        let left = left.clone_with_newtype(left_tag);
+                        let right = right.clone_with_newtype(right_tag);
+                        let ordering = ops::compare(&left, &right).unwrap();
+                        for comparison in [
+                            BytecodeComparison::Equal,
+                            BytecodeComparison::NotEqual,
+                            BytecodeComparison::LessThan,
+                            BytecodeComparison::LessThanOrEqual,
+                            BytecodeComparison::GreaterThan,
+                            BytecodeComparison::GreaterThanOrEqual,
+                        ] {
+                            let expected = match comparison {
+                                BytecodeComparison::Equal => ops::equals(&left, &right),
+                                BytecodeComparison::NotEqual => !ops::equals(&left, &right),
+                                BytecodeComparison::LessThan => ordering == Some(Ordering::Less),
+                                BytecodeComparison::LessThanOrEqual => {
+                                    matches!(ordering, Some(Ordering::Less | Ordering::Equal))
+                                }
+                                BytecodeComparison::GreaterThan => {
+                                    ordering == Some(Ordering::Greater)
+                                }
+                                BytecodeComparison::GreaterThanOrEqual => {
+                                    matches!(ordering, Some(Ordering::Greater | Ordering::Equal))
+                                }
+                            };
+                            assert_eq!(
+                                comparison_matches(comparison, &left, &right).ok(),
+                                Some(expected),
+                                "int {:?}/uint {:?} {comparison:?} int {:?}/uint {:?}",
+                                left.as_int(),
+                                left.as_uint(),
+                                right.as_int(),
+                                right.as_uint(),
+                            );
+                        }
+                        assert_eq!(left.newtype_id(), left_tag);
+                        assert_eq!(right.newtype_id(), right_tag);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mixed_integer_equality_stays_strict_for_equal_contents() {
+        for value in [0, 1, i64::MAX] {
+            let signed = Value::int(value);
+            let unsigned = Value::uint(u64::try_from(value).unwrap());
+            for (left, right) in [(&signed, &unsigned), (&unsigned, &signed)] {
+                assert_eq!(
+                    comparison_matches(BytecodeComparison::Equal, left, right).ok(),
+                    Some(false),
+                );
+                assert_eq!(
+                    comparison_matches(BytecodeComparison::NotEqual, left, right).ok(),
+                    Some(true),
+                );
+                assert_eq!(
+                    comparison_matches(BytecodeComparison::LessThanOrEqual, left, right).ok(),
+                    Some(true),
+                );
+                assert_eq!(
+                    comparison_matches(BytecodeComparison::GreaterThanOrEqual, left, right).ok(),
+                    Some(true),
+                );
+            }
         }
     }
 }

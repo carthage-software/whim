@@ -1,6 +1,50 @@
 use super::run_both_modes;
 
 #[test]
+fn mixed_integer_counter_loops_preserve_bounds_and_overflow_state() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function visit(int $value): int { return $value; }
+#[NeverInline]
+function ascend(int $start, uint $limit): (int, int, bool) {
+    $visits = 0;
+    $index = $start;
+    try {
+        for (; $index < $limit; $index++) { $visits += visit(1); }
+    } catch (Whim\Unwind\OverflowError $_) {
+        return ($index, $visits, true);
+    }
+    return ($index, $visits, false);
+}
+#[NeverInline]
+function unsigned_ascend(uint $start, int $limit): (uint, int) {
+    $visits = 0;
+    for ($index = $start; $index < $limit; $index++) { $visits += visit(1); }
+    return ($index, $visits);
+}
+assert!(ascend(-2, 2u) == (2, 4, false));
+assert!(ascend(0, 0u) == (0, 0, false));
+assert!(ascend(9223372036854775805, 9223372036854775807u) == (9223372036854775807, 2, false));
+assert!(ascend(9223372036854775806, 9223372036854775808u) == (9223372036854775807, 2, true));
+assert!(ascend(9223372036854775807, 18446744073709551615u) == (9223372036854775807, 1, true));
+assert!(unsigned_ascend(0u, -1) == (0u, 0));
+assert!(unsigned_ascend(0u, 2) == (2u, 2));
+assert!(unsigned_ascend(9223372036854775808u, 9223372036854775807) == (9223372036854775808u, 0));
+newtype Signed = int;
+newtype Unsigned = uint;
+$start = Signed(-2);
+$limit = Unsigned(2u);
+assert!(ascend($start, $limit) == (2, 4, false));
+assert!($start is Signed);
+assert!($limit is Unsigned);
+",
+        "/mixed-integer-counter-loops.whim",
+    );
+}
+
+#[test]
 fn negated_comparisons_preserve_edges_nan_and_live_results() {
     for operator in ["<", "<=", ">", ">="] {
         let source = format!(
