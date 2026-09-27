@@ -1,7 +1,6 @@
 namespace Whim\Filesystem;
 
 use Whim\Marker\AlwaysInline;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Uint32;
 use Whim\Time\SystemTime;
 
@@ -11,17 +10,17 @@ final readonly class Metadata {
   public function __construct(
     public NodeKind $kind,
     public Uint32 $permissions,
-    public NonNegativeInt $size,
+    public uint $size,
     public int $user,
     public int $group,
     public SystemTime $accessedAt,
     public SystemTime $modifiedAt,
     public SystemTime $changedAt,
-    public NonNegativeInt $hardLinkCount,
-    public int $device,
-    public int $inode,
-    public NonNegativeInt $blockSize,
-    public NonNegativeInt $blockCount,
+    public uint $hardLinkCount,
+    public uint $device,
+    public uint $inode,
+    public uint $blockSize,
+    public uint $blockCount,
   ) {}
 
   /** Whether the node is a regular file. */

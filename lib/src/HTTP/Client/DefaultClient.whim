@@ -32,7 +32,7 @@ final class DefaultClient implements Client {
     }
 
     $handler = new _Private\ExchangeHandler();
-    $index = length!($layers) - 1;
+    $index = (length!($layers) as int) - 1;
     while ($index >= 0) {
       $handler = new _Private\MiddlewareHandler($layers[$index], $handler);
 

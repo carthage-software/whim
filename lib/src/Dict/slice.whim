@@ -4,7 +4,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Marker\MustUse;
 use Whim\Refine\ArrayKey;
 use Whim\Refine\Iterable;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Predicate;
 use Whim\Refine\Transform;
 
@@ -43,10 +42,7 @@ function pull_with_key<K: ArrayKey, T, L: ArrayKey, V>(
 /** Returns the first requested entries. */
 #[MustUse]
 #[TrackCaller]
-function take<K: ArrayKey, V>(
-  Iterable<K, V> $values,
-  NonNegativeInt $count,
-): dict<K, V> {
+function take<K: ArrayKey, V>(Iterable<K, V> $values, uint $count): dict<K, V> {
   $result = dict[];
   foreach ($values as $key => $value) {
     if (length!($result) == $count) {
@@ -62,10 +58,7 @@ function take<K: ArrayKey, V>(
 /** Removes the first requested entries. */
 #[MustUse]
 #[TrackCaller]
-function drop<K: ArrayKey, V>(
-  Iterable<K, V> $values,
-  NonNegativeInt $count,
-): dict<K, V> {
+function drop<K: ArrayKey, V>(Iterable<K, V> $values, uint $count): dict<K, V> {
   $result = dict[];
   $index = 0;
   foreach ($values as $key => $value) {
@@ -125,8 +118,8 @@ function drop_while<K: ArrayKey, V>(
 #[TrackCaller]
 function slice<K: ArrayKey, V>(
   Iterable<K, V> $values,
-  NonNegativeInt $start,
-  null|NonNegativeInt $length = null,
+  uint $start,
+  null|uint $length = null,
 ): dict<K, V> {
   $result = dict[];
   $index = 0;

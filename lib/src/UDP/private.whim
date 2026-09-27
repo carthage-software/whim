@@ -72,7 +72,7 @@ function configure(
       $descriptor,
       Whim\_Private\SOCKET_LEVEL_SOCKET,
       Whim\_Private\SOCKET_OPTION_RECEIVE_BUFFER,
-      $configuration->receiveBuffer,
+      $configuration->receiveBuffer as int,
     );
   }
 
@@ -81,7 +81,7 @@ function configure(
       $descriptor,
       Whim\_Private\SOCKET_LEVEL_SOCKET,
       Whim\_Private\SOCKET_OPTION_SEND_BUFFER,
-      $configuration->sendBuffer,
+      $configuration->sendBuffer as int,
     );
   }
 }

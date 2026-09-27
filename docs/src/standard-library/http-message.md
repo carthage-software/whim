@@ -14,7 +14,8 @@ case-insensitive lookup. `from()` validates field names and values.
 - `with` replaces all values under a name.
 - `withAdded` appends one value.
 - `without` removes a name.
-- `toVec`, `count`, `isEmpty`, and `toIterator` inspect the map.
+- `count()` returns the number of entries as `uint`.
+- `toVec`, `isEmpty`, and `toIterator` inspect the map.
 
 `fromPartsUnsafe` is for already parsed and indexed internal data. Application
 code should use `from`.
@@ -87,6 +88,8 @@ plain HTTP local work.
 `MemoryStore` keeps session records in one process. `DatabaseStore` uses the
 database contracts. Store writes use a revision check; a conflict throws
 `ConflictException` rather than dropping one concurrent update.
+Record revisions and the revision passed to `Store::replace` use `uint`,
+starting at `0u`.
 
 The server session middleware loads a record, attaches the session to the
 request context, and writes or deletes it after the handler. The context gives

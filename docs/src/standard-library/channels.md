@@ -8,7 +8,7 @@ Both return a sender and a receiver.
 use Whim\Async;
 use Whim\Channel;
 
-($sender, $receiver) = Channel\bounded::<string>(4);
+($sender, $receiver) = Channel\bounded::<string>(4u);
 
 $producer = Async\spawn::<null>(fn(): null {
   $sender->send('one');
@@ -50,8 +50,8 @@ The API throws instead of using `null` to mean "no value." A channel may carry
 
 The sender and receiver share these operations:
 
-- `getCapacity(): null|NonNegativeInt` returns `null` for an unbounded channel.
-- `count(): NonNegativeInt` returns the buffered item count.
+- `getCapacity(): null|uint` returns `null` for an unbounded channel.
+- `count(): uint` returns the buffered item count.
 - `isFull()` and `isEmpty()` inspect the buffer.
 - `close()` ends further writes.
 - `isClosed()` reports whether the channel has closed.

@@ -80,7 +80,7 @@ function parse_parameters(string $input): null|vec<Parameter> {
     }
 
     $name = Str\lowercase(
-      Str\trim(Str\slice($input, $nameStart, $index - $nameStart)),
+      Str\trim(Str\slice($input, $nameStart, ($index - $nameStart) as uint)),
     );
 
     if (!is_token($name)) {
@@ -119,7 +119,9 @@ function parse_parameters(string $input): null|vec<Parameter> {
         $index++;
       }
 
-      $value = Str\trim(Str\slice($input, $valueStart, $index - $valueStart));
+      $value = Str\trim(
+        Str\slice($input, $valueStart, ($index - $valueStart) as uint),
+      );
     }
 
     $parameters[] = ($name, $value);
@@ -179,9 +181,9 @@ function fold_header(
   }
 
   $result = $name . ':';
-  $lineLength = length!($name) + 1;
+  $lineLength = (length!($name) as int) + 1;
   foreach (Str\words($value) as $word) {
-    $length = length!($word) + 1;
+    $length = (length!($word) as int) + 1;
     if ($lineLength + $length > $softLimit) {
       $result .= "\r\n ";
       $lineLength = 1;
@@ -190,15 +192,15 @@ function fold_header(
       $lineLength++;
     }
 
-    while (length!($word) + $lineLength > $hardLimit) {
+    while ((length!($word) as int) + $lineLength > $hardLimit) {
       $available = $hardLimit - $lineLength;
-      $result .= Str\slice($word, 0, $available) . "\r\n ";
+      $result .= Str\slice($word, 0, $available as uint) . "\r\n ";
       $word = Str\slice($word, $available);
       $lineLength = 1;
     }
 
     $result .= $word;
-    $lineLength += length!($word);
+    $lineLength += length!($word) as int;
   }
 
   return $result . "\r\n";
@@ -207,5 +209,5 @@ function fold_header(
 /** Generates a MIME multipart boundary. */
 #[MustUse]
 function generate_boundary(): string[55] {
-  return ('=_whim_' . SecureRandom\string(48)) as string[55];
+  return ('=_whim_' . SecureRandom\string(48u)) as string[55];
 }

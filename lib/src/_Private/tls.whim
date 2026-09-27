@@ -5,7 +5,7 @@ use Whim\Marker\SensitiveParameter;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Unwind\Error;
 
 /** The engine's number for TLS 1.2. */
@@ -144,7 +144,7 @@ final class TlsError extends Error {
   /** Returns one of the `TLS_ERROR_*` constants. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function kind(): int {}
+  public function kind(): uint {}
 }
 
 /** An immutable rustls client configuration. */
@@ -240,19 +240,19 @@ final class TlsConnection {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function readPlaintext(PositiveInt $maximumBytes): null|string {}
+  public function readPlaintext(NonZero<uint> $maximumBytes): null|string {}
 
   /** Accepts plaintext and returns the number of bytes buffered. */
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function writePlaintext(#[SensitiveParameter] string $bytes): int {}
+  public function writePlaintext(#[SensitiveParameter] string $bytes): uint {}
 
   /** Takes ciphertext waiting to be sent to the underlying transport. */
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function transmitCiphertext(PositiveInt $maximumBytes): string {}
+  public function transmitCiphertext(NonZero<uint> $maximumBytes): string {}
 
   /** Queues a TLS close notification. */
   #[TrackCaller]
@@ -263,7 +263,7 @@ final class TlsConnection {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function protocolVersion(): null|int {}
+  public function protocolVersion(): null|uint {}
 
   /** Returns the negotiated cipher suite, or null before the handshake. */
   #[MustUse]
@@ -281,7 +281,7 @@ final class TlsConnection {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function handshakeKind(): null|int {}
+  public function handshakeKind(): null|uint {}
 
   /** Returns the peer certificate chain as DER certificates. */
   #[MustUse]

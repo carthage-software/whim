@@ -11,11 +11,11 @@ assert!($sender is Channel\Sender<int>);
 assert!($receiver is Channel\Receiver<int>);
 assert!($sender->getCapacity() == null);
 assert!($receiver->getCapacity() == null);
-assert!($sender->count() == 0);
+assert!($sender->count() == 0u);
 assert!($receiver->isEmpty());
 
 $sender->send(41);
-assert!($receiver->count() == 1);
+assert!($receiver->count() == 1u);
 assert!(!($receiver->isEmpty()));
 assert!($receiver->receive() == 41);
 assert!($receiver->isEmpty());
@@ -25,10 +25,16 @@ $nullableSender->send(null);
 assert!($nullableReceiver->receive() == null);
 $nullableReceiver->close();
 
-$bounded = Channel\bounded::<string>(2);
+($largeSender, $largeReceiver) = Channel\bounded::<int>(Whim\Math\UINT_MAX);
+assert!($largeSender->getCapacity() == Whim\Math\UINT_MAX);
+$largeSender->send(42);
+assert!($largeReceiver->receive() == 42);
+$largeReceiver->close();
+
+$bounded = Channel\bounded::<string>(2u);
 $boundedSender = $bounded[0];
 $boundedReceiver = $bounded[1];
-assert!($boundedSender->getCapacity() == 2);
+assert!($boundedSender->getCapacity() == 2u);
 $boundedSender->trySend('a');
 $boundedSender->trySend('b');
 assert!($boundedSender->isFull());
@@ -89,7 +95,7 @@ try {
 
 assert!($assertion_error_20 is CancelledException);
 
-($sendableSender, $sendableReceiver) = Channel\bounded::<int>(1);
+($sendableSender, $sendableReceiver) = Channel\bounded::<int>(1u);
 $sendableSender->send(1);
 $sendable = Async\spawn::<null>(fn(): null {
   $sendableSender->waitUntilSendable();

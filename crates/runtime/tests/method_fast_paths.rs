@@ -149,10 +149,10 @@ function exercise(): void {
         assert!($caller->same() == $target);
         $copy = $target->identity::<vec<string>>($values);
         $copy[] = 'direct';
-        assert!(length!($values) == 1);
+        assert!(length!($values) == 1u);
         $copy = $caller->identity::<vec<string>>($values);
         $copy[] = 'indirect';
-        assert!(length!($values) == 1);
+        assert!(length!($values) == 1u);
         $token = $target->identity::<Token>($token);
         $token = $caller->identity::<Token>($token);
         assert!($token->name == 'retained token');
@@ -420,7 +420,7 @@ function make(int $seed): fn(int): int {
     return fn(int $value, int $offset = 1): int {
         assert!($value >= 0 && $tagged is CaptureId);
         $values[] = $value;
-        return $object->value + $tagged + $value + $offset + length!($values);
+        return $object->value + $tagged + $value + $offset + (length!($values) as int);
     };
 }
 #[NeverInline]

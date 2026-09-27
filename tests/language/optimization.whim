@@ -119,7 +119,7 @@ $falseGuardLimit = 0;
 $falseGuardSubject = 5;
 $falseGuardTotal = 0;
 while ($falseGuardIndex < $falseGuardLimit) {
-  $falseGuardTotal += length!($falseGuardSubject);
+  $falseGuardTotal += length!($falseGuardSubject) as int;
   $falseGuardIndex++;
 }
 
@@ -185,8 +185,8 @@ $configured = Command\Command::create($binary)
   ->withVariable('WHIM_OPTIMIZATIONS', 'off')
   ->run();
 
-assert!(length!($configured->standardError) == 0);
+assert!(length!($configured->standardError) == 0u);
 assert!($configured->isSuccess());
-assert!(length!($configured->standardOutput) == 0);
+assert!(length!($configured->standardOutput) == 0u);
 
 Filesystem\delete_directory($work, true);

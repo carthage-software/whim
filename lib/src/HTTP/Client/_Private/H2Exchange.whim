@@ -5,8 +5,7 @@ use Whim\Channel;
 use Whim\HTTP\_Private\Event\WeakendEvent;
 use Whim\HTTP\Client\ProtocolException;
 use Whim\HTTP\Message\Request;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Unwind\Throwable;
 
 /** Queues events for one HTTP/2 exchange. */
@@ -14,23 +13,23 @@ final class H2Exchange {
   private Channel\Sender<H2EventBatch> $sender;
   private Channel\Receiver<H2EventBatch> $receiver;
   private vec<WeakendEvent> $pending = vec[];
-  private int $bodyBytes = 0;
+  private uint $bodyBytes = 0u;
   private bool $finalResponse = false;
 
   public function __construct(
-    private PositiveInt $maximumBodyBytes,
-    private NonNegativeInt $maximumInformationalResponses,
+    private NonZero<uint> $maximumBodyBytes,
+    private uint $maximumInformationalResponses,
     private Request $request,
     private null|PushCollection $pushes = null,
   ) {
     ($this->sender, $this->receiver) = Channel\unbounded::<H2EventBatch>();
   }
 
-  public function maximumBodyBytes(): PositiveInt {
+  public function maximumBodyBytes(): NonZero<uint> {
     return $this->maximumBodyBytes;
   }
 
-  public function maximumInformationalResponses(): NonNegativeInt {
+  public function maximumInformationalResponses(): uint {
     return $this->maximumInformationalResponses;
   }
 

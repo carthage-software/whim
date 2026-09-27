@@ -117,7 +117,7 @@ assert!(
 );
 
 $allowed = $linted->getAttributes::<Allow>();
-assert!(length!($allowed) == 2);
+assert!(length!($allowed) == 2u);
 assert!($allowed[0]->newInstance()->rule == 'no-debug-symbols');
 assert!($allowed[0]->newInstance()->reason == null);
 assert!($allowed[1]->newInstance()->rule == 'sensitive-parameter');
@@ -171,7 +171,7 @@ foreach (vec[
   $definition = Reflection\reflect_class($control)?->getAttributeDefinition();
   assert!($definition != null);
   assert!($definition->isRepeatable());
-  assert!(length!($definition->getTargets()) == 10);
+  assert!(length!($definition->getTargets()) == 10u);
 }
 
 class LintAttributeParameters {

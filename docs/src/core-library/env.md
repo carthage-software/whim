@@ -58,6 +58,10 @@ priority. Resource-limit functions read or change the current process's soft
 and hard limits; `null` means unlimited. A missing process argument means the
 current process.
 
+Process, user, group, and session IDs use `uint`, as do resource limits.
+`Command\Child::getId()` returns the same unsigned process ID accepted by the
+process functions.
+
 Changing identities, groups, sessions, priorities, or resource limits may need
 operating-system permission. A failed operation throws `RuntimeException` with
 the system error as its cause.
@@ -87,12 +91,12 @@ the host; `isCatchable()` rejects signals such as forced kill and stop.
 `OS\information()` identifies the running system and machine. `uptime()`
 returns a `Duration`. `load_averages()` reports the one-, five-, and
 fifteen-minute load averages. `memory()` reports total and available physical
-memory in bytes.
+memory in bytes as `uint` values.
 
 ## Users and groups
 
 `OS\find_user()` and `OS\find_group()` query the operating-system account
-directory by name or numeric identifier. They return immutable `User` and
+directory by name or a `uint` identifier. They return immutable `User` and
 `Group` records, or `null` when no record exists.
 
 `OS\groups_for_user()` returns the available primary and supplementary group
@@ -111,5 +115,5 @@ syntax. Prefer `Command` for a normal program call.
 ## Terminal
 
 `Terminal\attached($descriptor)` checks whether a descriptor is a terminal.
-`size($descriptor)` returns columns and rows or `null`. `path($descriptor)`
+`size($descriptor)` returns positive `uint` columns and rows or `null`. `path($descriptor)`
 returns the terminal path or `null`.

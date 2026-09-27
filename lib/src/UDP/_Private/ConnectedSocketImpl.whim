@@ -37,7 +37,7 @@ final class ConnectedSocketImpl extends DatagramSocketImpl implements
     string[..=65_507] $bytes,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     if (
       null != $metadata
       && $metadata->sourceAddress->family
@@ -61,10 +61,10 @@ final class ConnectedSocketImpl extends DatagramSocketImpl implements
           $this->getFileDescriptor(),
           $bytes,
           null,
-          0,
+          0u,
           $metadata->sourceAddress->toString(),
           $metadata->interfaceIndex,
-          $metadata->explicitCongestion->value,
+          $metadata->explicitCongestion->value as uint,
         );
       } catch (Whim\_Private\SystemError $error) {
         if ($error->errno() != Whim\_Private\ERRNO_WOULD_BLOCK) {

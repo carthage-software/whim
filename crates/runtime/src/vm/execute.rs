@@ -5201,7 +5201,7 @@ impl VirtualMachine<'_> {
 
                         match outcome {
                             Ok(length) => {
-                                write_register!(registers, destination, Value::int(length))
+                                write_register!(registers, destination, Value::uint(length))
                             }
                             Err(fault) => {
                                 fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
@@ -5258,7 +5258,7 @@ impl VirtualMachine<'_> {
                         let value = unsafe { &*registers.add(source.index() as usize) };
                         // SAFETY: the value's tag proves this projection is valid.
                         let length = unsafe { value.as_string_len().unwrap_unchecked() };
-                        write_register!(registers, destination, Value::int(length as i64));
+                        write_register!(registers, destination, Value::uint(length as u64));
                     }
                     Instruction::Remove {
                         destination,

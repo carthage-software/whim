@@ -16,7 +16,6 @@ use Whim\IO\LimitExceededException;
 use Whim\IO\MemoryHandle;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Str\join;
 use Whim\Vec\reverse;
 
@@ -24,7 +23,7 @@ use Whim\Vec\reverse;
 final readonly class RequestDecompression implements Middleware {
   public function __construct(
     public Registry $codecs,
-    public NonNegativeInt $maximumDecodedBytes = 10_485_760,
+    public uint $maximumDecodedBytes = 10_485_760u,
   ) {}
 
   #[TrackCaller]

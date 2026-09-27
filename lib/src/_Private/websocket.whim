@@ -17,8 +17,8 @@ final class WebSocketCodec {
   #[TrackCaller]
   #[TraceBoundary]
   public static function server(
-    1.. $maximumMessageSize,
-    1.. $maximumFrameSize,
+    1u.. $maximumMessageSize,
+    1u.. $maximumFrameSize,
   ): WebSocketCodec {}
 
   /** Creates a strict client-side codec with bounded input. */
@@ -26,8 +26,8 @@ final class WebSocketCodec {
   #[TrackCaller]
   #[TraceBoundary]
   public static function client(
-    1.. $maximumMessageSize,
-    1.. $maximumFrameSize,
+    1u.. $maximumMessageSize,
+    1u.. $maximumFrameSize,
   ): WebSocketCodec {}
 
   /** Supplies received bytes. */
@@ -44,7 +44,7 @@ final class WebSocketCodec {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function nextEvent(): null|(int, string, int) {}
+  public function nextEvent(): null|(uint, string, uint) {}
 
   /** Takes encoded bytes waiting for the transport. */
   #[MustUse]
@@ -70,7 +70,7 @@ final class WebSocketCodec {
   /** Starts a clean close handshake. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function close(null|int $code = null, string $reason = ''): void {}
+  public function close(null|uint $code = null, string $reason = ''): void {}
 
   /** Reports whether the connection reached its terminal state. */
   #[MustUse]

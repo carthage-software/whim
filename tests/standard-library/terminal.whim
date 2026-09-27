@@ -3,10 +3,10 @@ use Whim\Terminal;
 use Whim\Terminal\Size;
 use Whim\Unwind\TypeError;
 
-$size = new Size(80, 24);
-assert!($size->columns == 80);
-assert!($size->rows == 24);
-$assertion_value_3 = fn(): Size => new Size(0, 24);
+$size = new Size(80u, 24u);
+assert!($size->columns == 80u);
+assert!($size->rows == 24u);
+$assertion_value_3 = fn(): Size => new Size(0u, 24u);
 $assertion_error_3 = null;
 try {
   $assertion_value_3();

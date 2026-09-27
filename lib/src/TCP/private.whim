@@ -68,7 +68,7 @@ function connect_endpoint(
     $descriptor->close();
     throw new ConnectionException(
       'failed to connect to ' . $endpoint->toString(),
-      $error->errno(),
+      $error->getCode(),
       $error,
     );
   } catch (Throwable $error) {

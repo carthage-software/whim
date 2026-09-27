@@ -34,7 +34,7 @@ impl OSOperation {
     const fn construct() {}
 
     #[whim_method(
-        "user(((string&!'')|(0..)) $identity): Whim\\_Private\\OSOperation",
+        "user(((string&!'')|uint) $identity): Whim\\_Private\\OSOperation",
         static,
         must_use
     )]
@@ -45,7 +45,7 @@ impl OSOperation {
     }
 
     #[whim_method(
-        "group(((string&!'')|(0..)) $identity): Whim\\_Private\\OSOperation",
+        "group(((string&!'')|uint) $identity): Whim\\_Private\\OSOperation",
         static,
         must_use
     )]
@@ -56,7 +56,7 @@ impl OSOperation {
     }
 
     #[whim_method(
-        "groupsForUser((string&!'') $name, (0..) $primaryGroup): Whim\\_Private\\OSOperation",
+        "groupsForUser((string&!'') $name, uint $primaryGroup): Whim\\_Private\\OSOperation",
         static,
         must_use
     )]
@@ -67,7 +67,7 @@ impl OSOperation {
         accounts::require_support().map_err(|error| io_error(cx, error))?;
         let name = CString::new(arguments.bytes(0))
             .map_err(|_| system_error(cx, "getgrouplist", libc::EINVAL))?;
-        let primary_group = u32::try_from(arguments.int(1))
+        let primary_group = u32::try_from(arguments.uint(1))
             .map_err(|_| system_error(cx, "getgrouplist", libc::EINVAL))?;
         start(cx, move || {
             accounts::groups_for_user(&name, primary_group).map(OSResult::Groups)
@@ -86,15 +86,15 @@ impl OSOperation {
     }
 
     #[whim_method(
-        "takeUser(): null|((string&!''), (0..), (0..), string, string)",
+        "takeUser(): null|((string&!''), uint, uint, string, string)",
         must_use
     )]
     fn take_user(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         match take(cx)? {
             Some(OSResult::User(Some(record))) => Ok(cx.tuple([
                 cx.string(&record.name),
-                Value::int(i64::from(record.id)),
-                Value::int(i64::from(record.primary_group)),
+                Value::uint(u64::from(record.id)),
+                Value::uint(u64::from(record.primary_group)),
                 cx.string(&record.home_directory),
                 cx.string(&record.shell),
             ])),
@@ -103,7 +103,7 @@ impl OSOperation {
         }
     }
 
-    #[whim_method("takeGroup(): null|((string&!''), (0..), vec<(string&!'')>)", must_use)]
+    #[whim_method("takeGroup(): null|((string&!''), uint, vec<(string&!'')>)", must_use)]
     fn take_group(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         match take(cx)? {
             Some(OSResult::Group(Some(record))) => Ok(group_value(cx, record)),
@@ -113,7 +113,7 @@ impl OSOperation {
     }
 
     #[whim_method(
-        "takeGroups(): null|vec<((string&!''), (0..), vec<(string&!'')>)>",
+        "takeGroups(): null|vec<((string&!''), uint, vec<(string&!'')>)>",
         must_use
     )]
     fn take_groups(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
@@ -139,7 +139,7 @@ fn identity(
     call: &'static str,
 ) -> Result<Identity, Throw> {
     let value = arguments.local(0);
-    if let Some(id) = value.as_int() {
+    if let Some(id) = value.as_uint() {
         return u32::try_from(id)
             .map(Identity::Id)
             .map_err(|_| system_error(cx, call, libc::EINVAL));
@@ -156,7 +156,7 @@ fn group_value(cx: &Context<'_, '_, '_>, record: Group) -> Value {
     let members = cx.vec(record.members.into_iter().map(|name| cx.string(&name)));
     cx.tuple([
         cx.string(&record.name),
-        Value::int(i64::from(record.id)),
+        Value::uint(u64::from(record.id)),
         members,
     ])
 }

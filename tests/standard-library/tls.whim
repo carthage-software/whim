@@ -57,7 +57,7 @@ final class TLSTestTransport implements NetworkStream<UnixEndpoint> {
 
   public function tryRead(null|int $maxBytes = null): string {
     $this->receiveFromPeer();
-    $maximum = $maxBytes ?? length!($this->incoming);
+    $maximum = $maxBytes ?? (length!($this->incoming) as int);
     if ($maximum <= 0 || $this->incoming == '') {
       return '';
     }
@@ -68,7 +68,7 @@ final class TLSTestTransport implements NetworkStream<UnixEndpoint> {
       return $bytes;
     }
 
-    $bytes = Str\slice($this->incoming, 0, $maximum);
+    $bytes = Str\slice($this->incoming, 0, $maximum as uint);
     $this->incoming = Str\slice($this->incoming, $maximum);
     return $bytes;
   }
@@ -79,9 +79,9 @@ final class TLSTestTransport implements NetworkStream<UnixEndpoint> {
     $cancellation?->throwIfCancellationRequested();
   }
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     if ($bytes == '') {
-      return 0;
+      return 0u;
     }
 
     $this->peer->receiveCiphertext($bytes);
@@ -92,7 +92,7 @@ final class TLSTestTransport implements NetworkStream<UnixEndpoint> {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     return $this->tryWrite($bytes);
   }
@@ -107,7 +107,7 @@ final class TLSTestTransport implements NetworkStream<UnixEndpoint> {
 
   private function receiveFromPeer(): void {
     while (true) {
-      $bytes = $this->peer->transmitCiphertext(65536);
+      $bytes = $this->peer->transmitCiphertext(65536u);
       if ($bytes == '') {
         return;
       }
@@ -122,7 +122,7 @@ $privateKeyPem = File\read(directory!() . '/fixtures/tls/private-key.pem');
 $certificate = Certificate::from($certificatePem);
 $identity = Identity::from($certificatePem, $privateKeyPem);
 assert!(length!($certificate->toDer()) > 0);
-assert!(length!($identity->certificateChain) == 1);
+assert!(length!($identity->certificateChain) == 1u);
 assert!(
   Certificate::from($certificate->toDer())->toDer() == $certificate->toDer(),
 );
@@ -132,7 +132,7 @@ assert!($certificate->getNotAfter()->seconds == 2101783033);
 assert!($certificate->getSubject() == 'CN=localhost');
 assert!($certificate->getIssuer() == 'CN=localhost');
 assert!($certificate->getDnsNames() == vec['localhost']);
-assert!(length!($certificate->getIpAddresses()) == 1);
+assert!(length!($certificate->getIpAddresses()) == 1u);
 assert!($certificate->getIpAddresses()[0]->toString() == '127.0.0.1');
 assert!($certificate->getEmailAddresses() == vec[]);
 assert!($certificate->getUris() == vec[]);
@@ -207,10 +207,10 @@ assert!($state->version == Version::Tls13);
 assert!($state->alpnProtocol == 'whim-test');
 assert!($state->handshakeKind == HandshakeKind::Full);
 assert!(length!($state->cipherSuite) > 0);
-assert!(length!($state->peerCertificates) == 1);
+assert!(length!($state->peerCertificates) == 1u);
 $stream->writeAll('ping');
-assert!($serverConnection->readPlaintext(4) == 'ping');
-assert!($serverConnection->writePlaintext('pong') == 4);
+assert!($serverConnection->readPlaintext(4u) == 'ping');
+assert!($serverConnection->writePlaintext('pong') == 4u);
 assert!($stream->readFixedSize(4) == 'pong');
 $stream->close();
 
@@ -226,8 +226,8 @@ $state = $stream->getConnectionState();
 assert!($state->version == Version::Tls13);
 assert!($state->serverName == 'localhost');
 $stream->writeAll('server');
-assert!($clientConnection->readPlaintext(6) == 'server');
-assert!($clientConnection->writePlaintext('client') == 6);
+assert!($clientConnection->readPlaintext(6u) == 'server');
+assert!($clientConnection->writePlaintext('client') == 6u);
 assert!($stream->readFixedSize(6) == 'client');
 $stream->close();
 

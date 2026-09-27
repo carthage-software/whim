@@ -334,7 +334,7 @@ fn write_binary(object: &InstanceObject, bytes: &mut Vec<u8>) -> Result<(), Code
         .as_string_bytes()
         .ok_or_else(|| CodecError::new("the BSON binary data must be a string"))?;
     let subtype = subtype
-        .as_int()
+        .as_uint()
         .and_then(|subtype| u8::try_from(subtype).ok())
         .ok_or_else(|| CodecError::new("a BSON binary subtype must fit in one byte"))?;
     if subtype == 0x02 {
@@ -488,8 +488,8 @@ fn decode_raw_value(
             context,
             class_text(TIMESTAMP),
             [
-                Value::int(i64::from(value.time)),
-                Value::int(i64::from(value.increment)),
+                Value::uint(u64::from(value.time)),
+                Value::uint(u64::from(value.increment)),
             ],
         ),
         RawBsonRef::Binary(value) => instance(
@@ -497,7 +497,7 @@ fn decode_raw_value(
             class_text(BINARY),
             [
                 context.string(value.bytes),
-                Value::int(i64::from(u8::from(value.subtype))),
+                Value::uint(u64::from(u8::from(value.subtype))),
             ],
         ),
         RawBsonRef::ObjectId(value) => instance(
@@ -735,7 +735,7 @@ fn system_time_value(
 
 fn uint32(value: &Value, name: &str) -> Result<u32, CodecError> {
     let value = value
-        .as_int()
-        .ok_or_else(|| CodecError::new(format!("{name} must be an integer")))?;
+        .as_uint()
+        .ok_or_else(|| CodecError::new(format!("{name} must be an unsigned integer")))?;
     u32::try_from(value).map_err(|_| CodecError::new(format!("{name} must fit in 32 bits")))
 }

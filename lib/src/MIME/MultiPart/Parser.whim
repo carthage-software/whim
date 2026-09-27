@@ -8,7 +8,6 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 
 /** Parses multipart bodies into independently readable parts. */
 final readonly class Parser {
@@ -19,10 +18,10 @@ final readonly class Parser {
   #[TrackCaller]
   public function __construct(
     string[1..=70] $boundary,
-    private NonNegativeInt $spoolThreshold = 2_097_152,
-    private NonNegativeInt $maximumParts = 0,
-    private NonNegativeInt $maximumPartSize = 0,
-    private NonNegativeInt $maximumHeaderSize = 65_536,
+    private uint $spoolThreshold = 2_097_152u,
+    private uint $maximumParts = 0u,
+    private uint $maximumPartSize = 0u,
+    private uint $maximumHeaderSize = 65_536u,
   ) {
     $this->delimiter = '--' . $boundary;
   }

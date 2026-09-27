@@ -3,7 +3,6 @@ namespace Whim\SecureRandom;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Math;
-use Whim\Refine\NonNegativeInt;
 use Whim\_Private\random_bytes;
 use Whim\_Private\random_string;
 
@@ -14,8 +13,8 @@ use Whim\_Private\random_string;
  */
 #[NeverInline]
 #[TrackCaller]
-function bytes(NonNegativeInt $length): string {
-  $bytes = random_bytes($length);
+function bytes(uint $length): string {
+  $bytes = random_bytes($length as int);
   if ($bytes is null) {
     throw new InsufficientEntropyException(
       'the operating system did not provide random bytes',
@@ -28,13 +27,10 @@ function bytes(NonNegativeInt $length): string {
 /** Generates a cryptographically secure random string. */
 #[NeverInline]
 #[TrackCaller]
-function string(
-  NonNegativeInt $length,
-  null|string[2..] $alphabet = null,
-): string {
+function string(uint $length, null|string[2..] $alphabet = null): string {
   $alphabet ??= '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  $result = random_string($length, $alphabet);
+  $result = random_string($length as int, $alphabet);
   if ($result is null) {
     throw new InsufficientEntropyException(
       'the operating system did not provide random bytes',

@@ -13,27 +13,27 @@ class Counter {
 $numbers = vec[1, 2];
 $appended = $numbers;
 $appended[] = 3;
-assert!(length!($numbers) == 2);
-assert!(length!($appended) == 3);
+assert!(length!($numbers) == 2u);
+assert!(length!($appended) == 3u);
 
 $entries = dict['k' => 1];
 $modified = $entries;
 $modified['k'] = 2;
 $modified['new'] = 3;
 assert!($entries['k'] == 1);
-assert!(length!($entries) == 1);
+assert!(length!($entries) == 1u);
 assert!($modified['k'] == 2);
-assert!(length!($modified) == 2);
+assert!(length!($modified) == 2u);
 
 /** Appends to its parameter and reports the length it observes. */
 function pad(vec<int> $items): int {
   $items[] = 0;
-  return length!($items);
+  return length!($items) as int;
 }
 
 $source = vec[1];
 assert!(pad($source) == 2);
-assert!(length!($source) == 1);
+assert!(length!($source) == 1u);
 
 $first_holder = vec[new Counter()];
 $second_holder = $first_holder;
@@ -79,4 +79,4 @@ foreach ($queue as $item) {
 }
 
 assert!($visited == vec[10, 20, 30]);
-assert!(length!($queue) == 0);
+assert!(length!($queue) == 0u);

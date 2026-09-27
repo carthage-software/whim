@@ -6,7 +6,6 @@ use Whim\HTTP\Message\Request;
 use Whim\HTTP\Server\HTTPException;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\LogicException;
 use Whim\_Private\Regex;
 use Whim\_Private\memchr;
@@ -104,5 +103,5 @@ function request_path(Request $request): string {
 
   $query = memchr($target, 63, 0) ?? return $target;
 
-  return string_slice($target, 0, $query as NonNegativeInt);
+  return string_slice($target, 0, $query as int);
 }

@@ -5,10 +5,10 @@ use Whim\Env;
 use Whim\IO;
 use Whim\Time\Duration;
 
-$boundedPair = Channel\bounded::<int>(2);
+$boundedPair = Channel\bounded::<int>(2u);
 $boundedSender = $boundedPair[0];
 $boundedReceiver = $boundedPair[1];
-assert!($boundedSender->getCapacity() == 2);
+assert!($boundedSender->getCapacity() == 2u);
 Async\spawn::<int>(fn(): int {
   for ($i = 1; $i <= 5; $i++) {
     $boundedSender->send($i);
@@ -43,10 +43,10 @@ for ($k = 1; $k <= 50; $k++) {
   $unboundedSender->send($k);
 }
 
-assert!($unboundedSender->count() == 50);
+assert!($unboundedSender->count() == 50u);
 assert!($unboundedReceiver->receive() == 1);
 
-$tinyPair = Channel\bounded::<int>(1);
+$tinyPair = Channel\bounded::<int>(1u);
 $tinySender = $tinyPair[0];
 $tinyReceiver = $tinyPair[1];
 $tinySender->trySend(7);
@@ -76,7 +76,7 @@ assert!($assertion_error_9 is Channel\EmptyException);
 
 $preCancelledToken = new Async\SignalCancellationToken();
 $preCancelledToken->cancel();
-$cancelledSendPair = Channel\bounded::<int>(1);
+$cancelledSendPair = Channel\bounded::<int>(1u);
 $cancelledSender = $cancelledSendPair[0];
 $cancelledSender->trySend(1);
 $assertion_value_10 = fn(): void {
@@ -92,8 +92,8 @@ try {
 
 assert!($assertion_error_10 is CancelledException);
 
-assert!($cancelledSender->count() == 1);
-$cancelledReceivePair = Channel\bounded::<int>(1);
+assert!($cancelledSender->count() == 1u);
+$cancelledReceivePair = Channel\bounded::<int>(1u);
 $cancelledReceiver = $cancelledReceivePair[1];
 $assertion_value_12 = fn(): void {
   $cancelledReceiver->receive($preCancelledToken);
@@ -127,7 +127,7 @@ accept_nullable_path_probe(Env\temporary_directory(...));
 accept_nullable_path_probe(Env\current_script(...));
 accept_binary_probe(Env\current_binary(...));
 
-assert!(length!(Env\get_arguments()) == 0);
+assert!(length!(Env\get_arguments()) == 0u);
 assert!(Env\get_arguments() is vec<string>);
 assert!(Env\set_variable('WHIM_TEST_ENVIRONMENT', 'value'));
 
@@ -155,8 +155,8 @@ assert!(Env\temporary_directory() != null);
 assert!(Env\current_binary() != '');
 
 ($emptyReader, $emptyWriter) = IO\pipe();
-assert!($emptyWriter->write('') == 0);
-assert!($emptyWriter->tryWrite('') == 0);
+assert!($emptyWriter->write('') == 0u);
+assert!($emptyWriter->tryWrite('') == 0u);
 $emptyReader->close();
 $emptyWriter->close();
 
@@ -186,7 +186,7 @@ Async\spawn::<int>(fn(): int {
   return 0;
 })->ignore();
 
-assert!(IO\copy($copySource, $copySink) == 18);
+assert!(IO\copy($copySource, $copySink) == 18u);
 $copySource->close();
 $copySink->seek(0);
 assert!($copySink->readAll() == 'copied via reactor');

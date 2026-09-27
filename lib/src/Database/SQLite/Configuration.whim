@@ -1,7 +1,6 @@
 namespace Whim\Database\SQLite;
 
 use Whim\Marker\AlwaysInline;
-use Whim\Refine\NonNegativeInt;
 
 /** Configures SQLite connections. */
 final readonly class Configuration {
@@ -11,8 +10,8 @@ final readonly class Configuration {
     public bool $readOnly = false,
     public bool $create = true,
     public bool $uri = false,
-    public NonNegativeInt $busyTimeoutMilliseconds = 5000,
-    public NonNegativeInt $statementCacheCapacity = 128,
+    public uint $busyTimeoutMilliseconds = 5000u,
+    public uint $statementCacheCapacity = 128u,
     public bool $foreignKeys = true,
   ) {}
 }

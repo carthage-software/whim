@@ -3,12 +3,12 @@ namespace Whim\Unix;
 use Whim\Default\Default;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 
 /** Configures a Unix-domain listener. */
 final readonly class ListenConfiguration implements Default {
   #[AlwaysInline]
-  public function __construct(public PositiveInt $backlog = 512) {}
+  public function __construct(public NonZero<uint> $backlog = 512u) {}
 
   #[AlwaysInline]
   #[MustUse]
@@ -18,7 +18,7 @@ final readonly class ListenConfiguration implements Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function withBacklog(PositiveInt $backlog): ListenConfiguration {
+  public function withBacklog(NonZero<uint> $backlog): ListenConfiguration {
     return clone!($this, backlog: $backlog);
   }
 }

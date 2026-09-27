@@ -11,7 +11,7 @@ use Whim\Marker\TraceBoundary;
 use Whim\Network\ClosedException;
 use Whim\Network\InternetEndpoint;
 use Whim\OS\FileDescriptor;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\UDP\Datagram;
 use Whim\UDP\ExplicitCongestion;
 use Whim\UDP\SendMetadata;
@@ -49,7 +49,7 @@ abstract class DatagramSocketImpl implements
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function tryReceive(PositiveInt $maxBytes): null|Datagram {
+  public function tryReceive(NonZero<uint> $maxBytes): null|Datagram {
     try {
       $message = Whim\_Private\receive_message(
         $this->getFileDescriptor(),
@@ -68,7 +68,7 @@ abstract class DatagramSocketImpl implements
       $message[0],
       Whim\Network\_Private\internet_endpoint($message[1]),
       Whim\Network\_Private\internet_endpoint($message[2]),
-      ExplicitCongestion::from($message[3]),
+      ExplicitCongestion::from($message[3] as int),
       $message[4],
       $message[5],
     );
@@ -78,7 +78,7 @@ abstract class DatagramSocketImpl implements
   #[TrackCaller]
   #[TraceBoundary]
   public function receive(
-    PositiveInt $maxBytes,
+    NonZero<uint> $maxBytes,
     null|CancellationToken $cancellation = null,
   ): Datagram {
     while (true) {
@@ -102,7 +102,7 @@ abstract class DatagramSocketImpl implements
     InternetEndpoint $peer,
     null|SendMetadata $metadata,
     null|CancellationToken $cancellation,
-  ): int {
+  ): uint {
     if (
       $peer->address->family != $this->localEndpoint->address->family
       || (
@@ -133,7 +133,7 @@ abstract class DatagramSocketImpl implements
           $peer->port,
           $metadata->sourceAddress->toString(),
           $metadata->interfaceIndex,
-          $metadata->explicitCongestion->value,
+          $metadata->explicitCongestion->value as uint,
         );
       } catch (Whim\_Private\SystemError $error) {
         if ($error->errno() != Whim\_Private\ERRNO_WOULD_BLOCK) {

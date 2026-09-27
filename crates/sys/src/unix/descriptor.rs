@@ -193,7 +193,10 @@ impl Descriptor {
     }
 
     pub fn read(&self, maximum: usize) -> Result<Option<Vec<u8>>> {
-        let mut bytes = Vec::<u8>::with_capacity(maximum);
+        let mut bytes = Vec::<u8>::new();
+        bytes
+            .try_reserve_exact(maximum)
+            .map_err(|_| Error::new("read", io::ErrorKind::OutOfMemory))?;
         let count = if let Resource::Standard(stream) = &self.inner {
             let file = stream.file();
             // SAFETY: bytes has maximum writable spare bytes and file is a live C stream.

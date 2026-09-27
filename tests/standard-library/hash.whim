@@ -9,7 +9,7 @@ use Whim\Unwind\RuntimeException;
 function hex(string $bytes): string {
   $rendered = '';
   foreach (Str\to_bytes($bytes) as $byte) {
-    $rendered .= Str\pad_left(Math\to_base($byte, 16), 2, '0');
+    $rendered .= Str\pad_left(Math\to_base($byte, 16), 2u, '0');
   }
 
   return $rendered;
@@ -238,8 +238,8 @@ assert!(
   ),
 );
 
-$long = Hash\hmac(Algorithm::Sha2_256, Str\pad_left('', 200, 'k'), 'body');
-assert!(length!($long) == 32);
+$long = Hash\hmac(Algorithm::Sha2_256, Str\pad_left('', 200u, 'k'), 'body');
+assert!(length!($long) == 32u);
 
 $checksum = null;
 $assertion_callable_38 = fn(): string => (

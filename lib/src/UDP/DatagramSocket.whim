@@ -6,7 +6,7 @@ use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Network\InternetEndpoint;
 use Whim\Network\Socket as NetworkSocket;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 
 /** Defines common UDP receive behavior and descriptor access. */
 interface DatagramSocket extends
@@ -15,13 +15,13 @@ interface DatagramSocket extends
   /** Attempts one non-blocking receive. */
   #[MustUse]
   #[TrackCaller]
-  public function tryReceive(PositiveInt $maxBytes): null|Datagram;
+  public function tryReceive(NonZero<uint> $maxBytes): null|Datagram;
 
   /** Waits for and receives one datagram. */
   #[MustUse]
   #[TrackCaller]
   public function receive(
-    PositiveInt $maxBytes,
+    NonZero<uint> $maxBytes,
     null|CancellationToken $cancellation = null,
   ): Datagram;
 }

@@ -4,7 +4,6 @@ use Whim\Async\CancellationToken;
 use Whim\HTTP\Session\Data;
 use Whim\Marker\MustUse;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Time\Duration;
 
 /** Stores versioned server-side sessions. */
@@ -31,7 +30,7 @@ interface Store {
    */
   public function replace(
     NonEmptyString $identifier,
-    NonNegativeInt $revision,
+    uint $revision,
     Data $data,
     Duration $ttl,
     null|CancellationToken $cancellation = null,

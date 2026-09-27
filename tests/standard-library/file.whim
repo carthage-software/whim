@@ -35,13 +35,22 @@ assert!($invalidTemporaryDirectoryPrefix is InvalidArgumentException);
 
 File\write($file, 'abcdef');
 assert!(File\read($file) == 'abcdef');
+$metadata = Filesystem\metadata($file);
+assert!($metadata->size == 6u);
+assert!($metadata->hardLinkCount is uint);
+assert!($metadata->blockSize is uint);
+assert!($metadata->blockCount is uint);
+assert!($metadata->device is uint);
+assert!($metadata->inode is uint);
+assert!(Filesystem\total_space($directory) is uint);
+assert!(Filesystem\available_space($directory) is uint);
 File\write($file, 'XY');
 assert!(File\read($file) == 'XYcdef');
 
 File\write($file, '++', WriteMode::Append);
 assert!(File\read($file) == 'XYcdef++');
-assert!(File\read($file, 2, 4) == 'cdef');
-assert!(File\read($file, 6) == '++');
+assert!(File\read($file, 2u, 4u) == 'cdef');
+assert!(File\read($file, 6u) == '++');
 
 File\write($file, "fresh\x00bytes", WriteMode::Truncate);
 assert!(File\read($file) == "fresh\x00bytes");
@@ -120,7 +129,7 @@ try {
 }
 
 assert!($assertion_error_18 is TypeError);
-$assertion_value_19 = fn(): string => File\read($file, 0, 0);
+$assertion_value_19 = fn(): string => File\read($file, 0u, 0u);
 $assertion_error_19 = null;
 try {
   $assertion_value_19();
@@ -148,7 +157,7 @@ Filesystem\delete_directory($directory, true);
 if (operating_system!() == 'windows') {
   $unsupported = false;
   try {
-    discard!(Filesystem\exchange_creation_mask(0o077));
+    discard!(Filesystem\exchange_creation_mask(0o077u));
   } catch (UnsupportedPlatformException $error) {
     $unsupported = true;
   }
@@ -158,18 +167,32 @@ if (operating_system!() == 'windows') {
 }
 
 $maskDirectory = Filesystem\create_temporary_directory(null, 'whim-mask-');
-$originalMask = Filesystem\exchange_creation_mask(0o077);
+$originalMask = Filesystem\exchange_creation_mask(0o077u);
 try {
-  assert!(Filesystem\exchange_creation_mask(0o027) == 0o077);
-  assert!(Filesystem\exchange_creation_mask(0o077) == 0o027);
+  assert!(Filesystem\exchange_creation_mask(0o027u) == 0o077u);
+  assert!(Filesystem\exchange_creation_mask(0o077u) == 0o027u);
 
   $maskedFile = $maskDirectory . '/masked';
-  Filesystem\create_file($maskedFile, 0o666);
-  assert!(Filesystem\metadata($maskedFile)->permissions == 0o600);
+  Filesystem\create_file($maskedFile, 0o666u);
+  assert!(Filesystem\metadata($maskedFile)->permissions == 0o600u);
+  assert!(Filesystem\metadata($maskedFile)->permissions is uint);
+  Filesystem\set_permissions($maskedFile, 0o640u);
+  assert!(Filesystem\metadata($maskedFile)->permissions == 0o640u);
+
+  Filesystem\create_directory(
+    $maskDirectory . '/nested/directory',
+    0o700u,
+    true,
+  );
+
+  assert!(
+    Filesystem\metadata($maskDirectory . '/nested/directory')->permissions
+    == 0o700u,
+  );
 
   $maskError = null;
   try {
-    discard!(Filesystem\exchange_creation_mask(0o1000));
+    discard!(Filesystem\exchange_creation_mask(0o1000u));
   } catch (TypeError $error) {
     $maskError = $error;
   }

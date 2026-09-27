@@ -59,7 +59,7 @@ final class FixedLengthReadHandle implements ReadHandle {
       );
     }
 
-    $this->consumed += length!($data);
+    $this->consumed += length!($data) as int;
     return $data;
   }
 }

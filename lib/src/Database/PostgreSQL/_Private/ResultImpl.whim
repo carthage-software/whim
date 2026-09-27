@@ -9,7 +9,6 @@ use Whim\Database\_Private\BatchResult;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\_Private\PostgreSQLResult;
 
 /** Implements a streaming PostgreSQL result. */
@@ -51,7 +50,7 @@ final class ResultImpl implements Result, BatchResult {
 
   /** Returns the affected row count. */
   #[MustUse]
-  public function getAffectedRows(): null|NonNegativeInt {
+  public function getAffectedRows(): null|uint {
     return $this->result->affectedRows();
   }
 

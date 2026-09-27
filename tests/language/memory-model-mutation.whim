@@ -130,4 +130,4 @@ $mapping['a'] = 10;
 assert!($mapping['a'] == 10);
 assert!($mapping['b'] == 2);
 remove!($mapping, 'a');
-assert!(length!($mapping) == 1);
+assert!(length!($mapping) == 1u);

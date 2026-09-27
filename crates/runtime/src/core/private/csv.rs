@@ -10,7 +10,6 @@ use csv_core::Terminator;
 use csv_core::WriteResult;
 use csv_core::WriterBuilder;
 use whim_base::unwrap_option_invariant;
-use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 use whim_value::Value;
@@ -246,7 +245,7 @@ impl CsvReader {
         Ok(object)
     }
 
-    #[whim_method("read(string $input): (int, null|vec<string>, int)")]
+    #[whim_method("read(string $input): (uint, null|vec<string>, uint)")]
     fn read<'call>(context: &Context<'call, '_, '_>, arguments: Arguments<'call>) -> Value {
         let input = arguments.bytes(0);
         let receiver = context.receiver();
@@ -273,14 +272,11 @@ impl CsvReader {
                 field
             }))
         });
-        // SAFETY: the surrounding invariant proves this result is successful.
-        let consumed = unsafe {
-            unwrap_result_invariant(
-                i64::try_from(consumed),
-                "a Whim string length fits in an integer",
-            )
-        };
-        context.tuple([Value::int(consumed), record, Value::int(error)])
+        context.tuple([
+            Value::uint(consumed as u64),
+            record,
+            Value::uint(error.cast_unsigned()),
+        ])
     }
 }
 

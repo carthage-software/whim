@@ -6,7 +6,7 @@ use Whim\HTTP\Message\FieldMap;
 
 /** Tracks the inbound side of one HTTP/2 request stream. */
 final class H2StreamState {
-  public int $bodyBytes = 0;
+  public uint $bodyBytes = 0u;
 
   public function __construct(
     public null|RequestBody $body,

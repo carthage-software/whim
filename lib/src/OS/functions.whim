@@ -6,7 +6,6 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Time\Duration;
 use Whim\_Private\OSOperation;
 
@@ -41,7 +40,7 @@ function uptime(): Duration {
     _Private\failure($error, 'read the operating-system uptime');
   }
 
-  return Duration::fromMilliseconds($milliseconds);
+  return Duration::fromMilliseconds($milliseconds as int);
 }
 
 /** Returns system load averages over one, five, and fifteen minutes. */
@@ -77,7 +76,7 @@ function memory(): MemoryInformation {
 #[NeverInline]
 #[TrackCaller]
 function find_user(
-  NonEmptyString|NonNegativeInt $identity,
+  NonEmptyString|uint $identity,
   null|CancellationToken $cancellation = null,
 ): null|User {
   try {
@@ -100,7 +99,7 @@ function find_user(
 #[NeverInline]
 #[TrackCaller]
 function find_group(
-  NonEmptyString|NonNegativeInt $identity,
+  NonEmptyString|uint $identity,
   null|CancellationToken $cancellation = null,
 ): null|Group {
   try {

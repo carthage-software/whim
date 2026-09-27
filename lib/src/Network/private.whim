@@ -28,7 +28,7 @@ function failure(Whim\_Private\SystemError $error): never {
     . $error->call()
     . ' system call failed with errno '
     . $error->errno(),
-    $error->errno(),
+    $error->getCode(),
   );
 }
 
@@ -87,7 +87,7 @@ function socket_family(Family $family): int {
 #[NeverInline]
 #[TrackCaller]
 #[TraceBoundary]
-function internet_endpoint((string, int) $address): InternetEndpoint {
+function internet_endpoint((string, uint) $address): InternetEndpoint {
   return new InternetEndpoint(Address::from($address[0]), $address[1] as Port);
 }
 
@@ -95,7 +95,7 @@ function internet_endpoint((string, int) $address): InternetEndpoint {
 #[NeverInline]
 #[TrackCaller]
 #[TraceBoundary]
-function unix_endpoint((string, int) $address): UnixEndpoint {
+function unix_endpoint((string, uint) $address): UnixEndpoint {
   $path = null;
   if ('' != $address[0]) {
     $path = $address[0] as NonEmptyString;
@@ -128,11 +128,11 @@ function resolve(
       $cancellation?->unregister($registration);
     }
 
-    $resolved = $operation->take() as vec<(int, (string&!''))>;
+    $resolved = $operation->take() as vec<(uint, (string&!''))>;
   } catch (Whim\_Private\SystemError $error) {
     throw new ResolutionException(
       'failed to resolve host `' . $host . '`',
-      $error->errno(),
+      $error->getCode(),
       $error,
     );
   }

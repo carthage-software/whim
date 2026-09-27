@@ -61,7 +61,7 @@ function failure(SystemError $error, string $action): never {
 /** Builds a public user from a trusted operating-system record. */
 #[AlwaysInline]
 function user_from_record(
-  ((string&!''), (0..), (0..), string, string) $record,
+  ((string&!''), uint, uint, string, string) $record,
 ): User {
   ($name, $id, $primaryGroupId, $homeDirectory, $shell) = $record;
   return new User(
@@ -76,7 +76,7 @@ function user_from_record(
 /** Builds a public group from a trusted operating-system record. */
 #[AlwaysInline]
 function group_from_record(
-  ((string&!''), (0..), vec<(string&!'')>) $record,
+  ((string&!''), uint, vec<(string&!'')>) $record,
 ): Group {
   ($name, $id, $memberNames) = $record;
   return new Group($id, $name, $memberNames);

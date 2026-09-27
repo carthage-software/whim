@@ -4,7 +4,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
 use Whim\Async\CancellationToken;
 use Whim\Channel\Sender;
-use Whim\Refine\NonNegativeInt;
 
 /** Represents a sender. */
 final readonly class SenderImpl<in T> implements Sender<T> {
@@ -42,7 +41,7 @@ final readonly class SenderImpl<in T> implements Sender<T> {
   /** Returns the channel capacity when it is bounded. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function getCapacity(): null|NonNegativeInt {
+  public function getCapacity(): null|uint {
     return $this->state->getCapacity();
   }
 
@@ -63,7 +62,7 @@ final readonly class SenderImpl<in T> implements Sender<T> {
   /** Returns the number of buffered values. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function count(): NonNegativeInt {
+  public function count(): uint {
     return $this->state->count();
   }
 

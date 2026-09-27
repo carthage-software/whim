@@ -14,7 +14,7 @@ function get_kind(string $name): SymbolKind {
     throw new UndefinedSymbolError('the symbol `' . $name . '` is not defined');
   }
 
-  return SymbolKind::from($kind);
+  return SymbolKind::from($kind as int);
 }
 
 /** Returns whether a symbol exists, autoloading unless asked not to. */

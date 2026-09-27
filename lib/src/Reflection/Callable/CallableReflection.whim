@@ -36,7 +36,7 @@ interface CallableReflection extends
 
   /** Returns the number of parameters a caller must provide. */
   #[MustUse]
-  public function getRequiredParameterCount(): 0..;
+  public function getRequiredParameterCount(): uint;
 
   /** Returns the declared return type, or null when it was omitted. */
   #[MustUse]

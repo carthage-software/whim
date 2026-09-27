@@ -23,7 +23,7 @@ final readonly class Group implements ToString {
   public static function parse(string $input): null|Group {
     $input = Str\trim($input);
     $colon = Str\search($input, ':');
-    if (null == $colon || 0 == $colon || !Str\ends_with($input, ';')) {
+    if (null == $colon || 0u == $colon || !Str\ends_with($input, ';')) {
       return null;
     }
 
@@ -31,7 +31,7 @@ final readonly class Group implements ToString {
       _Private\parse_display(Str\slice($input, 0, $colon)) ?? return null;
 
     $body = Str\trim(
-      Str\slice($input, $colon + 1, length!($input) - $colon - 2),
+      Str\slice($input, ($colon as int) + 1, length!($input) - $colon - 2u),
     );
 
     $mailboxes = vec[];

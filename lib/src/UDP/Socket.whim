@@ -15,7 +15,7 @@ interface Socket extends DatagramSocket {
     InternetEndpoint $peer,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,
-  ): int;
+  ): uint;
 
   /** Connects this socket to one peer and consumes this handle. */
   #[MustUse]

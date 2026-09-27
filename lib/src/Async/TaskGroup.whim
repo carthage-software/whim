@@ -81,7 +81,7 @@ final class TaskGroup {
 
     $errors = $this->errors;
     $this->errors = vec[];
-    if (length!($errors) == 1) {
+    if (length!($errors) == 1u) {
       throw $errors[0];
     }
 

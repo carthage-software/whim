@@ -140,7 +140,7 @@ final class PostgreSQLResult {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function affectedRows(): null|(0..) {}
+  public function affectedRows(): null|uint {}
 
   /** Returns a ready row, null at the result end, or false when blocked. */
   #[MustUse]

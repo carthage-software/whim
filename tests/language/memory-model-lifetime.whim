@@ -105,7 +105,7 @@ assert!(
 assert!($leak_previous);
 
 assert!($trace->events[9] == 'open escaped');
-assert!(length!($trace->events) == 10);
+assert!(length!($trace->events) == 10u);
 drop!($escaped);
 assert!($trace->events[10] == 'close escaped');
 

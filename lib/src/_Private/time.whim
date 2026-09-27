@@ -8,16 +8,16 @@ use Whim\Marker\TraceBoundary;
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function get_system_time(): (int, int) {}
+function get_system_time(): (int, uint) {}
 
 /** Reads monotonic time as seconds and nanoseconds. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function get_high_resolution_time(): (int, int) {}
+function get_high_resolution_time(): (uint, uint) {}
 
 /** Reads monotonic time as nanoseconds since the process clock origin. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function get_high_resolution_nanoseconds(): int {}
+function get_high_resolution_nanoseconds(): uint {}

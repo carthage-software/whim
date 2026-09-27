@@ -14,7 +14,7 @@ function prints(
     ->withVariables($variables)
     ->run();
 
-  assert!(length!($run->standardError) == 0);
+  assert!(length!($run->standardError) == 0u);
   assert!($run->isSuccess());
   assert!($run->standardOutput == $output);
 }

@@ -73,7 +73,7 @@ final class Session implements ToIterator<NonEmptyString, Value> {
   /** Removes every stored value. */
   #[AlwaysInline]
   public function clear(): void {
-    if (length!($this->data) == 0) {
+    if (length!($this->data) == 0u) {
       return;
     }
 

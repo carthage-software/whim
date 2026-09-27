@@ -15,14 +15,14 @@ interface WriteHandle extends Handle {
 
   /** Attempts one non-blocking write. */
   #[TrackCaller]
-  public function tryWrite(string $bytes): int;
+  public function tryWrite(string $bytes): uint;
 
   /** Writes bytes, waiting when necessary. */
   #[TrackCaller]
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int;
+  ): uint;
 
   /**
    * Writes every requested byte or throws when the handle stalls.
@@ -42,7 +42,7 @@ interface WriteHandle extends Handle {
         throw new Exception('the write handle stalled with bytes remaining');
       }
 
-      $bytes = Str\slice($bytes, $written);
+      $bytes = Str\slice($bytes, $written as int);
     }
   }
 }

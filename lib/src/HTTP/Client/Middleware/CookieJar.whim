@@ -37,7 +37,7 @@ final class CookieJar implements ClientMiddleware {
 
   /** Returns the number of unexpired cookies currently stored. */
   #[MustUse]
-  public function count(): int {
+  public function count(): uint {
     $this->purge(SystemTime::now()->seconds);
     return length!($this->cookies);
   }

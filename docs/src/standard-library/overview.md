@@ -29,9 +29,9 @@ Refined types state checked bounds in the signature:
 
 ```whim
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 
-function repeat_name(NonEmptyString $name, PositiveInt $count): vec<string> {
+function repeat_name(NonEmptyString $name, NonZero<uint> $count): vec<string> {
   return Whim\Vec\fill($count, $name);
 }
 ```
@@ -64,7 +64,7 @@ return a changed clone:
 ```whim,norun
 $configuration = Whim\TCP\ListenConfiguration::default()
   ->withReuseAddress(true)
-  ->withBacklog(256);
+  ->withBacklog(256u);
 ```
 
 Mutable resources, pools, buffers, handles, and task controls use stateful

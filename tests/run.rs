@@ -136,11 +136,11 @@ fn standard_pipe_handles_preserve_binary_data_under_backpressure() {
         "copy-standard-pipes.whim",
         r"
 $writer = Whim\IO\write_handle();
-$block = Whim\Str\repeat('x', 4095);
-$written = 0;
+$block = Whim\Str\repeat('x', 4095u);
+$written = 0u;
 while (true) {
     $count = $writer->tryWrite($block);
-    if ($count == 0) {
+    if ($count == 0u) {
         break;
     }
     $written += $count;

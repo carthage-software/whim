@@ -104,7 +104,7 @@ pub fn metadata(file: &File) -> Result<Metadata> {
         let ticks = ticks - 116_444_736_000_000_000;
         Timestamp {
             seconds: ticks.div_euclid(10_000_000),
-            nanoseconds: ticks.rem_euclid(10_000_000) * 100,
+            nanoseconds: ticks.rem_euclid(10_000_000).cast_unsigned() * 100,
         }
     };
 
@@ -121,16 +121,14 @@ pub fn metadata(file: &File) -> Result<Metadata> {
             } else {
                 0
             },
-        links: i64::from(information.nNumberOfLinks),
+        links: u64::from(information.nNumberOfLinks),
         user: -1,
         group: -1,
-        size: standard.EndOfFile,
+        size: standard.EndOfFile.cast_unsigned(),
         block_size: 0,
-        blocks: standard.AllocationSize / 512,
-        device: i64::from(information.dwVolumeSerialNumber),
-        inode: ((u64::from(information.nFileIndexHigh) << 32)
-            | u64::from(information.nFileIndexLow))
-        .cast_signed(),
+        blocks: standard.AllocationSize.cast_unsigned() / 512,
+        device: u64::from(information.dwVolumeSerialNumber),
+        inode: (u64::from(information.nFileIndexHigh) << 32) | u64::from(information.nFileIndexLow),
         accessed: time(basic.LastAccessTime),
         modified: time(basic.LastWriteTime),
         changed: time(basic.ChangeTime),

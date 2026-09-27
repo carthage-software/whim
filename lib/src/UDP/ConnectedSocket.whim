@@ -19,5 +19,5 @@ interface ConnectedSocket extends DatagramSocket {
     string[..=65_507] $bytes,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,
-  ): int;
+  ): uint;
 }

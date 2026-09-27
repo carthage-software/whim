@@ -50,4 +50,4 @@ function run_symbol_autoload(int $kind, string $name): void {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function get_symbol_kind(string $name): null|int {}
+function get_symbol_kind(string $name): null|uint {}

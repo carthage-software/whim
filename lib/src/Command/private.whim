@@ -29,7 +29,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
 use Whim\OS\FileDescriptor;
 use Whim\Process\Signal;
-use Whim\Refine\NonNegativeInt;
 use Whim\Time\Duration;
 
 /** Turns a stream choice into the engine's disposition and descriptor. */
@@ -135,17 +134,17 @@ function start(Definition $command): Child {
 #[MustUse]
 #[TrackCaller]
 #[TraceBoundary]
-function exit_status(int $status): ExitStatus {
+function exit_status(uint $status): ExitStatus {
   if (operating_system!() == 'windows') {
     return new Exited($status >> 8);
   }
 
-  $signal = $status & 127;
-  if (0 == $signal) {
-    return new Exited(($status >> 8) & 255);
+  $signal = $status & 127u;
+  if (0u == $signal) {
+    return new Exited(($status >> 8) & 255u);
   }
 
-  return new Signalled(signal_of($signal), ($status & 128) != 0);
+  return new Signalled(signal_of($signal as int), ($status & 128u) != 0u);
 }
 
 /**
@@ -189,7 +188,7 @@ final class ChildImpl implements Child {
   #[TrackCaller]
   #[TraceBoundary]
   public function __construct(
-    private readonly NonNegativeInt $id,
+    private readonly uint $id,
     private readonly null|WriteHandle&FileDescriptorHandle $input,
     private readonly null|ReadHandle&FileDescriptorHandle $output,
     private readonly null|ReadHandle&FileDescriptorHandle $error,
@@ -200,7 +199,7 @@ final class ChildImpl implements Child {
 
   #[AlwaysInline]
   #[MustUse]
-  public function getId(): NonNegativeInt {
+  public function getId(): uint {
     return $this->id;
   }
 
@@ -264,8 +263,8 @@ final class ChildImpl implements Child {
     }
 
     $target = match ($this->ownsProcessGroup) {
-      true => -$this->id,
-      false => $this->id,
+      true => -($this->id as int),
+      false => $this->id as int,
     };
 
     Whim\_Private\send_signal($target, number_of($signal));
@@ -297,7 +296,7 @@ final class ChildImpl implements Child {
   #[TraceBoundary]
   private function createWatcher(): Async\Future<ExitStatus> {
     $deferred = new Async\Deferred::<ExitStatus>();
-    $task = Whim\_Private\watch_process($this->id, fn(int $raw): void {
+    $task = Whim\_Private\watch_process($this->id, fn(uint $raw): void {
       $status = exit_status($raw);
       $this->status = $status;
       $deferred->complete($status);

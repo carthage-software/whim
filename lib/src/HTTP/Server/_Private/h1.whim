@@ -50,13 +50,13 @@ function h1_cancellation(
 #[TraceBoundary]
 function h1_read_request_head(
   BufferedReadHandle $reader,
-  int $maximumBytes,
+  uint $maximumBytes,
   CancellationToken $cancellation,
 ): null|H1RequestHead {
   try {
     $block = $reader->readUntilBounded(
       "\r\n\r\n",
-      $maximumBytes,
+      $maximumBytes as int,
       $cancellation,
     );
   } catch (LimitExceededException $error) {
@@ -72,12 +72,12 @@ function h1_read_request_head(
   }
 
   $parsed = http1_parse_request_head($block);
-  if ($parsed is int) {
+  if ($parsed is uint) {
     throw new HTTPException(
       $parsed as ErrorStatusCode,
       match ($parsed) {
-        417 => 'the request expectation is unsupported',
-        505 => 'the HTTP version is unsupported',
+        417u => 'the request expectation is unsupported',
+        505u => 'the HTTP version is unsupported',
         _ => 'the request head is invalid',
       },
     );
@@ -104,8 +104,8 @@ function h1_read_request_head(
     $method as Method,
     $target as RequestTarget,
     match ($version) {
-      10 => ProtocolVersion::V10,
-      11 => ProtocolVersion::V11,
+      10u => ProtocolVersion::V10,
+      11u => ProtocolVersion::V11,
       _ => ProtocolVersion::V11,
     },
     $headers,
@@ -123,7 +123,7 @@ function h1_read_request_head(
 #[AlwaysInline]
 function h1_field_tokens(string $field): vec<string> {
   $tokens = vec[];
-  foreach (string_split($field, ',', 0) as $token) {
+  foreach (string_split($field, ',', 0u) as $token) {
     $token = Str\lowercase(string_trim($token, " \t", 1));
 
     if ('' != $token) {
@@ -152,19 +152,19 @@ function h1_tokens(FieldMap $headers, string $name): vec<string> {
 #[NeverInline]
 #[TrackCaller]
 #[TraceBoundary]
-function h1_content_length(FieldMap $headers): null|int {
+function h1_content_length(FieldMap $headers): null|uint {
   $fields = $headers->getAll('content-length');
-  if (length!($fields) == 0) {
+  if (length!($fields) == 0u) {
     return null;
   }
 
-  if (length!($fields) == 1 && !Str\contains($fields[0], ',')) {
+  if (length!($fields) == 1u && !Str\contains($fields[0], ',')) {
     return h1_decimal($fields[0]);
   }
 
   $values = vec[];
   foreach ($fields as $field) {
-    foreach (string_split($field, ',', 0) as $value) {
+    foreach (string_split($field, ',', 0u) as $value) {
       $values[] = string_trim($value, " \t", 1);
     }
   }
@@ -186,7 +186,7 @@ function h1_content_length(FieldMap $headers): null|int {
 #[NeverInline]
 #[TrackCaller]
 #[TraceBoundary]
-function h1_decimal(string $value): int {
+function h1_decimal(string $value): uint {
   if ('' == $value) {
     throw new HTTPException(400, 'the request content length is empty');
   }
@@ -201,7 +201,7 @@ function h1_decimal(string $value): int {
   }
 
   try {
-    return Math\from_base($value, 10);
+    return Math\from_base($value, 10) as uint;
   } catch (OverflowException $error) {
     throw new HTTPException(
       400,
@@ -255,7 +255,7 @@ function h1_h2c_settings(
   }
 
   $values = $head->headers->getAll('http2-settings');
-  if (length!($values) != 1) {
+  if (length!($values) != 1u) {
     throw new HTTPException(
       400,
       'an h2c upgrade requires one HTTP2-Settings field',
@@ -272,14 +272,14 @@ function h1_h2c_settings(
     );
   }
 
-  if ((length!($payload) % 6) != 0) {
+  if ((length!($payload) % 6u) != 0u) {
     throw new HTTPException(400, 'the HTTP2-Settings payload is malformed');
   }
 
   $settings = dict[];
   $offset = 0;
   while ($offset < length!($payload)) {
-    $id = Binary\decode_u16(Str\slice($payload, $offset, 2));
+    $id = Binary\decode_u16(Str\slice($payload, $offset, 2u)) as int;
     if (0 == $id) {
       throw new HTTPException(
         400,
@@ -287,7 +287,7 @@ function h1_h2c_settings(
       );
     }
 
-    $value = Binary\decode_u32(Str\slice($payload, $offset + 2, 4));
+    $value = Binary\decode_u32(Str\slice($payload, $offset + 2, 4u)) as int;
     $settings[$id as H2\SettingId] = $value as H2\SettingValue;
     $offset += 6;
   }

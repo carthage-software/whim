@@ -6,13 +6,13 @@ use Whim\Str;
 /** Extracts the quoted entries of a one-line TOML array setting. */
 function toml_array(string $manifest, string $setting): vec<string> {
   $position = Str\search($manifest, $setting . ' = [');
-  assert!($position is int);
+  assert!($position is uint);
 
-  $open = $position + length!($setting) + 4;
+  $open = (($position + length!($setting)) as int) + 4;
   $close = Str\search($manifest, ']', $open);
-  assert!($close is int);
+  assert!($close is uint);
 
-  $body = Str\slice($manifest, $open, $close - $open);
+  $body = Str\slice($manifest, $open, $close - ($open as uint));
   $entries = vec[];
   foreach (Str\split($body, ',') as $entry) {
     $entry = Str\trim($entry, " \t\n\"");
@@ -27,20 +27,20 @@ function toml_array(string $manifest, string $setting): vec<string> {
 /** Extracts the package name a member manifest declares. */
 function package_name(string $manifest): string {
   $position = Str\search($manifest, 'name = "');
-  assert!($position is int);
+  assert!($position is uint);
 
-  $start = $position + 8;
+  $start = ($position as int) + 8;
   $end = Str\search($manifest, '"', $start);
-  assert!($end is int);
+  assert!($end is uint);
 
-  return Str\slice($manifest, $start, $end - $start);
+  return Str\slice($manifest, $start, $end - ($start as uint));
 }
 
 $script = Env\current_script();
 assert!($script is string);
 $script = Str\replace(Filesystem\canonicalize($script), '\\', '/');
 
-$root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as int);
+$root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as uint);
 
 $manifest = File\read($root . '/Cargo.toml');
 $members = toml_array($manifest, 'default-members');

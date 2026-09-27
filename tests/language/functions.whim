@@ -222,7 +222,7 @@ $previous = new RuntimeException('inner');
 $error = new RuntimeException('outer', previous: $previous);
 assert!($error->getCode() == 0);
 assert!($error->getPrevious() == $previous);
-assert!(File\read($sample, length: 5) == 'abcde');
+assert!(File\read($sample, length: 5u) == 'abcde');
 Filesystem\delete_directory($work, true);
 
 $memchr_error = null;
@@ -411,10 +411,10 @@ assert!(Str\ends_with('abc', ''));
 assert!(Str\ends_with('', ''));
 assert!(Str\starts_with_ci('abc', ''));
 assert!(Str\ends_with_ci('abc', ''));
-assert!(Str\search('abc', '') == 0);
-assert!(Str\search_ci('abc', '') == 0);
-assert!(Str\search_last('abc', '') == 3);
-assert!(Str\search_last_ci('abc', '') == 3);
+assert!(Str\search('abc', '') == 0u);
+assert!(Str\search_ci('abc', '') == 0u);
+assert!(Str\search_last('abc', '') == 3u);
+assert!(Str\search_last_ci('abc', '') == 3u);
 
 $assertion_value_64 = fn(): void {
   $_ = Vec\range(1, 1, 0);

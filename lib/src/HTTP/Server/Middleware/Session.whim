@@ -144,7 +144,7 @@ final readonly class Session implements Middleware {
   #[MustUse]
   #[TrackCaller]
   private function generateIdentifier(): string[44] {
-    return encode(bytes(32));
+    return encode(bytes(32u));
   }
 
   /** Creates the active session cookie. */

@@ -25,7 +25,6 @@ use Whim\IO\WriteHandle;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\Throwable;
 
 /** Multiplexes HTTP/2 exchanges over one byte stream. */
@@ -40,7 +39,7 @@ final class H2Connection implements MultiplexedConnection {
   private Channel\Sender<null> $capacitySender;
   private Channel\Receiver<null> $capacityReceiver;
   private bool $pushEnabled;
-  private int $maximumPushes;
+  private uint $maximumPushes;
 
   public function __construct(
     private ReadHandle&WriteHandle&CloseHandle $stream,
@@ -59,7 +58,7 @@ final class H2Connection implements MultiplexedConnection {
 
     $this->stop = new SignalCancellationToken();
     $this->readerCancellation = new SignalCancellationToken();
-    ($this->writeSender, $this->writeReceiver) = Channel\bounded::<null>(1);
+    ($this->writeSender, $this->writeReceiver) = Channel\bounded::<null>(1u);
     ($this->capacitySender, $this->capacityReceiver) = Channel\unbounded::<
       null,
     >();
@@ -245,7 +244,7 @@ final class H2Connection implements MultiplexedConnection {
     H2\StreamId $streamId,
     H2Exchange $exchange,
     CancellationToken $cancellation,
-    NonNegativeInt $maximumInformationalResponses,
+    uint $maximumInformationalResponses,
   ): (Transaction, bool) {
     $pushes = $exchange->pushes();
     $pushed = match ($pushes) {
@@ -256,7 +255,7 @@ final class H2Connection implements MultiplexedConnection {
     $informational = vec[];
     $events = $exchange->takePending();
     while (true) {
-      if (length!($events) == 0) {
+      if (length!($events) == 0u) {
         $batch = $exchange->receive($cancellation);
         if (null != $batch->error) {
           throw $batch->error;
@@ -446,7 +445,7 @@ final class H2Connection implements MultiplexedConnection {
     } finally {
       $this->readerRunning = false;
       if (
-        length!($this->exchanges) != 0
+        length!($this->exchanges) != 0u
         && !$this->stop->isCancellationRequested()
       ) {
         $this->startReader();
@@ -636,7 +635,7 @@ final class H2Connection implements MultiplexedConnection {
     $exchange = remove!($this->exchanges, $streamId);
     $exchange->close();
     $this->capacitySender->send(null);
-    if (length!($this->exchanges) == 0 && $this->readerRunning) {
+    if (length!($this->exchanges) == 0u && $this->readerRunning) {
       $this->readerCancellation->cancel();
     }
   }

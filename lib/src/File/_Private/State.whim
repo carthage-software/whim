@@ -10,7 +10,6 @@ use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
 use Whim\OS\FileDescriptor;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\RuntimeException;
 use Whim\_Private\FileOperation;
@@ -47,13 +46,13 @@ final class State {
   /** Returns the descriptor's current file size. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function getSize(): int {
+  public function getSize(): uint {
     $this->ensureOpen();
     try {
       $operation = FileOperation::metadata($this->descriptor);
       await_operation($operation, null);
-      $metadata = $operation->takeMetadata() as vec<int>;
-      return $metadata[4];
+      $metadata = $operation->takeMetadata() as vec<int|uint>;
+      return $metadata[4] as uint;
     } catch (Whim\_Private\SystemError $error) {
       $this->operationFailure($error, 'size');
     }
@@ -67,7 +66,7 @@ final class State {
   #[NeverInline]
   #[TrackCaller]
   #[TraceBoundary]
-  public function seek(int $offset, SeekWhence $whence): int {
+  public function seek(int $offset, SeekWhence $whence): uint {
     $this->ensureOpen();
     if (SeekWhence::Set == $whence && $offset < 0) {
       throw new RuntimeException('cannot seek before the start of the file');
@@ -81,7 +80,7 @@ final class State {
       );
 
       await_operation($operation, null);
-      $position = $operation->takeInt() as int;
+      $position = $operation->takeUint() as uint;
     } catch (Whim\_Private\SystemError $error) {
       $this->operationFailure($error, 'seek');
     }
@@ -144,7 +143,10 @@ final class State {
     }
 
     if (null == $this->readOperation) {
-      $this->readOperation = FileOperation::read($this->descriptor, $maximum);
+      $this->readOperation = FileOperation::read(
+        $this->descriptor,
+        $maximum as uint,
+      );
     }
 
     try {
@@ -169,10 +171,10 @@ final class State {
   /** Starts or collects one worker-backed write. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->ensureOpen();
     if ('' == $bytes) {
-      return 0;
+      return 0u;
     }
 
     if (null == $this->writeOperation) {
@@ -180,13 +182,13 @@ final class State {
     }
 
     try {
-      $written = $this->writeOperation->takeInt();
+      $written = $this->writeOperation->takeUint();
     } catch (Whim\_Private\SystemError $error) {
       $this->operationFailure($error, 'write to');
     }
 
     if (null == $written) {
-      return 0;
+      return 0u;
     }
 
     $this->writeOperation = null;
@@ -199,15 +201,15 @@ final class State {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     if ('' == $bytes) {
-      return 0;
+      return 0u;
     }
 
     while (true) {
       $written = $this->tryWrite($bytes);
-      if (0 != $written) {
+      if (0u != $written) {
         return $written;
       }
 
@@ -235,7 +237,7 @@ final class State {
   #[TrackCaller]
   #[TraceBoundary]
   public function truncate(
-    NonNegativeInt $length,
+    uint $length,
     null|CancellationToken $cancellation,
   ): void {
     $this->waitUntilWritable($cancellation);
@@ -323,7 +325,7 @@ final class State {
       . $error->call()
       . ' system call failed with errno '
       . $error->errno(),
-      $error->errno(),
+      $error->getCode(),
     );
   }
 }

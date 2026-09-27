@@ -4,7 +4,6 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Str\slice;
 use Whim\Unwind\InvalidArgumentException;
 
@@ -14,8 +13,8 @@ final readonly class MatchResult {
   #[TrackCaller]
   public function __construct(
     public string $subject,
-    public NonNegativeInt $start,
-    public NonNegativeInt $end,
+    public uint $start,
+    public uint $end,
     public dict<int|string, null|string> $captures,
   ) {
     if ($end < $start || $end > length!($subject)) {
@@ -29,13 +28,17 @@ final readonly class MatchResult {
   #[AlwaysInline]
   #[MustUse]
   public function value(): string {
-    return slice($this->subject, $this->start, $this->length());
+    return slice($this->subject, $this->start as int, $this->length());
   }
 
   /** Returns a numbered or named capture, or null when absent or unmatched. */
   #[AlwaysInline]
   #[MustUse]
-  public function capture(NonNegativeInt|NonEmptyString $capture): null|string {
+  public function capture(uint|NonEmptyString $capture): null|string {
+    if ($capture is uint) {
+      $capture = ($capture ?as int) ?? return null;
+    }
+
     if (!contains_key!($this->captures, $capture)) {
       return null;
     }
@@ -46,7 +49,7 @@ final readonly class MatchResult {
   /** Returns the matched byte length. */
   #[AlwaysInline]
   #[MustUse]
-  public function length(): NonNegativeInt {
+  public function length(): uint {
     return $this->end - $this->start;
   }
 }

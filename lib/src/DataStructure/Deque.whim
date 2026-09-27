@@ -6,7 +6,6 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\TrackCaller;
 use Whim\Option\Option;
 use Whim\Refine\Iterable;
-use Whim\Refine\NonNegativeInt;
 use Whim\_Private\RingBuffer;
 
 /** Stores values that can be added or removed at either end. */
@@ -60,7 +59,7 @@ final class Deque<T> implements ToIterator<int, T> {
 
   /** Returns the number of stored values. */
   #[AlwaysInline]
-  public function count(): NonNegativeInt {
+  public function count(): uint {
     return $this->buffer->count();
   }
 

@@ -10,6 +10,24 @@ use Whim\Database\SQLite\Connector;
 use Whim\Filesystem;
 use Whim\Reference\Strong;
 
+$oversizedTimeoutRejected = false;
+try {
+  Connector::inMemory(
+    new Whim\Database\SQLite\Configuration(
+      busyTimeoutMilliseconds: Whim\Math\UINT_MAX,
+    ),
+  )->connect()->close();
+} catch (Whim\_Private\SQLiteError $error) {
+  assert!(
+    $error->getMessage()
+    == 'SQLite busy timeout must not exceed 2147483647 milliseconds',
+  );
+
+  $oversizedTimeoutRejected = true;
+}
+
+assert!($oversizedTimeoutRejected);
+
 $connector = Connector::inMemory();
 $connection = $connector->connect();
 
@@ -22,7 +40,7 @@ $created = $connection->execute(
   . ')',
 );
 
-assert!($created->getAffectedRows() == 0);
+assert!($created->getAffectedRows() == 0u);
 $created->close();
 assert!($created->getColumns() == vec[]);
 
@@ -31,10 +49,10 @@ $insert = $connection->prepare(
 );
 
 $first = $insert->execute(vec['first', true, Blob("\x00\xff")]);
-assert!($first->getAffectedRows() == 1);
+assert!($first->getAffectedRows() == 1u);
 $first->close();
 $second = $insert->execute(vec['second', false, Blob('bytes')]);
-assert!($second->getAffectedRows() == 1);
+assert!($second->getAffectedRows() == 1u);
 $second->close();
 $insert->close();
 
@@ -43,7 +61,7 @@ $selected = $connection->execute(
 );
 
 $columns = $selected->getColumns();
-assert!(length!($columns) == 4);
+assert!(length!($columns) == 4u);
 assert!($columns[0]->name == 'id');
 assert!($columns[1]->typeName == 'TEXT');
 assert!($selected->fetch() == vec[1, 'first', 1, Blob("\x00\xff")]);
@@ -150,8 +168,8 @@ assert!($connection->isClosed());
 $pool = new ConnectionPool(
   Connector::inMemory(),
   new PoolConfiguration(
-    maximumConnections: 1,
-    maximumIdleConnections: 1,
+    maximumConnections: 1u,
+    maximumIdleConnections: 1u,
     validationInterval: null,
   ),
 );
@@ -185,7 +203,7 @@ while ($iteration < 25) {
 }
 
 $pooled->close();
-assert!($pool->getIdleConnections() == 1);
+assert!($pool->getIdleConnections() == 1u);
 $pool->close();
 
 $connections = vec[];

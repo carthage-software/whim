@@ -21,7 +21,7 @@ pub(super) fn bodies() -> Vec<String> {
         "$value = match (operating_system!() == operating_system!()) { true => 'linux', _ => 'macos' }; return match ($value) { 'linux' => 'chosen', _ => 'discarded' };".to_string(),
         format!("return match ((operating_system!(), cpu_architecture!())) {{ ('{}', '{}') => 'chosen', _ => 'discarded' }};", consts::OS, consts::ARCH),
         "return match ((1, 'linux')) { (2, string) => 'discarded', (1..=3, ...string) => 'chosen', _ => 'discarded' };".to_string(),
-        "return match (length!(operating_system!())) { 0 => 'discarded', 1.. => 'chosen', _ => 'discarded' };".to_string(),
+        "return match (length!(operating_system!())) { 0u => 'discarded', 1u.. => 'chosen', _ => 'discarded' };".to_string(),
         "return match (null) { true => 'discarded', false => 'discarded', _ => 'chosen' };".to_string(),
     ];
     for (construct, expected) in [

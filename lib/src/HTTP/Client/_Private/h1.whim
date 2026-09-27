@@ -18,13 +18,13 @@ use Whim\_Private\http1_parse_response_head;
 /** Parses one HTTP/1 response head. */
 function read_h1_response_head(
   BufferedReadHandle $reader,
-  int $maximumBytes,
+  uint $maximumBytes,
   null|CancellationToken $cancellation,
 ): H1ResponseHead {
   try {
     $block = $reader->readUntilBounded(
       "\r\n\r\n",
-      $maximumBytes,
+      $maximumBytes as int,
       $cancellation,
     );
   } catch (LimitExceededException $error) {
@@ -50,8 +50,8 @@ function read_h1_response_head(
 
   $head = new H1ResponseHead(
     match ($version) {
-      10 => ProtocolVersion::V10,
-      11 => ProtocolVersion::V11,
+      10u => ProtocolVersion::V10,
+      11u => ProtocolVersion::V11,
       _ => ProtocolVersion::V11,
     },
     $status as StatusCode,
@@ -91,13 +91,13 @@ function validate_response_framing(H1ResponseHead $head): void {
   }
 
   $length = content_length($head->headers);
-  if (null != $length && 0 != $length) {
+  if (null != $length && 0u != $length) {
     throw new ProtocolException('an HTTP/1 205 response must have no content');
   }
 }
 
 /** Parses one unsigned decimal integer. */
-function decimal(string $value): int {
+function decimal(string $value): uint {
   if ('' == $value) {
     throw new ProtocolException('an HTTP decimal value is empty');
   }
@@ -113,7 +113,7 @@ function decimal(string $value): int {
   }
 
   try {
-    return Math\from_base($value, 10);
+    return Math\from_base($value, 10) as uint;
   } catch (OverflowException $error) {
     throw new ProtocolException(
       'an HTTP decimal value is too large',
@@ -123,7 +123,7 @@ function decimal(string $value): int {
 }
 
 /** Parses and validates response content length fields. */
-function content_length(FieldMap $headers): null|int {
+function content_length(FieldMap $headers): null|uint {
   $values = vec[];
   foreach ($headers->getAll('content-length') as $field) {
     foreach (Str\split($field, ',') as $value) {
@@ -131,7 +131,7 @@ function content_length(FieldMap $headers): null|int {
     }
   }
 
-  if (length!($values) == 0) {
+  if (length!($values) == 0u) {
     return null;
   }
 
@@ -159,11 +159,11 @@ function is_chunked(FieldMap $headers): bool {
     }
   }
 
-  if (length!($codings) == 0) {
+  if (length!($codings) == 0u) {
     return false;
   }
 
-  if (length!($codings) != 1 || 'chunked' != $codings[0]) {
+  if (length!($codings) != 1u || 'chunked' != $codings[0]) {
     throw new ProtocolException('the response transfer coding is unsupported');
   }
 
@@ -199,13 +199,13 @@ function connection_token(
 function expects_continue(FieldMap $headers): bool {
   $values = $headers->getAll('expect');
   return (
-    length!($values) == 1
+    length!($values) == 1u
     && Str\lowercase(Str\trim($values[0], " \t")) == '100-continue'
   );
 }
 
 /** Returns a strict request content length. */
-function request_content_length(FieldMap $headers): null|int {
+function request_content_length(FieldMap $headers): null|uint {
   try {
     return content_length($headers);
   } catch (ProtocolException $error) {
@@ -224,8 +224,8 @@ function request_host(Request $request): string {
   $port = $url->authority->port ?? return $host;
 
   $default =
-    ('http' == $url->scheme && 80 == $port)
-    || ('https' == $url->scheme && 443 == $port);
+    ('http' == $url->scheme && 80u == $port)
+    || ('https' == $url->scheme && 443u == $port);
 
   if ($default) {
     return $host;

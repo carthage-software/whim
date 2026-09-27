@@ -88,7 +88,7 @@ impl HostResolutionOperation {
         Ok(Value::null())
     }
 
-    #[whim_method("take(): null|vec<(int, (string&!''))>", must_use)]
+    #[whim_method("take(): null|vec<(uint, (string&!''))>", must_use)]
     fn take(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         let shared = operation(cx)?;
         let addresses = match shared.take() {
@@ -102,7 +102,7 @@ impl HostResolutionOperation {
                 IpAddr::V4(address) => (constants::AF_INET, address.to_string()),
                 IpAddr::V6(address) => (constants::AF_INET6, address.to_string()),
             };
-            let family = Value::int(i64::from(family));
+            let family = Value::uint(u64::from(family.cast_unsigned()));
             let host = cx.string(host.as_bytes());
             cx.tuple([family, host])
         })))

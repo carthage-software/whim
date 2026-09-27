@@ -9,8 +9,7 @@ use Whim\Async\_Private as AsyncPrivate;
 use Whim\Channel\ClosedException;
 use Whim\Channel\EmptyException;
 use Whim\Channel\FullException;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Unwind\Throwable;
 use Whim\_Private\RingBuffer;
 use Whim;
@@ -25,7 +24,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
   /** Creates a state. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function __construct(private readonly null|PositiveInt $capacity) {
+  public function __construct(private readonly null|NonZero<uint> $capacity) {
     $this->buffer = new RingBuffer::<T>();
     $this->sendWaiters = new RingBuffer::<AsyncPrivate\Waiter<null>>();
     $this->receiveWaiters = new RingBuffer::<AsyncPrivate\Waiter<null>>();
@@ -34,7 +33,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
   /** Returns the channel capacity when it is bounded. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function getCapacity(): null|NonNegativeInt {
+  public function getCapacity(): null|uint {
     return $this->capacity;
   }
 
@@ -72,7 +71,7 @@ final class State<T> implements ReceiverState<T>, SenderState<T> {
 
   /** Returns the number of buffered values. */
   #[AlwaysInline]
-  public function count(): NonNegativeInt {
+  public function count(): uint {
     return $this->buffer->count();
   }
 

@@ -24,7 +24,7 @@ function connect(
   );
 
   try {
-    $connected = Whim\_Private\connect_socket($descriptor, $path, 0);
+    $connected = Whim\_Private\connect_socket($descriptor, $path, 0u);
     if (!$connected) {
       Whim\Network\_Private\wait_writable($descriptor, $cancellation);
       Whim\_Private\complete_socket_connection($descriptor);
@@ -33,7 +33,7 @@ function connect(
     $descriptor->close();
     throw new ConnectionException(
       'failed to connect to Unix-domain socket `' . $path . '`',
-      $error->errno(),
+      $error->getCode(),
       $error,
     );
   } catch (Throwable $error) {
@@ -67,7 +67,7 @@ function listen(
   );
 
   try {
-    Whim\_Private\bind_socket($descriptor, $path, 0);
+    Whim\_Private\bind_socket($descriptor, $path, 0u);
     Whim\_Private\listen_socket($descriptor, $configuration->backlog);
   } catch (Whim\_Private\SystemError $error) {
     $descriptor->close();

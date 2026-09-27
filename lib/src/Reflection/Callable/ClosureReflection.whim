@@ -70,7 +70,7 @@ final class ClosureReflection implements CallableReflection {
 
   /** Returns the number of parameters a caller must provide. */
   #[MustUse]
-  public function getRequiredParameterCount(): 0.. {}
+  public function getRequiredParameterCount(): uint {}
 
   /** Returns the declared return type, when present. */
   #[MustUse]

@@ -78,7 +78,7 @@ final class StreamDriverImpl implements StreamDriver {
       ) {
         $bytes = match (
           $stream->read(
-            length!(H2\CLIENT_PREFACE) - length!($prefix),
+            (length!(H2\CLIENT_PREFACE) - length!($prefix)) as int,
             $cancellation,
           )
         ) {

@@ -30,7 +30,7 @@ Autoload\register(
           continue;
         }
 
-        $relative = Str\slice($name, length!($prefix));
+        $relative = Str\slice($name, length!($prefix) as int);
         $exact = $root . '/' . Str\replace($relative, '\\', '/') . '.whim';
         if (Filesystem\is_file($exact)) {
           require_once!($exact);

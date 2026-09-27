@@ -51,14 +51,14 @@ impl H2FrameDecoder {
     const fn construct() {}
 
     #[whim_method(
-        "create(int $maximumFrameSize): Whim\\_Private\\H2FrameDecoder",
+        "create(uint $maximumFrameSize): Whim\\_Private\\H2FrameDecoder",
         static
     )]
     fn create<'call>(
         context: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let maximum_frame_size = frame_size(context, arguments.int(0))?;
+        let maximum_frame_size = frame_size(context, arguments.uint(0))?;
         let object = context.new_built_in_instance(DECODER)?;
         let Some(decoder) = state_ref::<Self>(&object) else {
             return Err(context.type_error("the HTTP/2 frame decoder has no built-in state"));
@@ -77,7 +77,7 @@ impl H2FrameDecoder {
         Ok(object)
     }
 
-    #[whim_method("push(string $bytes): vec<(int, int, int, string)>")]
+    #[whim_method("push(string $bytes): vec<(uint, uint, uint, string)>")]
     fn push<'call>(
         context: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
@@ -96,9 +96,9 @@ impl H2FrameDecoder {
             .into_iter()
             .map(|frame| {
                 context.tuple([
-                    Value::int(i64::from(frame.kind)),
-                    Value::int(i64::from(frame.flags)),
-                    Value::int(i64::from(frame.stream)),
+                    Value::uint(u64::from(frame.kind)),
+                    Value::uint(u64::from(frame.flags)),
+                    Value::uint(u64::from(frame.stream)),
                     context.owned_string(frame.payload),
                 ])
             })
@@ -129,17 +129,17 @@ impl H2FrameDecoder {
 }
 
 #[whim_function(
-    "Whim\\_Private\\h2_encode_frame(int $type, int $flags, int $stream, string $payload): string"
+    "Whim\\_Private\\h2_encode_frame(uint $type, uint $flags, uint $stream, string $payload): string"
 )]
 pub(crate) fn encode_frame(
     context: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    let kind = u8::try_from(arguments.int(0))
+    let kind = u8::try_from(arguments.uint(0))
         .map_err(|_| context.type_error("the HTTP/2 frame type must fit in one byte"))?;
-    let flags = u8::try_from(arguments.int(1))
+    let flags = u8::try_from(arguments.uint(1))
         .map_err(|_| context.type_error("the HTTP/2 frame flags must fit in one byte"))?;
-    let stream = u32::try_from(arguments.int(2))
+    let stream = u32::try_from(arguments.uint(2))
         .ok()
         .filter(|stream| *stream <= MAXIMUM_STREAM_ID)
         .ok_or_else(|| context.type_error("the HTTP/2 stream identifier is out of range"))?;
@@ -158,7 +158,7 @@ pub(crate) fn encode_frame(
     Ok(context.owned_string(encoded))
 }
 
-fn frame_size(context: &mut Context<'_, '_, '_>, value: i64) -> Result<u32, Throw> {
+fn frame_size(context: &mut Context<'_, '_, '_>, value: u64) -> Result<u32, Throw> {
     u32::try_from(value)
         .ok()
         .filter(|size| *size <= MAXIMUM_FRAME_SIZE)

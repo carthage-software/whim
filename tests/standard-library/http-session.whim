@@ -45,15 +45,15 @@ final class HTTPSessionTestContext implements Context\Context {
 }
 
 function http_session_test_context(): HTTPSessionTestContext {
-  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
-  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080u);
+  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u);
   return new HTTPSessionTestContext(ProtocolVersion::V11, $local, $peer);
 }
 
 function http_session_identifier(Response $response): NonEmptyString {
   $value = $response->headers->get('Set-Cookie') as string;
-  $pair = Str\split($value, ';', 2)[0];
-  return Str\split($pair, '=', 2)[1] as NonEmptyString;
+  $pair = Str\split($value, ';', 2u)[0];
+  return Str\split($pair, '=', 2u)[1] as NonEmptyString;
 }
 
 function http_session_request(null|string $identifier = null): Request {
@@ -119,15 +119,15 @@ $store->create('identifier', dict['count' => 1], $ttl);
 $record = $store->load('identifier');
 assert!(!($record == null));
 assert!($record?->data == dict['count' => 1]);
-assert!($record?->revision == 0);
+assert!($record?->revision == 0u);
 
-$store->replace('identifier', 0, dict['count' => 2], $ttl, $cancellation);
+$store->replace('identifier', 0u, dict['count' => 2], $ttl, $cancellation);
 
-assert!($store->load('identifier', $cancellation)?->revision == 1);
+assert!($store->load('identifier', $cancellation)?->revision == 1u);
 assert!($store->load('identifier', $cancellation)?->data == dict['count' => 2]);
 
 $assertion_value_22 = fn(): void {
-  $store->replace('identifier', 0, dict[], $ttl, $cancellation);
+  $store->replace('identifier', 0u, dict[], $ttl, $cancellation);
 };
 
 $assertion_error_22 = null;
@@ -154,7 +154,7 @@ $assertion_value_23 = fn(): Response {
         Request $_request,
         CancellationToken $_cancellation,
       ): Response {
-        $store->replace('identifier', 1, dict['external' => true], $ttl);
+        $store->replace('identifier', 1u, dict['external' => true], $ttl);
         return new Response(200);
       },
     ),
@@ -196,7 +196,7 @@ $response = $middleware->handle(
 );
 
 $identifier = http_session_identifier($response);
-assert!(length!($identifier) == 64);
+assert!(length!($identifier) == 64u);
 assert!($middlewareStore->load($identifier)?->data == dict['account' => 42]);
 
 $context = http_session_test_context();
@@ -267,7 +267,7 @@ assert!(
   Str\search(
     $response->headers->get('Set-Cookie') as string,
     'Max-Age=0',
-  ) is int,
+  ) is uint,
 );
 
 $context = http_session_test_context();
@@ -298,16 +298,16 @@ assert!(
   $databaseStore->load('database', $cancellation)?->data == dict['count' => 1],
 );
 
-assert!($databaseStore->load('database')?->revision == 0);
+assert!($databaseStore->load('database')?->revision == 0u);
 
 $databaseStore->replace(
   'database',
-  0,
+  0u,
   dict['count' => 2, 'nullable' => null],
   $ttl,
 );
 
-assert!($databaseStore->load('database')?->revision == 1);
+assert!($databaseStore->load('database')?->revision == 1u);
 assert!(
   $databaseStore->load('database')?->data == dict[
     'count' => 2,
@@ -316,7 +316,7 @@ assert!(
 );
 
 $assertion_value_42 = fn(): void {
-  $databaseStore->replace('database', 0, dict[], $ttl);
+  $databaseStore->replace('database', 0u, dict[], $ttl);
 };
 
 $assertion_error_42 = null;

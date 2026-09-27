@@ -21,7 +21,7 @@ final class SystemError extends Error {
   /** The raw platform error number. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function errno(): int {}
+  public function errno(): uint {}
 
   /** The system call that failed, such as `'openat'`. */
   #[TrackCaller]
@@ -391,14 +391,14 @@ const SOCKET_OPTION_ONLY_INET6 = SOCKET_OPTION_ONLY_INET6;
 #[TraceBoundary]
 function read_descriptor(
   FileDescriptor $descriptor,
-  (1..) $maxBytes,
+  (1u..) $maxBytes,
 ): null|string {}
 
 /** Writes as much of `$bytes` as the descriptor accepts. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function write_descriptor(FileDescriptor $descriptor, string $bytes): (0..) {}
+function write_descriptor(FileDescriptor $descriptor, string $bytes): uint {}
 
 /** Flushes a standard stream's libc buffer; a no-op on other descriptors. */
 #[Stub]
@@ -489,7 +489,7 @@ function open_directory_descriptor((string&!'') $path): null|FileDescriptor {}
 function open_regular_file_beneath(
   FileDescriptor $directory,
   string $path,
-): null|(FileDescriptor, vec<int>) {}
+): null|(FileDescriptor, vec<int|uint>) {}
 
 /** Whether a path exists at all, without raising when it does not. */
 #[Stub]
@@ -513,7 +513,10 @@ function check_access(
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function create_directory((string&!'') $path, 0..=4_294_967_295 $mode): void {}
+function create_directory(
+  (string&!'') $path,
+  0u..=4_294_967_295u $mode,
+): void {}
 
 /** Removes one empty directory. */
 #[Stub]
@@ -561,13 +564,16 @@ function resolve_path((string&!'') $path): (string&!'') {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function create_named_pipe((string&!'') $path, 0..=4_294_967_295 $mode): void {}
+function create_named_pipe(
+  (string&!'') $path,
+  0u..=4_294_967_295u $mode,
+): void {}
 
 /** Sets a path's permission bits. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function set_path_mode((string&!'') $path, 0..=4_294_967_295 $mode): void {}
+function set_path_mode((string&!'') $path, 0u..=4_294_967_295u $mode): void {}
 
 /** Sets a path's owner and group; `-1` leaves either unchanged. */
 #[Stub]
@@ -601,13 +607,13 @@ function set_path_times(
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function read_directory((string&!'') $path): vec<((string&!''), int)> {}
+function read_directory((string&!'') $path): vec<((string&!''), uint)> {}
 
 /** Filesystem capacity, as `(blockSize, blocks, freeBlocks, availableBlocks)`. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function filesystem_space((string&!'') $path): (int, int, int, int) {}
+function filesystem_space((string&!'') $path): (uint, uint, uint, uint) {}
 
 /** The directory for temporary files. */
 #[Stub]
@@ -630,7 +636,7 @@ function temporary_directory(): (string&!'') {}
 function create_temporary_file(
   (string&!'') $directory,
   string $prefix,
-  0..=429_4967_295 $mode,
+  0u..=429_4967_295u $mode,
 ): (FileDescriptor, (string&!'')) {}
 
 /** Creates a new directory with a generated name and returns its path. */
@@ -646,19 +652,19 @@ function create_temporary_directory(
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function process_user(): ((0..), (0..)) {}
+function process_user(): (uint, uint) {}
 
 /** The real and effective group identifiers. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function process_group(): ((0..), (0..)) {}
+function process_group(): (uint, uint) {}
 
 /** The supplementary group identifiers. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function process_supplementary_groups(): vec<(0..)> {}
+function process_supplementary_groups(): vec<uint> {}
 
 /** Sets the real and effective user; `-1` leaves either unchanged. */
 #[Stub]
@@ -676,49 +682,49 @@ function set_process_group(int $real, int $effective): void {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function set_process_supplementary_groups(vec<(0..)> $groups): void {}
+function set_process_supplementary_groups(vec<uint> $groups): void {}
 
 /** Loads a user's configured group set. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function initialize_groups((string&!'') $user, (0..) $group): void {}
+function initialize_groups((string&!'') $user, uint $group): void {}
 
 /** The session identifier of a process; `0` means the caller. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function session_id((0..) $process): (0..) {}
+function session_id(uint $process): uint {}
 
 /** Starts a new session and returns its identifier. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function start_session(): (0..) {}
+function start_session(): uint {}
 
 /** The process group of a process; `0` means the caller. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function process_group_id((0..) $process): (0..) {}
+function process_group_id(uint $process): uint {}
 
 /** Sets a process's group; `0` in either position means the caller. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function set_process_group_id((0..) $process, (0..) $group): void {}
+function set_process_group_id(uint $process, uint $group): void {}
 
 /** The scheduling priority of a process; `0` means the caller. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function process_priority((0..) $process): int {}
+function process_priority(uint $process): int {}
 
 /** Sets a process's scheduling priority. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function set_process_priority((0..) $process, int $priority): void {}
+function set_process_priority(uint $process, int $priority): void {}
 
 /** A resource limit as `(soft, hard)`; `-1` means unlimited. */
 #[Stub]
@@ -740,7 +746,7 @@ function set_resource_limit(int $resource, int $soft, int $hard): void {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function process_times(): (int, int, int, int) {}
+function process_times(): (uint, uint, uint, uint) {}
 
 /**
  * Replaces the running program. Returns only on failure.
@@ -769,7 +775,7 @@ function send_signal(int $process, (0..) $signal): void {}
 
 /** Ends a process at once. */
 #[Stub]
-function terminate_process((1..) $process): void {}
+function terminate_process((1u..) $process): void {}
 
 /**
  * Calls `$callback` each time a signal arrives.
@@ -815,9 +821,9 @@ function spawn_process(
   null|dict<(string&!''), string> $environment,
   null|(string&!'') $directory,
   vec<(int, null|FileDescriptor)> $streams,
-  vec<(FileDescriptor, (0..))> $inherited,
+  vec<(FileDescriptor, uint)> $inherited,
   int $processGroup,
-): ((0..), null|FileDescriptor, null|FileDescriptor, null|FileDescriptor) {}
+): (uint, null|FileDescriptor, null|FileDescriptor, null|FileDescriptor) {}
 
 /**
  * Calls `$callback` with a child's raw wait status once it ends.
@@ -829,7 +835,7 @@ function spawn_process(
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function watch_process((0..) $process, (fn(int): void) $callback): TaskId {}
+function watch_process(uint $process, (fn(uint): void) $callback): TaskId {}
 
 /**
  * The running system as
@@ -844,7 +850,7 @@ function system_information(): ((string&!''), string, string, string, string) {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function system_uptime(): (0..) {}
+function system_uptime(): uint {}
 
 /** Load averages over one, five, and fifteen minutes. */
 #[Stub]
@@ -856,7 +862,7 @@ function load_averages(): (float, float, float) {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function memory_information(): ((0..), (0..)) {}
+function memory_information(): (uint, uint) {}
 
 /** Creates a socket. The descriptor is close-on-exec and non-blocking. */
 #[Stub]
@@ -868,13 +874,17 @@ function create_socket(int $family, int $kind): FileDescriptor {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function bind_socket(FileDescriptor $socket, string $host, (0..) $port): void {}
+function bind_socket(
+  FileDescriptor $socket,
+  string $host,
+  (0u..=65_535u) $port,
+): void {}
 
 /** Marks a bound socket as accepting connections. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function listen_socket(FileDescriptor $socket, (1..) $backlog): void {}
+function listen_socket(FileDescriptor $socket, (1u..) $backlog): void {}
 
 /**
  * Accepts one pending connection as `(socket, host, port)`, or `null` when
@@ -888,7 +898,7 @@ function listen_socket(FileDescriptor $socket, (1..) $backlog): void {}
 #[TraceBoundary]
 function accept_socket(
   FileDescriptor $socket,
-): null|(FileDescriptor, string, (0..)) {}
+): null|(FileDescriptor, string, (0u..=65_535u)) {}
 
 /**
  * Starts connecting to an address.
@@ -899,7 +909,7 @@ function accept_socket(
 function connect_socket(
   FileDescriptor $socket,
   string $host,
-  (0..) $port,
+  (0u..=65_535u) $port,
 ): bool {}
 
 /** Completes a non-blocking connection after its socket becomes writable. */
@@ -912,7 +922,7 @@ function complete_socket_connection(FileDescriptor $socket): void {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function socket_address(FileDescriptor $socket): (string, (0..)) {}
+function socket_address(FileDescriptor $socket): (string, (0u..=65_535u)) {}
 
 /** Sets an integer socket option. */
 #[Stub]
@@ -933,8 +943,8 @@ function send_to(
   FileDescriptor $socket,
   string $bytes,
   string $host,
-  (0..) $port,
-): (0..) {}
+  (0u..=65_535u) $port,
+): uint {}
 
 /** Enables local-address and congestion metadata for received messages. */
 #[Stub]
@@ -952,9 +962,17 @@ function enable_message_metadata(FileDescriptor $socket): void {}
 #[TraceBoundary]
 function receive_message(
   FileDescriptor $socket,
-  (1..) $maxBytes,
-  (0..) $localPort,
-): null|(string, (string, (0..)), (string, (0..)), 0..=3, (0..), bool) {}
+  (1u..) $maxBytes,
+  (0u..=65_535u) $localPort,
+): null
+| (
+  string,
+  (string, (0u..=65_535u)),
+  (string, (0u..=65_535u)),
+  0u..=3u,
+  uint,
+  bool,
+) {}
 
 /**
  * Sends one datagram from a chosen local host with the given ECN bits.
@@ -968,11 +986,11 @@ function send_message(
   FileDescriptor $socket,
   string $bytes,
   null|string $host,
-  (0..) $port,
+  (0u..=65_535u) $port,
   string $sourceHost,
-  (0..) $interfaceIndex,
-  0..=3 $explicitCongestion,
-): (0..) {}
+  uint $interfaceIndex,
+  0u..=3u $explicitCongestion,
+): uint {}
 
 /** Closes one or both directions of a connection, leaving the descriptor. */
 #[Stub]
@@ -996,4 +1014,4 @@ function terminal_path(FileDescriptor $descriptor): null|(string&!'') {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function terminal_size(FileDescriptor $descriptor): null|((1..), (1..)) {}
+function terminal_size(FileDescriptor $descriptor): null|((1u..), (1u..)) {}

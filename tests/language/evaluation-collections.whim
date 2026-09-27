@@ -20,7 +20,7 @@ final class Histogram {
 $histogram = new Histogram();
 $histogram->fill();
 $filled = $histogram->values();
-assert!(length!($filled) == 12);
+assert!(length!($filled) == 12u);
 assert!($filled[0] == 'filled');
 assert!($filled[5] == 'filled');
 assert!($filled[10] == 'filled');
@@ -62,10 +62,10 @@ $numbers = vec[2, 3];
 $tuple = (5, 6);
 $dictionary = dict['x' => 1, 'y' => 2];
 
-assert!(length!(vec[1, ...$numbers, 4]) == 4);
+assert!(length!(vec[1, ...$numbers, 4]) == 4u);
 assert!(vec[1, ...$numbers, 4][2] == 3);
 assert!(vec[...$tuple, 7][0] == 5);
-assert!(length!(vec[...vec[]]) == 0);
+assert!(length!(vec[...vec[]]) == 0u);
 
 $widened = dict['a' => 0, ...$numbers];
 assert!(($widened['a'], $widened[0], $widened[1]) == (0, 2, 3));
@@ -154,7 +154,7 @@ $ordered = vec[
 ];
 
 assert!(SpreadLog::$events == vec['1', '2', '3']);
-assert!(length!($ordered) == 3);
+assert!(length!($ordered) == 3u);
 
 $source = vec[];
 $index = 0;
@@ -164,7 +164,7 @@ while ($index < 300) {
 }
 
 $spread = vec[-1, ...$source, -2];
-assert!(length!($spread) == 302);
+assert!(length!($spread) == 302u);
 assert!(
   ($spread[0], $spread[1], $spread[300], $spread[301]) == (-1, 0, 299, -2),
 );
@@ -177,13 +177,13 @@ while ($position < 300) {
 }
 
 $widenedKeys = dict['head' => 'x', ...$keyed];
-assert!(length!($widenedKeys) == 301);
+assert!(length!($widenedKeys) == 301u);
 assert!($widenedKeys['head'] == 'x');
 assert!($widenedKeys[0] == 0);
 assert!($widenedKeys[299] == 598);
 
 $doubled = vec[...$source, ...$source];
-assert!(length!($doubled) == 600);
+assert!(length!($doubled) == 600u);
 
 $name = 'Ada';
 $identifier = 42;

@@ -160,7 +160,7 @@ $file = Reflection\reflect_file('/reflection/declarations.whim');
 assert!($file->getPath() == '/reflection/declarations.whim');
 assert!($file->getOrigin() == Reflection\DeclarationOrigin::Extension);
 assert!(!$file->hasTopLevelCode());
-assert!(length!($file->getSymbols()) == 1);
+assert!(length!($file->getSymbols()) == 1u);
 assert!($file->getSymbols()[0]->getName() == 'ArtifactFile\\value');
 assert!($file->getSymbols()[0]->getFile()->getPath() == $file->getPath());
 assert!($file->getSymbols()[0]->getFile()->getOrigin() == $file->getOrigin());
@@ -170,7 +170,7 @@ assert!(Reflection\reflect_file('/reflection/unreachable.whim')->hasTopLevelCode
 assert!(Reflection\reflect_file('/reflection/entry.whim')->hasTopLevelCode());
 assert!(Reflection\reflect_file('/reflection/entry.whim')->getSymbols() == vec[]);
 assert!(Reflection\reflect_file('/reflection/bundle.whim') == null);
-assert!(length!(Reflection\get_loaded_files()) == 4);
+assert!(length!(Reflection\get_loaded_files()) == 4u);
 ",
                     ),
                 ],
@@ -246,8 +246,8 @@ assert!(!$first->hasTopLevelCode());
 assert!(!$second->hasTopLevelCode());
 assert!($first->getOrigin() == Reflection\DeclarationOrigin::Extension);
 assert!($first->getLocation() == null);
-assert!(length!($first->getAttributes()) == 1);
-assert!(length!($second->getAttributes()) == 1);
+assert!(length!($first->getAttributes()) == 1u);
+assert!(length!($second->getAttributes()) == 1u);
 $firstAttribute = $first->getAttributes()[0];
 assert!($firstAttribute->newInstance()->name == 'first');
 $callback = $firstAttribute->newInstance()->value;
@@ -532,7 +532,7 @@ fn artifact_source_files_rebase_later_main_side_tables() {
             &[
                 SourceFile::new(
                     "/artifact/first-tables.whim",
-                    "final class FirstTableHolder { public int $other = 0; } $first = new FirstTableHolder(); $first->other = 1; $typed = dict[] as dict<string, int>; $string = match ('first') { 'first' => 1, $_ => 0 }; assert!($string == 1 && length!($typed) == 0);",
+                    "final class FirstTableHolder { public int $other = 0; } $first = new FirstTableHolder(); $first->other = 1; $typed = dict[] as dict<string, int>; $string = match ('first') { 'first' => 1, $_ => 0 }; assert!($string == 1 && length!($typed) == 0u);",
                 ),
                 SourceFile::new(
                     "/artifact/second-tables.whim",
@@ -566,7 +566,7 @@ fn optimized_string_returns_accept_inline_strings() {
 #[test]
 fn recursive_aliases_keep_one_reified_shape_after_artifact_loading() {
     let artifact = compile(
-        "type Datum = null|int|vec<Datum>|dict<string, Datum>; type Data = dict<string, Datum>; final readonly class Box<T> { public function __construct(public T $value) {} } function accept_box(Box<Data> $box): int { return length!($box->value); } $box = new Box::<Data>(dict[]); assert!(accept_box($box) == 0);",
+        "type Datum = null|int|vec<Datum>|dict<string, Datum>; type Data = dict<string, Datum>; final readonly class Box<T> { public function __construct(public T $value) {} } function accept_box(Box<Data> $box): uint { return length!($box->value); } $box = new Box::<Data>(dict[]); assert!(accept_box($box) == 0u);",
         "/artifact/recursive-alias.whim",
     );
 

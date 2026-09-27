@@ -4,25 +4,21 @@ use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\MustUse;
 use Whim\Refine\Transform;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\LogicException;
 
 /** Creates a vec containing repeated copies of a value. */
 #[MustUse]
 #[TrackCaller]
-function fill<T>(NonNegativeInt $size, T $value): vec<T> {
-  return vec[$value; $size];
+function fill<T>(uint $size, T $value): vec<T> {
+  return vec[$value; $size as int];
 }
 
 /** Creates a vec by deriving each value from its index. */
 #[MustUse]
 #[TrackCaller]
-function reproduce<T>(
-  NonNegativeInt $size,
-  Transform<NonNegativeInt, T> $factory,
-): vec<T> {
+function reproduce<T>(uint $size, Transform<uint, T> $factory): vec<T> {
   $result = vec[];
-  $index = 0;
+  $index = 0u;
   while ($index < $size) {
     $result[] = $factory($index);
     $index++;

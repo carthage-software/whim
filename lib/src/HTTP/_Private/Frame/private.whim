@@ -5,6 +5,7 @@ use Whim\HTTP\_Private\ErrorCode;
 use Whim\HTTP\_Private\Frame;
 use Whim\HTTP\_Private\FrameDecodingException;
 use Whim\HTTP\_Private\StreamException;
+use Whim\Refine\Uint8;
 use Whim\Str;
 
 /** Maps a raw frame envelope to its typed representation. */
@@ -25,7 +26,7 @@ function parse(
     0x7 => parse_go_away($stream, $payload),
     0x8 => parse_window_update($stream, $payload),
     0x9 => parse_continuation($flags, $stream, $payload),
-    _ => (10, $type, $flags, $stream, $payload),
+    _ => (10, $type as uint, $flags as uint, $stream, $payload),
   };
 }
 
@@ -51,7 +52,7 @@ function parse_headers(
       frame_size_error('the `HEADERS` payload is missing priority data');
     }
 
-    $encodedDependency = Binary\decode_u32(Str\slice($payload, 0, 4));
+    $encodedDependency = Binary\decode_u32(Str\slice($payload, 0, 4u)) as int;
     $exclusive = ($encodedDependency & 0x80_00_00_00) != 0;
     $dependency = $encodedDependency & 0x7f_ff_ff_ff;
     $weight = Str\ord($payload[4]) + 1;
@@ -81,7 +82,7 @@ function parse_priority(int $stream, string $payload): Frame\PriorityFrame {
     );
   }
 
-  $dependency = Binary\decode_u32(Str\slice($payload, 0, 4));
+  $dependency = Binary\decode_u32(Str\slice($payload, 0, 4u)) as int;
 
   return (
     2,
@@ -98,7 +99,7 @@ function parse_reset(int $stream, string $payload): Frame\RstStreamFrame {
     frame_size_error('`RST_STREAM` requires exactly 4 payload bytes');
   }
 
-  return (3, $stream, Binary\decode_u32($payload));
+  return (3, $stream, Binary\decode_u32($payload) as int);
 }
 
 function parse_settings(
@@ -112,7 +113,7 @@ function parse_settings(
     frame_size_error('a SETTINGS acknowledgment must have an empty payload');
   }
 
-  if ((length!($payload) % 6) != 0) {
+  if ((length!($payload) % 6u) != 0u) {
     frame_size_error(
       'a SETTINGS payload must contain complete six-byte entries',
     );
@@ -121,8 +122,8 @@ function parse_settings(
   $settings = dict[];
   $offset = 0;
   while ($offset < length!($payload)) {
-    $id = Binary\decode_u16(Str\slice($payload, $offset, 2));
-    $value = Binary\decode_u32(Str\slice($payload, $offset + 2, 4));
+    $id = Binary\decode_u16(Str\slice($payload, $offset, 2u)) as int;
+    $value = Binary\decode_u32(Str\slice($payload, $offset + 2, 4u)) as int;
     if (0 != $id) {
       $settings[$id] = $value;
     }
@@ -144,7 +145,9 @@ function parse_push_promise(
   }
 
   ($payload, $padding) = unpad($flags, $payload, 4);
-  $promised = Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7f_ff_ff_ff;
+  $promised =
+    (Binary\decode_u32(Str\slice($payload, 0, 4u)) as int) & 0x7f_ff_ff_ff;
+
   require_stream($promised, 'PUSH_PROMISE');
 
   return (
@@ -174,8 +177,8 @@ function parse_go_away(int $stream, string $payload): Frame\GoAwayFrame {
 
   return (
     7,
-    Binary\decode_u32(Str\slice($payload, 0, 4)) & 0x7f_ff_ff_ff,
-    Binary\decode_u32(Str\slice($payload, 4, 4)),
+    (Binary\decode_u32(Str\slice($payload, 0, 4u)) as int) & 0x7f_ff_ff_ff,
+    Binary\decode_u32(Str\slice($payload, 4, 4u)) as int,
     Str\slice($payload, 8),
   );
 }
@@ -188,7 +191,7 @@ function parse_window_update(
     frame_size_error('`WINDOW_UPDATE` requires exactly 4 payload bytes');
   }
 
-  $increment = Binary\decode_u32($payload) & 0x7f_ff_ff_ff;
+  $increment = (Binary\decode_u32($payload) as int) & 0x7f_ff_ff_ff;
   if (0 == $increment) {
     if (0 != $stream) {
       throw new StreamException(
@@ -221,7 +224,7 @@ function encode_data(Frame\DataFrame $frame): (int, int, int, string) {
   };
 
   $payload = $frame[2];
-  if ($frame[4] > 0) {
+  if ($frame[4] > 0u) {
     $flags |= 0x8;
     $payload = Binary\encode_u8($frame[4]) . $payload . padding($frame[4]);
   }
@@ -248,12 +251,12 @@ function encode_headers(Frame\HeadersFrame $frame): (int, int, int, string) {
     }
 
     $payload =
-      Binary\encode_u32($dependency)
-      . Binary\encode_u8(($frame[6] ?? 16) - 1)
+      Binary\encode_u32($dependency as uint)
+      . Binary\encode_u8((($frame[6] ?? 16) - 1) as uint)
       . $payload;
   }
 
-  if ($frame[8] > 0) {
+  if ($frame[8] > 0u) {
     $flags |= 0x8;
     $payload = Binary\encode_u8($frame[8]) . $payload . padding($frame[8]);
   }
@@ -271,12 +274,13 @@ function encode_priority(Frame\PriorityFrame $frame): (int, int, int, string) {
     0x2,
     0,
     $frame[1],
-    Binary\encode_u32($dependency) . Binary\encode_u8($frame[3] - 1),
+    Binary\encode_u32($dependency as uint)
+    . Binary\encode_u8(($frame[3] - 1) as uint),
   );
 }
 
 function encode_reset(Frame\RstStreamFrame $frame): (int, int, int, string) {
-  return (0x3, 0, $frame[1], Binary\encode_u32($frame[2]));
+  return (0x3, 0, $frame[1], Binary\encode_u32($frame[2] as uint));
 }
 
 function encode_settings(Frame\SettingsFrame $frame): (int, int, int, string) {
@@ -286,7 +290,8 @@ function encode_settings(Frame\SettingsFrame $frame): (int, int, int, string) {
 
   $payload = '';
   foreach ($frame[1] as $id => $value) {
-    $payload .= Binary\encode_u16($id) . Binary\encode_u32($value);
+    $payload .=
+      Binary\encode_u16($id as uint) . Binary\encode_u32($value as uint);
   }
 
   $flags = match ($frame[2]) {
@@ -305,9 +310,9 @@ function encode_push_promise(
     false => 0,
   };
 
-  $payload = Binary\encode_u32($frame[2]) . $frame[3];
+  $payload = Binary\encode_u32($frame[2] as uint) . $frame[3];
 
-  if ($frame[5] > 0) {
+  if ($frame[5] > 0u) {
     $flags |= 0x8;
     $payload = Binary\encode_u8($frame[5]) . $payload . padding($frame[5]);
   }
@@ -329,14 +334,16 @@ function encode_go_away(Frame\GoAwayFrame $frame): (int, int, int, string) {
     0x7,
     0,
     0,
-    Binary\encode_u32($frame[1]) . Binary\encode_u32($frame[2]) . $frame[3],
+    Binary\encode_u32($frame[1] as uint)
+    . Binary\encode_u32($frame[2] as uint)
+    . $frame[3],
   );
 }
 
 function encode_window_update(
   Frame\WindowUpdateFrame $frame,
 ): (int, int, int, string) {
-  return (0x8, 0, $frame[1], Binary\encode_u32($frame[2]));
+  return (0x8, 0, $frame[1], Binary\encode_u32($frame[2] as uint));
 }
 
 function encode_continuation(
@@ -353,13 +360,17 @@ function encode_continuation(
   );
 }
 
-function unpad(int $flags, string $payload, int $minimum): (string, int) {
+function encode_unknown(Frame\UnknownFrame $frame): (int, int, int, string) {
+  return ($frame[1] as int, $frame[2] as int, $frame[3], $frame[4]);
+}
+
+function unpad(int $flags, string $payload, int $minimum): (string, Uint8) {
   if (($flags & 0x8) == 0) {
     if (length!($payload) < $minimum) {
       malformed('the HTTP/2 frame payload is truncated');
     }
 
-    return ($payload, 0);
+    return ($payload, 0u);
   }
 
   if ('' == $payload) {
@@ -367,15 +378,18 @@ function unpad(int $flags, string $payload, int $minimum): (string, int) {
   }
 
   $padding = Str\ord($payload[0]);
-  if (length!($payload) - 1 - $padding < $minimum) {
+  if ((length!($payload) as int) - 1 - $padding < $minimum) {
     malformed('the HTTP/2 frame padding exceeds its payload');
   }
 
-  return (Str\slice($payload, 1, length!($payload) - 1 - $padding), $padding);
+  return (
+    Str\slice($payload, 1, length!($payload) - 1u - ($padding as uint)),
+    $padding as uint,
+  );
 }
 
-function padding(int $length): string {
-  if (0 == $length) {
+function padding(Uint8 $length): string {
+  if (0u == $length) {
     return '';
   }
 

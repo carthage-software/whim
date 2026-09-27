@@ -59,7 +59,7 @@ assert!($names == vec[
     'First\\Alias', 'First\\Box', 'First\\Id', 'First\\Marker',
     'First\\State', 'First\\VALUE', 'First\\make', 'Second\\helper',
 ]);
-assert!(length!($file->getSymbols(null)) == 8);
+assert!(length!($file->getSymbols(null)) == 8u);
 assert!(Reflection\reflect_file('/reflection/code.whim')->hasTopLevelCode());
 assert!(Reflection\reflect_file('/reflection/code.whim')->getSymbols() == vec[]);
 assert!(!Reflection\reflect_file('/reflection/empty.whim')->hasTopLevelCode());
@@ -92,8 +92,8 @@ use Whim\Reflection;
 assert!(Reflection\reflect_file('/reflection/reloaded.whim')->hasTopLevelCode());
 assert!(Reflection\reflect_file('/reflection/reloaded.whim')->getSymbols() == vec[]);
 assert!(!Reflection\reflect_class('PreviousLoad')->getFile()->hasTopLevelCode());
-assert!(length!(Reflection\reflect_class('PreviousLoad')->getFile()->getSymbols()) == 1);
-assert!(length!(Reflection\get_loaded_files()) == 2);
+assert!(length!(Reflection\reflect_class('PreviousLoad')->getFile()->getSymbols()) == 1u);
+assert!(length!(Reflection\get_loaded_files()) == 2u);
 ",
         Path::new("/reflection/check.whim"),
     );
@@ -122,7 +122,7 @@ assert!($first->getSymbols()[0]->getName() == 'FirstAnonymous');
 assert!($second->getSymbols()[0]->getName() == 'SecondAnonymous');
 assert!(Reflection\reflect_class('Whim\\Async\\TaskLocal')->getFile() == null);
 assert!(Reflection\reflect_file('-') == null);
-assert!(length!(Reflection\get_loaded_files()) == 2);
+assert!(length!(Reflection\get_loaded_files()) == 2u);
 ",
         Path::new("-"),
     );

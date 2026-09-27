@@ -294,7 +294,7 @@ if ($filter != null) {
     }
   }
 
-  if (length!($selected) == 0) {
+  if (length!($selected) == 0u) {
     fail('no test matches ' . $filter);
   }
 
@@ -305,7 +305,7 @@ $started = Instant::now();
 $width = 0;
 foreach ($tests as $test) {
   if (length!($test) > $width) {
-    $width = length!($test);
+    $width = length!($test) as int;
   }
 }
 
@@ -375,7 +375,11 @@ $run = fn(string $test): vec<(string, null|string, null|string, float)> {
         $heat = "\e[92m";
       }
 
-      $duration = paint($color, Str\pad_left(elapsed($milliseconds), 6), $heat);
+      $duration = paint(
+        $color,
+        Str\pad_left(elapsed($milliseconds), 6u),
+        $heat,
+      );
 
       $label = $mode . ' ' . $duration;
       if ($failure != null) {
@@ -399,7 +403,7 @@ $run = fn(string $test): vec<(string, null|string, null|string, float)> {
       '  '
       . $verdict
       . ' '
-      . Str\pad_right($test, $width)
+      . Str\pad_right($test, $width as uint)
       . '  '
       . $timings
       . "\n",
@@ -414,7 +418,7 @@ $run = fn(string $test): vec<(string, null|string, null|string, float)> {
 $semaphore = new Async\Semaphore::<
   string,
   vec<(string, null|string, null|string, float)>,
->($parallelism, $run);
+>($parallelism as uint, $run);
 
 $futures = dict[];
 foreach (Vec\shuffle::<string>($tests) as $test) {
@@ -462,7 +466,7 @@ foreach ($tests as $test) {
   $fileTotals[$test] = $fileTotal;
 }
 
-if ($executed != length!($tests)) {
+if (($executed as uint) != length!($tests)) {
   fail('executed ' . $executed . ' of ' . length!($tests) . ' test file(s)');
 }
 
@@ -488,7 +492,7 @@ foreach ($modes as ($mode, $_optimizations)) {
 
   $console->write(
     '  '
-    . Str\pad_right($mode, 14)
+    . Str\pad_right($mode, 14u)
     . $status
     . paint(
       $color,
@@ -527,7 +531,7 @@ if (!$quiet) {
 
     $console->write(
       '  '
-      . Str\pad_right(elapsed(tally($fileTotals, $test)), 14)
+      . Str\pad_right(elapsed(tally($fileTotals, $test)), 14u)
       . $test
       . "\n",
     );

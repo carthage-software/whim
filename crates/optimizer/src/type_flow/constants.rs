@@ -452,7 +452,9 @@ impl TypeFlow<'_> {
                 source,
             } => Some((
                 destination,
-                ConstantValue::Int(self.constant_length_fact(self.fact(index, source), depth + 1)?),
+                ConstantValue::Uint(
+                    self.constant_length_fact(self.fact(index, source), depth + 1)?,
+                ),
             )),
             Instruction::IndexGet {
                 destination,
@@ -536,14 +538,14 @@ impl TypeFlow<'_> {
         &self,
         fact: Fact,
         depth: usize,
-    ) -> Option<i64> {
+    ) -> Option<u64> {
         if depth > MAX_TYPE_DEPTH {
             return None;
         }
         if let Some(TypeDescriptor::StringLiteral(value)) =
             self.origin_descriptor(fact.origin, depth + 1)
         {
-            return i64::try_from(value.as_bytes().len()).ok();
+            return u64::try_from(value.as_bytes().len()).ok();
         }
         let index = instruction_index(fact.origin)?;
         match self.chunk.code[index] {
@@ -552,13 +554,13 @@ impl TypeFlow<'_> {
                 else {
                     return None;
                 };
-                i64::try_from(value.as_bytes().len()).ok()
+                u64::try_from(value.as_bytes().len()).ok()
             }
             Instruction::NewArray {
                 kind: ArrayKind::Vec | ArrayKind::Tuple,
                 count: element_count,
                 ..
-            } => Some(i64::from(element_count.value())),
+            } => Some(u64::from(element_count.value())),
             Instruction::NewArray {
                 kind: ArrayKind::Dict,
                 count: pair_count,
@@ -566,7 +568,7 @@ impl TypeFlow<'_> {
                 ..
             } => {
                 if pair_count.value() <= 1 {
-                    return Some(i64::from(pair_count.value()));
+                    return Some(u64::from(pair_count.value()));
                 }
 
                 let mut keys = HashSet::with_capacity(usize::from(pair_count.value()));
@@ -579,7 +581,7 @@ impl TypeFlow<'_> {
                     keys.insert(key);
                 }
 
-                i64::try_from(keys.len()).ok()
+                u64::try_from(keys.len()).ok()
             }
             Instruction::Concatenate { left, right, .. } => {
                 let left = self.constant_length_fact(self.fact(index, left), depth + 1)?;
@@ -594,7 +596,7 @@ impl TypeFlow<'_> {
                 else {
                     return None;
                 };
-                left.checked_add(i64::try_from(right.as_bytes().len()).ok()?)
+                left.checked_add(u64::try_from(right.as_bytes().len()).ok()?)
             }
             Instruction::ConcatenateLeftConstant {
                 source, constant, ..
@@ -604,7 +606,7 @@ impl TypeFlow<'_> {
                     return None;
                 };
                 let right = self.constant_length_fact(self.fact(index, source), depth + 1)?;
-                i64::try_from(left.as_bytes().len())
+                u64::try_from(left.as_bytes().len())
                     .ok()?
                     .checked_add(right)
             }

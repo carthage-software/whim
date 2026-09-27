@@ -36,8 +36,8 @@ final class StaticFilesTestContext implements Context {
 function static_files_test_context(): StaticFilesTestContext {
   return new StaticFilesTestContext(
     ProtocolVersion::V11,
-    new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
-    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080u),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u),
   );
 }
 

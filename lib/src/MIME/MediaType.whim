@@ -42,8 +42,8 @@ final readonly class MediaType implements ToString {
 
     $suffix = '';
     $suffixPosition = Str\search_last($subtype, '+');
-    if (null != $suffixPosition && $suffixPosition + 1 < length!($subtype)) {
-      $suffix = Str\slice($subtype, $suffixPosition + 1);
+    if (null != $suffixPosition && $suffixPosition + 1u < length!($subtype)) {
+      $suffix = Str\slice($subtype, ($suffixPosition as int) + 1);
     }
 
     $tree = '';
@@ -73,16 +73,20 @@ final readonly class MediaType implements ToString {
     if (null != $semicolon) {
       $essence = Str\trim(Str\slice($input, 0, $semicolon));
       $parameters =
-        Parameters::parse(Str\slice($input, $semicolon + 1)) ?? return null;
+        Parameters::parse(Str\slice($input, ($semicolon as int) + 1))
+        ?? return null;
     }
 
     $slash = Str\search($essence, '/');
-    if (null == $slash || 0 == $slash || $slash + 1 >= length!($essence)) {
+    if (null == $slash || 0u == $slash || $slash + 1u >= length!($essence)) {
       return null;
     }
 
     $type = Str\lowercase(Str\trim(Str\slice($essence, 0, $slash)));
-    $subtype = Str\lowercase(Str\trim(Str\slice($essence, $slash + 1)));
+    $subtype = Str\lowercase(
+      Str\trim(Str\slice($essence, ($slash as int) + 1)),
+    );
+
     if (
       !_Private\is_media_component($type)
       || !_Private\is_media_component($subtype)

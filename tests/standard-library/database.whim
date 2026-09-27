@@ -18,7 +18,6 @@ use Whim\Database\Transaction;
 use Whim\Database\TransactionIsolation;
 use Whim\Database\Value;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Time\Duration;
 
 $databaseError = new QueryException('duplicate', sqlState: '23505');
@@ -31,14 +30,14 @@ final class DatabaseTestResult implements Result {
   public function __construct(
     private vec<Row> $rows,
     private vec<Column> $columns = vec[],
-    private null|NonNegativeInt $affectedRows = null,
+    private null|uint $affectedRows = null,
   ) {}
 
   public function getColumns(): vec<Column> {
     return $this->columns;
   }
 
-  public function getAffectedRows(): null|NonNegativeInt {
+  public function getAffectedRows(): null|uint {
     return $this->affectedRows;
   }
 
@@ -47,7 +46,7 @@ final class DatabaseTestResult implements Result {
       $cancellation->throwIfCancellationRequested();
     }
 
-    if (length!($this->rows) == 0) {
+    if (length!($this->rows) == 0u) {
       $this->close();
       return null;
     }
@@ -154,7 +153,7 @@ final class DatabaseTestConnection implements Connection {
       );
     }
 
-    return new DatabaseTestResult(vec[], affectedRows: 1);
+    return new DatabaseTestResult(vec[], affectedRows: 1u);
   }
 
   public function isReusable(): bool {
@@ -236,15 +235,15 @@ $rows = Database\fetch_all(
 assert!($rows == vec[vec[1, 'one'], vec[2, 'two']]);
 
 $transactionConnection = new DatabaseTestConnection();
-$transactionResult = Database\transactional::<int>(
+$transactionResult = Database\transactional::<uint>(
   $transactionConnection,
-  fn(Transaction $transaction): int {
+  fn(Transaction $transaction): uint {
     $result = $transaction->execute('UPDATE example SET value = $1', vec[1]);
-    return $result->getAffectedRows() ?? 0;
+    return $result->getAffectedRows() ?? 0u;
   },
 );
 
-assert!($transactionResult == 1);
+assert!($transactionResult == 1u);
 
 $connector = new DatabaseTestConnector();
 $pool = new ConnectionPool(
@@ -255,10 +254,10 @@ $pool = new ConnectionPool(
 $connection = $pool->connect();
 $result = $connection->execute('SELECT $1', vec['pooled']);
 $connection->close();
-assert!($pool->getOpenConnections() == 1);
-assert!($pool->getIdleConnections() == 0);
+assert!($pool->getOpenConnections() == 1u);
+assert!($pool->getIdleConnections() == 0u);
 assert!(Database\fetch_one($result) == vec['pooled']);
-assert!($pool->getIdleConnections() == 1);
+assert!($pool->getIdleConnections() == 1u);
 
 $connection = $pool->connect();
 assert!($connector->connections == 1);
@@ -266,25 +265,25 @@ assert!($connector->opened[0]->pings == 1);
 
 $statement = $connection->prepare('SELECT $1');
 $connection->close();
-assert!($pool->getIdleConnections() == 0);
+assert!($pool->getIdleConnections() == 0u);
 $statementResult = $statement->execute(vec[42]);
 assert!(Database\fetch_one($statementResult) == vec[42]);
 $statement->close();
-assert!($pool->getIdleConnections() == 1);
+assert!($pool->getIdleConnections() == 1u);
 
 $connection = $pool->connect();
 $transaction = $connection->begin(TransactionIsolation::Serializable);
 $connection->close();
-assert!($pool->getIdleConnections() == 0);
+assert!($pool->getIdleConnections() == 0u);
 $transaction->rollback();
-assert!($pool->getIdleConnections() == 1);
+assert!($pool->getIdleConnections() == 1u);
 
 $held = $pool->connect();
 $limited = new ConnectionPool(
   $connector,
   new PoolConfiguration(
-    maximumConnections: 1,
-    maximumIdleConnections: 1,
+    maximumConnections: 1u,
+    maximumIdleConnections: 1u,
     validationInterval: null,
   ),
 );
@@ -296,7 +295,7 @@ $waiting = Async\spawn::<Connection>(
 );
 
 Async\later();
-assert!($limited->getPendingConnections() == 1);
+assert!($limited->getPendingConnections() == 1u);
 $cancellation->cancel();
 $assertion_value_20 = fn(): Connection => $waiting->await();
 $assertion_error_20 = null;
@@ -314,8 +313,8 @@ $limited->close();
 $timed = new ConnectionPool(
   $connector,
   new PoolConfiguration(
-    maximumConnections: 1,
-    maximumIdleConnections: 1,
+    maximumConnections: 1u,
+    maximumIdleConnections: 1u,
     validationInterval: null,
     acquisitionTimeout: Duration::fromMilliseconds(5),
   ),

@@ -71,7 +71,7 @@ function secure_connect(
 function listen(
   InternetEndpoint $endpoint = new InternetEndpoint(
     Address::v4('127.0.0.1'),
-    0,
+    0u,
   ),
   ListenConfiguration $configuration = new ListenConfiguration(),
 ): Listener {

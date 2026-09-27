@@ -3,7 +3,7 @@ namespace Whim\Hash;
 use Whim\_Private;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 
 /** Names a digest the engine can compute. */
 enum Algorithm: int {
@@ -31,28 +31,28 @@ enum Algorithm: int {
   /** The number of bytes in this algorithm's digest. */
   #[AlwaysInline]
   #[MustUse]
-  public function digestLength(): PositiveInt {
+  public function digestLength(): NonZero<uint> {
     return match ($this) {
-      Algorithm::Sha2_224 => 28,
-      Algorithm::Sha2_256 => 32,
-      Algorithm::Sha2_384 => 48,
-      Algorithm::Sha2_512 => 64,
-      Algorithm::Sha2_512_256 => 32,
-      Algorithm::Sha3_224 => 28,
-      Algorithm::Sha3_256 => 32,
-      Algorithm::Sha3_384 => 48,
-      Algorithm::Sha3_512 => 64,
-      Algorithm::Keccak256 => 32,
-      Algorithm::Sha1 => 20,
-      Algorithm::Md5 => 16,
-      Algorithm::Ripemd160 => 20,
-      Algorithm::Blake3 => 32,
-      Algorithm::Blake2b256 => 32,
-      Algorithm::Crc32 => 4,
-      Algorithm::Crc32c => 4,
-      Algorithm::Adler32 => 4,
-      Algorithm::Xxhash64 => 8,
-      Algorithm::Xxhash3 => 8,
+      Algorithm::Sha2_224 => 28u,
+      Algorithm::Sha2_256 => 32u,
+      Algorithm::Sha2_384 => 48u,
+      Algorithm::Sha2_512 => 64u,
+      Algorithm::Sha2_512_256 => 32u,
+      Algorithm::Sha3_224 => 28u,
+      Algorithm::Sha3_256 => 32u,
+      Algorithm::Sha3_384 => 48u,
+      Algorithm::Sha3_512 => 64u,
+      Algorithm::Keccak256 => 32u,
+      Algorithm::Sha1 => 20u,
+      Algorithm::Md5 => 16u,
+      Algorithm::Ripemd160 => 20u,
+      Algorithm::Blake3 => 32u,
+      Algorithm::Blake2b256 => 32u,
+      Algorithm::Crc32 => 4u,
+      Algorithm::Crc32c => 4u,
+      Algorithm::Adler32 => 4u,
+      Algorithm::Xxhash64 => 8u,
+      Algorithm::Xxhash3 => 8u,
     };
   }
 

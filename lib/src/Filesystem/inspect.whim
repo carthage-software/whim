@@ -5,7 +5,6 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 
 /**
  * Reports whether a path points to an existing node, following symbolic links.
@@ -37,7 +36,7 @@ function is_file(NonEmptyString $path): bool {
     return false;
   }
 
-  return NodeKind::fromBits($metadata[0]) == NodeKind::File;
+  return NodeKind::fromBits($metadata[0] as int) == NodeKind::File;
 }
 
 /** Reports whether a path points to a directory. */
@@ -51,7 +50,7 @@ function is_directory(NonEmptyString $path): bool {
     return false;
   }
 
-  return NodeKind::fromBits($metadata[0]) == NodeKind::Directory;
+  return NodeKind::fromBits($metadata[0] as int) == NodeKind::Directory;
 }
 
 /** Reports whether a path points to a symbolic link. */
@@ -65,7 +64,7 @@ function is_symbolic_link(NonEmptyString $path): bool {
     return false;
   }
 
-  return NodeKind::fromBits($metadata[0]) == NodeKind::SymbolicLink;
+  return NodeKind::fromBits($metadata[0] as int) == NodeKind::SymbolicLink;
 }
 
 /**
@@ -187,7 +186,10 @@ function read_directory(NonEmptyString $path): vec<DirectoryEntry> {
 
   $result = vec[];
   foreach ($entries as $entry) {
-    $result[] = new DirectoryEntry($entry[0], NodeKind::fromBits($entry[1]));
+    $result[] = new DirectoryEntry(
+      $entry[0],
+      NodeKind::fromBits($entry[1] as int),
+    );
   }
 
   return $result;
@@ -204,7 +206,7 @@ function read_directory(NonEmptyString $path): vec<DirectoryEntry> {
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
-function total_space(NonEmptyString $path): NonNegativeInt {
+function total_space(NonEmptyString $path): uint {
   try {
     $space = Whim\_Private\filesystem_space($path);
   } catch (Whim\_Private\SystemError $error) {
@@ -225,7 +227,7 @@ function total_space(NonEmptyString $path): NonNegativeInt {
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
-function available_space(NonEmptyString $path): NonNegativeInt {
+function available_space(NonEmptyString $path): uint {
   try {
     $space = Whim\_Private\filesystem_space($path);
   } catch (Whim\_Private\SystemError $error) {

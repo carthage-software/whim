@@ -387,7 +387,7 @@ $keys = dict[
   MAXIMUM => 'max',
 ];
 
-assert!(length!($keys) == 5);
+assert!(length!($keys) == 5u);
 assert!($keys[1u] == 'uint');
 assert!($keys[MAXIMUM] == 'max');
 assert!(
@@ -426,7 +426,7 @@ assert!(
   == 'max',
 );
 
-assert!(length!(Whim\Vec\unique::<int|uint|float>(vec[1, 1u, 1.0, 1u])) == 3);
+assert!(length!(Whim\Vec\unique::<int|uint|float>(vec[1, 1u, 1.0, 1u])) == 3u);
 expect_error::<TypeError>(fn() => vec['one'][0u]);
 expect_error::<TypeError>(fn() => 'one'[0u]);
 

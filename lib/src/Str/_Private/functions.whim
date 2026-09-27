@@ -15,10 +15,10 @@ use Whim\Unwind\OutOfBoundsException;
 #[NeverInline]
 #[TrackCaller]
 #[TraceBoundary]
-function offset(int $offset, int $length): int {
+function offset(int $offset, uint $length): int {
   $original = $offset;
   if ($offset < 0) {
-    $offset += $length;
+    $offset += $length as int;
   }
 
   if ($offset < 0 || $offset > $length) {
@@ -57,7 +57,7 @@ function equal_at(
   int $position,
   bool $caseInsensitive,
 ): bool {
-  $needleLength = length!($needle);
+  $needleLength = length!($needle) as int;
   if ($position + $needleLength > length!($haystack)) {
     return false;
   }

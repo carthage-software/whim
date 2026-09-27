@@ -29,7 +29,7 @@ function accept_upgrade_request(
   $entry->receivedInitialHeaders = true;
   $entry->requestMethod = HeaderValidator::requestMethod(1, $headers);
   $entry->expectedContentLength = $contentLength;
-  $entry->receivedContentLength = $contentLength ?? 0;
+  $entry->receivedContentLength = $contentLength ?? 0u;
   discard!(end_remote($state, 1, $entry));
 
   return vec[$settingsEvent, (2, 1, $headers, true, false, false)];

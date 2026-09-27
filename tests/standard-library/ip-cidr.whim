@@ -5,10 +5,10 @@ use Whim\IP\Family;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\TypeError;
 
-assert!(Family::V4->byteLength() == 4);
-assert!(Family::V6->byteLength() == 16);
-assert!(Family::V4->bitLength() == 32);
-assert!(Family::V6->bitLength() == 128);
+assert!(Family::V4->byteLength() == 4u);
+assert!(Family::V6->byteLength() == 16u);
+assert!(Family::V4->bitLength() == 32u);
+assert!(Family::V6->bitLength() == 128u);
 assert!(Family::V4->ianaFamily() == 1);
 assert!(Family::fromIanaFamily(2) == Family::V6);
 

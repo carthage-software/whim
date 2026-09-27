@@ -128,7 +128,7 @@ the remainder. A variable after it binds the remainder as a vec:
 
 ```whim
 $total = match (vec[2, 3, 4]) {
-  ($first, ...$rest) @ vec<int> => $first + length!($rest),
+  ($first, ...$rest) @ vec<int> => $first + (length!($rest) as int),
   _ => 0,
 };
 

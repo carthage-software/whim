@@ -8,7 +8,6 @@ use Whim\Database\Row;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\_Private\SQLiteResult;
 
 /** Implements a database result over a SQLite row stream. */
@@ -49,7 +48,7 @@ final class ResultImpl implements Result {
 
   /** Returns the affected row count. */
   #[MustUse]
-  public function getAffectedRows(): null|NonNegativeInt {
+  public function getAffectedRows(): null|uint {
     return $this->result->affectedRows();
   }
 

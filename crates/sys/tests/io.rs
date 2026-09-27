@@ -61,6 +61,7 @@ fn until<T>(mut operation: impl FnMut() -> whim_sys::Result<Option<T>>) -> Resul
 fn file_operations_preserve_offsets_metadata_and_unlinked_temporary_files() -> Result {
     let directory = Directory::new()?;
     let (file, path) = filesystem::create_temporary_file(&directory.0, b"file-", 0o600)?;
+    assert!(file::read(&file, usize::MAX).is_err());
     assert_eq!(file::write(&file, b"abcdefgh")?, 8);
     file::synchronize(&file)?;
     assert_eq!(file::seek(&file, 2, 0)?, 2);
@@ -393,6 +394,17 @@ fn spawned_processes_report_output_and_exit_status() -> Result {
     assert_eq!(processes.record_exit(status), 7 << 8);
     assert!(until(|| spawned.output.as_ref().unwrap().read(32))?.starts_with(b"output"));
     assert!(until(|| spawned.error.as_ref().unwrap().read(32))?.starts_with(b"error"));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn watching_a_non_child_reports_the_wait_error() -> Result {
+    let mut processes = Processes::default();
+    let watch = processes.watch(i64::from(id()))?;
+    let error = until(|| process::read_exit(&watch)).err().unwrap();
+    let error = error.downcast_ref::<whim_sys::Error>().unwrap();
+    assert_eq!(error.errno(), libc::ECHILD);
     Ok(())
 }
 

@@ -48,10 +48,10 @@ final readonly class Time implements Order<Time>, ToString {
   #[AlwaysInline]
   #[MustUse]
   public static function fromPartsUnsafe(
-    int $hour,
-    int $minute,
-    int $second,
-    int $nanosecond,
+    uint $hour,
+    uint $minute,
+    uint $second,
+    uint $nanosecond,
   ): Time {
     return new Time(
       $hour as Hour,

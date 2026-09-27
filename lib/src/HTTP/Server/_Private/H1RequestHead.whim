@@ -14,7 +14,7 @@ final readonly class H1RequestHead {
     public RequestTarget $target,
     public ProtocolVersion $protocolVersion,
     public FieldMap $headers,
-    public null|int $contentLength,
+    public null|uint $contentLength,
     public bool $chunked,
     public bool $connectionClose,
     public bool $connectionKeepAlive,

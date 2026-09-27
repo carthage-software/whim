@@ -136,7 +136,7 @@ final class DefaultTransport implements Transport {
   private function checkin(_Private\Session $session): void {
     if (
       $this->closed
-      || 0 == $this->configuration->maximumIdleConnections
+      || 0u == $this->configuration->maximumIdleConnections
       || length!($this->idle) >= $this->configuration->maximumIdleConnections
     ) {
       $this->closeSession($session);
@@ -156,9 +156,9 @@ final class DefaultTransport implements Transport {
     ($host, $serverName) = $this->target($this->configuration->host);
     $port =
       $this->configuration->port ?? match ($this->configuration->security) {
-        Security::Plaintext => 25,
-        Security::StartTls => 587,
-        Security::ImplicitTls => 465,
+        Security::Plaintext => 25u,
+        Security::StartTls => 587u,
+        Security::ImplicitTls => 465u,
       };
 
     try {
@@ -397,7 +397,10 @@ final class DefaultTransport implements Transport {
     null|CancellationToken $cancellation,
   ): void {
     while (true) {
-      $chunk = $source->read($this->configuration->chunkSize, $cancellation);
+      $chunk = $source->read(
+        $this->configuration->chunkSize as int,
+        $cancellation,
+      );
 
       $last = '' == $chunk || $source->reachedEndOfDataSource();
       $command = 'BDAT ' . length!($chunk);

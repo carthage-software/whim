@@ -7,13 +7,13 @@ use Whim\IO\ReadHandle;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 
 /** Reads BSON documents from a handle. */
 final readonly class Reader {
   public function __construct(
     private ReadHandle $handle,
-    private PositiveInt $maximumBytes = DEFAULT_MAXIMUM_DOCUMENT_BYTES,
+    private NonZero<uint> $maximumBytes = DEFAULT_MAXIMUM_DOCUMENT_BYTES,
   ) {}
 
   /** Reads the next document, or null after the source ends. */
@@ -47,7 +47,7 @@ final readonly class Reader {
 
     $bytes = $prefix . $this->handle->readAll($length - 4, $cancellation);
 
-    if (length!($bytes) != $length) {
+    if (length!($bytes) != ($length as uint)) {
       throw new DecodingException(
         'the BSON document is shorter than its declared length',
       );

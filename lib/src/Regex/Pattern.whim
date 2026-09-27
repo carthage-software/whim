@@ -3,7 +3,6 @@ namespace Whim\Regex;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\_Private\Regex as BuiltInRegex;
 
 /** A compiled byte-oriented regular expression. */
@@ -29,16 +28,13 @@ final readonly class Pattern {
   /** Reports whether the subject contains a match. */
   #[AlwaysInline]
   #[MustUse]
-  public function matches(string $subject, NonNegativeInt $offset = 0): bool {
+  public function matches(string $subject, uint $offset = 0u): bool {
     return $this->compiled->find($subject, $offset) != null;
   }
 
   /** Returns the first match at or after the byte offset. */
   #[MustUse]
-  public function find(
-    string $subject,
-    NonNegativeInt $offset = 0,
-  ): null|MatchResult {
+  public function find(string $subject, uint $offset = 0u): null|MatchResult {
     $match = $this->compiled->find($subject, $offset) ?? return null;
 
     ($start, $end, $captures) = $match;
@@ -51,7 +47,7 @@ final readonly class Pattern {
   public function replaceAll(
     string $subject,
     string $replacement,
-    null|NonNegativeInt $limit = null,
+    null|uint $limit = null,
   ): string {
     return $this->compiled->replaceLiteral($subject, $replacement, $limit);
   }

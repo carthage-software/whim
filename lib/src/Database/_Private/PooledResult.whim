@@ -7,7 +7,6 @@ use Whim\Database\Row;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
-use Whim\Refine\NonNegativeInt;
 
 /** Keeps a pooled connection checked out while rows are streaming. */
 final class PooledResult implements Result, BatchResult {
@@ -27,7 +26,7 @@ final class PooledResult implements Result, BatchResult {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function getAffectedRows(): null|NonNegativeInt {
+  public function getAffectedRows(): null|uint {
     return $this->result->getAffectedRows();
   }
 

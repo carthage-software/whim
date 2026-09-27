@@ -69,7 +69,7 @@ assert!("\x" == '\x');
 
 ```whim
 $text = 'abc';
-assert!(length!($text) == 3);
+assert!(length!($text) == 3u);
 assert!($text[1] == 'b');
 ```
 

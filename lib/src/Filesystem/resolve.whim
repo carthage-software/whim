@@ -44,7 +44,7 @@ function read_symbolic_link(NonEmptyString $link): NonEmptyString {
     if ($error->errno() == Whim\_Private\ERRNO_INVALID_ARGUMENT) {
       throw new NotSymbolicLinkException(
         'path `' . $link . '` does not point to a symbolic link',
-        $error->errno(),
+        $error->getCode(),
       );
     }
 

@@ -242,7 +242,7 @@ assert!($_ == 3);
 (($_, $keptSkip), $_) = ((1, 2), 3);
 assert!($keptSkip == 2);
 ($_, ...$rest) = vec[1, 2, 3];
-assert!(length!($rest) == 2);
+assert!(length!($rest) == 2u);
 
 final class KeyTrace {
   public vec<string> $events = vec[];
@@ -320,19 +320,19 @@ assert!($rest == vec[3, 4]);
 $triple = (9, 8, 7);
 ($first, ...$tail) = $triple;
 assert!($first == 9);
-assert!(length!($tail) == 2);
+assert!(length!($tail) == 2u);
 assert!($tail[0] == 8);
 assert!($tail[1] == 7);
 
 ($a, $b, ...$emptyRest) = vec[1, 2];
-assert!(length!($emptyRest) == 0);
+assert!(length!($emptyRest) == 0u);
 
 ($only, ...) = $vector;
 assert!($only == 1);
 
 (($head, ...$innerRest), $label) = (vec[1, 2, 3], 'end');
 assert!($head == 1);
-assert!(length!($innerRest) == 2);
+assert!(length!($innerRest) == 2u);
 assert!($label == 'end');
 
 $assertion_value_76 = fn(): void {
@@ -458,7 +458,7 @@ while ($index < 300) {
 
 ($leader, ...$remainder) = $long;
 assert!($leader == 0);
-assert!(length!($remainder) == 299);
+assert!(length!($remainder) == 299u);
 assert!($remainder[298] == 299);
 
 $tupleSource = (1, 2, 3);
@@ -474,7 +474,7 @@ $again = vec[4, 5, 6];
 ($againHead, $again, ...$againRest) = $again;
 assert!($againHead == 4);
 assert!($again == 5);
-assert!(length!($againRest) == 1);
+assert!(length!($againRest) == 1u);
 
 $outerSource = (vec[7, 8], 9);
 (($outerSource, $outerSecond), $outerThird) = $outerSource;
@@ -619,11 +619,11 @@ for ($index = 0; $index < 2000; $index++) {
 }
 
 assert!($propertyDictionarySnapshot == dict['first' => 1, 'second' => 2]);
-assert!(length!($propertyDictionary->items) == 2002);
+assert!(length!($propertyDictionary->items) == 2002u);
 
 $propertyAppendScale = new AssignmentPropertyBuffer();
 for ($index = 0; $index < 50000; $index++) {
   $propertyAppendScale->push($index);
 }
 
-assert!(length!($propertyAppendScale->items) == 50000);
+assert!(length!($propertyAppendScale->items) == 50000u);

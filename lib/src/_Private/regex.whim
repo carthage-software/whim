@@ -24,8 +24,8 @@ final class Regex {
   #[TraceBoundary]
   public function find(
     string $subject,
-    0.. $offset = 0,
-  ): null|((0..), (0..), dict<int|string, null|string>) {}
+    uint $offset = 0u,
+  ): null|(uint, uint, dict<int|string, null|string>) {}
 
   /** Replaces matches with literal bytes. */
   #[MustUse]
@@ -34,7 +34,7 @@ final class Regex {
   public function replaceLiteral(
     string $subject,
     string $replacement,
-    null|(0..) $limit = null,
+    null|uint $limit = null,
   ): string {}
 
   /** Splits bytes around every match. */

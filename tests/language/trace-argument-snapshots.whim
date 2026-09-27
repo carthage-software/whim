@@ -26,7 +26,7 @@ try {
 
 assert!($caught is RuntimeException);
 $arguments = $caught->getTrace()[0]->arguments;
-assert!(length!($arguments) == 3);
+assert!(length!($arguments) == 3u);
 assert!($arguments[0] is SnapshotId);
 assert!($arguments[0] == 7);
 assert!($arguments[1] == vec[1, 2]);

@@ -17,7 +17,7 @@ final class FutureState<T> {
   private dict<string, fn(null|Throwable, null|(T,)): void> $callbacks = dict[];
   private null|(T,) $result = null;
   private null|Throwable $error = null;
-  private null|int $unhandledRecord = null;
+  private null|uint $unhandledRecord = null;
   private int $nextCallbackId = 0;
 
   /** Registers a callback for completion. */
@@ -148,7 +148,7 @@ final class FutureState<T> {
     $this->complete = true;
     $callbacks = $this->callbacks;
     $this->callbacks = dict[];
-    $observed = length!($callbacks) != 0;
+    $observed = length!($callbacks) != 0u;
 
     $error = $this->error;
     $result = $this->result;

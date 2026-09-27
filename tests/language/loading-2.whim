@@ -229,7 +229,7 @@ File\write(
 );
 
 function weigh_autoloaded_deep_data(Autoloaded\Deep\Log\Data $data): int {
-  return length!($data);
+  return length!($data) as int;
 }
 
 function make_autoloaded_deep_cell<T>(): Whim\Async\TaskLocal<T> {
@@ -403,7 +403,7 @@ try {
 
 assert!($assertion_error_22 is UndefinedSymbolError);
 
-assert!(length!($hollowRecorder->seen) == 0);
+assert!(length!($hollowRecorder->seen) == 0u);
 Autoload\unregister($hollowLoader);
 Autoload\unregister($hollowFallbackLoader);
 
@@ -424,10 +424,10 @@ $secondOrderLoader = new Autoload\Autoloader()->withFallback(
 
 Autoload\register($firstOrderLoader);
 Autoload\register($secondOrderLoader);
-assert!(length!(Autoload\get_autoloaders()) == 2);
+assert!(length!(Autoload\get_autoloaders()) == 2u);
 assert!(!(Autoload\load_symbol(SymbolKind::Class, 'Nowhere')));
 Autoload\unregister($firstOrderLoader);
-assert!(length!(Autoload\get_autoloaders()) == 1);
+assert!(length!(Autoload\get_autoloaders()) == 1u);
 assert!(!(Autoload\load_symbol(SymbolKind::Class, 'Nowhere')));
 assert!(
   $orderRecorder->seen == vec['first asked', 'second asked', 'second asked'],
@@ -475,9 +475,9 @@ Autoload\register($existsLoader);
 function probe_declared(): void {}
 
 assert!(Symbol\exists('probe_declared'));
-assert!(length!($existsRecorder->seen) == 0);
+assert!(length!($existsRecorder->seen) == 0u);
 assert!(!(Symbol\exists('missing', false)));
-assert!(length!($existsRecorder->seen) == 0);
+assert!(length!($existsRecorder->seen) == 0u);
 assert!(!(Symbol\exists('missing')));
 assert!(
   $existsRecorder->seen == vec[
@@ -540,7 +540,7 @@ try {
 
 assert!($assertion_error_45 is UndefinedSymbolError);
 
-assert!(length!($kindRecorder->seen) == 0);
+assert!(length!($kindRecorder->seen) == 0u);
 Autoload\unregister($kindLoader);
 
 File\write($work . '/builder-widget.whim', 'class BuilderWidget {}' . "\n");
@@ -640,7 +640,7 @@ $checkReentrantParameters = fn(
   string $label,
   int $last,
 ): int {
-  return $first + length!($label) + $last;
+  return $first + (length!($label) as int) + $last;
 };
 
 assert!(!Symbol\exists('ReentrantParameterInteger', false));

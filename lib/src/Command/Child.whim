@@ -7,7 +7,6 @@ use Whim\IO\WriteHandle;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Process\Signal;
-use Whim\Refine\NonNegativeInt;
 use Whim\Time\Duration;
 
 /** A running child process. */
@@ -15,7 +14,7 @@ interface Child {
   /** The identifier the operating system gave the child. */
   #[MustUse]
   #[TrackCaller]
-  public function getId(): NonNegativeInt;
+  public function getId(): uint;
 
   /** Whether the child has yet to end. */
   #[MustUse]

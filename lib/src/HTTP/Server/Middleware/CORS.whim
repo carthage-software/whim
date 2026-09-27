@@ -15,7 +15,6 @@ use Whim\HTTP\Message\STATUS_NO_CONTENT;
 use Whim\HTTP\Server\Context\Context;
 use Whim\HTTP\Server\Handler\Handler;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\Str\join;
 use Whim\Str\split;
 use Whim\Str\trim;
@@ -35,7 +34,7 @@ final readonly class CORS implements Middleware {
     public vec<FieldName> $allowedHeaders = vec[],
     public vec<FieldName> $exposedHeaders = vec[],
     public bool $allowCredentials = false,
-    public null|NonNegativeInt $maxAge = null,
+    public null|uint $maxAge = null,
   ) {}
 
   #[TrackCaller]
@@ -46,7 +45,7 @@ final readonly class CORS implements Middleware {
     CancellationToken $cancellation,
   ): Response {
     $origins = $request->headers->getAll('Origin');
-    if (length!($origins) != 1) {
+    if (length!($origins) != 1u) {
       return $next->handle($context, $request, $cancellation);
     }
 

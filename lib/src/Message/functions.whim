@@ -55,12 +55,12 @@ function parse(
     }
 
     $colon = Str\search($line, ':');
-    if (null == $colon || 0 == $colon) {
+    if (null == $colon || 0u == $colon) {
       throw new InvalidArgumentException('invalid RFC 5322 message header');
     }
 
     $name = Str\slice($line, 0, $colon);
-    $value = Str\trim(Str\slice($line, $colon + 1));
+    $value = Str\trim(Str\slice($line, ($colon as int) + 1));
   }
 
   if (null != $name) {

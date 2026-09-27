@@ -13,7 +13,7 @@ final readonly class Configuration {
   #[TrackCaller]
   public function __construct(
     public Host $host,
-    public Port $port = 1080,
+    public Port $port = 1080u,
     public null|string[1..=255] $username = null,
     #[SensitiveParameter] public null|string[1..=255] $password = null,
   ) {

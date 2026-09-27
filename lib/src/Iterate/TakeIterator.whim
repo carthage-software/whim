@@ -1,24 +1,22 @@
 namespace Whim\Iterate;
 
-use Whim\Refine\NonNegativeInt;
-
 /** Lazily limits the number of entries from another iterator. */
 final class TakeIterator<K, V> implements Iterator<K, V> {
   /** Creates an iterator that yields at most the requested number of entries. */
   public function __construct(
     private Iterator<K, V> $iterator,
-    private NonNegativeInt $remaining,
+    private uint $remaining,
   ) {}
 
   /** Returns the next entry while the limit has not been reached. */
   public function next(): null|(K, V) {
-    if (0 == $this->remaining) {
+    if (0u == $this->remaining) {
       return null;
     }
 
     $entry = $this->iterator->next();
     if (null == $entry) {
-      $this->remaining = 0;
+      $this->remaining = 0u;
       return null;
     }
 

@@ -599,8 +599,6 @@ fn transfer(
             destination,
             ..
         }
-        | Instruction::Length { destination, .. }
-        | Instruction::StringLength { destination, .. }
         | Instruction::Compare { destination, .. } => (destination, KnownKind::Int),
         Instruction::LoadInteger {
             kind: IntegerKind::U64,
@@ -690,7 +688,9 @@ fn transfer(
         | Instruction::UintCounterLoop {
             counter: destination,
             ..
-        } => (destination, KnownKind::Uint),
+        }
+        | Instruction::Length { destination, .. }
+        | Instruction::StringLength { destination, .. } => (destination, KnownKind::Uint),
         Instruction::Modulo {
             kind: None,
             destination,

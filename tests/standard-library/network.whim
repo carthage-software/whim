@@ -45,10 +45,10 @@ try {
 
 assert!($resolutionCancellation is CancelledException);
 
-$ipv4 = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+$ipv4 = new InternetEndpoint(Address::v4('127.0.0.1'), 8080u);
 assert!($ipv4->toString() == '127.0.0.1:8080');
 
-$ipv6 = new InternetEndpoint(Address::v6('::1'), 443);
+$ipv6 = new InternetEndpoint(Address::v6('::1'), 443u);
 assert!($ipv6->toString() == '[::1]:443');
 assert!(
   new UnixEndpoint('/tmp/example.sock')->toString() == '/tmp/example.sock',
@@ -109,9 +109,9 @@ $unixListener->close();
 Filesystem\delete_file($socketPath);
 Filesystem\delete_directory($directory);
 
-$receiver = UDP\bind(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$receiver = UDP\bind(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 
-$sender = UDP\bind(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$sender = UDP\bind(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 
 $senderEndpoint = $sender->getLocalEndpoint();
 $receiverEndpoint = $receiver->getLocalEndpoint();
@@ -120,9 +120,9 @@ $metadata = new UDP\SendMetadata(
   UDP\ExplicitCongestion::CapableTransport1,
 );
 
-assert!($sender->sendTo('datagram', $receiverEndpoint, $metadata) == 8);
+assert!($sender->sendTo('datagram', $receiverEndpoint, $metadata) == 8u);
 
-$datagram = $receiver->receive(64);
+$datagram = $receiver->receive(64u);
 assert!($datagram->bytes == 'datagram');
 assert!(
   $datagram->peer->address->toString() == $senderEndpoint->address->toString(),
@@ -138,11 +138,11 @@ assert!(
   $datagram->explicitCongestion == UDP\ExplicitCongestion::CapableTransport1,
 );
 
-assert!($datagram->interfaceIndex >= 0);
+assert!($datagram->interfaceIndex is uint);
 assert!(!($datagram->truncated));
 
 discard!($sender->sendTo('truncated', $receiverEndpoint));
-$truncated = $receiver->receive(3);
+$truncated = $receiver->receive(3u);
 assert!($truncated->bytes == 'tru');
 assert!($truncated->truncated);
 
@@ -154,8 +154,8 @@ assert!(
 
 assert!($connected->getPeerEndpoint()->port == $receiverEndpoint->port);
 
-assert!($connected->send('connected') == 9);
-$connectedDatagram = $receiver->receive(64);
+assert!($connected->send('connected') == 9u);
+$connectedDatagram = $receiver->receive(64u);
 assert!($connectedDatagram->bytes == 'connected');
 
 $connectedMetadata = new UDP\SendMetadata(
@@ -163,8 +163,8 @@ $connectedMetadata = new UDP\SendMetadata(
   UDP\ExplicitCongestion::CapableTransport0,
 );
 
-assert!($connected->send('metadata', $connectedMetadata) == 8);
-$metadataDatagram = $receiver->receive(64);
+assert!($connected->send('metadata', $connectedMetadata) == 8u);
+$metadataDatagram = $receiver->receive(64u);
 assert!($metadataDatagram->bytes == 'metadata');
 assert!(
   $metadataDatagram->explicitCongestion
@@ -172,7 +172,7 @@ assert!(
 );
 
 discard!($receiver->sendTo('reply', $connected->getLocalEndpoint()));
-assert!($connected->receive(64)->bytes == 'reply');
+assert!($connected->receive(64u)->bytes == 'reply');
 $connected->close();
 $receiver->close();
 
@@ -198,8 +198,8 @@ foreach (vec[
   ),
 ] as ($wildcard, $loopback, $senderBinding, $onlyIPv6)) {
   $configuration = new UDP\BindConfiguration(onlyIPv6: $onlyIPv6);
-  $receiver = UDP\bind(new InternetEndpoint($wildcard, 0), $configuration);
-  $sender = UDP\bind(new InternetEndpoint($senderBinding, 0), $configuration);
+  $receiver = UDP\bind(new InternetEndpoint($wildcard, 0u), $configuration);
+  $sender = UDP\bind(new InternetEndpoint($senderBinding, 0u), $configuration);
   $destination = new InternetEndpoint(
     $loopback,
     $receiver->getLocalEndpoint()->port,
@@ -210,8 +210,8 @@ foreach (vec[
     UDP\ExplicitCongestion::CapableTransport1,
   );
 
-  assert!($sender->sendTo('wildcard', $destination, $metadata) == 8);
-  $datagram = $receiver->receive(64);
+  assert!($sender->sendTo('wildcard', $destination, $metadata) == 8u);
+  $datagram = $receiver->receive(64u);
   assert!('wildcard' == $datagram->bytes);
   assert!($datagram->local->address->toString() == $loopback->toString());
   assert!($datagram->interfaceIndex > 0);
@@ -220,7 +220,7 @@ foreach (vec[
   );
 
   $interface = match ($loopback->family) {
-    Family::V4 => 0,
+    Family::V4 => 0u,
     Family::V6 => $datagram->interfaceIndex,
   };
 
@@ -230,8 +230,8 @@ foreach (vec[
     $interface,
   );
 
-  assert!($receiver->sendTo('reply', $datagram->peer, $reply) == 5);
-  $received = $sender->receive(64);
+  assert!($receiver->sendTo('reply', $datagram->peer, $reply) == 5u);
+  $received = $sender->receive(64u);
   assert!('reply' == $received->bytes);
   assert!(
     $received

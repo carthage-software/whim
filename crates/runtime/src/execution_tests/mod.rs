@@ -22,6 +22,35 @@ fn run_both_modes(source: &str, path: &str) {
 }
 
 #[test]
+fn lengths_preserve_unsigned_types() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function dynamic_length(mixed $value): uint { return length!($value); }
+#[NeverInline]
+function string_length(string $value): uint { return length!($value); }
+#[NeverInline]
+function invalid_length(mixed $value): int { return length!($value); }
+assert!(length!('abc') == 3u);
+assert!(length!(vec[]) == 0u);
+assert!(length!((1, 2)) is uint);
+assert!(!(length!(dict['a' => 1]) is int));
+assert!(dynamic_length('abc') == 3u);
+assert!(dynamic_length('a string longer than the inline capacity') == 40u);
+assert!(dynamic_length(vec[1, 2]) == 2u);
+assert!(dynamic_length(dict['a' => 1]) == 1u);
+assert!(dynamic_length((1, 2, 3)) == 3u);
+assert!(string_length('abc') == 3u);
+$caught = false;
+try { invalid_length(vec[]); } catch (Whim\Unwind\TypeError $error) { $caught = true; }
+assert!($caught);
+",
+        "/unsigned-lengths.whim",
+    );
+}
+
+#[test]
 fn repeated_tuple_reads_preserve_reassignment_and_copy_on_write() {
     run_both_modes(
         r"
@@ -45,15 +74,15 @@ function copied((vec<int>, int) $pair, bool $change_first): int {
     $first = $pair[0];
     $second = $pair[0];
     if ($change_first) { $first[] = 3; } else { $second[] = 3; }
-    return length!($first) * 100 + length!($second);
+    return (length!($first) as int) * 100 + (length!($second) as int);
 }
 #[NeverInline]
 function reused((vec<int>, int) $pair): int {
     $first = $pair[0];
-    $size = length!($first);
+    $size = length!($first) as int;
     $first = $pair[0];
     $first[] = 3;
-    return $size * 100 + length!($first);
+    return $size * 100 + (length!($first) as int);
 }
 assert!(repeated((3, 4), 100) == 1000);
 assert!(reassigned((3, 4), (5, 6), false) == 6);
@@ -124,7 +153,7 @@ for ($round = 0; $round < 4; $round++) {
             assert!(reversed_byte($offset, $text) == $expected);
         }
         $caught = false;
-        try { byte_value($text, length!($text)); }
+        try { byte_value($text, length!($text) as int); }
         catch (Whim\Unwind\OutOfBoundsError $error) {
             assert!($error->getTrace()[0]->function == 'Whim\Str\byte_at');
             assert!($error->getTrace()[1]->function == 'byte_value');

@@ -18,7 +18,7 @@ use crate::core::private::syscall::{
 
 enum FileResult {
     Bytes(Vec<u8>),
-    Integer(i64),
+    Integer(u64),
     Boolean(bool),
     Metadata(Metadata),
     Descriptor(File),
@@ -35,7 +35,7 @@ pub(crate) struct FileOperation {
 default_built_in_state!(FileOperation);
 
 #[whim_function(
-    "Whim\\_Private\\read_file(string $path, (0..) $offset, null|(1..) $maximumBytes): string",
+    "Whim\\_Private\\read_file(string $path, uint $offset, null|(1u..) $maximumBytes): string",
     must_use
 )]
 pub(crate) fn read_file<'call>(
@@ -43,8 +43,8 @@ pub(crate) fn read_file<'call>(
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     let path = path(cx, arguments.bytes(0), "open")?;
-    let offset = arguments.int(1).cast_unsigned();
-    let maximum = arguments.optional_int(2).map(i64::cast_unsigned);
+    let offset = arguments.uint(1);
+    let maximum = arguments.local(2).as_uint();
     let shared = submit(cx, move || {
         file::read_path(&path, offset, maximum).map(FileResult::Bytes)
     })?;
@@ -61,7 +61,7 @@ impl FileOperation {
     const fn construct() {}
 
     #[whim_method(
-        "read(Whim\\OS\\FileDescriptor $descriptor, (1..) $maximumBytes): Whim\\_Private\\FileOperation",
+        "read(Whim\\OS\\FileDescriptor $descriptor, (1u..) $maximumBytes): Whim\\_Private\\FileOperation",
         static,
         must_use
     )]
@@ -70,15 +70,16 @@ impl FileOperation {
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
         let descriptor = duplicate(cx, arguments, "read")?;
-        let maximum = usize::try_from(arguments.int(1))
-            .map_err(|_| system_error(cx, "read", libc::EOVERFLOW))?;
+        let maximum = isize::try_from(arguments.uint(1))
+            .map_err(|_| system_error(cx, "read", libc::EOVERFLOW))?
+            .cast_unsigned();
         start(cx, move || {
             file::read(&descriptor, maximum).map(FileResult::Bytes)
         })
     }
 
     #[whim_method(
-        "readPath(string $path, (0..) $offset, null|(1..) $maximumBytes): Whim\\_Private\\FileOperation",
+        "readPath(string $path, uint $offset, null|(1u..) $maximumBytes): Whim\\_Private\\FileOperation",
         static,
         must_use
     )]
@@ -87,8 +88,8 @@ impl FileOperation {
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
         let path = path(cx, arguments.bytes(0), "open")?;
-        let offset = arguments.int(1).cast_unsigned();
-        let maximum = arguments.optional_int(2).map(i64::cast_unsigned);
+        let offset = arguments.uint(1);
+        let maximum = arguments.local(2).as_uint();
         start(cx, move || {
             file::read_path(&path, offset, maximum).map(FileResult::Bytes)
         })
@@ -106,8 +107,7 @@ impl FileOperation {
         let descriptor = duplicate(cx, arguments, "write")?;
         let bytes = arguments.bytes(1).to_vec();
         start(cx, move || {
-            file::write(&descriptor, &bytes)
-                .map(|count| FileResult::Integer(i64::try_from(count).unwrap_or(i64::MAX)))
+            file::write(&descriptor, &bytes).map(|count| FileResult::Integer(count as u64))
         })
     }
 
@@ -127,7 +127,7 @@ impl FileOperation {
     }
 
     #[whim_method(
-        "truncate(Whim\\OS\\FileDescriptor $descriptor, (0..) $length): Whim\\_Private\\FileOperation",
+        "truncate(Whim\\OS\\FileDescriptor $descriptor, uint $length): Whim\\_Private\\FileOperation",
         static,
         must_use
     )]
@@ -136,7 +136,7 @@ impl FileOperation {
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
         let descriptor = duplicate(cx, arguments, "ftruncate")?;
-        let length = arguments.int(1).cast_unsigned();
+        let length = arguments.uint(1);
         start(cx, move || {
             file::truncate(&descriptor, length).map(|()| FileResult::Boolean(true))
         })
@@ -216,8 +216,7 @@ impl FileOperation {
         let descriptor = duplicate(cx, arguments, "lseek")?;
         let (offset, origin) = (arguments.int(1), arguments.int(2));
         start(cx, move || {
-            file::seek(&descriptor, offset, origin)
-                .map(|position| FileResult::Integer(i64::try_from(position).unwrap_or(i64::MAX)))
+            file::seek(&descriptor, offset, origin).map(FileResult::Integer)
         })
     }
 
@@ -254,10 +253,10 @@ impl FileOperation {
         }
     }
 
-    #[whim_method("takeInt(): null|int", must_use)]
-    fn take_int(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
+    #[whim_method("takeUint(): null|uint", must_use)]
+    fn take_uint(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         match take(cx)? {
-            Some(FileResult::Integer(value)) => Ok(Value::int(value)),
+            Some(FileResult::Integer(value)) => Ok(Value::uint(value)),
             None => Ok(Value::null()),
             _ => Err(cx.type_error("the file operation does not contain an integer")),
         }
@@ -272,7 +271,7 @@ impl FileOperation {
         }
     }
 
-    #[whim_method("takeMetadata(): null|vec<int>", must_use)]
+    #[whim_method("takeMetadata(): null|vec<int|uint>", must_use)]
     fn take_metadata(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         match take(cx)? {
             Some(FileResult::Metadata(metadata)) => Ok(metadata_value(cx, &metadata)),
@@ -369,26 +368,23 @@ fn wait_for(cx: &mut Context<'_, '_, '_>, shared: &Shared) -> Result<(), Throw> 
 }
 
 pub(crate) fn metadata_value(cx: &Context<'_, '_, '_>, metadata: &Metadata) -> Value {
-    cx.vec(
-        [
-            metadata.mode,
-            metadata.links,
-            metadata.user,
-            metadata.group,
-            metadata.size,
-            metadata.block_size,
-            metadata.blocks,
-            metadata.device,
-            metadata.inode,
-            metadata.accessed.seconds,
-            metadata.accessed.nanoseconds,
-            metadata.modified.seconds,
-            metadata.modified.nanoseconds,
-            metadata.changed.seconds,
-            metadata.changed.nanoseconds,
-        ]
-        .map(Value::int),
-    )
+    cx.vec([
+        Value::uint(metadata.mode),
+        Value::uint(metadata.links),
+        Value::int(metadata.user),
+        Value::int(metadata.group),
+        Value::uint(metadata.size),
+        Value::uint(metadata.block_size),
+        Value::uint(metadata.blocks),
+        Value::uint(metadata.device),
+        Value::uint(metadata.inode),
+        Value::int(metadata.accessed.seconds),
+        Value::uint(metadata.accessed.nanoseconds),
+        Value::int(metadata.modified.seconds),
+        Value::uint(metadata.modified.nanoseconds),
+        Value::int(metadata.changed.seconds),
+        Value::uint(metadata.changed.nanoseconds),
+    ])
 }
 
 #[cfg(test)]

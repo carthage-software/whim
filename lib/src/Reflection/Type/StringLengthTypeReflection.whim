@@ -51,9 +51,9 @@ final class StringLengthTypeReflection implements TypeReflection {
 
   /** Returns the smallest accepted byte length. */
   #[MustUse]
-  public function getMinimumLength(): 0.. {}
+  public function getMinimumLength(): uint {}
 
   /** Returns the largest accepted byte length, or null when unbounded. */
   #[MustUse]
-  public function getMaximumLength(): null|(0..) {}
+  public function getMaximumLength(): null|uint {}
 }

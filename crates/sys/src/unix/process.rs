@@ -476,8 +476,12 @@ pub fn read_exit(descriptor: &Descriptor) -> Result<Option<Exit>> {
     };
     let bytes =
         <[u8; 4]>::try_from(bytes).map_err(|_| Error::new("read", io::ErrorKind::BrokenPipe))?;
+    let status = i32::from_ne_bytes(bytes);
+    if status < 0 {
+        return Err(Error::new("waitpid", io::Error::from_raw_os_error(-status)));
+    }
     Ok(Some(Exit {
-        status: i64::from(i32::from_ne_bytes(bytes)),
+        status: i64::from(status),
         user_time: 0,
         system_time: 0,
     }))

@@ -18,7 +18,7 @@ use Whim\Unwind\InvalidArgumentException;
  */
 #[Stub]
 #[MustUse]
-function exchange_creation_mask(0..=0o777 $mask): 0..=0o777 {}
+function exchange_creation_mask(0u..=0o777u $mask): 0u..=0o777u {}
 
 /**
  * Creates a directory; permissions default to `0o755` before the umask applies.
@@ -33,7 +33,7 @@ function exchange_creation_mask(0..=0o777 $mask): 0..=0o777 {}
 #[TrackCaller]
 function create_directory(
   NonEmptyString $path,
-  Uint32 $permissions = 0o755,
+  Uint32 $permissions = 0o755u,
   bool $recursive = false,
 ): void {
   if ($recursive) {
@@ -60,7 +60,7 @@ function create_directory(
  */
 #[NeverInline]
 #[TrackCaller]
-function create_file(NonEmptyString $path, Uint32 $permissions = 0o666): void {
+function create_file(NonEmptyString $path, Uint32 $permissions = 0o666u): void {
   try {
     $descriptor = _Private\open_descriptor(
       $path,
@@ -131,7 +131,7 @@ function create_symbolic_link(
 #[TrackCaller]
 function create_named_pipe(
   NonEmptyString $path,
-  Uint32 $permissions = 0o666,
+  Uint32 $permissions = 0o666u,
 ): void {
   try {
     Whim\_Private\create_named_pipe($path, $permissions);
@@ -167,7 +167,7 @@ function create_temporary_file(
   }
 
   try {
-    $result = Whim\_Private\create_temporary_file($directory, $prefix, 0o600);
+    $result = Whim\_Private\create_temporary_file($directory, $prefix, 0o600u);
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, $directory, 'create temporary file');
   }

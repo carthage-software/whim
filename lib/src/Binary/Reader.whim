@@ -5,7 +5,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Refine\Int16;
 use Whim\Refine\Int32;
 use Whim\Refine\Int8;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Uint16;
 use Whim\Refine\Uint32;
 use Whim\Refine\Uint8;
@@ -65,7 +64,7 @@ interface Reader {
   /** Reads a fixed number of raw bytes. */
   #[MustUse]
   #[TrackCaller]
-  public function bytes(NonNegativeInt $length): string;
+  public function bytes(uint $length): string;
 
   /** Whether every byte has been consumed. */
   #[MustUse]
@@ -74,8 +73,8 @@ interface Reader {
 
   /** Advances past a number of bytes without returning them. */
   #[TrackCaller]
-  public function skip(NonNegativeInt $length): void {
-    if (0 == $length) {
+  public function skip(uint $length): void {
+    if (0u == $length) {
       return;
     }
 
@@ -107,6 +106,6 @@ interface Reader {
   #[MustUse]
   #[TrackCaller]
   public function u64PrefixedBytes(null|Endianness $endianness = null): string {
-    return $this->bytes($this->u64($endianness) as int);
+    return $this->bytes($this->u64($endianness));
   }
 }

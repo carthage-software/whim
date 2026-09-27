@@ -185,9 +185,7 @@ fn hoist_lengths(chunk: &mut Chunk) {
         };
 
         let Instruction::IntegerAddAssign {
-            kind: IntegerKind::I64,
-            source: consumed,
-            ..
+            source: consumed, ..
         } = chunk.code[header + 2]
         else {
             continue;

@@ -4,15 +4,14 @@ use Whim;
 use Whim\_Private\H2FrameDecoder;
 use Whim\_Private\HpackDecoder;
 use Whim\_Private\HpackEncoder;
-use Whim\Refine\NonNegativeInt;
 
 /** Mutable state shared by the sans-I/O protocol operations. */
 final class State {
   public H2FrameDecoder $frameDecoder;
   public HpackDecoder $headerDecoder;
   public HpackEncoder $headerEncoder;
-  public NonNegativeInt $maximumDecodedHeaderListSize;
-  public NonNegativeInt $maximumEncodedHeaderListSize;
+  public uint $maximumDecodedHeaderListSize;
+  public uint $maximumEncodedHeaderListSize;
   public SettingsRegistry $settings;
   public StreamTable $streams;
   public FlowController $flow;
@@ -36,30 +35,36 @@ final class State {
     validate_local_settings($role, $configuration->settings);
     $this->settings = new SettingsRegistry($configuration->settings);
     $this->frameDecoder = H2FrameDecoder::create(
-      $this->settings->local(Whim\HTTP\_Private\Setting::MaxFrameSize),
+      $this->settings->local(Whim\HTTP\_Private\Setting::MaxFrameSize) as uint,
     );
 
     $this->headerDecoder = HpackDecoder::create(
-      $this->settings->local(Whim\HTTP\_Private\Setting::HeaderTableSize),
+      $this->settings->local(Whim\HTTP\_Private\Setting::HeaderTableSize)
+        as uint,
     );
 
     $this->maximumDecodedHeaderListSize = $this->settings->local(
       Whim\HTTP\_Private\Setting::MaxHeaderListSize,
-    );
+    )
+      as uint;
 
     $this->headerEncoder = HpackEncoder::create(
-      $this->settings->remote(Whim\HTTP\_Private\Setting::HeaderTableSize),
+      $this->settings->remote(Whim\HTTP\_Private\Setting::HeaderTableSize)
+        as uint,
     );
 
     $this->maximumEncodedHeaderListSize = $this->settings->remote(
       Whim\HTTP\_Private\Setting::MaxHeaderListSize,
-    );
+    )
+      as uint;
 
     $this->streams = new StreamTable(
-      $this->settings->remote(Whim\HTTP\_Private\Setting::MaxConcurrentStreams),
+      $this->settings->remote(Whim\HTTP\_Private\Setting::MaxConcurrentStreams)
+        as uint,
       $this->settings->remote(Whim\HTTP\_Private\Setting::InitialWindowSize),
       $this->settings->local(Whim\HTTP\_Private\Setting::InitialWindowSize),
-      $this->settings->local(Whim\HTTP\_Private\Setting::MaxConcurrentStreams),
+      $this->settings->local(Whim\HTTP\_Private\Setting::MaxConcurrentStreams)
+        as uint,
       $configuration->maximumReservedPushes,
     );
 

@@ -52,7 +52,7 @@ final readonly class Handler implements HTTPHandler {
     }
 
     $versions = $request->headers->getAll('sec-websocket-version');
-    if (length!($versions) != 1 || Str\trim($versions[0], " \t") != '13') {
+    if (length!($versions) != 1u || Str\trim($versions[0], " \t") != '13') {
       return new Response(
         426,
         headers: FieldMap::from(vec[('Sec-WebSocket-Version', '13')]),
@@ -60,7 +60,7 @@ final readonly class Handler implements HTTPHandler {
     }
 
     $keys = $request->headers->getAll('sec-websocket-key');
-    if (length!($keys) != 1) {
+    if (length!($keys) != 1u) {
       throw new HTTPException(400, 'a WebSocket handshake requires one key');
     }
 

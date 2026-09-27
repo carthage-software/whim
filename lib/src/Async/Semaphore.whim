@@ -4,22 +4,21 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\Transform;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Unwind\Throwable;
 use Whim\_Private\RingBuffer;
 use Whim;
 
 /** Represents a semaphore. */
 final class Semaphore<in Tin, out Tout> {
-  private int $ongoing = 0;
+  private uint $ongoing = 0u;
   private RingBuffer<_Private\Waiter<null>> $pending;
   private RingBuffer<_Private\Waiter<null>> $waits;
 
   /** Creates a semaphore. */
   #[TrackCaller]
   public function __construct(
-    private readonly PositiveInt $concurrencyLimit,
+    private readonly NonZero<uint> $concurrencyLimit,
     private readonly Transform<Tin, Tout> $operation,
   ) {
     $this->pending = new RingBuffer::<_Private\Waiter<null>>();
@@ -141,39 +140,39 @@ final class Semaphore<in Tin, out Tout> {
 
   /** Returns the maximum number of concurrent operations. */
   #[AlwaysInline]
-  public function getConcurrencyLimit(): PositiveInt {
+  public function getConcurrencyLimit(): NonZero<uint> {
     return $this->concurrencyLimit;
   }
 
   /** Returns the number of running operations. */
   #[TrackCaller]
-  public function getOngoingOperations(): NonNegativeInt {
-    return $this->ongoing as NonNegativeInt;
+  public function getOngoingOperations(): uint {
+    return $this->ongoing;
   }
 
   /** Returns the number of operations waiting for a slot. */
   #[TrackCaller]
-  public function getPendingOperations(): NonNegativeInt {
-    $count = 0;
+  public function getPendingOperations(): uint {
+    $count = 0u;
     foreach ($this->pending->toVec() as $waiter) {
       if ($waiter->active) {
         $count++;
       }
     }
 
-    return $count as NonNegativeInt;
+    return $count;
   }
 
   /** Reports whether an operation is currently running. */
   #[AlwaysInline]
   public function hasOngoingOperations(): bool {
-    return 0 != $this->ongoing;
+    return 0u != $this->ongoing;
   }
 
   /** Reports whether an operation is waiting for a slot. */
   #[TrackCaller]
   public function hasPendingOperations(): bool {
-    return $this->getPendingOperations() != 0;
+    return $this->getPendingOperations() != 0u;
   }
 
   #[TrackCaller]

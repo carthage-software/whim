@@ -49,7 +49,7 @@ final readonly class ContentDisposition implements ToString {
     }
 
     $type = Str\trim(Str\slice($input, 0, $semicolon));
-    $parameters = Parameters::parse(Str\slice($input, $semicolon + 1));
+    $parameters = Parameters::parse(Str\slice($input, ($semicolon as int) + 1));
     if (null == $parameters || !_Private\is_token(Str\lowercase($type))) {
       return null;
     }
@@ -84,7 +84,7 @@ final readonly class ContentDisposition implements ToString {
     $filename = Str\replace($filename, '\\', '/');
     $slash = Str\search_last($filename, '/');
     if (null != $slash) {
-      $filename = Str\slice($filename, $slash + 1);
+      $filename = Str\slice($filename, ($slash as int) + 1);
     }
 
     if (

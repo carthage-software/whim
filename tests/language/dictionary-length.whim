@@ -3,7 +3,7 @@ use Whim\Unwind\TypeError;
 
 $key = 'a';
 $values = dict[$key => 1, $key => 2];
-assert!(length!($values) == 1);
+assert!(length!($values) == 1u);
 assert!($values['a'] == 2);
 
 $integer = 1;
@@ -20,31 +20,31 @@ $strictKeys = dict[
   $boolean => 1,
 ];
 
-assert!(length!($strictKeys) == 5);
+assert!(length!($strictKeys) == 5u);
 
 $prefix = 'same';
 $longKey = $prefix . '-long-key';
 $composedKeys = dict[$longKey => 1, 'same-long-key' => 2];
-assert!(length!($composedKeys) == 1);
+assert!(length!($composedKeys) == 1u);
 
 /** Counts runtime keys that may collide. */
 #[NeverInline]
-function dynamic_length(int|string|bool $first, int|string|bool $second): int {
+function dynamic_length(int|string|bool $first, int|string|bool $second): uint {
   return length!(dict[$first => 1, $second => 2]);
 }
 
-assert!(dynamic_length('a', 'a') == 1);
-assert!(dynamic_length('a', 'b') == 2);
-assert!(dynamic_length(1, 1) == 1);
-assert!(dynamic_length(true, true) == 1);
-assert!(dynamic_length(1, '1') == 2);
-assert!(dynamic_length(1, true) == 2);
+assert!(dynamic_length('a', 'a') == 1u);
+assert!(dynamic_length('a', 'b') == 2u);
+assert!(dynamic_length(1, 1) == 1u);
+assert!(dynamic_length(true, true) == 1u);
+assert!(dynamic_length(1, '1') == 2u);
+assert!(dynamic_length(1, true) == 2u);
 
 newtype UserId = int;
 newtype PostId = int;
 
 $taggedKeys = dict[UserId(7) => 'user', PostId(7) => 'post'];
-assert!(length!($taggedKeys) == 1);
+assert!(length!($taggedKeys) == 1u);
 assert!($taggedKeys[7] == 'post');
 
 final class KeySource {
@@ -59,16 +59,16 @@ final class KeySource {
 
 $source = new KeySource();
 $computedKeys = dict[$source->next() => 1, $source->next() => 2];
-assert!(length!($computedKeys) == 1);
+assert!(length!($computedKeys) == 1u);
 assert!($source->calls == 2);
 
 /** Counts a single entry without skipping key validation. */
 #[NeverInline]
-function single_length(mixed $key): int {
+function single_length(mixed $key): uint {
   return length!(dict[$key => 1]);
 }
 
-assert!(single_length('a') == 1);
+assert!(single_length('a') == 1u);
 $failed = false;
 try {
   single_length(null);
@@ -77,12 +77,12 @@ try {
 }
 
 assert!($failed);
-assert!(length!(dict[]) == 0);
+assert!(length!(dict[]) == 0u);
 
 $values['b'] = 3;
-assert!(length!($values) == 2);
+assert!(length!($values) == 2u);
 remove!($values, 'a');
-assert!(length!($values) == 1);
+assert!(length!($values) == 1u);
 
 $spread = dict[...$values, 'b' => 4];
-assert!(length!($spread) == 1);
+assert!(length!($spread) == 1u);

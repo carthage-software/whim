@@ -7,7 +7,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Refine\Int16;
 use Whim\Refine\Int32;
 use Whim\Refine\Int8;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Uint16;
 use Whim\Refine\Uint32;
 use Whim\Refine\Uint8;
@@ -17,8 +16,8 @@ use Whim;
 
 /** Reads values out of a byte string, advancing a cursor as it goes. */
 final class MemoryReader implements BufferedReader {
-  private NonNegativeInt $position = 0;
-  private readonly NonNegativeInt $size;
+  private uint $position = 0u;
+  private readonly uint $size;
 
   #[AlwaysInline]
   public function __construct(
@@ -32,8 +31,8 @@ final class MemoryReader implements BufferedReader {
   #[MustUse]
   #[NeverInline]
   #[TrackCaller]
-  private function consume(NonNegativeInt $length): string {
-    if (0 == $length) {
+  private function consume(uint $length): string {
+    if (0u == $length) {
       return '';
     }
 
@@ -46,7 +45,7 @@ final class MemoryReader implements BufferedReader {
       );
     }
 
-    $taken = Str\slice($this->buffer, $this->position, $length);
+    $taken = Str\slice($this->buffer, $this->position as int, $length);
     $this->position += $length;
 
     return $taken;
@@ -62,7 +61,7 @@ final class MemoryReader implements BufferedReader {
   public function u8(): Uint8 {
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       1,
       false,
       false,
@@ -84,13 +83,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       2,
       false,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 2;
+    $this->position += 2u;
 
     return $value;
   }
@@ -106,13 +105,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       4,
       false,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 4;
+    $this->position += 4u;
 
     return $value;
   }
@@ -128,13 +127,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       8,
       false,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 8;
+    $this->position += 8u;
 
     return $value;
   }
@@ -149,7 +148,7 @@ final class MemoryReader implements BufferedReader {
   public function i8(): Int8 {
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       1,
       true,
       false,
@@ -171,13 +170,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       2,
       true,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 2;
+    $this->position += 2u;
 
     return $value;
   }
@@ -193,13 +192,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       4,
       true,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 4;
+    $this->position += 4u;
 
     return $value;
   }
@@ -215,13 +214,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $value = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       8,
       true,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 8;
+    $this->position += 8u;
 
     return $value;
   }
@@ -237,13 +236,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $bits = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       4,
       false,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 4;
+    $this->position += 4u;
 
     return Whim\_Private\bits32_to_float($bits);
   }
@@ -259,13 +258,13 @@ final class MemoryReader implements BufferedReader {
     $endianness ??= $this->endianness;
     $bits = Whim\_Private\binary_decode(
       $this->buffer,
-      $this->position,
+      $this->position as int,
       8,
       true,
       Endianness::Little == $endianness,
     );
 
-    $this->position += 8;
+    $this->position += 8u;
 
     return Whim\Float\from_bits($bits);
   }
@@ -277,7 +276,7 @@ final class MemoryReader implements BufferedReader {
    */
   #[MustUse]
   #[TrackCaller]
-  public function bytes(NonNegativeInt $length): string {
+  public function bytes(uint $length): string {
     return $this->consume($length);
   }
 
@@ -294,7 +293,7 @@ final class MemoryReader implements BufferedReader {
    */
   #[NeverInline]
   #[TrackCaller]
-  public function skip(NonNegativeInt $length): void {
+  public function skip(uint $length): void {
     if ($this->size - $this->position < $length) {
       throw new UnderflowException(
         'expected '
@@ -309,19 +308,19 @@ final class MemoryReader implements BufferedReader {
 
   #[AlwaysInline]
   #[MustUse]
-  public function cursor(): NonNegativeInt {
+  public function cursor(): uint {
     return $this->position;
   }
 
   #[AlwaysInline]
   #[MustUse]
-  public function length(): NonNegativeInt {
+  public function length(): uint {
     return $this->size;
   }
 
   #[AlwaysInline]
   #[MustUse]
-  public function remaining(): NonNegativeInt {
+  public function remaining(): uint {
     return $this->size - $this->position;
   }
 }

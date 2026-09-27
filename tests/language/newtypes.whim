@@ -168,7 +168,7 @@ function cached_foo(mixed $value): Foo {
 $numbers = Numbers(vec[1, 2]);
 assert!($numbers[0] == 1);
 $numbers[] = 3;
-assert!(length!($numbers) == 3);
+assert!(length!($numbers) == 3u);
 $sum = 0;
 foreach ($numbers as $number) {
   $sum += $number;

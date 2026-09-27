@@ -7,11 +7,11 @@ use Whim\Marker\TrackCaller;
 
 /** Reads an HTTP/1 response body delimited by transport close. */
 final class UntilCloseBody implements ReadHandle {
-  private int $readBytes = 0;
+  private uint $readBytes = 0u;
 
   public function __construct(
     private ReadHandle $reader,
-    private int $maximumBytes,
+    private uint $maximumBytes,
   ) {}
 
   #[TrackCaller]

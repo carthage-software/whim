@@ -63,7 +63,7 @@ final readonly class Command implements ToString {
 
     return Command::fromParts(
       $verb as NonEmptyString,
-      Str\slice($command, $space + 1),
+      Str\slice($command, ($space as int) + 1),
     );
   }
 

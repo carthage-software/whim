@@ -9,43 +9,43 @@ assert!(
 assert!(Whim\_Private\websocket_accept_key('invalid') == null);
 assert!(Whim\_Private\websocket_accept_key('YQ==') == null);
 
-$codec = WebSocketCodec::server(1024, 1024);
+$codec = WebSocketCodec::server(1024u, 1024u);
 assert!($codec->nextEvent() == null);
 $codec->push("\x81\x85");
 assert!($codec->nextEvent() == null);
 $codec->push("\x01\x02\x03\x04\x69\x67\x6f\x68\x6e");
-assert!($codec->nextEvent() == (1, 'hello', 0));
+assert!($codec->nextEvent() == (1u, 'hello', 0u));
 assert!($codec->takeOutput() == '');
 
 $codec->push("\x82\x82\x01\x02\x03\x04\x01\xfd");
-assert!($codec->nextEvent() == (2, "\x00\xff", 0));
+assert!($codec->nextEvent() == (2u, "\x00\xff", 0u));
 
 $codec->push(
   "\x01\x83\x01\x02\x03\x04\x69\x67\x6f" . "\x80\x82\x05\x06\x07\x08\x69\x69",
 );
 
-assert!($codec->nextEvent() == (1, 'hello', 0));
+assert!($codec->nextEvent() == (1u, 'hello', 0u));
 
 $codec->push("\x89\x81\x01\x02\x03\x04\x79");
 assert!($codec->nextEvent() == null);
 assert!($codec->takeOutput() == "\x8a\x01x");
 
-$outgoing = WebSocketCodec::server(1024, 1024);
+$outgoing = WebSocketCodec::server(1024u, 1024u);
 $outgoing->sendText('hello');
 $outgoing->sendBinary("\x00\xff");
 $outgoing->ping('x');
 assert!($outgoing->takeOutput() == "\x81\x05hello\x82\x02\x00\xff\x89\x01x");
 
-$client = WebSocketCodec::client(1024, 1024);
+$client = WebSocketCodec::client(1024u, 1024u);
 $client->push("\x81\x05hello");
-assert!($client->nextEvent() == (1, 'hello', 0));
+assert!($client->nextEvent() == (1u, 'hello', 0u));
 $client->sendText('masked');
 $masked = $client->takeOutput();
-$server = WebSocketCodec::server(1024, 1024);
+$server = WebSocketCodec::server(1024u, 1024u);
 $server->push($masked);
-assert!($server->nextEvent() == (1, 'masked', 0));
+assert!($server->nextEvent() == (1u, 'masked', 0u));
 
-$maskedServer = WebSocketCodec::client(1024, 1024);
+$maskedServer = WebSocketCodec::client(1024u, 1024u);
 $maskedServer->push("\x81\x82\x01\x02\x03\x04\x69\x6b");
 $failed = false;
 try {
@@ -57,12 +57,12 @@ try {
 
 assert!($failed);
 
-$localClose = WebSocketCodec::server(1024, 1024);
-$localClose->close(1000, 'bye');
+$localClose = WebSocketCodec::server(1024u, 1024u);
+$localClose->close(1000u, 'bye');
 assert!($localClose->takeOutput() == "\x88\x05\x03\xe8bye");
 assert!(!$localClose->isClosed());
 
-$defaultClose = WebSocketCodec::server(1024, 1024);
+$defaultClose = WebSocketCodec::server(1024u, 1024u);
 $closeDefault = fn(): void {
   $defaultClose->close();
 };
@@ -70,25 +70,25 @@ $closeDefault = fn(): void {
 $closeDefault();
 assert!($defaultClose->takeOutput() == "\x88\x00");
 
-$defaultReason = WebSocketCodec::server(1024, 1024);
+$defaultReason = WebSocketCodec::server(1024u, 1024u);
 $closeDefaultReason = fn(): void {
-  $defaultReason->close(1000);
+  $defaultReason->close(1000u);
 };
 
 $closeDefaultReason();
 assert!($defaultReason->takeOutput() == "\x88\x02\x03\xe8");
 
-$defaultPing = WebSocketCodec::server(1024, 1024);
+$defaultPing = WebSocketCodec::server(1024u, 1024u);
 $defaultPing->ping();
 assert!($defaultPing->takeOutput() == "\x89\x00");
 
-$closing = WebSocketCodec::server(1024, 1024);
+$closing = WebSocketCodec::server(1024u, 1024u);
 $closing->push("\x88\x85\x01\x02\x03\x04\x02\xea\x61\x7d\x64");
-assert!($closing->nextEvent() == (8, 'bye', 1000));
+assert!($closing->nextEvent() == (8u, 'bye', 1000u));
 assert!($closing->takeOutput() == "\x88\x05\x03\xe8bye");
 assert!($closing->isClosed());
 
-$invalidMask = WebSocketCodec::server(1024, 1024);
+$invalidMask = WebSocketCodec::server(1024u, 1024u);
 $invalidMask->push("\x81\x05hello");
 $failed = false;
 try {
@@ -101,7 +101,7 @@ try {
 assert!($failed);
 assert!($invalidMask->takeOutput() != '');
 
-$invalidText = WebSocketCodec::server(1024, 1024);
+$invalidText = WebSocketCodec::server(1024u, 1024u);
 $invalidText->push("\x81\x81\x01\x02\x03\x04\xfe");
 $failed = false;
 try {
@@ -113,7 +113,7 @@ try {
 
 assert!($failed);
 
-$oversized = WebSocketCodec::server(4, 4);
+$oversized = WebSocketCodec::server(4u, 4u);
 $oversized->push("\x81\x85\x01\x02\x03\x04\x69\x67\x6f\x68\x6e");
 $failed = false;
 try {
@@ -125,7 +125,7 @@ try {
 
 assert!($failed);
 
-$oversizedMessage = WebSocketCodec::server(4, 4);
+$oversizedMessage = WebSocketCodec::server(4u, 4u);
 $oversizedMessage->push(
   "\x01\x83\x01\x02\x03\x04\x69\x67\x6f" . "\x80\x82\x05\x06\x07\x08\x69\x69",
 );
@@ -140,10 +140,10 @@ try {
 
 assert!($failed);
 
-$invalidClose = WebSocketCodec::server(1024, 1024);
+$invalidClose = WebSocketCodec::server(1024u, 1024u);
 $failed = false;
 try {
-  $invalidClose->close(1010, 'client only');
+  $invalidClose->close(1010u, 'client only');
 } catch (WebSocketException $error) {
   assert!($error->getCode() == 1002);
   $failed = true;
@@ -151,7 +151,7 @@ try {
 
 assert!($failed);
 
-$truncated = WebSocketCodec::server(1024, 1024);
+$truncated = WebSocketCodec::server(1024u, 1024u);
 $truncated->finishInput();
 $failed = false;
 try {

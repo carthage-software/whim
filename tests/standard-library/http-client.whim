@@ -21,6 +21,14 @@ use Whim\TLS;
 use Whim\Time\Duration;
 use Whim\URL\URL;
 
+assert!(Client\Origin::fromURL(URL::from('http://example.com'))->port is 80u);
+assert!(Client\Origin::fromURL(URL::from('https://example.com'))->port is 443u);
+assert!(
+  Client\Origin::fromURL(
+    URL::from('http://example.com:65535'),
+  )->port is 65_535u,
+);
+
 final class FakeConnection implements Client\Connection {
   private bool $closed = false;
   public null|Request $request = null;
@@ -369,15 +377,15 @@ final class ScriptedStream implements Stream<InternetEndpoint> {
     }
 
     $data = $this->chunks[$this->chunk];
-    $available = length!($data) - $this->offset;
+    $available = (length!($data) as int) - $this->offset;
     $length = $available;
     if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
-    $result = Str\slice($data, $this->offset, $length);
+    $result = Str\slice($data, $this->offset, $length as uint);
     $this->offset += $length;
-    if ($this->offset == length!($data)) {
+    if (($this->offset as uint) == length!($data)) {
       $this->chunk++;
       $this->offset = 0;
     }
@@ -392,7 +400,7 @@ final class ScriptedStream implements Stream<InternetEndpoint> {
     return $this->tryRead($maxBytes);
   }
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->written .= $bytes;
     return length!($bytes);
   }
@@ -400,7 +408,7 @@ final class ScriptedStream implements Stream<InternetEndpoint> {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return $this->tryWrite($bytes);
   }
 
@@ -413,8 +421,8 @@ final class ScriptedStream implements Stream<InternetEndpoint> {
   }
 }
 
-$local = new InternetEndpoint(Address::v4('127.0.0.1'), 40000);
-$peer = new InternetEndpoint(Address::v4('203.0.113.10'), 443);
+$local = new InternetEndpoint(Address::v4('127.0.0.1'), 40000u);
+$peer = new InternetEndpoint(Address::v4('203.0.113.10'), 443u);
 $metadata = new Client\ConnectionMetadata(
   $local,
   $peer,
@@ -480,7 +488,7 @@ discard!(
   ),
 );
 
-assert!($cookieJar->count() == 4);
+assert!($cookieJar->count() == 4u);
 
 discard!(
   $cookieJar->process(
@@ -541,7 +549,7 @@ discard!(
   ),
 );
 
-assert!($cookieJar->count() == 3);
+assert!($cookieJar->count() == 3u);
 
 discard!(
   $cookieJar->process(
@@ -558,10 +566,10 @@ assert!(
 );
 
 $cookieJar->clear();
-assert!($cookieJar->count() == 0);
+assert!($cookieJar->count() == 0u);
 
 assert!($connector->origin?->scheme == 'https');
-assert!($connector->origin?->port == 443);
+assert!($connector->origin?->port == 443u);
 assert!(
   $connector->request?->url?->toString()
   == 'https://example.com/api/users?id=1',
@@ -569,20 +577,20 @@ assert!(
 
 $configuration = new Client\Configuration();
 $overridden = $configuration->withOverrides(
-  new Client\SendConfiguration(maximumResponseBodySize: 1234),
+  new Client\SendConfiguration(maximumResponseBodySize: 1234u),
 );
 
-assert!($overridden->maximumResponseBodySize == 1234);
-assert!($overridden->maximumResponseHeaderSize == 8192);
-assert!($overridden->maximumInformationalResponses == 16);
+assert!($overridden->maximumResponseBodySize == 1234u);
+assert!($overridden->maximumResponseHeaderSize == 8192u);
+assert!($overridden->maximumInformationalResponses == 16u);
 assert!($overridden->h2 is H2\Configuration);
 assert!($overridden->tls is TLS\ClientConfiguration);
 
 $informationalOverride = $configuration->withOverrides(
-  new Client\SendConfiguration(maximumInformationalResponses: 2),
+  new Client\SendConfiguration(maximumInformationalResponses: 2u),
 );
 
-assert!($informationalOverride->maximumInformationalResponses == 2);
+assert!($informationalOverride->maximumInformationalResponses == 2u);
 
 $protocolURL = URL::from('https://example.com/');
 $protocolConfiguration = new Client\Configuration(
@@ -779,7 +787,7 @@ $result = $h1->exchange(
   new Client\Configuration(),
 );
 
-assert!(length!($result->informational) == 1);
+assert!(length!($result->informational) == 1u);
 assert!($result->informational[0]->status == Message\STATUS_EARLY_HINTS);
 
 assert!($result->response->headers->get('x-test') == 'yes');
@@ -808,7 +816,7 @@ $assertion_value_38 = fn(): Transaction => (
     new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
   )->exchange(
     Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
-    new Client\Configuration(maximumInformationalResponses: 1),
+    new Client\Configuration(maximumInformationalResponses: 1u),
   )
 );
 
@@ -835,7 +843,7 @@ $assertion_value_40 = fn(): Transaction => (
     new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
   )->exchange(
     Request::fromURL(Message\METHOD_GET, URL::from('http://example.com/')),
-    new Client\Configuration(maximumResponseHeaderSize: 24),
+    new Client\Configuration(maximumResponseHeaderSize: 24u),
   )
 );
 
@@ -985,7 +993,7 @@ $expectResult = new Client\_Private\H1Connection(
   new Client\Configuration(),
 );
 
-assert!(length!($expectResult->informational) == 2);
+assert!(length!($expectResult->informational) == 2u);
 assert!($expectResult->informational[0]->status == Message\STATUS_EARLY_HINTS);
 
 assert!($expectResult->informational[1]->status == Message\STATUS_CONTINUE);
@@ -1273,7 +1281,7 @@ $result = $h2->exchange(
   new Client\Configuration(),
 );
 
-assert!(length!($result->informational) == 1);
+assert!(length!($result->informational) == 1u);
 assert!($result->response->headers->get('x-h2') == 'yes');
 $responseBody = $result->response->body;
 assert!($responseBody != null);
@@ -1385,7 +1393,7 @@ $assertion_value_80 = fn(): Transaction => (
       Message\METHOD_GET,
       URL::from('https://example.com/informational'),
     ),
-    new Client\Configuration(maximumInformationalResponses: 1),
+    new Client\Configuration(maximumInformationalResponses: 1u),
   )
 );
 
@@ -1458,7 +1466,7 @@ $pushResult = new Client\_Private\H2Connection(
 $pushedFuture = $pushResult->pushed;
 assert!($pushedFuture != null);
 $pushed = $pushedFuture->await();
-assert!(length!($pushed) == 1);
+assert!(length!($pushed) == 1u);
 assert!(
   $pushed[0]->request->url?->toString() == 'https://example.com/style.css',
 );
@@ -1508,7 +1516,7 @@ $limitedResult = $limitedH2->exchange(
     Message\METHOD_GET,
     URL::from('https://example.com/limited'),
   ),
-  new Client\Configuration(maximumResponseBodySize: 4),
+  new Client\Configuration(maximumResponseBodySize: 4u),
 );
 
 $limitedBody = $limitedResult->response->body;
@@ -1542,7 +1550,7 @@ $headWireServer->sendHeaders($headStreamId, vec[(':status', '200', false)]);
 
 $headWire =
   $headWireServer->takeOutboundBytes()
-  . H2\Frame\encode((0, $headStreamId, 'must be rejected', true, 0));
+  . H2\Frame\encode((0, $headStreamId, 'must be rejected', true, 0u));
 
 $headStream = new ScriptedStream(vec[$headWire], $local, $peer);
 
@@ -1569,7 +1577,7 @@ try {
 
 assert!($assertion_error_87 is Client\ProtocolException);
 
-$plainServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$plainServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 
 $plainServerTask = Async\spawn::<null>(fn(): null {
   $stream = $plainServer->accept();
@@ -1616,7 +1624,7 @@ try {
 assert!($resolutionTimeout is Async\CancelledException);
 assert!($resolutionTimeout->getPrevious() is Async\TimeoutException);
 
-$resetServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$resetServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 $resetServerTask = Async\spawn::<null>(fn(): null {
   $stream = $resetServer->accept();
   $protocol = new H2\ServerConnection(
@@ -1679,7 +1687,7 @@ $resetServerTask->await();
 $resetServer->close();
 assert!($resetFailure is Client\ProtocolException);
 
-$earlyH2Server = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$earlyH2Server = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 
 $earlyH2ServerTask = Async\spawn::<null>(fn(): null {
   $stream = $earlyH2Server->accept();
@@ -1741,7 +1749,7 @@ $certificatePem = File\read(directory!() . '/fixtures/tls/certificate.pem');
 $privateKeyPem = File\read(directory!() . '/fixtures/tls/private-key.pem');
 $certificate = TLS\Certificate::from($certificatePem);
 $identity = TLS\Identity::from($certificatePem, $privateKeyPem);
-$h2TcpServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$h2TcpServer = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 
 $h2TlsServer = TLS\listen::<InternetEndpoint>(
   $h2TcpServer,
@@ -1813,7 +1821,7 @@ $h2ServerTask->await();
 $h2TlsServer->close();
 
 $streamingTcpServer = TCP\listen(
-  new InternetEndpoint(Address::v4('127.0.0.1'), 0),
+  new InternetEndpoint(Address::v4('127.0.0.1'), 0u),
 );
 
 $streamingTlsServer = TLS\listen::<InternetEndpoint>(
@@ -1907,7 +1915,7 @@ $streamingServerTask->await();
 $streamingTlsServer->close();
 
 $multiplexTcpServer = TCP\listen(
-  new InternetEndpoint(Address::v4('127.0.0.1'), 0),
+  new InternetEndpoint(Address::v4('127.0.0.1'), 0u),
 );
 
 $multiplexTlsServer = TLS\listen::<InternetEndpoint>(
@@ -1925,7 +1933,7 @@ $multiplexServerTask = Async\spawn::<null>(fn(): null {
     foreach ($protocol->receive($stream->read(16384)) as $event) {
       if ($event is H2\Event\RequestHeadersReceived) {
         $streams[] = $event[1];
-        if (length!($streams) == 1) {
+        if (length!($streams) == 1u) {
           $firstRequestReceived->complete(null);
         }
       }
@@ -2032,7 +2040,7 @@ $redirected = $redirect->send(
 
 assert!($redirected->response->status == Message\STATUS_OK);
 assert!($redirectBody->reachedEndOfDataSource());
-assert!(length!($redirectTarget->requests) == 2);
+assert!(length!($redirectTarget->requests) == 2u);
 assert!($redirectTarget->requests[1]->method == Message\METHOD_GET);
 assert!($redirectTarget->requests[1]->body == null);
 assert!($redirectTarget->requests[1]->headers->get('content-length') == null);
@@ -2130,7 +2138,7 @@ $afterFailedDrain = new Client\RedirectClient($failedRedirectDrain)->send(
 );
 
 assert!($afterFailedDrain->response->status == Message\STATUS_OK);
-assert!(length!($failedRedirectDrain->requests) == 2);
+assert!(length!($failedRedirectDrain->requests) == 2u);
 
 $flaky = new FlakyClient(2);
 $retried = new Client\RetryClient($flaky, backoff: Duration::zero())->send(
@@ -2198,7 +2206,7 @@ assert!($post->attempts == 1);
 $deniedConnection = new FakeConnection(
   new Client\ConnectionMetadata(
     $local,
-    new InternetEndpoint(Address::v4('127.0.0.1'), 80),
+    new InternetEndpoint(Address::v4('127.0.0.1'), 80u),
     Message\ProtocolVersion::V11,
   ),
   new Response(Message\STATUS_OK),
@@ -2229,7 +2237,7 @@ assert!($deniedConnection->request == null);
 $mappedConnection = new FakeConnection(
   new Client\ConnectionMetadata(
     $local,
-    new InternetEndpoint(Address::v6('::ffff:203.0.113.10'), 80),
+    new InternetEndpoint(Address::v6('::ffff:203.0.113.10'), 80u),
     Message\ProtocolVersion::V11,
   ),
   new Response(Message\STATUS_OK),
@@ -2263,7 +2271,7 @@ assert!($assertion_error_133 is Client\DestinationDeniedException);
 $allowedConnection = new FakeConnection(
   new Client\ConnectionMetadata(
     $local,
-    new InternetEndpoint(Address::v4('8.8.8.8'), 443),
+    new InternetEndpoint(Address::v4('8.8.8.8'), 443u),
     Message\ProtocolVersion::V2,
   ),
   new Response(Message\STATUS_OK),
@@ -2531,7 +2539,7 @@ $uncappedMultiplexed = new CountingConnector(
 );
 
 $uncappedMultiplexedClient = new Client\DefaultClient(
-  new Client\PooledConnector($uncappedMultiplexed, 0, 0),
+  new Client\PooledConnector($uncappedMultiplexed, 0u, 0u),
   new Client\Configuration(protocolVersions: vec[Message\ProtocolVersion::V2]),
 );
 
@@ -2555,7 +2563,7 @@ $originLimited = new CountingConnector(
   new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
 );
 
-$originLimitedPool = new Client\PooledConnector($originLimited, 10, 1);
+$originLimitedPool = new Client\PooledConnector($originLimited, 10u, 1u);
 $originLimitedConfiguration = new Client\Configuration(
   protocolVersions: vec[Message\ProtocolVersion::V11],
 );
@@ -2616,7 +2624,7 @@ $globallyLimited = new CountingConnector(
   new Client\ConnectionMetadata($local, $peer, Message\ProtocolVersion::V11),
 );
 
-$globallyLimitedPool = new Client\PooledConnector($globallyLimited, 2, 2);
+$globallyLimitedPool = new Client\PooledConnector($globallyLimited, 2u, 2u);
 $globallyLimitedConfiguration = new Client\Configuration(
   protocolVersions: vec[Message\ProtocolVersion::V11],
 );

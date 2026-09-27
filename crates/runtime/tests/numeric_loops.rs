@@ -186,32 +186,32 @@ fn joined_string_lengths_preserve_live_strings_and_alternative_inputs() {
     let source = r"
 use Whim\Marker\NeverInline;
 #[NeverInline]
-function parity_length(int $value): int {
+function parity_length(int $value): uint {
     return length!(match ($value & 1) { 0 => 'even', _ => 'odd' });
 }
 #[NeverInline]
-function byte_length(bool $choose): int {
+function byte_length(bool $choose): uint {
     return length!(match ($choose) { true => 'é', false => '' });
 }
 #[NeverInline]
-function retained(int $value): (string, int) {
+function retained(int $value): (string, uint) {
     $label = match ($value & 1) { 0 => 'even', _ => 'odd' };
     return ($label, length!($label));
 }
 #[NeverInline]
-function fallback_length(string|null $fallback, bool $choose): int {
+function fallback_length(string|null $fallback, bool $choose): uint {
     return length!($fallback ?? match ($choose) { true => 'even', false => 'odd' });
 }
 for ($index = 0; $index < 20; $index++) {
-    assert!(parity_length($index) == 4 - ($index & 1));
-    assert!(retained($index) == match ($index & 1) { 0 => ('even', 4), _ => ('odd', 3) });
+    assert!(parity_length($index) == 4u - (($index & 1) as uint));
+    assert!(retained($index) == match ($index & 1) { 0 => ('even', 4u), _ => ('odd', 3u) });
 }
-assert!(byte_length(true) == 2);
-assert!(byte_length(false) == 0);
-assert!(fallback_length('unchanged', true) == 9);
-assert!(fallback_length('unchanged', false) == 9);
-assert!(fallback_length(null, true) == 4);
-assert!(fallback_length(null, false) == 3);
+assert!(byte_length(true) == 2u);
+assert!(byte_length(false) == 0u);
+assert!(fallback_length('unchanged', true) == 9u);
+assert!(fallback_length('unchanged', false) == 9u);
+assert!(fallback_length(null, true) == 4u);
+assert!(fallback_length(null, false) == 3u);
 ";
     run_both_modes(source);
 }
@@ -252,12 +252,12 @@ assert!(concatenate($shared, 'x', 0) == ($shared, -1, false));
 assert!(concatenate($shared, 'x', 1) == ('abcdefghx', -1, false));
 assert!(concatenate($shared, 'x', -9223372036854775808) == ($shared, -9223372036854775808, true));
 ($result, $count, $failed) = concatenate($shared, 'x', 65537);
-assert!(length!($result) == 65545 && $result[8] == 'x' && $result[65544] == 'x');
+assert!(length!($result) == 65545u && $result[8] == 'x' && $result[65544] == 'x');
 assert!($count == -1 && !$failed && $shared == 'abcdefgh');
 $part = 'abcdefghijklmnopqrstuvwxyz';
 $rope = join($part, $part);
 ($result, $count, $failed) = concatenate($shared, $rope, 65537);
-assert!(length!($result) == 8 + 52 * 65537 && $result[8] == 'a' && $result[59] == 'z');
+assert!(length!($result) == 8u + 52u * 65537u && $result[8] == 'a' && $result[59] == 'z');
 assert!($rope == $part . $part && $count == -1 && !$failed);
 ",
     );
@@ -354,14 +354,14 @@ use Whim\Marker\NeverInline;
 #[NeverInline]
 function stable(string $value, int $count): int {
     $sum = 0;
-    for ($index = 0; $index < $count; $index++) { $sum += length!($value); }
+    for ($index = 0; $index < $count; $index++) { $sum += length!($value) as int; }
     return $sum;
 }
 #[NeverInline]
 function changed(string $value, int $count): int {
     $sum = 0;
     for ($index = 0; $index < $count; $index++) {
-        $sum += length!($value);
+        $sum += length!($value) as int;
         $value .= 'x';
     }
     return $sum;

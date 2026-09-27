@@ -612,9 +612,9 @@ File\write(
 
 $stopped = Command\run($binary, vec[$stop_file]);
 assert!($stopped->status is Command\Exited);
-assert!(($stopped->status as Command\Exited)->code == 7);
+assert!(($stopped->status as Command\Exited)->code == 7u);
 assert!($stopped->standardOutput == 'stop' . "\n");
-assert!(length!($stopped->standardError) == 0);
+assert!(length!($stopped->standardError) == 0u);
 
 $cycle_file = $work . '/cycle-destructors.whim';
 File\write(
@@ -649,7 +649,7 @@ File\write(
   . "\n"
   . '$collected = Whim\GC\collect_cycles();'
   . "\n"
-  . 'assert!($collected is int);'
+  . 'assert!($collected is uint);'
   . "\n"
   . 'write_line!(\'collected\');'
   . "\n",
@@ -660,7 +660,7 @@ $cycle_run = Command\Command::create($binary)
   ->withVariable('WHIM_CYCLE_THRESHOLD', '8')
   ->run();
 
-assert!(length!($cycle_run->standardError) == 0);
+assert!(length!($cycle_run->standardError) == 0u);
 assert!($cycle_run->isSuccess());
 assert!(
   $cycle_run->standardOutput
@@ -721,7 +721,7 @@ $async_cycle_run = Command\Command::create($binary)
   ->withVariable('WHIM_CYCLE_THRESHOLD', '8')
   ->run();
 
-assert!(length!($async_cycle_run->standardError) == 0);
+assert!(length!($async_cycle_run->standardError) == 0u);
 assert!($async_cycle_run->isSuccess());
 assert!(
   $async_cycle_run->standardOutput

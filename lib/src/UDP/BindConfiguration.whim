@@ -3,7 +3,7 @@ namespace Whim\UDP;
 use Whim\Default\Default;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 
 /** Configures a UDP socket. */
 final readonly class BindConfiguration implements Default {
@@ -13,8 +13,8 @@ final readonly class BindConfiguration implements Default {
     public bool $reusePort = false,
     public bool $broadcast = false,
     public bool $onlyIPv6 = true,
-    public null|PositiveInt $receiveBuffer = null,
-    public null|PositiveInt $sendBuffer = null,
+    public null|NonZero<uint> $receiveBuffer = null,
+    public null|NonZero<uint> $sendBuffer = null,
   ) {}
 
   #[AlwaysInline]
@@ -50,7 +50,7 @@ final readonly class BindConfiguration implements Default {
   #[AlwaysInline]
   #[MustUse]
   public function withReceiveBuffer(
-    null|PositiveInt $receiveBuffer,
+    null|NonZero<uint> $receiveBuffer,
   ): BindConfiguration {
     return clone!($this, receiveBuffer: $receiveBuffer);
   }
@@ -58,7 +58,7 @@ final readonly class BindConfiguration implements Default {
   #[AlwaysInline]
   #[MustUse]
   public function withSendBuffer(
-    null|PositiveInt $sendBuffer,
+    null|NonZero<uint> $sendBuffer,
   ): BindConfiguration {
     return clone!($this, sendBuffer: $sendBuffer);
   }

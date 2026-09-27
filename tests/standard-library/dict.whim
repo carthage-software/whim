@@ -50,9 +50,14 @@ assert!(
 
 assert!(
   Dict\count_values::<string>(vec['x', 'y', 'x', 'x']) == dict[
-    'x' => 3,
-    'y' => 1,
+    'x' => 3u,
+    'y' => 1u,
   ],
+);
+
+assert!(Dict\count_values::<uint>(vec[1u, 2u, 1u]) == dict[1u => 2u, 2u => 1u]);
+assert!(
+  Dict\from_entries::<uint, string>(vec[(1u, 'one')]) == dict[1u => 'one'],
 );
 
 $sorted = Dict\sort::<string, int>(dict['a' => 3, 'b' => 1, 'c' => 2]);
@@ -63,7 +68,7 @@ $descending = Dict\sort::<string, int>(
 );
 
 assert!(Vec\keys::<string>($descending) == vec['b', 'c', 'a']);
-assert!(length!(Dict\sort::<string, int>(dict[])) == 0);
+assert!(length!(Dict\sort::<string, int>(dict[])) == 0u);
 
 assert!(
   Dict\map::<int, int, int>(
@@ -89,10 +94,10 @@ assert!($assertion_value_14 is dict<string, string>);
 assert!($assertion_value_14 == dict['a' => 'v=1', 'b' => 'v=2']);
 
 assert!(
-  Dict\map_keys::<string, int, int>(
+  Dict\map_keys::<string, uint, int>(
     dict['a' => 1, 'b' => 2],
-    fn(string $key): int => length!($key),
-  ) is dict<int, int>,
+    fn(string $key): uint => length!($key),
+  ) is dict<uint, int>,
 );
 
 assert!(
@@ -122,12 +127,12 @@ $nullableMapped = Dict\map_nonnull::<string, int, null>(
 
 $assertion_value_19 = $nullableMapped;
 assert!($assertion_value_19 is dict<string, null>);
-assert!(length!($assertion_value_19) == 1);
+assert!(length!($assertion_value_19) == 1u);
 
 assert!($nullableMapped['present'] == null);
 
 assert!(
-  Dict\take::<string, int>(dict['a' => 1, 'b' => 2], 1) == dict['a' => 1],
+  Dict\take::<string, int>(dict['a' => 1, 'b' => 2], 1u) == dict['a' => 1],
 );
 
 assert!(
@@ -160,9 +165,9 @@ assert!(
 );
 
 assert!(
-  Dict\sort_by::<string, string, int>(
+  Dict\sort_by::<string, string, uint>(
     dict['a' => 'cc', 'b' => 'a', 'c' => 'bb', 'd' => 'dd'],
-    fn(string $value): int => length!($value),
+    fn(string $value): uint => length!($value),
   ) == dict['b' => 'a', 'a' => 'cc', 'c' => 'bb', 'd' => 'dd'],
 );
 

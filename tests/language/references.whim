@@ -23,14 +23,14 @@ class Key1 {}
 function fill(WeakMap<Key1, string> $map): void {
   $key = new Key1();
   $map->set($key, 'payload');
-  assert!($map->length() == 1);
+  assert!($map->length() == 1u);
   assert!($map->get($key) == 'payload');
   assert!($map->has($key));
 }
 
 $map = new WeakMap::<Key1, string>();
 fill($map);
-assert!($map->length() == 0);
+assert!($map->length() == 0u);
 $other = new Key1();
 $assertion_value_7 = fn(): void {
   $map->get($other);

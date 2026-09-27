@@ -12,7 +12,7 @@ function decode_headers(State $state, string $bytes): vec<Header> {
     );
   }
 
-  $size = 0;
+  $size = 0u;
   foreach ($decoded as ($name, $value, $_)) {
     if ('' == $name) {
       throw new ProtocolException(
@@ -21,7 +21,7 @@ function decode_headers(State $state, string $bytes): vec<Header> {
       );
     }
 
-    $size += length!($name) + length!($value) + 32;
+    $size += length!($name) + length!($value) + 32u;
     if ($size > $state->maximumDecodedHeaderListSize) {
       throw new ProtocolException(
         'the field list exceeds the configured size limit',
@@ -34,9 +34,9 @@ function decode_headers(State $state, string $bytes): vec<Header> {
 }
 
 function encode_headers(State $state, vec<Header> $headers): string {
-  $size = 0;
+  $size = 0u;
   foreach ($headers as $header) {
-    $size += length!($header[0]) + length!($header[1]) + 32;
+    $size += length!($header[0]) + length!($header[1]) + 32u;
     if ($size > $state->maximumEncodedHeaderListSize) {
       throw new ProtocolException(
         'the field list exceeds the configured size limit',

@@ -41,9 +41,9 @@ File\write(
 
 $bypassed = Command\run($binary, vec[$bypass]);
 assert!($bypassed->status is Command\Exited);
-assert!(($bypassed->status as Command\Exited)->code == 9);
-assert!(length!($bypassed->standardOutput) == 0);
-assert!(length!($bypassed->standardError) == 0);
+assert!(($bypassed->status as Command\Exited)->code == 9u);
+assert!(length!($bypassed->standardOutput) == 0u);
+assert!(length!($bypassed->standardError) == 0u);
 
 Filesystem\delete_directory($work, true);
 

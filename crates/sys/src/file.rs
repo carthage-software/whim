@@ -11,29 +11,32 @@ pub use crate::platform::file::{lock, metadata, open, path_metadata, temporary};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Timestamp {
     pub seconds: i64,
-    pub nanoseconds: i64,
+    pub nanoseconds: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Metadata {
-    pub mode: i64,
-    pub links: i64,
+    pub mode: u64,
+    pub links: u64,
     pub user: i64,
     pub group: i64,
-    pub size: i64,
-    pub block_size: i64,
-    pub blocks: i64,
-    pub device: i64,
-    pub inode: i64,
+    pub size: u64,
+    pub block_size: u64,
+    pub blocks: u64,
+    pub device: u64,
+    pub inode: u64,
     pub accessed: Timestamp,
     pub modified: Timestamp,
     pub changed: Timestamp,
 }
 
 pub fn read(file: &File, maximum: usize) -> Result<Vec<u8>> {
+    let mut bytes = Vec::<u8>::new();
+    bytes
+        .try_reserve_exact(maximum)
+        .map_err(|_| Error::new("read", ErrorKind::OutOfMemory))?;
     #[cfg(unix)]
     {
-        let mut bytes = Vec::<u8>::with_capacity(maximum);
         let (initialized, _) = unix_io::read(file, bytes.spare_capacity_mut())
             .map_err(|error| Error::new("read", error))?;
         let count = initialized.len();
@@ -44,7 +47,7 @@ pub fn read(file: &File, maximum: usize) -> Result<Vec<u8>> {
     #[cfg(windows)]
     {
         let mut file = file;
-        let mut bytes = vec![0; maximum];
+        bytes.resize(maximum, 0);
         let count = file
             .read(&mut bytes)
             .map_err(|error| Error::new("read", error))?;

@@ -69,12 +69,12 @@ assert!(vec[new Point()] != vec[new Point()]);
 assert!(dict[5 => 'a'] != dict['5' => 'a']);
 $strict = dict[5 => 'int keyed'];
 $strict['5'] = 'string keyed';
-assert!(length!($strict) == 2);
+assert!(length!($strict) == 2u);
 assert!($strict[5] == 'int keyed');
 assert!($strict['5'] == 'string keyed');
 $strict[true] = 'bool keyed';
 $strict[1] = 'int keyed';
-assert!(length!($strict) == 4);
+assert!(length!($strict) == 4u);
 assert!($strict[true] == 'bool keyed');
 assert!($strict[1] == 'int keyed');
 

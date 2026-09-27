@@ -33,7 +33,7 @@ final readonly class ScramSha256Authenticator implements Authenticator {
     null|CancellationToken $cancellation = null,
   ): void {
     _Private\require_mechanism($connection, $this->mechanism());
-    $nonce = Base64\encode(SecureRandom\bytes(18));
+    $nonce = Base64\encode(SecureRandom\bytes(18u));
     $escapedUsername = Str\replace_every(
       $this->username,
       dict['=' => '=3D', ',' => '=2C'],

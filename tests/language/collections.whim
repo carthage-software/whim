@@ -10,10 +10,10 @@ $copied_left = vec[1, 2];
 $copied_right = $copied_left;
 $copied_right[] = 3;
 $assertion_value_1 = $copied_left;
-assert!(length!($assertion_value_1) == 2);
+assert!(length!($assertion_value_1) == 2u);
 assert!($assertion_value_1 == vec[1, 2]);
 $assertion_value_2 = $copied_right;
-assert!(length!($assertion_value_2) == 3);
+assert!(length!($assertion_value_2) == 3u);
 assert!($assertion_value_2 == vec[1, 2, 3]);
 
 $work = Filesystem\create_temporary_directory(null, 'whim-test-');
@@ -35,7 +35,7 @@ File\write(
 
 $debug_copies = Command\run($binary, vec[$debug_copies_file]);
 assert!($debug_copies->isSuccess());
-assert!(length!($debug_copies->standardOutput) == 0);
+assert!(length!($debug_copies->standardOutput) == 0u);
 assert!(
   $debug_copies->standardError
   == '['
@@ -64,7 +64,7 @@ $debug_tuple_file = $work . '/debug-single-tuple.whim';
 File\write($debug_tuple_file, 'debug!((1,), vec[(2,)]);' . "\n");
 $debug_tuple = Command\run($binary, vec[$debug_tuple_file]);
 assert!($debug_tuple->isSuccess());
-assert!(length!($debug_tuple->standardOutput) == 0);
+assert!(length!($debug_tuple->standardOutput) == 0u);
 $assertion_value_9 = $debug_tuple->standardError;
 assert!(Whim\Str\contains($assertion_value_9, 'tuple(1) ['));
 assert!(Whim\Str\contains($assertion_value_9, 'vec(1) ['));
@@ -197,7 +197,7 @@ assert!($string_keyed['5'] == 'string');
 
 $mixed_keys = dict[5 => 'int'];
 $mixed_keys['5'] = 'string';
-assert!(length!($mixed_keys) == 2);
+assert!(length!($mixed_keys) == 2u);
 assert!($mixed_keys[5] == 'int');
 assert!($mixed_keys['5'] == 'string');
 
@@ -259,10 +259,10 @@ assert!($paired[1] == 'right');
 $removal_probe = vec['a', 'b', 'c'];
 assert!(remove!($removal_probe, 1) == 'b');
 assert!($removal_probe[1] == 'c');
-assert!(length!($removal_probe) == 2);
+assert!(length!($removal_probe) == 2u);
 assert!(remove_first!($removal_probe) == 'a');
 assert!(remove_last!($removal_probe) == 'c');
-assert!(length!($removal_probe) == 0);
+assert!(length!($removal_probe) == 0u);
 
 $unordered = vec['a', 'b', 'c', 'd'];
 assert!(swap_remove!($unordered, 1) == 'b');
@@ -446,10 +446,10 @@ try {
 
 assert!($assertion_error_44 is TypeError);
 
-assert!(length!('abcd') == 4);
-assert!(length!(vec[1]) == 1);
-assert!(length!(dict['k' => 1]) == 1);
-assert!(length!((1, 2)) == 2);
+assert!(length!('abcd') == 4u);
+assert!(length!(vec[1]) == 1u);
+assert!(length!(dict['k' => 1]) == 1u);
+assert!(length!((1, 2)) == 2u);
 $assertion_value_49 = fn(): void {
   length!(5);
 };
@@ -468,7 +468,7 @@ assert!(($nested_first, $nested_second, $nested_third) == (1, 2, 3));
 
 (($mixed_first, $mixed_second), ...$mixed_rest) = vec[(1, 2), 3, 4];
 assert!(($mixed_first, $mixed_second) == (1, 2));
-assert!(length!($mixed_rest) == 2);
+assert!(length!($mixed_rest) == 2u);
 
 $assertion_value_53 = fn(): void {
   ($left, $right) = (1, 2, 3);
@@ -502,7 +502,7 @@ class AppendBag {
 
 $append_bag = new AppendBag();
 ($append_bag->items[], $append_bag->items[]) = (10, 20);
-assert!(length!($append_bag->items) == 2);
+assert!(length!($append_bag->items) == 2u);
 assert!($append_bag->items[0] == 10);
 assert!($append_bag->items[1] == 20);
 

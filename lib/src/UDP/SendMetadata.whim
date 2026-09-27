@@ -2,7 +2,6 @@ namespace Whim\UDP;
 
 use Whim\IP\Address;
 use Whim\Marker\AlwaysInline;
-use Whim\Refine\NonNegativeInt;
 
 /** Selects source-address and congestion metadata for an outgoing datagram. */
 final readonly class SendMetadata {
@@ -10,6 +9,6 @@ final readonly class SendMetadata {
   public function __construct(
     public Address $sourceAddress,
     public ExplicitCongestion $explicitCongestion = ExplicitCongestion::NotCapable,
-    public NonNegativeInt $interfaceIndex = 0,
+    public uint $interfaceIndex = 0u,
   ) {}
 }

@@ -11,7 +11,6 @@ use Whim\Option\Option;
 use Whim\Option\Some;
 use Whim\Refine\Comparator;
 use Whim\Refine\Iterable;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\LogicException;
 
 /**
@@ -43,7 +42,7 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
   public function push(T $value): void {
     $this->assertMutable();
 
-    $index = length!($this->values);
+    $index = length!($this->values) as int;
     $path = $this->upwardPath($value, $index);
 
     $this->values[] = $value;
@@ -60,7 +59,7 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
   #[TrackCaller]
   public function pop(): Option<T> {
     $this->assertMutable();
-    if (length!($this->values) == 0) {
+    if (length!($this->values) == 0u) {
       return new None();
     }
 
@@ -70,7 +69,7 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
   /** Returns the first value in comparator order without removing it. */
   #[AlwaysInline]
   public function peek(): Option<T> {
-    if (length!($this->values) == 0) {
+    if (length!($this->values) == 0u) {
       return new None();
     }
 
@@ -79,14 +78,14 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
 
   /** Returns the number of stored values. */
   #[AlwaysInline]
-  public function count(): NonNegativeInt {
+  public function count(): uint {
     return length!($this->values);
   }
 
   /** Reports whether the heap contains no values. */
   #[AlwaysInline]
   public function isEmpty(): bool {
-    return length!($this->values) == 0;
+    return length!($this->values) == 0u;
   }
 
   /** Removes every stored value. */
@@ -118,7 +117,7 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
   #[TrackCaller]
   #[TraceBoundary]
   private function heapify(): void {
-    $count = length!($this->values);
+    $count = length!($this->values) as int;
     if ($count < 2) {
       return;
     }
@@ -194,7 +193,7 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
   #[TrackCaller]
   #[TraceBoundary]
   private function removeRoot(): T {
-    $count = length!($this->values);
+    $count = length!($this->values) as int;
     $root = $this->values[0];
     if (1 == $count) {
       $this->values = vec[];

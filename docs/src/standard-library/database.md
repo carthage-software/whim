@@ -47,6 +47,7 @@ Statements and results are closeable.
 
 A result exposes column metadata, an affected-row count when the operation has
 one, and streaming `fetch()`. Fetch returns one row or `null` at the end.
+`getAffectedRows()` returns `null|uint`.
 
 Helpers cover common shapes:
 
@@ -85,7 +86,7 @@ implements `Connection`; closing it returns a reusable connection to the pool.
 The default acquisition timeout is 30 seconds. A null timeout waits without a
 pool deadline, though the caller's cancellation token can still end the wait.
 
-The pool reports open, idle, and waiting counts. Closing it closes idle
+The pool reports open, idle, and waiting counts as uints. Closing it closes idle
 connections and fails pending acquisitions. Checked-out leases close or return
 when their owners finish.
 
@@ -97,6 +98,7 @@ in-memory database.
 Configuration sets read-only and create behavior, URI parsing, busy timeout,
 statement-cache size, and foreign-key enforcement. SQLite work runs through the
 shared bounded blocking pool, so file work does not stop the event loop.
+The timeout in milliseconds and statement-cache capacity take uints.
 
 Each connection permits one active operation. The driver waits for its prior
 worker operation to retire before reuse; application code does not retry a

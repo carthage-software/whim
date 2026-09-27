@@ -140,7 +140,7 @@ $parameter = $box->getTypeParameter('T');
 assert!($parameter != null);
 assert!($parameter->getPosition() == 0);
 assert!($parameter->getVariance() == Variance::Invariant);
-assert!(length!($parameter->getBounds()) == 1);
+assert!(length!($parameter->getBounds()) == 1u);
 assert!($parameter->getBounds()[0]->toString() == 'mixed');
 assert!($parameter->getDefault()?->toString() == 'string');
 
@@ -177,7 +177,7 @@ assert!(
 );
 
 $properties = $object->getProperties();
-assert!(length!($properties) == 3);
+assert!(length!($properties) == 3u);
 assert!($properties[0]->getProperty()->getName() == 'value');
 assert!($properties[0]->getDeclaredType()?->toString() == 'int');
 assert!($properties[0]->getValueType()?->toString() == 'int');
@@ -288,18 +288,18 @@ assert!($foundIdentity);
 
 $provider = Reflection\reflect_interface('ReflectionTest\\Provider');
 assert!($provider != null);
-assert!(length!($provider->getDirectParentTypes()) == 0);
-assert!(length!($provider->getParentTypes()) == 0);
+assert!(length!($provider->getDirectParentTypes()) == 0u);
+assert!(length!($provider->getParentTypes()) == 0u);
 assert!($provider->getTypeParameter(0)?->getVariance() == Variance::Covariant);
-assert!(length!($box->getDirectBaseTypes()) == 1);
+assert!(length!($box->getDirectBaseTypes()) == 1u);
 assert!(
   $box->getDirectBaseTypes()[0]->toString() == 'ReflectionTest\\Provider<T>',
 );
 
-assert!(length!($box->getBaseTypes()) == 1);
+assert!(length!($box->getBaseTypes()) == 1u);
 assert!($box->getParentType() == null);
-assert!(length!($box->getDirectInterfaceTypes()) == 1);
-assert!(length!($box->getInterfaceTypes()) == 1);
+assert!(length!($box->getDirectInterfaceTypes()) == 1u);
+assert!(length!($box->getInterfaceTypes()) == 1u);
 assert!(!$box->isAbstract());
 assert!(!$box->isFinal());
 assert!(!$box->isReadonly());
@@ -310,7 +310,7 @@ assert!($box->getDestructor() == null);
 assert!($box->getPermittedSubtypeNames() == null);
 
 $declaredMethods = $box->getDeclaredMethods();
-assert!(length!($declaredMethods) == 6);
+assert!(length!($declaredMethods) == 6u);
 assert!($box->getMethod('missing') == null);
 $hidden = $box->getMethod('hidden');
 assert!($hidden != null);
@@ -323,7 +323,7 @@ assert!(!$value->isAbstract());
 assert!(!$value->isFinal());
 assert!(!$value->isConstructor());
 assert!(!$value->isDestructor());
-assert!(length!($value->getPrototypes()) == 1);
+assert!(length!($value->getPrototypes()) == 1u);
 assert!(
   $value
     ->getPrototypes()[0]
@@ -335,7 +335,7 @@ assert!(
 assert!($value->getType()->toString() == 'ReflectionTest\\Box<T>::value');
 
 $properties = $box->getDeclaredProperties();
-assert!(length!($properties) == 4);
+assert!(length!($properties) == 4u);
 assert!($box->getProperty('missing') == null);
 $valueProperty = $box->getProperty('value');
 assert!($valueProperty != null);
@@ -365,7 +365,7 @@ assert!($limit->getType()->toString() == 'ReflectionTest\\Box<T>::LIMIT');
 $status = Reflection\reflect_enum('ReflectionTest\\Status');
 assert!($status != null);
 assert!($status->getBackingType()?->toString() == 'string');
-assert!(length!($status->getCases()) == 2);
+assert!(length!($status->getCases()) == 2u);
 $ready = $status->getCase('Ready');
 assert!($ready != null);
 assert!($status->getCase('Missing') == null);
@@ -393,11 +393,11 @@ assert!(
 
 // Attributes retain declarations and create fresh instances on demand.
 $tags = $box->getAttributes::<Tag>();
-assert!(length!($tags) == 2);
+assert!(length!($tags) == 2u);
 assert!($tags[0]->getClass()->getName() == 'ReflectionTest\\Tag');
 assert!($tags[0]->getTarget()->getName() == 'ReflectionTest\\Box');
 assert!($tags[0]->getArguments() == vec['class']);
-assert!(length!($tags[0]->getNamedArguments()) == 0);
+assert!(length!($tags[0]->getNamedArguments()) == 0u);
 assert!($tags[1]->getNamedArguments()['label'] == 'class-named');
 assert!($tags[1]->getNamedArguments()['rank'] == 2);
 assert!($tags[0]->getLocation() != null);
@@ -406,8 +406,8 @@ $secondTag = $tags[0]->newInstance();
 assert!($firstTag is Tag);
 assert!($firstTag->label == 'class');
 assert!($firstTag != $secondTag);
-assert!(length!($box->getAttributesByName('ReflectionTest\\Tag')) == 2);
-assert!(length!($box->getAttributesByName('ReflectionTest\\Missing')) == 0);
+assert!(length!($box->getAttributesByName('ReflectionTest\\Tag')) == 2u);
+assert!(length!($box->getAttributesByName('ReflectionTest\\Missing')) == 0u);
 $definition = Reflection\reflect_class(
   'ReflectionTest\\Tag',
 )?->getAttributeDefinition();
@@ -415,16 +415,16 @@ $definition = Reflection\reflect_class(
 assert!($definition != null);
 assert!($definition->getClass()->getName() == 'ReflectionTest\\Tag');
 assert!($definition->isRepeatable());
-assert!(length!($definition->getTargets()) == 10);
+assert!(length!($definition->getTargets()) == 10u);
 assert!($definition->getTargets()[0] == Target::Class);
 
 // Callable declarations, parameters, and literal defaults.
 $configured = Reflection\reflect_function('ReflectionTest\\configured');
 assert!($configured != null);
-assert!(length!($configured->getParameters()) == 2);
+assert!(length!($configured->getParameters()) == 2u);
 assert!($configured->getParameter(0)?->getName() == 'value');
 assert!($configured->getParameter('missing') == null);
-assert!($configured->getRequiredParameterCount() == 1);
+assert!($configured->getRequiredParameterCount() == 1u);
 $secretParameter = $configured->getParameter('secret');
 assert!($secretParameter != null);
 assert!($secretParameter->isOptional());
@@ -457,7 +457,7 @@ assert!($pi->getValue() == \Whim\Math\PI);
 // Live objects preserve exact generic bindings and initialization state.
 $environment = $object->getTypeEnvironment();
 $bindings = $environment->getBindings();
-assert!(length!($bindings) == 2);
+assert!(length!($bindings) == 2u);
 assert!($bindings[0]->getParameter()->getName() == 'T');
 assert!($bindings[0]->getArgument()->toString() == 'int');
 assert!($environment->get($parameter)?->toString() == 'int');
@@ -503,8 +503,8 @@ assert!(
   == 'ReflectionTest\\IntegerBox',
 );
 
-assert!(length!($instanceCallable->getCaptures()) == 0);
-assert!(length!($instanceCallable->getBoundArguments()) == 0);
+assert!(length!($instanceCallable->getCaptures()) == 0u);
+assert!(length!($instanceCallable->getBoundArguments()) == 0u);
 
 $staticCallable = Reflection\reflect_callable(Box::label(...));
 assert!($staticCallable->getKind() == CallableKind::StaticMethod);
@@ -523,11 +523,11 @@ $closureValue = fn(int $offset = 1): int {
 $closure = Reflection\reflect_callable($closureValue);
 assert!($closure->getKind() == CallableKind::Closure);
 assert!($closure->getDeclaration() is Reflection\Callable\ClosureReflection);
-assert!(length!($closure->getDeclaration()->getCaptures()) == 1);
+assert!(length!($closure->getDeclaration()->getCaptures()) == 1u);
 assert!($closure->getDeclaration()->getCaptures()[0]->getName() == 'captured');
 assert!($closure->getDeclaration()->getCaptures()[0]->getPosition() == 0);
 assert!(!$closure->getDeclaration()->getCaptures()[0]->isReceiver());
-assert!(length!($closure->getCaptures()) == 1);
+assert!(length!($closure->getCaptures()) == 1u);
 assert!($closure->getCaptures()[0]->getCapture()->getName() == 'captured');
 assert!($closure->getCaptures()[0]->getType()->toString() == 'int');
 assert!($closure->getCaptures()[0]->getValue() == 12);
@@ -540,7 +540,7 @@ assert!($expressionClosure->getType()->toString() == 'fn(int): int');
 $partial = Reflection\reflect_callable(describe('sum=', ?, 10));
 assert!($partial->getKind() == CallableKind::Partial);
 $boundArguments = $partial->getBoundArguments();
-assert!(length!($boundArguments) == 2);
+assert!(length!($boundArguments) == 2u);
 assert!($boundArguments[0]->getParameter()->getName() == 'prefix');
 assert!($boundArguments[0]->getType()->toString() == 'string');
 assert!($boundArguments[0]->getValue() == 'sum=');
@@ -602,8 +602,8 @@ assert!(Reflection\reflect_type::<(10..)>()->getUpperBound() == null);
 $stringLength = Reflection\reflect_type::<string[1..=64]>();
 assert!($stringLength is Reflection\Type\StringLengthTypeReflection);
 assert!($stringLength->getKind() == TypeKind::StringLength);
-assert!($stringLength->getMinimumLength() == 1);
-assert!($stringLength->getMaximumLength() == 64);
+assert!($stringLength->getMinimumLength() == 1u);
+assert!($stringLength->getMaximumLength() == 64u);
 assert!($stringLength->toString() == 'string[1..=64]');
 assert!($stringLength->accepts('hello'));
 assert!(!$stringLength->accepts(''));
@@ -635,7 +635,7 @@ $boxType = Reflection\reflect_type::<Box<int>>();
 assert!($boxType is Reflection\Type\ClassTypeReflection);
 assert!($boxType->getDeclaration()->getName() == 'ReflectionTest\\Box');
 assert!($boxType->getClassLike()->getName() == 'ReflectionTest\\Box');
-assert!(length!($boxType->getTypeArguments()) == 1);
+assert!(length!($boxType->getTypeArguments()) == 1u);
 assert!($boxType->getTypeArguments()[0]->toString() == 'int');
 assert!($boxType->getTypeEnvironment()->get($parameter)?->toString() == 'int');
 assert!($boxType->getSpecialization($box)?->equals($boxType));
@@ -647,13 +647,13 @@ assert!(
   == 'ReflectionTest\\Box<int>',
 );
 
-assert!(length!($object->getType()->getBaseTypes()) == 2);
+assert!(length!($object->getType()->getBaseTypes()) == 2u);
 assert!(!$boxType->isRecursiveReference());
 
 $aliasType = $pair->getType();
 assert!($aliasType is Reflection\Type\SymbolTypeReflection);
 assert!($aliasType->getDeclaration()->getName() == 'ReflectionTest\\Pair');
-assert!(length!($aliasType->getTypeArguments()) == 1);
+assert!(length!($aliasType->getTypeArguments()) == 1u);
 
 $parameterType = $parameter->getType();
 assert!($parameterType is Reflection\Type\TypeParameterTypeReflection);
@@ -674,13 +674,13 @@ assert!(
 
 $union = Reflection\reflect_type::<int|string>();
 assert!($union is Reflection\Type\UnionTypeReflection);
-assert!(length!($union->getTypes()) == 2);
+assert!(length!($union->getTypes()) == 2u);
 assert!($union->getTypes()[0]->toString() == 'int');
 assert!($union->getTypes()[1]->toString() == 'string');
 
 $intersection = Reflection\reflect_type::<object&Box<int>>();
 assert!($intersection is Reflection\Type\IntersectionTypeReflection);
-assert!(length!($intersection->getTypes()) == 2);
+assert!(length!($intersection->getTypes()) == 2u);
 
 $negated = Reflection\reflect_type::<!int>();
 assert!($negated is Reflection\Type\NegatedTypeReflection);
@@ -688,7 +688,7 @@ assert!($negated->getType()->toString() == 'int');
 
 $functionType = Reflection\reflect_type::<fn(int, =string): bool>();
 assert!($functionType is Reflection\Type\FunctionTypeReflection);
-assert!(length!($functionType->getParameters()) == 2);
+assert!(length!($functionType->getParameters()) == 2u);
 assert!($functionType->getParameters()[0]->getPosition() == 0);
 assert!($functionType->getParameters()[0]->getType()->toString() == 'int');
 assert!(!$functionType->getParameters()[0]->isOptional());
@@ -708,7 +708,7 @@ assert!(Reflection\reflect_type::<vec>()->getValueType() == null);
 
 $vecShape = Reflection\reflect_type::<vec[int, string, ...float]>();
 assert!($vecShape is Reflection\Type\VecShapeTypeReflection);
-assert!(length!($vecShape->getTypes()) == 2);
+assert!(length!($vecShape->getTypes()) == 2u);
 assert!($vecShape->getRestType()?->toString() == 'float');
 
 $dictType = Reflection\reflect_type::<dict<string, int>>();
@@ -722,7 +722,7 @@ $dictShape = Reflection\reflect_type::<
 >();
 
 assert!($dictShape is Reflection\Type\DictShapeTypeReflection);
-assert!(length!($dictShape->getEntries()) == 2);
+assert!(length!($dictShape->getEntries()) == 2u);
 assert!($dictShape->getEntries()[0]->getKey() == 'id');
 assert!($dictShape->getEntries()[0]->getType()->toString() == 'int');
 assert!($dictShape->getRestKeyType()?->toString() == 'string');
@@ -748,7 +748,7 @@ assert!(
 
 $tupleType = Reflection\reflect_type::<(int, string)>();
 assert!($tupleType is Reflection\Type\TupleTypeReflection);
-assert!(length!($tupleType->getTypes()) == 2);
+assert!(length!($tupleType->getTypes()) == 2u);
 assert!($tupleType->getRestType() == null);
 $tupleRest = Reflection\reflect_type::<(int, ...string)>();
 assert!($tupleRest->getTypes()[0]->toString() == 'int');

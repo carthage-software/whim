@@ -122,7 +122,7 @@ final readonly class AddressList implements
   /** Returns the number of top-level addresses. */
   #[AlwaysInline]
   #[MustUse]
-  public function count(): int {
+  public function count(): uint {
     return length!($this->addresses);
   }
 

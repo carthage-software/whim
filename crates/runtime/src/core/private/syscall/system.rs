@@ -14,10 +14,10 @@ pub(crate) fn system_information(cx: &mut Context<'_, '_, '_>) -> Result<Value, 
     Ok(cx.tuple(fields.map(|field| cx.string(&field))))
 }
 
-#[whim_function("Whim\\_Private\\system_uptime(): (0..)")]
+#[whim_function("Whim\\_Private\\system_uptime(): uint")]
 pub(crate) fn system_uptime(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     let uptime = system::uptime().map_err(|error| io_error(cx, error))?;
-    Ok(Value::int(i64::try_from(uptime).unwrap_or(i64::MAX)))
+    Ok(Value::uint(uptime))
 }
 
 #[whim_function("Whim\\_Private\\load_averages(): (float, float, float)")]
@@ -26,10 +26,10 @@ pub(crate) fn load_averages(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw
     Ok(cx.tuple(averages.map(Value::float)))
 }
 
-#[whim_function("Whim\\_Private\\memory_information(): ((0..), (0..))")]
+#[whim_function("Whim\\_Private\\memory_information(): (uint, uint)")]
 pub(crate) fn memory_information(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     let memory: [u64; 2] = system::memory()
         .map_err(|error| io_error(cx, error))?
         .into();
-    Ok(cx.tuple(memory.map(|bytes| Value::int(i64::try_from(bytes).unwrap_or(i64::MAX)))))
+    Ok(cx.tuple(memory.map(Value::uint)))
 }

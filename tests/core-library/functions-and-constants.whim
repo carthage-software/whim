@@ -16,7 +16,7 @@ assert!(Float\is_infinite($infinity));
 assert!(Float\is_infinite(-$infinity));
 assert!(!(Float\is_infinite(1.5)));
 
-assert!(length!(Path\SEPARATOR) == 1);
+assert!(length!(Path\SEPARATOR) == 1u);
 assert!(
   Path\SEPARATOR == match (operating_system!()) {
     'windows' => '\\',

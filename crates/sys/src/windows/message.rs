@@ -142,7 +142,11 @@ pub fn receive(
     let receive = receive_function(socket)
         .map_err(|error| Error::new("WSAIoctl", error))?
         .unwrap();
-    let mut bytes = vec![0_u8; maximum as usize];
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(maximum as usize)
+        .map_err(|_| Error::new("WSARecvMsg", io::ErrorKind::OutOfMemory))?;
+    bytes.resize(maximum as usize, 0_u8);
     let mut control = [0_usize; CONTROL_WORDS];
     let mut buffer = ws::WSABUF {
         len: maximum,

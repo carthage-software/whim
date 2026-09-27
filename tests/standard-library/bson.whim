@@ -69,12 +69,12 @@ final class ChunkedBsonReadHandle implements ReadHandle {
       $length = $maxBytes;
     }
 
-    $remaining = length!($this->bytes) - $this->offset;
+    $remaining = (length!($this->bytes) as int) - $this->offset;
     if ($remaining < $length) {
       $length = $remaining;
     }
 
-    $bytes = Str\slice($this->bytes, $this->offset, $length);
+    $bytes = Str\slice($this->bytes, $this->offset, $length as uint);
     $this->offset += $length;
     return $bytes;
   }
@@ -88,18 +88,18 @@ final class RecordingBsonWriteHandle implements WriteHandle {
     null|CancellationToken $cancellation = null,
   ): void {}
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     return $this->record($bytes);
   }
 
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return $this->record($bytes);
   }
 
-  private function record(string $bytes): int {
+  private function record(string $bytes): uint {
     $this->bytes .= $bytes;
     $this->writes++;
     return length!($bytes);
@@ -136,7 +136,7 @@ assert!(ObjectId::isValid('0123456789abcdef01234567'));
 assert!(!ObjectId::isValid('0123456789ABCDEF01234567'));
 assert!(ObjectId::fromBytes($identifier->toBytes())->equals($identifier));
 $generated = ObjectId::generate();
-assert!(length!($generated->toBytes()) == 12);
+assert!(length!($generated->toBytes()) == 12u);
 assert!(!$generated->equals(ObjectId::generate()));
 
 $regularExpression = RegularExpression::fromParts('^whim$', 'xmi');
@@ -145,8 +145,11 @@ assert!($regularExpression->options == 'imx');
 $uuid = Whim\UUID\UUID::from('123e4567-e89b-42d3-a456-426614174000');
 $uuidBinary = Binary::fromUUID($uuid);
 assert!($uuidBinary->subtype == Binary::UUID);
+assert!($uuidBinary->subtype is uint);
 assert!(($uuidBinary->toUUID() as Whim\UUID\UUID)->equals($uuid));
 assert!(new Binary('not a uuid')->toUUID() == null);
+assert!(new Binary('bytes')->subtype == 0u);
+assert!(!new Binary('bytes', 1u)->equals(new Binary('bytes', 2u)));
 
 $decimalBytes =
   "\x00\x01\x02\x03\x04\x05\x06\x07" . "\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f";
@@ -160,7 +163,7 @@ $values = dict[
   'string' => 'Whim',
   'document' => dict['answer' => Int32(42)],
   'array' => vec[null, true, 7],
-  'binary' => new Binary("\x00\xff", 0x80),
+  'binary' => new Binary("\x00\xff", 0x80u),
   'old_binary' => new Binary('old', Binary::OLD_BINARY),
   'undefined' => Marker::Undefined,
   'object_id' => $identifier,
@@ -173,7 +176,7 @@ $values = dict[
   'symbol' => Symbol('legacy'),
   'scoped' => new JavaScriptWithScope('return n;', dict['n' => Int32(3)]),
   'int32' => Int32(-7),
-  'timestamp' => new Timestamp(1_700_000_000, 7),
+  'timestamp' => new Timestamp(1_700_000_000u, 7u),
   'int64' => Math\INT_MAX,
   'decimal' => $decimal,
   'max' => Marker::MaxKey,
@@ -193,9 +196,16 @@ assert!(($decoded['object_id'] as ObjectId)->equals($identifier));
 assert!($decoded['regex'] is RegularExpression);
 assert!(($decoded['regex'] as RegularExpression)->equals($regularExpression));
 assert!($decoded['timestamp'] is Timestamp);
+assert!(($decoded['timestamp'] as Timestamp)->seconds is uint);
+assert!(($decoded['timestamp'] as Timestamp)->increment is uint);
 assert!(
-  ($decoded['timestamp'] as Timestamp)->equals(new Timestamp(1_700_000_000, 7)),
+  ($decoded['timestamp'] as Timestamp)->equals(
+    new Timestamp(1_700_000_000u, 7u),
+  ),
 );
+
+assert!(!new Timestamp(1u, 2u)->equals(new Timestamp(1u, 3u)));
+assert!(!new Timestamp(1u, 2u)->equals(new Timestamp(2u, 2u)));
 
 assert!($decoded['decimal'] is Decimal128);
 assert!(($decoded['decimal'] as Decimal128)->equals($decimal));
@@ -278,7 +288,7 @@ $level = 0;
 while ($level < 129) {
   $nestedBytes =
     Whim\Binary\encode_i32(
-      length!($nestedBytes) + 8,
+      (length!($nestedBytes) as int) + 8,
       Whim\Binary\Endianness::Little,
     )
     . "\x03x\x00"
@@ -324,7 +334,7 @@ assert!($shortError is DecodingException);
 $largeInput = new MemoryHandle($hello);
 $largeError = null;
 try {
-  new BSON\Reader($largeInput, 5)->read();
+  new BSON\Reader($largeInput, 5u)->read();
 } catch (DecodingException $caught) {
   $largeError = $caught;
 }

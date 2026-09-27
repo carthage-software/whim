@@ -95,12 +95,12 @@ final class RequestBody implements ReadHandle {
       return '';
     }
 
-    $length = length!($this->buffer);
+    $length = length!($this->buffer) as int;
     if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
-    $data = Str\slice($this->buffer, 0, $length);
+    $data = Str\slice($this->buffer, 0, $length as uint);
     $this->buffer = Str\slice($this->buffer, $length);
     return $data;
   }

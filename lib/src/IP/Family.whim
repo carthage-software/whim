@@ -14,17 +14,17 @@ enum Family: int {
   /** Returns the address width in bytes. */
   #[AlwaysInline]
   #[MustUse]
-  public function byteLength(): 4|16 {
-    return $this->value as 4|16;
+  public function byteLength(): 4u|16u {
+    return $this->value as 4u|16u;
   }
 
   /** Returns the address width in bits. */
   #[AlwaysInline]
   #[MustUse]
-  public function bitLength(): 32|128 {
+  public function bitLength(): 32u|128u {
     return match ($this) {
-      Family::V4 => 32,
-      Family::V6 => 128,
+      Family::V4 => 32u,
+      Family::V6 => 128u,
     };
   }
 

@@ -61,14 +61,14 @@ final class HTTPServerTestStream implements NetworkStream<InternetEndpoint> {
     $cancellation?->throwIfCancellationRequested();
   }
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     return length!($bytes);
   }
 
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     return length!($bytes);
   }
@@ -176,13 +176,13 @@ final class HTTPServerProtocolStream implements
       return '';
     }
 
-    $remaining = length!($this->incoming) - $this->offset;
+    $remaining = (length!($this->incoming) as int) - $this->offset;
     $length = $remaining;
     if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
-    $data = Str\slice($this->incoming, $this->offset, $length);
+    $data = Str\slice($this->incoming, $this->offset, $length as uint);
     $this->offset += $length;
     return $data;
   }
@@ -193,7 +193,7 @@ final class HTTPServerProtocolStream implements
     $cancellation?->throwIfCancellationRequested();
   }
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->written .= $bytes;
     return length!($bytes);
   }
@@ -201,7 +201,7 @@ final class HTTPServerProtocolStream implements
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     return $this->tryWrite($bytes);
   }
@@ -256,13 +256,13 @@ final class HTTPServerH2Stream implements NetworkStream<InternetEndpoint> {
       return '';
     }
 
-    $remaining = length!($this->incoming) - $this->offset;
+    $remaining = (length!($this->incoming) as int) - $this->offset;
     $length = $remaining;
     if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
-    $data = Str\slice($this->incoming, $this->offset, $length);
+    $data = Str\slice($this->incoming, $this->offset, $length as uint);
     $this->offset += $length;
     return $data;
   }
@@ -273,7 +273,7 @@ final class HTTPServerH2Stream implements NetworkStream<InternetEndpoint> {
     $cancellation?->throwIfCancellationRequested();
   }
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->written .= $bytes;
     return length!($bytes);
   }
@@ -281,7 +281,7 @@ final class HTTPServerH2Stream implements NetworkStream<InternetEndpoint> {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     return $this->tryWrite($bytes);
   }
@@ -304,8 +304,8 @@ final class HTTPServerRequestState {
 }
 
 $configuration = Configuration::default();
-assert!($configuration->maximumConnections == 1_000);
-assert!($configuration->maximumHeaderSize == 16_384);
+assert!($configuration->maximumConnections == 1_000u);
+assert!($configuration->maximumHeaderSize == 16_384u);
 assert!($configuration->h2 is H2\Configuration);
 
 $handler = new Handler\FunctionHandler(
@@ -342,8 +342,8 @@ $security = new Context\Security(serverName: 'example.com');
 assert!($security->serverName == 'example.com');
 assert!(!$security->earlyDataAccepted);
 
-$local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
-$peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60000);
+$local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080u);
+$peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60000u);
 $functionContext = new ServerPrivate\H1Context(
   ProtocolVersion::V11,
   $local,
@@ -408,7 +408,7 @@ $listener = new HTTPServerTestListener($local, vec[$first, $second]);
 $driver = new HTTPServerTestStreamDriver();
 $server = new Server(
   vec[new Whim\HTTP\Server\Binding\Stream($listener)],
-  new Configuration(maximumConnections: 1),
+  new Configuration(maximumConnections: 1u),
   $driver,
 );
 
@@ -481,7 +481,7 @@ assert!($state->request?->method == 'POST');
 assert!($state->request?->requestTarget == '/echo?q=1');
 assert!($state->request?->url?->toString() == 'http://example.com/echo?q=1');
 assert!($state->body == 'hello');
-assert!(Str\search($protocolStream->written, "HTTP/1.1 200 OK\r\n") == 0);
+assert!(Str\search($protocolStream->written, "HTTP/1.1 200 OK\r\n") == 0u);
 assert!(Str\search($protocolStream->written, "server: Whim\r\n") != null);
 assert!(Str\ends_with($protocolStream->written, "\r\n\r\nworld"));
 
@@ -548,7 +548,7 @@ new ServerPrivate\H1Driver()->serve(
 assert!($chunkState->calls == 1);
 assert!($chunkState->body == 'hello world');
 assert!($chunkState->trailer == '42');
-assert!(Str\search($chunkStream->written, 'HTTP/1.1 204 No Content') == 0);
+assert!(Str\search($chunkStream->written, 'HTTP/1.1 204 No Content') == 0u);
 
 $invalidState = new HTTPServerRequestState();
 $invalidStream = new HTTPServerProtocolStream(
@@ -578,7 +578,7 @@ new ServerPrivate\H1Driver()->serve(
 );
 
 assert!($invalidState->calls == 0);
-assert!(Str\search($invalidStream->written, 'HTTP/1.1 400 Bad Request') == 0);
+assert!(Str\search($invalidStream->written, 'HTTP/1.1 400 Bad Request') == 0u);
 
 $shortH1State = new HTTPServerRequestState();
 $shortH1Stream = new HTTPServerProtocolStream(

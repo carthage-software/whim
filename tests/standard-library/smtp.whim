@@ -68,7 +68,7 @@ final class ScriptedDuplex implements ReadHandle, WriteHandle {
     null|CancellationToken $cancellation = null,
   ): void {}
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->output .= $bytes;
     return length!($bytes);
   }
@@ -76,7 +76,7 @@ final class ScriptedDuplex implements ReadHandle, WriteHandle {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return $this->tryWrite($bytes);
   }
 }
@@ -155,7 +155,7 @@ assert!($connection->readGreeting()->code == 220);
 assert!($connection->ehlo('client.example')->code == 250);
 assert!($connection->supportsCapability('size') == true);
 assert!($connection->capability('AUTH') == 'PLAIN LOGIN');
-assert!($connection->maximumMessageSize() == 1048576);
+assert!($connection->maximumMessageSize() == 1048576u);
 assert!(
   $connection->sendCommand('RSET')->enhancedStatus?->toString() == '2.0.0',
 );
@@ -321,7 +321,14 @@ assert!($assertion_error_46 is InvalidArgumentException);
 $transportConfiguration = new TransportConfiguration();
 assert!($transportConfiguration->security == Security::StartTls);
 assert!($transportConfiguration->port == null);
-assert!($transportConfiguration->maximumIdleConnections == 1);
+assert!($transportConfiguration->maximumIdleConnections == 1u);
+assert!(
+  $transportConfiguration->withMaximumIdleConnections(
+    0u,
+  )->maximumIdleConnections
+  == 0u,
+);
+
 assert!(new DeliveryReport()->hasRejections() == false);
 
 $extensionDuplex = new ScriptedDuplex(
@@ -376,7 +383,7 @@ try {
 
 assert!($assertion_error_55 is InvalidArgumentException);
 
-$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 $endpoint = $listener->getLocalEndpoint();
 $server = Async\spawn::<(string, string)>(fn(): (string, string) {
   return (
@@ -425,7 +432,7 @@ $listener->close();
 assert!(Str\contains($payload, "\r\n\r\n..hello\r\nworld") == true);
 assert!(Str\contains($secondPayload, "\r\n\r\nsecond message") == true);
 
-$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0));
+$listener = TCP\listen(new InternetEndpoint(Address::v4('127.0.0.1'), 0u));
 $endpoint = $listener->getLocalEndpoint();
 $server = Async\spawn::<string>(fn(): string {
   $stream = $listener->accept();
@@ -470,7 +477,7 @@ $server = Async\spawn::<string>(fn(): string {
       $size = parse_decimal($parts[1]);
       assert!($size != null);
       $payload .= $reader->readFixedSize($size);
-      $last = length!($parts) == 3 && $parts[2] == 'LAST';
+      $last = length!($parts) == 3u && $parts[2] == 'LAST';
       $stream->writeAll("250 2.0.0 queued\r\n");
     }
 
@@ -516,7 +523,7 @@ $message = Message::create(
 
 $rejectedReport = $transport->send($envelope, $message);
 assert!($rejectedReport->hasRejections() == true);
-assert!(length!($rejectedReport->rejectedRecipients) == 1);
+assert!(length!($rejectedReport->rejectedRecipients) == 1u);
 assert!($rejectedReport->rejectedRecipients[0][1]->code == 550);
 
 $transport->close();

@@ -2419,21 +2419,16 @@ unsafe fn string_length_operation(
     // SAFETY: other-kind shadows never shadow their live register, so the
     // read sees the current value.
     let length = match unsafe { &*registers.add(source_index) }.transparent() {
-        ValueView::String(string) => string.len() as i64,
-        ValueView::ShortString(string) => string.as_bytes().len() as i64,
+        ValueView::String(string) => string.len() as u64,
+        ValueView::ShortString(string) => string.as_bytes().len() as u64,
         _ => return false,
     };
-    // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
-    unsafe {
-        assign(
-            registers,
-            values,
-            dirty,
-            pins,
-            destination,
-            NumericValue::int(length),
-        )
-    };
+    let destination_index = destination.index() as usize;
+    // SAFETY: the destination is in the active numeric register window.
+    unsafe { *registers.add(destination_index) = Value::uint(length) };
+    values.set(destination_index, NumericValue::OTHER);
+    *dirty &= !(1u64 << destination_index);
+    pins.invalidate(destination_index);
     true
 }
 

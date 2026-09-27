@@ -31,7 +31,7 @@ function failure(SystemError $error): never {
     . $error->call()
     . ' system call failed with errno '
     . $error->errno(),
-    $error->errno(),
+    $error->getCode(),
   );
 }
 

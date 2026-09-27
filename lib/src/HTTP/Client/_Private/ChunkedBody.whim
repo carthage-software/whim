@@ -17,8 +17,8 @@ use Whim\Unwind\OverflowException;
 
 /** Decodes one chunked HTTP/1 response body. */
 final class ChunkedBody implements ReadHandle {
-  private int $chunkRemaining = 0;
-  private int $readBytes = 0;
+  private uint $chunkRemaining = 0u;
+  private uint $readBytes = 0u;
   private bool $needsTerminator = false;
   private bool $completed = false;
 
@@ -26,8 +26,8 @@ final class ChunkedBody implements ReadHandle {
     private BufferedReadHandle $reader,
     private CloseHandle $transport,
     private Deferred<FieldMap> $trailers,
-    private int $maximumBodyBytes,
-    private int $maximumTrailerBytes,
+    private uint $maximumBodyBytes,
+    private uint $maximumTrailerBytes,
     private bool $closeAtEnd,
   ) {}
 
@@ -47,11 +47,11 @@ final class ChunkedBody implements ReadHandle {
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->completed || 0 == $this->chunkRemaining) {
+    if ($this->completed || 0u == $this->chunkRemaining) {
       return '';
     }
 
-    $data = $this->reader->tryRead($this->limit($maxBytes));
+    $data = $this->reader->tryRead($this->limit($maxBytes) as int);
     $this->consume($data);
     return $data;
   }
@@ -65,14 +65,14 @@ final class ChunkedBody implements ReadHandle {
       return '';
     }
 
-    if (0 == $this->chunkRemaining) {
+    if (0u == $this->chunkRemaining) {
       $this->beginChunk($cancellation);
       if ($this->completed) {
         return '';
       }
     }
 
-    $data = $this->reader->read($this->limit($maxBytes), $cancellation);
+    $data = $this->reader->read($this->limit($maxBytes) as int, $cancellation);
     if ('' == $data && $this->reader->reachedEndOfDataSource()) {
       $this->transport->close();
       throw new ProtocolException('the response ended inside a chunk');
@@ -113,7 +113,7 @@ final class ChunkedBody implements ReadHandle {
       throw new ProtocolException('the response ended before a chunk size');
     }
 
-    $line = Str\slice($line, 0, length!($line) - 2);
+    $line = Str\slice($line, 0, length!($line) - 2u);
     $extension = Str\search($line, ';');
     if (null != $extension) {
       $line = Str\slice($line, 0, $extension);
@@ -135,7 +135,7 @@ final class ChunkedBody implements ReadHandle {
     }
 
     try {
-      $this->chunkRemaining = Math\from_base($line, 16);
+      $this->chunkRemaining = Math\from_base($line, 16) as uint;
     } catch (OverflowException $error) {
       throw new ProtocolException(
         'a response chunk size is too large',
@@ -143,7 +143,7 @@ final class ChunkedBody implements ReadHandle {
       );
     }
 
-    if (0 == $this->chunkRemaining) {
+    if (0u == $this->chunkRemaining) {
       $this->readTrailers($cancellation);
       $this->completed = true;
       if ($this->closeAtEnd) {
@@ -156,12 +156,12 @@ final class ChunkedBody implements ReadHandle {
 
   private function readTrailers(null|CancellationToken $cancellation): void {
     $fields = vec[];
-    $bytes = 0;
+    $bytes = 0u;
     while (true) {
       try {
         $line = $this->reader->readUntilBounded(
           "\r\n",
-          $this->maximumTrailerBytes - $bytes,
+          ($this->maximumTrailerBytes as int) - ($bytes as int),
           $cancellation,
         );
       } catch (LimitExceededException $error) {
@@ -176,7 +176,7 @@ final class ChunkedBody implements ReadHandle {
       }
 
       $bytes += length!($line);
-      $line = match (Str\slice($line, 0, length!($line) - 2)) {
+      $line = match (Str\slice($line, 0, length!($line) - 2u)) {
         '' => break,
         $line => $line,
       };
@@ -186,7 +186,7 @@ final class ChunkedBody implements ReadHandle {
       }
 
       $separator = Str\search($line, ':');
-      if (null == $separator || 0 == $separator) {
+      if (null == $separator || 0u == $separator) {
         throw new ProtocolException(
           'the response contains a malformed trailer',
         );
@@ -194,7 +194,7 @@ final class ChunkedBody implements ReadHandle {
 
       $fields[] = (
         Str\slice($line, 0, $separator),
-        Str\trim(Str\slice($line, $separator + 1), " \t"),
+        Str\trim(Str\slice($line, ($separator as int) + 1), " \t"),
       );
     }
 
@@ -208,12 +208,12 @@ final class ChunkedBody implements ReadHandle {
     }
   }
 
-  private function limit(null|int $maximum): int {
+  private function limit(null|int $maximum): uint {
     if (null == $maximum || $maximum < 0 || $maximum > $this->chunkRemaining) {
       return $this->chunkRemaining;
     }
 
-    return $maximum;
+    return $maximum as uint;
   }
 
   private function consume(string $data): void {

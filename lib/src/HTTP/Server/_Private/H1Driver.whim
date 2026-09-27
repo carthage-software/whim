@@ -189,7 +189,7 @@ final class H1Driver implements StreamDriver {
 
         $body = $chunkedBody;
         $trailers = $chunkedBody->getTrailers();
-      } else if (null != $head->contentLength && 0 != $head->contentLength) {
+      } else if (null != $head->contentLength && 0u != $head->contentLength) {
         $body = new H1FixedLengthBody(
           $reader,
           $head->contentLength,
@@ -272,7 +272,7 @@ final class H1Driver implements StreamDriver {
       }
 
       $handlerCancellation = $forced;
-      if (length!($configuration->middleware) != 0) {
+      if (length!($configuration->middleware) != 0u) {
         $handlerCancellation = new RequestCancellationToken($forced);
       }
 
@@ -429,7 +429,7 @@ final class H1Driver implements StreamDriver {
     $addContentLength = false;
     if ($bodyAllowed && null == $response->body) {
       if (null == $contentLength) {
-        $contentLength = 0;
+        $contentLength = 0u;
         $addContentLength = true;
       }
     } else if (null == $contentLength) {
@@ -442,7 +442,7 @@ final class H1Driver implements StreamDriver {
 
     $head = http1_serialize_response_head(
       $requestVersion->value,
-      $response->status,
+      $response->status as uint,
       Message\reason_phrase($response->status) ?? '',
       $headers->toVec(),
       $bodyAllowed,
@@ -458,7 +458,7 @@ final class H1Driver implements StreamDriver {
     }
 
     if (!$chunked && null != $contentLength && $contentLength <= 16_384) {
-      $data = $response->body->readAll($contentLength, $cancellation);
+      $data = $response->body->readAll($contentLength as int, $cancellation);
       $stream->writeAll($head . $data, $cancellation);
       return length!($data) == $contentLength;
     }
@@ -497,7 +497,7 @@ final class H1Driver implements StreamDriver {
     ) {
       $maximum = 16_384;
       if (null != $remaining && $remaining < $maximum) {
-        $maximum = $remaining;
+        $maximum = $remaining as int;
       }
 
       $data = match ($response->body->read($maximum, $cancellation)) {
@@ -511,6 +511,6 @@ final class H1Driver implements StreamDriver {
       }
     }
 
-    return null == $remaining || 0 == $remaining;
+    return null == $remaining || 0u == $remaining;
   }
 }

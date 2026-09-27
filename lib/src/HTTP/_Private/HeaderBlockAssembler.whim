@@ -1,7 +1,6 @@
 namespace Whim\HTTP\_Private;
 
 use Whim;
-use Whim\Refine\NonNegativeInt;
 
 /** Reassembles HEADERS and PUSH_PROMISE continuation sequences. */
 final class HeaderBlockAssembler {
@@ -11,7 +10,7 @@ final class HeaderBlockAssembler {
   private bool $endStream = false;
   private null|StreamId $promisedStreamId = null;
 
-  public function __construct(private NonNegativeInt $maximumSize) {}
+  public function __construct(private uint $maximumSize) {}
 
   public function active(): bool {
     return null != $this->kind;
@@ -119,8 +118,8 @@ final class HeaderBlockAssembler {
     return $completed;
   }
 
-  private function guardSize(int $size): void {
-    if (0 != $this->maximumSize && $size > $this->maximumSize) {
+  private function guardSize(uint $size): void {
+    if (0u != $this->maximumSize && $size > $this->maximumSize) {
       throw new ProtocolException(
         'the compressed HTTP/2 header block exceeds its configured limit',
         Whim\HTTP\_Private\ErrorCode::CompressionError->value,

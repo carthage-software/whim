@@ -22,9 +22,9 @@ fn computed_scalar_captures_keep_types_without_erasing_named_types() {
             $scale = $value * 0.5;
             return fn(float $input): float => $input * $scale;
         }
-        function label(int $value): fn(): int {
+        function label(int $value): fn(): uint {
             $text = 'value=' . $value;
-            return fn(): int => length!($text);
+            return fn(): uint => length!($text);
         }
         function named(Token $value): fn(): Token { return fn(): Token => $value; }
         function uncertain(bool $condition): fn(): int {

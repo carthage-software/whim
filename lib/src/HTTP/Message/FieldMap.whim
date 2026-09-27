@@ -122,7 +122,7 @@ final readonly class FieldMap implements Default, ToIterator<int, Field> {
       $values = vec[];
     }
 
-    if (length!($values) == 1 && $values[0] == $value) {
+    if (length!($values) == 1u && $values[0] == $value) {
       return $this;
     }
 
@@ -185,7 +185,7 @@ final readonly class FieldMap implements Default, ToIterator<int, Field> {
   /** Returns the number of field entries, including repeated names. */
   #[AlwaysInline]
   #[MustUse]
-  public function count(): int {
+  public function count(): uint {
     return length!($this->fields);
   }
 

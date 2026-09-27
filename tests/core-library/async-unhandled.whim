@@ -127,7 +127,7 @@ File\write(
 
 $deadlockedRun = Command\run($binary, vec[$deadlocked]);
 assert!($deadlockedRun->status is Command\Exited);
-assert!(($deadlockedRun->status as Command\Exited)->code == 255);
+assert!(($deadlockedRun->status as Command\Exited)->code == 255u);
 assert!($deadlockedRun->standardOutput == 'waiting' . "\n");
 assert!(
   Whim\Str\contains(
@@ -155,7 +155,7 @@ File\write(
 
 $surfacingRun = Command\run($binary, vec[$surfacing]);
 assert!($surfacingRun->status is Command\Exited);
-assert!(($surfacingRun->status as Command\Exited)->code == 255);
+assert!(($surfacingRun->status as Command\Exited)->code == 255u);
 assert!($surfacingRun->standardOutput == 'spawning' . "\n");
 assert!(
   Whim\Str\contains(

@@ -26,7 +26,7 @@ File\write(
 
 $rendered = Command\run($binary, vec[$rendering]);
 assert!($rendered->status is Command\Exited);
-assert!(($rendered->status as Command\Exited)->code == 255);
+assert!(($rendered->status as Command\Exited)->code == 255u);
 assert!($rendered->standardOutput == 'before the throw' . "\n");
 $assertion_value_5 = $rendered->standardError;
 assert!(
@@ -55,8 +55,8 @@ File\write(
 
 $traced = Command\run($binary, vec[$tracked]);
 assert!($traced->status is Command\Exited);
-assert!(($traced->status as Command\Exited)->code == 255);
-assert!(length!($traced->standardOutput) == 0);
+assert!(($traced->status as Command\Exited)->code == 255u);
+assert!(length!($traced->standardOutput) == 0u);
 $assertion_value_9 = $traced->standardError;
 assert!(
   Whim\Str\contains(

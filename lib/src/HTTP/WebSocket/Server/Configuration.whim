@@ -1,7 +1,7 @@
 namespace Whim\HTTP\WebSocket\Server;
 
 use Whim\Marker\TrackCaller;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\_Private\http_valid_token;
 
@@ -9,9 +9,9 @@ use Whim\_Private\http_valid_token;
 final readonly class Configuration {
   #[TrackCaller]
   public function __construct(
-    public PositiveInt $maximumMessageSize = 16_777_216,
-    public PositiveInt $maximumFrameSize = 1_048_576,
-    public PositiveInt $readSize = 16_384,
+    public NonZero<uint> $maximumMessageSize = 16_777_216u,
+    public NonZero<uint> $maximumFrameSize = 1_048_576u,
+    public NonZero<uint> $readSize = 16_384u,
     public vec<string> $subprotocols = vec[],
   ) {
     $seen = dict[];

@@ -12,7 +12,7 @@ use Whim\Unwind\Throwable;
 #[TraceBoundary]
 function select_future<T>(vec<Future<T>> $futures): int {
   $winner = new Deferred::<int>();
-  $count = length!($futures);
+  $count = length!($futures) as int;
   $start = Selection::$offset % $count;
   Selection::$offset = ($start + 1) % $count;
   $position = 0;
@@ -43,7 +43,7 @@ function select_future<T>(vec<Future<T>> $futures): int {
 #[TraceBoundary]
 function select_successful_future<T>(vec<Future<T>> $futures): T {
   $selection = new AnySelection::<T>(length!($futures));
-  $count = length!($futures);
+  $count = length!($futures) as int;
   $start = Selection::$offset % $count;
   Selection::$offset = ($start + 1) % $count;
   $position = 0;

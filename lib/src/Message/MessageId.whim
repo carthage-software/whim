@@ -22,7 +22,7 @@ final readonly class MessageId implements ToString {
   public static function parse(string $input): null|MessageId {
     $input = Str\trim($input);
     if (Str\starts_with($input, '<') && Str\ends_with($input, '>')) {
-      $input = Str\slice($input, 1, length!($input) - 2);
+      $input = Str\slice($input, 1, length!($input) - 2u);
     }
 
     if (
@@ -56,7 +56,7 @@ final readonly class MessageId implements ToString {
     NonEmptyString $domain = 'whim-lang.dev',
   ): MessageId {
     return new MessageId(
-      (Hex\encode(SecureRandom\bytes(16)) . '@' . $domain) as NonEmptyString,
+      (Hex\encode(SecureRandom\bytes(16u)) . '@' . $domain) as NonEmptyString,
     );
   }
 

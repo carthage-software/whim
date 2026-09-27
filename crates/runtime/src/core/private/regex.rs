@@ -74,7 +74,7 @@ impl Regex {
     }
 
     #[whim_method(
-        "find(string $subject, 0.. $offset = 0): null|((0..), (0..), dict<int|string, null|string>)"
+        "find(string $subject, uint $offset = 0u): null|(uint, uint, dict<int|string, null|string>)"
     )]
     fn find<'call>(
         context: &mut Context<'call, '_, '_>,
@@ -84,7 +84,7 @@ impl Regex {
         let offset = if arguments.is_absent(1) {
             0
         } else {
-            arguments.int(1)
+            arguments.uint(1)
         };
 
         let Ok(offset) = usize::try_from(offset) else {
@@ -133,25 +133,15 @@ impl Regex {
 
         let captures = context.dict(captures);
 
-        // SAFETY: the surrounding invariant proves this result is successful.
-        let start = unsafe {
-            unwrap_result_invariant(
-                i64::try_from(found.start()),
-                "string offsets fit in Whim integers",
-            )
-        };
-        // SAFETY: the surrounding invariant proves this result is successful.
-        let end = unsafe {
-            unwrap_result_invariant(
-                i64::try_from(found.end()),
-                "string offsets fit in Whim integers",
-            )
-        };
-        Ok(context.tuple([Value::int(start), Value::int(end), captures]))
+        Ok(context.tuple([
+            Value::uint(found.start() as u64),
+            Value::uint(found.end() as u64),
+            captures,
+        ]))
     }
 
     #[whim_method(
-        "replaceLiteral(string $subject, string $replacement, null|(0..) $limit = null): string"
+        "replaceLiteral(string $subject, string $replacement, null|uint $limit = null): string"
     )]
     fn replace_literal<'call>(
         context: &mut Context<'call, '_, '_>,
@@ -162,7 +152,7 @@ impl Regex {
         let (limit, replaces_nothing) = if arguments.is_absent(2) {
             (0, false)
         } else {
-            usize::try_from(arguments.int(2))
+            usize::try_from(arguments.uint(2))
                 .map_or((usize::MAX, false), |limit| (limit, limit == 0))
         };
 

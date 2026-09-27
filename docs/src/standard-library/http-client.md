@@ -32,6 +32,10 @@ Configuration sets header and body size limits, informational response limits,
 a base URL, TLS settings, HTTP/2 settings, enabled protocol versions, and an
 optional proxy.
 
+The informational-response limit uses `uint`, such as `16u`. Pool limits and
+the redirect limit also use `uint`; pass `0u` when disabling an idle pool.
+Response header and body size limits use `NonZero<uint>`, such as `8192u`.
+
 `SendConfiguration` overrides one call. It can also set callbacks for
 informational responses and connection metadata, plus a connection timeout.
 
@@ -46,6 +50,7 @@ whether the pool may reuse it, and an `exchange` operation.
 
 `DirectConnector` opens one network connection. `PooledConnector` reuses safe
 connections by origin. `UnixConnector` sends HTTP over a Unix socket.
+Origin and endpoint ports use `uint` in the range `0u..=65535u`.
 
 `ProxyConfiguration` supports an HTTP proxy URL, optional authorization, TLS to
 the proxy, a server-name override, and host bypass rules.
@@ -58,7 +63,7 @@ settings, next handler, and cancellation token.
 
 `CookieJar` stores accepted response cookies and adds matching cookies to later
 requests. It follows domain, path, secure, expiry, and same-site data available
-to the client. `clear()` removes stored cookies and `count()` reports them.
+to the client. `clear()` removes stored cookies and `count()` returns their number as `uint`.
 
 `DeniedDestinationsMiddleware` rejects configured IP blocks after resolution.
 `publicOnly()` blocks private, loopback, link-local, and other non-public
@@ -73,7 +78,7 @@ body that cannot rewind stops the redirect.
 
 `RetryClient` retries idempotent methods after connection or transport errors.
 It uses bounded attempts and increasing delays. A request body must be seekable
-to replay.
+to replay. The backoff multiplier uses `NonZero<uint>` and defaults to `2u`.
 
 Redirect and retry are client decorators, not connection middleware, because
 they may need another connection.
@@ -83,6 +88,7 @@ they may need another connection.
 `HTTP\WebSocket\Client\connect()` performs a WebSocket handshake for a URL and
 returns a client connection. Configuration sets frame and message limits,
 headers, origin, subprotocols, response header size, and TLS settings.
+Frame, message, header, and read sizes use `NonZero<uint>`.
 
 The connection adds URL, response fields, endpoints, and TLS state to the common
 WebSocket connection API described in the server chapter.

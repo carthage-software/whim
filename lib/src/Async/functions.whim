@@ -110,7 +110,7 @@ function all<K: ArrayKey, V>(Iterable<K, Future<V>> $futures): dict<K, V> {
     }
   }
 
-  if (length!($errors) == 1) {
+  if (length!($errors) == 1u) {
     throw $errors[0];
   }
 
@@ -157,7 +157,7 @@ function series<K: ArrayKey, V>(Iterable<K, Supplier<V>> $tasks): dict<K, V> {
 #[TrackCaller]
 function any<T>(array<_, Future<T>> $futures): T {
   $futures = Vec\values::<Future<T>>($futures);
-  if (length!($futures) == 0) {
+  if (length!($futures) == 0u) {
     throw new InvalidArgumentException('any() requires at least one future');
   }
 
@@ -175,7 +175,7 @@ function any<T>(array<_, Future<T>> $futures): T {
 #[TrackCaller]
 function first<T>(array<_, Future<T>> $futures): T {
   $futures = Vec\values::<Future<T>>($futures);
-  if (length!($futures) == 0) {
+  if (length!($futures) == 0u) {
     throw new InvalidArgumentException('first() requires at least one future');
   }
 

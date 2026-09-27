@@ -47,8 +47,8 @@ final class SQLiteConnection {
     bool $readOnly,
     bool $create,
     bool $uri,
-    0.. $busyTimeoutMilliseconds,
-    0.. $statementCacheCapacity,
+    uint $busyTimeoutMilliseconds,
+    uint $statementCacheCapacity,
     bool $foreignKeys,
   ): (SQLiteConnection, SQLiteOperation) {}
 
@@ -129,7 +129,7 @@ final class SQLiteResult {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function affectedRows(): null|(0..) {}
+  public function affectedRows(): null|uint {}
 
   /** Suspends until the next row or the end of the result. */
   #[MustUse]

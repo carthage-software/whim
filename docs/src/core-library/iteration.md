@@ -95,6 +95,7 @@ short pipelines, or construct these types when an API needs a concrete adapter.
 
 `count`, `reduce`, `to_vec`, and `to_dict` consume the rest of an iterable.
 `to_dict` keeps its keys; `to_vec` keeps only its values.
+`take` and `drop` accept uint counts; `count` returns a uint.
 
 ```whim
 use Whim\Iterate;
@@ -107,7 +108,7 @@ $values = Iterate\take::<int, int>(
     ),
     fn(int $value): bool => $value > 4,
   ),
-  1,
+  1u,
 );
 
 assert!(Iterate\to_vec::<int, int>($values) == vec[6]);

@@ -123,7 +123,7 @@ pub(crate) fn string_byte_at<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\memchr(string $haystack, 0..=255 $needle, (0..) $offset): null|(0..)"
+    "Whim\\_Private\\memchr(string $haystack, 0..=255 $needle, (0..) $offset): null|uint"
 )]
 pub(crate) fn memchr(arguments: Arguments<'_>) -> Value {
     let haystack = arguments.bytes(0);
@@ -137,7 +137,7 @@ pub(crate) fn memchr(arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\memrchr(string $haystack, 0..=255 $needle, (0..) $offset): null|(0..)"
+    "Whim\\_Private\\memrchr(string $haystack, 0..=255 $needle, (0..) $offset): null|uint"
 )]
 pub(crate) fn memrchr(arguments: Arguments<'_>) -> Value {
     let haystack = arguments.bytes(0);
@@ -151,7 +151,7 @@ pub(crate) fn memrchr(arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\memmem(string $haystack, string $needle, (0..) $offset, bool $ci): null|(0..)"
+    "Whim\\_Private\\memmem(string $haystack, string $needle, (0..) $offset, bool $ci): null|uint"
 )]
 pub(crate) fn memmem(arguments: Arguments<'_>) -> Value {
     let haystack = arguments.bytes(0);
@@ -172,7 +172,7 @@ pub(crate) fn memmem(arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\memrmem(string $haystack, string $needle, (0..) $offset, bool $ci): null|(0..)"
+    "Whim\\_Private\\memrmem(string $haystack, string $needle, (0..) $offset, bool $ci): null|uint"
 )]
 pub(crate) fn memrmem(arguments: Arguments<'_>) -> Value {
     let haystack = arguments.bytes(0);
@@ -193,7 +193,7 @@ pub(crate) fn memrmem(arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\string_split(string $string, string $delimiter, (0..) $limit): vec<string>"
+    "Whim\\_Private\\string_split(string $string, string $delimiter, uint $limit): vec<string>"
 )]
 pub(crate) fn string_split<'call>(
     context: &Context<'call, '_, '_>,
@@ -201,7 +201,7 @@ pub(crate) fn string_split<'call>(
 ) -> Value {
     let haystack = arguments.bytes(0);
     let delimiter = arguments.bytes(1);
-    let limit = arguments.int(2);
+    let limit = arguments.uint(2);
     let mut positions = find_bytes_positions(haystack, delimiter).peekable();
     if delimiter.is_empty() || limit == 1 || positions.peek().is_none() {
         return context.vec([arguments.local(0).with_newtype(None)]);
@@ -209,7 +209,7 @@ pub(crate) fn string_split<'call>(
 
     let string = (haystack.len() > ShortString::CAPACITY).then(|| arguments.string(0));
     let source = string.as_ref().map(FlatStringSlices::new);
-    let limit = string_index(limit);
+    let limit = usize::try_from(limit).unwrap_or(usize::MAX);
     let mut parts: Vec<Value> = Vec::new();
     let mut start = 0usize;
     for position in positions {
@@ -419,20 +419,25 @@ pub(crate) fn string_trim<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\string_pad(string $string, (0..) $length, (string&!'') $pad, 0..=2 $mode): string"
+    "Whim\\_Private\\string_pad(string $string, uint $length, (string&!'') $pad, 0..=2 $mode): string"
 )]
 pub(crate) fn string_pad<'call>(
-    context: &Context<'call, '_, '_>,
+    context: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
-) -> Value {
+) -> Result<Value, Throw> {
     let string = arguments.string(0);
-    let length = arguments.int(1);
+    let length = arguments.uint(1);
     let pad = arguments.bytes(2);
     let mode = arguments.int(3);
     let bytes = ByteStringObject::handle_bytes(&string);
-    let length = string_index(length);
+    let length = usize::try_from(length).map_err(|_| {
+        let class = context.vm.intern(b"Whim\\Unwind\\ValueError");
+        context
+            .vm
+            .throw(class, "the padded string length is too large", 0)
+    })?;
     if length <= bytes.len() {
-        return Value::string(string);
+        return Ok(Value::string(string));
     }
 
     let needed = length - bytes.len();
@@ -441,11 +446,17 @@ pub(crate) fn string_pad<'call>(
         2 => (0, needed),
         _ => (needed / 2, needed - needed / 2),
     };
-    let mut result = Vec::with_capacity(length);
+    let mut result = Vec::new();
+    result.try_reserve_exact(length).map_err(|_| {
+        let class = context.vm.intern(b"Whim\\Unwind\\ValueError");
+        context
+            .vm
+            .throw(class, "the padded string length is too large", 0)
+    })?;
     result.extend(pad.iter().cycle().take(left));
     result.extend_from_slice(bytes);
     result.extend(pad.iter().cycle().take(right));
-    context.owned_string(result)
+    Ok(context.owned_string(result))
 }
 
 #[whim_function("Whim\\Str\\lowercase(string $string): string", must_use)]
@@ -579,22 +590,12 @@ fn string_index(value: i64) -> usize {
     }
 }
 
-fn string_position(value: usize) -> i64 {
-    // SAFETY: the surrounding invariant proves this result is successful.
-    unsafe {
-        unwrap_result_invariant(
-            i64::try_from(value),
-            "a string position fits in a Whim integer",
-        )
-    }
-}
-
-fn search_result(result: Option<usize>, offset: usize) -> Value {
+const fn search_result(result: Option<usize>, offset: usize) -> Value {
     let Some(position) = result else {
         return Value::null();
     };
 
-    Value::int(string_position(position + offset))
+    Value::uint((position + offset) as u64)
 }
 
 #[cfg(test)]

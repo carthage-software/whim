@@ -54,7 +54,7 @@ accept_load_probe($base->loadSymbol(...));
 $mapped = $base->withSymbolFile('App\\greet', $work . '/greet.whim');
 assert!($mapped != $base);
 Autoload\register($base);
-assert!(length!(Autoload\get_autoloaders()) == 1);
+assert!(length!(Autoload\get_autoloaders()) == 1u);
 $assertion_value_3 = fn(): string => App\greet();
 $assertion_error_3 = null;
 try {
@@ -65,13 +65,13 @@ try {
 
 assert!($assertion_error_3 is UndefinedSymbolError);
 Autoload\register($mapped);
-assert!(length!(Autoload\get_autoloaders()) == 2);
+assert!(length!(Autoload\get_autoloaders()) == 2u);
 assert!(Autoload\load_symbol(SymbolKind::Function, 'App\\greet'));
 
 assert!(App\greet() == 'hello from disk');
 Autoload\unregister($base);
 Autoload\unregister($mapped);
-assert!(length!(Autoload\get_autoloaders()) == 0);
+assert!(length!(Autoload\get_autoloaders()) == 0u);
 
 File\write(
   $work . '/user.whim',
@@ -307,7 +307,7 @@ try {
 
 assert!($assertion_error_19 is UndefinedSymbolError);
 assert!(App\unrelated() == 'loaded anyway');
-assert!(length!($fallbackRecorder->seen) == 0);
+assert!(length!($fallbackRecorder->seen) == 0u);
 $assertion_value_22 = fn(): string => ghost();
 $assertion_error_22 = null;
 try {
@@ -330,11 +330,11 @@ $secondChainLoader = new Autoload\Autoloader()->withFallback(
 
 Autoload\register($firstChainLoader);
 Autoload\register($secondChainLoader);
-assert!(length!(Autoload\get_autoloaders()) == 2);
+assert!(length!(Autoload\get_autoloaders()) == 2u);
 Autoload\unregister($firstChainLoader);
-assert!(length!(Autoload\get_autoloaders()) == 1);
+assert!(length!(Autoload\get_autoloaders()) == 1u);
 Autoload\unregister($firstChainLoader);
-assert!(length!(Autoload\get_autoloaders()) == 1);
+assert!(length!(Autoload\get_autoloaders()) == 1u);
 $assertion_value_27 = fn(): void {
   Whim\_Private\register_symbol_autoloader(
     fn(int $kind, string $name): void {},

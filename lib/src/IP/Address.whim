@@ -132,7 +132,7 @@ final readonly class Address implements Order<Address>, ToString {
         (Str\ord($this->bytes[$index]) << 8)
         | Str\ord($this->bytes[$index + 1]);
 
-      $groups[] = Str\pad_left(Math\to_base($value, 16), 4, '0');
+      $groups[] = Str\pad_left(Math\to_base($value, 16), 4u, '0');
       $index += 2;
     }
 
@@ -156,7 +156,7 @@ final readonly class Address implements Order<Address>, ToString {
     while ($index < 16) {
       $hex = Str\pad_left(
         Math\to_base(Str\ord($this->bytes[$index]), 16),
-        2,
+        2u,
         '0',
       );
 

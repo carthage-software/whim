@@ -30,7 +30,7 @@ pub(crate) fn terminal_path<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\terminal_size(Whim\\OS\\FileDescriptor $descriptor): null|((1..), (1..))"
+    "Whim\\_Private\\terminal_size(Whim\\OS\\FileDescriptor $descriptor): null|((1u..), (1u..))"
 )]
 pub(crate) fn terminal_size<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -38,6 +38,9 @@ pub(crate) fn terminal_size<'call>(
 ) -> Result<Value, Throw> {
     let size = with_descriptor(cx, &arguments.local(0), "ioctl", terminal::size)?;
     Ok(size.map_or_else(Value::null, |(columns, rows)| {
-        cx.tuple([Value::int(i64::from(columns)), Value::int(i64::from(rows))])
+        cx.tuple([
+            Value::uint(u64::from(columns)),
+            Value::uint(u64::from(rows)),
+        ])
     }))
 }

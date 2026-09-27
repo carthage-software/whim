@@ -57,22 +57,24 @@ final readonly class Mailbox implements ToString {
     $displayName = null;
     $open = Str\search($input, '<');
     if (null != $open) {
-      $close = Str\search($input, '>', $open + 1);
-      if (null == $close || $close + 1 != length!($input)) {
+      $close = Str\search($input, '>', ($open as int) + 1);
+      if (null == $close || $close + 1u != length!($input)) {
         return null;
       }
 
       $displayName = _Private\parse_display(Str\slice($input, 0, $open));
-      $input = Str\trim(Str\slice($input, $open + 1, $close - $open - 1));
+      $input = Str\trim(
+        Str\slice($input, ($open as int) + 1, $close - $open - 1u),
+      );
     }
 
     $at = Str\search_last($input, '@');
-    if (null == $at || 0 == $at || $at + 1 >= length!($input)) {
+    if (null == $at || 0u == $at || $at + 1u >= length!($input)) {
       return null;
     }
 
     $localPart = Str\slice($input, 0, $at);
-    $domain = Str\slice($input, $at + 1);
+    $domain = Str\slice($input, ($at as int) + 1);
     if (
       Str\contains($localPart, "\r")
       || Str\contains($localPart, "\n")

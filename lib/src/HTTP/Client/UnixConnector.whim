@@ -38,7 +38,7 @@ final readonly class UnixConnector implements Connector {
       );
     }
 
-    if (length!($versions) == 1 && ProtocolVersion::V2 == $versions[0]) {
+    if (length!($versions) == 1u && ProtocolVersion::V2 == $versions[0]) {
       return new _Private\H2Connection(
         $stream,
         new ConnectionMetadata(

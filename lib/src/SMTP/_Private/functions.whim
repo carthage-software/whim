@@ -21,14 +21,14 @@ function parse_reply(
       throw new ProtocolException('the SMTP server sent a malformed reply');
     }
 
-    $line = Str\slice($wireLine, 0, length!($wireLine) - 2);
+    $line = Str\slice($wireLine, 0, length!($wireLine) - 2u);
     if (!($line is string[3..])) {
       throw new ProtocolException(
         'the SMTP server sent a malformed reply: `' . $line . '`',
       );
     }
 
-    $lineCode = parse_decimal(Str\slice($line, 0, 3));
+    $lineCode = parse_decimal(Str\slice($line, 0, 3u));
     if (!($lineCode is ReplyCode)) {
       throw new ProtocolException(
         'the SMTP server sent a malformed reply: `' . $line . '`',
@@ -78,7 +78,7 @@ function parse_reply(
   if (null != $enhanced) {
     $message = match ($space) {
       null => '',
-      _ => Str\slice($message, $space + 1),
+      _ => Str\slice($message, ($space as int) + 1),
     };
   }
 

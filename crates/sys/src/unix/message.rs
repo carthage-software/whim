@@ -302,7 +302,11 @@ pub fn receive(
 ) -> crate::Result<Option<Message>> {
     let fd = descriptor.raw();
 
-    let mut bytes = vec![0_u8; maximum];
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(maximum)
+        .map_err(|_| Error::new("recvmsg", io::ErrorKind::OutOfMemory))?;
+    bytes.resize(maximum, 0_u8);
     // SAFETY: zero is valid for this C output type.
     let mut source = unsafe { zeroed::<libc::sockaddr_storage>() };
     let mut control = [0_usize; CONTROL_WORDS];

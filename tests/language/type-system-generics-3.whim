@@ -189,7 +189,7 @@ function parse_length(string $value): Result<int, string> {
     return new Err::<string>('empty');
   }
 
-  return new Ok::<int>(length!($value));
+  return new Ok::<int>(length!($value) as int);
 }
 
 function divide_hundred(int $value): Result<int, string> {
@@ -238,7 +238,10 @@ assert!($thrown is Err<UnwrapException>);
 assert!($ok->unwrapOrElse::<string>(fn(never $_): string => 'unused') == 42);
 
 assert!(
-  $err->unwrapOrElse::<int>(fn(string $message): int => length!($message)) == 4,
+  $err->unwrapOrElse::<int>(
+    fn(string $message): int => length!($message) as int,
+  )
+  == 4,
 );
 
 $mapped = $ok->map::<int>(fn(int $value): int => $value * 2);
@@ -253,7 +256,10 @@ $untouched = $err->map::<int>(fn(never $value): int => 0);
 assert!($untouched is Err<string>);
 assert!($untouched->unwrapErr() == 'boom');
 
-$adapted = $err->mapErr::<int>(fn(string $value): int => length!($value));
+$adapted = $err->mapErr::<int>(
+  fn(string $value): int => length!($value) as int,
+);
+
 assert!($adapted is Result<never, int>);
 assert!($adapted->unwrapErr() == 4);
 

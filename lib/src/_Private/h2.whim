@@ -15,12 +15,12 @@ final class H2FrameDecoder {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public static function create(int $maximumFrameSize): H2FrameDecoder {}
+  public static function create(uint $maximumFrameSize): H2FrameDecoder {}
 
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function push(string $bytes): vec<(int, int, int, string)> {}
+  public function push(string $bytes): vec<(uint, uint, uint, string)> {}
 
   #[TrackCaller]
   #[TraceBoundary]
@@ -33,8 +33,8 @@ final class H2FrameDecoder {
 #[TrackCaller]
 #[TraceBoundary]
 function h2_encode_frame(
-  int $type,
-  int $flags,
-  int $stream,
+  uint $type,
+  uint $flags,
+  uint $stream,
   string $payload,
 ): string {}

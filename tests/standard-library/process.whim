@@ -16,8 +16,8 @@ use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\RuntimeException;
 use Whim\Unwind\UnsupportedPlatformException;
 
-const INVALID_PROCESS_ID = 2_147_483_648;
-const INVALID_POSIX_ID = 4_294_967_296;
+const INVALID_PROCESS_ID = 2_147_483_648u;
+const INVALID_POSIX_ID = 4_294_967_296u;
 
 function expect_process_failure(fn(): void $operation): RuntimeException {
   try {
@@ -33,9 +33,11 @@ function expect_process_failure(fn(): void $operation): RuntimeException {
 $id = Whim\Process\get_id();
 
 assert!($id > 0);
+assert!($id is uint);
+assert!(Process\get_parent_id() is uint);
 assert!(Process\get_parent_id() >= 0);
 assert!(Process\exists($id));
-assert!(!(Process\exists(2_147_483_647)));
+assert!(!(Process\exists(2_147_483_647u)));
 
 $cpuTimes = Process\cpu_times();
 assert!($cpuTimes is CpuTimes);
@@ -62,7 +64,7 @@ if (operating_system!() == 'windows') {
   }, fn(): void {
     Process\set_supplementary_group_ids(vec[]);
   }, fn(): void {
-    Process\initialize_supplementary_group_ids('unused', 0);
+    Process\initialize_supplementary_group_ids('unused', 0u);
   }, fn(): void {
     discard!(Process\get_session_id());
   }, fn(): void {
@@ -78,7 +80,10 @@ if (operating_system!() == 'windows') {
   }, fn(): void {
     discard!(Process\get_resource_limit(Resource::OpenFiles));
   }, fn(): void {
-    Process\set_resource_limit(Resource::OpenFiles, new ResourceLimit(10, 10));
+    Process\set_resource_limit(
+      Resource::OpenFiles,
+      new ResourceLimit(10u, 10u),
+    );
   }, fn(): void {
     Process\replace($binary);
   }, fn(): void {
@@ -100,8 +105,8 @@ if (operating_system!() == 'windows') {
 
 $user = Process\get_user_identity();
 assert!($user is UserIdentity);
-assert!($user->real >= 0);
-assert!($user->effective >= 0);
+assert!($user->real is uint);
+assert!($user->effective is uint);
 Process\set_user_identity();
 $sameUser = Process\get_user_identity();
 assert!($sameUser->real == $user->real);
@@ -109,19 +114,21 @@ assert!($sameUser->effective == $user->effective);
 
 $group = Process\get_group_identity();
 assert!($group is GroupIdentity);
-assert!($group->real >= 0);
-assert!($group->effective >= 0);
+assert!($group->real is uint);
+assert!($group->effective is uint);
 Process\set_group_identity();
 $sameGroup = Process\get_group_identity();
 assert!($sameGroup->real == $group->real);
 assert!($sameGroup->effective == $group->effective);
 
 foreach (Process\get_supplementary_group_ids() as $groupId) {
-  assert!($groupId >= 0);
+  assert!($groupId is uint);
 }
 
 assert!(Process\get_session_id() == Process\get_session_id($id));
+assert!(Process\get_session_id() is uint);
 assert!(Process\get_process_group_id() == Process\get_process_group_id($id));
+assert!(Process\get_process_group_id() is uint);
 assert!(Process\get_priority() == Process\get_priority($id));
 
 foreach (vec[
@@ -135,9 +142,9 @@ foreach (vec[
 ] as $resource) {
   $limit = Process\get_resource_limit($resource);
   assert!($limit is ResourceLimit);
-  assert!($limit->soft == null || $limit->soft >= 0);
+  assert!($limit->soft is null|uint);
 
-  assert!($limit->hard == null || $limit->hard >= 0);
+  assert!($limit->hard is null|uint);
 }
 
 $openFiles = Process\get_resource_limit(Resource::OpenFiles);
@@ -147,25 +154,25 @@ assert!($sameOpenFiles->soft == $openFiles->soft);
 assert!($sameOpenFiles->hard == $openFiles->hard);
 
 discard!(expect_process_failure(fn(): void {
-  Process\set_resource_limit(Resource::FileSize, new ResourceLimit(1, 0));
+  Process\set_resource_limit(Resource::FileSize, new ResourceLimit(1u, 0u));
 }));
 
 discard!(expect_process_failure(fn(): void {
-  Process\set_user_identity(INVALID_POSIX_ID);
+  Process\set_user_identity(INVALID_POSIX_ID as uint);
 }));
 
 discard!(expect_process_failure(fn(): void {
-  Process\set_group_identity(INVALID_POSIX_ID);
+  Process\set_group_identity(INVALID_POSIX_ID as uint);
 }));
 
 discard!(expect_process_failure(fn(): void {
-  Process\set_supplementary_group_ids(vec[INVALID_POSIX_ID]);
+  Process\set_supplementary_group_ids(vec[INVALID_POSIX_ID as uint]);
 }));
 
 discard!(expect_process_failure(fn(): void {
   Process\initialize_supplementary_group_ids(
     'whim-invalid-user',
-    INVALID_POSIX_ID,
+    INVALID_POSIX_ID as uint,
   );
 }));
 
@@ -225,7 +232,7 @@ File\write(
   $sessionScript,
   'use Whim\\Process;'
   . "\n"
-  . 'assert!(Process\\start_session() == Process\\get_id());'
+  . 'assert!(Process\\start_session() == (Process\\get_id() as uint));'
   . "\n",
 );
 
@@ -267,8 +274,8 @@ try {
 }
 
 $child = Command\create('sh', vec['-c', 'exec sleep 30'])->start();
-assert!(Process\exists($child->getId() as 1..));
-Process\signal($child->getId() as 1.., Signal::Terminate);
+assert!(Process\exists($child->getId() as 1u..));
+Process\signal($child->getId() as 1u.., Signal::Terminate);
 assert!($child->wait() is Signalled);
 
 $group = Command\create(
@@ -276,7 +283,7 @@ $group = Command\create(
   vec['-c', 'exec sleep 30'],
 )->withOwnProcessGroup()->start();
 
-Process\signal_group($group->getId() as 1.., Signal::Terminate);
+Process\signal_group($group->getId() as 1u.., Signal::Terminate);
 assert!($group->wait() is Signalled);
 
 $assertion_value_12 = fn(): void {

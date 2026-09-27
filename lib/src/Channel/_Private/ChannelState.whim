@@ -2,14 +2,13 @@ namespace Whim\Channel\_Private;
 
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
-use Whim\Refine\NonNegativeInt;
 
 /** Defines the behavior of channel state values. */
 interface ChannelState {
   /** Returns the channel capacity when it is bounded. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function getCapacity(): null|NonNegativeInt;
+  public function getCapacity(): null|uint;
 
   /** Closes the resource to further operations. */
   #[TrackCaller]
@@ -24,7 +23,7 @@ interface ChannelState {
   /** Returns the number of buffered values. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function count(): NonNegativeInt;
+  public function count(): uint;
 
   /** Reports whether the channel buffer is full. */
   #[TrackCaller]

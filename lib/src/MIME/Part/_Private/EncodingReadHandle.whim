@@ -74,7 +74,7 @@ final class EncodingReadHandle implements ReadHandle {
     };
 
     while (length!($this->sourceBuffer) < $chunkSize && !$this->sourceEnded) {
-      $remaining = $chunkSize - length!($this->sourceBuffer);
+      $remaining = $chunkSize - (length!($this->sourceBuffer) as int);
       $chunk = $this->source->tryRead($remaining);
       if ('' != $chunk) {
         $this->sourceBuffer .= $chunk;
@@ -137,7 +137,7 @@ final class EncodingReadHandle implements ReadHandle {
       return $result;
     }
 
-    $result = Str\slice($this->encodedBuffer, 0, $maxBytes);
+    $result = Str\slice($this->encodedBuffer, 0, $maxBytes as uint);
     $this->encodedBuffer = Str\slice($this->encodedBuffer, $maxBytes);
     return $result;
   }

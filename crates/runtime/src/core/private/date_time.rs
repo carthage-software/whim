@@ -318,14 +318,16 @@ pub(crate) fn is_valid_time(arguments: Arguments<'_>) -> Value {
     Value::bool(time_from_arguments(arguments, 0).is_some())
 }
 
-#[whim_function("Whim\\_Private\\date_time_parse_date(string $value): null|(int, int, int)")]
+#[whim_function("Whim\\_Private\\date_time_parse_date(string $value): null|(int, uint, uint)")]
 pub(crate) fn parse_date(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let value = arguments.bytes(0);
     let date = temporal::DateTimeParser::new().parse_date(value).ok();
     date.map_or_else(Value::null, |date| date_value(context, date))
 }
 
-#[whim_function("Whim\\_Private\\date_time_parse_time(string $value): null|(int, int, int, int)")]
+#[whim_function(
+    "Whim\\_Private\\date_time_parse_time(string $value): null|(uint, uint, uint, uint)"
+)]
 pub(crate) fn parse_time(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let value = arguments.bytes(0);
     let time = temporal::DateTimeParser::new().parse_time(value).ok();
@@ -333,7 +335,7 @@ pub(crate) fn parse_time(context: &Context<'_, '_, '_>, arguments: Arguments<'_>
 }
 
 #[whim_function(
-    "Whim\\_Private\\date_time_parse_date_time(string $value): null|(int, int, int, int, int, int, int)"
+    "Whim\\_Private\\date_time_parse_date_time(string $value): null|(int, uint, uint, uint, uint, uint, uint)"
 )]
 pub(crate) fn parse_date_time(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let value = arguments.bytes(0);
@@ -374,21 +376,21 @@ pub(crate) fn parse_rfc2822(context: &Context<'_, '_, '_>, arguments: Arguments<
 }
 
 #[whim_function(
-    "Whim\\_Private\\date_time_date_metadata(int $year, int $month, int $day): (int, int, int)"
+    "Whim\\_Private\\date_time_date_metadata(int $year, int $month, int $day): (uint, uint, uint)"
 )]
 pub(crate) fn date_metadata(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let Some(date) = date_from_arguments(arguments, 0) else {
-        return context.tuple([Value::int(1), Value::int(1), Value::int(31)]);
+        return context.tuple([Value::uint(1), Value::uint(1), Value::uint(31)]);
     };
     context.tuple([
-        Value::int(i64::from(date.weekday().to_monday_one_offset())),
-        Value::int(i64::from(date.day_of_year())),
-        Value::int(i64::from(date.days_in_month())),
+        Value::uint(i64::from(date.weekday().to_monday_one_offset()).cast_unsigned()),
+        Value::uint(i64::from(date.day_of_year()).cast_unsigned()),
+        Value::uint(i64::from(date.days_in_month()).cast_unsigned()),
     ])
 }
 
 #[whim_function(
-    "Whim\\_Private\\date_time_shift_date(int $year, int $month, int $day, int $years, int $months, int $weeks, int $days, int $overflow): null|(int, int, int)"
+    "Whim\\_Private\\date_time_shift_date(int $year, int $month, int $day, int $years, int $months, int $weeks, int $days, int $overflow): null|(int, uint, uint)"
 )]
 pub(crate) fn shift_date(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let Some(date) = date_from_arguments(arguments, 0) else {
@@ -404,7 +406,7 @@ pub(crate) fn shift_date(context: &Context<'_, '_, '_>, arguments: Arguments<'_>
 }
 
 #[whim_function(
-    "Whim\\_Private\\date_time_shift_date_time(int $year, int $month, int $day, int $hour, int $minute, int $second, int $nanosecond, int $years, int $months, int $weeks, int $days, int $durationSeconds, int $durationNanoseconds, int $overflow): null|(int, int, int, int, int, int, int)"
+    "Whim\\_Private\\date_time_shift_date_time(int $year, int $month, int $day, int $hour, int $minute, int $second, int $nanosecond, int $years, int $months, int $weeks, int $days, int $durationSeconds, int $durationNanoseconds, int $overflow): null|(int, uint, uint, uint, uint, uint, uint)"
 )]
 pub(crate) fn shift_date_time(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let Some(date_time) = date_time_from_arguments(arguments, 0) else {
@@ -467,7 +469,7 @@ pub(crate) fn resolve(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -
 }
 
 #[whim_function(
-    "Whim\\_Private\\date_time_localize(Whim\\_Private\\DateTimeZone $timezone, int $seconds, int $nanoseconds): null|(int, int, int, int, int, int, int, int, string)"
+    "Whim\\_Private\\date_time_localize(Whim\\_Private\\DateTimeZone $timezone, int $seconds, int $nanoseconds): null|(int, uint, uint, uint, uint, uint, uint, int, string)"
 )]
 pub(crate) fn localize(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let timezone = arguments.local(0);
@@ -481,12 +483,12 @@ pub(crate) fn localize(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) 
     let info = state.timezone.to_offset_info(timestamp);
     context.tuple([
         Value::int(i64::from(date_time.year())),
-        Value::int(i64::from(date_time.month())),
-        Value::int(i64::from(date_time.day())),
-        Value::int(i64::from(date_time.hour())),
-        Value::int(i64::from(date_time.minute())),
-        Value::int(i64::from(date_time.second())),
-        Value::int(i64::from(date_time.subsec_nanosecond())),
+        Value::uint(i64::from(date_time.month()).cast_unsigned()),
+        Value::uint(i64::from(date_time.day()).cast_unsigned()),
+        Value::uint(i64::from(date_time.hour()).cast_unsigned()),
+        Value::uint(i64::from(date_time.minute()).cast_unsigned()),
+        Value::uint(i64::from(date_time.second()).cast_unsigned()),
+        Value::uint(i64::from(date_time.subsec_nanosecond()).cast_unsigned()),
         Value::int(i64::from(info.offset().seconds())),
         context.string(info.abbreviation().as_bytes()),
     ])
@@ -654,28 +656,28 @@ fn timestamp_value(context: &Context<'_, '_, '_>, timestamp: Timestamp) -> Value
 fn date_value(context: &Context<'_, '_, '_>, date: Date) -> Value {
     context.tuple([
         Value::int(i64::from(date.year())),
-        Value::int(i64::from(date.month())),
-        Value::int(i64::from(date.day())),
+        Value::uint(i64::from(date.month()).cast_unsigned()),
+        Value::uint(i64::from(date.day()).cast_unsigned()),
     ])
 }
 
 fn time_value(context: &Context<'_, '_, '_>, time: Time) -> Value {
     context.tuple([
-        Value::int(i64::from(time.hour())),
-        Value::int(i64::from(time.minute())),
-        Value::int(i64::from(time.second())),
-        Value::int(i64::from(time.subsec_nanosecond())),
+        Value::uint(i64::from(time.hour()).cast_unsigned()),
+        Value::uint(i64::from(time.minute()).cast_unsigned()),
+        Value::uint(i64::from(time.second()).cast_unsigned()),
+        Value::uint(i64::from(time.subsec_nanosecond()).cast_unsigned()),
     ])
 }
 
 fn date_time_value(context: &Context<'_, '_, '_>, date_time: DateTime) -> Value {
     context.tuple([
         Value::int(i64::from(date_time.year())),
-        Value::int(i64::from(date_time.month())),
-        Value::int(i64::from(date_time.day())),
-        Value::int(i64::from(date_time.hour())),
-        Value::int(i64::from(date_time.minute())),
-        Value::int(i64::from(date_time.second())),
-        Value::int(i64::from(date_time.subsec_nanosecond())),
+        Value::uint(i64::from(date_time.month()).cast_unsigned()),
+        Value::uint(i64::from(date_time.day()).cast_unsigned()),
+        Value::uint(i64::from(date_time.hour()).cast_unsigned()),
+        Value::uint(i64::from(date_time.minute()).cast_unsigned()),
+        Value::uint(i64::from(date_time.second()).cast_unsigned()),
+        Value::uint(i64::from(date_time.subsec_nanosecond()).cast_unsigned()),
     ])
 }

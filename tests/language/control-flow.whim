@@ -9,7 +9,7 @@ foreach ($items as $item) {
 }
 
 assert!($sum == 6);
-assert!(length!($items) == 0);
+assert!(length!($items) == 0u);
 
 $bindings = vec[];
 foreach (vec['a', 'b'] as $index => $letter) {
@@ -178,7 +178,7 @@ $rest = match (vec[1, 2, 3]) {
   $_ => 0,
 };
 
-assert!($rest == 3);
+assert!($rest == 3u);
 
 $first_of_vec = match (vec[1]) {
   vec[$first @ int, ...] => $first,

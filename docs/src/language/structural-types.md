@@ -198,7 +198,7 @@ The rest item must be last. Omitting its type, as in `(int, ...)`, uses
 
 ```whim
 function count_values(array<_, _> $values): int {
-  return length!($values);
+  return length!($values) as int;
 }
 
 assert!(count_values(vec[1, 2]) == 2);

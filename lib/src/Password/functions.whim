@@ -31,7 +31,7 @@ function hash(
     );
   }
 
-  $salt = SecureRandom\bytes(16);
+  $salt = SecureRandom\bytes(16u);
   $hash = match ($algorithm) {
     $bcrypt @ Bcrypt => _Private\password_hash_bcrypt(
       $password,

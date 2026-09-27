@@ -5,6 +5,12 @@
 Whim strings hold bytes, so `Whim\Str` uses byte offsets and byte
 lengths.
 
+`length` returns `uint`; searches return `null|uint`. Search and slice input
+offsets stay signed, so negative offsets can count from the end. Slice,
+splice, and comparison lengths use `null|uint`. A length larger than the
+remaining bytes clamps to the end. Repeat counts and padding lengths use
+`uint` too. Chunk sizes, split limits, and wrap widths use `NonZero<uint>`.
+
 Inspection functions include `length`, `ord`, `chr`, `byte_at`, `compare`,
 `compare_ci`, `search`, `search_last`, `contains`, `starts_with`, and
 `ends_with`. Search and containment functions accept a byte offset. The byte
@@ -25,7 +31,8 @@ use Whim\Str;
 $words = Str\split('one,two,three', ',');
 assert!(Str\join(' + ', $words) == 'one + two + three');
 assert!(Str\starts_with('whimsical', 'whim'));
-assert!(Str\slice('abcdef', 1, 3) == 'bcd');
+assert!(Str\slice('abcdef', 1, 3u) == 'bcd');
+assert!(Str\length('abcdef') == 6u);
 ```
 
 Use `Encoding\UTF8` before treating unknown bytes as Unicode text.
@@ -113,9 +120,10 @@ The namespace defines integer and float limits plus `NAN`, `INF`, `E`, and
 values use different constants.
 `UINT_MIN` and `UINT_MAX` are `0u` and `18_446_744_073_709_551_615u`.
 
-The existing `Whim\Refine\Uint8`, `Uint16`, `Uint32`, and `Uint64` aliases
-remain signed ranges. They do not accept uint values. Use unsigned bounds such
-as `0u..=255u` for an unsigned range.
+`Whim\Refine\Uint8`, `Uint16`, and `Uint32` accept uints within their bit
+widths: `0u..=255u`, `0u..=65_535u`, and `0u..=4_294_967_295u`.
+`NonZero<uint>` excludes `0u`. These types do not accept signed ints.
+Use `uint` for the full unsigned 64-bit range.
 
 ## Ranges
 
@@ -137,12 +145,13 @@ check their exact width. `MemoryReader`, `MemoryWriter`, `HandleReader`, and
 `HandleWriter` provide moving cursors. Buffered readers report remaining data;
 buffered writers return their bytes through `toString()`.
 
-`decode_u64` and reader `u64` methods always return `uint`, including for zero
-and small values. They accept every 64-bit pattern. Cast the result to `int`
-when a signed API requires it; values above `INT_MAX` fail that cast.
-Unsigned 8-, 16-, and 32-bit decoders still return signed ints.
-Unsigned encoders and writer methods accept both their old non-negative signed
-range and uints within the chosen width. They reject values that do not fit.
+Unsigned decoders and reader methods always return `uint`, including for zero
+and small values. Cast the result to `int` when a signed API requires it;
+values above `INT_MAX` fail that cast.
+Unsigned encoders and writer methods require uints within the chosen width,
+including the 64-bit methods. All reject values that do not fit.
+Reader byte counts, skips, cursors, lengths, and remaining-byte counts also
+use `uint`.
 
 Use binary APIs for protocol fields and file formats. Do not reverse byte
 strings by hand.

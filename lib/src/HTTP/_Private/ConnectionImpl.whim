@@ -3,7 +3,6 @@ namespace Whim\HTTP\_Private;
 use Whim\HTTP\_Private\Event\WeakendEvent;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 
 /** Shares the public sans-I/O connection operations. */
 abstract class ConnectionImpl {
@@ -25,12 +24,12 @@ abstract class ConnectionImpl {
   }
 
   #[MustUse]
-  public function activeStreamCount(): NonNegativeInt {
+  public function activeStreamCount(): uint {
     return $this->state->streams->activeCount();
   }
 
   #[MustUse]
-  public function maximumConcurrentStreams(): NonNegativeInt {
+  public function maximumConcurrentStreams(): uint {
     return $this->state->streams->localMaximum();
   }
 

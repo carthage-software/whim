@@ -4,7 +4,6 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 
 use whim_base::unwrap_option_invariant;
-use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 use whim_value::Value;
@@ -47,17 +46,10 @@ impl RingBuffer {
     #[whim_method("__construct(): void", no_track_caller, no_trace_boundary)]
     const fn construct() {}
 
-    #[whim_method("count(): (0..)", no_track_caller, no_trace_boundary, must_use)]
+    #[whim_method("count(): uint", no_track_caller, no_trace_boundary, must_use)]
     fn count(context: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         let count = context.state::<Self>()?.values.borrow().len();
-        // SAFETY: the surrounding invariant proves this result is successful.
-        let count = unsafe {
-            unwrap_result_invariant(
-                i64::try_from(count),
-                "a ring buffer cannot exhaust the signed integer range",
-            )
-        };
-        Ok(Value::int(count))
+        Ok(Value::uint(count as u64))
     }
 
     #[whim_method("isEmpty(): bool", no_track_caller, no_trace_boundary, must_use)]

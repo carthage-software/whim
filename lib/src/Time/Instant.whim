@@ -21,7 +21,7 @@ final readonly class Instant implements Order<Instant> {
   #[TrackCaller]
   public static function now(): Instant {
     $reading = Whim\_Private\get_high_resolution_time();
-    return new Instant($reading[0], $reading[1]);
+    return new Instant($reading[0] as int, $reading[1] as int);
   }
 
   /** Measures the duration elapsed since this reading. */
@@ -29,7 +29,10 @@ final readonly class Instant implements Order<Instant> {
   #[TrackCaller]
   public function elapsed(): Duration {
     $now = Whim\_Private\get_high_resolution_time();
-    return new Duration($now[0] - $this->seconds, $now[1] - $this->nanoseconds);
+    return new Duration(
+      ($now[0] as int) - $this->seconds,
+      ($now[1] as int) - $this->nanoseconds,
+    );
   }
 
   /** Measures the duration since an earlier reading. */

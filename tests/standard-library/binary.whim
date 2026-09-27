@@ -7,23 +7,23 @@ $big = Binary\Endianness::Big;
 $little = Binary\Endianness::Little;
 assert!(Binary\Endianness::default() == $big);
 
-assert!(Binary\encode_u8(0xab) == "\xab");
-assert!(Binary\decode_u8("\xab") == 0xab);
+assert!(Binary\encode_u8(0xabu) == "\xab");
+assert!(Binary\decode_u8("\xab") == 0xabu);
 assert!(Binary\encode_i8(-2) == "\xfe");
 assert!(Binary\decode_i8("\xfe") == -2);
 
-assert!(Binary\encode_u16(0x1234, $big) == "\x12\x34");
-assert!(Binary\encode_u16(0x1234, $little) == "\x34\x12");
-assert!(Binary\decode_u16("\x12\x34", $big) == 0x1234);
-assert!(Binary\decode_u16("\x34\x12", $little) == 0x1234);
+assert!(Binary\encode_u16(0x1234u, $big) == "\x12\x34");
+assert!(Binary\encode_u16(0x1234u, $little) == "\x34\x12");
+assert!(Binary\decode_u16("\x12\x34", $big) == 0x1234u);
+assert!(Binary\decode_u16("\x34\x12", $little) == 0x1234u);
 assert!(Binary\encode_i16(-2, $big) == "\xff\xfe");
 assert!(Binary\decode_i16("\xfe\xff", $little) == -2);
 
-assert!(Binary\encode_u32(0x12345678, $big) == "\x12\x34\x56\x78");
-assert!(Binary\encode_u32(0x12345678, $little) == "\x78\x56\x34\x12");
+assert!(Binary\encode_u32(0x12345678u, $big) == "\x12\x34\x56\x78");
+assert!(Binary\encode_u32(0x12345678u, $little) == "\x78\x56\x34\x12");
 
-assert!(Binary\decode_u32("\x12\x34\x56\x78", $big) == 0x12345678);
-assert!(Binary\decode_u32("\x78\x56\x34\x12", $little) == 0x12345678);
+assert!(Binary\decode_u32("\x12\x34\x56\x78", $big) == 0x12345678u);
+assert!(Binary\decode_u32("\x78\x56\x34\x12", $little) == 0x12345678u);
 
 assert!(Binary\encode_i32(-2, $big) == "\xff\xff\xff\xfe");
 assert!(Binary\decode_i32("\xfe\xff\xff\xff", $little) == -2);
@@ -57,46 +57,60 @@ assert!(Whim\Float\is_nan(Binary\decode_f32(Binary\encode_f32(Math\NAN))));
 assert!(Whim\Float\is_nan(Binary\decode_f64(Binary\encode_f64(Math\NAN))));
 
 $writer = Binary\MemoryWriter::default()
-  ->u8(7)
+  ->u8(7u)
   ->i16(-2)
-  ->u32(0x12345678, $little)
+  ->u32(0x12345678u, $little)
   ->f32(1.5)
   ->u8PrefixedBytes('cat')
-  ->u16PrefixedBytes('hello');
+  ->u16PrefixedBytes('hello')
+  ->u32PrefixedBytes('');
 
 $encoded = $writer->toString();
 $reader = new Binary\MemoryReader($encoded);
-assert!($reader->cursor() == 0);
+assert!($reader->cursor() == 0u);
 assert!($reader->length() == length!($encoded));
 assert!($reader->remaining() == length!($encoded));
 assert!(!($reader->isConsumed()));
-assert!($reader->u8() == 7);
+assert!($reader->u8() == 7u);
 assert!($reader->i16() == -2);
-assert!($reader->u32($little) == 0x12345678);
+assert!($reader->u32($little) == 0x12345678u);
 assert!($reader->f32() == 1.5);
 assert!($reader->u8PrefixedBytes() == 'cat');
 assert!($reader->u16PrefixedBytes() == 'hello');
-assert!($reader->remaining() == 0);
+assert!($reader->u32PrefixedBytes() == '');
+assert!($reader->remaining() == 0u);
 assert!($reader->isConsumed());
 
 $skipReader = new Binary\MemoryReader('abcdef');
-$skipReader->skip(2);
-assert!($skipReader->cursor() == 2);
-assert!($skipReader->bytes(2) == 'cd');
+$skipReader->skip(2u);
+assert!($skipReader->cursor() == 2u);
+assert!($skipReader->bytes(2u) == 'cd');
 
 $memory = new MemoryHandle();
 $handleWriter = new Binary\HandleWriter($memory, $little);
-discard!($handleWriter->u16(0x1234)->f64(1.5)->bytes('ok'));
+discard!(
+  $handleWriter
+    ->u16(0x1234u)
+    ->f64(1.5)
+    ->bytes('ok')
+    ->u8PrefixedBytes('cat')
+    ->u16PrefixedBytes('hello')
+    ->u32PrefixedBytes(''),
+);
+
 discard!($memory->seek(0));
 
 $handleReader = new Binary\HandleReader($memory, $little);
-assert!($handleReader->u16() == 0x1234);
+assert!($handleReader->u16() == 0x1234u);
 assert!($handleReader->f64() == 1.5);
-$handleReader->skip(1);
-assert!($handleReader->bytes(1) == 'k');
+$handleReader->skip(1u);
+assert!($handleReader->bytes(1u) == 'k');
+assert!($handleReader->u8PrefixedBytes() == 'cat');
+assert!($handleReader->u16PrefixedBytes() == 'hello');
+assert!($handleReader->u32PrefixedBytes() == '');
 assert!($handleReader->isConsumed());
 
-$assertion_value_52 = fn(): int => Binary\decode_u32("\x00\x01");
+$assertion_value_52 = fn(): uint => Binary\decode_u32("\x00\x01");
 $assertion_error_52 = null;
 try {
   $assertion_value_52();

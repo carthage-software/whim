@@ -248,7 +248,7 @@ File\write(
 
 $traceRun = Command\run($binary, vec[$work . '/trace-main.whim']);
 assert!($traceRun->status is Command\Exited);
-assert!(($traceRun->status as Command\Exited)->code == 255);
+assert!(($traceRun->status as Command\Exited)->code == 255u);
 $canonicalTraceLibrary = Filesystem\canonicalize($work . '/trace-library.whim');
 $assertion_value_16 = $traceRun->standardError;
 assert!(
@@ -394,6 +394,6 @@ foreach ($survivorDict as $key => $value) {
 }
 
 assert!($survivorEntries == vec['0:0', '3:30', '6:60', '9:90']);
-assert!(length!($survivorDict) == 4);
+assert!(length!($survivorDict) == 4u);
 
 Filesystem\delete_directory($work, true);

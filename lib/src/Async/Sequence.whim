@@ -2,7 +2,6 @@ namespace Whim\Async;
 
 use Whim\Marker\TrackCaller;
 use Whim\Refine\Transform;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\Throwable;
 
 /** Serializes invocations of an asynchronous operation. */
@@ -12,7 +11,7 @@ final readonly class Sequence<in Tin, out Tout> {
   /** Creates a sequence around an operation. */
   #[TrackCaller]
   public function __construct(Transform<Tin, Tout> $operation) {
-    $this->semaphore = new Semaphore::<Tin, Tout>(1, $operation);
+    $this->semaphore = new Semaphore::<Tin, Tout>(1u, $operation);
   }
 
   /** Runs an operation after all earlier invocations. */
@@ -40,7 +39,7 @@ final readonly class Sequence<in Tin, out Tout> {
 
   /** Returns the number of invocations waiting to start. */
   #[TrackCaller]
-  public function getPendingOperations(): NonNegativeInt {
+  public function getPendingOperations(): uint {
     return $this->semaphore->getPendingOperations();
   }
 

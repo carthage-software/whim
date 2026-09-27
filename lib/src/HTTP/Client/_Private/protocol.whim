@@ -39,7 +39,7 @@ function resolve_protocol_versions(
   Configuration $configuration,
 ): vec<ProtocolVersion> {
   $versions = $configuration->protocolVersions;
-  if (length!($versions) == 0) {
+  if (length!($versions) == 0u) {
     throw new ProtocolException('no HTTP protocol version is enabled');
   }
 

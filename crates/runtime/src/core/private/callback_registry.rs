@@ -29,7 +29,7 @@ struct Registry {
 }
 
 impl Registry {
-    fn insert(&mut self, callback: Value) -> i64 {
+    fn insert(&mut self, callback: Value) -> u64 {
         let (index, generation) = if let Some(index) = self.free.pop() {
             // SAFETY: the surrounding invariant keeps this index in bounds.
             let slot = unsafe { self.slots.get_unchecked_mut(index) };
@@ -53,20 +53,10 @@ impl Registry {
                 "a callback registry cannot exceed the thirty-two-bit index range",
             )
         };
-        let identifier = (u64::from(generation) << 32) | u64::from(index);
-        // SAFETY: the surrounding invariant proves this result is successful.
-        unsafe {
-            unwrap_result_invariant(
-                i64::try_from(identifier),
-                "callback generations keep identifiers in the signed integer range",
-            )
-        }
+        (u64::from(generation) << 32) | u64::from(index)
     }
 
-    fn remove(&mut self, identifier: i64) {
-        let Ok(identifier) = u64::try_from(identifier) else {
-            return;
-        };
+    fn remove(&mut self, identifier: u64) {
         let Ok(generation) = u32::try_from(identifier >> 32) else {
             return;
         };
@@ -142,7 +132,7 @@ impl CallbackRegistry {
     const fn construct() {}
 
     #[whim_method(
-        "insert(fn(): void $callback): int",
+        "insert(fn(): void $callback): uint",
         no_track_caller,
         no_trace_boundary,
         must_use
@@ -154,16 +144,16 @@ impl CallbackRegistry {
             .registry
             .borrow_mut()
             .insert(callback);
-        Ok(Value::int(identifier))
+        Ok(Value::uint(identifier))
     }
 
-    #[whim_method("remove(int $id): void", no_track_caller, no_trace_boundary)]
+    #[whim_method("remove(uint $id): void", no_track_caller, no_trace_boundary)]
     fn remove(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result<Value, Throw> {
         context
             .state::<Self>()?
             .registry
             .borrow_mut()
-            .remove(arguments.int(0));
+            .remove(arguments.uint(0));
         Ok(Value::null())
     }
 

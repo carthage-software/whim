@@ -105,7 +105,7 @@ function delivery_status_notifications(
     }
   }
 
-  if ($never && length!($parts) != 1) {
+  if ($never && length!($parts) != 1u) {
     throw new InvalidArgumentException(
       '`NEVER` cannot be combined with other SMTP delivery notifications',
     );

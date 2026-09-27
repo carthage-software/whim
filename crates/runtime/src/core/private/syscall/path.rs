@@ -40,7 +40,7 @@ pub(crate) fn open_directory_descriptor<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\open_regular_file_beneath(Whim\\OS\\FileDescriptor $directory, string $path): null|(Whim\\OS\\FileDescriptor, vec<int>)"
+    "Whim\\_Private\\open_regular_file_beneath(Whim\\OS\\FileDescriptor $directory, string $path): null|(Whim\\OS\\FileDescriptor, vec<int|uint>)"
 )]
 pub(crate) fn open_regular_file_beneath<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -86,13 +86,16 @@ pub(crate) fn check_access<'call>(
     .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\create_directory((string&!'') $path, 0..=4294967295 $mode): void")]
+#[whim_function(
+    "Whim\\_Private\\create_directory((string&!'') $path, 0u..=4294967295u $mode): void"
+)]
 pub(crate) fn create_directory<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     let path = path(cx, arguments.bytes(0), "mkdir")?;
-    fs::create_directory(&path, arguments.int(1)).map_err(|error| io_error(cx, error))?;
+    fs::create_directory(&path, arguments.uint(1).cast_signed())
+        .map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
@@ -172,24 +175,25 @@ pub(crate) fn resolve_path<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\create_named_pipe((string&!'') $path, 0..=4294967295 $mode): void"
+    "Whim\\_Private\\create_named_pipe((string&!'') $path, 0u..=4294967295u $mode): void"
 )]
 pub(crate) fn create_named_pipe<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     let path = path(cx, arguments.bytes(0), "mkfifo")?;
-    fs::create_named_pipe(&path, arguments.int(1)).map_err(|error| io_error(cx, error))?;
+    fs::create_named_pipe(&path, arguments.uint(1).cast_signed())
+        .map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\set_path_mode((string&!'') $path, 0..=4294967295 $mode): void")]
+#[whim_function("Whim\\_Private\\set_path_mode((string&!'') $path, 0u..=4294967295u $mode): void")]
 pub(crate) fn set_path_mode<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     let path = path(cx, arguments.bytes(0), "chmod")?;
-    fs::set_mode(&path, arguments.int(1)).map_err(|error| io_error(cx, error))?;
+    fs::set_mode(&path, arguments.uint(1).cast_signed()).map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
@@ -216,42 +220,42 @@ pub(crate) fn set_path_times<'call>(
     let path = path(cx, arguments.bytes(0), "utimensat")?;
     let accessed = Timestamp {
         seconds: arguments.int(1),
-        nanoseconds: arguments.int(2),
+        nanoseconds: u64::try_from(arguments.int(2))
+            .map_err(|_| io_error(cx, whim_sys::Error::invalid("utimensat")))?,
     };
     let modified = Timestamp {
         seconds: arguments.int(3),
-        nanoseconds: arguments.int(4),
+        nanoseconds: u64::try_from(arguments.int(4))
+            .map_err(|_| io_error(cx, whim_sys::Error::invalid("utimensat")))?,
     };
     fs::set_times(&path, accessed, modified, arguments.bool(5))
         .map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\read_directory((string&!'') $path): vec<((string&!''), int)>")]
+#[whim_function("Whim\\_Private\\read_directory((string&!'') $path): vec<((string&!''), uint)>")]
 pub(crate) fn read_directory<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     let path = path(cx, arguments.bytes(0), "opendir")?;
     let entries = fs::read_directory(&path).map_err(|error| io_error(cx, error))?;
-    Ok(cx.vec(
-        entries
-            .into_iter()
-            .map(|entry| cx.tuple([cx.string(&entry.name), Value::int(entry.mode)])),
-    ))
+    Ok(cx.vec(entries.into_iter().map(|entry| {
+        cx.tuple([
+            cx.string(&entry.name),
+            Value::uint(entry.mode.cast_unsigned()),
+        ])
+    })))
 }
 
-#[whim_function("Whim\\_Private\\filesystem_space((string&!'') $path): (int, int, int, int)")]
+#[whim_function("Whim\\_Private\\filesystem_space((string&!'') $path): (uint, uint, uint, uint)")]
 pub(crate) fn filesystem_space<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     let path = path(cx, arguments.bytes(0), "statvfs")?;
     let space = fs::space(&path).map_err(|error| io_error(cx, error))?;
-    Ok(cx.tuple(
-        [space.block_size, space.blocks, space.free, space.available]
-            .map(|value| Value::int(i64::try_from(value).unwrap_or(i64::MAX))),
-    ))
+    Ok(cx.tuple([space.block_size, space.blocks, space.free, space.available].map(Value::uint)))
 }
 
 #[whim_function("Whim\\_Private\\temporary_directory(): (string&!'')")]
@@ -260,15 +264,19 @@ pub(crate) fn temporary_directory(cx: &Context<'_, '_, '_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\create_temporary_file((string&!'') $directory, string $prefix, 0..=4294967295 $mode): (Whim\\OS\\FileDescriptor, (string&!''))"
+    "Whim\\_Private\\create_temporary_file((string&!'') $directory, string $prefix, 0u..=4294967295u $mode): (Whim\\OS\\FileDescriptor, (string&!''))"
 )]
 pub(crate) fn create_temporary_file<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     let directory = path(cx, arguments.bytes(0), "mkstemp")?;
-    let (file, path) = fs::create_temporary_file(&directory, arguments.bytes(1), arguments.int(2))
-        .map_err(|error| io_error(cx, error))?;
+    let (file, path) = fs::create_temporary_file(
+        &directory,
+        arguments.bytes(1),
+        arguments.uint(2).cast_signed(),
+    )
+    .map_err(|error| io_error(cx, error))?;
     let descriptor = build_file_descriptor(cx, Descriptor::from_file(file))?;
     Ok(cx.tuple([descriptor, cx.string(&path_bytes(&path))]))
 }

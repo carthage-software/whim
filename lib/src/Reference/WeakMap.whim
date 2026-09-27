@@ -22,5 +22,5 @@ final class WeakMap<K: object, V> {
   public function remove(K $key): void {}
 
   #[MustUse]
-  public function length(): int {}
+  public function length(): uint {}
 }

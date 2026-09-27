@@ -21,8 +21,8 @@ final class ConnectionImpl extends BaseConnection {
       $write,
       $cancellation,
       WebSocketCodec::server(
-        $configuration->maximumMessageSize,
-        $configuration->maximumFrameSize,
+        $configuration->maximumMessageSize as uint,
+        $configuration->maximumFrameSize as uint,
       ),
       $configuration->readSize,
       $subprotocol,

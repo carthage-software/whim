@@ -307,7 +307,7 @@ try {
 assert!($assertion_error_19 is ArgumentCountError);
 
 function open(int $first, vec<int> $rest = vec[]): int {
-  return $first + length!($rest);
+  return $first + (length!($rest) as int);
 }
 
 assert!(open(1, vec[2, 3, 4]) == 4);

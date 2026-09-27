@@ -27,7 +27,7 @@ function delete_file(NonEmptyString $path): void {
     if ($denied && _Private\is_existing_directory($path, false)) {
       throw new NotFileException(
         'path `' . $path . '` does not point to a file',
-        $error->errno(),
+        $error->getCode(),
       );
     }
 

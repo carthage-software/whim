@@ -14,6 +14,10 @@ it needs.
 - `CloseHandle` reports and closes owned state.
 - `FileDescriptorHandle` exposes an owned `OS\FileDescriptor`.
 
+Write operations return a `uint` byte count. Seeking accepts a signed offset
+and returns a `uint` position. `IO\copy()` and `IO\copy_chunked()` also return
+the number of bytes copied as `uint`.
+
 `CloseHandle::__destruct()` attempts a final close and discards its error. Use
 `using` when close time or errors matter.
 
@@ -55,7 +59,7 @@ Other adapters include:
 - `TeeWriteHandle` copies writes to several targets.
 - sink handles discard writes or expose end-of-input reads.
 - `SpoolHandle` keeps small data in memory and moves larger data to a temporary
-  file while preserving one seekable handle.
+  file while preserving one seekable handle. Its memory threshold takes `uint`.
 
 Adapters do not claim an operating-system descriptor unless their own contract
 implements `FileDescriptorHandle`.
@@ -89,6 +93,8 @@ Writable file handles can change the file length with `truncate` and flush
 pending data and metadata with `synchronize`. Both operations run on the
 blocking worker pool and accept a cancellation token.
 
+`File\read` takes a `uint` byte offset, and `truncate` takes a `uint` length.
+
 ## File system
 
 `Whim\Filesystem` creates files, directories, hard links, symbolic links,
@@ -99,8 +105,11 @@ Inspection covers existence, node kind, access bits, metadata, and available or
 total disk space. `metadata` follows a symbolic link;
 `symbolic_link_metadata` inspects the link itself.
 
+Metadata byte sizes, block counts, and link counts use `uint`, as do the
+available and total disk-space results.
+
 Callers must pass `true` to delete a directory tree. Permission values use
-octal literals such as `0o755`.
+unsigned octal literals such as `0o755u`.
 
 `Filesystem\exchange_creation_mask()` replaces the process-wide file creation
 mask and returns its previous value. Set it during startup. A temporary change
@@ -114,7 +123,7 @@ surrogates, so names read from the filesystem can be passed back unchanged.
 
 `OS\FileDescriptor` owns a Unix descriptor or a Windows handle or socket.
 `duplicate($number)` creates a
-new owned descriptor from an open number. `toInt()` returns its number.
+new owned descriptor from an open number. `toUint()` returns its number as `uint`.
 `isClosed()` and `close()` manage its lifetime.
 
 Duplicating is not the same as borrowing an integer. The new object owns its

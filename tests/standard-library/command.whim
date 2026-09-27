@@ -26,7 +26,8 @@ function output_command(
 $output = output_command('standard-output', 'standard-error', 7)->run();
 
 assert!($output->status is Command\Exited);
-assert!(($output->status as Command\Exited)->code == 7);
+assert!(($output->status as Command\Exited)->code == 7u);
+assert!(($output->status as Command\Exited)->code is uint);
 assert!(!($output->isSuccess()));
 assert!($output->standardOutput == 'standard-output');
 assert!($output->standardError == 'standard-error');
@@ -86,6 +87,7 @@ assert!($failure->getStandardError() == 'err');
 $child = child_command('copy')->withStandardInput(Command\piped())->start();
 
 assert!($child->getId() > 0);
+assert!($child->getId() is uint);
 assert!($child->isRunning());
 assert!($child->getStandardInput() is IO\FileDescriptorHandle);
 
@@ -189,7 +191,7 @@ if (operating_system!() == 'windows') {
   ])->run();
 
   assert!($wideExit->status is Command\Exited);
-  assert!(($wideExit->status as Command\Exited)->code == 65535);
+  assert!(($wideExit->status as Command\Exited)->code == 65535u);
   assert!($killed is Command\Exited);
   assert!(!$killed->isSuccess());
   $terminated = child_command('sleep')->start()->terminate(

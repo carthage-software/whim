@@ -12,7 +12,6 @@ use Whim\Json;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Time\Duration;
 use Whim\Time\SystemTime;
 use Whim\Unwind\InvalidArgumentException;
@@ -66,7 +65,7 @@ final readonly class DatabaseStore implements Store {
 
       $row = $row as Row;
       $encoded = $row[0] as NonEmptyString;
-      $revision = $row[1] as NonNegativeInt;
+      $revision = $row[1] as uint;
       $data = Json\decode($encoded);
       if (!($data is Data)) {
         throw new QueryException('the database returned invalid session data');
@@ -114,7 +113,7 @@ final readonly class DatabaseStore implements Store {
           $cancellation,
         ),
       ) {
-        if ($result->getAffectedRows() != 1) {
+        if ($result->getAffectedRows() != 1u) {
           throw new ConflictException('the session record already exists');
         }
       }
@@ -125,7 +124,7 @@ final readonly class DatabaseStore implements Store {
   #[TrackCaller]
   public function replace(
     NonEmptyString $identifier,
-    NonNegativeInt $revision,
+    uint $revision,
     Data $data,
     Duration $ttl,
     null|CancellationToken $cancellation = null,
@@ -149,14 +148,14 @@ final readonly class DatabaseStore implements Store {
             $expiresAt->seconds,
             $expiresAt->nanoseconds,
             $identifier,
-            $revision,
+            $revision as int,
             $now->seconds,
             $now->nanoseconds,
           ],
           $cancellation,
         ),
       ) {
-        if ($result->getAffectedRows() != 1) {
+        if ($result->getAffectedRows() != 1u) {
           throw new ConflictException('the session record has changed');
         }
       }

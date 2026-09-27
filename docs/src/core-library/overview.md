@@ -129,7 +129,8 @@ Strong references can form an unreachable cycle. Whim's cycle collector finds
 such cycles and runs their destructors.
 
 `Whim\GC\collect_cycles()` requests a collection and returns the number of
-boxes it freed. The runtime also starts collection after its cycle threshold.
+boxes it freed as a uint. The runtime also starts collection after its cycle
+threshold.
 Set that threshold under `[runtime]` in `whim.toml`, or set
 `WHIM_CYCLE_THRESHOLD` for one run.
 

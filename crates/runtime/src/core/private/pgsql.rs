@@ -553,7 +553,7 @@ impl PostgreSQLResult {
         Ok(cx.vec(columns))
     }
 
-    #[whim_method("affectedRows(): null|(0..)", must_use)]
+    #[whim_method("affectedRows(): null|uint", must_use)]
     fn affected_rows(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         // SAFETY: the surrounding invariant proves this option contains a value.
         let metadata = unsafe {
@@ -562,9 +562,7 @@ impl PostgreSQLResult {
                 "the PostgreSQL result metadata is ready before it is exposed",
             )
         };
-        Ok(metadata.affected_rows.map_or_else(Value::null, |rows| {
-            Value::int(i64::try_from(rows).unwrap_or(i64::MAX))
-        }))
+        Ok(metadata.affected_rows.map_or_else(Value::null, Value::uint))
     }
 
     #[whim_method("poll(): bool|null|vec<mixed>", must_use)]

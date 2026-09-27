@@ -28,22 +28,22 @@ const INVALID_ARGUMENT_EXCEPTION: &[u8] = b"Whim\\Unwind\\InvalidArgumentExcepti
 #[whim_implements("Whim\\Comparison\\Equal<Whim\\BSON\\Binary>")]
 #[whim_property("public string $bytes")]
 #[whim_property("public Whim\\Refine\\Uint8 $subtype")]
-#[whim_class_like_constant("GENERIC", "int", visibility = "public", literal = 0)]
-#[whim_class_like_constant("FUNCTION", "int", visibility = "public", literal = 1)]
-#[whim_class_like_constant("OLD_BINARY", "int", visibility = "public", literal = 2)]
-#[whim_class_like_constant("OLD_UUID", "int", visibility = "public", literal = 3)]
-#[whim_class_like_constant("UUID", "int", visibility = "public", literal = 4)]
-#[whim_class_like_constant("MD5", "int", visibility = "public", literal = 5)]
-#[whim_class_like_constant("ENCRYPTED", "int", visibility = "public", literal = 6)]
-#[whim_class_like_constant("COLUMN", "int", visibility = "public", literal = 7)]
-#[whim_class_like_constant("SENSITIVE", "int", visibility = "public", literal = 8)]
-#[whim_class_like_constant("VECTOR", "int", visibility = "public", literal = 9)]
+#[whim_class_like_constant("GENERIC", "uint", visibility = "public", literal = 0u64)]
+#[whim_class_like_constant("FUNCTION", "uint", visibility = "public", literal = 1u64)]
+#[whim_class_like_constant("OLD_BINARY", "uint", visibility = "public", literal = 2u64)]
+#[whim_class_like_constant("OLD_UUID", "uint", visibility = "public", literal = 3u64)]
+#[whim_class_like_constant("UUID", "uint", visibility = "public", literal = 4u64)]
+#[whim_class_like_constant("MD5", "uint", visibility = "public", literal = 5u64)]
+#[whim_class_like_constant("ENCRYPTED", "uint", visibility = "public", literal = 6u64)]
+#[whim_class_like_constant("COLUMN", "uint", visibility = "public", literal = 7u64)]
+#[whim_class_like_constant("SENSITIVE", "uint", visibility = "public", literal = 8u64)]
+#[whim_class_like_constant("VECTOR", "uint", visibility = "public", literal = 9u64)]
 pub(crate) struct Binary;
 
 #[whim_methods]
 impl Binary {
     #[whim_method(
-        "__construct(string $bytes, Whim\\Refine\\Uint8 $subtype = 0): void",
+        "__construct(string $bytes, Whim\\Refine\\Uint8 $subtype = 0u): void",
         no_track_caller,
         no_trace_boundary
     )]
@@ -54,7 +54,7 @@ impl Binary {
         let receiver = context.receiver();
         let bytes = arguments.local(0);
         let subtype = if arguments.is_absent(1) {
-            Value::int(0)
+            Value::uint(0)
         } else {
             arguments.local(1)
         };
@@ -79,7 +79,7 @@ impl Binary {
             return Err(context.type_error("the value must be a UUID"));
         }
         let bytes = uuid.read_slot(0);
-        new_instance(context, BINARY_CLASS, [bytes, Value::int(4)])
+        new_instance(context, BINARY_CLASS, [bytes, Value::uint(4)])
     }
 
     #[whim_method(
@@ -96,7 +96,7 @@ impl Binary {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { unreachable_invariant("the BSON binary bytes are a string") }
         };
-        if subtype.as_int() != Some(4) || bytes.len() != 16 {
+        if subtype.as_uint() != Some(4) || bytes.len() != 16 {
             return Ok(Value::null());
         }
         let uuid = RawUuid::from_slice(bytes)
@@ -122,7 +122,7 @@ impl Binary {
         let receiver = receiver(context);
         let other = arguments.instance(0);
         Value::bool(
-            string_slots_equal(&receiver, &other, 0) && int_slots_equal(&receiver, &other, 1),
+            string_slots_equal(&receiver, &other, 0) && uint_slots_equal(&receiver, &other, 1),
         )
     }
 }
@@ -429,7 +429,9 @@ impl Timestamp {
     fn equals(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
         let receiver = receiver(context);
         let other = arguments.instance(0);
-        Value::bool(int_slots_equal(&receiver, &other, 0) && int_slots_equal(&receiver, &other, 1))
+        Value::bool(
+            uint_slots_equal(&receiver, &other, 0) && uint_slots_equal(&receiver, &other, 1),
+        )
     }
 }
 
@@ -468,8 +470,8 @@ fn string_slots_equal(left: &InstanceObject, right: &InstanceObject, slot: usize
     left.as_string_bytes() == right.as_string_bytes()
 }
 
-fn int_slots_equal(left: &InstanceObject, right: &InstanceObject, slot: usize) -> bool {
-    left.read_slot(slot).as_int() == right.read_slot(slot).as_int()
+fn uint_slots_equal(left: &InstanceObject, right: &InstanceObject, slot: usize) -> bool {
+    left.read_slot(slot).as_uint() == right.read_slot(slot).as_uint()
 }
 
 fn set_property(

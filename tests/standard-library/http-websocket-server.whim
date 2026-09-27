@@ -32,11 +32,11 @@ final class WebSocketServerTestStream implements Stream<InternetEndpoint> {
   public function __construct(private string $incoming) {}
 
   public function getLocalEndpoint(): InternetEndpoint {
-    return new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
+    return new InternetEndpoint(Address::v4('127.0.0.1'), 8080u);
   }
 
   public function getPeerEndpoint(): InternetEndpoint {
-    return new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+    return new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u);
   }
 
   public function shutdown(
@@ -58,12 +58,12 @@ final class WebSocketServerTestStream implements Stream<InternetEndpoint> {
       return '';
     }
 
-    $length = length!($this->incoming) - $this->offset;
+    $length = (length!($this->incoming) as int) - $this->offset;
     if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
-    $data = Str\slice($this->incoming, $this->offset, $length);
+    $data = Str\slice($this->incoming, $this->offset, $length as uint);
     $this->offset += $length;
     return $data;
   }
@@ -74,7 +74,7 @@ final class WebSocketServerTestStream implements Stream<InternetEndpoint> {
     $cancellation?->throwIfCancellationRequested();
   }
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->written .= $bytes;
     return length!($bytes);
   }
@@ -82,7 +82,7 @@ final class WebSocketServerTestStream implements Stream<InternetEndpoint> {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     return $this->tryWrite($bytes);
   }
@@ -321,7 +321,7 @@ $pendingWait = Async\spawn::<null>(fn(): null {
 });
 
 Async\later();
-$peerCodec = WebSocketCodec::client(1024, 1024);
+$peerCodec = WebSocketCodec::client(1024u, 1024u);
 $peerCodec->sendText('after cancellation');
 $peerStream->writeAll($peerCodec->takeOutput());
 $pendingWait->await();

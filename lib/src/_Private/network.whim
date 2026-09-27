@@ -28,7 +28,7 @@ final class HostResolutionOperation {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function take(): null|vec<(int, (string&!''))> {}
+  public function take(): null|vec<(uint, (string&!''))> {}
 
   /** Abandons this lookup's result. */
   public function cancel(): void {}

@@ -73,7 +73,7 @@ final class Router implements
 
     if (null == $resolution) {
       $allowedMethods = $resolver->allowedMethods($path);
-      if (length!($allowedMethods) == 0) {
+      if (length!($allowedMethods) == 0u) {
         throw new NotFoundException();
       }
 

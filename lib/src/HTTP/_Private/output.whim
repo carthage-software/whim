@@ -15,7 +15,12 @@ function queue_raw_frame(
 ): void {
   queue_bytes(
     $state,
-    Whim\_Private\h2_encode_frame($type, $flags, $streamId, $payload),
+    Whim\_Private\h2_encode_frame(
+      $type as uint,
+      $flags as uint,
+      $streamId as uint,
+      $payload,
+    ),
   );
 }
 

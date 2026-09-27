@@ -70,7 +70,7 @@ final class ReentrantPriorityComparator {
 }
 
 $stack = new Stack::<null|int>(vec[1, null, 3]);
-assert!($stack->count() == 3);
+assert!($stack->count() == 3u);
 assert!($stack->toVec() == vec[3, null, 1]);
 assert!($stack->peek()->unwrap() == 3);
 assert!($stack->pop()->unwrap() == 3);
@@ -117,7 +117,7 @@ while ($index < 48) {
   $index++;
 }
 
-assert!($queue->count() == 37);
+assert!($queue->count() == 37u);
 assert!($queue->peek()->unwrap() == 12);
 $queueSnapshot = $queue->toIterator();
 $queue->enqueue(48);
@@ -145,7 +145,7 @@ foreach ($queueSnapshot as $value) {
   $queueSnapshotValues[] = $value;
 }
 
-assert!(length!($queueSnapshotValues) == 37);
+assert!(length!($queueSnapshotValues) == 37u);
 assert!($queueSnapshotValues[0] == 12);
 assert!($queueSnapshotValues[12] == null);
 assert!($queueSnapshotValues[36] == 47);
@@ -165,10 +165,10 @@ assert!($deque->popFront()->isNone());
 assert!($deque->popBack()->isNone());
 
 $heap = new BinaryHeap::<int>(compare_int(...), vec[5, 1, 4, 2, 3]);
-assert!($heap->count() == 5);
+assert!($heap->count() == 5u);
 assert!($heap->peek()->unwrap() == 1);
 assert!($heap->toVec() == vec[1, 2, 3, 4, 5]);
-assert!($heap->count() == 5);
+assert!($heap->count() == 5u);
 assert!($heap->pop()->unwrap() == 1);
 $heap->push(0);
 assert!($heap->toVec() == vec[0, 2, 3, 4, 5]);
@@ -245,13 +245,13 @@ $priorityQueue = new PriorityQueue::<string, int>(
   vec[('low', 30), ('high', 10), ('middle', 20)],
 );
 
-assert!($priorityQueue->count() == 3);
+assert!($priorityQueue->count() == 3u);
 assert!($priorityQueue->peek()->unwrap() == ('high', 10));
 assert!(
   $priorityQueue->toVec() == vec[('high', 10), ('middle', 20), ('low', 30)],
 );
 
-assert!($priorityQueue->count() == 3);
+assert!($priorityQueue->count() == 3u);
 
 $priorityIterator = $priorityQueue->toIterator();
 $priorityQueue->enqueue('first', 0);

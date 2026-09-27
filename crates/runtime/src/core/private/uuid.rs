@@ -54,7 +54,7 @@ pub(crate) fn format(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) ->
 }
 
 #[whim_function(
-    "Whim\\_Private\\uuid_version(string[16] $bytes): null|1..=8",
+    "Whim\\_Private\\uuid_version(string[16] $bytes): null|1u..=8u",
     must_use
 )]
 pub(crate) fn version(arguments: Arguments<'_>) -> Value {
@@ -70,16 +70,10 @@ pub(crate) fn version(arguments: Arguments<'_>) -> Value {
         return Value::null();
     }
 
-    // SAFETY: the surrounding invariant proves this result is successful.
-    let version = unsafe {
-        unwrap_result_invariant(
-            i64::try_from(uuid.get_version_num()),
-            "a UUID version nibble fits in a signed integer",
-        )
-    };
+    let version = uuid.get_version_num() as u64;
     if !(1..=8).contains(&version) {
         return Value::null();
     }
 
-    Value::int(version)
+    Value::uint(version)
 }

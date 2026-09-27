@@ -47,7 +47,7 @@ namespace FileMetadata\App {
   assert!($file->getDocumentation() == null);
   $attributes = $file->getAttributes::<Label>();
   assert!(Label::$instances == 0);
-  assert!(length!($file->getAttributes()) == length!($attributes) + 1);
+  assert!(length!($file->getAttributes()) == length!($attributes) + 1u);
   assert!(
     length!($file->getAttributesByName('FileMetadata\\Tag'))
     == length!($attributes),
@@ -73,7 +73,7 @@ namespace FileMetadata\App {
     ],
   );
 
-  assert!(Label::$instances == length!($attributes));
+  assert!((Label::$instances as uint) == length!($attributes));
   assert!($attributes[1]->getArguments() == vec['root', 5]);
   assert!($attributes[2]->getArguments() == vec[]);
   assert!(

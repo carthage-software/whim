@@ -76,7 +76,7 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
     try {
       $bytes = Whim\_Private\read_descriptor(
         $this->getFileDescriptor(),
-        $maximum,
+        $maximum as uint,
       );
     } catch (Whim\_Private\SystemError $error) {
       failure($error);
@@ -111,7 +111,7 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
 
     while (true) {
       try {
-        $bytes = Whim\_Private\read_descriptor($descriptor, $maximum);
+        $bytes = Whim\_Private\read_descriptor($descriptor, $maximum as uint);
       } catch (Whim\_Private\SystemError $error) {
         failure($error);
       }
@@ -139,7 +139,7 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     try {
       return Whim\_Private\write_descriptor($this->getFileDescriptor(), $bytes);
     } catch (Whim\_Private\SystemError $error) {
@@ -152,9 +152,9 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     if ('' == $bytes) {
-      return 0;
+      return 0u;
     }
 
     while (true) {
@@ -185,12 +185,12 @@ abstract class StreamImpl<TEndpoint: Endpoint> implements
         failure($error);
       }
 
-      if (0 == $written) {
+      if (0u == $written) {
         wait_writable($descriptor, $cancellation);
         continue;
       }
 
-      $bytes = Str\slice($bytes, $written);
+      $bytes = Str\slice($bytes, $written as int);
     }
   }
 

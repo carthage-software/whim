@@ -572,20 +572,20 @@ fn nonescaping_static_dict_reads_are_replaced() {
 fn dictionary_lengths_fold_distinct_constant_keys() {
     let unit = compile(
         r"
-        function empty(): int {
+        function empty(): uint {
             return length!(dict[]);
         }
 
-        function single(string $key): int {
+        function single(string $key): uint {
             return length!(dict[$key => 0]);
         }
 
-        function repeated(): int {
+        function repeated(): uint {
             $key = 'a';
             return length!(dict[$key => 1, 'b' => 2, $key => 3]);
         }
 
-        function strict(): int {
+        function strict(): uint {
             $integer = 1;
             $string = '1';
             $boolean = true;
@@ -596,7 +596,7 @@ fn dictionary_lengths_fold_distinct_constant_keys() {
             ]);
         }
 
-        function composed(): int {
+        function composed(): uint {
             $prefix = 'same';
             $key = $prefix . '-long-key';
             return length!(dict[$key => 1, 'same-long-key' => 2]);
@@ -621,7 +621,7 @@ fn dictionary_lengths_fold_distinct_constant_keys() {
             function.chunk.code.iter().any(|instruction| {
                 matches!(
                     instruction,
-                    Instruction::ReturnIntegerUnchecked { kind: IntegerKind::I64, immediate } if immediate.as_int() == expected
+                    Instruction::ReturnIntegerUnchecked { kind: IntegerKind::U64, immediate } if immediate.as_uint() == expected
                 )
             }),
             "{}: {:#?}",
@@ -638,15 +638,15 @@ fn dictionary_lengths_keep_checks_for_unknown_keys() {
         r"
         newtype Key = int;
 
-        function dynamic(string $first, string $second): int {
+        function dynamic(string $first, string $second): uint {
             return length!(dict[$first => 1, $second => 2]);
         }
 
-        function partly_known(string $key): int {
+        function partly_known(string $key): uint {
             return length!(dict['known' => 1, $key => 2]);
         }
 
-        function tagged(int $first, int $second): int {
+        function tagged(int $first, int $second): uint {
             return length!(dict[Key($first) => 1, Key($second) => 2]);
         }
         ",
@@ -729,11 +729,11 @@ fn tuple_index_specialization_requires_proven_bounds() {
     let unit = compile(
         r"
         function exact((int, string) $values): int {
-            return $values[0] + length!($values[1]);
+            return $values[0] + (length!($values[1]) as int);
         }
 
         function prefix((int, string, ...bool) $values): int {
-            return $values[0] + length!($values[1]);
+            return $values[0] + (length!($values[1]) as int);
         }
 
         function beyond((int, string, ...bool) $values): mixed {
@@ -781,14 +781,13 @@ fn mixed_dictionary_keys_remain_generic() {
     let unit = compile(
         r#"
         type NonEmptyString = string & !"";
-        type NonNegativeInt = 0..;
 
         final readonly class Captures {
             public function __construct(
-                public dict<int|string, null|string> $values,
+                public dict<uint|string, null|string> $values,
             ) {}
 
-            public function capture(NonNegativeInt|NonEmptyString $key): null|string {
+            public function capture(uint|NonEmptyString $key): null|string {
                 if (!contains_key!($this->values, $key)) {
                     return null;
                 }
@@ -2734,15 +2733,15 @@ fn discarded_dict_increments_use_one_lookup() {
 fn counted_loops_reuse_only_unchanged_string_lengths() {
     let unit = compile(
         r"
-        function stable(string $value, int $count): int {
-            $sum = 0;
+        function stable(string $value, int $count): uint {
+            $sum = 0u;
             for ($index = 0; $index < $count; $index++) {
                 $sum += length!($value);
             }
             return $sum;
         }
-        function changed(string $value, int $count): int {
-            $sum = 0;
+        function changed(string $value, int $count): uint {
+            $sum = 0u;
             for ($index = 0; $index < $count; $index++) {
                 $sum += length!($value);
                 $value .= 'x';

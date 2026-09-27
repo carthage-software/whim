@@ -12,7 +12,7 @@ function beside(string $relative): string {
   assert!($script is string);
   $script = Str\replace(Filesystem\canonicalize($script), '\\', '/');
   $slash = Str\search_last($script, '/');
-  assert!($slash is int);
+  assert!($slash is uint);
 
   return Str\slice($script, 0, $slash) . '/' . $relative;
 }

@@ -8,32 +8,32 @@ use whim_sys::constants as libc;
 #[whim_constant("Whim\\Path\\SEPARATOR", "string")]
 pub(crate) const PATH_SEPARATOR: &str = MAIN_SEPARATOR_STR;
 
-#[whim_constant("Whim\\_Private\\ERRNO_NOT_FOUND", "int")]
-pub(crate) const ERRNO_NOT_FOUND: i64 = libc::ENOENT as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_NOT_FOUND", "uint")]
+pub(crate) const ERRNO_NOT_FOUND: u64 = libc::ENOENT.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_NOT_DIRECTORY", "int")]
-pub(crate) const ERRNO_NOT_DIRECTORY: i64 = libc::ENOTDIR as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_NOT_DIRECTORY", "uint")]
+pub(crate) const ERRNO_NOT_DIRECTORY: u64 = libc::ENOTDIR.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_IS_DIRECTORY", "int")]
-pub(crate) const ERRNO_IS_DIRECTORY: i64 = libc::EISDIR as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_IS_DIRECTORY", "uint")]
+pub(crate) const ERRNO_IS_DIRECTORY: u64 = libc::EISDIR.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_ALREADY_EXISTS", "int")]
-pub(crate) const ERRNO_ALREADY_EXISTS: i64 = libc::EEXIST as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_ALREADY_EXISTS", "uint")]
+pub(crate) const ERRNO_ALREADY_EXISTS: u64 = libc::EEXIST.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_PERMISSION_DENIED", "int")]
-pub(crate) const ERRNO_PERMISSION_DENIED: i64 = libc::EACCES as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_PERMISSION_DENIED", "uint")]
+pub(crate) const ERRNO_PERMISSION_DENIED: u64 = libc::EACCES.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_OPERATION_NOT_PERMITTED", "int")]
-pub(crate) const ERRNO_OPERATION_NOT_PERMITTED: i64 = libc::EPERM as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_OPERATION_NOT_PERMITTED", "uint")]
+pub(crate) const ERRNO_OPERATION_NOT_PERMITTED: u64 = libc::EPERM.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_DIRECTORY_NOT_EMPTY", "int")]
-pub(crate) const ERRNO_DIRECTORY_NOT_EMPTY: i64 = libc::ENOTEMPTY as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_DIRECTORY_NOT_EMPTY", "uint")]
+pub(crate) const ERRNO_DIRECTORY_NOT_EMPTY: u64 = libc::ENOTEMPTY.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_INVALID_ARGUMENT", "int")]
-pub(crate) const ERRNO_INVALID_ARGUMENT: i64 = libc::EINVAL as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_INVALID_ARGUMENT", "uint")]
+pub(crate) const ERRNO_INVALID_ARGUMENT: u64 = libc::EINVAL.cast_unsigned() as u64;
 
-#[whim_constant("Whim\\_Private\\ERRNO_WOULD_BLOCK", "int")]
-pub(crate) const ERRNO_WOULD_BLOCK: i64 = libc::EAGAIN as i64;
+#[whim_constant("Whim\\_Private\\ERRNO_WOULD_BLOCK", "uint")]
+pub(crate) const ERRNO_WOULD_BLOCK: u64 = libc::EAGAIN.cast_unsigned() as u64;
 
 #[whim_constant("Whim\\_Private\\FILE_TYPE_MASK", "int")]
 pub(crate) const FILE_TYPE_MASK: i64 = libc::S_IFMT as i64;

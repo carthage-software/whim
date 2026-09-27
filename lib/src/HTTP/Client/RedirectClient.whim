@@ -13,7 +13,6 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Network\NetworkException;
-use Whim\Refine\NonNegativeInt;
 use Whim\Str;
 use Whim\URI\URI;
 use Whim\URL\URL;
@@ -22,7 +21,7 @@ use Whim\URL\URL;
 final readonly class RedirectClient implements Client {
   public function __construct(
     private Client $client,
-    private NonNegativeInt $maximumRedirects = 10,
+    private uint $maximumRedirects = 10u,
     private bool $automaticReferrer = true,
   ) {}
 
@@ -34,7 +33,7 @@ final readonly class RedirectClient implements Client {
     SendConfiguration $configuration = new SendConfiguration(),
     null|CancellationToken $cancellation = null,
   ): Transaction {
-    $redirects = 0;
+    $redirects = 0u;
     $body = $request->body;
     $bodyOffset = null;
     if ($body is SeekHandle) {
@@ -54,7 +53,7 @@ final readonly class RedirectClient implements Client {
       }
 
       $locations = $response->headers->getAll('location');
-      if (length!($locations) != 1 || '' == $locations[0]) {
+      if (length!($locations) != 1u || '' == $locations[0]) {
         return $transaction;
       }
 
@@ -97,7 +96,7 @@ final readonly class RedirectClient implements Client {
           );
         }
 
-        discard!($body->seek($bodyOffset));
+        discard!($body->seek($bodyOffset as int));
       }
 
       if (

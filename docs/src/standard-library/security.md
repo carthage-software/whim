@@ -35,6 +35,7 @@ instead of truncating it. Traces hide passwords and stored hashes.
 
 `SecureRandom\bytes($length)` reads operating-system random bytes.
 `string($length, $alphabet)` selects unbiased characters from an alphabet.
+Both take a uint length, such as `32u`.
 `int($min, $max)` selects an inclusive unbiased integer. `float()` returns a
 value from zero inclusive to one exclusive.
 
@@ -50,7 +51,7 @@ Failure to obtain enough operating-system randomness throws
 random bytes. They are suitable for tests, sampling, games, and shuffling, not
 for keys, tokens, salts, or passwords.
 
-`RandomSequence\MersenneTwisterSequence` accepts an explicit 32-bit seed and is
+`RandomSequence\MersenneTwisterSequence` accepts an unsigned 32-bit seed and is
 repeatable. `SecureSequence` reads fresh secure data. Both implement `Sequence`
 with `next`, `nextFloat`, and inclusive `nextIn`.
 

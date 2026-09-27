@@ -6,7 +6,6 @@ use Whim\File\_Private\ReadWriteHandleImpl;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\InvalidArgumentException;
 
 /** Stores bytes in memory, spilling larger buffers to an anonymous file. */
@@ -19,14 +18,12 @@ final class SpoolHandle implements
   private null|ReadWriteHandleImpl $file = null;
   private bool $closed = false;
   private bool $spillRequired = false;
-  private int $position = 0;
-  private int $size = 0;
+  private uint $position = 0u;
+  private uint $size = 0u;
 
   /** Creates a spool with its maximum in-memory byte count. */
   #[AlwaysInline]
-  public function __construct(
-    private NonNegativeInt $memoryThreshold = 2_097_152,
-  ) {
+  public function __construct(private uint $memoryThreshold = 2_097_152u) {
     $this->memory = new MemoryHandle();
   }
 
@@ -92,17 +89,17 @@ final class SpoolHandle implements
 
   /** Attempts one write without waiting for a spill. */
   #[TrackCaller]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->ensureOpen();
     if ('' == $bytes) {
-      return 0;
+      return 0u;
     }
 
     if (null == $this->file) {
       $end = $this->position + length!($bytes);
       if ($this->spillRequired || $end > $this->memoryThreshold) {
         $this->spillRequired = true;
-        return 0;
+        return 0u;
       }
 
       $written = ($this->memory as MemoryHandle)->tryWrite($bytes);
@@ -119,16 +116,16 @@ final class SpoolHandle implements
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     if ('' == $bytes) {
       $this->ensureOpen();
-      return 0;
+      return 0u;
     }
 
     while (true) {
       $written = $this->tryWrite($bytes);
-      if (0 != $written) {
+      if (0u != $written) {
         return $written;
       }
 
@@ -138,7 +135,10 @@ final class SpoolHandle implements
 
   /** Moves the cursor and returns its new byte offset. */
   #[TrackCaller]
-  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+  public function seek(
+    int $offset,
+    SeekWhence $whence = SeekWhence::Set,
+  ): uint {
     $this->ensureOpen();
     if (null != $this->file) {
       $this->position = $this->file->seek($offset, $whence);
@@ -173,7 +173,7 @@ final class SpoolHandle implements
 
   /** Updates the tracked cursor and byte count after a write. */
   #[AlwaysInline]
-  private function advance(int $written): void {
+  private function advance(uint $written): void {
     $this->position += $written;
     if ($this->position > $this->size) {
       $this->size = $this->position;
@@ -196,7 +196,7 @@ final class SpoolHandle implements
       $file->writeAll($bytes, $cancellation);
     }
 
-    $file->seek($this->position);
+    $file->seek($this->position as int);
     $this->file = $file;
     $this->memory = null;
     $this->spillRequired = false;

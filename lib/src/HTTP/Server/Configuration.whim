@@ -7,8 +7,7 @@ use Whim\HTTP\Server\Responder\Responder;
 use Whim\HTTP\Server\Middleware\Middleware;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Time\Duration;
 
 /** Configures protocol limits, timeouts, and error responses. */
@@ -20,13 +19,13 @@ final readonly class Configuration implements Default {
     public null|Duration $requestBodyTimeout = new Duration(30, 0),
     public null|Duration $responseWriteTimeout = new Duration(60, 0),
     public Duration $shutdownTimeout = new Duration(30, 0),
-    public PositiveInt $maximumConnections = 1_000,
-    public null|PositiveInt $maximumConnectionsPerPeer = null,
-    public PositiveInt $maximumConcurrentRequests = 10_000,
-    public null|NonNegativeInt $maximumServerPushes = 100,
-    public PositiveInt $maximumHeaderSize = 16_384,
-    public NonNegativeInt $maximumRequestBodySize = 10_485_760,
-    public PositiveInt $maximumRequestsPerConnection = 1_000,
+    public NonZero<uint> $maximumConnections = 1_000u,
+    public null|NonZero<uint> $maximumConnectionsPerPeer = null,
+    public NonZero<uint> $maximumConcurrentRequests = 10_000u,
+    public null|uint $maximumServerPushes = 100u,
+    public NonZero<uint> $maximumHeaderSize = 16_384u,
+    public uint $maximumRequestBodySize = 10_485_760u,
+    public NonZero<uint> $maximumRequestsPerConnection = 1_000u,
     public bool $keepAlive = true,
     public H2\Configuration $h2 = new H2\Configuration(
       rateLimiter: H2\RateLimiter::default(),

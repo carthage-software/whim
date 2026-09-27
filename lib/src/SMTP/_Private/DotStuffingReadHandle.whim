@@ -106,7 +106,7 @@ final class DotStuffingReadHandle implements ReadHandle {
       return '';
     }
 
-    $length = length!($this->buffer);
+    $length = length!($this->buffer) as int;
     if (null != $maxBytes && $maxBytes > 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
@@ -115,7 +115,7 @@ final class DotStuffingReadHandle implements ReadHandle {
     $this->buffer = string_slice(
       $this->buffer,
       $length,
-      length!($this->buffer) - $length,
+      (length!($this->buffer) as int) - $length,
     );
 
     return $result;

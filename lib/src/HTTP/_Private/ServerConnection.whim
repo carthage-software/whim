@@ -43,7 +43,7 @@ final class ServerConnection extends ConnectionImpl {
     StreamId $streamId,
     vec<Header> $headers,
     100..=599 $status,
-    null|int $contentLength,
+    null|uint $contentLength,
     bool $endStream,
   ): void {
     send_response_headers(

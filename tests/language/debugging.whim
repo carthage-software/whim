@@ -86,7 +86,7 @@ File\write(
 
 $run = Command\run($binary, vec[$source]);
 assert!($run->isSuccess());
-assert!(length!($run->standardOutput) == 0);
+assert!(length!($run->standardOutput) == 0u);
 $assertion_value_4 = $run->standardError;
 assert!(
   Whim\Str\contains(

@@ -1,21 +1,20 @@
 namespace Whim\HTTP\_Private;
 
 use Whim;
-use Whim\Refine\NonNegativeInt;
 
 /** Tracks stream state, windows, and concurrency. */
 final class StreamTable {
   private dict<StreamId, StreamEntry> $streams = dict[];
-  private NonNegativeInt $localActive = 0;
-  private NonNegativeInt $peerActive = 0;
-  private NonNegativeInt $peerReserved = 0;
+  private uint $localActive = 0u;
+  private uint $peerActive = 0u;
+  private uint $peerReserved = 0u;
 
   public function __construct(
-    private NonNegativeInt $localMaximum,
+    private uint $localMaximum,
     private int $initialSendWindow,
     private int $initialReceiveWindow,
-    private NonNegativeInt $peerMaximum,
-    private NonNegativeInt $peerReservedMaximum,
+    private uint $peerMaximum,
+    private uint $peerReservedMaximum,
   ) {}
 
   public function get(StreamId $streamId): null|StreamEntry {
@@ -110,7 +109,7 @@ final class StreamTable {
       );
     }
 
-    if ($this->peerReserved > 0) {
+    if ($this->peerReserved > 0u) {
       $this->peerReserved--;
     }
 
@@ -140,13 +139,13 @@ final class StreamTable {
 
     if (
       StreamState::ReservedRemote == $entry->state
-      && $this->peerReserved > 0
+      && $this->peerReserved > 0u
     ) {
       $this->peerReserved--;
     } else if (counts_toward_concurrency($entry->state)) {
-      if ($entry->locallyInitiated && $this->localActive > 0) {
+      if ($entry->locallyInitiated && $this->localActive > 0u) {
         $this->localActive--;
-      } else if (!$entry->locallyInitiated && $this->peerActive > 0) {
+      } else if (!$entry->locallyInitiated && $this->peerActive > 0u) {
         $this->peerActive--;
       }
     }
@@ -155,15 +154,15 @@ final class StreamTable {
     remove!($this->streams, $streamId);
   }
 
-  public function activeCount(): NonNegativeInt {
+  public function activeCount(): uint {
     return $this->localActive;
   }
 
-  public function localMaximum(): NonNegativeInt {
+  public function localMaximum(): uint {
     return $this->localMaximum;
   }
 
-  public function setLocalMaximum(NonNegativeInt $maximum): void {
+  public function setLocalMaximum(uint $maximum): void {
     $this->localMaximum = $maximum;
   }
 

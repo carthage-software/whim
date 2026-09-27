@@ -18,7 +18,7 @@ final readonly class Certificate {
   #[TrackCaller]
   public static function from(string $bytes): Certificate {
     $certificates = self::decode($bytes);
-    if (length!($certificates) != 1) {
+    if (length!($certificates) != 1u) {
       throw new CertificateException('expected exactly one certificate');
     }
 

@@ -30,14 +30,20 @@ function split_enhanced_status(
 ): null|(EnhancedStatusPart, EnhancedStatusPart, EnhancedStatusPart) {
   $first = Str\search($value, '.') ?? return null;
 
-  $second = Str\search($value, '.', $first + 1);
-  if (null == $second || Str\search($value, '.', $second + 1) != null) {
+  $second = Str\search($value, '.', ($first as int) + 1);
+  if (
+    null == $second
+    || Str\search($value, '.', ($second as int) + 1) != null
+  ) {
     return null;
   }
 
   $class = parse_decimal(Str\slice($value, 0, $first));
-  $subject = parse_decimal(Str\slice($value, $first + 1, $second - $first - 1));
-  $detail = parse_decimal(Str\slice($value, $second + 1));
+  $subject = parse_decimal(
+    Str\slice($value, ($first as int) + 1, $second - $first - 1u),
+  );
+
+  $detail = parse_decimal(Str\slice($value, ($second as int) + 1));
   if (
     !($class is EnhancedStatusPart)
     || !($subject is EnhancedStatusPart)

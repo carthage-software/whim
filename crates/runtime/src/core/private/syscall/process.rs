@@ -16,35 +16,39 @@ use crate::core::private::syscall::{
     Descriptor, build_file_descriptor, io_error, system_error, with_descriptor,
 };
 
-#[whim_function("Whim\\Process\\get_parent_id(): (0..)", must_use)]
+#[whim_function("Whim\\Process\\get_parent_id(): uint", must_use)]
 pub(crate) fn parent_process_id(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     process::parent_id()
-        .map(|id| Value::int(i64::from(id)))
+        .map(|id| Value::uint(u64::from(id)))
         .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\process_user(): ((0..), (0..))")]
+#[whim_function("Whim\\_Private\\process_user(): (uint, uint)")]
 pub(crate) fn process_user(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     let (real, effective) = process::user().map_err(|error| io_error(cx, error))?;
     Ok(cx.tuple([
-        Value::int(i64::from(real)),
-        Value::int(i64::from(effective)),
+        Value::uint(u64::from(real)),
+        Value::uint(u64::from(effective)),
     ]))
 }
 
-#[whim_function("Whim\\_Private\\process_group(): ((0..), (0..))")]
+#[whim_function("Whim\\_Private\\process_group(): (uint, uint)")]
 pub(crate) fn process_group(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     let (real, effective) = process::group().map_err(|error| io_error(cx, error))?;
     Ok(cx.tuple([
-        Value::int(i64::from(real)),
-        Value::int(i64::from(effective)),
+        Value::uint(u64::from(real)),
+        Value::uint(u64::from(effective)),
     ]))
 }
 
-#[whim_function("Whim\\_Private\\process_supplementary_groups(): vec<(0..)>")]
+#[whim_function("Whim\\_Private\\process_supplementary_groups(): vec<uint>")]
 pub(crate) fn process_supplementary_groups(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     let groups = process::supplementary_groups().map_err(|error| io_error(cx, error))?;
-    Ok(cx.vec(groups.into_iter().map(|group| Value::int(i64::from(group)))))
+    Ok(cx.vec(
+        groups
+            .into_iter()
+            .map(|group| Value::uint(u64::from(group))),
+    ))
 }
 
 #[whim_function("Whim\\_Private\\set_process_user(int $real, int $effective): void")]
@@ -65,7 +69,7 @@ pub(crate) fn set_process_group(
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\set_process_supplementary_groups(vec<(0..)> $groups): void")]
+#[whim_function("Whim\\_Private\\set_process_supplementary_groups(vec<uint> $groups): void")]
 pub(crate) fn set_process_supplementary_groups(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
@@ -74,78 +78,90 @@ pub(crate) fn set_process_supplementary_groups(
         .vec(0)
         .iter()
         .map(|group| {
-            // SAFETY: argument validation proves each group is an integer.
-            unsafe { group.as_int_unchecked() }
+            // SAFETY: argument validation proves each group is an unsigned integer.
+            let group = unsafe { group.as_uint_unchecked() };
+            i64::try_from(group).map_err(|_| system_error(cx, "setgroups", libc::EINVAL))
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, Throw>>()?;
     process::set_supplementary_groups(&groups).map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\initialize_groups((string&!'') $user, (0..) $group): void")]
+#[whim_function("Whim\\_Private\\initialize_groups((string&!'') $user, uint $group): void")]
 pub(crate) fn initialize_groups(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::initialize_groups(arguments.bytes(0), arguments.int(1))
-        .map_err(|error| io_error(cx, error))?;
+    let group = i64::try_from(arguments.uint(1))
+        .map_err(|_| system_error(cx, "initgroups", libc::EINVAL))?;
+    process::initialize_groups(arguments.bytes(0), group).map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\session_id((0..) $process): (0..)")]
+#[whim_function("Whim\\_Private\\session_id(uint $process): uint")]
 pub(crate) fn session_id(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::session_id(arguments.int(0))
-        .map(|id| Value::int(i64::from(id)))
+    let process =
+        i64::try_from(arguments.uint(0)).map_err(|_| system_error(cx, "getsid", libc::EINVAL))?;
+    process::session_id(process)
+        .map(|id| Value::uint(u64::from(id)))
         .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\start_session(): (0..)")]
+#[whim_function("Whim\\_Private\\start_session(): uint")]
 pub(crate) fn start_session(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     process::start_session()
-        .map(|id| Value::int(i64::from(id)))
+        .map(|id| Value::uint(u64::from(id)))
         .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\process_group_id((0..) $process): (0..)")]
+#[whim_function("Whim\\_Private\\process_group_id(uint $process): uint")]
 pub(crate) fn process_group_id(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::group_id(arguments.int(0))
-        .map(|id| Value::int(i64::from(id)))
+    let process =
+        i64::try_from(arguments.uint(0)).map_err(|_| system_error(cx, "getpgid", libc::EINVAL))?;
+    process::group_id(process)
+        .map(|id| Value::uint(u64::from(id)))
         .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\set_process_group_id((0..) $process, (0..) $group): void")]
+#[whim_function("Whim\\_Private\\set_process_group_id(uint $process, uint $group): void")]
 pub(crate) fn set_process_group_id(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::set_group_id(arguments.int(0), arguments.int(1))
-        .map_err(|error| io_error(cx, error))?;
+    let process =
+        i64::try_from(arguments.uint(0)).map_err(|_| system_error(cx, "setpgid", libc::EINVAL))?;
+    let group =
+        i64::try_from(arguments.uint(1)).map_err(|_| system_error(cx, "setpgid", libc::EINVAL))?;
+    process::set_group_id(process, group).map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\process_priority((0..) $process): int")]
+#[whim_function("Whim\\_Private\\process_priority(uint $process): int")]
 pub(crate) fn process_priority(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::priority(arguments.int(0))
+    let process = i64::try_from(arguments.uint(0))
+        .map_err(|_| system_error(cx, "getpriority", libc::EINVAL))?;
+    process::priority(process)
         .map(|value| Value::int(i64::from(value)))
         .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\set_process_priority((0..) $process, int $priority): void")]
+#[whim_function("Whim\\_Private\\set_process_priority(uint $process, int $priority): void")]
 pub(crate) fn set_process_priority(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::set_priority(arguments.int(0), arguments.int(1))
-        .map_err(|error| io_error(cx, error))?;
+    let process = i64::try_from(arguments.uint(0))
+        .map_err(|_| system_error(cx, "setpriority", libc::EINVAL))?;
+    process::set_priority(process, arguments.int(1)).map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
@@ -170,19 +186,19 @@ pub(crate) fn set_resource_limit(
 }
 
 #[whim_function(
-    "Whim\\Filesystem\\exchange_creation_mask(0..=511 $mask): 0..=511",
+    "Whim\\Filesystem\\exchange_creation_mask(0u..=511u $mask): 0u..=511u",
     must_use
 )]
 pub(crate) fn exchange_file_mode_mask(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::exchange_creation_mask(arguments.int(0))
-        .map(|mask| Value::int(i64::from(mask)))
+    process::exchange_creation_mask(arguments.uint(0).cast_signed())
+        .map(|mask| Value::uint(u64::from(mask)))
         .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\process_times(): (int, int, int, int)")]
+#[whim_function("Whim\\_Private\\process_times(): (uint, uint, uint, uint)")]
 pub(crate) fn process_times(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
     let times = cx
         .vm
@@ -190,7 +206,7 @@ pub(crate) fn process_times(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw
         .processes
         .times()
         .map_err(|error| io_error(cx, error))?;
-    Ok(cx.tuple(times.map(Value::int)))
+    Ok(cx.tuple(times.map(|time| Value::uint(time.cast_unsigned()))))
 }
 
 #[whim_function(
@@ -218,22 +234,26 @@ pub(crate) fn send_signal(
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\Process\\exists((1..) $process): bool", must_use)]
+#[whim_function("Whim\\Process\\exists((1u..) $process): bool", must_use)]
 pub(crate) fn process_exists(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::exists(arguments.int(0))
+    let process =
+        i64::try_from(arguments.uint(0)).map_err(|_| system_error(cx, "kill", libc::EINVAL))?;
+    process::exists(process)
         .map(Value::bool)
         .map_err(|error| io_error(cx, error))
 }
 
-#[whim_function("Whim\\_Private\\terminate_process((1..) $process): void")]
+#[whim_function("Whim\\_Private\\terminate_process((1u..) $process): void")]
 pub(crate) fn terminate_process(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
-    process::terminate(arguments.int(0)).map_err(|error| io_error(cx, error))?;
+    let process =
+        i64::try_from(arguments.uint(0)).map_err(|_| system_error(cx, "kill", libc::EINVAL))?;
+    process::terminate(process).map_err(|error| io_error(cx, error))?;
     Ok(Value::null())
 }
 
@@ -344,7 +364,7 @@ fn stream(cx: &mut Context<'_, '_, '_>, value: &Value) -> Result<Stream, Throw> 
 }
 
 #[whim_function(
-    "Whim\\_Private\\spawn_process((string&!'') $program, vec<string> $arguments, null|dict<(string&!''), string> $environment, null|(string&!'') $directory, vec<(int, null|Whim\\OS\\FileDescriptor)> $streams, vec<(Whim\\OS\\FileDescriptor, (0..))> $inherited, int $processGroup): ((0..), null|Whim\\OS\\FileDescriptor, null|Whim\\OS\\FileDescriptor, null|Whim\\OS\\FileDescriptor)"
+    "Whim\\_Private\\spawn_process((string&!'') $program, vec<string> $arguments, null|dict<(string&!''), string> $environment, null|(string&!'') $directory, vec<(int, null|Whim\\OS\\FileDescriptor)> $streams, vec<(Whim\\OS\\FileDescriptor, uint)> $inherited, int $processGroup): (uint, null|Whim\\OS\\FileDescriptor, null|Whim\\OS\\FileDescriptor, null|Whim\\OS\\FileDescriptor)"
 )]
 pub(crate) fn spawn_process(
     cx: &mut Context<'_, '_, '_>,
@@ -376,7 +396,7 @@ pub(crate) fn spawn_process(
             let Some(source) = elements.get(0) else {
                 return Err(cx.type_error("missing inherited descriptor"));
             };
-            let Some(target) = elements.get(1).and_then(Value::as_int) else {
+            let Some(target) = elements.get(1).and_then(Value::as_uint) else {
                 return Err(cx.type_error("missing inherited descriptor number"));
             };
             let target =
@@ -409,7 +429,7 @@ pub(crate) fn spawn_process(
     let input = child_descriptor(cx, spawned.input)?;
     let output = child_descriptor(cx, spawned.output)?;
     let error = child_descriptor(cx, spawned.error)?;
-    Ok(cx.tuple([Value::int(i64::from(spawned.id)), input, output, error]))
+    Ok(cx.tuple([Value::uint(u64::from(spawned.id)), input, output, error]))
 }
 
 fn child_descriptor(
@@ -431,23 +451,27 @@ fn process_runner(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         cx.io_wait_until_readable(source)?;
         if let Some(exit) = with_descriptor(cx, &descriptor, "wait", process::read_exit)? {
             let status = cx.vm.engine.processes.record_exit(exit);
-            return cx.vm.call_function_value(&callback, &[Value::int(status)]);
+            return cx
+                .vm
+                .call_function_value(&callback, &[Value::uint(status.cast_unsigned())]);
         }
     }
 }
 
 #[whim_function(
-    "Whim\\_Private\\watch_process((0..) $process, (fn(int): void) $callback): Whim\\_Private\\TaskId"
+    "Whim\\_Private\\watch_process(uint $process, (fn(uint): void) $callback): Whim\\_Private\\TaskId"
 )]
 pub(crate) fn watch_process(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
+    let process =
+        i64::try_from(arguments.uint(0)).map_err(|_| system_error(cx, "wait", libc::EINVAL))?;
     let descriptor = cx
         .vm
         .engine
         .processes
-        .watch(arguments.int(0))
+        .watch(process)
         .map_err(|error| io_error(cx, error))?;
     let descriptor = build_file_descriptor(cx, descriptor)?;
     let runner = cx.closure(process_runner_spec(), &[descriptor, arguments.local(1)]);

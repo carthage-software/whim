@@ -9,7 +9,7 @@ final class HeaderValidator {
     StreamId $streamId,
     vec<Header> $headers,
     bool $extendedConnectEnabled,
-  ): (null|int, string, string, string, string, vec<(string, string)>) {
+  ): (null|uint, string, string, string, string, vec<(string, string)>) {
     $regular = false;
     $contentLength = null;
     $method = null;
@@ -158,7 +158,7 @@ final class HeaderValidator {
     bool $trailers,
     bool $pushPromise,
     bool $extendedConnectEnabled,
-  ): null|int {
+  ): null|uint {
     $regular = false;
     $pseudo = dict[];
     $contentLength = null;
@@ -253,8 +253,8 @@ final class HeaderValidator {
     StreamId $streamId,
     null|string $requestMethod,
     100..=599 $status,
-    null|int $contentLength,
-  ): null|int {
+    null|uint $contentLength,
+  ): null|uint {
     $tunnel = 'CONNECT' == $requestMethod && $status is 200..=299;
     if ($status is 100..=199|204 || $tunnel) {
       if (null != $contentLength) {
@@ -263,20 +263,20 @@ final class HeaderValidator {
 
       return match ($tunnel) {
         true => null,
-        false => 0,
+        false => 0u,
       };
     }
 
     if ('HEAD' == $requestMethod || 304 == $status) {
-      return 0;
+      return 0u;
     }
 
     if (205 == $status) {
-      if (null != $contentLength && 0 != $contentLength) {
+      if (null != $contentLength && 0u != $contentLength) {
         fail($streamId, 'a 205 HTTP/2 response must have no content');
       }
 
-      return 0;
+      return 0u;
     }
 
     return $contentLength;
@@ -286,7 +286,7 @@ final class HeaderValidator {
 function validate_push_request(
   StreamId $streamId,
   dict<string, string> $pseudo,
-  null|int $contentLength,
+  null|uint $contentLength,
 ): void {
   require_pseudo($streamId, $pseudo, ':authority');
   if ('' == $pseudo[':authority']) {
@@ -297,7 +297,7 @@ function validate_push_request(
     fail($streamId, 'an HTTP/2 push promise must use GET or HEAD');
   }
 
-  if (null != $contentLength && 0 != $contentLength) {
+  if (null != $contentLength && 0u != $contentLength) {
     fail($streamId, 'an HTTP/2 push promise cannot include content');
   }
 }
@@ -410,12 +410,12 @@ function require_pseudo(
   }
 }
 
-function parse_length(StreamId $streamId, string $value): int {
+function parse_length(StreamId $streamId, string $value): uint {
   if ('' == $value) {
     fail($streamId, 'the HTTP/2 content-length field is malformed');
   }
 
-  $length = 0;
+  $length = 0u;
   $index = 0;
   while ($index < length!($value)) {
     $digit = Str\ord($value[$index]);
@@ -425,13 +425,13 @@ function parse_length(StreamId $streamId, string $value): int {
 
     $digit -= 48;
     if (
-      $length > 922_337_203_685_477_580
-      || (922_337_203_685_477_580 == $length && $digit > 7)
+      $length > 922_337_203_685_477_580u
+      || (922_337_203_685_477_580u == $length && $digit > 7)
     ) {
       fail($streamId, 'the HTTP/2 content-length field is too large');
     }
 
-    $length = $length * 10 + $digit;
+    $length = $length * 10u + ($digit as uint);
 
     $index++;
   }

@@ -187,7 +187,7 @@ try {
 assert!($composite is CompositeException);
 
 $reasons = $composite->getReasons();
-assert!(length!($reasons) == 2);
+assert!(length!($reasons) == 2u);
 assert!($reasons[0] is RuntimeException);
 assert!($reasons[0]->getMessage() == 'first failed');
 assert!($reasons[1] is LogicException);
@@ -218,9 +218,12 @@ assert!($assertion_error_20 is RuntimeException);
 
 $preCancelledToken = new Async\SignalCancellationToken();
 $preCancelledToken->cancel();
+$completedSubscription = $preCancelledToken->register(fn(): void {});
+assert!($completedSubscription == -1);
+$preCancelledToken->unregister($completedSubscription);
 
 $semaphoreProbe = new CancellationProbe();
-$probedSemaphore = new Async\Semaphore::<int, int>(1, fn(int $value): int {
+$probedSemaphore = new Async\Semaphore::<int, int>(1u, fn(int $value): int {
   $semaphoreProbe->calls++;
   return $value;
 });
@@ -314,7 +317,7 @@ assert!($waitingGroupProbe->calls == 1);
 
 $queueGate = new Async\Deferred::<null>();
 $queuedProbe = new CancellationProbe();
-$queuedSemaphore = new Async\Semaphore::<int, int>(1, fn(int $value): int {
+$queuedSemaphore = new Async\Semaphore::<int, int>(1u, fn(int $value): int {
   $queuedProbe->calls++;
   if ($value == 1) {
     $queueGate->getFuture()->await();
@@ -334,12 +337,12 @@ $secondQueued = Async\spawn::<int>(fn(): int {
 });
 
 Async\later();
-assert!($queuedSemaphore->getOngoingOperations() == 1);
-assert!($queuedSemaphore->getPendingOperations() == 1);
+assert!($queuedSemaphore->getOngoingOperations() == 1u);
+assert!($queuedSemaphore->getPendingOperations() == 1u);
 $queuedCancellationToken->cancel();
 $queueGate->complete(null);
 assert!($firstQueued->await() == 1);
 assert!($secondQueued->await() == -1);
 assert!($queuedProbe->calls == 1);
-assert!($queuedSemaphore->getOngoingOperations() == 0);
-assert!($queuedSemaphore->getPendingOperations() == 0);
+assert!($queuedSemaphore->getOngoingOperations() == 0u);
+assert!($queuedSemaphore->getPendingOperations() == 0u);

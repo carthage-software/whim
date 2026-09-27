@@ -50,7 +50,7 @@ final class JoinedReadWriteHandle implements
 
   /** Attempts a write to the writable side. */
   #[TrackCaller]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     return $this->writer->tryWrite($bytes);
   }
 
@@ -59,7 +59,7 @@ final class JoinedReadWriteHandle implements
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return $this->writer->write($bytes, $cancellation);
   }
 

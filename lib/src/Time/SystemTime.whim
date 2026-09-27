@@ -18,7 +18,7 @@ final readonly class SystemTime implements Order<SystemTime> {
   #[TrackCaller]
   public static function now(): SystemTime {
     $reading = Whim\_Private\get_system_time();
-    return new SystemTime($reading[0], $reading[1]);
+    return new SystemTime($reading[0], $reading[1] as int);
   }
 
   /** Returns the Unix epoch. */

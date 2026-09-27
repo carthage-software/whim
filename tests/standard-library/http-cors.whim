@@ -49,8 +49,8 @@ final class CORSTestHandler implements Handler {
 function cors_test_context(): CORSTestContext {
   return new CORSTestContext(
     ProtocolVersion::V11,
-    new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
-    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080u),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u),
   );
 }
 
@@ -70,7 +70,7 @@ $cors = new CORS(
   allowedHeaders: vec['Content-Type', 'X-Token'],
   exposedHeaders: vec['X-Result'],
   allowCredentials: true,
-  maxAge: 600,
+  maxAge: 600u,
 );
 
 $response = $cors->handle(

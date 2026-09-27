@@ -43,27 +43,33 @@ pub fn path_metadata(path: &Path, follow: bool) -> Result<Metadata> {
 
 pub(crate) fn from_stat(stat: fs::Stat) -> Metadata {
     let integer = |value: i128| value.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
+    let unsigned =
+        |value: i128| u64::try_from(value).unwrap_or_else(|_| integer(value).cast_unsigned());
+    #[cfg(target_vendor = "apple")]
+    let device = u64::from(stat.st_dev.cast_unsigned());
+    #[cfg(not(target_vendor = "apple"))]
+    let device = unsigned(stat.st_dev.into());
     Metadata {
-        mode: integer(stat.st_mode.into()),
-        links: integer(stat.st_nlink.into()),
+        mode: unsigned(stat.st_mode.into()),
+        links: unsigned(stat.st_nlink.into()),
         user: integer(stat.st_uid.into()),
         group: integer(stat.st_gid.into()),
-        size: integer(stat.st_size.into()),
-        block_size: integer(stat.st_blksize.into()),
-        blocks: integer(stat.st_blocks.into()),
-        device: integer(stat.st_dev.into()),
-        inode: integer(stat.st_ino.into()),
+        size: unsigned(stat.st_size.into()),
+        block_size: unsigned(stat.st_blksize.into()),
+        blocks: unsigned(stat.st_blocks.into()),
+        device,
+        inode: unsigned(stat.st_ino.into()),
         accessed: Timestamp {
             seconds: integer(stat.st_atime.into()),
-            nanoseconds: integer(stat.st_atime_nsec.into()),
+            nanoseconds: unsigned(stat.st_atime_nsec.into()),
         },
         modified: Timestamp {
             seconds: integer(stat.st_mtime.into()),
-            nanoseconds: integer(stat.st_mtime_nsec.into()),
+            nanoseconds: unsigned(stat.st_mtime_nsec.into()),
         },
         changed: Timestamp {
             seconds: integer(stat.st_ctime.into()),
-            nanoseconds: integer(stat.st_ctime_nsec.into()),
+            nanoseconds: unsigned(stat.st_ctime_nsec.into()),
         },
     }
 }
@@ -115,4 +121,24 @@ pub fn temporary(directory: &Path) -> Result<File> {
     result?;
     removed?;
     Ok(file)
+}
+
+#[cfg(test)]
+mod tests {
+    use rustix::fs;
+
+    use super::from_stat;
+
+    #[test]
+    fn metadata_preserves_unsigned_inode_bits() {
+        let mut stat = fs::statat(fs::CWD, "/", fs::AtFlags::empty()).unwrap();
+        stat.st_ino = !0;
+        stat.st_dev = !0;
+        stat.st_atime = -1;
+        let device_bits = size_of_val(&stat.st_dev) * 8;
+        let metadata = from_stat(stat);
+        assert_eq!(metadata.inode, u64::MAX);
+        assert_eq!(metadata.device, u64::MAX >> (64 - device_bits));
+        assert_eq!(metadata.accessed.seconds, -1);
+    }
 }

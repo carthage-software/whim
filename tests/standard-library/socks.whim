@@ -12,7 +12,7 @@ use Whim\TCP;
 use Whim\URL\URL;
 
 $loopback = Address::v4('127.0.0.1');
-$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$listener = TCP\listen(new InternetEndpoint($loopback, 0u));
 $endpoint = $listener->getLocalEndpoint();
 $server = Async\spawn::<string>(fn(): string {
   $stream = $listener->accept();
@@ -22,7 +22,7 @@ $server = Async\spawn::<string>(fn(): string {
   assert!($stream->readFixedSize(4) == "\x05\x01\x00\x03");
   $length = Str\ord($stream->readFixedSize(1));
   assert!($stream->readFixedSize($length) == 'target.local');
-  assert!(Binary\decode_u16($stream->readFixedSize(2)) == 8080);
+  assert!(Binary\decode_u16($stream->readFixedSize(2)) is 8080u);
   $stream->writeAll("\x05\x00\x00\x01\x00\x00\x00\x00\x00\x00");
 
   $reader = new Reader($stream);
@@ -67,7 +67,7 @@ $head = $server->await();
 $listener->close();
 assert!(Str\starts_with($head, "GET /path HTTP/1.1\r\n"));
 
-$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$listener = TCP\listen(new InternetEndpoint($loopback, 0u));
 $endpoint = $listener->getLocalEndpoint();
 $server = Async\spawn::<null>(fn(): null {
   $stream = $listener->accept();
@@ -84,7 +84,7 @@ $server = Async\spawn::<null>(fn(): null {
   assert!($stream->readFixedSize(4) == "\x05\x01\x00\x01");
   assert!($stream->readFixedSize(4) == Address::v4('192.0.2.10')->toBytes());
 
-  assert!(Binary\decode_u16($stream->readFixedSize(2)) == 9000);
+  assert!(Binary\decode_u16($stream->readFixedSize(2)) is 9000u);
   $stream->writeAll("\x05\x00\x00\x04" . Str\join('', vec["\x00"; 18]));
   assert!($stream->readFixedSize(4) == 'ping');
   $stream->writeAll('pong');
@@ -101,7 +101,7 @@ $socks = new SOCKS\Connector(
   ),
 );
 
-$stream = $socks->connect(Address::v4('192.0.2.10'), 9000);
+$stream = $socks->connect(Address::v4('192.0.2.10'), 9000u);
 $stream->writeAll('ping');
 assert!($stream->readFixedSize(4) == 'pong');
 $stream->close();
@@ -120,7 +120,7 @@ assert!(
 
 assert!(SOCKS\_Private\encode_host('example.com') == "\x03\x0bexample.com");
 
-$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$listener = TCP\listen(new InternetEndpoint($loopback, 0u));
 $endpoint = $listener->getLocalEndpoint();
 $server = Async\spawn::<null>(fn(): null {
   $stream = $listener->accept();
@@ -144,7 +144,7 @@ $socks = new SOCKS\Connector(
 );
 
 $assertion_value_21 = fn(): TCP\Stream => (
-  $socks->connect('unreachable.local', 80)
+  $socks->connect('unreachable.local', 80u)
 );
 
 $assertion_error_21 = null;

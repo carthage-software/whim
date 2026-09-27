@@ -360,7 +360,7 @@ assert!($wildPair is WildPair<_, int>);
 assert!(!($wildPair is WildPair<_, string>));
 assert!(('x', 1, false) is (string, int, _));
 assert!(vec[1, 'x'] is vec<_>);
-$wildCallable = fn(string $value): int => length!($value);
+$wildCallable = fn(string $value): int => length!($value) as int;
 assert!($wildCallable is fn(_): int);
 
 final class DeclaredPair<A, B> {
@@ -476,7 +476,7 @@ $binary = Env\current_binary();
 assert!($binary is string);
 $debugRender = Command\run($binary, vec[$work . '/debug-render.whim']);
 assert!($debugRender->isSuccess());
-assert!(length!($debugRender->standardOutput) == 0);
+assert!(length!($debugRender->standardOutput) == 0u);
 assert!(
   $debugRender->standardError
   == '['

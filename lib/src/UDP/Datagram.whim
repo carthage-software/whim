@@ -2,7 +2,6 @@ namespace Whim\UDP;
 
 use Whim\Marker\AlwaysInline;
 use Whim\Network\InternetEndpoint;
-use Whim\Refine\NonNegativeInt;
 
 /** A received UDP datagram and its packet metadata. */
 final readonly class Datagram {
@@ -12,7 +11,7 @@ final readonly class Datagram {
     public InternetEndpoint $peer,
     public InternetEndpoint $local,
     public ExplicitCongestion $explicitCongestion,
-    public NonNegativeInt $interfaceIndex,
+    public uint $interfaceIndex,
     public bool $truncated,
   ) {}
 }

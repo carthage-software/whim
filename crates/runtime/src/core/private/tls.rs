@@ -136,10 +136,14 @@ impl TlsError {
     #[whim_method("__construct(): void", visibility = "private")]
     const fn construct() {}
 
-    #[whim_method("kind(): int")]
+    #[whim_method("kind(): uint")]
     fn kind(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         let receiver = cx.receiver();
-        cx.get_property(&receiver, "code")
+        let code = cx.get_property(&receiver, "code")?;
+        let code = code
+            .as_int()
+            .ok_or_else(|| cx.type_error("the TLS error code must be an int"))?;
+        Ok(Value::uint(code.cast_unsigned()))
     }
 }
 
@@ -622,14 +626,14 @@ impl TlsConnection {
     }
 
     #[whim_method(
-        "readPlaintext(Whim\\Refine\\PositiveInt $maximumBytes): null|string",
+        "readPlaintext(Whim\\Refine\\NonZero<uint> $maximumBytes): null|string",
         must_use
     )]
     fn read_plaintext<'call>(
         cx: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let maximum = arguments.int(0);
+        let maximum = arguments.uint(0);
         let maximum = positive_size(cx, maximum)?;
         with_connection(cx, |cx, state| {
             let mut bytes = vec![0; maximum];
@@ -645,7 +649,7 @@ impl TlsConnection {
         })
     }
 
-    #[whim_method("writePlaintext(#[SensitiveParameter] string $bytes): int", must_use)]
+    #[whim_method("writePlaintext(#[SensitiveParameter] string $bytes): uint", must_use)]
     fn write_plaintext<'call>(
         cx: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
@@ -658,19 +662,19 @@ impl TlsConnection {
                 .write(bytes)
                 .map_err(|error| tls_error(cx, TLS_ERROR_PROTOCOL, &error.to_string()))?;
 
-            Ok(Value::int(i64::try_from(written).unwrap_or(i64::MAX)))
+            Ok(Value::uint(written as u64))
         })
     }
 
     #[whim_method(
-        "transmitCiphertext(Whim\\Refine\\PositiveInt $maximumBytes): string",
+        "transmitCiphertext(Whim\\Refine\\NonZero<uint> $maximumBytes): string",
         must_use
     )]
     fn transmit_ciphertext<'call>(
         cx: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let maximum = arguments.int(0);
+        let maximum = arguments.uint(0);
         let maximum = positive_size(cx, maximum)?;
         with_connection(cx, |cx, state| {
             let mut output = LimitedWriter::new(maximum);
@@ -691,12 +695,12 @@ impl TlsConnection {
         })
     }
 
-    #[whim_method("protocolVersion(): null|int", must_use)]
+    #[whim_method("protocolVersion(): null|uint", must_use)]
     fn protocol_version(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         with_connection(cx, |_, state| {
             Ok(match state.connection.protocol_version() {
-                Some(ProtocolVersion::TLSv1_2) => Value::int(TLS_VERSION_1_2),
-                Some(ProtocolVersion::TLSv1_3) => Value::int(TLS_VERSION_1_3),
+                Some(ProtocolVersion::TLSv1_2) => Value::uint(TLS_VERSION_1_2.cast_unsigned()),
+                Some(ProtocolVersion::TLSv1_3) => Value::uint(TLS_VERSION_1_3.cast_unsigned()),
                 Some(_) | None => Value::null(),
             })
         })
@@ -724,15 +728,17 @@ impl TlsConnection {
         })
     }
 
-    #[whim_method("handshakeKind(): null|int", must_use)]
+    #[whim_method("handshakeKind(): null|uint", must_use)]
     fn handshake_kind(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         with_connection(cx, |_, state| {
             Ok(match state.connection.handshake_kind() {
-                Some(HandshakeKind::Full) => Value::int(TLS_HANDSHAKE_KIND_FULL),
+                Some(HandshakeKind::Full) => Value::uint(TLS_HANDSHAKE_KIND_FULL.cast_unsigned()),
                 Some(HandshakeKind::FullWithHelloRetryRequest) => {
-                    Value::int(TLS_HANDSHAKE_KIND_FULL_WITH_HELLO_RETRY_REQUEST)
+                    Value::uint(TLS_HANDSHAKE_KIND_FULL_WITH_HELLO_RETRY_REQUEST.cast_unsigned())
                 }
-                Some(HandshakeKind::Resumed) => Value::int(TLS_HANDSHAKE_KIND_RESUMED),
+                Some(HandshakeKind::Resumed) => {
+                    Value::uint(TLS_HANDSHAKE_KIND_RESUMED.cast_unsigned())
+                }
                 None => Value::null(),
             })
         })
@@ -1266,11 +1272,11 @@ fn key_text(cx: &mut Context<'_, '_, '_>, key: KeyRef<'_>) -> Result<String, Thr
     text.map_err(|_| cx.type_error("a server name identity is not valid UTF-8"))
 }
 
-fn positive_size(cx: &mut Context<'_, '_, '_>, value: i64) -> Result<usize, Throw> {
+fn positive_size(cx: &mut Context<'_, '_, '_>, value: u64) -> Result<usize, Throw> {
     usize::try_from(value)
         .ok()
-        .filter(|value| *value > 0)
-        .ok_or_else(|| cx.type_error("a maximum byte count must be positive"))
+        .filter(|value| *value > 0 && isize::try_from(*value).is_ok())
+        .ok_or_else(|| cx.type_error("a maximum byte count must fit the allocation size"))
 }
 
 fn tls_error(cx: &mut Context<'_, '_, '_>, kind: i64, message: &str) -> Throw {

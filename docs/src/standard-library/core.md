@@ -12,15 +12,19 @@ This page covers small contracts used throughout the standard library.
 - `Nullable<T>` is `T|null`.
 - `NonNull`, `NonEmptyString`, `NonEmptyVec<T>`, and `NonEmptyDict<K, V>`
   exclude empty values.
-- `PositiveInt`, `NonNegativeInt`, `NegativeInt`, and `NonPositiveInt` name
-  integer ranges.
-- `Uint8`, `Int8`, `Uint16`, `Int16`, `Uint32`, `Int32`, and `Uint64` name
-  fixed bounds.
-- `Percent` is `0..=100`; `Digit` is `0..=9`.
+- `NonZero<T>` excludes zero from a numeric type. `NonZero<uint>` accepts
+  positive uints; `NonZero<int>` accepts positive and negative nonzero ints.
+- `NegativeInt` and `NonPositiveInt` name signed integer ranges.
+- `Uint8`, `Uint16`, and `Uint32` name unsigned integer ranges with fixed
+  bounds. `Int8`, `Int16`, and `Int32` name their signed counterparts.
+- `Percent` is `0u..=100u`; `Digit` is `0u..=9u`.
 - `Iterable<K, V>` accepts an iterator, a value that creates an iterator, or an
   array.
 - `AnyTuple` and `AnyTupleOf<T>` accept tuples of any supported length.
 - `Exclude<T, N>` removes `N` from `T`; `Extract<T, U>` keeps their overlap.
+
+Standard-library counts and lengths use `uint`, with literals such as `0u`
+and `16u`. The `length!()` built-in also returns `uint`.
 
 It also names common callables:
 
@@ -107,4 +111,4 @@ Every enum implements `Enum\UnitEnum`; a backed enum also implements
 
 Reference counts release ordinary values. `GC\collect_cycles()` asks the cycle
 collector to find unreachable strong cycles and returns the number it
-collected. Normal programs seldom need to call it.
+collected as a `uint`. Normal programs seldom need to call it.

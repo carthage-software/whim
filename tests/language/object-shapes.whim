@@ -127,12 +127,12 @@ function acceptsShape(IntValue $value): int {
 
 #[NeverInline]
 function acceptsShapeVector(vec<IntValue> $values): int {
-  return length!($values);
+  return length!($values) as int;
 }
 
 #[NeverInline]
 function acceptsShapeDict(dict<string, IntValue> $values): int {
-  return length!($values);
+  return length!($values) as int;
 }
 
 #[NeverInline]
@@ -413,7 +413,7 @@ assert!(
 
 assert!(
   match (vec[new ShapeValue(9)]) {
-    vec[...$rest @ ShapeValue #{ value: int }] => length!($rest),
+    vec[...$rest @ ShapeValue #{ value: int }] => length!($rest) as int,
   }
   == 1,
 );
@@ -466,7 +466,7 @@ assert!($closed->toString() == '#{ value: int }');
 assert!($any->toString() == '#{ ... }');
 assert!($emptyType->toString() == '#{}');
 assert!($closed->isResolved());
-assert!(length!($closed->getProperties()) == 1);
+assert!(length!($closed->getProperties()) == 1u);
 assert!(
   $closed->getProperties()[0] is Whim\Reflection\Type\ObjectShapePropertyReflection,
 );

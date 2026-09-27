@@ -28,9 +28,9 @@ $openOperation->wait();
 $descriptor = $openOperation->takeDescriptor() as Whim\OS\FileDescriptor;
 
 assert!(!($descriptor->isClosed()));
-assert!($descriptor->toInt() >= 0);
-assert!(Whim\_Private\write_descriptor($descriptor, 'abcdef') == 6);
-assert!(Whim\Filesystem\metadata($path)->size == 6);
+assert!($descriptor->toUint() is uint);
+assert!(Whim\_Private\write_descriptor($descriptor, 'abcdef') == 6u);
+assert!(Whim\Filesystem\metadata($path)->size == 6u);
 assert!(Whim\_Private\path_exists($path, true));
 assert!(Whim\_Private\check_access($path, true, true, false, false));
 
@@ -41,29 +41,50 @@ assert!(Whim\_Private\path_exists($link, false));
 assert!(Whim\_Private\resolve_path($link) == Whim\_Private\resolve_path($path));
 
 $entries = Whim\_Private\read_directory($directory);
-assert!(length!($entries) == 2);
+assert!(length!($entries) == 2u);
 assert!(Whim\_Private\filesystem_space($directory)[0] > 0);
 
 ($read, $write) = Whim\_Private\create_pipe();
-assert!(Whim\_Private\write_descriptor($write, 'pipe') == 4);
-assert!(Whim\_Private\read_descriptor($read, 4) == 'pipe');
+assert!(Whim\_Private\write_descriptor($write, 'pipe') == 4u);
+assert!(Whim\_Private\read_descriptor($read, 4u) == 'pipe');
+foreach (vec[
+  fn() => Whim\_Private\read_descriptor($read, Whim\Math\UINT_MAX),
+  fn() => Whim\_Private\FileOperation::read($read, Whim\Math\UINT_MAX),
+  fn() => Whim\_Private\receive_message($read, Whim\Math\UINT_MAX, 0u),
+] as $oversizedRead) {
+  $rejected = false;
+  try {
+    $oversizedRead();
+  } catch (Whim\_Private\SystemError $error) {
+    $rejected = true;
+  }
+
+  assert!($rejected);
+}
+
 $read->close();
 $write->close();
 
 ($left, $right) = Whim\_Private\create_socket_pair();
-assert!(Whim\_Private\write_descriptor($left, 'socket') == 6);
-assert!(Whim\_Private\read_descriptor($right, 6) == 'socket');
+assert!(Whim\_Private\write_descriptor($left, 'socket') == 6u);
+assert!(Whim\_Private\read_descriptor($right, 6u) == 'socket');
 $left->close();
 $right->close();
 
 assert!(Whim\Process\get_parent_id() > 0);
+assert!(Whim\_Private\process_times() is (uint, uint, uint, uint));
+assert!(Whim\_Private\get_system_time() is (int, uint));
+assert!(Whim\_Private\get_high_resolution_time() is (uint, uint));
+assert!(Whim\_Private\get_high_resolution_nanoseconds() is uint);
+assert!(Whim\_Private\system_uptime() is uint);
+assert!(Whim\_Private\memory_information() is (uint, uint));
 if (operating_system!() != 'windows') {
-  assert!(Whim\_Private\process_user() is (int, int));
-  assert!(Whim\_Private\process_group() is (int, int));
-  assert!(Whim\_Private\process_supplementary_groups() is vec<int>);
-  assert!(Whim\_Private\session_id(0) > 0);
-  assert!(Whim\_Private\process_group_id(0) > 0);
-  assert!(Whim\_Private\process_priority(0) is int);
+  assert!(Whim\_Private\process_user() is (uint, uint));
+  assert!(Whim\_Private\process_group() is (uint, uint));
+  assert!(Whim\_Private\process_supplementary_groups() is vec<uint>);
+  assert!(Whim\_Private\session_id(0u) > 0);
+  assert!(Whim\_Private\process_group_id(0u) > 0);
+  assert!(Whim\_Private\process_priority(0u) is int);
   assert!(
     Whim\_Private\resource_limit(Whim\_Private\RESOURCE_LIMIT_OPEN_FILES) is (
         int,
@@ -78,7 +99,7 @@ $resolution = Whim\_Private\HostResolutionOperation::start(
 );
 
 $resolution->wait();
-$resolved = $resolution->take() as vec<(int, (string&!''))>;
+$resolved = $resolution->take() as vec<(uint, (string&!''))>;
 assert!(length!($resolved) > 0);
 
 $openError = null;
@@ -109,6 +130,8 @@ assert!(
 );
 
 assert!($openError->errno() == Whim\_Private\ERRNO_NOT_FOUND);
+assert!($openError->errno() is uint);
+assert!($openError->getCode() == ($openError->errno() as int));
 
 $descriptor->close();
 Whim\_Private\remove_file($link);

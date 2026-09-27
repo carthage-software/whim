@@ -51,14 +51,14 @@ assert!($assertion_error_7 is InvalidArgumentException);
 assert!(Mailbox::parse('lenient local@example.com') != null);
 
 $group = Group::from('Team: jane@example.com, john@example.com;');
-assert!(length!($group->mailboxes) == 2);
+assert!(length!($group->mailboxes) == 2u);
 
 $addresses = AddressList::from(
   '"Jane Doe" <jane@example.com>, Team: john@example.com;',
 );
 
-assert!($addresses->count() == 2);
-assert!(length!($addresses->mailboxes()) == 2);
+assert!($addresses->count() == 2u);
+assert!(length!($addresses->mailboxes()) == 2u);
 
 $date = TimeZone::utc()->at(SystemTime::unixEpoch());
 $messageId = MessageId::from('<message@example.com>');
@@ -74,7 +74,7 @@ $message = Message::create(
 
 $envelope = Envelope::fromMessage($message);
 assert!($envelope->sender == $mailbox);
-assert!(length!($envelope->recipients) == 2);
+assert!(length!($envelope->recipients) == 2u);
 
 $serialized = serialize($message)->readAll();
 assert!(Whim\Str\contains($serialized, 'MIME-Version: 1.0'));

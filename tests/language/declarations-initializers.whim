@@ -88,7 +88,7 @@ assert!(
 $callReflection = Reflection\reflect_class($callTarget);
 assert!($callReflection != null);
 $callAttributes = $callReflection->getAttributes::<CallHolds>();
-assert!(length!($callAttributes) == 1);
+assert!(length!($callAttributes) == 1u);
 $callAttribute = $callAttributes[0]->newInstance();
 assert!($callAttribute->value == 42);
 
@@ -167,7 +167,7 @@ assert!(object_defaults() == (6, 8));
 $objectReflection = Reflection\reflect_class($first);
 assert!($objectReflection != null);
 $objectAttributes = $objectReflection->getAttributes::<ObjectHolds>();
-assert!(length!($objectAttributes) == 2);
+assert!(length!($objectAttributes) == 2u);
 $attributeBox = $objectAttributes[0]->newInstance()->value;
 assert!($attributeBox is Box);
 

@@ -16,7 +16,7 @@ function default_path(URL $url): string {
   }
 
   $last = Str\search_last($path, '/');
-  if (null == $last || 0 == $last) {
+  if (null == $last || 0u == $last) {
     return '/';
   }
 
@@ -42,7 +42,7 @@ function path_matches(string $requestPath, string $cookiePath): bool {
     Str\ends_with($cookiePath, '/')
     || (
       length!($requestPath) > length!($cookiePath)
-      && '/' == $requestPath[length!($cookiePath)]
+      && '/' == $requestPath[length!($cookiePath) as int]
     )
   );
 }

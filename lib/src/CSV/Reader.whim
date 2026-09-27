@@ -48,11 +48,11 @@ final class Reader implements Iterator<int, vec<string>> {
       if ('' != $this->buffer || $this->finished) {
         ($consumed, $record, $error) = $this->reader->read($this->buffer);
         $this->throwMalformed($error);
-        if (0 != $consumed) {
+        if (0u != $consumed) {
           $this->buffer = string_slice(
             $this->buffer,
-            $consumed,
-            length!($this->buffer) - $consumed,
+            $consumed as int,
+            (length!($this->buffer) - $consumed) as int,
           );
         }
 
@@ -73,18 +73,18 @@ final class Reader implements Iterator<int, vec<string>> {
   }
 
   #[TrackCaller]
-  private function throwMalformed(int $error): void {
-    if (1 == $error) {
+  private function throwMalformed(uint $error): void {
+    if (1u == $error) {
       throw new MalformedCSVException('unterminated quoted CSV field');
     }
 
-    if (2 == $error) {
+    if (2u == $error) {
       throw new MalformedCSVException(
         'a closing CSV enclosure must precede a delimiter or line ending',
       );
     }
 
-    if (3 == $error) {
+    if (3u == $error) {
       throw new MalformedCSVException(
         'a CSV enclosure may only begin at the start of a field',
       );

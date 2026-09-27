@@ -6,8 +6,7 @@ use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Refine\Iterable;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Vec;
 use Whim;
 
@@ -52,12 +51,12 @@ function reverse(string $string): string {}
 /** Repeats a string the requested number of times. */
 #[MustUse]
 #[TrackCaller]
-function repeat(string $string, NonNegativeInt $times): string {
-  if (0 == $times || '' == $string) {
+function repeat(string $string, uint $times): string {
+  if (0u == $times || '' == $string) {
     return '';
   }
 
-  if (1 == $times) {
+  if (1u == $times) {
     return $string;
   }
 
@@ -117,7 +116,7 @@ function replace_every(
 
       $position = Whim\_Private\memmem($haystack, $needle, $offset, false);
       if (null != $position) {
-        $candidate = $position;
+        $candidate = $position as int;
         if (null == $best || $candidate < $best[0]) {
           $best = ($candidate, $needle, $replacement);
         }
@@ -128,9 +127,9 @@ function replace_every(
       return $result . slice($haystack, $offset);
     }
 
-    $result .= slice($haystack, $offset, $best[0] - $offset);
+    $result .= slice($haystack, $offset, ($best[0] - $offset) as uint);
     $result .= $best[2];
-    $offset = $best[0] + length!($best[1]);
+    $offset = $best[0] + (length!($best[1]) as int);
   }
 
   return $result;
@@ -156,7 +155,7 @@ function replace_every_ci(
 
       $position = search_ci($haystack, $needle, $offset);
       if (null != $position) {
-        $candidate = $position;
+        $candidate = $position as int;
         if (null == $best || $candidate < $best[0]) {
           $best = ($candidate, $needle, $replacement);
         }
@@ -167,9 +166,9 @@ function replace_every_ci(
       return $result . slice($haystack, $offset);
     }
 
-    $result .= slice($haystack, $offset, $best[0] - $offset);
+    $result .= slice($haystack, $offset, ($best[0] - $offset) as uint);
     $result .= $best[2];
-    $offset = $best[0] + length!($best[1]);
+    $offset = $best[0] + (length!($best[1]) as int);
   }
 
   return $result;
@@ -180,7 +179,7 @@ function replace_every_ci(
 #[TrackCaller]
 function strip_prefix(string $string, string $prefix): string {
   return match (starts_with($string, $prefix)) {
-    true => slice($string, length!($prefix)),
+    true => slice($string, length!($prefix) as int),
     false => $string,
   };
 }
@@ -200,7 +199,7 @@ function strip_suffix(string $string, string $suffix): string {
 #[TrackCaller]
 function pad_left(
   string $string,
-  NonNegativeInt $totalLength,
+  uint $totalLength,
   NonEmptyString $padString = ' ',
 ): string {
   return Whim\_Private\string_pad($string, $totalLength, $padString, 0);
@@ -211,7 +210,7 @@ function pad_left(
 #[TrackCaller]
 function pad_right(
   string $string,
-  NonNegativeInt $totalLength,
+  uint $totalLength,
   NonEmptyString $padString = ' ',
 ): string {
   return Whim\_Private\string_pad($string, $totalLength, $padString, 2);
@@ -275,7 +274,7 @@ function words(
       $index++;
     }
 
-    if ($index == length!($string)) {
+    if ($index >= length!($string)) {
       break;
     }
 
@@ -300,7 +299,7 @@ function words(
       break;
     }
 
-    $result[$start] = slice($string, $start, $index - $start);
+    $result[$start] = slice($string, $start, ($index - $start) as uint);
   }
 
   return $result;
@@ -311,7 +310,7 @@ function words(
 #[TrackCaller]
 function wrap(
   string $string,
-  PositiveInt $width = 75,
+  NonZero<uint> $width = 75u,
   NonEmptyString $break = "\n",
   bool $cut = false,
 ): string {
@@ -340,10 +339,10 @@ function wrap(
       $wordEnd++;
     }
 
-    $word = slice($string, $index, $wordEnd - $index);
-    if ($lineLength > 0 && $lineLength + length!($word) > $width) {
+    $word = slice($string, $index, ($wordEnd - $index) as uint);
+    if ($lineLength > 0 && $lineLength + (length!($word) as int) > $width) {
       while (ends_with($result, ' ')) {
-        $result = slice($result, 0, length!($result) - 1);
+        $result = slice($result, 0, length!($result) - 1u);
         $lineLength--;
       }
 
@@ -353,11 +352,11 @@ function wrap(
 
     while ($cut && length!($word) > $width) {
       $result .= slice($word, 0, $width) . $break;
-      $word = slice($word, $width);
+      $word = slice($word, $width as int);
     }
 
     $result .= $word;
-    $lineLength += length!($word);
+    $lineLength += length!($word) as int;
     $index = $wordEnd;
     if ($index < length!($string) && ' ' == $string[$index]) {
       if ($lineLength + 1 > $width) {

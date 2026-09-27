@@ -61,8 +61,8 @@ final class RouterTestContext implements Context {
 }
 
 function router_test_context(): RouterTestContext {
-  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
-  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080u);
+  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u);
   return new RouterTestContext(ProtocolVersion::V11, $local, $peer);
 }
 
@@ -95,8 +95,8 @@ $primitive = Regex::compile('\A(?P<value>[^/]+)\z');
 assert!(!($primitive == null));
 assert!(
   $primitive?->find('value') == (
-    0,
-    5,
+    0u,
+    5u,
     dict[0 => 'value', 1 => 'value', 'value' => 'value'],
   ),
 );
@@ -495,7 +495,7 @@ $enumerable->get('/first', router_test_handler(200))->post(
 
 $registrations = vec[];
 foreach ($enumerable as $index => ($method, $pattern, $_handler)) {
-  assert!($index == length!($registrations));
+  assert!(($index as uint) == length!($registrations));
   $registrations[] = ($method, $pattern);
 }
 

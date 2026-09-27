@@ -336,7 +336,8 @@ fn string_length_bound(descriptor: &TypeDescriptor, minimum: bool) -> Value {
     let TypeDescriptor::StringLength { min, max } = descriptor else {
         return Value::null();
     };
-    if minimum { Some(*min) } else { *max }.map_or_else(Value::null, Value::int)
+    if minimum { Some(*min) } else { *max }
+        .map_or_else(Value::null, |length| Value::uint(length.cast_unsigned()))
 }
 
 fn declaration(

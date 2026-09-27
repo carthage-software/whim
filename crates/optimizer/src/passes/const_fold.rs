@@ -406,8 +406,8 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
             continue;
         };
         let (Ok(first_length), Ok(second_length)) = (
-            i16::try_from(first_value.as_bytes().len()),
-            i16::try_from(second_value.as_bytes().len()),
+            u16::try_from(first_value.as_bytes().len()),
+            u16::try_from(second_value.as_bytes().len()),
         ) else {
             continue;
         };
@@ -431,14 +431,14 @@ fn fold_joined_string_lengths(chunk: &mut Chunk, statistics: &mut OptimizationSt
         }
 
         chunk.code[first] = Instruction::LoadInteger {
-            kind: IntegerKind::I64,
+            kind: IntegerKind::U64,
             destination: joined,
-            immediate: ImmediateInteger::signed(first_length),
+            immediate: ImmediateInteger::unsigned(first_length),
         };
         chunk.code[second] = Instruction::LoadInteger {
-            kind: IntegerKind::I64,
+            kind: IntegerKind::U64,
             destination: joined,
-            immediate: ImmediateInteger::signed(second_length),
+            immediate: ImmediateInteger::unsigned(second_length),
         };
         chunk.code[consumer] = Instruction::Move {
             destination,

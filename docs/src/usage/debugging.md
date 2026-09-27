@@ -42,7 +42,7 @@ Use `assert!` for each condition:
 
 ```whim
 assert!(2 + 2 == 4);
-assert!(length!('whim') == 4);
+assert!(length!('whim') == 4u);
 assert!(Whim\Str\contains('whim', 'him'));
 assert!(contains_key!(vec[1, 2], 1));
 ```

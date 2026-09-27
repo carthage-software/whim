@@ -1,4 +1,4 @@
 namespace Whim\BSON;
 
 /** The default largest document accepted by read(). */
-const DEFAULT_MAXIMUM_DOCUMENT_BYTES = 16_777_216;
+const DEFAULT_MAXIMUM_DOCUMENT_BYTES = 16_777_216u;

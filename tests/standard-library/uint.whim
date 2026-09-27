@@ -24,7 +24,7 @@ assert!(1u is Refine\ArrayKey);
 assert!(1u is Refine\NonZero<uint>);
 assert!(!(0u is Refine\NonZero<uint>));
 assert!(0u is Refine\Falsy);
-assert!(!(1u is Refine\Uint8));
+assert!(1u is Refine\Uint8);
 assert!(Math\to_base(Math\UINT_MAX, 16) == 'ffffffffffffffff');
 assert!(Math\to_base(0u, 10) == '0');
 assert!(Math\abs(Math\UINT_MAX) == Math\UINT_MAX);
@@ -45,7 +45,7 @@ expect_error::<TypeError>(fn() => Math\sum(vec[1u]));
 foreach (vec[Binary\Endianness::Big, Binary\Endianness::Little] as $order) {
   foreach (vec[0u, 1u, 9_223_372_036_854_775_808u, Math\UINT_MAX] as $value) {
     $bytes = Binary\encode_u64($value, $order);
-    assert!(length!($bytes) == 8);
+    assert!(length!($bytes) == 8u);
     assert!(Binary\decode_u64($bytes, $order) == $value);
     $writer = Binary\MemoryWriter::default()->u64($value, $order);
     assert!($writer->toString() == $bytes);
@@ -57,14 +57,25 @@ foreach (vec[Binary\Endianness::Big, Binary\Endianness::Little] as $order) {
   }
 }
 
-assert!(Binary\decode_u64(Binary\encode_u64(42)) == 42u);
-assert!(Binary\decode_u8(Binary\encode_u8(255u)) == 255);
-assert!(Binary\decode_u16(Binary\encode_u16(65535u)) == 65535);
-assert!(Binary\decode_u32(Binary\encode_u32(4294967295u)) == 4294967295);
+assert!(Binary\decode_u64(Binary\encode_u64(42u)) == 42u);
+assert!(Binary\decode_u8(Binary\encode_u8(255u)) == 255u);
+assert!(Binary\decode_u16(Binary\encode_u16(65535u)) == 65535u);
+assert!(Binary\decode_u32(Binary\encode_u32(4294967295u)) == 4294967295u);
+assert!(Binary\decode_u8("\x00") is uint);
+assert!(Binary\decode_u16("\x00\x00") is uint);
+assert!(Binary\decode_u32("\x00\x00\x00\x00") is uint);
+expect_error::<TypeError>(fn() => Binary\encode_u8(1));
+expect_error::<TypeError>(fn() => Binary\encode_u16(1));
+expect_error::<TypeError>(fn() => Binary\encode_u32(1));
+expect_error::<TypeError>(fn() => Binary\encode_u64(1));
 expect_error::<TypeError>(fn() => Binary\encode_u8(256u));
 expect_error::<TypeError>(fn() => Binary\encode_u16(65536u));
 expect_error::<TypeError>(fn() => Binary\encode_u32(4294967296u));
 expect_error::<TypeError>(fn() => Binary\encode_i64(1u));
+expect_error::<TypeError>(fn() => Binary\MemoryWriter::default()->u8(1));
+expect_error::<TypeError>(fn() => Binary\MemoryWriter::default()->u16(1));
+expect_error::<TypeError>(fn() => Binary\MemoryWriter::default()->u32(1));
+expect_error::<TypeError>(fn() => Binary\MemoryWriter::default()->u64(1));
 $prefixed = Binary\MemoryWriter::default()->u64PrefixedBytes(
   'bytes',
 )->toString();

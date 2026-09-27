@@ -14,13 +14,13 @@ function string_slice(string $string, 0.. $offset, 0.. $length): string {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function memchr(string $haystack, 0..=255 $needle, 0.. $offset): null|(0..) {}
+function memchr(string $haystack, 0..=255 $needle, 0.. $offset): null|uint {}
 
 /** Finds the last byte at or after an offset. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function memrchr(string $haystack, 0..=255 $needle, 0.. $offset): null|(0..) {}
+function memrchr(string $haystack, 0..=255 $needle, 0.. $offset): null|uint {}
 
 /** Finds the first byte sequence at or after an offset. */
 #[Stub]
@@ -31,7 +31,7 @@ function memmem(
   string $needle,
   0.. $offset,
   bool $ci,
-): null|(0..) {}
+): null|uint {}
 
 /** Finds the last byte sequence at or after an offset. */
 #[Stub]
@@ -42,7 +42,7 @@ function memrmem(
   string $needle,
   0.. $offset,
   bool $ci,
-): null|(0..) {}
+): null|uint {}
 
 /** Splits a string around a non-empty delimiter into zero-copy slices. */
 #[Stub]
@@ -51,7 +51,7 @@ function memrmem(
 function string_split(
   string $string,
   string $delimiter,
-  0.. $limit,
+  uint $limit,
 ): vec<string> {}
 
 /** Joins string values with a separator in one allocation. */
@@ -83,7 +83,7 @@ function string_trim(string $string, string $mask, 0..=2 $mode): string {}
 #[TraceBoundary]
 function string_pad(
   string $string,
-  0.. $length,
+  uint $length,
   string&!'' $pad,
   0..=2 $mode,
 ): string {}

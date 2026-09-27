@@ -14,7 +14,7 @@ use Whim\Refine\Uint8;
 #[MustUse]
 #[TrackCaller]
 function decode_u8(string[1..] $bytes): Uint8 {
-  return Whim\_Private\binary_decode($bytes, 0, 1, false, false) as int;
+  return Whim\_Private\binary_decode($bytes, 0, 1, false, false) as uint;
 }
 
 /** Reads one byte as a signed 8-bit integer. */
@@ -39,7 +39,7 @@ function decode_u16(
       false,
       Endianness::Little == $endianness,
     )
-      as int
+      as uint
   );
 }
 
@@ -77,7 +77,7 @@ function decode_u32(
       false,
       Endianness::Little == $endianness,
     )
-      as int
+      as uint
   );
 }
 
@@ -152,7 +152,7 @@ function decode_f32(
     false,
     Endianness::Little == $endianness,
   )
-    as int;
+    as uint;
 
   return Whim\_Private\bits32_to_float($bits);
 }

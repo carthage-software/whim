@@ -8,16 +8,16 @@ use Whim\Marker\TrackCaller;
 
 /** Reads one fixed-length HTTP/1 response body. */
 final class FixedLengthBody implements ReadHandle {
-  private int $remaining;
+  private uint $remaining;
 
   public function __construct(
     private ReadHandle $reader,
     private CloseHandle $transport,
-    int $length,
+    uint $length,
     private bool $closeAtEnd,
   ) {
     $this->remaining = $length;
-    if (0 == $length && $this->closeAtEnd) {
+    if (0u == $length && $this->closeAtEnd) {
       $this->transport->close();
     }
   }
@@ -33,17 +33,17 @@ final class FixedLengthBody implements ReadHandle {
 
   #[TrackCaller]
   public function reachedEndOfDataSource(): bool {
-    return 0 == $this->remaining;
+    return 0u == $this->remaining;
   }
 
   #[TrackCaller]
   public function tryRead(null|int $maxBytes = null): string {
-    if (0 == $this->remaining) {
+    if (0u == $this->remaining) {
       return '';
     }
 
     $limit = $this->limit($maxBytes);
-    $data = $this->reader->tryRead($limit);
+    $data = $this->reader->tryRead($limit as int);
     $this->consume($data);
     return $data;
   }
@@ -53,11 +53,11 @@ final class FixedLengthBody implements ReadHandle {
     null|int $maxBytes = null,
     null|CancellationToken $cancellation = null,
   ): string {
-    if (0 == $this->remaining) {
+    if (0u == $this->remaining) {
       return '';
     }
 
-    $data = $this->reader->read($this->limit($maxBytes), $cancellation);
+    $data = $this->reader->read($this->limit($maxBytes) as int, $cancellation);
     if ('' == $data && $this->reader->reachedEndOfDataSource()) {
       $this->transport->close();
       throw new ProtocolException(
@@ -69,17 +69,17 @@ final class FixedLengthBody implements ReadHandle {
     return $data;
   }
 
-  private function limit(null|int $maximum): int {
+  private function limit(null|int $maximum): uint {
     if (null == $maximum || $maximum < 0 || $maximum > $this->remaining) {
       return $this->remaining;
     }
 
-    return $maximum;
+    return $maximum as uint;
   }
 
   private function consume(string $data): void {
     $this->remaining -= length!($data);
-    if (0 == $this->remaining && $this->closeAtEnd) {
+    if (0u == $this->remaining && $this->closeAtEnd) {
       $this->transport->close();
     }
   }

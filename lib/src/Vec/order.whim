@@ -108,7 +108,7 @@ function sort_by<T, S>(
 #[TrackCaller]
 function shuffle<T>(Iterable<_, T> $values): vec<T> {
   $values = values::<T>($values);
-  $index = length!($values) - 1;
+  $index = (length!($values) as int) - 1;
   while ($index > 0) {
     $other = PseudoRandom\int(0, $index);
     $temporary = $values[$index];

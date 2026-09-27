@@ -122,7 +122,7 @@ while ($hotIndex < $hotIterations) {
 }
 
 $lastHotIndex = $hotIterations - 1;
-assert!(length!($hotWrites->indexed) == 256);
+assert!(length!($hotWrites->indexed) == 256u);
 assert!($hotWrites->indexed[$lastHotIndex % 256] == $lastHotIndex);
 
 final class CompoundPropertyWrite {
@@ -275,13 +275,13 @@ foreach ($sizes as $size) {
   }
 
   $recordedVec = WindowRecord::$vecs[$index];
-  assert!(length!($recordedVec) == $size);
+  assert!(length!($recordedVec) == ($size as uint));
   assert!($recordedVec[0] == 1);
   assert!($recordedVec[$size - 1] == $size);
   assert!($recordedVec == $expectedVec);
 
   $recordedDict = WindowRecord::$dicts[$index];
-  assert!(length!($recordedDict) == $size);
+  assert!(length!($recordedDict) == ($size as uint));
   assert!($recordedDict[1] == 1);
   assert!($recordedDict[$size] == $size);
   assert!($recordedDict == $expectedDict);
@@ -347,11 +347,11 @@ function boom_int(): int {
 Trace::$events = vec[];
 $and = false && boom_bool();
 assert!(!($and));
-assert!(length!(Trace::$events) == 0);
+assert!(length!(Trace::$events) == 0u);
 
 $or = true || boom_bool();
 assert!($or);
-assert!(length!(Trace::$events) == 0);
+assert!(length!(Trace::$events) == 0u);
 
 $evaluated = true && false;
 assert!(!($evaluated));
@@ -363,7 +363,7 @@ $zero = 0 ?? boom_string();
 assert!($zero == 0);
 $flag = false ?? boom_string();
 assert!(!($flag));
-assert!(length!(Trace::$events) == 0);
+assert!(length!(Trace::$events) == 0u);
 $fell = null ?? boom_string();
 assert!($fell == 'right');
 assert!(Trace::$events == vec['boom']);
@@ -378,7 +378,7 @@ Trace::$events = vec[];
 $missing = null;
 $skipped = $missing?->id(boom_int());
 assert!($skipped == null);
-assert!(length!(Trace::$events) == 0);
+assert!(length!(Trace::$events) == 0u);
 
 $node = new NullsafeNode();
 assert!($node?->id(7) == 7);

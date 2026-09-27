@@ -4,4 +4,4 @@ use Whim\Marker\Stub;
 
 /** Runs cycle collection and returns the number of reclaimed values. */
 #[Stub]
-function collect_cycles(): int {}
+function collect_cycles(): uint {}

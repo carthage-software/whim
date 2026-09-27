@@ -4,7 +4,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
 use Whim\Async\CancellationToken;
 use Whim\Channel\Receiver;
-use Whim\Refine\NonNegativeInt;
 
 /** Represents a receiver. */
 final readonly class ReceiverImpl<out T> implements Receiver<T> {
@@ -39,7 +38,7 @@ final readonly class ReceiverImpl<out T> implements Receiver<T> {
   /** Returns the channel capacity when it is bounded. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function getCapacity(): null|NonNegativeInt {
+  public function getCapacity(): null|uint {
     return $this->state->getCapacity();
   }
 
@@ -60,7 +59,7 @@ final readonly class ReceiverImpl<out T> implements Receiver<T> {
   /** Returns the number of buffered values. */
   #[TrackCaller]
   #[TraceBoundary]
-  public function count(): NonNegativeInt {
+  public function count(): uint {
     return $this->state->count();
   }
 

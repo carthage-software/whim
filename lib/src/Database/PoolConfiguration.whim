@@ -1,8 +1,7 @@
 namespace Whim\Database;
 
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Time\Duration;
 use Whim\Unwind\InvalidArgumentException;
 
@@ -11,8 +10,8 @@ final readonly class PoolConfiguration {
   /** Creates a pool configuration. */
   #[TrackCaller]
   public function __construct(
-    public PositiveInt $maximumConnections = 10,
-    public NonNegativeInt $maximumIdleConnections = 10,
+    public NonZero<uint> $maximumConnections = 10u,
+    public uint $maximumIdleConnections = 10u,
     public Duration $maximumIdleTime = new Duration(300, 0),
     public Duration $maximumLifetime = new Duration(1_800, 0),
     public null|Duration $validationInterval = new Duration(30, 0),

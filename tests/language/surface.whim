@@ -46,7 +46,7 @@ assert!(
   ),
 );
 
-assert!(Str\length('héllo') == 6);
+assert!(Str\length('héllo') == 6u);
 $assertion_value_9 = fn(): void {
   $x = Math\INT_MAX + 1;
 };
@@ -60,7 +60,7 @@ try {
 
 assert!($assertion_error_9 is OverflowError);
 
-$assertion_value_10 = fn(): int => Str\length(5);
+$assertion_value_10 = fn(): uint => Str\length(5);
 $assertion_error_10 = null;
 try {
   $assertion_value_10();
@@ -76,7 +76,7 @@ try {
 
 assert!($assertion_error_10 is TypeError);
 
-$assertion_value_11 = fn(): int => Str\length();
+$assertion_value_11 = fn(): uint => Str\length();
 $assertion_error_11 = null;
 try {
   $assertion_value_11();

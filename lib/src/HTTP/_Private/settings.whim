@@ -88,16 +88,19 @@ function apply_remote_settings(
 
   if (contains_key!($settings, Setting::MaxConcurrentStreams->value)) {
     $state->streams->setLocalMaximum(
-      $settings[Setting::MaxConcurrentStreams->value],
+      $settings[Setting::MaxConcurrentStreams->value] as uint,
     );
   }
 
   if (contains_key!($settings, Setting::HeaderTableSize->value)) {
-    $state->headerEncoder->resize($settings[Setting::HeaderTableSize->value]);
+    $state->headerEncoder->resize(
+      $settings[Setting::HeaderTableSize->value] as uint,
+    );
   }
 
   if (contains_key!($settings, Setting::MaxHeaderListSize->value)) {
-    $state->maximumEncodedHeaderListSize = $settings[Setting::MaxHeaderListSize->value];
+    $state->maximumEncodedHeaderListSize = $settings[Setting::MaxHeaderListSize->value]
+      as uint;
   }
 
   return (3, $settings);

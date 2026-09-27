@@ -13,7 +13,7 @@ final class SinkWriteHandle implements WriteHandle {
 
   /** Discards every byte and reports all of them accepted. */
   #[AlwaysInline]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     return length!($bytes);
   }
 
@@ -22,7 +22,7 @@ final class SinkWriteHandle implements WriteHandle {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return length!($bytes);
   }
 }

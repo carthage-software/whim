@@ -8,13 +8,13 @@ use Whim\Marker\TraceBoundary;
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function float_to_bits32(float $value): 0..=4_294_967_295 {}
+function float_to_bits32(float $value): 0u..=4_294_967_295u {}
 
 /** Widens a single-precision value, given its 32 bits, to a double. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function bits32_to_float(int $bits): float {}
+function bits32_to_float(0u..=4_294_967_295u $bits): float {}
 
 /** Returns the big-endian IEEE 754 bytes of a float. */
 #[Stub]

@@ -56,13 +56,13 @@ function is_valid_mailbox(string $localPart, string $domain): bool {
   if (
     '' == $asciiDomain
     || '.' == $asciiDomain[0]
-    || '.' == $asciiDomain[length!($asciiDomain) - 1]
+    || '.' == $asciiDomain[(length!($asciiDomain) as int) - 1]
     || Str\contains($asciiDomain, '..')
   ) {
     return false;
   }
 
-  return length!($localPart) + length!($asciiDomain) + 1 <= 254;
+  return length!($localPart) + length!($asciiDomain) + 1u <= 254u;
 }
 
 /** Splits an address list outside quotes, angles, and groups. */
@@ -195,7 +195,7 @@ function parse_display(string $display): null|string {
     && Str\ends_with($display, '"')
   ) {
     return Str\replace(
-      Str\slice($display, 1, length!($display) - 2),
+      Str\slice($display, 1, length!($display) - 2u),
       '\\"',
       '"',
     );

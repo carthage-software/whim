@@ -35,13 +35,16 @@ final class ReadHandleImpl implements ReadHandle {
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function getSize(): int {
+  public function getSize(): uint {
     return $this->state->getSize();
   }
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+  public function seek(
+    int $offset,
+    SeekWhence $whence = SeekWhence::Set,
+  ): uint {
     return $this->state->seek($offset, $whence);
   }
 

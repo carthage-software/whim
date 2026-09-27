@@ -14,21 +14,21 @@ final readonly class UUID implements Equal<UUID>, ToString {
   #[AlwaysInline]
   private function __construct(
     private string[16] $bytes,
-    public null|1..=8 $version,
+    public null|1u..=8u $version,
   ) {}
 
   /** Generates a random UUID version 4. */
   #[AlwaysInline]
   #[MustUse]
   public static function v4(): UUID {
-    return new UUID(Whim\_Private\uuid_v4(), 4);
+    return new UUID(Whim\_Private\uuid_v4(), 4u);
   }
 
   /** Generates a time-ordered UUID version 7. */
   #[AlwaysInline]
   #[MustUse]
   public static function v7(): UUID {
-    return new UUID(Whim\_Private\uuid_v7(), 7);
+    return new UUID(Whim\_Private\uuid_v7(), 7u);
   }
 
   /** Parses canonical lowercase UUID text, or returns null. */

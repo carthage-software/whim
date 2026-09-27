@@ -61,12 +61,6 @@ type NonEmptyDict<K: ArrayKey, V> = Exclude<dict<K, V>, dict<never, never>>;
 /** A string containing at least one byte. */
 type NonEmptyString = string[1..];
 
-/** An integer greater than zero. */
-type PositiveInt = 1..;
-
-/** An integer greater than or equal to zero. */
-type NonNegativeInt = 0..;
-
 /** An integer less than zero. */
 type NegativeInt = ..0;
 
@@ -76,32 +70,29 @@ type NonPositiveInt = ..=0;
 /** Any value other than null. */
 type NonNull = Exclude<mixed, null>;
 
-/** A signed int in the unsigned 8-bit range. */
-type Uint8 = 0..=255;
+/** An unsigned 8-bit integer. */
+type Uint8 = 0u..=255u;
 
 /** A signed 8-bit integer. */
 type Int8 = -128..=127;
 
-/** A signed int in the unsigned 16-bit range. */
-type Uint16 = 0..=65_535;
+/** An unsigned 16-bit integer. */
+type Uint16 = 0u..=65_535u;
 
 /** A signed 16-bit integer. */
 type Int16 = -32_768..=32_767;
 
-/** A signed int in the unsigned 32-bit range. */
-type Uint32 = 0..=4_294_967_295;
+/** An unsigned 32-bit integer. */
+type Uint32 = 0u..=4_294_967_295u;
 
 /** A signed 32-bit integer. */
 type Int32 = -2_147_483_648..=2_147_483_647;
 
-/** A non-negative signed int; use uint for the full unsigned 64-bit range. */
-type Uint64 = 0..;
-
 /** A value from zero to one hundred, such as a percentage. */
-type Percent = 0..=100;
+type Percent = 0u..=100u;
 
 /** A single base-10 digit. */
-type Digit = 0..=9;
+type Digit = 0u..=9u;
 
 /** Null, false, numeric zeros, and the empty string. */
 type Falsy = null|false|0|0u|0.0|'';

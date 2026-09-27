@@ -326,7 +326,7 @@ try {
 assert!($collected is Error);
 
 $collectArguments = $collected->getTrace()[0]->arguments;
-assert!(length!($collectArguments) == 2);
+assert!(length!($collectArguments) == 2u);
 $assertion_value_28 = $collectArguments[0];
 assert!($assertion_value_28 is int);
 assert!($assertion_value_28 == 1);
@@ -356,7 +356,7 @@ try {
 assert!($loggedIn is Error);
 
 $loginArguments = $loggedIn->getTrace()[0]->arguments;
-assert!(length!($loginArguments) == 2);
+assert!(length!($loginArguments) == 2u);
 $assertion_value_32 = $loginArguments[0];
 assert!($assertion_value_32 is string);
 assert!($assertion_value_32 == 'ada');

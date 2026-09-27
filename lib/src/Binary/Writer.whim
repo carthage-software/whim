@@ -5,7 +5,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Refine\Int16;
 use Whim\Refine\Int32;
 use Whim\Refine\Int8;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Uint16;
 use Whim\Refine\Uint32;
 use Whim\Refine\Uint8;
@@ -15,13 +14,13 @@ interface Writer {
   /** Writes an unsigned 8-bit integer. */
   #[MustUse]
   #[TrackCaller]
-  public function u8(Uint8|0u..=255u $value): static;
+  public function u8(Uint8 $value): static;
 
   /** Writes an unsigned 16-bit integer. */
   #[MustUse]
   #[TrackCaller]
   public function u16(
-    Uint16|0u..=65_535u $value,
+    Uint16 $value,
     null|Endianness $endianness = null,
   ): static;
 
@@ -29,17 +28,14 @@ interface Writer {
   #[MustUse]
   #[TrackCaller]
   public function u32(
-    Uint32|0u..=4_294_967_295u $value,
+    Uint32 $value,
     null|Endianness $endianness = null,
   ): static;
 
   /** Writes an unsigned 64-bit integer. */
   #[MustUse]
   #[TrackCaller]
-  public function u64(
-    NonNegativeInt|uint $value,
-    null|Endianness $endianness = null,
-  ): static;
+  public function u64(uint $value, null|Endianness $endianness = null): static;
 
   /** Writes a signed 8-bit integer. */
   #[MustUse]

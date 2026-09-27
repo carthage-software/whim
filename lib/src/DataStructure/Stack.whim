@@ -8,7 +8,6 @@ use Whim\Option\None;
 use Whim\Option\Option;
 use Whim\Option\Some;
 use Whim\Refine\Iterable;
-use Whim\Refine\NonNegativeInt;
 use Whim\Vec;
 
 /** Stores values in last-in, first-out order. */
@@ -32,7 +31,7 @@ final class Stack<T> implements ToIterator<int, T> {
   /** Removes and returns the top value. */
   #[AlwaysInline]
   public function pop(): Option<T> {
-    if (length!($this->values) == 0) {
+    if (length!($this->values) == 0u) {
       return new None();
     }
 
@@ -42,7 +41,7 @@ final class Stack<T> implements ToIterator<int, T> {
   /** Returns the top value without removing it. */
   #[AlwaysInline]
   public function peek(): Option<T> {
-    $count = length!($this->values);
+    $count = length!($this->values) as int;
     if (0 == $count) {
       return new None();
     }
@@ -52,14 +51,14 @@ final class Stack<T> implements ToIterator<int, T> {
 
   /** Returns the number of stored values. */
   #[AlwaysInline]
-  public function count(): NonNegativeInt {
+  public function count(): uint {
     return length!($this->values);
   }
 
   /** Reports whether the stack contains no values. */
   #[AlwaysInline]
   public function isEmpty(): bool {
-    return length!($this->values) == 0;
+    return length!($this->values) == 0u;
   }
 
   /** Removes every stored value. */

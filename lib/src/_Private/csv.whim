@@ -20,7 +20,7 @@ final class CSVReader {
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function read(string $input): (int, null|vec<string>, int) {}
+  public function read(string $input): (uint, null|vec<string>, uint) {}
 }
 
 /** Encodes CSV records. */

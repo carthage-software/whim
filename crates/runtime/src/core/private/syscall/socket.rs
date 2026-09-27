@@ -5,7 +5,9 @@ use whim_value::Value;
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
 use crate::builtin::throw::Throw;
-use crate::core::private::syscall::{build_file_descriptor, io_error, with_descriptor};
+use crate::core::private::syscall::{
+    build_file_descriptor, io_error, system_error, with_descriptor,
+};
 
 #[whim_function("Whim\\_Private\\create_socket(int $family, int $kind): Whim\\OS\\FileDescriptor")]
 pub(crate) fn create_socket<'call>(
@@ -18,33 +20,39 @@ pub(crate) fn create_socket<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\bind_socket(Whim\\OS\\FileDescriptor $socket, string $host, (0..) $port): void"
+    "Whim\\_Private\\bind_socket(Whim\\OS\\FileDescriptor $socket, string $host, (0u..=65535u) $port): void"
 )]
 pub(crate) fn bind_socket<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     with_descriptor(cx, &arguments.local(0), "bind", |descriptor| {
-        socket::bind(descriptor, arguments.bytes(1), arguments.int(2))
+        socket::bind(
+            descriptor,
+            arguments.bytes(1),
+            arguments.uint(2).cast_signed(),
+        )
     })?;
     Ok(Value::null())
 }
 
 #[whim_function(
-    "Whim\\_Private\\listen_socket(Whim\\OS\\FileDescriptor $socket, (1..) $backlog): void"
+    "Whim\\_Private\\listen_socket(Whim\\OS\\FileDescriptor $socket, (1u..) $backlog): void"
 )]
 pub(crate) fn listen_socket<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
+    let backlog =
+        i64::try_from(arguments.uint(1)).map_err(|_| system_error(cx, "listen", libc::EINVAL))?;
     with_descriptor(cx, &arguments.local(0), "listen", |descriptor| {
-        socket::listen(descriptor, arguments.int(1))
+        socket::listen(descriptor, backlog)
     })?;
     Ok(Value::null())
 }
 
 #[whim_function(
-    "Whim\\_Private\\accept_socket(Whim\\OS\\FileDescriptor $socket): null|(Whim\\OS\\FileDescriptor, string, (0..))"
+    "Whim\\_Private\\accept_socket(Whim\\OS\\FileDescriptor $socket): null|(Whim\\OS\\FileDescriptor, string, (0u..=65535u))"
 )]
 pub(crate) fn accept_socket<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -59,19 +67,23 @@ pub(crate) fn accept_socket<'call>(
     Ok(cx.tuple([
         descriptor,
         cx.string(&address.host),
-        Value::int(i64::from(address.port)),
+        Value::uint(u64::from(address.port)),
     ]))
 }
 
 #[whim_function(
-    "Whim\\_Private\\connect_socket(Whim\\OS\\FileDescriptor $socket, string $host, (0..) $port): bool"
+    "Whim\\_Private\\connect_socket(Whim\\OS\\FileDescriptor $socket, string $host, (0u..=65535u) $port): bool"
 )]
 pub(crate) fn connect_socket<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
     with_descriptor(cx, &arguments.local(0), "connect", |descriptor| {
-        socket::connect(descriptor, arguments.bytes(1), arguments.int(2))
+        socket::connect(
+            descriptor,
+            arguments.bytes(1),
+            arguments.uint(2).cast_signed(),
+        )
     })
     .map(Value::bool)
 }
@@ -93,7 +105,7 @@ pub(crate) fn complete_socket_connection<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\socket_address(Whim\\OS\\FileDescriptor $socket): (string, (0..))"
+    "Whim\\_Private\\socket_address(Whim\\OS\\FileDescriptor $socket): (string, (0u..=65535u))"
 )]
 pub(crate) fn socket_address<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -107,7 +119,7 @@ pub(crate) fn socket_address<'call>(
     )?;
     Ok(cx.tuple([
         cx.string(&address.host),
-        Value::int(i64::from(address.port)),
+        Value::uint(u64::from(address.port)),
     ]))
 }
 
@@ -130,7 +142,7 @@ pub(crate) fn set_socket_option<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\send_to(Whim\\OS\\FileDescriptor $socket, string $bytes, string $host, (0..) $port): (0..)"
+    "Whim\\_Private\\send_to(Whim\\OS\\FileDescriptor $socket, string $bytes, string $host, (0u..=65535u) $port): uint"
 )]
 pub(crate) fn send_to<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -141,10 +153,10 @@ pub(crate) fn send_to<'call>(
             descriptor,
             arguments.bytes(1),
             arguments.bytes(2),
-            arguments.int(3),
+            arguments.uint(3).cast_signed(),
         )
     })?;
-    Ok(Value::int(i64::try_from(count).unwrap_or(i64::MAX)))
+    Ok(Value::uint(count as u64))
 }
 
 #[whim_function(

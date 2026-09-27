@@ -30,27 +30,27 @@ assert!($memory is WriteHandle);
 assert!($memory is SeekHandle);
 assert!(!($memory is FileDescriptorHandle));
 
-$memorySpool = new SpoolHandle(16);
+$memorySpool = new SpoolHandle(16u);
 assert!($memorySpool is ReadHandle);
 assert!($memorySpool is WriteHandle);
 assert!($memorySpool is SeekHandle);
 assert!(!($memorySpool is FileDescriptorHandle));
-assert!($memorySpool->write('hello') == 5);
+assert!($memorySpool->write('hello') == 5u);
 $memorySpool->seek(0);
 assert!($memorySpool->readAll() == 'hello');
 
-$spilled = new SpoolHandle(3);
-assert!($spilled->tryWrite('abcd') == 0);
+$spilled = new SpoolHandle(3u);
+assert!($spilled->tryWrite('abcd') == 0u);
 $spilled->waitUntilWritable();
 $spilledWrite = $spilled->tryWrite('abcd');
-if ($spilledWrite == 0) {
+if ($spilledWrite == 0u) {
   $spilled->waitUntilWritable();
   $spilledWrite = $spilled->tryWrite('abcd');
 }
 
-assert!($spilledWrite == 4);
+assert!($spilledWrite == 4u);
 $spilled->seek(1);
-assert!($spilled->write('Z') == 1);
+assert!($spilled->write('Z') == 1u);
 $spilled->seek(0);
 assert!($spilled->readAll() == 'aZcd');
 $spilled->close();
@@ -72,12 +72,12 @@ $readDescriptor = $pipeReader->getFileDescriptor();
 $writeDescriptor = $pipeWriter->getFileDescriptor();
 assert!($readDescriptor is FileDescriptor);
 assert!($writeDescriptor is FileDescriptor);
-assert!($readDescriptor->toInt() >= 0);
-assert!($writeDescriptor->toInt() >= 0);
-assert!($readDescriptor->toInt() != $writeDescriptor->toInt());
-$readNumber = $readDescriptor->toInt();
+assert!($readDescriptor->toUint() is uint);
+assert!($writeDescriptor->toUint() is uint);
+assert!($readDescriptor->toUint() != $writeDescriptor->toUint());
+$readNumber = $readDescriptor->toUint();
 $duplicate = FileDescriptor::duplicate($readNumber);
-assert!($duplicate->toInt() != $readNumber);
+assert!($duplicate->toUint() != $readNumber);
 $duplicate->close();
 assert!($pipeReader->getFileDescriptor() == $readDescriptor);
 $pipeReader->close();
@@ -105,11 +105,11 @@ try {
 
 assert!($assertion_error_28 is Whim\_Private\SystemError);
 
-assert!($memory->write('hello world') == 11);
-assert!($memory->seek(0, SeekWhence::Current) == 11);
+assert!($memory->write('hello world') == 11u);
+assert!($memory->seek(0, SeekWhence::Current) == 11u);
 assert!($memory->reachedEndOfDataSource());
 $memory->seek(0);
-assert!($memory->seek(0, SeekWhence::Current) == 0);
+assert!($memory->seek(0, SeekWhence::Current) == 0u);
 assert!(!($memory->reachedEndOfDataSource()));
 assert!($memory->read() == 'hello world');
 assert!($memory->reachedEndOfDataSource());
@@ -117,7 +117,7 @@ assert!($memory->toString() == 'hello world');
 
 $memory->seek(0);
 assert!($memory->read(0) == '');
-assert!($memory->seek(0, SeekWhence::Current) == 0);
+assert!($memory->seek(0, SeekWhence::Current) == 0u);
 assert!($memory->read() == 'hello world');
 
 $memory->seek(0);
@@ -140,23 +140,23 @@ assert!($memory->tryRead() == 'hello world');
 
 $appending = new MemoryHandle('one');
 $appending->seek(0, SeekWhence::End);
-assert!($appending->write('two') == 3);
-assert!($appending->write('three') == 5);
+assert!($appending->write('two') == 3u);
+assert!($appending->write('three') == 5u);
 assert!($appending->toString() == 'onetwothree');
 
 $overwriting = new MemoryHandle();
 $overwriting->write('abcdef');
 $overwriting->seek(2);
-assert!($overwriting->write('XY') == 2);
+assert!($overwriting->write('XY') == 2u);
 assert!($overwriting->toString() == 'abXYef');
 $overwriting->seek(4);
-assert!($overwriting->write('WXYZ') == 4);
+assert!($overwriting->write('WXYZ') == 4u);
 assert!($overwriting->toString() == 'abXYWXYZ');
 
 $sparse = new MemoryHandle();
 $sparse->write('abc');
 $sparse->seek(5);
-assert!($sparse->write('z') == 1);
+assert!($sparse->write('z') == 1u);
 assert!($sparse->toString() == "abc\x00\x00z");
 
 $fixedSource = new MemoryHandle('abc');
@@ -194,15 +194,15 @@ assert!($copySource->tryRead() == 'abc');
 assert!($copyDestination->toString() == '');
 
 $memory->seek(-5, SeekWhence::End);
-assert!($memory->seek(0, SeekWhence::Current) == 6);
+assert!($memory->seek(0, SeekWhence::Current) == 6u);
 assert!($memory->read() == 'world');
 $memory->seek(0);
 $memory->seek(3, SeekWhence::Current);
-assert!($memory->seek(0, SeekWhence::Current) == 3);
+assert!($memory->seek(0, SeekWhence::Current) == 3u);
 
 $overflowing = new MemoryHandle();
 $overflowing->seek(Math\INT_MAX);
-$assertion_value_53 = fn(): int => $overflowing->seek(1, SeekWhence::Current);
+$assertion_value_53 = fn(): uint => $overflowing->seek(1, SeekWhence::Current);
 $assertion_error_53 = null;
 try {
   $assertion_value_53();
@@ -212,7 +212,7 @@ try {
 
 assert!($assertion_error_53 is OverflowError);
 
-assert!($overflowing->seek(0, SeekWhence::Current) == Math\INT_MAX);
+assert!($overflowing->seek(0, SeekWhence::Current) == (Math\INT_MAX as uint));
 
 $reader = new Reader(new MemoryHandle("alpha\nbeta\ngamma"));
 assert!($reader is BufferedReadHandle);
@@ -299,9 +299,9 @@ assert!($concat->reachedEndOfDataSource());
 
 $sink = new SinkWriteHandle();
 assert!($sink is WriteHandle);
-assert!($sink->write('anything') == 8);
+assert!($sink->write('anything') == 8u);
 $sink->writeAll('more bytes');
-assert!($sink->tryWrite('x') == 1);
+assert!($sink->tryWrite('x') == 1u);
 
 final class OneByteWriteHandle implements WriteHandle {
   private string $buffer = '';
@@ -310,19 +310,19 @@ final class OneByteWriteHandle implements WriteHandle {
     null|Whim\Async\CancellationToken $cancellation = null,
   ): void {}
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     if ($bytes == '') {
-      return 0;
+      return 0u;
     }
 
     $this->buffer .= $bytes[0];
-    return 1;
+    return 1u;
   }
 
   public function write(
     string $bytes,
     null|Whim\Async\CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return $this->tryWrite($bytes);
   }
 
@@ -334,25 +334,25 @@ final class OneByteWriteHandle implements WriteHandle {
 $fast = new MemoryHandle();
 $slow = new OneByteWriteHandle();
 $tee = new TeeWriteHandle($fast, $slow);
-assert!($tee->tryWrite('abc') == 3);
+assert!($tee->tryWrite('abc') == 3u);
 assert!($fast->toString() == 'abc');
 assert!($slow->toString() == 'a');
 
-assert!($tee->tryWrite('d') == 0);
+assert!($tee->tryWrite('d') == 0u);
 assert!($fast->toString() == 'abc');
 assert!($slow->toString() == 'ab');
 $tee->waitUntilWritable();
 assert!($fast->toString() == 'abc');
 assert!($slow->toString() == 'abc');
 
-assert!($tee->tryWrite('d') == 1);
+assert!($tee->tryWrite('d') == 1u);
 assert!($fast->toString() == 'abcd');
 assert!($slow->toString() == 'abcd');
 
-assert!($tee->tryWrite('ef') == 2);
+assert!($tee->tryWrite('ef') == 2u);
 assert!($fast->toString() == 'abcdef');
 assert!($slow->toString() == 'abcde');
-assert!($tee->write('g') == 1);
+assert!($tee->write('g') == 1u);
 assert!($fast->toString() == 'abcdefg');
 assert!($slow->toString() == 'abcdefg');
 
@@ -379,14 +379,14 @@ final class CountingDuplexHandle implements
     null|Whim\Async\CancellationToken $cancellation = null,
   ): void {}
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     return length!($bytes);
   }
 
   public function write(
     string $bytes,
     null|Whim\Async\CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return length!($bytes);
   }
 

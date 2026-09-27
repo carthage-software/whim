@@ -14,13 +14,13 @@ final class OSOperation {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public static function user((string&!'')|(0..) $identity): OSOperation {}
+  public static function user((string&!'')|uint $identity): OSOperation {}
 
   /** Starts a group lookup by name or identifier. */
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public static function group((string&!'')|(0..) $identity): OSOperation {}
+  public static function group((string&!'')|uint $identity): OSOperation {}
 
   /** Starts resolving the primary and supplementary groups of a user. */
   #[MustUse]
@@ -28,7 +28,7 @@ final class OSOperation {
   #[TraceBoundary]
   public static function groupsForUser(
     (string&!'') $name,
-    (0..) $primaryGroup,
+    uint $primaryGroup,
   ): OSOperation {}
 
   /** Suspends until this operation completes. */
@@ -40,21 +40,20 @@ final class OSOperation {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function takeUser(
-  ): null|((string&!''), (0..), (0..), string, string) {}
+  public function takeUser(): null|((string&!''), uint, uint, string, string) {}
 
   /** Takes a completed group record. */
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function takeGroup(): null|((string&!''), (0..), vec<(string&!'')>) {}
+  public function takeGroup(): null|((string&!''), uint, vec<(string&!'')>) {}
 
   /** Takes completed group records. */
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
   public function takeGroups(
-  ): null|vec<((string&!''), (0..), vec<(string&!'')>)> {}
+  ): null|vec<((string&!''), uint, vec<(string&!'')>)> {}
 
   /** Abandons this operation's result. */
   public function cancel(): void {}

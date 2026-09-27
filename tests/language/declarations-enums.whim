@@ -327,7 +327,7 @@ File\write(
 
 $debug_run = Command\run($binary, vec[$debug_snippet]);
 assert!($debug_run->isSuccess());
-assert!(length!($debug_run->standardOutput) == 0);
+assert!(length!($debug_run->standardOutput) == 0u);
 assert!(
   $debug_run->standardError
   == '['

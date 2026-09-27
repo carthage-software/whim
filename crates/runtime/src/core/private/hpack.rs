@@ -40,14 +40,14 @@ impl HpackEncoder {
     const fn construct() {}
 
     #[whim_method(
-        "create(int $maximumTableCapacity): Whim\\_Private\\HpackEncoder",
+        "create(uint $maximumTableCapacity): Whim\\_Private\\HpackEncoder",
         static
     )]
     fn create<'call>(
         context: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let capacity = capacity(context, arguments.int(0))?;
+        let capacity = capacity(context, arguments.uint(0))?;
         let object = context.new_built_in_instance(HPACK_ENCODER)?;
         let Some(built_in) = state_ref::<Self>(&object) else {
             return Err(context.type_error("the HPACK encoder has no built-in state"));
@@ -68,12 +68,12 @@ impl HpackEncoder {
         Ok(object)
     }
 
-    #[whim_method("resize(int $capacity): void")]
+    #[whim_method("resize(uint $capacity): void")]
     fn resize<'call>(
         context: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let capacity = capacity(context, arguments.int(0))?;
+        let capacity = capacity(context, arguments.uint(0))?;
         let receiver = context.receiver();
         let Some(built_in) = state_ref::<Self>(&receiver) else {
             return Err(context.type_error("the HPACK encoder has no built-in state"));
@@ -201,14 +201,14 @@ impl HpackDecoder {
     const fn construct() {}
 
     #[whim_method(
-        "create(int $maximumTableCapacity): Whim\\_Private\\HpackDecoder",
+        "create(uint $maximumTableCapacity): Whim\\_Private\\HpackDecoder",
         static
     )]
     fn create<'call>(
         context: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let capacity = capacity(context, arguments.int(0))?;
+        let capacity = capacity(context, arguments.uint(0))?;
         let object = context.new_built_in_instance(HPACK_DECODER)?;
         let Some(built_in) = state_ref::<Self>(&object) else {
             return Err(context.type_error("the HPACK decoder has no built-in state"));
@@ -224,12 +224,12 @@ impl HpackDecoder {
         Ok(object)
     }
 
-    #[whim_method("resize(int $capacity): void")]
+    #[whim_method("resize(uint $capacity): void")]
     fn resize<'call>(
         context: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let capacity = capacity(context, arguments.int(0))?;
+        let capacity = capacity(context, arguments.uint(0))?;
         let receiver = context.receiver();
         let Some(built_in) = state_ref::<Self>(&receiver) else {
             return Err(context.type_error("the HPACK decoder has no built-in state"));
@@ -279,7 +279,7 @@ impl HpackDecoder {
     }
 }
 
-fn capacity(context: &mut Context<'_, '_, '_>, value: i64) -> Result<u32, Throw> {
+fn capacity(context: &mut Context<'_, '_, '_>, value: u64) -> Result<u32, Throw> {
     u32::try_from(value).map_err(|_| context.type_error("the HPACK table capacity is too large"))
 }
 

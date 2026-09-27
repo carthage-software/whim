@@ -64,8 +64,8 @@ function connect_proxy(
     $configuration->url->authority->port ?? match (
       $configuration->url->scheme
     ) {
-      'https' => 443,
-      _ => 80,
+      'https' => 443u,
+      _ => 80u,
     };
 
   $stream = $connector->connect($host, $port, $cancellation);
@@ -94,7 +94,7 @@ function establish_tunnel(
   NetworkStream<InternetEndpoint> $stream,
   Origin $origin,
   ProxyConfiguration $configuration,
-  int $maximumHeaderSize,
+  uint $maximumHeaderSize,
   null|CancellationToken $cancellation,
 ): void {
   $authority = $origin->host->toString() . ':' . $origin->port;

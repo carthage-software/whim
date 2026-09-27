@@ -4,7 +4,6 @@ use Whim\HTTP\Server\Handler\Handler;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\InvalidArgumentException;
 use Whim\_Private\string_slice;
 
@@ -14,7 +13,7 @@ final readonly class PrefixMap {
     private dict<string, Handler> $literals,
     private dict<string, PrefixMap> $prefixes,
     private vec<RegexBranch> $regexes,
-    private NonNegativeInt $prefixLength,
+    private uint $prefixLength,
   ) {}
 
   /** Compiles parsed routes into a prefix map. */
@@ -26,7 +25,7 @@ final readonly class PrefixMap {
     $regexEntries = vec[];
     foreach ($entries as $entry) {
       ($nodes, $handler) = $entry;
-      if (length!($nodes) == 0) {
+      if (length!($nodes) == 0u) {
         if (contains_key!($literals, '')) {
           throw new InvalidArgumentException(
             'two route patterns resolve to the same path',
@@ -41,7 +40,7 @@ final readonly class PrefixMap {
       $remaining = vec[...$nodes];
       remove!($remaining, 0);
       if ($node is LiteralNode) {
-        if (length!($remaining) == 0) {
+        if (length!($remaining) == 0u) {
           if (contains_key!($literals, $node->text)) {
             throw new InvalidArgumentException(
               'two route patterns resolve to the same path',
@@ -95,14 +94,15 @@ final readonly class PrefixMap {
       return ($this->literals[$path], dict[]);
     }
 
-    $length = length!($path);
-    if ($this->prefixLength > 0 && $length >= $this->prefixLength) {
-      $prefix = string_slice($path, 0, $this->prefixLength);
+    $length = length!($path) as int;
+    $prefixLength = $this->prefixLength as int;
+    if ($prefixLength > 0 && $length >= $prefixLength) {
+      $prefix = string_slice($path, 0, $prefixLength);
       if (contains_key!($this->prefixes, $prefix)) {
         $remaining = string_slice(
           $path,
-          $this->prefixLength,
-          $length - $this->prefixLength,
+          $prefixLength,
+          $length - $prefixLength,
         );
 
         $result = $this->prefixes[$prefix]->resolve($remaining);
@@ -116,7 +116,7 @@ final readonly class PrefixMap {
       $match = $branch->regex->find($path) ?? continue;
 
       ($start, $end, $captures) = $match;
-      if (0 != $start) {
+      if (0u != $start) {
         continue;
       }
 
@@ -127,7 +127,7 @@ final readonly class PrefixMap {
         );
       }
 
-      $remaining = string_slice($path, $end, $length - $end);
+      $remaining = string_slice($path, $end as int, $length - ($end as int));
       $result = $branch->map?->resolve($remaining) ?? continue;
 
       ($handler, $parameters) = $result;
@@ -149,14 +149,14 @@ final readonly class PrefixMap {
   #[TrackCaller]
   private static function compilePrefixes(
     vec<(string, vec<Node>, Handler)> $entries,
-  ): (dict<string, PrefixMap>, NonNegativeInt) {
-    if (length!($entries) == 0) {
-      return (dict[], 0);
+  ): (dict<string, PrefixMap>, uint) {
+    if (length!($entries) == 0u) {
+      return (dict[], 0u);
     }
 
-    $prefixLength = length!($entries[0][0]);
+    $prefixLength = length!($entries[0][0]) as int;
     foreach ($entries as $entry) {
-      $length = length!($entry[0]);
+      $length = length!($entry[0]) as int;
       if ($length < $prefixLength) {
         $prefixLength = $length;
       }
@@ -171,13 +171,13 @@ final readonly class PrefixMap {
         false => vec[],
       };
 
-      if (length!($text) == $prefixLength) {
+      if (length!($text) == ($prefixLength as uint)) {
         $group[] = ($nodes, $handler);
       } else {
         $suffix = string_slice(
           $text,
           $prefixLength,
-          length!($text) - $prefixLength,
+          (length!($text) as int) - $prefixLength,
         );
 
         $group[] = (
@@ -194,7 +194,7 @@ final readonly class PrefixMap {
       $prefixes[$prefix] = PrefixMap::fromEntries($group_entries);
     }
 
-    return ($prefixes, $prefixLength as NonNegativeInt);
+    return ($prefixes, $prefixLength as uint);
   }
 
   /** Compiles dynamic branches. */
@@ -218,7 +218,7 @@ final readonly class PrefixMap {
     $branches = vec[];
     foreach ($groups as $source => $group) {
       $first = $group[0];
-      if (length!($group) == 1) {
+      if (length!($group) == 1u) {
         $remaining = $first[1];
         $names = vec[...$first[3]];
         foreach (node_parameter_names($remaining) as $name) {

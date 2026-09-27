@@ -16,7 +16,7 @@ use Whim\Network\Port;
 #[NeverInline]
 #[TrackCaller]
 function bind(
-  InternetEndpoint $endpoint = new InternetEndpoint(Address::v4('0.0.0.0'), 0),
+  InternetEndpoint $endpoint = new InternetEndpoint(Address::v4('0.0.0.0'), 0u),
   BindConfiguration $configuration = new BindConfiguration(),
 ): Socket {
   $descriptor = Whim\Network\_Private\create_socket(
@@ -74,7 +74,7 @@ function connect(
         Whim\IP\Family::V6 => Address::v6('::'),
       };
 
-      $local = new InternetEndpoint($localAddress, 0);
+      $local = new InternetEndpoint($localAddress, 0u);
     }
 
     $socket = bind($local, $configuration);

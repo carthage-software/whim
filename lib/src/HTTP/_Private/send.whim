@@ -50,7 +50,7 @@ function send_headers(
   }
 
   $sentLength = match ($entry) {
-    null => 0,
+    null => 0u,
     $stream @ StreamEntry => $stream->sentContentLength,
   };
 
@@ -122,7 +122,7 @@ function send_response_headers(
   StreamId $streamId,
   vec<Header> $headers,
   100..=599 $status,
-  null|int $contentLength,
+  null|uint $contentLength,
   bool $endStream,
 ): void {
   require_open($state);
@@ -176,7 +176,7 @@ function queue_header_block(
   bool $endStream,
 ): void {
   $maximum = $state->settings->remote(Setting::MaxFrameSize);
-  $first = Str\slice($block, 0, $maximum);
+  $first = Str\slice($block, 0, $maximum as uint);
   $offset = length!($first);
   $flags = match ($endStream) {
     true => 0x1,
@@ -190,7 +190,7 @@ function queue_header_block(
   queue_raw_frame($state, 0x1, $flags, $streamId, $first);
 
   while ($offset < length!($block)) {
-    $fragment = Str\slice($block, $offset, $maximum);
+    $fragment = Str\slice($block, $offset as int, $maximum as uint);
     $offset += length!($fragment);
     queue_raw_frame(
       $state,
@@ -257,13 +257,13 @@ function send_data(
   }
 
   while ($offset < length!($data)) {
-    $fragment = Str\slice($data, $offset, $maximum);
-    $offset += length!($fragment);
-    $state->flow->consumeSend($entry, length!($fragment));
+    $fragment = Str\slice($data, $offset, $maximum as uint);
+    $offset += length!($fragment) as int;
+    $state->flow->consumeSend($entry, length!($fragment) as int);
     queue_raw_frame(
       $state,
       0x0,
-      match ($endStream && $offset == length!($data)) {
+      match ($endStream && ($offset as uint) == length!($data)) {
         true => 0x1,
         false => 0,
       },
@@ -359,15 +359,15 @@ function send_push_promise(
 
   $block = encode_headers($state, $headers);
   $maximum = $state->settings->remote(Setting::MaxFrameSize);
-  $first = Str\slice($block, 0, $maximum - 4);
+  $first = Str\slice($block, 0, ($maximum - 4) as uint);
   $offset = length!($first);
   queue_frame(
     $state,
-    (5, $streamId, $promisedStreamId, $first, $offset == length!($block), 0),
+    (5, $streamId, $promisedStreamId, $first, $offset == length!($block), 0u),
   );
 
   while ($offset < length!($block)) {
-    $fragment = Str\slice($block, $offset, $maximum);
+    $fragment = Str\slice($block, $offset as int, $maximum as uint);
     $offset += length!($fragment);
     queue_frame($state, (9, $streamId, $fragment, $offset == length!($block)));
   }

@@ -9,11 +9,11 @@ use Whim\Marker\TrackCaller;
 
 /** Reads exactly one HTTP/1 request body's declared length. */
 final class H1FixedLengthBody implements ReadHandle {
-  private int $remaining;
+  private uint $remaining;
 
   public function __construct(
     private ReadHandle $reader,
-    int $length,
+    uint $length,
     private CancellationToken $cancellation,
   ) {
     $this->remaining = $length;
@@ -24,24 +24,24 @@ final class H1FixedLengthBody implements ReadHandle {
   public function waitUntilReadable(
     null|CancellationToken $cancellation = null,
   ): void {
-    if (0 != $this->remaining) {
+    if (0u != $this->remaining) {
       $this->reader->waitUntilReadable($this->cancellation);
     }
   }
 
   public function reachedEndOfDataSource(): bool {
-    return 0 == $this->remaining;
+    return 0u == $this->remaining;
   }
 
   #[TrackCaller]
   #[TraceBoundary]
   public function tryRead(null|int $maxBytes = null): string {
-    if (0 == $this->remaining) {
+    if (0u == $this->remaining) {
       return '';
     }
 
     $maximum = $this->limit($maxBytes);
-    $data = $this->reader->tryRead($maximum);
+    $data = $this->reader->tryRead($maximum as int);
     $this->consume($data);
     return $data;
   }
@@ -53,12 +53,12 @@ final class H1FixedLengthBody implements ReadHandle {
     null|int $maxBytes = null,
     null|CancellationToken $cancellation = null,
   ): string {
-    if (0 == $this->remaining) {
+    if (0u == $this->remaining) {
       return '';
     }
 
     $data = match (
-      $this->reader->read($this->limit($maxBytes), $this->cancellation)
+      $this->reader->read($this->limit($maxBytes) as int, $this->cancellation)
     ) {
       '' => throw new Exception(
         'the request ended before its declared content length',
@@ -70,12 +70,12 @@ final class H1FixedLengthBody implements ReadHandle {
     return $data;
   }
 
-  private function limit(null|int $maximum): int {
+  private function limit(null|int $maximum): uint {
     if (null == $maximum || $maximum < 0 || $maximum > $this->remaining) {
       return $this->remaining;
     }
 
-    return $maximum;
+    return $maximum as uint;
   }
 
   private function consume(string $data): void {

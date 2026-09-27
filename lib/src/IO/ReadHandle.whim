@@ -53,7 +53,7 @@ interface ReadHandle extends Handle {
     while (null == $maxBytes || length!($result) < $maxBytes) {
       $remaining = null;
       if (null != $maxBytes) {
-        $remaining = $maxBytes - length!($result);
+        $remaining = $maxBytes - (length!($result) as int);
       }
 
       $chunk = match ($this->read($remaining, $cancellation)) {

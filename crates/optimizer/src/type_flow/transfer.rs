@@ -337,7 +337,7 @@ pub(crate) fn transfer(
             ..
         } => write(target, Fact::with_origin(INT, origin)),
         Instruction::Length { destination, .. } | Instruction::StringLength { destination, .. } => {
-            let mut fact = Fact::known(INT);
+            let mut fact = Fact::known(UINT);
             fact.non_negative = true;
             write(destination, with_origin(fact, origin));
         }

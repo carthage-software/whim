@@ -9,8 +9,8 @@ function receive_data(
     stream_error($frame[1], 'HTTP/2 DATA preceded final fields');
   }
 
-  $flowSize = length!($frame[2]) + $frame[4];
-  if ($frame[4] > 0) {
+  $flowSize = (length!($frame[2]) + $frame[4]) as int;
+  if ($frame[4] > 0u) {
     $flowSize++;
   }
 

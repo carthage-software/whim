@@ -34,15 +34,15 @@ assert!($assertion_inner_13 == 'failed');
 assert!($err->unwrapOr::<int>(7) == 7);
 assert!($err->unwrapOr::<int>(7) is int|string);
 
-$recovered = $err->orElse::<int, never>(
-  fn(string $error): Result<int, never> => new Ok::<int>(length!($error)),
+$recovered = $err->orElse::<uint, never>(
+  fn(string $error): Result<uint, never> => new Ok::<uint>(length!($error)),
 );
 
-assert!($recovered is Ok<int>);
+assert!($recovered is Ok<uint>);
 $assertion_value_17 = $recovered;
-assert!($assertion_value_17 is Whim\Result\Ok<int>);
+assert!($assertion_value_17 is Whim\Result\Ok<uint>);
 $assertion_inner_17 = $assertion_value_17->value;
-assert!($assertion_inner_17 == 6);
+assert!($assertion_inner_17 == 6u);
 
 $caught = Whim\Result\attempt::<never, RuntimeException>(
   fn(): never => throw new RuntimeException('boom'),

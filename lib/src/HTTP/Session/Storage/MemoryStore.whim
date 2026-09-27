@@ -7,7 +7,6 @@ use Whim\HTTP\Session\Storage\_Private\Entry;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Time\Duration;
 use Whim\Time\SystemTime;
 use Whim\Unwind\InvalidArgumentException;
@@ -46,7 +45,7 @@ final class MemoryStore implements Store {
     }
 
     $this->entries[$identifier] = new Entry(
-      new Record($data, 0),
+      new Record($data, 0u),
       SystemTime::now()->plus($ttl),
     );
   }
@@ -55,7 +54,7 @@ final class MemoryStore implements Store {
   #[TrackCaller]
   public function replace(
     NonEmptyString $identifier,
-    NonNegativeInt $revision,
+    uint $revision,
     Data $data,
     Duration $ttl,
     null|CancellationToken $cancellation = null,
@@ -68,7 +67,7 @@ final class MemoryStore implements Store {
     }
 
     $this->entries[$identifier] = new Entry(
-      new Record($data, $revision + 1),
+      new Record($data, $revision + 1u),
       SystemTime::now()->plus($ttl),
     );
   }

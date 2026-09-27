@@ -43,7 +43,7 @@ $fields = FieldMap::from(vec[
   ('set-cookie', 'theme=dark'),
 ]);
 
-assert!($fields->count() == 3);
+assert!($fields->count() == 3u);
 assert!(!($fields->isEmpty()));
 assert!($fields->has('content-type'));
 assert!($fields->has('CONTENT-TYPE'));
@@ -387,7 +387,7 @@ assert!($transaction->response == $response);
 $pushes = $transaction->pushed;
 assert!($pushes != null);
 $pushes = $pushes->await();
-assert!(length!($pushes) == 1);
+assert!(length!($pushes) == 1u);
 assert!($pushes[0]->request == $pushedRequest);
 assert!($pushes[0]->response == $pushedResponse);
 

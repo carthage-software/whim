@@ -159,14 +159,14 @@ function date_time_is_valid_time(
 #[MustUse]
 #[TrackCaller]
 #[TraceBoundary]
-function date_time_parse_date(string $value): null|(int, int, int) {}
+function date_time_parse_date(string $value): null|(int, uint, uint) {}
 
 /** Parses an ISO civil time. */
 #[Stub]
 #[MustUse]
 #[TrackCaller]
 #[TraceBoundary]
-function date_time_parse_time(string $value): null|(int, int, int, int) {}
+function date_time_parse_time(string $value): null|(uint, uint, uint, uint) {}
 
 /** Parses an ISO civil date and time. */
 #[Stub]
@@ -175,7 +175,7 @@ function date_time_parse_time(string $value): null|(int, int, int, int) {}
 #[TraceBoundary]
 function date_time_parse_date_time(
   string $value,
-): null|(int, int, int, int, int, int, int) {}
+): null|(int, uint, uint, uint, uint, uint, uint) {}
 
 /** Parses a Temporal-style zoned date and time. */
 #[Stub]
@@ -200,7 +200,7 @@ function date_time_date_metadata(
   int $year,
   int $month,
   int $day,
-): (int, int, int) {}
+): (uint, uint, uint) {}
 
 /** Applies calendar units to a civil date. */
 #[Stub]
@@ -216,7 +216,7 @@ function date_time_shift_date(
   int $weeks,
   int $days,
   int $overflow,
-): null|(int, int, int) {}
+): null|(int, uint, uint) {}
 
 /** Applies calendar and exact units to a civil date and time. */
 #[Stub]
@@ -238,7 +238,7 @@ function date_time_shift_date_time(
   int $durationSeconds,
   int $durationNanoseconds,
   int $overflow,
-): null|(int, int, int, int, int, int, int) {}
+): null|(int, uint, uint, uint, uint, uint, uint) {}
 
 /** Resolves a civil date and time in a timezone. */
 #[Stub]
@@ -266,4 +266,4 @@ function date_time_localize(
   DateTimeZone $timezone,
   int $seconds,
   int $nanoseconds,
-): null|(int, int, int, int, int, int, int, int, string) {}
+): null|(int, uint, uint, uint, uint, uint, uint, int, string) {}

@@ -19,7 +19,7 @@ assert!($between is Range\UpperBoundRange);
 
 $values = vec[];
 foreach ($between as $key => $value) {
-  assert!($key == length!($values));
+  assert!(($key as uint) == length!($values));
   $values[] = $value;
 }
 

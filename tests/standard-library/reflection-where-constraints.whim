@@ -30,10 +30,10 @@ function outer<T>(T $value): mixed {
 
 $inline = Reflection\reflect_function('WhereReflectionTest\\inline_bound');
 $where = Reflection\reflect_function('WhereReflectionTest\\where_bound');
-assert!(length!($inline->getTypeParameter(0)->getBounds()) == 1);
+assert!(length!($inline->getTypeParameter(0)->getBounds()) == 1u);
 assert!($inline->getWhereConstraints() == vec[]);
 assert!($where->getTypeParameter(0)->getBounds() == vec[]);
-assert!(length!($where->getWhereConstraints()) == 1);
+assert!(length!($where->getWhereConstraints()) == 1u);
 assert!($where->getWhereConstraints()[0]->getBound()->toString() == '!null');
 assert!(
   $where
@@ -43,10 +43,10 @@ assert!(
 );
 
 $both = Reflection\reflect_function('WhereReflectionTest\\both_bounds');
-assert!(length!($both->getTypeParameter('T')->getBounds()) == 1);
+assert!(length!($both->getTypeParameter('T')->getBounds()) == 1u);
 assert!($both->getTypeParameter('U')->getBounds() == vec[]);
 $constraints = $both->getWhereConstraints();
-assert!(length!($constraints) == 3);
+assert!(length!($constraints) == 3u);
 foreach ($constraints as $position => $constraint) {
   assert!($constraint->getPosition() == $position);
   assert!(
@@ -124,7 +124,7 @@ enum Choice {
 $class = Reflection\reflect_class('WhereReflectionTest\\Container');
 $method = $class->getMethod('inspect');
 $constraints = $method->getWhereConstraints();
-assert!(length!($constraints) == 3);
+assert!(length!($constraints) == 3u);
 foreach ($constraints as $position => $constraint) {
   assert!($constraint is WhereConstraintReflection);
   assert!($constraint->getPosition() == $position);
@@ -193,7 +193,7 @@ $inherited = Reflection\reflect_class(
   'WhereReflectionTest\\IntegerContainer',
 )->getMethod('inspect')->getWhereConstraints();
 
-assert!(length!($inherited) == 3);
+assert!(length!($inherited) == 3u);
 assert!(
   $inherited[0]
     ->getDeclaringCallable()
@@ -269,7 +269,7 @@ assert!(
 );
 
 $interfaceConstraints = $prototype->getWhereConstraints();
-assert!(length!($interfaceConstraints) == 2);
+assert!(length!($interfaceConstraints) == 2u);
 assert!($interfaceConstraints[0]->getParameter()->getName() == 'T');
 assert!(
   $interfaceConstraints[1]
@@ -288,12 +288,12 @@ $override = Reflection\reflect_class(
   'WhereReflectionTest\\OverridingContainer',
 )->getMethod('inspect');
 
-assert!(length!($override->getWhereConstraints()) == 1);
+assert!(length!($override->getWhereConstraints()) == 1u);
 assert!(
   $override->getWhereConstraints()[0]->getBound()->toString() == 'vec<int>',
 );
 
-assert!(length!($override->getPrototypes()[0]->getWhereConstraints()) == 3);
+assert!(length!($override->getPrototypes()[0]->getWhereConstraints()) == 3u);
 $enum = Reflection\reflect_enum('WhereReflectionTest\\Choice')->getMethod(
   'check',
 )->getWhereConstraints();

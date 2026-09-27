@@ -94,7 +94,7 @@ Use a fully qualified name or import a symbol:
 use Whim\Str;
 
 $parts = Str\split('one,two,three', ',');
-assert!(length!($parts) == 3);
+assert!(length!($parts) == 3u);
 ```
 
 One `use` form imports classes, interfaces, enums, functions, constants,

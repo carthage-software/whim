@@ -12,6 +12,6 @@ interface WordSequence extends Sequence {
   /** Advances the iterator and returns its next entry. */
   #[TrackCaller]
   public function next(): int {
-    return ($this->nextWord() << 32) | $this->nextWord();
+    return (($this->nextWord() as int) << 32) | ($this->nextWord() as int);
   }
 }

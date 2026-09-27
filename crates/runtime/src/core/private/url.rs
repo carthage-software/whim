@@ -65,7 +65,7 @@ pub(crate) fn parse_authority(context: &Context<'_, '_, '_>, arguments: Argument
         optional_string(context, parts.userinfo()),
         context.string(kind),
         host,
-        optional_int(port),
+        optional_uint(port),
     ])
 }
 
@@ -251,10 +251,10 @@ fn optional_string(context: &Context<'_, '_, '_>, value: Option<&str>) -> Value 
     context.string(value.as_bytes())
 }
 
-fn optional_int(value: Option<u16>) -> Value {
+fn optional_uint(value: Option<u16>) -> Value {
     let Some(value) = value else {
         return Value::null();
     };
 
-    Value::int(i64::from(value))
+    Value::uint(u64::from(value))
 }

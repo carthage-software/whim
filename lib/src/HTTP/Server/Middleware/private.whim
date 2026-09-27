@@ -114,8 +114,8 @@ function weighted_coding(string $part): null|(string, int) {
   $quality = 1000;
   $index = 1;
   while ($index < length!($segments)) {
-    $parameter = split(trim($segments[$index]), '=', 2);
-    if (length!($parameter) == 2 && lowercase(trim($parameter[0])) == 'q') {
+    $parameter = split(trim($segments[$index]), '=', 2u);
+    if (length!($parameter) == 2u && lowercase(trim($parameter[0])) == 'q') {
       $parsed = quality(trim($parameter[1]));
       $quality = $parsed ?? 0;
       break;

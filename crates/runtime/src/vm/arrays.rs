@@ -246,15 +246,15 @@ pub(in crate::vm) fn append_value(container: &mut Value, value: Value) -> Result
 
 /// The size of any value accepted by `length!()`.
 #[inline(always)]
-pub(in crate::vm) fn array_length(value: &Value) -> Result<i64, ArrayFault> {
+pub(in crate::vm) fn array_length(value: &Value) -> Result<u64, ArrayFault> {
     match value.transparent() {
         ValueView::String(_) | ValueView::ShortString(_) => {
             // SAFETY: the value's tag proves this projection is valid.
-            Ok(unsafe { value.as_string_len().unwrap_unchecked() as i64 })
+            Ok(unsafe { value.as_string_len().unwrap_unchecked() as u64 })
         }
-        ValueView::Vec(vec) => Ok(vec.len() as i64),
-        ValueView::Dict(dict) => Ok(dict.len() as i64),
-        ValueView::Tuple(tuple) => Ok(tuple.len() as i64),
+        ValueView::Vec(vec) => Ok(vec.len() as u64),
+        ValueView::Dict(dict) => Ok(dict.len() as u64),
+        ValueView::Tuple(tuple) => Ok(tuple.len() as u64),
         _ => Err(ArrayFault::type_error(format!(
             "length!() accepts a string, vec, dict, or tuple, {} given",
             value.kind_name()

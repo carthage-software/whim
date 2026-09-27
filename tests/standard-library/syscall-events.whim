@@ -17,15 +17,15 @@ $output = $output as Whim\OS\FileDescriptor;
 $error = $error as Whim\OS\FileDescriptor;
 $input->close();
 
-$processStatus = Whim\_Private\create_suspension::<int>();
-$processTask = Whim\_Private\watch_process($process, fn(int $status): void {
+$processStatus = Whim\_Private\create_suspension::<uint>();
+$processTask = Whim\_Private\watch_process($process, fn(uint $status): void {
   $processStatus->resume($status);
 });
 
-assert!($processStatus->suspend() == 0);
+assert!($processStatus->suspend() == 0u);
 Whim\_Private\cancel_task($processTask);
-assert!(Whim\_Private\read_descriptor($output, 16) == 'child');
-assert!(Whim\_Private\read_descriptor($error, 16) == '');
+assert!(Whim\_Private\read_descriptor($output, 16u) == 'child');
+assert!(Whim\_Private\read_descriptor($error, 16u) == '');
 $output->close();
 $error->close();
 
@@ -58,7 +58,7 @@ Whim\_Private\set_socket_option(
   1,
 );
 
-Whim\_Private\bind_socket($receiver, '127.0.0.1', 0);
+Whim\_Private\bind_socket($receiver, '127.0.0.1', 0u);
 ($host, $port) = Whim\_Private\socket_address($receiver);
 assert!($host == '127.0.0.1');
 assert!($port > 0);
@@ -73,12 +73,12 @@ $readableTask = Whim\_Private\watch_readable($receiver, fn(): void {
   $readable->resume(null);
 });
 
-assert!(Whim\_Private\send_to($sender, 'datagram', $host, $port) == 8);
+assert!(Whim\_Private\send_to($sender, 'datagram', $host, $port) == 8u);
 
 $readable->suspend();
 Whim\_Private\cancel_task($readableTask);
-$received = Whim\_Private\receive_message($receiver, 16, $port)
-  as (string, (string, int), (string, int), int, int, bool);
+$received = Whim\_Private\receive_message($receiver, 16u, $port)
+  as (string, (string, uint), (string, uint), uint, uint, bool);
 
 assert!($received[0] == 'datagram');
 assert!($received[1][0] == '127.0.0.1');
@@ -91,7 +91,7 @@ $receiver = Whim\_Private\create_socket(
   Whim\_Private\SOCKET_KIND_DATAGRAM,
 );
 
-Whim\_Private\bind_socket($receiver, '0.0.0.0', 0);
+Whim\_Private\bind_socket($receiver, '0.0.0.0', 0u);
 ($_host, $port) = Whim\_Private\socket_address($receiver);
 Whim\_Private\enable_message_metadata($receiver);
 
@@ -112,24 +112,24 @@ assert!(
     '127.0.0.1',
     $port,
     '127.0.0.1',
-    0,
-    1,
+    0u,
+    1u,
   )
-  == 7,
+  == 7u,
 );
 
 $readable->suspend();
 Whim\_Private\cancel_task($readableTask);
 
-$received = Whim\_Private\receive_message($receiver, 16, $port)
-  as (string, (string, int), (string, int), int, int, bool);
+$received = Whim\_Private\receive_message($receiver, 16u, $port)
+  as (string, (string, uint), (string, uint), uint, uint, bool);
 
 assert!($received[0] == 'message');
 assert!($received[1][0] == '127.0.0.1');
 assert!($received[1][1] > 0);
 assert!($received[2][0] == '127.0.0.1');
 assert!($received[2][1] == $port);
-assert!($received[3] == 1);
+assert!($received[3] == 1u);
 assert!($received[4] >= 0);
 assert!(!($received[5]));
 $receiver->close();
@@ -139,4 +139,4 @@ $sender->close();
 assert!(Whim\_Private\is_terminal($output) is bool);
 assert!(Whim\Terminal\path($output) is null|string);
 
-assert!(Whim\_Private\terminal_size($output) is null|(int, int));
+assert!(Whim\_Private\terminal_size($output) is null|(uint, uint));

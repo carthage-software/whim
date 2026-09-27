@@ -11,7 +11,6 @@ use Whim\Option\Option;
 use Whim\Option\Some;
 use Whim\Refine\Comparator;
 use Whim\Refine\Iterable;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\LogicException;
 
 /**
@@ -44,7 +43,7 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
   public function enqueue(T $value, P $priority): void {
     $this->assertMutable();
 
-    $index = length!($this->entries);
+    $index = length!($this->entries) as int;
     $path = $this->upwardPath($priority, $index);
     $entry = ($value, $priority);
 
@@ -62,7 +61,7 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
   #[TrackCaller]
   public function dequeue(): Option<(T, P)> {
     $this->assertMutable();
-    if (length!($this->entries) == 0) {
+    if (length!($this->entries) == 0u) {
       return new None();
     }
 
@@ -72,7 +71,7 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
   /** Returns the first value and priority without removing them. */
   #[AlwaysInline]
   public function peek(): Option<(T, P)> {
-    if (length!($this->entries) == 0) {
+    if (length!($this->entries) == 0u) {
       return new None();
     }
 
@@ -81,14 +80,14 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
 
   /** Returns the number of stored values. */
   #[AlwaysInline]
-  public function count(): NonNegativeInt {
+  public function count(): uint {
     return length!($this->entries);
   }
 
   /** Reports whether the queue contains no values. */
   #[AlwaysInline]
   public function isEmpty(): bool {
-    return length!($this->entries) == 0;
+    return length!($this->entries) == 0u;
   }
 
   /** Removes every stored value. */
@@ -120,7 +119,7 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
   #[TrackCaller]
   #[TraceBoundary]
   private function heapify(): void {
-    $count = length!($this->entries);
+    $count = length!($this->entries) as int;
     if ($count < 2) {
       return;
     }
@@ -200,7 +199,7 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
   #[TrackCaller]
   #[TraceBoundary]
   private function removeRoot(): (T, P) {
-    $count = length!($this->entries);
+    $count = length!($this->entries) as int;
     $root = $this->entries[0];
     if (1 == $count) {
       $this->entries = vec[];

@@ -35,7 +35,7 @@ class Holder {
 assert!(READY == 'value');
 assert!(Holder::LABEL == 'value');
 
-assert!(length!('hello') == 5);
+assert!(length!('hello') == 5u);
 
 assert!(sequence!(42) == 42);
 assert!(sequence!(true) is true);
@@ -528,11 +528,11 @@ assert!($assertion_error_50 is VisibilityError);
 
 assert!($state->name() == 'Ada');
 
-assert!(length!('héllo') == 6);
-assert!(length!('') == 0);
-assert!(length!(vec[1, 2, 3]) == 3);
-assert!(length!(dict['a' => 1]) == 1);
-assert!(length!((1, 2)) == 2);
+assert!(length!('héllo') == 6u);
+assert!(length!('') == 0u);
+assert!(length!(vec[1, 2, 3]) == 3u);
+assert!(length!(dict['a' => 1]) == 1u);
+assert!(length!((1, 2)) == 2u);
 $assertion_value_57 = fn(): void {
   length!(5);
 };
@@ -594,10 +594,10 @@ assert!($assertion_error_63 is OutOfBoundsError);
 $items = vec['a', 'b', 'c'];
 assert!(remove!($items, 1) == 'b');
 assert!($items[1] == 'c');
-assert!(length!($items) == 2);
+assert!(length!($items) == 2u);
 $mapping = dict['x' => 1, 'y' => 2];
 assert!(remove!($mapping, 'x') == 1);
-assert!(length!($mapping) == 1);
+assert!(length!($mapping) == 1u);
 $assertion_value_69 = fn(): void {
   $mapping = dict['y' => 2];
   remove!($mapping, 'x');
@@ -748,8 +748,8 @@ assert!(
 File\write($work . '/exit-default.whim', 'exit!();' . "\n");
 $exitDefault = Command\run($binary, vec[$work . '/exit-default.whim']);
 assert!($exitDefault->isSuccess());
-assert!(length!($exitDefault->standardOutput) == 0);
-assert!(length!($exitDefault->standardError) == 0);
+assert!(length!($exitDefault->standardOutput) == 0u);
+assert!(length!($exitDefault->standardError) == 0u);
 
 File\write(
   $work . '/exit-terminates.whim',
@@ -775,8 +775,8 @@ File\write(
 
 $exitTerminates = Command\run($binary, vec[$work . '/exit-terminates.whim']);
 assert!($exitTerminates->status is Command\Exited);
-assert!(($exitTerminates->status as Command\Exited)->code == 7);
+assert!(($exitTerminates->status as Command\Exited)->code == 7u);
 assert!($exitTerminates->standardOutput == 'before' . "\n");
-assert!(length!($exitTerminates->standardError) == 0);
+assert!(length!($exitTerminates->standardError) == 0u);
 
 Filesystem\delete_directory($work, true);

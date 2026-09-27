@@ -5,13 +5,12 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use whim_base::unwrap_result_invariant;
 use whim_macros::whim_function;
 use whim_value::Value;
 
 use crate::builtin::Context;
 
-#[whim_function("Whim\\_Private\\get_system_time(): (int, int)")]
+#[whim_function("Whim\\_Private\\get_system_time(): (int, uint)")]
 pub(crate) fn get_system_time(scope: &Context<'_, '_, '_>) -> Value {
     let (seconds, nanoseconds) = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(duration) => (
@@ -35,35 +34,27 @@ pub(crate) fn get_system_time(scope: &Context<'_, '_, '_>) -> Value {
     };
 
     let seconds = Value::int(seconds);
-    let nanoseconds = Value::int(nanoseconds);
+    let nanoseconds = Value::uint(nanoseconds.cast_unsigned());
     scope.tuple([seconds, nanoseconds])
 }
 
-#[whim_function("Whim\\_Private\\get_high_resolution_time(): (int, int)")]
+#[whim_function("Whim\\_Private\\get_high_resolution_time(): (uint, uint)")]
 pub(crate) fn get_high_resolution_time(scope: &Context<'_, '_, '_>) -> Value {
     let elapsed = high_resolution_origin().elapsed();
-    let seconds = Value::int(saturating_seconds(elapsed.as_secs()));
-    let nanoseconds = Value::int(i64::from(elapsed.subsec_nanos()));
+    let seconds = Value::uint(elapsed.as_secs());
+    let nanoseconds = Value::uint(u64::from(elapsed.subsec_nanos()));
     scope.tuple([seconds, nanoseconds])
 }
 
-#[whim_function("Whim\\_Private\\get_high_resolution_nanoseconds(): int")]
+#[whim_function("Whim\\_Private\\get_high_resolution_nanoseconds(): uint")]
 pub(crate) fn get_high_resolution_nanoseconds() -> Value {
     let elapsed = high_resolution_origin().elapsed();
     let nanoseconds = elapsed
         .as_secs()
         .saturating_mul(1_000_000_000)
-        .saturating_add(u64::from(elapsed.subsec_nanos()))
-        .min(i64::MAX.unsigned_abs());
-    // SAFETY: the surrounding invariant proves this result is successful.
-    let nanoseconds = unsafe {
-        unwrap_result_invariant(
-            i64::try_from(nanoseconds),
-            "the elapsed nanoseconds were clamped to the signed integer range",
-        )
-    };
+        .saturating_add(u64::from(elapsed.subsec_nanos()));
 
-    Value::int(nanoseconds)
+    Value::uint(nanoseconds)
 }
 
 fn saturating_seconds(seconds: u64) -> i64 {

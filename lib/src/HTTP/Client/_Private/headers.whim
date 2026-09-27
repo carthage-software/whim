@@ -107,7 +107,7 @@ function h2_response_headers(vec<H2\Header> $headers): (int, FieldMap) {
   $fields = vec[];
   foreach ($headers as $header) {
     if (':status' == $header[0]) {
-      $status = decimal($header[1]);
+      $status = decimal($header[1]) as int;
     } else if (!Str\starts_with($header[0], ':')) {
       $fields[] = ($header[0], $header[1]);
     }

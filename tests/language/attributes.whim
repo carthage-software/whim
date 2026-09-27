@@ -204,7 +204,7 @@ $describedClass = Reflection\reflect_class(new Described());
 assert!($describedClass != null);
 $found = $describedClass->getAttributes::<Meta>();
 
-assert!(length!($found) == 5);
+assert!(length!($found) == 5u);
 assert!($found[0]->getArguments()[0] == 14);
 assert!($found[1]->getArguments()[0] == 'ab');
 assert!($found[2]->getArguments()[0] == 7);

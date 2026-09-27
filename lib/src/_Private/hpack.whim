@@ -15,11 +15,11 @@ final class HpackEncoder {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public static function create(int $maximumTableCapacity): HpackEncoder {}
+  public static function create(uint $maximumTableCapacity): HpackEncoder {}
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function resize(int $capacity): void {}
+  public function resize(uint $capacity): void {}
 
   #[MustUse]
   #[TrackCaller]
@@ -37,11 +37,11 @@ final class HpackDecoder {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public static function create(int $maximumTableCapacity): HpackDecoder {}
+  public static function create(uint $maximumTableCapacity): HpackDecoder {}
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function resize(int $capacity): void {}
+  public function resize(uint $capacity): void {}
 
   #[MustUse]
   #[TrackCaller]

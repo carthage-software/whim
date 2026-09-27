@@ -160,7 +160,7 @@ function maxva(
 /** Computes the arithmetic mean of a non-empty input. */
 #[TrackCaller]
 function mean(array<_, Numeric> $numbers): null|float {
-  $count = length!($numbers);
+  $count = length!($numbers) as int;
   if (0 == $count) {
     return null;
   }
@@ -176,7 +176,7 @@ function mean(array<_, Numeric> $numbers): null|float {
 /** Computes the median of a non-empty input. */
 #[TrackCaller]
 function median(array<_, Numeric> $numbers): null|float {
-  if (length!($numbers) == 0) {
+  if (length!($numbers) == 0u) {
     return null;
   }
 
@@ -194,8 +194,8 @@ function median(array<_, Numeric> $numbers): null|float {
     ): Ordering => Ordering::from(Whim\_Private\math_compare($left, $right)),
   );
 
-  $middle = div(length!($numbers), 2);
-  if (length!($numbers) % 2 == 1) {
+  $middle = div(length!($numbers) as int, 2);
+  if (length!($numbers) % 2u == 1u) {
     return _Private\midpoint($numbers[$middle], $numbers[$middle]);
   }
 

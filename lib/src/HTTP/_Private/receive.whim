@@ -16,7 +16,12 @@ function receive(State $state, string $bytes): vec<Event\WeakendEvent> {
     foreach ($state->frameDecoder->push($bytes) as $raw) {
       try {
         ($type, $flags, $stream, $payload) = $raw;
-        $frame = Frame\_Private\parse($type, $flags, $stream, $payload);
+        $frame = Frame\_Private\parse(
+          $type as int,
+          $flags as int,
+          $stream as int,
+          $payload,
+        );
 
         if (!$state->receivedInitialSettings) {
           if (4 != $frame[0] || $frame[2]) {
@@ -93,13 +98,13 @@ function consume_client_preface(State $state, string $bytes): string {
   }
 
   $state->pendingClientPreface .= $bytes;
-  $received = length!($state->pendingClientPreface);
-  $compared = min_int($received, length!(H2\CLIENT_PREFACE));
+  $received = length!($state->pendingClientPreface) as int;
+  $compared = min_int($received, length!(H2\CLIENT_PREFACE) as int);
   if (
-    Str\slice($state->pendingClientPreface, 0, $compared) != Str\slice(
+    Str\slice($state->pendingClientPreface, 0, $compared as uint) != Str\slice(
       H2\CLIENT_PREFACE,
       0,
-      $compared,
+      $compared as uint,
     )
   ) {
     throw new ProtocolException('the HTTP/2 client preface is invalid');
@@ -109,7 +114,11 @@ function consume_client_preface(State $state, string $bytes): string {
     return '';
   }
 
-  $bytes = Str\slice($state->pendingClientPreface, length!(H2\CLIENT_PREFACE));
+  $bytes = Str\slice(
+    $state->pendingClientPreface,
+    length!(H2\CLIENT_PREFACE) as int,
+  );
+
   $state->pendingClientPreface = '';
   $state->receivedClientPreface = true;
   return $bytes;
@@ -141,7 +150,7 @@ function record_frame(State $state, Frame\WeakendFrame $frame): void {
   if (0 == $type && '' == $frame[2] && !$frame[3]) {
     $type = Whim\HTTP\_Private\RateLimiter::EMPTY_DATA_FRAME;
   } else if (10 == $type) {
-    $type = $frame[1];
+    $type = $frame[1] as int;
   }
 
   $limiter->record($type);

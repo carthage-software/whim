@@ -9,8 +9,7 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Str;
 use Whim\Time\Duration;
 use Whim\Unwind\RuntimeException;
@@ -19,12 +18,12 @@ use Whim\Unwind\UnsupportedPlatformException;
 /** Returns the current process identifier. */
 #[Stub]
 #[MustUse]
-function get_id(): (1..) {}
+function get_id(): (1u..) {}
 
 /** Returns the parent process identifier. */
 #[Stub]
 #[MustUse]
-function get_parent_id(): (0..) {}
+function get_parent_id(): uint {}
 
 /** Returns CPU time consumed by this process and its waited-for children. */
 #[MustUse]
@@ -43,10 +42,10 @@ function cpu_times(): CpuTimes {
   }
 
   return new CpuTimes(
-    Duration::fromMicroseconds($user),
-    Duration::fromMicroseconds($system),
-    Duration::fromMicroseconds($childrenUser),
-    Duration::fromMicroseconds($childrenSystem),
+    Duration::fromMicroseconds($user as int),
+    Duration::fromMicroseconds($system as int),
+    Duration::fromMicroseconds($childrenUser as int),
+    Duration::fromMicroseconds($childrenSystem as int),
   );
 }
 
@@ -88,11 +87,14 @@ function get_user_identity(): UserIdentity {
 #[NeverInline]
 #[TrackCaller]
 function set_user_identity(
-  null|NonNegativeInt $real = null,
-  null|NonNegativeInt $effective = null,
+  null|uint $real = null,
+  null|uint $effective = null,
 ): void {
   try {
-    Whim\_Private\set_process_user($real ?? -1, $effective ?? -1);
+    Whim\_Private\set_process_user(
+      ($real ?? -1) as int,
+      ($effective ?? -1) as int,
+    );
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'set the process user identity');
   }
@@ -110,11 +112,14 @@ function get_group_identity(): GroupIdentity {
 #[NeverInline]
 #[TrackCaller]
 function set_group_identity(
-  null|NonNegativeInt $real = null,
-  null|NonNegativeInt $effective = null,
+  null|uint $real = null,
+  null|uint $effective = null,
 ): void {
   try {
-    Whim\_Private\set_process_group($real ?? -1, $effective ?? -1);
+    Whim\_Private\set_process_group(
+      ($real ?? -1) as int,
+      ($effective ?? -1) as int,
+    );
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'set the process group identity');
   }
@@ -124,7 +129,7 @@ function set_group_identity(
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
-function get_supplementary_group_ids(): vec<NonNegativeInt> {
+function get_supplementary_group_ids(): vec<uint> {
   try {
     return Whim\_Private\process_supplementary_groups();
   } catch (Whim\_Private\SystemError $error) {
@@ -135,7 +140,7 @@ function get_supplementary_group_ids(): vec<NonNegativeInt> {
 /** Replaces the supplementary group identifiers. */
 #[NeverInline]
 #[TrackCaller]
-function set_supplementary_group_ids(vec<NonNegativeInt> $groups): void {
+function set_supplementary_group_ids(vec<uint> $groups): void {
   try {
     Whim\_Private\set_process_supplementary_groups($groups);
   } catch (Whim\_Private\SystemError $error) {
@@ -148,7 +153,7 @@ function set_supplementary_group_ids(vec<NonNegativeInt> $groups): void {
 #[TrackCaller]
 function initialize_supplementary_group_ids(
   NonEmptyString $user,
-  NonNegativeInt $primaryGroup,
+  uint $primaryGroup,
 ): void {
   try {
     Whim\_Private\initialize_groups($user, $primaryGroup);
@@ -161,9 +166,9 @@ function initialize_supplementary_group_ids(
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
-function get_session_id(null|PositiveInt $process = null): NonNegativeInt {
+function get_session_id(null|NonZero<uint> $process = null): uint {
   try {
-    return Whim\_Private\session_id($process ?? 0);
+    return Whim\_Private\session_id($process ?? 0u);
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'read the process session identifier');
   }
@@ -173,7 +178,7 @@ function get_session_id(null|PositiveInt $process = null): NonNegativeInt {
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
-function start_session(): NonNegativeInt {
+function start_session(): uint {
   try {
     return Whim\_Private\start_session();
   } catch (Whim\_Private\SystemError $error) {
@@ -185,11 +190,9 @@ function start_session(): NonNegativeInt {
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
-function get_process_group_id(
-  null|PositiveInt $process = null,
-): NonNegativeInt {
+function get_process_group_id(null|NonZero<uint> $process = null): uint {
   try {
-    return Whim\_Private\process_group_id($process ?? 0);
+    return Whim\_Private\process_group_id($process ?? 0u);
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'read the process group identifier');
   }
@@ -199,11 +202,11 @@ function get_process_group_id(
 #[NeverInline]
 #[TrackCaller]
 function set_process_group_id(
-  null|PositiveInt $process = null,
-  null|PositiveInt $group = null,
+  null|NonZero<uint> $process = null,
+  null|NonZero<uint> $group = null,
 ): void {
   try {
-    Whim\_Private\set_process_group_id($process ?? 0, $group ?? 0);
+    Whim\_Private\set_process_group_id($process ?? 0u, $group ?? 0u);
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'set the process group identifier');
   }
@@ -213,9 +216,9 @@ function set_process_group_id(
 #[MustUse]
 #[NeverInline]
 #[TrackCaller]
-function get_priority(null|PositiveInt $process = null): int {
+function get_priority(null|NonZero<uint> $process = null): int {
   try {
-    return Whim\_Private\process_priority($process ?? 0);
+    return Whim\_Private\process_priority($process ?? 0u);
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'read the process priority');
   }
@@ -224,9 +227,9 @@ function get_priority(null|PositiveInt $process = null): int {
 /** Changes a process's scheduling priority. */
 #[NeverInline]
 #[TrackCaller]
-function set_priority(int $priority, null|PositiveInt $process = null): void {
+function set_priority(int $priority, null|NonZero<uint> $process = null): void {
   try {
-    Whim\_Private\set_process_priority($process ?? 0, $priority);
+    Whim\_Private\set_process_priority($process ?? 0u, $priority);
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'set the process priority');
   }
@@ -246,11 +249,11 @@ function get_resource_limit(Resource $resource): ResourceLimit {
   return new ResourceLimit(
     match ($soft) {
       -1 => null,
-      _ => $soft as NonNegativeInt,
+      _ => $soft as uint,
     },
     match ($hard) {
       -1 => null,
-      _ => $hard as NonNegativeInt,
+      _ => $hard as uint,
     },
   );
 }
@@ -262,8 +265,8 @@ function set_resource_limit(Resource $resource, ResourceLimit $limit): void {
   try {
     Whim\_Private\set_resource_limit(
       $resource->value,
-      $limit->soft ?? -1,
-      $limit->hard ?? -1,
+      ($limit->soft ?? -1) as int,
+      ($limit->hard ?? -1) as int,
     );
   } catch (Whim\_Private\SystemError $error) {
     _Private\failure($error, 'set the process resource limit');
@@ -274,12 +277,12 @@ function set_resource_limit(Resource $resource, ResourceLimit $limit): void {
 #[Stub]
 #[MustUse]
 #[TrackCaller]
-function exists((1..) $process): bool {}
+function exists((1u..) $process): bool {}
 
 /** Sends a signal to one process. */
 #[NeverInline]
 #[TrackCaller]
-function signal(PositiveInt $process, Signal $signal): void {
+function signal(NonZero<uint> $process, Signal $signal): void {
   if (!$signal->isSupported()) {
     throw new UnsupportedPlatformException(
       'signal ' . $signal->name . ' is not supported on ' . operating_system!(),
@@ -287,7 +290,7 @@ function signal(PositiveInt $process, Signal $signal): void {
   }
 
   try {
-    Whim\_Private\send_signal($process, $signal->value);
+    Whim\_Private\send_signal($process as int, $signal->value);
   } catch (Whim\_Private\SystemError $error) {
     throw new RuntimeException(
       'failed to signal process ' . $process . ': ' . $error->getMessage(),
@@ -299,7 +302,7 @@ function signal(PositiveInt $process, Signal $signal): void {
 /** Sends a signal to every process in a process group. */
 #[NeverInline]
 #[TrackCaller]
-function signal_group(PositiveInt $group, Signal $signal): void {
+function signal_group(NonZero<uint> $group, Signal $signal): void {
   if (!$signal->isSupported()) {
     throw new UnsupportedPlatformException(
       'signal ' . $signal->name . ' is not supported on ' . operating_system!(),
@@ -307,7 +310,7 @@ function signal_group(PositiveInt $group, Signal $signal): void {
   }
 
   try {
-    Whim\_Private\send_signal(-$group, $signal->value);
+    Whim\_Private\send_signal(-($group as int), $signal->value);
   } catch (Whim\_Private\SystemError $error) {
     throw new RuntimeException(
       'failed to signal process group ' . $group . ': ' . $error->getMessage(),

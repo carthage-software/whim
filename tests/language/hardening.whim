@@ -17,12 +17,12 @@ while ($j < 2000) {
   $j = $j + 1;
 }
 
-assert!(length!($snapshot) == 4000);
-assert!(length!($s) == 8000);
+assert!(length!($snapshot) == 4000u);
+assert!(length!($s) == 8000u);
 $t = $s;
 $t .= '!';
-assert!(length!($s) == 8000);
-assert!(length!($t) == 8001);
+assert!(length!($s) == 8000u);
+assert!(length!($t) == 8001u);
 
 $doubled = 'abcdefghijklmnopqrstuvwxyz0123456789';
 $doubling = 0;
@@ -31,7 +31,7 @@ while ($doubling < 6) {
   $doubling = $doubling + 1;
 }
 
-assert!(length!($doubled) == 2304);
+assert!(length!($doubled) == 2304u);
 
 prints(
   'catchable-overflow',

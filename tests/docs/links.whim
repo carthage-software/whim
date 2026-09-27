@@ -39,7 +39,7 @@ $script = Env\current_script();
 assert!($script is string);
 $script = Str\replace(Filesystem\canonicalize($script), '\\', '/');
 
-$root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as int);
+$root = Str\slice($script, 0, Str\search_last($script, '/tests/docs/') as uint);
 
 $docs = $root . '/docs/src';
 $files = files_with_suffix($docs, '.md');
@@ -52,7 +52,7 @@ foreach ($files as $file) {
     continue;
   }
 
-  $relative = Str\slice($file, length!($docs) + 1);
+  $relative = Str\slice($file, (length!($docs) as int) + 1);
   if (!Str\contains($summary, '](' . $relative . ')')) {
     $unlisted[] = $relative;
   }
@@ -62,7 +62,7 @@ assert!($unlisted == vec[]);
 
 $broken = vec[];
 foreach ($files as $file) {
-  $directory = Str\slice($file, 0, Str\search_last($file, '/') as int);
+  $directory = Str\slice($file, 0, Str\search_last($file, '/') as uint);
   $lines = Str\split(File\read($file), "\n");
   $lineNumber = 0;
   foreach ($lines as $line) {
@@ -74,7 +74,7 @@ foreach ($files as $file) {
         break;
       }
 
-      $after = Str\slice($rest, $open + 2);
+      $after = Str\slice($rest, ($open as int) + 2);
       $close = Str\search($after, ')');
       if ($close == null) {
         break;
@@ -132,8 +132,8 @@ foreach (Str\split($index, "\n") as $line) {
   }
 
   $end = Str\search($line, '`', 3);
-  assert!($end is int);
-  $namespace = Str\slice($line, 3, $end - 3);
+  assert!($end is uint);
+  $namespace = Str\slice($line, 3, $end - 3u);
   if (contains!($indexed, $namespace)) {
     $duplicates[] = $namespace;
   } else {

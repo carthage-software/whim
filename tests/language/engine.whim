@@ -79,7 +79,7 @@ try {
 
 assert!($assertion_error_5 is TypeError);
 
-assert!(length!(Autoload\get_autoloaders()) == 0);
+assert!(length!(Autoload\get_autoloaders()) == 0u);
 
 $frame = new TraceFrame('render', '/tmp/x.whim', 3, vec[1]);
 assert!($frame->function == 'render');

@@ -3,7 +3,6 @@
 use std::cell::RefCell;
 
 use whim_base::unwrap_option_invariant;
-use whim_base::unwrap_result_invariant;
 use whim_macros::whim_class;
 use whim_macros::whim_methods;
 use whim_value::Value;
@@ -102,18 +101,10 @@ impl WeakMap {
             .throw(class, "the weak map has no entry for the key", 0))
     }
 
-    #[whim_method("length(): int", no_track_caller, must_use)]
+    #[whim_method("length(): uint", no_track_caller, must_use)]
     fn length(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         let map = storage(cx)?;
-        // SAFETY: the surrounding invariant proves this result is successful.
-        let length = unsafe {
-            unwrap_result_invariant(
-                i64::try_from(map.len()),
-                "a weak map cannot exhaust the signed integer range",
-            )
-        };
-
-        Ok(Value::int(length))
+        Ok(Value::uint(map.len() as u64))
     }
 }
 

@@ -1,20 +1,18 @@
 namespace Whim\Iterate;
 
-use Whim\Refine\NonNegativeInt;
-
 /** Lazily skips entries from another iterator. */
 final class DropIterator<K, V> implements Iterator<K, V> {
   /** Creates an iterator that skips the first requested entries. */
   public function __construct(
     private Iterator<K, V> $iterator,
-    private NonNegativeInt $remaining,
+    private uint $remaining,
   ) {}
 
   /** Returns the next entry after the skipped prefix. */
   public function next(): null|(K, V) {
-    while ($this->remaining > 0) {
+    while ($this->remaining > 0u) {
       if ($this->iterator->next() == null) {
-        $this->remaining = 0;
+        $this->remaining = 0u;
         return null;
       }
 

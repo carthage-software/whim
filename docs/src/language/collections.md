@@ -74,7 +74,7 @@ $scores['Ada'] = 11;
 $scores['Linus'] = 9;
 
 assert!($scores['Ada'] == 11);
-assert!(length!($scores) == 3);
+assert!(length!($scores) == 3u);
 ```
 
 Keys do not convert. `1`, `1u`, `'1'`, and `true` are four different keys.

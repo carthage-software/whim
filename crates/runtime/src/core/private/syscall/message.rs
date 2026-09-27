@@ -22,16 +22,17 @@ pub(crate) fn enable_message_metadata<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\receive_message(Whim\\OS\\FileDescriptor $socket, (1..) $maxBytes, (0..) $localPort): null|(string, (string, (0..)), (string, (0..)), 0..=3, (0..), bool)"
+    "Whim\\_Private\\receive_message(Whim\\OS\\FileDescriptor $socket, (1u..) $maxBytes, (0u..=65535u) $localPort): null|(string, (string, (0u..=65535u)), (string, (0u..=65535u)), 0u..=3u, uint, bool)"
 )]
 pub(crate) fn receive_message<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
-    let maximum =
-        usize::try_from(arguments.int(1)).map_err(|_| system_error(cx, "recvmsg", libc::EINVAL))?;
+    let maximum = isize::try_from(arguments.uint(1))
+        .map_err(|_| system_error(cx, "recvmsg", libc::EINVAL))?
+        .cast_unsigned();
     let port =
-        u16::try_from(arguments.int(2)).map_err(|_| system_error(cx, "recvmsg", libc::EINVAL))?;
+        u16::try_from(arguments.uint(2)).map_err(|_| system_error(cx, "recvmsg", libc::EINVAL))?;
     let Some(message) = with_descriptor(cx, &arguments.local(0), "recvmsg", |descriptor| {
         message::receive(descriptor, maximum, port)
     })?
@@ -42,20 +43,20 @@ pub(crate) fn receive_message<'call>(
         Value::from_string_vec(cx.vm.heap(), message.bytes),
         cx.tuple([
             cx.string(&message.peer.host),
-            Value::int(i64::from(message.peer.port)),
+            Value::uint(u64::from(message.peer.port)),
         ]),
         cx.tuple([
             cx.string(&message.local.host),
-            Value::int(i64::from(message.local.port)),
+            Value::uint(u64::from(message.local.port)),
         ]),
-        Value::int(i64::from(message.congestion)),
-        Value::int(i64::from(message.interface)),
+        Value::uint(u64::from(message.congestion)),
+        Value::uint(u64::from(message.interface)),
         Value::bool(message.truncated),
     ]))
 }
 
 #[whim_function(
-    "Whim\\_Private\\send_message(Whim\\OS\\FileDescriptor $socket, string $bytes, null|string $host, (0..) $port, string $sourceHost, (0..) $interfaceIndex, 0..=3 $explicitCongestion): (0..)"
+    "Whim\\_Private\\send_message(Whim\\OS\\FileDescriptor $socket, string $bytes, null|string $host, (0u..=65535u) $port, string $sourceHost, uint $interfaceIndex, 0u..=3u $explicitCongestion): uint"
 )]
 pub(crate) fn send_message<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -63,11 +64,11 @@ pub(crate) fn send_message<'call>(
 ) -> Result<Value, Throw> {
     let host = arguments.local(2);
     let port =
-        u16::try_from(arguments.int(3)).map_err(|_| system_error(cx, "sendmsg", libc::EINVAL))?;
+        u16::try_from(arguments.uint(3)).map_err(|_| system_error(cx, "sendmsg", libc::EINVAL))?;
     let interface =
-        u32::try_from(arguments.int(5)).map_err(|_| system_error(cx, "sendmsg", libc::EINVAL))?;
+        u32::try_from(arguments.uint(5)).map_err(|_| system_error(cx, "sendmsg", libc::EINVAL))?;
     let congestion =
-        u8::try_from(arguments.int(6)).map_err(|_| system_error(cx, "sendmsg", libc::EINVAL))?;
+        u8::try_from(arguments.uint(6)).map_err(|_| system_error(cx, "sendmsg", libc::EINVAL))?;
     let count = with_descriptor(cx, &arguments.local(0), "sendmsg", |descriptor| {
         message::send(
             descriptor,
@@ -79,5 +80,5 @@ pub(crate) fn send_message<'call>(
             congestion,
         )
     })?;
-    Ok(Value::int(i64::try_from(count).unwrap_or(i64::MAX)))
+    Ok(Value::uint(count as u64))
 }

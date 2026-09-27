@@ -1,37 +1,47 @@
 use Whim\Str;
+use Whim\Math;
 use Whim\Unwind\OutOfBoundsError;
 use Whim\Unwind\OutOfBoundsException;
 use Whim\Unwind\TypeError;
 
 assert!(Str\split('a,b,,c', ',') == vec['a', 'b', '', 'c']);
 assert!(Str\split('abc', 'x') == vec['abc']);
-assert!(Str\split('a,b,c,d', ',', 2) == vec['a', 'b,c,d']);
+assert!(Str\split('a,b,c,d', ',', 2u) == vec['a', 'b,c,d']);
 assert!(Str\split('abc', '') == vec['a', 'b', 'c']);
 
 assert!(Str\split('', ',') == vec['']);
 assert!(
-  Str\split(',a,1234567,12345678,', ',')
-  == vec['', 'a', '1234567', '12345678', ''],
+  Str\split(',a,1234567,12345678,', ',') == vec[
+    '',
+    'a',
+    '1234567',
+    '12345678',
+    '',
+  ],
 );
+
 assert!(Str\split('1234567', ',') == vec['1234567']);
 assert!(Str\split('12345678', ',') == vec['12345678']);
-assert!(Str\split('a,b,c', ',', 100) == vec['a', 'b', 'c']);
-assert!(Str\split('a,1234567', ',', 2) == vec['a', '1234567']);
-assert!(Str\split('a,12345678', ',', 2) == vec['a', '12345678']);
-assert!(Str\split('a,12345678', ',', 1) == vec['a,12345678']);
+assert!(Str\split('a,b,c', ',', 100u) == vec['a', 'b', 'c']);
+assert!(Str\split('a,1234567', ',', 2u) == vec['a', '1234567']);
+assert!(Str\split('a,12345678', ',', 2u) == vec['a', '12345678']);
+assert!(Str\split('a,12345678', ',', 1u) == vec['a,12345678']);
 assert!(
-  Str\split('--a----12345678--', '--')
-  == vec['', 'a', '', '12345678', ''],
+  Str\split('--a----12345678--', '--') == vec['', 'a', '', '12345678', ''],
 );
+
 assert!(Str\split('aaaaa', 'aa') == vec['', '', 'a']);
 assert!(
-  Str\split("\x00\xff12345,\x00\xff123456", ',')
-  == vec["\x00\xff12345", "\x00\xff123456"],
+  Str\split("\x00\xff12345,\x00\xff123456", ',') == vec[
+    "\x00\xff12345",
+    "\x00\xff123456",
+  ],
 );
+
 assert!(Str\split("a\x00b\x00", "\x00") == vec['a', 'b', '']);
-assert!(Whim\_Private\string_split('a,b,', ',', 0) == vec['a', 'b', '']);
-assert!(Whim\_Private\string_split('abc', '', 0) == vec['abc']);
-assert!(Whim\_Private\string_split('abc', '', 2) == vec['abc']);
+assert!(Whim\_Private\string_split('a,b,', ',', 0u) == vec['a', 'b', '']);
+assert!(Whim\_Private\string_split('abc', '', 0u) == vec['abc']);
+assert!(Whim\_Private\string_split('abc', '', 2u) == vec['abc']);
 
 $split_expected = vec['', 'a', '1234567', '12345678', ''];
 $split_source = Str\join(',', $split_expected);
@@ -53,14 +63,32 @@ assert!(Str\lowercase('MiXeD 123!') == 'mixed 123!');
 assert!(Str\uppercase('MiXeD 123!') == 'MIXED 123!');
 assert!(Str\uppercase('') == '');
 assert!(Str\uppercase("ALREADY UPPER\x00\xff") == "ALREADY UPPER\x00\xff");
-foreach (vec[1, 7, 8, 23, 24, 31, 32, 33, 63, 64, 65, 255, 256, 257] as $length) {
-  $input = Str\repeat('a', $length - 1) . 'z';
-  assert!(Str\uppercase($input) == Str\repeat('A', $length - 1) . 'Z');
+foreach (vec[
+  1u,
+  7u,
+  8u,
+  23u,
+  24u,
+  31u,
+  32u,
+  33u,
+  63u,
+  64u,
+  65u,
+  255u,
+  256u,
+  257u,
+] as $length) {
+  $input = Str\repeat('a', $length - 1u) . 'z';
+  assert!(Str\uppercase($input) == Str\repeat('A', $length - 1u) . 'Z');
   assert!(
-    Str\uppercase(Str\repeat("aZ\x00\xff", $length))
-    == Str\repeat("AZ\x00\xff", $length),
+    Str\uppercase(Str\repeat("aZ\x00\xff", $length)) == Str\repeat(
+      "AZ\x00\xff",
+      $length,
+    ),
   );
 }
+
 $all_bytes = '';
 $uppercase_bytes = '';
 for ($byte = 0; $byte < 256; $byte += 1) {
@@ -69,8 +97,10 @@ for ($byte = 0; $byte < 256; $byte += 1) {
   if ($byte >= 97 && $byte <= 122) {
     $upper_byte -= 32;
   }
+
   $uppercase_bytes .= Str\chr($upper_byte);
 }
+
 assert!(Str\uppercase($all_bytes) == $uppercase_bytes);
 assert!(Str\capitalize('hello') == 'Hello');
 assert!(Str\capitalize_words('hello world') == 'Hello World');
@@ -87,9 +117,9 @@ assert!(Str\trim_left('xxhixx', 'x') == 'hixx');
 assert!(Str\trim_right('xxhixx', 'x') == 'xxhi');
 assert!(Str\trim('aAbchixba', 'a..c') == 'Abchix');
 
-assert!(Str\pad_left('7', 3, '0') == '007');
-assert!(Str\pad_right('7', 3, '.') == '7..');
-assert!(Str\pad_left('long', 2, '0') == 'long');
+assert!(Str\pad_left('7', 3u, '0') == '007');
+assert!(Str\pad_right('7', 3u, '.') == '7..');
+assert!(Str\pad_left('long', 2u, '0') == 'long');
 
 assert!(Str\ord('A') == 65);
 assert!(Str\chr(66) == 'B');
@@ -101,9 +131,9 @@ assert!(Str\byte_at('☕', 0) == 226);
 assert!(Str\to_bytes("A\x00\xff") == vec[65, 0, 255]);
 assert!(Str\to_bytes(string: "\x00\xff") == vec[0, 255]);
 assert!(Str\from_bytes(vec[65, 0, 255]) == "A\x00\xff");
-assert!(Str\repeat('ab', 3) == 'ababab');
-assert!(Str\repeat('ab', 0) == '');
-assert!(Str\repeat('', 100) == '');
+assert!(Str\repeat('ab', 3u) == 'ababab');
+assert!(Str\repeat('ab', 0u) == '');
+assert!(Str\repeat('', 100u) == '');
 
 assert!(Str\is_whitespace(' '));
 assert!(Str\is_whitespace("\t"));
@@ -129,12 +159,12 @@ assert!(Str\is_ascii_punctuation('!'));
 assert!(Str\is_ascii_punctuation('~'));
 assert!(!(Str\is_ascii_punctuation('A')));
 
-assert!(Str\search('hello world', 'world') == 6);
+assert!(Str\search('hello world', 'world') == 6u);
 assert!(Str\search('hello', 'xyz') == null);
-assert!(Str\search('banana', 'a', -3) == 3);
-assert!(Str\search_ci('Hello World', 'WORLD') == 6);
-assert!(Str\search_last('ab ab ab', 'ab') == 6);
-assert!(Str\search_last_ci('ab AB ab', 'AB') == 6);
+assert!(Str\search('banana', 'a', -3) == 3u);
+assert!(Str\search_ci('Hello World', 'WORLD') == 6u);
+assert!(Str\search_last('ab ab ab', 'ab') == 6u);
+assert!(Str\search_last_ci('ab AB ab', 'AB') == 6u);
 
 assert!(Str\contains('haystack', 'stack'));
 assert!(Str\contains_ci('HAYSTACK', 'stack'));
@@ -142,7 +172,7 @@ assert!(Str\starts_with('haystack', 'hay'));
 assert!(Str\ends_with('haystack', 'stack'));
 
 assert!(Str\slice('haystack', 3) == 'stack');
-assert!(Str\slice('haystack', 0, 3) == 'hay');
+assert!(Str\slice('haystack', 0, 3u) == 'hay');
 $assertion_value_70 = fn(): string => Str\slice('short', 99);
 $assertion_error_70 = null;
 try {
@@ -172,7 +202,8 @@ final class ReplacementIterator implements
   }
 }
 
-assert!(Str\length('hello') == 5);
+assert!(Str\length('hello') == 5u);
+assert!(Str\length('') == 0u);
 $assertion_value_73 = fn(): int => Str\ord('');
 $assertion_error_73 = null;
 try {
@@ -203,24 +234,47 @@ assert!($assertion_error_75 is OutOfBoundsError);
 
 assert!(Str\compare('a', 'b')->isLess());
 assert!(Str\compare_ci('A', 'a')->isEqual());
+assert!(Str\compare('prefixA', 'prefixB', 6u)->isEqual());
+assert!(Str\compare_ci('ABCx', 'abcy', 3u)->isEqual());
+assert!(Str\compare('a', 'b', Math\UINT_MAX)->isLess());
+assert!(Str\compare_ci('a', 'B', Math\UINT_MAX)->isLess());
+assert!(Str\compare('a', 'b', 0u)->isEqual());
 
-assert!(Str\search('banana', 'a', 2) == 3);
-assert!(Str\search('banana', 'ana', 2) == 3);
-assert!(Str\search('hello', '') == 0);
-assert!(Str\search_last('ababa', 'ba') == 3);
-assert!(Str\search_last('banana', 'a', 2) == 5);
-assert!(Str\search_last('bananana', 'ana', 2) == 5);
+assert!(Str\search('banana', 'a', 2) == 3u);
+assert!(Str\search('banana', 'ana', 2) == 3u);
+assert!(Str\search('hello', '') == 0u);
+assert!(Str\search_last('ababa', 'ba') == 3u);
+assert!(Str\search_last('banana', 'a', 2) == 5u);
+assert!(Str\search_last('bananana', 'ana', 2) == 5u);
 assert!(Str\search_last('banana', 'xyz') == null);
 assert!(Str\starts_with('hello', ''));
 assert!(Str\ends_with('hello', ''));
 
-assert!(Str\slice('hello', 1, 100) == 'ello');
-assert!(Str\splice('hello', 'i', 1, 3) == 'hio');
-assert!(Str\chunk('abcde', 2) == vec['ab', 'cd', 'e']);
-assert!(Str\split('a,b,c', ',', 1) == vec['a,b,c']);
+assert!(Str\slice('hello', 1, 100u) == 'ello');
+assert!(Str\splice('hello', 'i', 1, 3u) == 'hio');
+assert!(Str\slice('hello', 1, Math\UINT_MAX) == 'ello');
+assert!(Str\slice('hello', -2, Math\UINT_MAX) == 'lo');
+assert!(Str\slice('hello', 5, Math\UINT_MAX) == '');
+assert!(Str\slice('hello', 1, 0u) == '');
+assert!(Str\splice('hello', 'i', 1, Math\UINT_MAX) == 'hi');
+assert!(Str\splice('hello', '!', 5, Math\UINT_MAX) == 'hello!');
+assert!(Str\chunk('abcde', 2u) == vec['ab', 'cd', 'e']);
+assert!(Str\chunk('abcde', 0xffff_ffff_ffff_ffffu) == vec['abcde']);
+assert!(Str\split('a,b,c', ',', 1u) == vec['a,b,c']);
 assert!(Str\split('a--b--c', '--') == vec['a', 'b', 'c']);
-assert!(Str\split('a--b--c', '--', 2) == vec['a', 'b--c']);
-assert!(Str\split('Hello', '', 2) == vec['H', 'ello']);
+assert!(Str\split('a--b--c', '--', 2u) == vec['a', 'b--c']);
+assert!(Str\split('Hello', '', 2u) == vec['H', 'ello']);
+assert!(
+  Str\split('Hello', '', 0xffff_ffff_ffff_ffffu) == vec[
+    'H',
+    'e',
+    'l',
+    'l',
+    'o',
+  ],
+);
+
+assert!(Str\split('a,b,c', ',', 0xffff_ffff_ffff_ffffu) == vec['a', 'b', 'c']);
 assert!(Str\before('a:b', ':') == 'a');
 assert!(Str\after('a:b', ':') == 'b');
 
@@ -240,17 +294,17 @@ assert!(Str\strip_suffix('hello', 'lo') == 'hel');
 assert!(Str\trim(" \thello\n", null) == 'hello');
 assert!(Str\words('Hello, World!', '!, ') == dict[0 => 'Hello, World!']);
 
-assert!(Str\wrap('hello world', 5, '|') == 'hello|world');
+assert!(Str\wrap('hello world', 5u, '|') == 'hello|world');
 assert!(
-  Str\wrap('The quick brown fox', 10, '<BR>') == 'The quick<BR>brown fox',
+  Str\wrap('The quick brown fox', 10u, '<BR>') == 'The quick<BR>brown fox',
 );
 
-assert!(Str\wrap('aaa bbb ccc', 4, '<BR>') == 'aaa<BR>bbb<BR>ccc');
-assert!(Str\wrap('word  double  spaces', 6, '|') == 'word|double|spaces');
+assert!(Str\wrap('aaa bbb ccc', 4u, '<BR>') == 'aaa<BR>bbb<BR>ccc');
+assert!(Str\wrap('word  double  spaces', 6u, '|') == 'word|double|spaces');
 
-assert!(Str\wrap('hi toolongword', 5, '|', false) == 'hi|toolongword');
+assert!(Str\wrap('hi toolongword', 5u, '|', false) == 'hi|toolongword');
 
-assert!(Str\wrap('☕ ☕ ☕', 1, ' ~ ') == '☕ ~ ☕ ~ ☕');
-assert!(Str\wrap('héllö, wôrld', 8, "-\n", true) == "héllö,-\nwôrld");
+assert!(Str\wrap('☕ ☕ ☕', 1u, ' ~ ') == '☕ ~ ☕ ~ ☕');
+assert!(Str\wrap('héllö, wôrld', 8u, "-\n", true) == "héllö,-\nwôrld");
 
-assert!(Str\wrap('مرحبا بكم', 3, '<br />', false) == 'مرحبا<br />بكم');
+assert!(Str\wrap('مرحبا بكم', 3u, '<br />', false) == 'مرحبا<br />بكم');

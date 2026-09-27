@@ -4,18 +4,17 @@ use Whim\Async\Deferred;
 use Whim\Async\Future;
 use Whim\HTTP\Message\Exchange;
 use Whim\Marker\MustUse;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\Throwable;
 
 /** Collects the pushed exchanges associated with one request. */
 final class PushCollection {
   private Deferred<vec<Exchange>> $deferred;
   private vec<Exchange> $exchanges = vec[];
-  private NonNegativeInt $accepted = 0;
-  private NonNegativeInt $pending = 0;
+  private uint $accepted = 0u;
+  private uint $pending = 0u;
   private bool $sealed = false;
 
-  public function __construct(private NonNegativeInt $maximum) {
+  public function __construct(private uint $maximum) {
     $this->deferred = new Deferred::<vec<Exchange>>();
   }
 
@@ -51,7 +50,7 @@ final class PushCollection {
 
   /** Releases a reserved result that the server cancelled. */
   public function cancel(): void {
-    if ($this->deferred->isComplete() || 0 == $this->pending) {
+    if ($this->deferred->isComplete() || 0u == $this->pending) {
       return;
     }
 
@@ -73,7 +72,7 @@ final class PushCollection {
   private function finish(): void {
     if (
       $this->sealed
-      && 0 == $this->pending
+      && 0u == $this->pending
       && !$this->deferred->isComplete()
     ) {
       $this->deferred->complete($this->exchanges);

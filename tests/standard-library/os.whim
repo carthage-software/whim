@@ -28,6 +28,8 @@ if (operating_system!() != 'windows') {
 
 $memory = OS\memory();
 assert!($memory is MemoryInformation);
+assert!($memory->total is uint);
+assert!($memory->available is uint);
 assert!($memory->total > 0);
 assert!($memory->available <= $memory->total);
 
@@ -36,9 +38,9 @@ if (operating_system!() == 'windows') {
   foreach (vec[fn(): void {
     discard!(OS\load_averages());
   }, fn(): void {
-    discard!(OS\find_user(0));
+    discard!(OS\find_user(0u));
   }, fn(): void {
-    discard!(OS\find_group(0));
+    discard!(OS\find_group(0u));
   }] as $operation) {
     $caught = false;
     try {
@@ -56,6 +58,8 @@ if (operating_system!() == 'windows') {
 $identity = Process\get_user_identity();
 $user = OS\find_user($identity->effective);
 assert!($user is User);
+assert!($user->id is uint);
+assert!($user->primaryGroupId is uint);
 assert!($user->id == $identity->effective);
 assert!($user->name != '');
 if ($user->homeDirectory != null) {
@@ -74,6 +78,7 @@ assert!($sameUser->primaryGroupId == $user->primaryGroupId);
 
 $primaryGroup = OS\find_group($user->primaryGroupId);
 assert!($primaryGroup is Group);
+assert!($primaryGroup->id is uint);
 assert!($primaryGroup->id == $user->primaryGroupId);
 assert!($primaryGroup->name != '');
 

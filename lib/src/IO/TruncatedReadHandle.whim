@@ -58,7 +58,7 @@ final class TruncatedReadHandle implements ReadHandle {
     }
 
     $data = $this->handle->tryRead($wanted);
-    $this->consumed += length!($data);
+    $this->consumed += length!($data) as int;
     return $data;
   }
 }

@@ -45,7 +45,9 @@ Use `URI` for a relative reference, `IRI` for an international identifier, and
 
 ## Endpoints and streams
 
-`Network\InternetEndpoint` stores an `IP\Address` and port. `UnixEndpoint`
+`Network\InternetEndpoint` stores an `IP\Address` and a `Uint16` port.
+Ports use uint literals such as `443u`; `0u` asks the system to choose a local
+port when binding. `UnixEndpoint`
 stores a local socket path or `null` for an unnamed endpoint.
 
 `Network\Stream<TEndpoint>` is a read, write, close, and file-descriptor handle.
@@ -71,7 +73,8 @@ implement both the TCP and TLS stream contracts.
 
 `UDP\bind()` returns a datagram socket. `sendTo` sends bytes and metadata to an
 endpoint. `receive` and `tryReceive` return a `Datagram` with bytes, sender,
-destination details, and congestion data when the host supplies it.
+destination details, and congestion data when the host supplies it. Received
+and outgoing interface indices use `uint`.
 
 Connecting a UDP socket fixes its peer and returns `ConnectedSocket`; it does
 not create a byte stream. Connected sends still preserve datagram boundaries.
@@ -81,11 +84,11 @@ sizes.
 
 On FreeBSD, IPv4 send metadata supports source addresses and congestion bits,
 but not an explicit outgoing interface. Leave `interfaceIndex` in `SendMetadata`
-at `0` for IPv4; a nonzero value throws `NetworkException`. Received datagrams
+at `0u` for IPv4; a nonzero value throws `NetworkException`. Received datagrams
 still report their interface index, and IPv6 supports selecting an interface.
 A socket bound to a specific IPv4 address must use that source address.
 On FreeBSD 14.4, sockets bound or connected to an IPv4-mapped IPv6 address do not
-receive packet metadata: datagrams report an interface index of `0` and
+receive packet metadata: datagrams report an interface index of `0u` and
 `ExplicitCongestion::NotCapable`. Bind to an IPv4 address, or use an unconnected
 dual-stack socket bound to `::`, when you need that metadata.
 

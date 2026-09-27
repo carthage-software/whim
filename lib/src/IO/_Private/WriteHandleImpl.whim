@@ -47,7 +47,7 @@ final class WriteHandleImpl implements
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     try {
       return Whim\_Private\write_descriptor($this->descriptor, $bytes);
     } catch (Whim\_Private\SystemError $error) {
@@ -60,9 +60,9 @@ final class WriteHandleImpl implements
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     if ('' == $bytes) {
-      return 0;
+      return 0u;
     }
 
     while (true) {

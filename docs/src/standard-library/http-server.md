@@ -65,6 +65,13 @@ connections, connections per peer, concurrent requests, server pushes, header
 and body sizes, requests per connection, HTTP/2 settings, middleware, and the
 error responder.
 
+The request-body size and server-push limits use `uint`, such as
+`maximumRequestBodySize: 10_485_760u` and `maximumServerPushes: 100u`.
+Connection, concurrent-request, header-size, and requests-per-connection limits
+use `NonZero<uint>`, such as `maximumConnections: 1_000u`.
+`CORS::maxAge` and `RequestDecompression::maximumDecodedBytes` also use uint
+values; `maxAge` may be null.
+
 ## Middleware
 
 Server middleware receives context, request, next handler, and cancellation. It

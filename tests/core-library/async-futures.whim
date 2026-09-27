@@ -87,7 +87,7 @@ $mapped = $lazySource->map::<int>(fn(int $value): int {
   return $value + 1;
 });
 
-assert!(length!($observation->events) == 0);
+assert!(length!($observation->events) == 0u);
 assert!($mapped->await() == 2);
 assert!($observation->events == vec['task', 'mapped']);
 
@@ -105,7 +105,7 @@ $then = $thenSource->then::<int>(fn(int $value): int {
   return 0;
 });
 
-assert!(length!($observation->events) == 0);
+assert!(length!($observation->events) == 0u);
 assert!($then->await() == 3);
 assert!($observation->events == vec['then source', 'then success']);
 
@@ -120,7 +120,7 @@ $caught = $catchSource->catch::<int>(fn(Throwable $_): int {
   return 4;
 });
 
-assert!(length!($observation->events) == 0);
+assert!(length!($observation->events) == 0u);
 assert!($caught->await() == 4);
 assert!($observation->events == vec['catch source', 'catch failure']);
 
@@ -134,7 +134,7 @@ $always = $alwaysSource->always(fn(): void {
   $observation->events[] = 'always callback';
 });
 
-assert!(length!($observation->events) == 0);
+assert!(length!($observation->events) == 0u);
 assert!($always->await() == 5);
 assert!($observation->events == vec['always source', 'always callback']);
 
@@ -269,7 +269,7 @@ try {
 }
 
 assert!($selectionFailure is CompositeException);
-assert!(length!($selectionFailure->getReasons()) == 32);
+assert!(length!($selectionFailure->getReasons()) == 32u);
 foreach ($trackedFailures as $tracked) {
   assert!($tracked->awaits == 1);
 }
@@ -355,7 +355,7 @@ try {
 
 assert!($doubleFailure is CompositeException);
 
-assert!(length!($doubleFailure->getReasons()) == 2);
+assert!(length!($doubleFailure->getReasons()) == 2u);
 
 $selectRecorder = new FutureEventRecorder();
 $selectWorker = Async\spawn::<int>(fn(): int {

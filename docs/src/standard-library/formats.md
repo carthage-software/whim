@@ -129,6 +129,12 @@ matches, or split a string. `Regex\escape($literal)` quotes bytes for a pattern.
 `MatchResult` exposes its byte `start`, `end`, full `value`, byte `length`, and
 numbered or named captures. An absent or unmatched capture returns `null`.
 
+Match offsets and lengths use `uint`. `matches` and `find` accept a uint
+offset, defaulting to `0u`; an offset beyond the subject returns no match.
+`replaceAll` takes a `null|uint` limit. `capture` accepts a uint index or a
+name, while the public `captures` dictionary keeps its signed numeric keys.
+An out-of-range capture index returns `null`.
+
 Patterns work on bytes. Validate or repair UTF-8 first when an application
 needs Unicode text rules.
 

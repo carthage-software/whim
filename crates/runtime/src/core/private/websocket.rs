@@ -35,9 +35,9 @@ use crate::builtin::throw::Throw;
 const CODEC: &str = "Whim\\_Private\\WebSocketCodec";
 const EXCEPTION: &[u8] = b"Whim\\HTTP\\WebSocket\\Exception";
 const GUID: &[u8] = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-const EVENT_TEXT: i64 = 1;
-const EVENT_BINARY: i64 = 2;
-const EVENT_CLOSE: i64 = 8;
+const EVENT_TEXT: u64 = 1;
+const EVENT_BINARY: u64 = 2;
+const EVENT_CLOSE: u64 = 8;
 
 #[derive(Debug, Default)]
 struct BufferTransport {
@@ -117,9 +117,9 @@ impl CodecState {
 }
 
 struct Event {
-    kind: i64,
+    kind: u64,
     payload: Vec<u8>,
-    close_code: i64,
+    close_code: u64,
 }
 
 #[whim_class("Whim\\_Private\\WebSocketCodec", final)]
@@ -136,7 +136,7 @@ impl WebSocketCodec {
     const fn construct() {}
 
     #[whim_method(
-        "server(1.. $maximumMessageSize, 1.. $maximumFrameSize): Whim\\_Private\\WebSocketCodec",
+        "server(1u.. $maximumMessageSize, 1u.. $maximumFrameSize): Whim\\_Private\\WebSocketCodec",
         static,
         must_use
     )]
@@ -148,7 +148,7 @@ impl WebSocketCodec {
     }
 
     #[whim_method(
-        "client(1.. $maximumMessageSize, 1.. $maximumFrameSize): Whim\\_Private\\WebSocketCodec",
+        "client(1u.. $maximumMessageSize, 1u.. $maximumFrameSize): Whim\\_Private\\WebSocketCodec",
         static,
         must_use
     )]
@@ -188,7 +188,7 @@ impl WebSocketCodec {
         Ok(Value::null())
     }
 
-    #[whim_method("nextEvent(): null|(int, string, int)", must_use)]
+    #[whim_method("nextEvent(): null|(uint, string, uint)", must_use)]
     fn next_event(context: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         let event = with_state(context, receive_event)?;
         let Some(event) = event else {
@@ -196,9 +196,9 @@ impl WebSocketCodec {
         };
 
         Ok(context.tuple([
-            Value::int(event.kind),
+            Value::uint(event.kind),
             Value::from_string_vec(context.vm.heap(), event.payload),
-            Value::int(event.close_code),
+            Value::uint(event.close_code),
         ]))
     }
 
@@ -263,12 +263,12 @@ impl WebSocketCodec {
         Ok(Value::null())
     }
 
-    #[whim_method("close(null|int $code = null, string $reason = ''): void")]
+    #[whim_method("close(null|uint $code = null, string $reason = ''): void")]
     fn close<'call>(
         context: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let code = arguments.optional_int(0);
+        let code = (!arguments.is_absent(0)).then(|| arguments.uint(0));
         let reason: &[u8] = if arguments.is_absent(1) {
             &[]
         } else {
@@ -301,12 +301,12 @@ fn create_codec<'call>(
 ) -> Result<Value, Throw> {
     let maximum_message_size = size(
         context,
-        arguments.int(0),
+        arguments.uint(0),
         "the maximum WebSocket message size is out of range",
     )?;
     let maximum_frame_size = size(
         context,
-        arguments.int(1),
+        arguments.uint(1),
         "the maximum WebSocket frame size is out of range",
     )?;
     let object = context.new_built_in_instance(CODEC)?;
@@ -419,7 +419,7 @@ fn receive_event(state: &mut CodecState) -> Result<Option<Event>, StateError> {
                 let (payload, close_code) = match frame {
                     Some(frame) => (
                         frame.reason.as_bytes().to_vec(),
-                        i64::from(u16::from(frame.code)),
+                        u64::from(u16::from(frame.code)),
                     ),
                     None => (Vec::new(), 0),
                 };
@@ -502,7 +502,7 @@ const fn close_code_for_error(error: &WebSocketError) -> u16 {
 
 fn close_frame(
     context: &mut Context<'_, '_, '_>,
-    code: Option<i64>,
+    code: Option<u64>,
     reason: &[u8],
 ) -> Result<Option<CloseFrame>, Throw> {
     let Some(code) = code else {
@@ -552,7 +552,7 @@ fn close_frame(
     }))
 }
 
-fn size(context: &mut Context<'_, '_, '_>, value: i64, message: &str) -> Result<usize, Throw> {
+fn size(context: &mut Context<'_, '_, '_>, value: u64, message: &str) -> Result<usize, Throw> {
     usize::try_from(value)
         .ok()
         .filter(|value| *value != 0)

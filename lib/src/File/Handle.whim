@@ -14,7 +14,7 @@ interface Handle extends SeekHandle, FileDescriptorHandle {
 
   /** Returns the current file size in bytes. */
   #[TrackCaller]
-  public function getSize(): int;
+  public function getSize(): uint;
 
   /** Attempts to run a callback while holding an advisory lock. */
   #[TrackCaller]

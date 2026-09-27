@@ -10,21 +10,21 @@ fn joined_literal_lengths_fold_without_losing_other_inputs_or_uses() {
         function label(int $value): string {
             return match (($value & 1) == 0) { true => 'even', _ => 'odd' };
         }
-        function inlined(int $value): int { return length!(label($value)); }
-        function direct(bool $condition): int {
+        function inlined(int $value): uint { return length!(label($value)); }
+        function direct(bool $condition): uint {
             return length!(match ($condition) { true => 'even', _ => 'odd' });
         }
-        function bytes(bool $condition): int {
+        function bytes(bool $condition): uint {
             return length!(match ($condition) { true => 'é', _ => '' });
         }
-        function reused(bool $condition): (string, int) {
+        function reused(bool $condition): (string, uint) {
             $value = match ($condition) { true => 'even', _ => 'odd' };
             return ($value, length!($value));
         }
-        function coalesced(string|null $value, bool $condition): int {
+        function coalesced(string|null $value, bool $condition): uint {
             return length!($value ?? match ($condition) { true => 'even', _ => 'odd' });
         }
-        function dynamic(bool $condition, string $value): int {
+        function dynamic(bool $condition, string $value): uint {
             return length!(match ($condition) { true => 'even', _ => $value });
         }
         ",

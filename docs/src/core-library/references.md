@@ -59,7 +59,7 @@ The main methods are:
 - `has($key): bool`
 - `get($key): V`
 - `remove($key): V`
-- `length(): int`
+- `length(): uint`
 
 `get` and `remove` throw `OutOfBoundsError` when the key has no entry.
 

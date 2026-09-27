@@ -29,7 +29,6 @@ use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\OS\FileDescriptor;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 use Whim\Str\contains;
 use Whim\Str\ends_with;
 use Whim\Str\lowercase;
@@ -77,7 +76,7 @@ final readonly class StaticFiles implements Handler {
     }
 
     while (length!($prefix) > 1 && ends_with($prefix, '/')) {
-      $prefix = slice($prefix, 0, length!($prefix) - 1) as NonEmptyString;
+      $prefix = slice($prefix, 0, length!($prefix) - 1u) as NonEmptyString;
     }
 
     if (null != $index && !$this->validRelativePath($index)) {
@@ -144,9 +143,9 @@ final readonly class StaticFiles implements Handler {
     }
 
     ($descriptor, $metadata) = $opened;
-    $size = $metadata[4] as NonNegativeInt;
-    $modifiedSeconds = $metadata[11];
-    $modifiedNanoseconds = $metadata[12];
+    $size = $metadata[4] as uint;
+    $modifiedSeconds = $metadata[11] as int;
+    $modifiedNanoseconds = $metadata[12] as int;
     $etag = $this->etag($metadata);
     $lastModified = Formatter::httpDate()->formatZonedDateTime(
       TimeZone::utc()->at(
@@ -171,7 +170,7 @@ final readonly class StaticFiles implements Handler {
       && $this->ifRangeMatches($request, $modifiedSeconds)
     ) {
       $range = match (length!($rangeFields)) {
-        1 => $this->parseRange($rangeFields[0], $size),
+        1u => $this->parseRange($rangeFields[0], $size),
         _ => false,
       };
     }
@@ -244,13 +243,13 @@ final readonly class StaticFiles implements Handler {
       return null;
     }
 
-    return slice($path, length!($mount));
+    return slice($path, length!($mount) as int);
   }
 
   /** Builds representation fields for a regular file. */
   private function responseHeaders(
     string $path,
-    NonNegativeInt $size,
+    uint $size,
     string $etag,
     string $lastModified,
   ): FieldMap {
@@ -278,7 +277,7 @@ final readonly class StaticFiles implements Handler {
 
   /** Builds a weak validator from stable file metadata. */
   #[MustUse]
-  private function etag(vec<int> $metadata): string {
+  private function etag(vec<int|uint> $metadata): string {
     return (
       'W/"'
       . $metadata[7]
@@ -337,8 +336,9 @@ final readonly class StaticFiles implements Handler {
   /** Parses one byte range, returning false when it is unsatisfiable. */
   private function parseRange(
     string $field,
-    NonNegativeInt $size,
+    uint $size,
   ): null|false|(int, int) {
+    $size = $size as int;
     $field = trim($field);
     if (!starts_with($field, 'bytes=')) {
       return null;
@@ -350,7 +350,7 @@ final readonly class StaticFiles implements Handler {
     }
 
     $parts = split($value, '-');
-    if (length!($parts) != 2 || 0 == $size) {
+    if (length!($parts) != 2u || 0 == $size) {
       return false;
     }
 
@@ -449,7 +449,7 @@ final readonly class StaticFiles implements Handler {
       return 'application/octet-stream';
     }
 
-    $extension = lowercase(slice($path, $dot + 1));
+    $extension = lowercase(slice($path, ($dot as int) + 1));
     return match ($extension) {
       'html' => 'text/html; charset=utf-8',
       'htm' => 'text/html; charset=utf-8',

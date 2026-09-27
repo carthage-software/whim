@@ -13,8 +13,8 @@ use Whim\OS\FileDescriptor;
 #[TraceBoundary]
 function read_file(
   string $path,
-  (0..) $offset,
-  null|(1..) $maximumBytes,
+  uint $offset,
+  null|(1u..) $maximumBytes,
 ): string {}
 
 /** Represents one file operation running on the blocking worker pool. */
@@ -28,7 +28,7 @@ final class FileOperation {
   #[TraceBoundary]
   public static function read(
     FileDescriptor $descriptor,
-    1.. $maximumBytes,
+    1u.. $maximumBytes,
   ): FileOperation {}
 
   /** Starts reading bytes directly from a path. */
@@ -37,8 +37,8 @@ final class FileOperation {
   #[TraceBoundary]
   public static function readPath(
     string $path,
-    (0..) $offset,
-    null|(1..) $maximumBytes,
+    uint $offset,
+    null|(1u..) $maximumBytes,
   ): FileOperation {}
 
   /** Starts writing bytes to a descriptor. */
@@ -64,7 +64,7 @@ final class FileOperation {
   #[TraceBoundary]
   public static function truncate(
     FileDescriptor $descriptor,
-    (0..) $length,
+    uint $length,
   ): FileOperation {}
 
   /** Starts reading descriptor metadata. */
@@ -133,7 +133,7 @@ final class FileOperation {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function takeInt(): null|int {}
+  public function takeUint(): null|uint {}
 
   /** Takes a completed boolean result. */
   #[MustUse]
@@ -145,7 +145,7 @@ final class FileOperation {
   #[MustUse]
   #[TrackCaller]
   #[TraceBoundary]
-  public function takeMetadata(): null|vec<int> {}
+  public function takeMetadata(): null|vec<int|uint> {}
 
   /** Takes a completed descriptor. */
   #[MustUse]

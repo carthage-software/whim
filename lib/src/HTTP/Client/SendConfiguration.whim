@@ -5,8 +5,7 @@ use Whim\HTTP\Message\ProtocolVersion;
 use Whim\HTTP\Message\Response;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\Time\Duration;
 use Whim\TLS;
 use Whim\URL\URL;
@@ -15,9 +14,9 @@ use Whim\URL\URL;
 final readonly class SendConfiguration {
   #[AlwaysInline]
   public function __construct(
-    public null|PositiveInt $maximumResponseHeaderSize = null,
-    public null|PositiveInt $maximumResponseBodySize = null,
-    public null|NonNegativeInt $maximumInformationalResponses = null,
+    public null|NonZero<uint> $maximumResponseHeaderSize = null,
+    public null|NonZero<uint> $maximumResponseBodySize = null,
+    public null|uint $maximumInformationalResponses = null,
     public null|URL $baseURL = null,
     public null|TLS\ClientConfiguration $tls = null,
     public null|H2\Configuration $h2 = null,
@@ -30,7 +29,7 @@ final readonly class SendConfiguration {
   #[AlwaysInline]
   #[MustUse]
   public function withMaximumResponseHeaderSize(
-    null|PositiveInt $size,
+    null|NonZero<uint> $size,
   ): SendConfiguration {
     return clone!($this, maximumResponseHeaderSize: $size);
   }
@@ -38,7 +37,7 @@ final readonly class SendConfiguration {
   #[AlwaysInline]
   #[MustUse]
   public function withMaximumResponseBodySize(
-    null|PositiveInt $size,
+    null|NonZero<uint> $size,
   ): SendConfiguration {
     return clone!($this, maximumResponseBodySize: $size);
   }
@@ -46,7 +45,7 @@ final readonly class SendConfiguration {
   #[AlwaysInline]
   #[MustUse]
   public function withMaximumInformationalResponses(
-    null|NonNegativeInt $maximum,
+    null|uint $maximum,
   ): SendConfiguration {
     return clone!($this, maximumInformationalResponses: $maximum);
   }

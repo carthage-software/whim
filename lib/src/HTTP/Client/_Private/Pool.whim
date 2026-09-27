@@ -10,7 +10,6 @@ use Whim\HTTP\Message\Request;
 use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\Throwable;
 
 /** Owns checked-in HTTP connections. */
@@ -21,8 +20,8 @@ final class Pool {
 
   public function __construct(
     private Connector $connector,
-    private NonNegativeInt $maximumIdleConnections,
-    private NonNegativeInt $maximumIdleConnectionsPerOrigin,
+    private uint $maximumIdleConnections,
+    private uint $maximumIdleConnectionsPerOrigin,
   ) {}
 
   #[MustUse]
@@ -149,8 +148,8 @@ final class Pool {
     }
 
     if (
-      0 == $this->maximumIdleConnections
-      || 0 == $this->maximumIdleConnectionsPerOrigin
+      0u == $this->maximumIdleConnections
+      || 0u == $this->maximumIdleConnectionsPerOrigin
     ) {
       $this->close($entry->connection);
       return;
@@ -162,7 +161,7 @@ final class Pool {
   }
 
   private function evictOrigin(Origin $origin): void {
-    $count = 0;
+    $count = 0u;
     foreach ($this->idle as $entry) {
       if ($entry->hasOrigin($origin)) {
         $count++;
@@ -193,7 +192,7 @@ final class Pool {
 
   private function evictShared(): void {
     if (
-      0 == $this->maximumIdleConnections
+      0u == $this->maximumIdleConnections
       || length!($this->shared) < $this->maximumIdleConnections
     ) {
       return;

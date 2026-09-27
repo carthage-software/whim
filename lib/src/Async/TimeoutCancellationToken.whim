@@ -15,7 +15,7 @@ final class TimeoutCancellationToken implements CancellationToken {
   private null|CancelledException $exception = null;
   private CallbackRegistry $callbacks;
   private Duration $timeout;
-  private int $startedAt;
+  private uint $startedAt;
   private null|Whim\_Private\TaskId $watcher = null;
   private null|CancellationToken $parent;
   private null|int $parentSubscription = null;
@@ -103,8 +103,10 @@ final class TimeoutCancellationToken implements CancellationToken {
   /** Returns elapsed seconds and nanoseconds. */
   #[NeverInline]
   private function elapsed(): (int, int) {
-    $nanoseconds =
-      Whim\_Private\get_high_resolution_nanoseconds() - $this->startedAt;
+    $nanoseconds = (
+      Whim\_Private\get_high_resolution_nanoseconds() - $this->startedAt
+    )
+      as int;
 
     return (
       Math\div($nanoseconds, 1_000_000_000),
@@ -191,7 +193,7 @@ final class TimeoutCancellationToken implements CancellationToken {
       }
     }
 
-    if (length!($errors) == 1) {
+    if (length!($errors) == 1u) {
       throw $errors[0];
     }
 
@@ -217,13 +219,15 @@ final class TimeoutCancellationToken implements CancellationToken {
       }
     }
 
-    return $this->callbacks->insert($callback);
+    return $this->callbacks->insert($callback) as int;
   }
 
   /** Removes a registered cancellation callback. */
   #[TrackCaller]
   public function unregister(int $id): void {
-    $this->callbacks->remove($id);
+    if ($id >= 0) {
+      $this->callbacks->remove($id as uint);
+    }
 
     if ($this->callbacks->isEmpty() && !$this->cancelled) {
       $this->disarm();

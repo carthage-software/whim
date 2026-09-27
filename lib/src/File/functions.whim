@@ -4,8 +4,7 @@ use Whim\Async\CancellationToken;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 use Whim\_Private\FileOperation;
 use Whim\_Private\SystemError;
 use Whim\_Private\read_file;
@@ -44,8 +43,8 @@ function write(
 #[TrackCaller]
 function read(
   NonEmptyString $file,
-  NonNegativeInt $offset = 0,
-  null|PositiveInt $length = null,
+  uint $offset = 0u,
+  null|NonZero<uint> $length = null,
   null|CancellationToken $cancellation = null,
 ): string {
   try {

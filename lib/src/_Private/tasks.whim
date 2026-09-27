@@ -49,11 +49,11 @@ final class Suspension<T> {
 /** Identifies a task scheduled on the engine event loop. */
 #[Stub]
 final readonly class TaskId {
-  public int $id;
+  public uint $id;
 
   #[TrackCaller]
   #[TraceBoundary]
-  private function __construct(int $id) {}
+  private function __construct(uint $id) {}
 }
 
 /** Creates a typed suspension for the current task. */
@@ -102,10 +102,10 @@ function unreference_task(TaskId $task): void {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function record_unhandled(Throwable $error): int {}
+function record_unhandled(Throwable $error): uint {}
 
 /** Removes a recorded task failure. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function forget_unhandled(int $id): void {}
+function forget_unhandled(uint $id): void {}

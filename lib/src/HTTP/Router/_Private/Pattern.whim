@@ -15,7 +15,7 @@ final readonly class Pattern {
   #[TrackCaller]
   public static function parse(NonEmptyString $source): Pattern {
     ($nodes, $offset) = Pattern::parseSequence($source, 0, null);
-    if ($offset != length!($source)) {
+    if (($offset as uint) != length!($source)) {
       throw new InvalidArgumentException(
         'the route pattern has trailing input',
       );
@@ -53,7 +53,7 @@ final readonly class Pattern {
   ): (vec<Node>, int) {
     $nodes = vec[];
     $literal = '';
-    $length = length!($source);
+    $length = length!($source) as int;
     while ($offset < $length) {
       $byte = $source[$offset];
       if (null != $closing && $byte == $closing) {

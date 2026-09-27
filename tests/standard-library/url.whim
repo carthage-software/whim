@@ -40,7 +40,7 @@ assert!(
 
 $ipv6 = URL::from('http://[2001:db8::1]:8080/path');
 assert!($ipv6->authority->host is IPHost);
-assert!($ipv6->authority->port == 8080);
+assert!($ipv6->authority->port == 8080u);
 assert!($ipv6->toString() == 'http://[2001:db8::1]:8080/path');
 
 assert!(URL::from('ws://example.com:80/')->authority->port == null);
@@ -48,7 +48,7 @@ assert!(URL::from('ftp://example.com:21/')->authority->port == null);
 assert!(URL::from('ssh://example.com:22/')->authority->port == null);
 assert!(URL::from('redis://example.com:6379/')->authority->port == null);
 
-assert!(URL::from('custom://example.com:80/')->authority->port == 80);
+assert!(URL::from('custom://example.com:80/')->authority->port == 80u);
 
 assert!(
   URL::from('http://example.com:00081/')->toString()
@@ -75,7 +75,18 @@ assert!($assertion_error_31 is InvalidArgumentException);
 $authority = Authority::from('admin@münich.example:65535');
 assert!($authority->userInfo == 'admin');
 assert!($authority->host->toString() == 'xn--mnich-kva.example');
-assert!($authority->port == 65535);
+assert!($authority->port == 65535u);
+assert!($authority->port is uint);
+assert!($authority->withPort(8080u)->port == 8080u);
+assert!(
+  Authority::fromParts(
+    RegisteredNameHost::from('example.com'),
+    null,
+    80u,
+  )->toString()
+  == 'example.com:80',
+);
+
 assert!(Authority::parse('example.com:65536') == null);
 assert!(Authority::from('EXAMPLE.COM:00081')->toString() == 'example.com:81');
 

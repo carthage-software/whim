@@ -131,7 +131,7 @@ final readonly class SetCookie implements ToString {
     $separator = Str\search($pair, '=') ?? return null;
 
     $name = Str\trim(Str\slice($pair, 0, $separator));
-    $value = Str\trim(Str\slice($pair, $separator + 1));
+    $value = Str\trim(Str\slice($pair, ($separator as int) + 1));
     if (
       '' == $name
       || !Whim\_Private\http_valid_token($name)
@@ -159,7 +159,7 @@ final readonly class SetCookie implements ToString {
           Str\trim(Str\slice($attribute, 0, $equals)),
         );
 
-        $attributeValue = Str\trim(Str\slice($attribute, $equals + 1));
+        $attributeValue = Str\trim(Str\slice($attribute, ($equals as int) + 1));
       }
 
       if ('expires' == $attributeName && null != $attributeValue) {

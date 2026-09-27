@@ -18,6 +18,19 @@ use Whim\Network\Stream;
 use Whim\Str;
 use Whim\Unwind\RuntimeException;
 
+$parsedHead = Whim\_Private\http1_parse_request_head(
+  "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 0\r\n\r\n",
+);
+
+assert!($parsedHead is (_, _, uint, _, _, uint, _, _, _, _, _, _));
+assert!($parsedHead[2] == 11u && $parsedHead[5] == 0u);
+assert!(Whim\_Private\http1_parse_request_head("invalid\r\n\r\n") is 400u);
+$parsedResponse = Whim\_Private\http1_parse_response_head(
+  "HTTP/1.1 204 No Content\r\n\r\n",
+);
+
+assert!($parsedResponse is (11u, 204u, _, _));
+
 final class HTTPServerH1ParityStream implements Stream<InternetEndpoint> {
   private int $offset = 0;
   private bool $closed = false;
@@ -56,12 +69,12 @@ final class HTTPServerH1ParityStream implements Stream<InternetEndpoint> {
       return '';
     }
 
-    $length = length!($this->incoming) - $this->offset;
+    $length = (length!($this->incoming) as int) - $this->offset;
     if ($maxBytes != null && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
 
-    $data = Str\slice($this->incoming, $this->offset, $length);
+    $data = Str\slice($this->incoming, $this->offset, $length as uint);
     $this->offset += $length;
     return $data;
   }
@@ -72,7 +85,7 @@ final class HTTPServerH1ParityStream implements Stream<InternetEndpoint> {
     $cancellation?->throwIfCancellationRequested();
   }
 
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->written .= $bytes;
     return length!($bytes);
   }
@@ -80,7 +93,7 @@ final class HTTPServerH1ParityStream implements Stream<InternetEndpoint> {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $cancellation?->throwIfCancellationRequested();
     return $this->tryWrite($bytes);
   }
@@ -141,8 +154,8 @@ function http_server_h1_serve(
 ): HTTPServerH1ParityStream {
   $stream = new HTTPServerH1ParityStream(
     $request,
-    new InternetEndpoint(Address::v4('127.0.0.1'), 8080),
-    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000),
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080u),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u),
   );
 
   new H1Driver()->serve(
@@ -195,7 +208,7 @@ function http_server_h1_body(string $response): string {
     return '';
   }
 
-  return Str\slice($response, $separator + 4);
+  return Str\slice($response, ($separator as int) + 4);
 }
 
 $state = new HTTPServerH1ParityState();
@@ -290,7 +303,7 @@ foreach (vec[
 $tooLarge = http_server_h1_serve(
   "GET / HTTP/1.1\r\nHost: example.com\r\nX-Large: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\r\n\r\n",
   http_server_h1_ok_handler(),
-  new Configuration(maximumHeaderSize: 128),
+  new Configuration(maximumHeaderSize: 128u),
 );
 
 assert!(http_server_h1_status($tooLarge->written, 431));

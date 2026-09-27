@@ -4,7 +4,6 @@ use Whim\Async\CancellationToken;
 use Whim\IO\CloseHandle;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 
 /** Streams the result of one database statement. */
 interface Result extends CloseHandle {
@@ -16,7 +15,7 @@ interface Result extends CloseHandle {
   /** Returns the affected row count when the database provides one. */
   #[MustUse]
   #[TrackCaller]
-  public function getAffectedRows(): null|NonNegativeInt;
+  public function getAffectedRows(): null|uint;
 
   /** Fetches the next row, or null after the result ends. */
   #[MustUse]

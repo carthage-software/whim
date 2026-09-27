@@ -353,7 +353,7 @@ pub(crate) fn callable_dispatch(
             Ok(context.vec(parameters))
         }
         Operation::Parameter => callable_parameter(context, arguments, callable, &info),
-        Operation::RequiredParameterCount => Ok(index_value(info.required_parameters())),
+        Operation::RequiredParameterCount => Ok(Value::uint(info.required_parameters() as u64)),
         Operation::ReturnType => {
             let Some(descriptor) = info.return_type else {
                 return Ok(Value::null());

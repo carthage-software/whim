@@ -26,7 +26,7 @@ function from_handle(
   try {
     $content = $handle->readAll(4096, $cancellation);
   } finally {
-    $handle->seek($position);
+    $handle->seek($position as int);
   }
 
   return from_string($content);

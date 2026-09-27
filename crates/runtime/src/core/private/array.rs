@@ -85,7 +85,7 @@ fn array_entries(value: &Value) -> Option<ArrayEntries<'_>> {
 }
 
 #[whim_function(
-    "Whim\\_Private\\array_entries(array<_, _> $values): vec<(string|int|bool, mixed)>"
+    "Whim\\_Private\\array_entries(array<_, _> $values): vec<(string|int|uint|bool, mixed)>"
 )]
 pub(crate) fn entries<'call>(
     context: &Context<'call, '_, '_>,
@@ -154,7 +154,7 @@ pub(crate) fn vec_from_array<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_from_array(array<_, _> $values): dict<string|int|bool, mixed>"
+    "Whim\\_Private\\dict_from_array(array<_, _> $values): dict<string|int|uint|bool, mixed>"
 )]
 pub(crate) fn dict_from_array<'call>(
     context: &Context<'call, '_, '_>,
@@ -177,7 +177,7 @@ pub(crate) fn dict_from_array<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_from_entries(array<_, (string|int|bool, _)> $entries): dict<string|int|bool, mixed>"
+    "Whim\\_Private\\dict_from_entries(array<_, (string|int|uint|bool, _)> $entries): dict<string|int|uint|bool, mixed>"
 )]
 pub(crate) fn dict_from_entries<'call>(
     context: &Context<'call, '_, '_>,
@@ -224,7 +224,7 @@ pub(crate) fn dict_from_entries<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_merge(dict<_, _> $first, dict<_, _> $second): dict<string|int|bool, mixed>"
+    "Whim\\_Private\\dict_merge(dict<_, _> $first, dict<_, _> $second): dict<string|int|uint|bool, mixed>"
 )]
 pub(crate) fn dict_merge(arguments: Arguments<'_>) -> Value {
     let first = arguments.dict(0);
@@ -242,7 +242,7 @@ pub(crate) fn dict_merge(arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_flip(array<_, string|int|bool> $values): dict<string|int|bool, mixed>"
+    "Whim\\_Private\\dict_flip(array<_, string|int|uint|bool> $values): dict<string|int|uint|bool, mixed>"
 )]
 pub(crate) fn dict_flip<'call>(
     context: &Context<'call, '_, '_>,
@@ -274,7 +274,7 @@ pub(crate) fn dict_flip<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_flatten(array<_, _> $values): null|dict<string|int|bool, mixed>"
+    "Whim\\_Private\\dict_flatten(array<_, _> $values): null|dict<string|int|uint|bool, mixed>"
 )]
 pub(crate) fn dict_flatten<'call>(
     context: &Context<'call, '_, '_>,
@@ -311,7 +311,7 @@ pub(crate) fn dict_flatten<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_count_values(array<_, string|int|bool> $values): dict<string|int|bool, int>"
+    "Whim\\_Private\\dict_count_values(array<_, string|int|uint|bool> $values): dict<string|int|uint|bool, uint>"
 )]
 pub(crate) fn dict_count_values<'call>(
     context: &Context<'call, '_, '_>,
@@ -336,9 +336,9 @@ pub(crate) fn dict_count_values<'call>(
             )
         };
 
-        let previous = counts.make_mut().insert(key.clone(), Value::int(1));
-        if let Some(count) = previous.as_ref().and_then(Value::as_int) {
-            counts.make_mut().insert(key, Value::int(count + 1));
+        let previous = counts.make_mut().insert(key.clone(), Value::uint(1));
+        if let Some(count) = previous.as_ref().and_then(Value::as_uint) {
+            counts.make_mut().insert(key, Value::uint(count + 1));
         }
     }
 
@@ -346,7 +346,7 @@ pub(crate) fn dict_count_values<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_sort(dict<_, _> $values, null|fn(_, _): int $comparator): dict<string|int|bool, mixed>"
+    "Whim\\_Private\\dict_sort(dict<_, _> $values, null|fn(_, _): int $comparator): dict<string|int|uint|bool, mixed>"
 )]
 pub(crate) fn dict_sort(
     context: &mut Context<'_, '_, '_>,
@@ -465,20 +465,20 @@ pub(crate) fn vec_sort_by(
 }
 
 #[whim_function(
-    "Whim\\_Private\\vec_slice(vec<_> $values, (0..) $start, null|(0..) $length): vec<mixed>"
+    "Whim\\_Private\\vec_slice(vec<_> $values, uint $start, null|uint $length): vec<mixed>"
 )]
 pub(crate) fn vec_slice<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
     let values = arguments.vec(0);
-    let start = usize::try_from(arguments.int(1)).unwrap_or(usize::MAX);
+    let start = usize::try_from(arguments.uint(1)).unwrap_or(usize::MAX);
     if start >= values.len() {
         return context.vec([]);
     }
     let length = arguments.local(2);
     let length = length
-        .as_int()
+        .as_uint()
         .and_then(|length| usize::try_from(length).ok())
         .unwrap_or(values.len() - start)
         .min(values.len() - start);
@@ -495,13 +495,13 @@ pub(crate) fn vec_slice<'call>(
     )
 }
 
-#[whim_function("Whim\\_Private\\vec_chunk(vec<_> $values, (1..) $size): vec<vec<mixed>>")]
+#[whim_function("Whim\\_Private\\vec_chunk(vec<_> $values, (1u..) $size): vec<vec<mixed>>")]
 pub(crate) fn vec_chunk<'call>(
     context: &Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Value {
     let values = arguments.vec(0);
-    let size = usize::try_from(arguments.int(1)).unwrap_or(usize::MAX);
+    let size = usize::try_from(arguments.uint(1)).unwrap_or(usize::MAX);
     let mut chunks = Vec::with_capacity(values.len().div_ceil(size));
     let mut start = 0;
     while start < values.len() {

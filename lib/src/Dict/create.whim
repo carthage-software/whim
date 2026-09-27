@@ -124,7 +124,7 @@ function group_by<K: ArrayKey, V>(
 /** Counts the occurrences of each value. */
 #[MustUse]
 #[TrackCaller]
-function count_values<V: ArrayKey>(Iterable<_, V> $values): dict<V, int> {
+function count_values<V: ArrayKey>(Iterable<_, V> $values): dict<V, uint> {
   if ($values is array<_, _>) {
     return Whim\_Private\dict_count_values($values);
   }
@@ -134,10 +134,10 @@ function count_values<V: ArrayKey>(Iterable<_, V> $values): dict<V, int> {
     try {
       $count = $result[$value];
     } catch (OutOfBoundsError $_) {
-      $count = 0;
+      $count = 0u;
     }
 
-    $result[$value] = $count + 1;
+    $result[$value] = $count + 1u;
   }
 
   return $result;

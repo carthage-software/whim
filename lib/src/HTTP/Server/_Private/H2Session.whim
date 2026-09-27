@@ -43,7 +43,7 @@ final class H2Session {
   private Channel\Receiver<null> $capacityReceiver;
   private SignalCancellationToken $drainWake;
   private int $activeRequests = 0;
-  private int $pushCount = 0;
+  private uint $pushCount = 0u;
   private bool $pushEnabled = true;
   private bool $drainingStarted = false;
   private Endpoint $localEndpoint;
@@ -594,7 +594,7 @@ final class H2Session {
       && $contentLength <= 16_384
     ) {
       try {
-        $data = $body->readAll($contentLength, $cancellation);
+        $data = $body->readAll($contentLength as int, $cancellation);
         $headers = h2_response_headers($response->status, $response->headers);
         $this->acquireWrite($cancellation);
         try {
@@ -680,7 +680,7 @@ final class H2Session {
     H2\StreamId $streamId,
     vec<Header> $headers,
     Message\StatusCode $status,
-    null|int $contentLength,
+    null|uint $contentLength,
     bool $endStream,
     CancellationToken $cancellation,
   ): void {
@@ -718,7 +718,7 @@ final class H2Session {
       try {
         $window = $this->protocol->availableSendWindow($streamId);
         if ($window > 0) {
-          $length = length!($data) - $offset;
+          $length = (length!($data) as int) - $offset;
           if ($length > 16_384) {
             $length = 16_384;
           }
@@ -727,13 +727,13 @@ final class H2Session {
             $length = $window;
           }
 
-          $chunk = Str\slice($data, $offset, $length);
+          $chunk = Str\slice($data, $offset, $length as uint);
           $offset += $length;
           $this->protocol->sendData(
             $streamId,
             $chunk,
             $endStream
-            && $offset == length!($data),
+            && ($offset as uint) == length!($data),
           );
 
           $this->writeOutbound($cancellation);

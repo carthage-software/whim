@@ -30,7 +30,7 @@ final class SocketImpl extends DatagramSocketImpl implements Whim\UDP\Socket {
     InternetEndpoint $peer,
     null|SendMetadata $metadata = null,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return parent::sendTo($bytes, $peer, $metadata, $cancellation);
   }
 
@@ -67,7 +67,7 @@ final class SocketImpl extends DatagramSocketImpl implements Whim\UDP\Socket {
     } catch (Whim\_Private\SystemError $error) {
       throw new ConnectionException(
         'failed to connect UDP socket to ' . $peer->toString(),
-        $error->errno(),
+        $error->getCode(),
         $error,
       );
     }

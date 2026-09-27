@@ -14,14 +14,13 @@ use Whim\Marker\MustUse;
 use Whim\Marker\NeverInline;
 use Whim\Marker\TrackCaller;
 use Whim\Marker\TraceBoundary;
-use Whim\Refine\NonNegativeInt;
 use Whim\Unwind\Throwable;
 use Whim\_Private\RingBuffer;
 
 /** Owns the mutable state of one connection pool. */
 final class PoolState {
   private bool $closed = false;
-  private int $openConnections = 0;
+  private uint $openConnections = 0u;
   private RingBuffer<Entry> $idle;
   private RingBuffer<Waiter> $pending;
 
@@ -84,7 +83,7 @@ final class PoolState {
     }
 
     if (
-      0 == $this->configuration->maximumIdleConnections
+      0u == $this->configuration->maximumIdleConnections
       || $this->idle->count() >= $this->configuration->maximumIdleConnections
     ) {
       $this->discard($entry);
@@ -102,27 +101,27 @@ final class PoolState {
 
   /** Returns the number of open and reserved connections. */
   #[MustUse]
-  public function getOpenConnections(): NonNegativeInt {
-    return $this->openConnections as NonNegativeInt;
+  public function getOpenConnections(): uint {
+    return $this->openConnections;
   }
 
   /** Returns the number of idle connections. */
   #[MustUse]
-  public function getIdleConnections(): NonNegativeInt {
+  public function getIdleConnections(): uint {
     return $this->idle->count();
   }
 
   /** Returns the number of tasks waiting for a connection. */
   #[MustUse]
-  public function getPendingConnections(): NonNegativeInt {
-    $count = 0;
+  public function getPendingConnections(): uint {
+    $count = 0u;
     foreach ($this->pending->toVec() as $waiter) {
       if ($waiter->active) {
         $count++;
       }
     }
 
-    return $count as NonNegativeInt;
+    return $count;
   }
 
   /** Closes idle connections and rejects pending acquisitions. */

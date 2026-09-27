@@ -19,7 +19,7 @@ use Whim\Unwind\InvalidArgumentException;
 final class Connection implements WriteHandle {
   private Reader $reader;
   private dict<string, string> $capabilities = dict[];
-  private null|int $maximumMessageSize = null;
+  private null|uint $maximumMessageSize = null;
 
   /** Wraps an established duplex handle. */
   #[TrackCaller]
@@ -82,14 +82,14 @@ final class Connection implements WriteHandle {
 
       $value = match ($space) {
         null => '',
-        _ => Str\trim(Str\slice($line, $space + 1)),
+        _ => Str\trim(Str\slice($line, ($space as int) + 1)),
       };
 
       $this->capabilities[$keyword] = $value;
       if ($keyword == Capability::Size->value && '' != $value) {
         $size = _Private\parse_decimal($value);
         if (null != $size && $size >= 0) {
-          $this->maximumMessageSize = $size;
+          $this->maximumMessageSize = $size as uint;
         }
       }
     }
@@ -148,7 +148,7 @@ final class Connection implements WriteHandle {
   /** Returns the advertised SIZE limit. */
   #[AlwaysInline]
   #[MustUse]
-  public function maximumMessageSize(): null|int {
+  public function maximumMessageSize(): null|uint {
     return $this->maximumMessageSize;
   }
 
@@ -233,7 +233,7 @@ final class Connection implements WriteHandle {
   }
 
   #[TrackCaller]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     return $this->stream->tryWrite($bytes);
   }
 
@@ -241,7 +241,7 @@ final class Connection implements WriteHandle {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return $this->stream->write($bytes, $cancellation);
   }
 }

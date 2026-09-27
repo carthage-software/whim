@@ -6,7 +6,7 @@ compiler knows its rules and may emit direct bytecode for it.
 ## Array and string constructs
 
 - `length!($value)` returns the byte length of a string or the item count of an
-  array.
+  array, as a `uint`.
 - `contains!($array, $value)` checks array values with strict equality.
 - `contains_key!($array, $key)` checks an array key or index.
 - `remove!($array, $key)` removes and returns one entry.

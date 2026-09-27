@@ -15,13 +15,13 @@ final class MemoryHandle implements
   SeekHandle,
   CloseHandle,
   ToString {
-  private int $cursor = 0;
+  private uint $cursor = 0u;
   private bool $closed = false;
   private string $buffer;
   private null|ByteBuffer $byteBuffer = null;
-  private int $bufferBytes;
+  private uint $bufferBytes;
   private vec<string> $pendingWrites = vec[];
-  private int $pendingBytes = 0;
+  private uint $pendingBytes = 0u;
 
   /** Creates an in-memory handle containing an initial byte string. */
   #[TrackCaller]
@@ -58,20 +58,20 @@ final class MemoryHandle implements
   public function tryRead(null|int $maxBytes = null): string {
     $this->ensureOpen();
     $this->flushWrites();
-    $available = $this->bufferBytes - $this->cursor;
-    if ($available <= 0) {
+    if ($this->cursor >= $this->bufferBytes) {
       return '';
     }
 
+    $available = $this->bufferBytes - $this->cursor;
     $length = $available;
     if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $available) {
-      $length = $maxBytes;
+      $length = $maxBytes as uint;
     }
 
     $byteBuffer = $this->byteBuffer;
     $result = match ($byteBuffer) {
-      null => Str\slice($this->buffer, $this->cursor, $length),
-      _ => $byteBuffer->read($this->cursor, $length),
+      null => Str\slice($this->buffer, $this->cursor as int, $length),
+      _ => $byteBuffer->read($this->cursor as int, $length as int),
     };
 
     $this->cursor += $length;
@@ -98,7 +98,7 @@ final class MemoryHandle implements
 
   /** Attempts to write bytes at the cursor. */
   #[TrackCaller]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     $this->ensureOpen();
     return $this->performWrite($bytes);
   }
@@ -108,7 +108,7 @@ final class MemoryHandle implements
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     $this->ensureOpen();
     return $this->performWrite($bytes);
   }
@@ -120,12 +120,15 @@ final class MemoryHandle implements
    */
   #[NeverInline]
   #[TrackCaller]
-  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+  public function seek(
+    int $offset,
+    SeekWhence $whence = SeekWhence::Set,
+  ): uint {
     $this->ensureOpen();
     $base = match ($whence) {
       SeekWhence::Set => 0,
-      SeekWhence::Current => $this->cursor,
-      SeekWhence::End => $this->bufferedLength(),
+      SeekWhence::Current => $this->cursor as int,
+      SeekWhence::End => $this->bufferedLength() as int,
     };
 
     $target = $base + $offset;
@@ -133,8 +136,8 @@ final class MemoryHandle implements
       throw new Exception('cannot seek before the start of the data source');
     }
 
-    $this->cursor = $target;
-    return $target;
+    $this->cursor = $target as uint;
+    return $this->cursor;
   }
 
   /** Marks the handle closed. */
@@ -162,19 +165,19 @@ final class MemoryHandle implements
 
   /** Overwrites bytes at the cursor, extending and zero-filling as needed. */
   #[TrackCaller]
-  private function performWrite(string $bytes): int {
+  private function performWrite(string $bytes): uint {
     if ($this->cursor == $this->bufferedLength()) {
       return $this->append($bytes);
     }
 
     $this->flushWrites();
     $length = length!($bytes);
-    if (0 == $length) {
-      return 0;
+    if (0u == $length) {
+      return 0u;
     }
 
     $buffer = $this->mutableBuffer();
-    $buffer->write($this->cursor, $bytes);
+    $buffer->write($this->cursor as int, $bytes);
     $this->cursor += $length;
     if ($this->cursor > $this->bufferBytes) {
       $this->bufferBytes = $this->cursor;
@@ -184,9 +187,9 @@ final class MemoryHandle implements
   }
 
   /** Queues bytes written at the end. */
-  private function append(string $bytes): int {
+  private function append(string $bytes): uint {
     $length = length!($bytes);
-    if (0 != $length) {
+    if (0u != $length) {
       $this->pendingWrites[] = $bytes;
       $this->pendingBytes += $length;
       $this->cursor += $length;
@@ -197,7 +200,7 @@ final class MemoryHandle implements
 
   /** Commits queued writes. */
   private function flushWrites(): void {
-    if (0 == $this->pendingBytes) {
+    if (0u == $this->pendingBytes) {
       return;
     }
 
@@ -214,11 +217,11 @@ final class MemoryHandle implements
 
     $this->bufferBytes += $this->pendingBytes;
     $this->pendingWrites = vec[];
-    $this->pendingBytes = 0;
+    $this->pendingBytes = 0u;
   }
 
   /** Returns the stored and queued byte length. */
-  private function bufferedLength(): int {
+  private function bufferedLength(): uint {
     return $this->bufferBytes + $this->pendingBytes;
   }
 

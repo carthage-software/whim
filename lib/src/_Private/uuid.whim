@@ -38,4 +38,4 @@ function uuid_format(string[16] $bytes): string[36] {}
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
-function uuid_version(string[16] $bytes): null|1..=8 {}
+function uuid_version(string[16] $bytes): null|1u..=8u {}

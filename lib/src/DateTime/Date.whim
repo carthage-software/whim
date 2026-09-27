@@ -36,10 +36,10 @@ final readonly class Date implements Order<Date>, ToString {
   #[MustUse]
   public static function fromPartsUnsafe(
     int $year,
-    int $month,
-    int $day,
+    uint $month,
+    uint $day,
   ): Date {
-    return new Date($year as Year, Month::from($month), $day as Day);
+    return new Date($year as Year, Month::from($month as int), $day as Day);
   }
 
   /** Parses an ISO date, or returns null. */
@@ -76,7 +76,7 @@ final readonly class Date implements Order<Date>, ToString {
       $this->day,
     );
 
-    return Weekday::from($metadata[0]);
+    return Weekday::from($metadata[0] as int);
   }
 
   /** Returns this date's one-based day of year. */

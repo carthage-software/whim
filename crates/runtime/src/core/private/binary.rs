@@ -22,9 +22,11 @@ fn decode(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result
     let Ok(offset) = usize::try_from(offset) else {
         return invalid_offset(context);
     };
+
     let Some(end) = offset.checked_add(width) else {
         return invalid_offset(context);
     };
+
     let Some(bytes) = bytes.get(offset..end) else {
         return Ok(Value::null());
     };
@@ -48,7 +50,11 @@ fn decode(context: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result
         _ => unsafe { unreachable_invariant("binary widths are limited to 1, 2, 4, or 8") },
     };
 
-    Ok(Value::int(value))
+    Ok(if signed {
+        Value::int(value)
+    } else {
+        Value::uint(value.cast_unsigned())
+    })
 }
 
 #[whim_function("Whim\\_Private\\binary_encode(int|uint $value, int $width, bool $little): string")]

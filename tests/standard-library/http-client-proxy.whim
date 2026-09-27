@@ -53,7 +53,7 @@ final readonly class ProxyTestHandler implements Client\Handler {
 }
 
 $loopback = Address::v4('127.0.0.1');
-$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$listener = TCP\listen(new InternetEndpoint($loopback, 0u));
 $proxyEndpoint = $listener->getLocalEndpoint();
 $proxyURL = URL::from('http://' . $proxyEndpoint->toString());
 $proxy = new Client\ProxyConfiguration(
@@ -103,7 +103,7 @@ assert!(Str\contains($head, "Proxy-Authorization: Basic cHJveHk6c2VjcmV0\r\n"));
 
 assert!(!Str\contains($head, '#ignored'));
 
-$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$listener = TCP\listen(new InternetEndpoint($loopback, 0u));
 $proxyEndpoint = $listener->getLocalEndpoint();
 $proxy = new Client\ProxyConfiguration(
   URL::from('http://' . $proxyEndpoint->toString()),
@@ -148,7 +148,7 @@ assert!(Str\contains($head, "Proxy-Authorization: Bearer request-token\r\n"));
 
 assert!(!Str\contains($head, 'Basic cHJveHk6c2VjcmV0'));
 
-$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$listener = TCP\listen(new InternetEndpoint($loopback, 0u));
 $proxyEndpoint = $listener->getLocalEndpoint();
 $proxy = new Client\ProxyConfiguration(
   URL::from('http://' . $proxyEndpoint->toString()),
@@ -175,7 +175,7 @@ Client\_Private\establish_tunnel(
   $stream,
   Client\Origin::fromURL(URL::from('https://example.com:8443/')),
   $proxy,
-  8192,
+  8192u,
   null,
 );
 
@@ -270,7 +270,7 @@ try {
 
 assert!($assertion_error_8 is Whim\Unwind\InvalidArgumentException);
 
-$listener = TCP\listen(new InternetEndpoint($loopback, 0));
+$listener = TCP\listen(new InternetEndpoint($loopback, 0u));
 $proxyEndpoint = $listener->getLocalEndpoint();
 $proxy = new Client\ProxyConfiguration(
   URL::from('http://' . $proxyEndpoint->toString()),
@@ -294,7 +294,7 @@ $assertion_value_9 = fn(): void {
     $stream,
     Client\Origin::fromURL(URL::from('https://example.com/')),
     $proxy,
-    8192,
+    8192u,
     null,
   );
 };
@@ -320,8 +320,8 @@ $request = Request::fromURL(
 $configuration = new Client\Configuration();
 $middleware = Client\DeniedDestinationsMiddleware::publicOnly();
 $handler = new ProxyTestHandler();
-$proxyPeer = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
-$publicDestination = new InternetEndpoint(Address::v4('8.8.8.8'), 443);
+$proxyPeer = new InternetEndpoint(Address::v4('127.0.0.1'), 8080u);
+$publicDestination = new InternetEndpoint(Address::v4('8.8.8.8'), 443u);
 $known = new ProxyTestConnection(
   new Client\ConnectionMetadata(
     $proxyPeer,

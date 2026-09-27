@@ -9,9 +9,9 @@ final class CallbackRegistry {
   public function __construct() {}
 
   #[MustUse]
-  public function insert(fn(): void $callback): int {}
+  public function insert(fn(): void $callback): uint {}
 
-  public function remove(int $id): void {}
+  public function remove(uint $id): void {}
 
   #[MustUse]
   public function isEmpty(): bool {}

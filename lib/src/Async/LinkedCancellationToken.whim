@@ -24,7 +24,7 @@ final class LinkedCancellationToken implements CancellationToken {
   #[TrackCaller]
   public function __construct(array<_, CancellationToken> $tokens) {
     $this->callbacks = new CallbackRegistry();
-    if (length!($tokens) == 0) {
+    if (length!($tokens) == 0u) {
       throw new InvalidArgumentException(
         'a linked cancellation token requires at least one token to link',
       );
@@ -85,7 +85,7 @@ final class LinkedCancellationToken implements CancellationToken {
       }
     }
 
-    if (length!($errors) == 1) {
+    if (length!($errors) == 1u) {
       throw $errors[0];
     }
 
@@ -102,13 +102,15 @@ final class LinkedCancellationToken implements CancellationToken {
       return -1;
     }
 
-    return $this->callbacks->insert($callback);
+    return $this->callbacks->insert($callback) as int;
   }
 
   /** Removes a registered cancellation callback. */
   #[TrackCaller]
   public function unregister(int $id): void {
-    $this->callbacks->remove($id);
+    if ($id >= 0) {
+      $this->callbacks->remove($id as uint);
+    }
   }
 
   /** Reports whether cancellation was requested. */

@@ -113,13 +113,13 @@ pub(crate) fn index_fields(context: &Context<'_, '_, '_>, arguments: Arguments<'
 }
 
 #[whim_function(
-    "Whim\\_Private\\http1_parse_request_head(string $block): int|(string, string, int, vec<(string, string)>, dict<string, vec<string>>, null|int, bool, bool, bool, bool, null|string, null|string)"
+    "Whim\\_Private\\http1_parse_request_head(string $block): uint|(string, string, uint, vec<(string, string)>, dict<string, vec<string>>, null|uint, bool, bool, bool, bool, null|string, null|string)"
 )]
 pub(crate) fn parse_request_head(context: &Context<'_, '_, '_>, arguments: Arguments<'_>) -> Value {
     let block = arguments.bytes(0);
     let parsed = match parse_request(block) {
         Ok(parsed) => parsed,
-        Err(error) => return Value::int(error.status()),
+        Err(error) => return Value::uint(error.status()),
     };
     let (fields, field_index) = materialize_indexed_fields(context, &parsed.fields);
     let host = parsed
@@ -132,10 +132,10 @@ pub(crate) fn parse_request_head(context: &Context<'_, '_, '_>, arguments: Argum
     context.tuple([
         context.string(parsed.method),
         context.string(parsed.target),
-        Value::int(parsed.version),
+        Value::uint(parsed.version),
         fields,
         field_index,
-        parsed.content_length.map_or_else(Value::null, Value::int),
+        parsed.content_length.map_or_else(Value::null, Value::uint),
         Value::bool(parsed.chunked),
         Value::bool(parsed.connection_close),
         Value::bool(parsed.connection_keep_alive),
@@ -146,7 +146,7 @@ pub(crate) fn parse_request_head(context: &Context<'_, '_, '_>, arguments: Argum
 }
 
 #[whim_function(
-    "Whim\\_Private\\http1_parse_response_head(string $block): null|(int, int, vec<(string, string)>, dict<string, vec<string>>)"
+    "Whim\\_Private\\http1_parse_response_head(string $block): null|(uint, uint, vec<(string, string)>, dict<string, vec<string>>)"
 )]
 pub(crate) fn parse_response_head(
     context: &Context<'_, '_, '_>,
@@ -159,8 +159,8 @@ pub(crate) fn parse_response_head(
     let (fields, field_index) = materialize_indexed_fields(context, &parsed.fields);
 
     context.tuple([
-        Value::int(parsed.version),
-        Value::int(parsed.status),
+        Value::uint(parsed.version),
+        Value::uint(parsed.status),
         fields,
         field_index,
     ])
@@ -210,8 +210,8 @@ fn materialize_indexed_fields(
 }
 
 struct ParsedResponse<'a> {
-    version: i64,
-    status: i64,
+    version: u64,
+    status: u64,
     fields: Vec<(&'a [u8], &'a [u8])>,
 }
 
@@ -255,7 +255,7 @@ fn parse_response_with_headers<'block>(
 
     Some(ParsedResponse {
         version,
-        status: i64::from(status),
+        status: u64::from(status),
         fields,
     })
 }
@@ -267,9 +267,9 @@ fn parse_response_with_headers<'block>(
 struct ParsedRequest<'a> {
     method: &'a [u8],
     target: &'a [u8],
-    version: i64,
+    version: u64,
     fields: Vec<(&'a [u8], &'a [u8])>,
-    content_length: Option<i64>,
+    content_length: Option<u64>,
     chunked: bool,
     connection_close: bool,
     connection_keep_alive: bool,
@@ -286,7 +286,7 @@ enum RequestParseError {
 }
 
 impl RequestParseError {
-    const fn status(self) -> i64 {
+    const fn status(self) -> u64 {
         match self {
             Self::BadRequest => 400,
             Self::ExpectationFailed => 417,
@@ -468,7 +468,7 @@ fn classify_request_parse_error(block: &[u8]) -> RequestParseError {
     }
 }
 
-fn parse_content_length(fields: &[(&[u8], &[u8])]) -> Result<Option<i64>, RequestParseError> {
+fn parse_content_length(fields: &[(&[u8], &[u8])]) -> Result<Option<u64>, RequestParseError> {
     let mut result = None;
     for (name, value) in fields {
         if !name.eq_ignore_ascii_case(b"content-length") {
@@ -485,7 +485,7 @@ fn parse_content_length(fields: &[(&[u8], &[u8])]) -> Result<Option<i64>, Reques
     Ok(result)
 }
 
-fn parse_decimal(value: &[u8]) -> Result<i64, RequestParseError> {
+fn parse_decimal(value: &[u8]) -> Result<u64, RequestParseError> {
     if value.is_empty() {
         return Err(RequestParseError::BadRequest);
     }
@@ -500,7 +500,7 @@ fn parse_decimal(value: &[u8]) -> Result<i64, RequestParseError> {
             .and_then(|result| result.checked_add(i64::from(digit)))
             .ok_or(RequestParseError::BadRequest)?;
     }
-    Ok(result)
+    u64::try_from(result).map_err(|_| RequestParseError::BadRequest)
 }
 
 fn trim_optional_whitespace(mut value: &[u8]) -> &[u8] {
@@ -553,14 +553,14 @@ pub(crate) fn serialize_request_head(
 }
 
 #[whim_function(
-    "Whim\\_Private\\http1_serialize_response_head(string $version, 100..=599 $status, string $reason, vec<(string, string)> $fields, bool $bodyAllowed, bool $chunked, bool $addContentLength, bool $close, string $date): string"
+    "Whim\\_Private\\http1_serialize_response_head(string $version, 100u..=599u $status, string $reason, vec<(string, string)> $fields, bool $bodyAllowed, bool $chunked, bool $addContentLength, bool $close, string $date): string"
 )]
 pub(crate) fn serialize_response_head(
     context: &Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Value {
     let version = arguments.bytes(0);
-    let status = arguments.int(1);
+    let status = arguments.uint(1);
     let reason = arguments.bytes(2);
     let fields = arguments.vec(3);
     let body_allowed = arguments.bool(4);

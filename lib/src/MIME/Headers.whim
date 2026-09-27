@@ -139,7 +139,7 @@ final readonly class Headers implements
   /** Returns the number of header entries. */
   #[AlwaysInline]
   #[MustUse]
-  public function count(): int {
+  public function count(): uint {
     return length!($this->headers);
   }
 

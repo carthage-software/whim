@@ -10,7 +10,6 @@ use Whim\Marker\TrackCaller;
 use Whim\Refine\Int16;
 use Whim\Refine\Int32;
 use Whim\Refine\Int8;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Uint16;
 use Whim\Refine\Uint32;
 use Whim\Refine\Uint8;
@@ -29,13 +28,13 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[NeverInline]
   #[TrackCaller]
-  private function consume(NonNegativeInt $length): string {
-    if (0 == $length) {
+  private function consume(uint $length): string {
+    if (0u == $length) {
       return '';
     }
 
     try {
-      return $this->handle->readFixedSize($length);
+      return $this->handle->readFixedSize($length as int);
     } catch (RuntimeException $error) {
       throw new UnderflowException(
         'expected ' . $length . ' bytes, but the handle reached its end',
@@ -52,7 +51,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function u8(): Uint8 {
-    return decode_u8($this->consume(1));
+    return decode_u8($this->consume(1u));
   }
 
   /**
@@ -63,7 +62,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function u16(null|Endianness $endianness = null): Uint16 {
-    return decode_u16($this->consume(2), $endianness ?? $this->endianness);
+    return decode_u16($this->consume(2u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -74,7 +73,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function u32(null|Endianness $endianness = null): Uint32 {
-    return decode_u32($this->consume(4), $endianness ?? $this->endianness);
+    return decode_u32($this->consume(4u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -85,7 +84,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function u64(null|Endianness $endianness = null): uint {
-    return decode_u64($this->consume(8), $endianness ?? $this->endianness);
+    return decode_u64($this->consume(8u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -96,7 +95,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function i8(): Int8 {
-    return decode_i8($this->consume(1));
+    return decode_i8($this->consume(1u));
   }
 
   /**
@@ -107,7 +106,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function i16(null|Endianness $endianness = null): Int16 {
-    return decode_i16($this->consume(2), $endianness ?? $this->endianness);
+    return decode_i16($this->consume(2u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -118,7 +117,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function i32(null|Endianness $endianness = null): Int32 {
-    return decode_i32($this->consume(4), $endianness ?? $this->endianness);
+    return decode_i32($this->consume(4u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -129,7 +128,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function i64(null|Endianness $endianness = null): int {
-    return decode_i64($this->consume(8), $endianness ?? $this->endianness);
+    return decode_i64($this->consume(8u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -140,7 +139,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function f32(null|Endianness $endianness = null): float {
-    return decode_f32($this->consume(4), $endianness ?? $this->endianness);
+    return decode_f32($this->consume(4u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -151,7 +150,7 @@ final class HandleReader implements Reader {
   #[MustUse]
   #[TrackCaller]
   public function f64(null|Endianness $endianness = null): float {
-    return decode_f64($this->consume(8), $endianness ?? $this->endianness);
+    return decode_f64($this->consume(8u), $endianness ?? $this->endianness);
   }
 
   /**
@@ -161,7 +160,7 @@ final class HandleReader implements Reader {
    */
   #[MustUse]
   #[TrackCaller]
-  public function bytes(NonNegativeInt $length): string {
+  public function bytes(uint $length): string {
     return $this->consume($length);
   }
 
@@ -178,15 +177,15 @@ final class HandleReader implements Reader {
    */
   #[NeverInline]
   #[TrackCaller]
-  public function skip(NonNegativeInt $length): void {
-    if (0 == $length) {
+  public function skip(uint $length): void {
+    if (0u == $length) {
       return;
     }
 
     $handle = $this->handle;
     if ($handle is SeekHandle) {
       try {
-        discard!($handle->seek($length, SeekWhence::Current));
+        discard!($handle->seek($length as int, SeekWhence::Current));
       } catch (RuntimeException $error) {
         throw new UnderflowException(
           'could not skip ' . $length . ' bytes: the handle reached its end',

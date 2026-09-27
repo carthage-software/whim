@@ -4,7 +4,6 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\Stub;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Iterable;
 use Whim;
 use Whim\Comparison\Ordering;
@@ -13,7 +12,7 @@ use Whim\Vec;
 /** Returns the number of bytes in a string. */
 #[AlwaysInline]
 #[MustUse]
-function length(string $string): NonNegativeInt {
+function length(string $string): uint {
   return length!($string);
 }
 
@@ -116,7 +115,7 @@ function join(string $separator, Iterable<_, string> $values): string {
 function compare(
   string $string,
   string $other,
-  null|NonNegativeInt $length = null,
+  null|uint $length = null,
 ): Ordering {
   if (null != $length) {
     $string = slice($string, 0, $length);
@@ -132,7 +131,7 @@ function compare(
 function compare_ci(
   string $string,
   string $other,
-  null|NonNegativeInt $length = null,
+  null|uint $length = null,
 ): Ordering {
   return compare(lowercase($string), lowercase($other), $length);
 }
@@ -144,18 +143,14 @@ function compare_ci(
  */
 #[MustUse]
 #[TrackCaller]
-function search(
-  string $haystack,
-  string $needle,
-  int $offset = 0,
-): null|NonNegativeInt {
+function search(string $haystack, string $needle, int $offset = 0): null|uint {
   $offset = _Private\offset($offset, length!($haystack));
   $needleLength = length!($needle);
-  if (0 == $needleLength) {
-    return $offset;
+  if (0u == $needleLength) {
+    return $offset as uint;
   }
 
-  if (1 == $needleLength) {
+  if (1u == $needleLength) {
     return Whim\_Private\memchr($haystack, ord($needle), $offset);
   }
 
@@ -173,10 +168,10 @@ function search_ci(
   string $haystack,
   string $needle,
   int $offset = 0,
-): null|NonNegativeInt {
+): null|uint {
   $offset = _Private\offset($offset, length!($haystack));
-  if (length!($needle) == 0) {
-    return $offset;
+  if (length!($needle) == 0u) {
+    return $offset as uint;
   }
 
   return Whim\_Private\memmem($haystack, $needle, $offset, true);
@@ -193,14 +188,14 @@ function search_last(
   string $haystack,
   string $needle,
   int $offset = 0,
-): null|NonNegativeInt {
+): null|uint {
   $offset = _Private\offset($offset, length!($haystack));
   $needleLength = length!($needle);
-  if (0 == $needleLength) {
+  if (0u == $needleLength) {
     return length!($haystack);
   }
 
-  if (1 == $needleLength) {
+  if (1u == $needleLength) {
     return Whim\_Private\memrchr($haystack, ord($needle), $offset);
   }
 
@@ -218,9 +213,9 @@ function search_last_ci(
   string $haystack,
   string $needle,
   int $offset = 0,
-): null|NonNegativeInt {
+): null|uint {
   $offset = _Private\offset($offset, length!($haystack));
-  if (length!($needle) == 0) {
+  if (length!($needle) == 0u) {
     return length!($haystack);
   }
 
@@ -277,7 +272,7 @@ function starts_with_ci(string $string, string $prefix): bool {
 #[MustUse]
 #[TrackCaller]
 function ends_with(string $string, string $suffix): bool {
-  $offset = length!($string) - length!($suffix);
+  $offset = (length!($string) as int) - (length!($suffix) as int);
   return (
     '' == $suffix
     || ($offset >= 0 && _Private\equal_at($string, $suffix, $offset, false))
@@ -288,7 +283,7 @@ function ends_with(string $string, string $suffix): bool {
 #[MustUse]
 #[TrackCaller]
 function ends_with_ci(string $string, string $suffix): bool {
-  $offset = length!($string) - length!($suffix);
+  $offset = (length!($string) as int) - (length!($suffix) as int);
   return (
     '' == $suffix
     || ($offset >= 0 && _Private\equal_at($string, $suffix, $offset, true))

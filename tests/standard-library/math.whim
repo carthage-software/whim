@@ -150,12 +150,12 @@ $visited = new Whim\Reference\Strong::<vec<float>>(vec[]);
 $suspending = new MathCallbackIterator(fn(): null|(int, float) {
   Whim\Async\later();
   Whim\GC\collect_cycles();
-  if (length!($visited->value) == 3) {
+  if (length!($visited->value) == 3u) {
     return null;
   }
 
   $visited->value[] = 2.0;
-  return (length!($visited->value), 2.0);
+  return (length!($visited->value) as int, 2.0);
 });
 
 assert!(Whim\Math\dot(vec[1.0, 2.0, 3.0], $suspending) == 12.0);
@@ -292,7 +292,7 @@ assert!($frame->file == '<std>/Math/clamp.whim');
 $nanKeyObservation = new NanKeyObservation();
 $nanKey = fn(
   string $value,
-): int|float {
+): uint|float {
   $nanKeyObservation->calls++;
   return match ($value) {
     'nan' => Whim\Math\NAN,
@@ -390,13 +390,13 @@ assert!(
 
 assert!(Whim\Math\base_convert('0000', 10, 2) == '0');
 
-$largeDecimal = Str\repeat('1234567890', 10);
+$largeDecimal = Str\repeat('1234567890', 10u);
 assert!(
   Whim\Math\base_convert(Whim\Math\base_convert($largeDecimal, 10, 36), 36, 10)
   == $largeDecimal,
 );
 
-$largeBinary = '1' . Str\repeat('00101101', 128);
+$largeBinary = '1' . Str\repeat('00101101', 128u);
 assert!(
   Whim\Math\base_convert(Whim\Math\base_convert($largeBinary, 2, 36), 36, 2)
   == $largeBinary,
@@ -423,7 +423,7 @@ try {
 assert!($assertion_error_71 is Whim\Unwind\InvalidArgumentException);
 
 $assertion_value_72 = fn(): string => (
-  Whim\Math\base_convert(Str\repeat('9', 32) . 'z', 10, 16)
+  Whim\Math\base_convert(Str\repeat('9', 32u) . 'z', 10, 16)
 );
 
 $assertion_error_72 = null;
@@ -451,7 +451,7 @@ assert!($assertion_error_73 is Whim\Unwind\OverflowException);
 assert!(
   Whim\Math\min_by::<string>(
     dict['long' => 'aaaa', 'short' => 'b', 'medium' => 'cc'],
-    fn(string $value): int => length!($value),
+    fn(string $value): uint => length!($value),
   )->unwrap()
   == 'b',
 );

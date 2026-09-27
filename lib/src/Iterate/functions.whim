@@ -4,7 +4,6 @@ use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
 use Whim\Refine\ArrayKey;
 use Whim\Refine\Iterable;
-use Whim\Refine\NonNegativeInt;
 use Whim\Refine\Predicate;
 use Whim\Refine\Reducer;
 use Whim\Refine\Transform;
@@ -47,20 +46,14 @@ function filter<K, V>(
 /** Lazily yields at most the first requested entries. */
 #[MustUse]
 #[TrackCaller]
-function take<K, V>(
-  Iterable<K, V> $values,
-  NonNegativeInt $count,
-): Iterator<K, V> {
+function take<K, V>(Iterable<K, V> $values, uint $count): Iterator<K, V> {
   return new TakeIterator::<K, V>(to_iterator::<K, V>($values), $count);
 }
 
 /** Lazily skips the first requested entries. */
 #[MustUse]
 #[TrackCaller]
-function drop<K, V>(
-  Iterable<K, V> $values,
-  NonNegativeInt $count,
-): Iterator<K, V> {
+function drop<K, V>(Iterable<K, V> $values, uint $count): Iterator<K, V> {
   return new DropIterator::<K, V>(to_iterator::<K, V>($values), $count);
 }
 
@@ -74,9 +67,9 @@ function join<O, K, V>(Iterable<O, Iterable<K, V>> $values): Iterator<K, V> {
 /** Consumes an iterable and returns its entry count. */
 #[MustUse]
 #[TrackCaller]
-function count<K, V>(Iterable<K, V> $values): NonNegativeInt {
+function count<K, V>(Iterable<K, V> $values): uint {
   $iterator = to_iterator::<K, V>($values);
-  $count = 0;
+  $count = 0u;
   while ($iterator->next() != null) {
     $count++;
   }

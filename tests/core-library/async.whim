@@ -76,7 +76,7 @@ Async\spawn::<int>(fn(): int {
 })->ignore();
 
 $drainLog->seek(0);
-assert!(length!($drainLog->readAll()) == 0);
+assert!(length!($drainLog->readAll()) == 0u);
 Async\drain();
 $drainLog->seek(0);
 assert!($drainLog->readAll() == 'immediate quick slow ');
@@ -96,7 +96,7 @@ $squareFutures = dict[0 => Async\spawn::<int>(fn(): int {
 $squares = Async\all::<int, int>($squareFutures);
 assert!($squares == dict[0 => 1, 1 => 4, 2 => 9]);
 
-$demoChannel = Channel\bounded::<string>(2);
+$demoChannel = Channel\bounded::<string>(2u);
 $demoSender = $demoChannel[0];
 $demoReceiver = $demoChannel[1];
 Async\spawn::<int>(fn(): int {
@@ -130,11 +130,11 @@ for ($i = 0; $i < 3; $i++) {
   })->ignore();
 }
 
-assert!($waitGroup->getCount() == 3);
+assert!($waitGroup->getCount() == 3u);
 $waitGroup->wait();
-assert!($waitGroup->getCount() == 0);
+assert!($waitGroup->getCount() == 0u);
 
-$semaphore = new Async\Semaphore::<int, int>(2, fn(int $value): int {
+$semaphore = new Async\Semaphore::<int, int>(2u, fn(int $value): int {
   Async\sleep(Duration::fromMilliseconds(20));
   return $value * 10;
 });
@@ -144,8 +144,8 @@ $secondPermit = Async\spawn::<int>(fn(): int => $semaphore->waitFor(2));
 $thirdPermit = Async\spawn::<int>(fn(): int => $semaphore->waitFor(3));
 $fourthPermit = Async\spawn::<int>(fn(): int => $semaphore->waitFor(4));
 Async\later();
-assert!($semaphore->getOngoingOperations() == 2);
-assert!($semaphore->getPendingOperations() == 2);
+assert!($semaphore->getOngoingOperations() == 2u);
+assert!($semaphore->getPendingOperations() == 2u);
 assert!($firstPermit->await() == 10);
 assert!($secondPermit->await() == 20);
 assert!($thirdPermit->await() == 30);

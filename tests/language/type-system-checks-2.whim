@@ -183,7 +183,7 @@ assert!($wildcardBox is WildcardBox<_>);
 assert!(!($wildcardBox is WildcardBox<mixed>));
 assert!($wildcardPair is WildcardPair<_, int>);
 assert!(('x', 1, false) is (string, int, _));
-assert!((fn(string $value): int => length!($value)) is fn(_): int);
+assert!((fn(string $value): int => length!($value) as int) is fn(_): int);
 
 $assertion_value_62 = fn(): bool => $wildcardPair is WildcardPair<_>;
 $assertion_error_62 = null;

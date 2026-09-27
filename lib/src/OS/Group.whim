@@ -2,13 +2,12 @@ namespace Whim\OS;
 
 use Whim\Marker\AlwaysInline;
 use Whim\Refine\NonEmptyString;
-use Whim\Refine\NonNegativeInt;
 
 /** A group record returned by the operating-system account directory. */
 final readonly class Group {
   #[AlwaysInline]
   public function __construct(
-    public NonNegativeInt $id,
+    public uint $id,
     public NonEmptyString $name,
     /**
      * Names explicitly listed as members.

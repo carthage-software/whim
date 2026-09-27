@@ -19,8 +19,8 @@ use Whim\Unwind\OverflowException;
 
 /** Decodes one chunked HTTP/1 request body and its trailers. */
 final class H1ChunkedBody implements ReadHandle {
-  private int $chunkRemaining = 0;
-  private int $readBytes = 0;
+  private uint $chunkRemaining = 0u;
+  private uint $readBytes = 0u;
   private bool $needsTerminator = false;
   private bool $completed = false;
   private bool $failed = false;
@@ -28,8 +28,8 @@ final class H1ChunkedBody implements ReadHandle {
 
   public function __construct(
     private BufferedReadHandle $reader,
-    private int $maximumBodyBytes,
-    private int $maximumTrailerBytes,
+    private uint $maximumBodyBytes,
+    private uint $maximumTrailerBytes,
     private CancellationToken $cancellation,
   ) {
     $this->trailers = new Deferred::<FieldMap>();
@@ -56,11 +56,11 @@ final class H1ChunkedBody implements ReadHandle {
   #[TrackCaller]
   #[TraceBoundary]
   public function tryRead(null|int $maxBytes = null): string {
-    if ($this->completed || $this->failed || 0 == $this->chunkRemaining) {
+    if ($this->completed || $this->failed || 0u == $this->chunkRemaining) {
       return '';
     }
 
-    $data = $this->reader->tryRead($this->limit($maxBytes));
+    $data = $this->reader->tryRead($this->limit($maxBytes) as int);
     $this->consume($data);
     return $data;
   }
@@ -76,7 +76,7 @@ final class H1ChunkedBody implements ReadHandle {
       return '';
     }
 
-    if (0 == $this->chunkRemaining) {
+    if (0u == $this->chunkRemaining) {
       $this->beginChunk();
       if ($this->completed) {
         return '';
@@ -84,7 +84,7 @@ final class H1ChunkedBody implements ReadHandle {
     }
 
     $data = match (
-      $this->reader->read($this->limit($maxBytes), $this->cancellation)
+      $this->reader->read($this->limit($maxBytes) as int, $this->cancellation)
     ) {
       '' => $this->fail('the request ended inside a chunk'),
       $data => $data,
@@ -125,10 +125,10 @@ final class H1ChunkedBody implements ReadHandle {
       $this->fail('the request ended before a chunk size');
     }
 
-    $line = Str\slice($line, 0, length!($line) - 2);
+    $line = Str\slice($line, 0, length!($line) - 2u);
     $extension = Str\search($line, ';');
     if (null != $extension) {
-      $value = Str\slice($line, $extension + 1);
+      $value = Str\slice($line, ($extension as int) + 1);
       if (!($value is string[..=4096]) || !$this->validExtension($value)) {
         $this->fail('the request contains an invalid chunk extension');
       }
@@ -152,12 +152,12 @@ final class H1ChunkedBody implements ReadHandle {
     }
 
     try {
-      $this->chunkRemaining = Math\from_base($line, 16);
+      $this->chunkRemaining = Math\from_base($line, 16) as uint;
     } catch (OverflowException $_) {
       $this->fail('the request chunk size is too large');
     }
 
-    if (0 == $this->chunkRemaining) {
+    if (0u == $this->chunkRemaining) {
       $this->readTrailers();
       $this->completed = true;
     } else {
@@ -169,12 +169,12 @@ final class H1ChunkedBody implements ReadHandle {
   #[TraceBoundary]
   private function readTrailers(): void {
     $fields = vec[];
-    $bytes = 0;
+    $bytes = 0u;
     while (true) {
       try {
         $line = $this->reader->readUntilBounded(
           "\r\n",
-          $this->maximumTrailerBytes - $bytes,
+          ($this->maximumTrailerBytes as int) - ($bytes as int),
           $this->cancellation,
         );
       } catch (LimitExceededException $_) {
@@ -186,7 +186,7 @@ final class H1ChunkedBody implements ReadHandle {
       }
 
       $bytes += length!($line);
-      $line = match (Str\slice($line, 0, length!($line) - 2)) {
+      $line = match (Str\slice($line, 0, length!($line) - 2u)) {
         '' => break,
         $line => $line,
       };
@@ -196,7 +196,7 @@ final class H1ChunkedBody implements ReadHandle {
       }
 
       $separator = Str\search($line, ':');
-      if (null == $separator || 0 == $separator) {
+      if (null == $separator || 0u == $separator) {
         $this->fail('the request contains a malformed trailer');
       }
 
@@ -213,7 +213,10 @@ final class H1ChunkedBody implements ReadHandle {
         $this->fail('the request contains a forbidden trailer');
       }
 
-      $fields[] = ($name, Str\trim(Str\slice($line, $separator + 1), " \t"));
+      $fields[] = (
+        $name,
+        Str\trim(Str\slice($line, ($separator as int) + 1), " \t"),
+      );
     }
 
     try {
@@ -237,12 +240,12 @@ final class H1ChunkedBody implements ReadHandle {
     return true;
   }
 
-  private function limit(null|int $maximum): int {
+  private function limit(null|int $maximum): uint {
     if (null == $maximum || $maximum < 0 || $maximum > $this->chunkRemaining) {
       return $this->chunkRemaining;
     }
 
-    return $maximum;
+    return $maximum as uint;
   }
 
   #[NeverInline]

@@ -976,10 +976,10 @@ fn array_vec_dict_and_tuple_types() {
 #[test]
 fn parameters_break_before_a_return_tuple() {
     assert_formats(
-        "function bounded_with_capacity<T>(PositiveInt $capacity): (Sender<T>, Receiver<T>) {}",
+        "function bounded_with_capacity<T>(NonZero<uint> $capacity): (Sender<T>, Receiver<T>) {}",
         concat!(
             "function bounded_with_capacity<T>(\n",
-            "  PositiveInt $capacity,\n",
+            "  NonZero<uint> $capacity,\n",
             "): (Sender<T>, Receiver<T>) {}\n",
         ),
     );

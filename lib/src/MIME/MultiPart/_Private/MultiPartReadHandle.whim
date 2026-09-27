@@ -131,7 +131,7 @@ final class MultiPartReadHandle implements ReadHandle {
       return $result;
     }
 
-    $result = Str\slice($this->buffer, 0, $maxBytes);
+    $result = Str\slice($this->buffer, 0, $maxBytes as uint);
     $this->buffer = Str\slice($this->buffer, $maxBytes);
     return $result;
   }

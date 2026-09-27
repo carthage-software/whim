@@ -42,7 +42,7 @@ function parse_pairs(string $value): vec<Pair> {
     $offset = Str\search($part, '=') ?? continue;
 
     $name = Str\trim(Str\slice($part, 0, $offset));
-    $cookieValue = Str\trim(Str\slice($part, $offset + 1));
+    $cookieValue = Str\trim(Str\slice($part, ($offset as int) + 1));
     if (
       '' == $name
       || !Whim\_Private\http_valid_token($name)
@@ -69,7 +69,7 @@ function parse_integer(string $value): null|int {
     false => 0,
   };
 
-  if ($offset == length!($value)) {
+  if (($offset as uint) == length!($value)) {
     return null;
   }
 

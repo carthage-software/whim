@@ -96,13 +96,13 @@ function get_cargo_version(): (int, int, int) {
 
   $start += length!(VERSION_PREFIX);
   $end =
-    Str\search($manifest, '"', $start) ?? fail(
+    Str\search($manifest, '"', $start as int) ?? fail(
       'the workspace package version is incomplete',
     );
 
-  $version = Str\slice($manifest, $start, $end - $start);
+  $version = Str\slice($manifest, $start as int, $end - $start);
   $parts = Str\split($version, '.');
-  if (length!($parts) != 3) {
+  if (length!($parts) != 3u) {
     fail('the workspace package version must have the form 0.x.z');
   }
 

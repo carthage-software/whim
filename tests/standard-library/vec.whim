@@ -49,7 +49,7 @@ assert!(
   ],
 );
 
-assert!(length!(Vec\sort::<int>(vec[])) == 0);
+assert!(length!(Vec\sort::<int>(vec[])) == 0u);
 assert!(
   Vec\sort::<int>(
     vec[1, 3, 2],
@@ -74,9 +74,9 @@ assert!(Vec\keys::<string>(dict['a' => 1, 'b' => 2]) == vec['a', 'b']);
 assert!(Vec\reverse::<int>(vec[1, 2, 3]) == vec[3, 2, 1]);
 assert!(Vec\unique::<int>(vec[1, 2, 1, 3, 2]) == vec[1, 2, 3]);
 assert!(
-  Vec\unique_by::<string, int>(
+  Vec\unique_by::<string, uint>(
     vec['a', 'bb', 'c', 'ddd', 'ee'],
-    fn(string $value): int => length!($value),
+    fn(string $value): uint => length!($value),
   ) == vec['a', 'bb', 'ddd'],
 );
 
@@ -124,7 +124,7 @@ $nestedUnique = Vec\unique::<mixed>(vec[
   (vec[5], dict['y' => 6]),
 ]);
 
-assert!(length!($nestedUnique) == 3);
+assert!(length!($nestedUnique) == 3u);
 assert!($nestedUnique[0] == vec[dict['x' => 1], vec[2]]);
 assert!($nestedUnique[1] == $firstNestedDict);
 assert!($nestedUnique[2] == (vec[5], dict['y' => 6]));
@@ -151,12 +151,12 @@ $nullableMapped = Vec\map_nonnull::<int, null>(
 
 $assertion_value_17 = $nullableMapped;
 assert!($assertion_value_17 is vec<null>);
-assert!(length!($assertion_value_17) == 1);
+assert!(length!($assertion_value_17) == 1u);
 assert!($nullableMapped[0] == null);
 
 assert!(Vec\filter_nulls::<int>(vec[1, null, 2]) == vec[1, 2]);
-assert!(Vec\take::<int>(vec[1, 2, 3], 2) == vec[1, 2]);
-assert!(Vec\drop::<int>(vec[1, 2, 3], 1) == vec[2, 3]);
+assert!(Vec\take::<int>(vec[1, 2, 3], 2u) == vec[1, 2]);
+assert!(Vec\drop::<int>(vec[1, 2, 3], 1u) == vec[2, 3]);
 assert!(
   Vec\concat::<int>(vec[1, 2], vec[vec[3], vec[4, 5]]) == vec[1, 2, 3, 4, 5],
 );
@@ -180,13 +180,21 @@ assert!(
   == 0,
 );
 
-assert!(Vec\fill::<string>(3, 'x') == vec['x', 'x', 'x']);
+assert!(Vec\fill::<string>(3u, 'x') == vec['x', 'x', 'x']);
+assert!(Vec\fill::<string>(0u, 'x') == vec[]);
+assert!(
+  Vec\reproduce::<uint>(3u, fn(uint $index): uint => $index) == vec[0u, 1u, 2u],
+);
+
 assert!(Vec\zip::<int, string>(vec[1, 2], vec['a', 'b']) is vec<(int, string)>);
 
-assert!(Vec\chunk::<int>(vec[1, 2, 3], 2) == vec[vec[1, 2], vec[3]]);
-assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 1, 2) == vec[2, 3]);
-assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 2) == vec[3, 4]);
-assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 9) == vec[]);
+assert!(Vec\chunk::<int>(vec[1, 2, 3], 2u) == vec[vec[1, 2], vec[3]]);
+assert!(Vec\chunk::<int>(vec[1, 2, 3], Math\UINT_MAX) == vec[vec[1, 2, 3]]);
+assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 1u, 2u) == vec[2, 3]);
+assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 2u) == vec[3, 4]);
+assert!(Vec\slice::<int>(vec[1, 2, 3, 4], 9u) == vec[]);
+assert!(Vec\slice::<int>(vec[1, 2], 18_446_744_073_709_551_615u) == vec[]);
+assert!(Vec\slice::<int>(vec[1, 2], 1u, 18_446_744_073_709_551_615u) == vec[2]);
 
 class SortKeyCounter {
   public int $calls = 0;

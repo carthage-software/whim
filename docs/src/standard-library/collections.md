@@ -8,6 +8,8 @@ packed vec.
 Creation and access include `values`, `keys`, `fill`, `reproduce`, and integer
 `range`. Transform tools include `map`, `map_with_key`, `map_nonnull`,
 `flat_map`, `enumerate`, `reductions`, and `reduce`.
+`fill` and `reproduce` take a uint size. The `reproduce` callback receives a
+uint index.
 
 Filtering includes `filter`, key-aware filters, null removal, partitioning, and
 callback forms that keep non-null results.
@@ -16,6 +18,8 @@ Order and slice tools include `reverse`, `unique`, `unique_by`, `sort`,
 `sort_by`, `shuffle`, `take`, `drop`, `slice`, and `chunk`. `equals` compares
 vecs whose values implement `Comparison\Equal<T>`. `concat`,
 `flatten`, and `zip` combine inputs.
+`take`, `drop`, and `slice` take uint counts and offsets. `chunk` takes a
+nonzero uint size.
 
 ```whim
 use Whim\Vec;
@@ -33,10 +37,12 @@ preserves order; `swap_remove!` moves the last item into the removed index.
 
 `Whim\Dict` keeps keys. It creates dicts from iterables, entries, keys, value
 selectors, groups, and counts.
+`count_values` returns uint counts.
 
 Transform tools map values or keys, flatten nested keyed values, reindex, and
 flip. Filters preserve keys. Slice tools take, drop, pull, select keys, and
 apply while predicates.
+As with vecs, `take`, `drop`, and `slice` take uint counts and offsets.
 
 `merge`, `diff`, and `intersect` have value and key forms. `equal` accepts a
 custom equality callback. Dict sorting can sort by value, selected value, or
@@ -60,7 +66,7 @@ the caller may stop early or the source is a stream. See
 
 Empty removals and peeks return `Option<T>` so a stored `null` remains distinct
 from no item. Each type reports `count`, `isEmpty`, supports `clear`, converts
-to a vec, and implements `ToIterator`.
+to a vec, and implements `ToIterator`. `count()` returns a uint.
 
 The heap and priority queue do not share an implementation. Equal values or
 priorities have no set relative order.

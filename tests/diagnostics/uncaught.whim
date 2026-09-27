@@ -15,7 +15,7 @@ File\write(
 
 $run = Command\run($binary, vec[$snippet]);
 assert!(!($run->isSuccess()));
-assert!(length!($run->standardOutput) == 0);
+assert!(length!($run->standardOutput) == 0u);
 $assertion_value_4 = $run->standardError;
 assert!(
   Whim\Str\contains(
@@ -38,6 +38,6 @@ $exit = $work . '/exit.whim';
 File\write($exit, 'exit!(7);' . "\n");
 $run = Command\run($binary, vec[$exit]);
 assert!(!($run->isSuccess()));
-assert!(length!($run->standardError) == 0);
+assert!(length!($run->standardError) == 0u);
 
 Filesystem\delete_directory($work, true);

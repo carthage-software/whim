@@ -276,18 +276,24 @@ impl SQLiteConnection {
     const fn construct() {}
 
     #[whim_method(
-        "open(string $path, bool $readOnly, bool $create, bool $uri, (0..) $busyTimeoutMilliseconds, (0..) $statementCacheCapacity, bool $foreignKeys): (Whim\\_Private\\SQLiteConnection, Whim\\_Private\\SQLiteOperation)",
+        "open(string $path, bool $readOnly, bool $create, bool $uri, uint $busyTimeoutMilliseconds, uint $statementCacheCapacity, bool $foreignKeys): (Whim\\_Private\\SQLiteConnection, Whim\\_Private\\SQLiteOperation)",
         static,
         must_use
     )]
     fn open(cx: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) -> Result<Value, Throw> {
         let path = path_from_bytes(arguments.bytes(0))
             .map_err(|error| cx.type_error(&error.to_string()))?;
-        let busy_timeout = u64::try_from(arguments.int(4))
-            .map(Duration::from_millis)
-            .map_err(|_| DriverError::message("invalid SQLite busy timeout"))
-            .map_err(|error| sqlite_error(cx, &error))?;
-        let statement_cache_capacity = usize::try_from(arguments.int(5))
+        let busy_timeout = arguments.uint(4);
+        if i32::try_from(busy_timeout).is_err() {
+            return Err(sqlite_error(
+                cx,
+                &DriverError::message(
+                    "SQLite busy timeout must not exceed 2147483647 milliseconds",
+                ),
+            ));
+        }
+        let busy_timeout = Duration::from_millis(busy_timeout);
+        let statement_cache_capacity = usize::try_from(arguments.uint(5))
             .map_err(|_| DriverError::message("invalid SQLite statement cache capacity"))
             .map_err(|error| sqlite_error(cx, &error))?;
         let configuration = Configuration {
@@ -455,7 +461,7 @@ impl SQLiteResult {
         Ok(cx.vec(columns))
     }
 
-    #[whim_method("affectedRows(): null|(0..)", must_use)]
+    #[whim_method("affectedRows(): null|uint", must_use)]
     fn affected_rows(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         let result = result(cx)?;
         // SAFETY: the surrounding invariant proves this option contains a value.
@@ -465,9 +471,7 @@ impl SQLiteResult {
                 "the SQLite result metadata is ready before it is exposed",
             )
         };
-        Ok(metadata.affected_rows.map_or_else(Value::null, |rows| {
-            Value::int(i64::try_from(rows).unwrap_or(i64::MAX))
-        }))
+        Ok(metadata.affected_rows.map_or_else(Value::null, Value::uint))
     }
 
     #[whim_method("fetch(): null|vec<mixed>", must_use)]

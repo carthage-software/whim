@@ -36,7 +36,7 @@ final class MIMEStreamingReadHandle implements ReadHandle {
   }
 
   public function tryRead(null|int $maxBytes = null): string {
-    $remaining = length!($this->bytes) - $this->bytesRead;
+    $remaining = (length!($this->bytes) as int) - $this->bytesRead;
     if ($remaining <= 0) {
       return '';
     }
@@ -50,7 +50,7 @@ final class MIMEStreamingReadHandle implements ReadHandle {
       $length = $maxBytes;
     }
 
-    $result = Str\slice($this->bytes, $this->bytesRead, $length);
+    $result = Str\slice($this->bytes, $this->bytesRead, $length as uint);
     $this->bytesRead += $length;
     return $result;
   }
@@ -97,7 +97,7 @@ $sniffHandle = new MemoryHandle('xx%PDF-1.7');
 discard!($sniffHandle->seek(2));
 assert!(Sniff\from_handle($sniffHandle)->essence() == 'application/pdf');
 
-assert!($sniffHandle->seek(0, SeekWhence::Current) == 2);
+assert!($sniffHandle->seek(0, SeekWhence::Current) == 2u);
 
 $disposition = ContentDisposition::attachment('../report.csv');
 assert!($disposition->filename() == 'report.csv');
@@ -217,7 +217,9 @@ $parsedBytes =
 
 $parsedSource = new MIMEStreamingReadHandle($parsedBytes, 5);
 
-$parsed = new Parser('parse-boundary', spoolThreshold: 4)->parse($parsedSource);
+$parsed = new Parser('parse-boundary', spoolThreshold: 4u)->parse(
+  $parsedSource,
+);
 
 assert!($parsedSource->bytesRead == 0);
 ($firstIndex, $firstPart) = $parsed->next() as (int, Part);
@@ -229,7 +231,7 @@ assert!($parsedSource->bytesRead < length!($parsedBytes));
 
 ($secondIndex, $secondPart) = $parsed->next() as (int, Part);
 assert!($secondIndex == 1);
-assert!($secondPart->headers()->count() == 0);
+assert!($secondPart->headers()->count() == 0u);
 assert!(
   $secondPart->body()->readAll()
   == "second body with --parse-boundary inside\r\n"
@@ -256,7 +258,7 @@ while ($largeIndex < 1_000) {
   $largeIndex++;
 }
 
-$largeParts = new Parser('large', spoolThreshold: 32)->parse(
+$largeParts = new Parser('large', spoolThreshold: 32u)->parse(
   new MIMEStreamingReadHandle(
     "--large\r\n\r\n" . $largeBody . "\r\n--large--\r\n",
     11,
@@ -304,7 +306,7 @@ try {
 assert!($assertion_error_59 is TypeError);
 
 $assertion_value_60 = fn(): void {
-  $parts = new Parser('limit', maximumPartSize: 3)->parse(
+  $parts = new Parser('limit', maximumPartSize: 3u)->parse(
     new MemoryHandle("--limit\r\n\r\nfour\r\n--limit--\r\n"),
   );
 
@@ -321,7 +323,7 @@ try {
 assert!($assertion_error_60 is MultiPartException);
 
 $assertion_value_61 = fn(): void {
-  $parts = new Parser('limit', maximumParts: 1)->parse(
+  $parts = new Parser('limit', maximumParts: 1u)->parse(
     new MemoryHandle(
       "--limit\r\n\r\none\r\n" . "--limit\r\n\r\ntwo\r\n" . "--limit--\r\n",
     ),
@@ -358,7 +360,7 @@ try {
 assert!($assertion_error_62 is MultiPartException);
 
 $assertion_value_63 = fn(): void {
-  $parts = new Parser('headers', maximumHeaderSize: 8)->parse(
+  $parts = new Parser('headers', maximumHeaderSize: 8u)->parse(
     new MemoryHandle(
       "--headers\r\nX-Header: too-large\r\n\r\nbody\r\n--headers--\r\n",
     ),

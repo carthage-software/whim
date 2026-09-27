@@ -232,7 +232,7 @@ macro_rules! reflection_class_methods {
                 get_parameters: "getParameters(): vec<Whim\\Reflection\\Callable\\ParameterReflection>" => Parameters;
                 get_where_constraints: "getWhereConstraints(): vec<Whim\\Reflection\\Generic\\WhereConstraintReflection>" => WhereConstraints;
                 get_parameter: "getParameter(int|string $parameter): null|Whim\\Reflection\\Callable\\ParameterReflection" => Parameter;
-                get_required_parameter_count: "getRequiredParameterCount(): (0..)" => RequiredParameterCount;
+                get_required_parameter_count: "getRequiredParameterCount(): uint" => RequiredParameterCount;
                 get_return_type: "getReturnType(): null|Whim\\Reflection\\Type\\TypeReflection" => ReturnType;
                 get_callable_type: "getCallableType(null|Whim\\Reflection\\Generic\\TypeEnvironmentReflection $environment = null, null|Whim\\Reflection\\Type\\ClassTypeReflection $calledType = null): Whim\\Reflection\\Type\\FunctionTypeReflection" => CallableType;
             ];
@@ -722,8 +722,8 @@ reflection_class! {
     StringLengthTypeReflection = "Whim\\Reflection\\Type\\StringLengthTypeReflection"
     implements ["Whim\\Reflection\\Type\\TypeReflection"]
     with [type_reflection] {
-        get_minimum_length: "getMinimumLength(): (0..)" => MinimumLength;
-        get_maximum_length: "getMaximumLength(): null|(0..)" => MaximumLength;
+        get_minimum_length: "getMinimumLength(): uint" => MinimumLength;
+        get_maximum_length: "getMaximumLength(): null|uint" => MaximumLength;
     }
 }
 

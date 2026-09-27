@@ -84,7 +84,7 @@ while ($index < 70000) {
   $index++;
 }
 
-assert!(length!($values) == 70000);
+assert!(length!($values) == 70000u);
 assert!($values[0] == 0);
 assert!($values[65536] == 608);
 assert!($values[69999] == 997);

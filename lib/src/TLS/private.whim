@@ -26,7 +26,7 @@ use Whim\TLS\Version;
 #[TraceBoundary]
 function failure(Whim\_Private\TlsError $error): never {
   $message = $error->getMessage();
-  $code = $error->kind();
+  $code = $error->kind() as int;
   if (Whim\_Private\TLS_ERROR_CONFIGURATION == $code) {
     throw new ConfigurationException($message, $code, $error);
   }
@@ -131,7 +131,7 @@ function transmit<TEndpoint: Endpoint>(
 ): void {
   while (true) {
     try {
-      $bytes = $connection->transmitCiphertext(65_536);
+      $bytes = $connection->transmitCiphertext(65_536u);
     } catch (Whim\_Private\TlsError $error) {
       failure($error);
     }
@@ -242,10 +242,10 @@ function connection_state(
   }
 
   return new ConnectionState(
-    Version::from($version),
+    Version::from($version as int),
     $cipherSuite as NonEmptyString,
     $alpnProtocol as null|NonEmptyString,
-    HandshakeKind::from($handshakeKind),
+    HandshakeKind::from($handshakeKind as int),
     $peerCertificates,
     $serverName as null|NonEmptyString,
   );

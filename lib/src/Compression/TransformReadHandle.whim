@@ -4,19 +4,18 @@ use Whim\Async\CancellationToken;
 use Whim\IO\LimitExceededException;
 use Whim\IO\ReadHandle;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 use Whim\_Private\string_slice;
 
 /** Applies a streaming byte transformer while reading another handle. */
 final class TransformReadHandle implements ReadHandle {
   private string $buffer = '';
   private bool $finished = false;
-  private int $produced = 0;
+  private uint $produced = 0u;
 
   public function __construct(
     private ReadHandle $source,
     private Transformer $transformer,
-    private null|NonNegativeInt $maximumOutputBytes = null,
+    private null|uint $maximumOutputBytes = null,
   ) {}
 
   /** Waits until input may produce transformed bytes. */
@@ -61,7 +60,7 @@ final class TransformReadHandle implements ReadHandle {
       $this->append($this->transformer->push($input));
     }
 
-    $length = length!($this->buffer);
+    $length = length!($this->buffer) as int;
     if (null != $maxBytes && $maxBytes >= 0 && $maxBytes < $length) {
       $length = $maxBytes;
     }
@@ -70,7 +69,7 @@ final class TransformReadHandle implements ReadHandle {
     $this->buffer = string_slice(
       $this->buffer,
       $length,
-      length!($this->buffer) - $length,
+      (length!($this->buffer) as int) - $length,
     );
 
     return $result;

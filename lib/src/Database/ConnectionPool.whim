@@ -7,7 +7,6 @@ use Whim\Database\_Private\PoolState;
 use Whim\IO\CloseHandle;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
-use Whim\Refine\NonNegativeInt;
 
 /** Reuses a bounded set of database connections. */
 final class ConnectionPool implements Connector, CloseHandle {
@@ -41,19 +40,19 @@ final class ConnectionPool implements Connector, CloseHandle {
 
   /** Returns the number of open and reserved connections. */
   #[MustUse]
-  public function getOpenConnections(): NonNegativeInt {
+  public function getOpenConnections(): uint {
     return $this->state->getOpenConnections();
   }
 
   /** Returns the number of idle connections. */
   #[MustUse]
-  public function getIdleConnections(): NonNegativeInt {
+  public function getIdleConnections(): uint {
     return $this->state->getIdleConnections();
   }
 
   /** Returns the number of tasks waiting for a connection. */
   #[MustUse]
-  public function getPendingConnections(): NonNegativeInt {
+  public function getPendingConnections(): uint {
     return $this->state->getPendingConnections();
   }
 

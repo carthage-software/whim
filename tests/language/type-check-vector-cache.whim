@@ -14,11 +14,11 @@ function alternate_vector_sum(vec<int> $values): int {
 }
 
 function numeric_count(vec<int|float> $values): int {
-  return length!($values);
+  return length!($values) as int;
 }
 
 function guarded_pair(int $id, vec<int> $values): int {
-  return $id + length!($values);
+  return $id + (length!($values) as int);
 }
 
 function call_guarded_pair(

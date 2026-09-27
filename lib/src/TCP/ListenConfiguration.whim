@@ -3,7 +3,7 @@ namespace Whim\TCP;
 use Whim\Default\Default;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
-use Whim\Refine\PositiveInt;
+use Whim\Refine\NonZero;
 
 /** Configures a TCP listener. */
 final readonly class ListenConfiguration implements Default {
@@ -13,7 +13,7 @@ final readonly class ListenConfiguration implements Default {
     public bool $reuseAddress = false,
     public bool $reusePort = false,
     public bool $onlyIPv6 = true,
-    public PositiveInt $backlog = 512,
+    public NonZero<uint> $backlog = 512u,
   ) {}
 
   #[AlwaysInline]
@@ -48,7 +48,7 @@ final readonly class ListenConfiguration implements Default {
 
   #[AlwaysInline]
   #[MustUse]
-  public function withBacklog(PositiveInt $backlog): ListenConfiguration {
+  public function withBacklog(NonZero<uint> $backlog): ListenConfiguration {
     return clone!($this, backlog: $backlog);
   }
 }

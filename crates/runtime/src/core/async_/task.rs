@@ -20,7 +20,7 @@ use crate::builtin::throw::Throw;
 const NANOSECONDS_PER_SECOND: i64 = 1_000_000_000;
 
 #[whim_class("Whim\\_Private\\TaskId", final, readonly)]
-#[whim_property("public int $id")]
+#[whim_property("public uint $id")]
 #[derive(Default)]
 pub(crate) struct TaskId {
     task: Cell<Option<LoopTaskId>>,
@@ -30,7 +30,7 @@ default_built_in_state!(TaskId);
 
 #[whim_methods]
 impl TaskId {
-    #[whim_method("__construct(int $id): void", visibility = "private")]
+    #[whim_method("__construct(uint $id): void", visibility = "private")]
     const fn construct() {}
 }
 
@@ -79,14 +79,7 @@ pub(crate) fn task_value(cx: &mut Context<'_, '_, '_>, id: LoopTaskId) -> Result
         return Err(cx.type_error("the task identifier has no built-in state"));
     };
     state.task.set(Some(id));
-    // SAFETY: the surrounding invariant proves this result is successful.
-    let id = unsafe {
-        unwrap_result_invariant(
-            i64::try_from(id.get()),
-            "a task identifier cannot exhaust the signed integer range",
-        )
-    };
-    let value = Value::int(id);
+    let value = Value::uint(id.get());
     cx.set_property(&task, "id", value)?;
     Ok(task)
 }
@@ -191,29 +184,19 @@ task_operation!(
     "Whim\\_Private\\unreference_task(Whim\\_Private\\TaskId $task): void",
     loop_unreference
 );
-#[whim_function("Whim\\_Private\\record_unhandled(Whim\\Unwind\\Throwable $error): int")]
+#[whim_function("Whim\\_Private\\record_unhandled(Whim\\Unwind\\Throwable $error): uint")]
 fn record_unhandled(
     cx: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
 ) -> Result<Value, Throw> {
     let error = arguments.local(0);
     let id = cx.vm.loop_record_error(error)?;
-    // SAFETY: the surrounding invariant proves this result is successful.
-    let id = unsafe {
-        unwrap_result_invariant(
-            i64::try_from(id),
-            "an unhandled-error identifier cannot exhaust the signed integer range",
-        )
-    };
-    Ok(Value::int(id))
+    Ok(Value::uint(id))
 }
 
-#[whim_function("Whim\\_Private\\forget_unhandled(int $id): void")]
+#[whim_function("Whim\\_Private\\forget_unhandled(uint $id): void")]
 fn forget_unhandled(cx: &mut Context<'_, '_, '_>, arguments: Arguments<'_>) {
-    let id = arguments.int(0);
-    if let Ok(id) = u64::try_from(id) {
-        cx.vm.loop_forget_error(id);
-    }
+    cx.vm.loop_forget_error(arguments.uint(0));
 }
 
 #[cfg(test)]

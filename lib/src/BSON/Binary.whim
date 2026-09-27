@@ -10,16 +10,16 @@ use Whim\UUID\UUID;
 /** A BSON binary value and its subtype. */
 #[Stub]
 final readonly class Binary implements Equal<Binary> {
-  public const int GENERIC = 0x00;
-  public const int FUNCTION = 0x01;
-  public const int OLD_BINARY = 0x02;
-  public const int OLD_UUID = 0x03;
-  public const int UUID = 0x04;
-  public const int MD5 = 0x05;
-  public const int ENCRYPTED = 0x06;
-  public const int COLUMN = 0x07;
-  public const int SENSITIVE = 0x08;
-  public const int VECTOR = 0x09;
+  public const uint GENERIC = 0x00u;
+  public const uint FUNCTION = 0x01u;
+  public const uint OLD_BINARY = 0x02u;
+  public const uint OLD_UUID = 0x03u;
+  public const uint UUID = 0x04u;
+  public const uint MD5 = 0x05u;
+  public const uint ENCRYPTED = 0x06u;
+  public const uint COLUMN = 0x07u;
+  public const uint SENSITIVE = 0x08u;
+  public const uint VECTOR = 0x09u;
 
   #[AlwaysInline]
   public function __construct(

@@ -100,7 +100,7 @@ final class H1Connection implements Connection {
     $headers = $request->headers;
     if (!$headers->has('host')) {
       $headers = $headers->with('Host', request_host($request));
-    } else if (length!($headers->getAll('host')) != 1) {
+    } else if (length!($headers->getAll('host')) != 1u) {
       throw new RequestException('an HTTP/1 request must have one Host field');
     }
 
@@ -146,7 +146,7 @@ final class H1Connection implements Connection {
     if (
       null == $request->body
       && null != $contentLength
-      && 0 != $contentLength
+      && 0u != $contentLength
     ) {
       throw new RequestException(
         'the request has a non-zero Content-Length but no body',
@@ -159,7 +159,7 @@ final class H1Connection implements Connection {
       && !$transferEncoding
     ) {
       $headers = $headers->with('Content-Length', '0');
-      $contentLength = 0;
+      $contentLength = 0u;
     }
 
     $target = match ($this->forwardProxy) {
@@ -194,7 +194,7 @@ final class H1Connection implements Connection {
     Configuration $configuration,
     null|CancellationToken $cancellation,
     FieldMap $headers,
-    null|int $contentLength,
+    null|uint $contentLength,
     bool $chunked,
     string $target,
   ): Transaction {
@@ -322,7 +322,7 @@ final class H1Connection implements Connection {
           );
         }
 
-        if (0 == $contentLength) {
+        if (0u == $contentLength) {
           if (!$this->reusable) {
             $this->stream->close();
           }
@@ -379,7 +379,7 @@ final class H1Connection implements Connection {
 
   private function writeBody(
     Request $request,
-    null|int $contentLength,
+    null|uint $contentLength,
     bool $chunked,
     null|CancellationToken $cancellation,
   ): void {
@@ -421,7 +421,7 @@ final class H1Connection implements Connection {
 
     $remaining = $contentLength;
     while ($remaining > 0) {
-      $data = $body->read($remaining, $cancellation);
+      $data = $body->read($remaining as int, $cancellation);
       if ('' == $data && $body->reachedEndOfDataSource()) {
         throw new RequestException(
           'the request body ended before its declared content length',

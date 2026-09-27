@@ -28,10 +28,14 @@ impl SystemError {
     #[whim_method("__construct(): void", visibility = "private")]
     const fn construct() {}
 
-    #[whim_method("errno(): int")]
+    #[whim_method("errno(): uint")]
     fn errno(cx: &mut Context<'_, '_, '_>) -> Result<Value, Throw> {
         let receiver = cx.receiver();
-        cx.get_property(&receiver, "code")
+        let code = cx.get_property(&receiver, "code")?;
+        let code = code
+            .as_int()
+            .ok_or_else(|| cx.type_error("the system error code must be an int"))?;
+        Ok(Value::uint(code.cast_unsigned()))
     }
 
     #[whim_method("call(): (string&!'')")]
@@ -55,20 +59,27 @@ impl FileDescriptor {
     #[whim_method("__construct(): void", visibility = "private")]
     const fn construct() {}
 
-    #[whim_method("duplicate(int $number): Whim\\OS\\FileDescriptor", static)]
+    #[whim_method("duplicate(uint $number): Whim\\OS\\FileDescriptor", static)]
     fn duplicate<'call>(
         cx: &mut Context<'call, '_, '_>,
         arguments: Arguments<'call>,
     ) -> Result<Value, Throw> {
-        let descriptor =
-            Descriptor::duplicate(arguments.int(0)).map_err(|error| io_error(cx, error))?;
+        let number = i64::try_from(arguments.uint(0))
+            .map_err(|_| system_error(cx, "duplicate", libc::EINVAL))?;
+        let descriptor = Descriptor::duplicate(number).map_err(|error| io_error(cx, error))?;
         build_file_descriptor(cx, descriptor)
     }
 
-    #[whim_method("toInt(): (0..)")]
-    fn to_int(cx: &Context<'_, '_, '_>) -> Value {
+    #[whim_method("toUint(): uint")]
+    fn to_uint(cx: &Context<'_, '_, '_>) -> Value {
         let receiver = cx.receiver();
-        Value::int(descriptor_state(&receiver).number.get().max(0))
+        Value::uint(
+            descriptor_state(&receiver)
+                .number
+                .get()
+                .max(0)
+                .cast_unsigned(),
+        )
     }
 
     #[whim_method("isClosed(): bool")]

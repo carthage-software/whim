@@ -60,7 +60,10 @@ final class ReadHandleImpl implements ReadHandle, FileDescriptorHandle {
     }
 
     try {
-      $bytes = Whim\_Private\read_descriptor($this->descriptor, $maximum);
+      $bytes = Whim\_Private\read_descriptor(
+        $this->descriptor,
+        $maximum as uint,
+      );
     } catch (Whim\_Private\SystemError $error) {
       failure($error);
     }

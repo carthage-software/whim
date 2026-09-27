@@ -47,7 +47,7 @@ function copy(
   ReadHandle $reader,
   WriteHandle $writer,
   null|CancellationToken $cancellation = null,
-): int {
+): uint {
   return copy_chunked($reader, $writer, 8192, $cancellation);
 }
 
@@ -64,12 +64,12 @@ function copy_chunked(
   WriteHandle $writer,
   int $chunkSize,
   null|CancellationToken $cancellation = null,
-): int {
+): uint {
   if ($chunkSize <= 0) {
     throw new InvalidArgumentException('$chunkSize must be greater than zero');
   }
 
-  $copied = 0;
+  $copied = 0u;
   while (true) {
     $data = match ($reader->read($chunkSize, $cancellation)) {
       '' => match ($reader->reachedEndOfDataSource()) {

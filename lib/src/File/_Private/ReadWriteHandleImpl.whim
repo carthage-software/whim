@@ -14,7 +14,6 @@ use Whim\OS\FileDescriptor;
 use Whim\Option\None;
 use Whim\Option\Option;
 use Whim\Option\Some;
-use Whim\Refine\NonNegativeInt;
 
 /** Descriptor-backed implementation returned by the read-write file factory. */
 final class ReadWriteHandleImpl implements ReadHandle, WriteHandle {
@@ -37,13 +36,16 @@ final class ReadWriteHandleImpl implements ReadHandle, WriteHandle {
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function getSize(): int {
+  public function getSize(): uint {
     return $this->state->getSize();
   }
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function seek(int $offset, SeekWhence $whence = SeekWhence::Set): int {
+  public function seek(
+    int $offset,
+    SeekWhence $whence = SeekWhence::Set,
+  ): uint {
     return $this->state->seek($offset, $whence);
   }
 
@@ -77,7 +79,7 @@ final class ReadWriteHandleImpl implements ReadHandle, WriteHandle {
 
   #[TrackCaller]
   #[TraceBoundary]
-  public function tryWrite(string $bytes): int {
+  public function tryWrite(string $bytes): uint {
     return $this->state->tryWrite($bytes);
   }
 
@@ -86,7 +88,7 @@ final class ReadWriteHandleImpl implements ReadHandle, WriteHandle {
   public function write(
     string $bytes,
     null|CancellationToken $cancellation = null,
-  ): int {
+  ): uint {
     return $this->state->write($bytes, $cancellation);
   }
 
@@ -101,7 +103,7 @@ final class ReadWriteHandleImpl implements ReadHandle, WriteHandle {
   #[TrackCaller]
   #[TraceBoundary]
   public function truncate(
-    NonNegativeInt $length,
+    uint $length,
     null|CancellationToken $cancellation = null,
   ): void {
     $this->state->truncate($length, $cancellation);

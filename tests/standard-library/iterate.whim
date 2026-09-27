@@ -65,7 +65,7 @@ $taken = Iterate\take::<string, int>(
     $takePulls,
     2,
   ),
-  2,
+  2u,
 );
 
 assert!($takePulls->count == 0);
@@ -76,7 +76,7 @@ assert!($takePulls->count == 2);
 $emptyTakePulls = new PullCounter();
 $empty = Iterate\take::<string, int>(
   new CountingIterator::<string, int>(vec[('one', 1)], $emptyTakePulls, 0),
-  0,
+  0u,
 );
 
 assert!(Iterate\to_vec::<string, int>($empty) == vec[]);
@@ -89,7 +89,7 @@ $dropped = Iterate\drop::<string, int>(
     $dropPulls,
     3,
   ),
-  2,
+  2u,
 );
 
 assert!($dropPulls->count == 0);
@@ -125,7 +125,7 @@ assert!(
   ],
 );
 
-assert!(Iterate\count::<int, string>(vec['a', 'b', 'c']) == 3);
+assert!(Iterate\count::<int, string>(vec['a', 'b', 'c']) == 3u);
 assert!(
   Iterate\reduce::<int, int, int>(
     vec[1, 2, 3, 4],

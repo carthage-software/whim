@@ -17,23 +17,22 @@ fn from_bits(arguments: Arguments<'_>) -> Value {
     Value::float(f64::from_ne_bytes(arguments.int(0).to_ne_bytes()))
 }
 
-#[whim_function("Whim\\_Private\\float_to_bits32(float $value): 0..=4294967295")]
+#[whim_function("Whim\\_Private\\float_to_bits32(float $value): 0u..=4294967295u")]
 #[expect(
     clippy::cast_possible_truncation,
     reason = "this operation explicitly narrows a double to single precision"
 )]
 fn to_bits32(arguments: Arguments<'_>) -> Value {
-    Value::int(i64::from((arguments.float(0) as f32).to_bits()))
+    Value::uint(u64::from((arguments.float(0) as f32).to_bits()))
 }
 
-#[whim_function("Whim\\_Private\\bits32_to_float(int $bits): float")]
+#[whim_function("Whim\\_Private\\bits32_to_float(0u..=4294967295u $bits): float")]
 #[expect(
     clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
     reason = "a 32-bit representation uses the low bits of the supplied integer"
 )]
 fn from_bits32(arguments: Arguments<'_>) -> Value {
-    Value::float(f64::from(f32::from_bits(arguments.int(0) as u32)))
+    Value::float(f64::from(f32::from_bits(arguments.uint(0) as u32)))
 }
 
 #[whim_function("Whim\\_Private\\float_to_be_bytes(float $value): string[8]")]

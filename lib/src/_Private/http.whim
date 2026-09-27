@@ -65,14 +65,14 @@ function http_index_fields(
 #[TraceBoundary]
 function http1_parse_request_head(
   string $block,
-): int
+): uint
 | (
   string,
   string,
-  int,
+  uint,
   vec<(string, string)>,
   dict<string, vec<string>>,
-  null|int,
+  null|uint,
   bool,
   bool,
   bool,
@@ -87,7 +87,7 @@ function http1_parse_request_head(
 #[TraceBoundary]
 function http1_parse_response_head(
   string $block,
-): null|(int, int, vec<(string, string)>, dict<string, vec<string>>) {}
+): null|(uint, uint, vec<(string, string)>, dict<string, vec<string>>) {}
 
 /** Serializes an HTTP/1 request head. */
 #[Stub]
@@ -106,7 +106,7 @@ function http1_serialize_request_head(
 #[TraceBoundary]
 function http1_serialize_response_head(
   string $version,
-  100..=599 $status,
+  100u..=599u $status,
   string $reason,
   vec<(string, string)> $fields,
   bool $bodyAllowed,

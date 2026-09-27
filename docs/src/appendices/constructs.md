@@ -21,7 +21,7 @@ This table lists every construct.
 | `exit!()` | `never` | exits with status zero |
 | `exit!($status)` | `never` | exits with the low eight bits of an int |
 | `file!()` | `string` | returns the current source file |
-| `length!($value)` | `int` | counts string bytes or array items |
+| `length!($value)` | `uint` | counts string bytes or array items |
 | `operating_system!()` | `string` | returns the platform's operating system |
 | `operating_system_family!()` | `string` | returns the platform's operating system family |
 | `panic!($message)` | `never` | requires a string, prints a trace, and exits with status 255 |

@@ -47,7 +47,7 @@ enum TransferEncoding: string {
       return TransferEncoding::SevenBit;
     }
 
-    if (!$longLine && $high * 10 <= length!($content) * 3) {
+    if (!$longLine && $high * 10 <= length!($content) * 3u) {
       return TransferEncoding::QuotedPrintable;
     }
 

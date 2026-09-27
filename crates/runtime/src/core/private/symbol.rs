@@ -92,7 +92,7 @@ fn run_symbol_autoload(
     Ok(Value::null())
 }
 
-#[whim_function("Whim\\_Private\\get_symbol_kind(string $name): null|int")]
+#[whim_function("Whim\\_Private\\get_symbol_kind(string $name): null|uint")]
 fn get_symbol_kind(
     context: &mut Context<'_, '_, '_>,
     arguments: Arguments<'_>,
@@ -110,7 +110,7 @@ fn get_symbol_kind(
         return Ok(Value::null());
     };
 
-    Ok(Value::int(kind as i64))
+    Ok(Value::uint(kind as u64))
 }
 
 fn symbol_name(

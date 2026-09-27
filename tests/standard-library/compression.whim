@@ -84,8 +84,8 @@ final class CompressionTestContext implements Context {
 }
 
 function compression_test_context(): CompressionTestContext {
-  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080);
-  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000);
+  $local = new InternetEndpoint(Address::v4('127.0.0.1'), 8080u);
+  $peer = new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u);
   return new CompressionTestContext(ProtocolVersion::V11, $local, $peer);
 }
 
@@ -109,15 +109,17 @@ function compression_test_encode(Codec $codec, vec<string> $chunks): string {
 function compression_test_decode(Codec $codec, string $encoded): string {
   $decompressor = $codec->createDecompressor();
   $decoded = '';
-  $offset = 0;
+  $offset = 0u;
   $length = length!($encoded);
   while ($offset < $length) {
-    $chunkLength = 3;
+    $chunkLength = 3u;
     if ($offset + $chunkLength > $length) {
       $chunkLength = $length - $offset;
     }
 
-    $decoded .= $decompressor->push(Str\slice($encoded, $offset, $chunkLength));
+    $decoded .= $decompressor->push(
+      Str\slice($encoded, $offset as int, $chunkLength),
+    );
 
     $offset += $chunkLength;
   }
@@ -127,7 +129,7 @@ function compression_test_decode(Codec $codec, string $encoded): string {
 
 function compression_test_truncated(Codec $codec): void {
   $encoded = compression_test_encode($codec, vec['truncated stream']);
-  $encoded = Str\slice($encoded, 0, length!($encoded) - 1);
+  $encoded = Str\slice($encoded, 0, length!($encoded) - 1u);
   compression_test_decode($codec, $encoded);
 }
 
@@ -213,7 +215,7 @@ assert!($transformed->reachedEndOfDataSource());
 $limited = new TransformReadHandle(
   new MemoryHandle('payload'),
   new CompressionTestTransformer('alpha'),
-  4,
+  4u,
 );
 
 $assertion_value_14 = fn(): string => $limited->readAll();
@@ -273,7 +275,7 @@ $unsupported = $decompression->handle(
 assert!($unsupported->status == 415);
 assert!($unsupported->headers->get('Accept-Encoding') == 'alpha, beta');
 
-$tooLarge = new RequestDecompression($registry, 4);
+$tooLarge = new RequestDecompression($registry, 4u);
 $limitedResponse = $tooLarge->handle(
   compression_test_context(),
   Request::fromParts(

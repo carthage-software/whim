@@ -33,6 +33,10 @@ known structured fields from an existing MIME header map.
 returns a streaming read handle. Large attachments stay streaming through
 transfer encoding and multipart output.
 
+`MIME\MultiPart\Parser` takes `uint` values for its spool threshold, maximum
+part count, maximum part size, and maximum header size. `0u` means no limit
+for each maximum.
+
 ## Envelope
 
 An SMTP envelope is separate from visible message headers. `Envelope::fromParts`
@@ -49,6 +53,8 @@ visible headers.
 `EnhancedStatusCode` stores its class, subject, and detail. Enums name
 capabilities, security modes, priority, delivery status requests, return modes,
 and delivery deadlines.
+`SMTP\Client\Connection::maximumMessageSize()` returns the advertised size
+limit as `null|uint`.
 
 ## Transport
 
@@ -58,9 +64,12 @@ optional authentication, sends a message, and pools idle connections.
 Transport configuration sets host, optional port, plaintext, STARTTLS, or
 implicit TLS, local hostname, pipelining, chunking, chunk size, partial-success
 policy, idle pool limits, connector, and TLS settings.
+`maximumIdleConnections` uses `uint` and defaults to `1u`; `0u` disables idle
+connection reuse.
+The chunk size uses `NonZero<uint>` and defaults to `65_536u`.
 
-When the caller omits a port, STARTTLS uses 587, implicit TLS uses 465, and
-plaintext uses 25.
+Ports use `uint` in the range `0u..=65535u`. When the caller omits a port,
+STARTTLS uses `587u`, implicit TLS uses `465u`, and plaintext uses `25u`.
 
 Idle connections have a timeout. A checked-out idle connection must answer
 `NOOP`; otherwise the transport closes it and opens a new one.

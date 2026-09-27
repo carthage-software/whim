@@ -84,8 +84,8 @@ function authenticate(
   #[SensitiveParameter] string[1..=255] $password,
   null|CancellationToken $cancellation,
 ): void {
-  $request = "\x01" . Str\chr(length!($username)) . $username;
-  $request .= Str\chr(length!($password)) . $password;
+  $request = "\x01" . Str\chr(length!($username) as int) . $username;
+  $request .= Str\chr(length!($password) as int) . $password;
   $stream->writeAll($request, $cancellation);
 
   $response = $stream->readFixedSize(2, $cancellation);
@@ -103,7 +103,7 @@ function encode_host(Host $host): string {
       Family::V4 => "\x01" . $address->toBytes(),
       Family::V6 => "\x04" . $address->toBytes(),
     },
-    $name @ string[..=255] => "\x03" . Str\chr(length!($name)) . $name,
+    $name @ string[..=255] => "\x03" . Str\chr(length!($name) as int) . $name,
     string => throw new ProtocolException(
       'a SOCKS destination name cannot exceed 255 bytes',
     ),

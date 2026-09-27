@@ -1,13 +1,9 @@
 namespace Whim\OS;
 
 use Whim\Marker\AlwaysInline;
-use Whim\Refine\NonNegativeInt;
 
 /** Total and currently available physical memory, in bytes. */
 final readonly class MemoryInformation {
   #[AlwaysInline]
-  public function __construct(
-    public NonNegativeInt $total,
-    public NonNegativeInt $available,
-  ) {}
+  public function __construct(public uint $total, public uint $available) {}
 }

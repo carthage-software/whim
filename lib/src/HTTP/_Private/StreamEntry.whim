@@ -4,10 +4,10 @@ namespace Whim\HTTP\_Private;
 final class StreamEntry {
   public StreamState $state = StreamState::Idle;
   public null|string $requestMethod = null;
-  public null|int $expectedContentLength = null;
-  public int $receivedContentLength = 0;
-  public null|int $expectedSentContentLength = null;
-  public int $sentContentLength = 0;
+  public null|uint $expectedContentLength = null;
+  public uint $receivedContentLength = 0u;
+  public null|uint $expectedSentContentLength = null;
+  public uint $sentContentLength = 0u;
   public bool $receivedInitialHeaders = false;
   public bool $sentInitialHeaders = false;
 

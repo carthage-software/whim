@@ -52,7 +52,9 @@ foreach (vec[
   "\xe2\x82",
 ] as $malformed) {
   assert!(Unicode\code_point_at($malformed, 0) == 0xfffd);
-  assert!(Unicode\code_point_before($malformed, length!($malformed)) == 0xfffd);
+  assert!(
+    Unicode\code_point_before($malformed, length!($malformed) as int) == 0xfffd,
+  );
 }
 
 assert!(Str\from_code_point(0) == "\x00");
@@ -75,7 +77,9 @@ foreach (vec[
 ] as $scalar) {
   $encoded = Str\from_code_point($scalar);
   assert!(Unicode\code_point_at($encoded, 0) == $scalar);
-  assert!(Unicode\code_point_before($encoded, length!($encoded)) == $scalar);
+  assert!(
+    Unicode\code_point_before($encoded, length!($encoded) as int) == $scalar,
+  );
 }
 
 $assertion_value_37 = fn(): string => Str\from_code_point(0xd800);

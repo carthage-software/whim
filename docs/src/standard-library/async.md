@@ -45,9 +45,9 @@ change the source future.
 use Whim\Async;
 
 $length = Async\spawn::<string>(fn(): string => 'whim')
-  ->map::<int>(fn(string $value): int => length!($value));
+  ->map::<uint>(fn(string $value): uint => length!($value));
 
-assert!($length->await() == 4);
+assert!($length->await() == 4u);
 ```
 
 ## Deferred results
@@ -141,13 +141,13 @@ not the tasks already in the group.
 unit of work, call `done()` once it finishes, and call `wait()` to pause until
 the count reaches zero. `done()` throws if the count is already zero.
 
-`getCount()` returns the current count. A cancellation token cancels only the
-wait.
+`getCount()` returns the current count as a uint. A cancellation token cancels
+only the wait.
 
 ## Semaphore and Sequence
 
 `Semaphore<Tin, Tout>` limits how many calls to one operation may run at once.
-Its constructor takes a positive limit and the operation. `waitFor($input)`
+Its constructor takes a nonzero uint limit and the operation. `waitFor($input)`
 waits for a slot, runs the operation, and releases the slot in a `finally`
 block.
 

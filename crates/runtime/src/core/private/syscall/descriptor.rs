@@ -12,14 +12,15 @@ use crate::core::private::syscall::{
 };
 
 #[whim_function(
-    "Whim\\_Private\\read_descriptor(Whim\\OS\\FileDescriptor $descriptor, (1..) $maxBytes): null|string"
+    "Whim\\_Private\\read_descriptor(Whim\\OS\\FileDescriptor $descriptor, (1u..) $maxBytes): null|string"
 )]
 pub(crate) fn read_descriptor<'call>(
     cx: &mut Context<'call, '_, '_>,
     arguments: Arguments<'call>,
 ) -> Result<Value, Throw> {
-    let maximum =
-        usize::try_from(arguments.int(1)).map_err(|_| system_error(cx, "read", libc::EOVERFLOW))?;
+    let maximum = isize::try_from(arguments.uint(1))
+        .map_err(|_| system_error(cx, "read", libc::EOVERFLOW))?
+        .cast_unsigned();
     let bytes = with_descriptor(cx, &arguments.local(0), "read", |descriptor| {
         descriptor.read(maximum)
     })?;
@@ -29,7 +30,7 @@ pub(crate) fn read_descriptor<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\write_descriptor(Whim\\OS\\FileDescriptor $descriptor, string $bytes): (0..)"
+    "Whim\\_Private\\write_descriptor(Whim\\OS\\FileDescriptor $descriptor, string $bytes): uint"
 )]
 pub(crate) fn write_descriptor<'call>(
     cx: &mut Context<'call, '_, '_>,
@@ -38,7 +39,7 @@ pub(crate) fn write_descriptor<'call>(
     let count = with_descriptor(cx, &arguments.local(0), "write", |descriptor| {
         descriptor.write(arguments.bytes(1))
     })?;
-    Ok(Value::int(i64::try_from(count).unwrap_or(i64::MAX)))
+    Ok(Value::uint(count as u64))
 }
 
 #[whim_function("Whim\\_Private\\flush_descriptor(Whim\\OS\\FileDescriptor $descriptor): void")]
