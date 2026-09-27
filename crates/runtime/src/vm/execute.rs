@@ -2193,6 +2193,15 @@ impl VirtualMachine<'_> {
                                             ByteStringObject::append_unique_string(target, extra)
                                         }
                                     }
+                                    (ValueView::String(target), ValueView::ShortString(extra))
+                                        if left_value.newtype_id().is_none() =>
+                                    {
+                                        prepare_string_append(left_value);
+                                        // SAFETY: inline bytes in the right register cannot overlap the heap buffer.
+                                        unsafe {
+                                            ByteStringObject::append_unique(target, extra.as_bytes())
+                                        }
+                                    }
                                     _ => false,
                                 }
                             };
