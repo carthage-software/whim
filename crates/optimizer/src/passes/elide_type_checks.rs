@@ -2,10 +2,15 @@
 
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::AsMode;
+use whim_bytecode::instruction::operands::JumpOffset;
+use whim_bytecode::rewrite::for_each_control_flow_target;
+use whim_bytecode::rewrite::relative_target;
 
 use crate::OptimizationConfiguration;
 use crate::OptimizationStatistics;
 use crate::analysis::Analysis;
+use crate::analysis::AnalyzedChunk;
 use crate::candidates::CandidateSet;
 use crate::passes::FunctionLocation;
 use crate::rewrite::plan::RewritePlan;
@@ -24,6 +29,12 @@ pub(crate) fn optimize_unit(
     for analyzed in analysis.chunks() {
         if !analyzed.candidates.contains(CandidateSet::TYPE_CHECK) {
             continue;
+        }
+
+        if let Some(instruction) = provided_default_branch(analyzed, plan)
+            && analyzed.write(plan, 0, instruction)
+        {
+            statistics.type_checks_elided += 1;
         }
 
         for (index, instruction) in analyzed.chunk.code.iter().copied().enumerate() {
@@ -88,6 +99,50 @@ pub(crate) fn optimize_unit(
             }
         }
     }
+}
+
+fn provided_default_branch(
+    analyzed: &AnalyzedChunk<'_>,
+    plan: &RewritePlan,
+) -> Option<Instruction> {
+    let Instruction::FillDefault { target, offset } = *analyzed.chunk.code.first()? else {
+        return None;
+    };
+    let check = relative_target(0, offset.offset());
+    let Instruction::AsCheck {
+        destination,
+        source,
+        descriptor,
+        mode: AsMode::Boundary,
+    } = *analyzed.chunk.code.get(check)?
+    else {
+        return None;
+    };
+    if destination != target
+        || source != target
+        || !plan.is_available(analyzed, 0)
+        || !plan.is_available(analyzed, check)
+        || check + 1 >= analyzed.chunk.code.len()
+    {
+        return None;
+    }
+    let parameter = usize::from(target.index()).checked_sub(usize::from(analyzed.has_receiver))?;
+    if !analyzed.flow.provided_default_type_proven(
+        parameter,
+        &analyzed.chunk.type_descriptors[usize::from(descriptor.index())],
+    ) {
+        return None;
+    }
+    let mut reenters = false;
+    for_each_control_flow_target(analyzed.chunk, |target| reenters |= target == 0);
+    if reenters {
+        return None;
+    }
+
+    Some(Instruction::FillDefault {
+        target,
+        offset: JumpOffset::new(offset.offset().checked_add(1)?),
+    })
 }
 
 fn return_is_proven(

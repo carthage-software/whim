@@ -1,0 +1,144 @@
+use Whim\Marker\NeverInline;
+use Whim\Unwind\TypeError;
+
+type Numeric = int|uint|float;
+type Exclude<T, N> = T&!N;
+type NonZero<T: Numeric> = Exclude<T, 0|0u|0.0>;
+type DefaultNonZero<T: Numeric = uint> = Exclude<T, 0|0u|0.0>;
+type Dependent<T: U, U> = T&!0u;
+type Unused<T: int> = uint;
+type UnknownBound<T: MissingBound> = uint;
+type UnknownArgument<T: int, U> = uint;
+type UnknownBody<T: int> = MissingBody|uint;
+type Erase<T> = uint;
+type HiddenArgument<T: int> = Erase<MissingHidden>;
+type Recursive<T: int> = uint|vec<Recursive<T>>;
+
+final class Effects {
+  public static int $calls = 0;
+  public static int $loads = 0;
+}
+
+#[NeverInline]
+function take(null|NonZero<uint> $value): uint { Effects::$calls++; return $value ?? 0u; }
+#[NeverInline]
+function signed(NonZero<int> $value): int { Effects::$calls++; return $value; }
+#[NeverInline]
+function floating(NonZero<float> $value): float { Effects::$calls++; return $value; }
+#[NeverInline]
+function plain(Exclude<uint, 0u> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function literal(2u $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function defaulted(DefaultNonZero $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function dependent(Dependent<uint, uint> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function bad_bound<T>(Unused<T> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function unknown_bound(UnknownBound<uint> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function unknown_argument(UnknownArgument<int, MissingArgument> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function unknown_body(UnknownBody<int> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function hidden_argument(HiddenArgument<int> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function recursive(Recursive<int> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function union_argument(MissingUnion|NonZero<uint> $value): uint { Effects::$calls++; return $value; }
+#[NeverInline]
+function union_bound<T>(Unused<T>|NonZero<uint> $value): uint { Effects::$calls++; return $value; }
+
+#[NeverInline]
+function positive_small(): uint { return take(2u); }
+#[NeverInline]
+function positive_wide(): uint { return take(4294967295u); }
+#[NeverInline]
+function positive_large(): uint { return take(18446744073709551615u); }
+#[NeverInline]
+function positive_signed(): int { return signed(-2); }
+#[NeverInline]
+function positive_float(): float { return floating(2.5); }
+#[NeverInline]
+function positive_plain(): uint { return plain(2u); }
+#[NeverInline]
+function positive_literal(): uint { return literal(2u); }
+#[NeverInline]
+function positive_default(): uint { return defaulted(2u); }
+#[NeverInline]
+function positive_dependent(): uint { return dependent(2u); }
+#[NeverInline]
+function zero(): uint { return take(0u); }
+#[NeverInline]
+function wrong_kind(): uint { return take(2); }
+#[NeverInline]
+function unknown(uint $value): uint { return take($value); }
+#[NeverInline]
+function merged(bool $zero): uint {
+  $value = 2u;
+  if ($zero) { $value = 0u; }
+  return take($value);
+}
+#[NeverInline]
+function invalid_bound(): uint { return bad_bound::<string>(2u); }
+#[NeverInline]
+function unresolved_bound(): uint { return unknown_bound(2u); }
+#[NeverInline]
+function unresolved_argument(): uint { return unknown_argument(2u); }
+#[NeverInline]
+function unresolved_body(): uint { return unknown_body(2u); }
+#[NeverInline]
+function unresolved_hidden(): uint { return hidden_argument(2u); }
+#[NeverInline]
+function unresolved_recursive(): uint { return recursive(2u); }
+#[NeverInline]
+function unresolved_union(): uint { return union_argument(2u); }
+#[NeverInline]
+function invalid_union(): uint { return union_bound::<string>(2u); }
+
+function rejects(fn(): mixed $operation): void {
+  $before = Effects::$calls;
+  $caught = false;
+  try { $operation(); } catch (TypeError $_error) { $caught = true; }
+  assert!($caught);
+  assert!(Effects::$calls == $before);
+}
+
+assert!(positive_small() == 2u);
+assert!(positive_wide() == 4294967295u);
+assert!(positive_large() == 18446744073709551615u);
+assert!(positive_signed() == -2);
+assert!(positive_float() == 2.5);
+assert!(positive_plain() == 2u);
+assert!(positive_literal() == 2u);
+assert!(positive_default() == 2u);
+assert!(positive_dependent() == 2u);
+assert!(Effects::$calls == 9);
+rejects(fn(): uint => zero());
+rejects(fn(): uint => wrong_kind());
+rejects(fn(): uint => unknown(0u));
+rejects(fn(): uint => merged(true));
+rejects(fn(): uint => invalid_bound());
+rejects(fn(): uint => invalid_union());
+assert!(unresolved_recursive() == 2u);
+assert!(unknown(2u) == 2u);
+assert!(merged(false) == 2u);
+
+Whim\_Private\register_symbol_autoloader(fn(int $kind, string $name): void {
+  Effects::$loads++;
+});
+rejects(fn(): uint => unresolved_bound());
+assert!(Effects::$loads > 0);
+$before = Effects::$loads;
+assert!(unresolved_argument() == 2u);
+assert!(Effects::$loads > $before);
+$before = Effects::$loads;
+assert!(unresolved_body() == 2u);
+assert!(Effects::$loads == $before);
+$before = Effects::$loads;
+assert!(unresolved_hidden() == 2u);
+assert!(Effects::$loads > $before);
+$before = Effects::$loads;
+assert!(unresolved_union() == 2u);
+assert!(Effects::$loads > $before);

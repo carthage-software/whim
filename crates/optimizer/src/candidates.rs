@@ -264,6 +264,7 @@ fn instruction_candidates(
         && matches!(
             instruction,
             Instruction::CheckDestructure { .. }
+                | Instruction::FillDefault { .. }
                 | Instruction::JumpIfNull { .. }
                 | Instruction::JumpIfNotNull { .. }
                 | Instruction::Return { .. }

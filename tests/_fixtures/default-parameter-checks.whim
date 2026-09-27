@@ -1,0 +1,159 @@
+use Whim\Marker\NeverInline;
+use Whim\Unwind\TypeError;
+
+type Count<T> = T & !0u;
+type MutableShape = #{ value: int };
+type MutableShapes = vec<MutableShape>;
+newtype Label = string;
+
+class Effects {
+  public static int $count = 0;
+  public static mixed $cell = null;
+}
+
+class Cell {
+  public mixed $value = 1;
+}
+
+#[NeverInline]
+function next_count(): uint {
+  Effects::$count++;
+  return 7u;
+}
+
+#[NeverInline]
+function optional_count(null|Count<uint> $count = null): null|Count<uint> {
+  return $count;
+}
+
+#[NeverInline]
+function default_count(uint $count = next_count()): uint {
+  return $count;
+}
+
+#[NeverInline]
+function invalid_count(Count<uint> $count = 0u): uint {
+  return $count;
+}
+
+#[NeverInline]
+function invalid_integer(int $value = 'bad'): int {
+  return $value;
+}
+
+#[NeverInline]
+function tagged(Label $value = Label('default')): Label {
+  return $value;
+}
+
+#[NeverInline]
+function mutable_shape(MutableShape $value = new Cell()): void {}
+
+#[NeverInline]
+function mutable_shapes(MutableShapes $values = vec[]): void {}
+
+#[NeverInline]
+function unknown_type(UnknownDefaultType $value = null): void {}
+
+#[NeverInline]
+function constrained<T>(uint $count = next_count()): uint where T: int {
+  return $count;
+}
+
+#[NeverInline]
+function prior_default(mixed $first = next_count(), int $last = 5): int {
+  return $last;
+}
+
+#[NeverInline]
+function mutate_shape(): int {
+  Effects::$cell->value = 'bad';
+  return 0;
+}
+
+#[NeverInline]
+function shape_after_default(
+  MutableShape $value = new Cell(),
+  int $other = mutate_shape(),
+): void {}
+
+final class Defaults {
+  public function __construct(public uint $base = next_count()) {}
+
+  #[NeverInline]
+  public function instance(uint $count = 1u): uint {
+    return $count;
+  }
+
+  #[NeverInline]
+  public static function static_method(uint $count = 2u): uint {
+    return $count;
+  }
+
+  public function closure(): fn(=uint): uint {
+    return fn(uint $count = 3u): uint => $this->base + $count;
+  }
+}
+
+function rejects(fn(): mixed $operation): void {
+  $caught = false;
+  try {
+    $operation();
+  } catch (TypeError $_error) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+assert!(optional_count() == null);
+assert!(optional_count(null) == null);
+assert!(optional_count(2u) == 2u);
+rejects(fn(): mixed => optional_count(0u));
+rejects(fn(): mixed => optional_count(2));
+assert!(default_count(4u) == 4u);
+assert!(Effects::$count == 0);
+assert!(default_count() == 7u);
+assert!(Effects::$count == 1);
+assert!(default_count(count: 5u) == 5u);
+assert!(Effects::$count == 1);
+rejects(fn(): mixed => default_count(4));
+assert!(invalid_count(3u) == 3u);
+rejects(fn(): mixed => invalid_count());
+assert!(invalid_integer(3) == 3);
+rejects(fn(): mixed => invalid_integer());
+assert!(tagged() is Label);
+assert!(tagged(Label('given')) is Label);
+assert!(tagged(Label('given')) == Label('given'));
+rejects(fn(): mixed => tagged('plain'));
+
+$instance = new Defaults(10u);
+assert!(Effects::$count == 1);
+assert!($instance->instance() == 1u);
+assert!($instance->instance(6u) == 6u);
+assert!(Defaults::static_method() == 2u);
+assert!(Defaults::static_method(8u) == 8u);
+$closure = $instance->closure();
+assert!($closure() == 13u);
+assert!($closure(9u) == 19u);
+assert!((new Defaults())->base == 7u);
+assert!(Effects::$count == 2);
+rejects(fn(): mixed => $instance->instance(1));
+rejects(fn(): mixed => Defaults::static_method(1));
+rejects(fn(): mixed => $closure(1));
+
+assert!(constrained::<int>(4u) == 4u);
+rejects(fn(): mixed => constrained::<string>(4u));
+assert!(Effects::$count == 2);
+rejects(fn(): mixed => constrained::<string>());
+assert!(Effects::$count == 2);
+assert!(constrained::<int>() == 7u);
+assert!(Effects::$count == 3);
+assert!(prior_default(last: 8) == 8);
+assert!(Effects::$count == 4);
+assert!(prior_default('given', 8) == 8);
+assert!(Effects::$count == 4);
+$cell = new Cell();
+Effects::$cell = $cell;
+rejects(fn(): mixed => shape_after_default($cell));
+assert!($cell->value == 'bad');

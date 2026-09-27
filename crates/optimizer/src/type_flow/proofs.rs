@@ -4,9 +4,13 @@
 use std::slice;
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::aliases::TypeAliasLookup;
+use whim_bytecode::aliases::alias_bindings;
+use whim_bytecode::aliases::substitute;
 use whim_bytecode::chunk::descriptors::DictionaryTypeDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
+use whim_bytecode::chunk::descriptors::descriptor_is_trivial;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::IntegerKind;
@@ -24,6 +28,7 @@ use crate::type_flow::DICTIONARY;
 use crate::type_flow::FLOAT;
 use crate::type_flow::Fact;
 use crate::type_flow::INT;
+use crate::type_flow::IndexedUnit;
 use crate::type_flow::MAY_BE_REFERENCE_COUNTED;
 use crate::type_flow::NO_ORIGIN;
 use crate::type_flow::NULL;
@@ -39,6 +44,7 @@ use crate::type_flow::descriptors::descriptor_mask;
 use crate::type_flow::descriptors::descriptor_proves;
 use crate::type_flow::descriptors::descriptor_slices_equal;
 use crate::type_flow::descriptors::descriptors_disjoint;
+use crate::type_flow::descriptors::descriptors_equal;
 use crate::type_flow::descriptors::exact_descriptor_mask;
 use crate::type_flow::descriptors::literal_descriptor_disjoint;
 use crate::type_flow::descriptors::literal_descriptor_matches;
@@ -48,6 +54,23 @@ use crate::type_flow::instruction_index;
 use crate::type_flow::same_atom;
 
 impl TypeFlow<'_> {
+    pub(crate) fn provided_default_type_proven(
+        &self,
+        parameter: usize,
+        expected: &TypeDescriptor,
+    ) -> bool {
+        let Some(parameter) = self.parameters.get(parameter) else {
+            return false;
+        };
+        parameter.has_default
+            && parameter.declared_type.as_ref().is_some_and(|declared| {
+                descriptors_equal(declared, expected, 0)
+                    && (descriptor_is_trivial(expected)
+                        || self.scalar_alias_descriptor(expected, 0).is_some())
+                    && self.descriptor_proves(declared, expected, 0)
+            })
+    }
+
     pub(crate) fn callable_arguments_proven(
         &self,
         index: usize,
@@ -300,6 +323,14 @@ impl TypeFlow<'_> {
         }
         let fact = self.fact(index, register);
         if self.fact_proves(fact, expected, 0) {
+            return true;
+        }
+        if matches!(
+            expected,
+            TypeDescriptor::Named { .. } | TypeDescriptor::Union(_)
+        ) && let Some(expected) = self.scalar_alias_descriptor(expected, 1)
+            && self.fact_proves(fact, &expected, 1)
+        {
             return true;
         }
 
@@ -1084,6 +1115,71 @@ impl TypeFlow<'_> {
         }
     }
 
+    fn scalar_alias_descriptor(
+        &self,
+        expected: &TypeDescriptor,
+        depth: usize,
+    ) -> Option<TypeDescriptor> {
+        if depth > MAX_TYPE_DEPTH {
+            return None;
+        }
+        if let TypeDescriptor::Union(members) = expected {
+            return members
+                .iter()
+                .map(|member| self.scalar_alias_descriptor(member, depth + 1))
+                .collect::<Option<Vec<_>>>()
+                .map(TypeDescriptor::Union);
+        }
+        if scalar_alias_body(expected, self.unit, depth + 1) {
+            return Some(self.expanded_aliases(expected).into_owned());
+        }
+        let TypeDescriptor::Named {
+            name,
+            arguments,
+            recursive: false,
+        } = expected
+        else {
+            return None;
+        };
+        let alias = self.unit.and_then(|unit| unit.find_alias(name))?;
+        if alias
+            .type_parameters
+            .iter()
+            .all(|parameter| parameter.bounds.is_empty())
+        {
+            return None;
+        }
+        let bindings = alias_bindings(&alias.type_parameters, arguments.as_deref())?;
+        let scalar = |descriptor: &TypeDescriptor| {
+            exact_descriptor_mask(descriptor)
+                .is_some_and(|mask| mask & !(NULL | BOOL | INT | UINT | FLOAT | STRING) == 0)
+        };
+        for (parameter, (_, argument)) in alias.type_parameters.iter().zip(&bindings) {
+            if !scalar_alias_body(argument, self.unit, depth + 1) {
+                return None;
+            }
+            let argument = self.expanded_aliases(argument);
+            if !scalar(&argument) {
+                return None;
+            }
+            for bound in &parameter.bounds {
+                let bound = substitute(bound, &bindings, depth + 1);
+                if !scalar_alias_body(&bound, self.unit, depth + 1) {
+                    return None;
+                }
+                let bound = self.expanded_aliases(&bound);
+                if !scalar(&bound) || !self.descriptor_proves(&argument, &bound, depth + 1) {
+                    return None;
+                }
+            }
+        }
+        let body = substitute(&alias.descriptor, &bindings, depth + 1);
+        if !scalar_alias_body(&body, self.unit, depth + 1) {
+            return None;
+        }
+        Some(self.expanded_aliases(&body).into_owned())
+    }
+
     pub(in crate::type_flow) fn array_proves(
         &self,
         fact: Fact,
@@ -1241,11 +1337,12 @@ impl TypeFlow<'_> {
             Instruction::LoadTrue { .. } => matches!(expected, TypeDescriptor::TrueLiteral),
             Instruction::LoadFalse { .. } => matches!(expected, TypeDescriptor::FalseLiteral),
             Instruction::LoadInteger {
-                kind: IntegerKind::I64,
-                immediate,
-                ..
+                kind, immediate, ..
             } => descriptor_proves(
-                &TypeDescriptor::IntLiteral(i64::from(immediate.as_int())),
+                &match kind {
+                    IntegerKind::I64 => TypeDescriptor::IntLiteral(i64::from(immediate.as_int())),
+                    IntegerKind::U64 => TypeDescriptor::UintLiteral(u64::from(immediate.as_uint())),
+                },
                 expected,
                 self.unit,
                 0,
@@ -1270,11 +1367,12 @@ impl TypeFlow<'_> {
                 descriptors_disjoint(&TypeDescriptor::FalseLiteral, excluded, 0)
             }
             Instruction::LoadInteger {
-                kind: IntegerKind::I64,
-                immediate,
-                ..
+                kind, immediate, ..
             } => descriptors_disjoint(
-                &TypeDescriptor::IntLiteral(i64::from(immediate.as_int())),
+                &match kind {
+                    IntegerKind::I64 => TypeDescriptor::IntLiteral(i64::from(immediate.as_int())),
+                    IntegerKind::U64 => TypeDescriptor::UintLiteral(u64::from(immediate.as_uint())),
+                },
                 excluded,
                 0,
             ),
@@ -1406,6 +1504,67 @@ impl TypeFlow<'_> {
                 depth + 1,
             )
         })
+    }
+}
+
+fn scalar_alias_body(
+    descriptor: &TypeDescriptor,
+    unit: Option<&IndexedUnit<'_>>,
+    depth: usize,
+) -> bool {
+    if depth > MAX_TYPE_DEPTH {
+        return false;
+    }
+    match descriptor {
+        TypeDescriptor::Null
+        | TypeDescriptor::Bool
+        | TypeDescriptor::Int
+        | TypeDescriptor::Uint
+        | TypeDescriptor::Float
+        | TypeDescriptor::String
+        | TypeDescriptor::Never
+        | TypeDescriptor::TrueLiteral
+        | TypeDescriptor::FalseLiteral
+        | TypeDescriptor::IntLiteral(_)
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::FloatLiteral(_)
+        | TypeDescriptor::StringLiteral(_)
+        | TypeDescriptor::IntRange { .. }
+        | TypeDescriptor::UintRange { .. }
+        | TypeDescriptor::StringLength { .. } => true,
+        TypeDescriptor::Union(members) | TypeDescriptor::Intersection(members) => members
+            .iter()
+            .all(|member| scalar_alias_body(member, unit, depth + 1)),
+        TypeDescriptor::Negated(inner) => scalar_alias_body(inner, unit, depth + 1),
+        TypeDescriptor::Named {
+            name,
+            arguments,
+            recursive: false,
+        } => {
+            let Some(alias) = unit.and_then(|unit| unit.find_alias(name)) else {
+                return false;
+            };
+            if alias
+                .type_parameters
+                .iter()
+                .any(|parameter| !parameter.bounds.is_empty() || parameter.default.is_some())
+            {
+                return false;
+            }
+            let Some(bindings) = alias_bindings(&alias.type_parameters, arguments.as_deref())
+            else {
+                return false;
+            };
+            bindings
+                .iter()
+                .all(|(_, argument)| scalar_alias_body(argument, unit, depth + 1))
+                && scalar_alias_body(
+                    &substitute(&alias.descriptor, &bindings, depth + 1),
+                    unit,
+                    depth + 1,
+                )
+        }
+        _ => false,
     }
 }
 
