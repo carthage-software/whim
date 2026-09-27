@@ -104,6 +104,52 @@ fn key_value(key: Key) -> Value {
     }
 }
 
+fn numeric_cast_candidate(target: &TypeDescriptor, value: &Value) -> Option<Value> {
+    match target {
+        TypeDescriptor::Int | TypeDescriptor::IntLiteral(_) | TypeDescriptor::IntRange { .. } => {
+            let converted = match value.transparent() {
+                ValueView::Int(value) => Some(*value),
+                ValueView::Uint(value) => i64::try_from(*value).ok(),
+                ValueView::Float(value)
+                    if value.fract() == 0.0
+                        && (-9_223_372_036_854_775_808.0..9_223_372_036_854_775_808.0)
+                            .contains(value) =>
+                {
+                    Some(*value as i64)
+                }
+                _ => None,
+            };
+            converted.map(Value::int)
+        }
+        TypeDescriptor::Uint
+        | TypeDescriptor::UintLiteral(_)
+        | TypeDescriptor::UintRange { .. } => {
+            let converted = match value.transparent() {
+                ValueView::Uint(value) => Some(*value),
+                ValueView::Int(value) => u64::try_from(*value).ok(),
+                ValueView::Float(value)
+                    if value.fract() == 0.0
+                        && (0.0..18_446_744_073_709_551_616.0).contains(value) =>
+                {
+                    Some(*value as u64)
+                }
+                _ => None,
+            };
+            converted.map(Value::uint)
+        }
+        TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => {
+            let converted = match value.transparent() {
+                ValueView::Int(value) => Some(*value as f64),
+                ValueView::Uint(value) => Some(*value as f64),
+                ValueView::Float(value) => Some(*value),
+                _ => None,
+            };
+            converted.map(Value::float)
+        }
+        _ => None,
+    }
+}
+
 fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
     match (left, right) {
         (ShapeKey::Bool(left), ShapeKey::Bool(right)) => left == right,
@@ -591,6 +637,12 @@ impl VirtualMachine<'_> {
         called: Option<ClassId>,
         environment: TypeEnvironmentId,
     ) -> Result<Option<Value>, VirtualMachineControl> {
+        if matches!(
+            descriptor,
+            TypeDescriptor::Int | TypeDescriptor::Uint | TypeDescriptor::Float
+        ) {
+            return Ok(numeric_cast_candidate(descriptor, value));
+        }
         let mut target = self.substitute_descriptor(descriptor, environment, 0);
         for _ in 0..=MAX_TYPE_DEPTH_U32 {
             let Some(expanded) = self.expand_type_alias_once(&target, 0)? else {
@@ -720,49 +772,7 @@ impl VirtualMachine<'_> {
                     }
                 }
             }
-            TypeDescriptor::Int
-            | TypeDescriptor::IntLiteral(_)
-            | TypeDescriptor::IntRange { .. } => {
-                let converted = match value.transparent() {
-                    ValueView::Int(value) => Some(*value),
-                    ValueView::Uint(value) => i64::try_from(*value).ok(),
-                    ValueView::Float(value)
-                        if value.fract() == 0.0
-                            && (-9_223_372_036_854_775_808.0..9_223_372_036_854_775_808.0)
-                                .contains(value) =>
-                    {
-                        Some(*value as i64)
-                    }
-                    _ => None,
-                };
-                candidates[0] = converted.map(Value::int);
-            }
-            TypeDescriptor::Uint
-            | TypeDescriptor::UintLiteral(_)
-            | TypeDescriptor::UintRange { .. } => {
-                let converted = match value.transparent() {
-                    ValueView::Uint(value) => Some(*value),
-                    ValueView::Int(value) => u64::try_from(*value).ok(),
-                    ValueView::Float(value)
-                        if value.fract() == 0.0
-                            && (0.0..18_446_744_073_709_551_616.0).contains(value) =>
-                    {
-                        Some(*value as u64)
-                    }
-                    _ => None,
-                };
-                candidates[0] = converted.map(Value::uint);
-            }
-            TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => {
-                let converted = match value.transparent() {
-                    ValueView::Int(value) => Some(*value as f64),
-                    ValueView::Uint(value) => Some(*value as f64),
-                    ValueView::Float(value) => Some(*value),
-                    _ => None,
-                };
-                candidates[0] = converted.map(Value::float);
-            }
-            _ => {}
+            _ => candidates[0] = numeric_cast_candidate(&target, value),
         }
         for candidate in &mut candidates {
             if let Some(value) = candidate
