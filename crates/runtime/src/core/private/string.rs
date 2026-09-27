@@ -366,9 +366,9 @@ pub(crate) fn string_replace<'call>(
         .saturating_sub(needle.len())
         .saturating_add(replacement.len());
     let mut start = 0usize;
-    let mut append_match = |position| {
+    let mut append_match = |position, first_capacity| {
         if start == 0 {
-            result.reserve(capacity);
+            result.reserve(first_capacity);
         }
         result.extend_from_slice(&haystack[start..position]);
         result.extend_from_slice(replacement);
@@ -378,7 +378,7 @@ pub(crate) fn string_replace<'call>(
         let folded_haystack = haystack.to_ascii_lowercase();
         let folded_needle = needle.to_ascii_lowercase();
         for position in find_bytes_positions(&folded_haystack, &folded_needle) {
-            append_match(position);
+            append_match(position, capacity);
         }
     } else if let [byte] = needle {
         let mut positions = find_byte_positions(*byte, haystack);
@@ -394,16 +394,19 @@ pub(crate) fn string_replace<'call>(
             bytes[end..capacity].copy_from_slice(&haystack[first + 1..]);
             return context.string(&bytes[..capacity]);
         }
-        append_match(first);
+        let first_capacity = second
+            .and_then(|_| capacity.checked_add(replacement.len().saturating_sub(1)))
+            .unwrap_or(capacity);
+        append_match(first, first_capacity);
         if let Some(second) = second {
-            append_match(second);
+            append_match(second, capacity);
             for position in positions {
-                append_match(position);
+                append_match(position, capacity);
             }
         }
     } else {
         for position in find_bytes_positions(haystack, needle) {
-            append_match(position);
+            append_match(position, capacity);
         }
     }
 
@@ -713,16 +716,28 @@ mod tests {
         let mut engine = Engine::new(EngineConfiguration::default());
         let mut vm = VirtualMachine::new(&mut engine);
         for length in [0, 1, 7, 8, 22, 23, 24, 25] {
-            for replacement in [b"".as_slice(), b"Z", b"<\0\xff>"] {
-                if length < replacement.len() {
+            for (replacement, matches) in [
+                (b"".as_slice(), 1),
+                (b"", 2),
+                (b"", 3),
+                (b"Z", 1),
+                (b"Z", 2),
+                (b"Z", 3),
+                (b"<\0\xff>", 1),
+                (b"<\0\xff>", 2),
+                (b"<\0\xff>", 3),
+            ] {
+                let replaced_length = replacement.len() * matches;
+                if length < replaced_length {
                     continue;
                 }
-                let unchanged = length - replacement.len();
+                let unchanged = length - replaced_length;
                 for position in [0, unchanged / 2, unchanged] {
-                    let mut original = vec![b'a'; unchanged + 1];
-                    original[position] = b'#';
+                    let mut original = vec![b'a'; unchanged + matches];
+                    original[position..position + matches].fill(b'#');
                     let mut expected = vec![b'a'; length];
-                    expected[position..position + replacement.len()].copy_from_slice(replacement);
+                    expected[position..position + replaced_length]
+                        .copy_from_slice(&replacement.repeat(matches));
                     for representation in 0..3 {
                         let source = match representation {
                             0 => Value::from_string_bytes(vm.heap(), &original),
@@ -804,6 +819,13 @@ mod tests {
                 b"aabcdefghibabcdefghic",
             ),
             (b"missing", b"#", b"x", false, b"missing"),
+            (
+                b"0123456789abcdefghijklmn",
+                b"#",
+                b"longer",
+                false,
+                b"0123456789abcdefghijklmn",
+            ),
             (b"unchanged", b"", b"x", false, b"unchanged"),
             (b"abcabc", b"ab", b"Z", false, b"ZcZc"),
             (b"aaaaa", b"aa", b"X", false, b"XXa"),
