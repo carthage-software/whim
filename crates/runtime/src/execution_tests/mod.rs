@@ -2,6 +2,7 @@ mod argument_guards;
 mod arithmetic;
 mod callable_collections;
 mod declaration_optimization;
+mod final_class_checks;
 mod matching;
 mod nominal_refinement;
 mod object_shape_checks;

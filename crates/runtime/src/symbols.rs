@@ -327,9 +327,17 @@ pub(crate) struct CachedIsCheck {
     pub(crate) environment: TypeEnvironmentId,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
+pub(crate) struct CachedObjectShape {
+    pub(crate) class: ClassId,
+    pub(crate) slots: Box<[u32]>,
+}
+
+#[derive(Clone)]
 pub(crate) struct IsCheckWays {
     pub(crate) array_id: Option<ArrayTypeCheckId>,
+    pub(crate) final_class: Option<ClassId>,
+    pub(crate) wildcard_shape: Option<CachedObjectShape>,
     cacheability: Option<(TypeEnvironmentId, Option<ClassId>, bool)>,
     ways: [Option<CachedIsCheck>; IS_CHECK_WAYS],
 }
@@ -339,6 +347,8 @@ const IS_CHECK_WAYS: usize = 4;
 impl IsCheckWays {
     pub(crate) const EMPTY: Self = Self {
         array_id: None,
+        final_class: None,
+        wildcard_shape: None,
         cacheability: None,
         ways: [None; IS_CHECK_WAYS],
     };

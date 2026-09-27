@@ -5479,7 +5479,26 @@ impl VirtualMachine<'_> {
                         let checked = &chunk.type_descriptors[descriptor.index() as usize];
                         // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                         let value = unsafe { &*registers.add(source.index() as usize) };
-                        if let Some(matches) = check_trivial_descriptor(checked, value) {
+                        let matches = match checked {
+                            TypeDescriptor::Named { .. } => self.cached_final_class_match(
+                                checked,
+                                value,
+                                descriptor.index() as usize,
+                            ),
+                            TypeDescriptor::ObjectShape { entries, open: true }
+                                if entries.is_empty() =>
+                            {
+                                check_trivial_descriptor(checked, value)
+                            }
+                            TypeDescriptor::ObjectShape { .. } => self
+                                .cached_wildcard_object_shape_match(
+                                    checked,
+                                    value,
+                                    descriptor.index() as usize,
+                                ),
+                            _ => check_trivial_descriptor(checked, value),
+                        };
+                        if let Some(matches) = matches {
                             write_register!(registers, destination, Value::bool(matches));
                             continue 'instructions;
                         }

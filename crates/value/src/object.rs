@@ -337,7 +337,7 @@ impl InstanceObject {
 
     /// Whether the slot at `index` has never been written.
     #[must_use]
-    #[inline(never)]
+    #[inline]
     pub fn slot_is_uninitialized(&self, index: usize) -> bool {
         let slot_count = self.slot_count();
         if index >= slot_count {

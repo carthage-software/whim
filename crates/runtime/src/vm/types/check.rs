@@ -41,7 +41,9 @@ use whim_value::string::ByteStringObject;
 use crate::classes::ClassMemberEntry;
 use crate::classes::MethodBodyKind;
 use crate::engine::builtins::built_in_type_parameters;
+use crate::symbols::CachedObjectShape;
 use crate::symbols::FunctionTable;
+use crate::symbols::IsCheckWays;
 use crate::symbols::SymbolEntry;
 use crate::vm::types::SymbolKind;
 use crate::vm::types::VirtualMachine;
@@ -560,6 +562,125 @@ impl VirtualMachine<'_> {
             }
             _ => None,
         })
+    }
+
+    #[inline]
+    pub(in crate::vm) fn cached_final_class_match(
+        &mut self,
+        descriptor: &TypeDescriptor,
+        value: &Value,
+        site: usize,
+    ) -> Option<bool> {
+        let TypeDescriptor::Named {
+            name,
+            arguments: None,
+            ..
+        } = descriptor
+        else {
+            return None;
+        };
+        if self.engine.declaration_depth != 0 {
+            return None;
+        }
+        // SAFETY: this call owns the VM, and loaded class checks cannot re-enter it.
+        let checks = unsafe { &mut *self.current_frame().cache.as_ref().is_checks() };
+        if checks.len() <= site {
+            checks.resize(site + 1, IsCheckWays::EMPTY);
+        }
+        let target = &mut checks[site].final_class;
+        let class = match *target {
+            Some(class) => class,
+            None => {
+                let entry = self.engine.tables.symbols.get(name)?;
+                if entry.kind != SymbolKind::Class {
+                    return None;
+                }
+                let class = &self.engine.tables.classes[entry.index as usize];
+                if !class.is_final || !class.type_parameters.is_empty() {
+                    return None;
+                }
+                let class = ClassId(entry.index);
+                *target = Some(class);
+                class
+            }
+        };
+        Some(
+            value
+                .as_object()
+                .is_some_and(|object| object.class() == class),
+        )
+    }
+
+    /// Caches public slot positions, but checks initialization on every hit.
+    /// This path cannot call user code or grow the VM stack.
+    pub(in crate::vm) fn cached_wildcard_object_shape_match(
+        &mut self,
+        descriptor: &TypeDescriptor,
+        value: &Value,
+        site: usize,
+    ) -> Option<bool> {
+        let TypeDescriptor::ObjectShape { entries, open } = descriptor else {
+            return None;
+        };
+        if self.engine.declaration_depth != 0 {
+            return None;
+        }
+        // SAFETY: this call owns the VM, and layout checks cannot re-enter it.
+        let checks = unsafe { &mut *self.current_frame().cache.as_ref().is_checks() };
+        if checks
+            .get(site)
+            .is_none_or(|check| check.wildcard_shape.is_none())
+            && !entries
+                .iter()
+                .all(|(_, descriptor)| matches!(descriptor, TypeDescriptor::Wildcard))
+        {
+            return None;
+        }
+        let Some(object) = value.as_object() else {
+            return Some(false);
+        };
+        if checks.len() <= site {
+            checks.resize(site + 1, IsCheckWays::EMPTY);
+        }
+        let cached = &mut checks[site].wildcard_shape;
+        if cached.is_none() {
+            let class = &self.engine.tables.classes[object.class().0 as usize];
+            if !open
+                && class
+                    .slots
+                    .iter()
+                    .filter(|property| property.visibility == Visibility::Public)
+                    .count()
+                    != entries.len()
+            {
+                return Some(false);
+            }
+            let Some(slots) =
+                entries
+                    .iter()
+                    .map(|(name, _)| {
+                        class.slot_names.get(name).copied().filter(|slot| {
+                            class.slots[*slot as usize].visibility == Visibility::Public
+                        })
+                    })
+                    .collect::<Option<Box<[u32]>>>()
+            else {
+                return Some(false);
+            };
+            *cached = Some(CachedObjectShape {
+                class: object.class(),
+                slots,
+            });
+        }
+        cached
+            .as_ref()
+            .filter(|cached| cached.class == object.class())
+            .map(|cached| {
+                cached
+                    .slots
+                    .iter()
+                    .all(|slot| !object.slot_is_uninitialized(*slot as usize))
+            })
     }
 
     /// Whether a positive object check depends only on the object's class and
