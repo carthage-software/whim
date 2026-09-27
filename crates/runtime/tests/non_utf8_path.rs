@@ -36,7 +36,7 @@ fn source_paths_preserve_non_utf8_bytes_for_embedding() {
     let outcome = engine.run_source(
         r"
 assert!(embed!('payload.txt') == 'embedded');
-assert!(Whim\_Private\read_file(directory!() . '/./unused/../payload.txt', 0, null) == 'embedded');
+assert!(Whim\_Private\read_file(directory!() . '/./unused/../payload.txt', 0u, null) == 'embedded');
 $path = Whim\Reflection\get_loaded_files()[0]->getPath();
 assert!(Whim\Reflection\reflect_file($path)->getPath() == $path);
 ",

@@ -102,7 +102,7 @@ impl HostResolutionOperation {
                 IpAddr::V4(address) => (constants::AF_INET, address.to_string()),
                 IpAddr::V6(address) => (constants::AF_INET6, address.to_string()),
             };
-            let family = Value::uint(u64::from(family.cast_unsigned()));
+            let family = Value::uint(i64::from(family).cast_unsigned());
             let host = cx.string(host.as_bytes());
             cx.tuple([family, host])
         })))
