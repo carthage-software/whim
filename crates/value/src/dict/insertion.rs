@@ -10,6 +10,7 @@ use crate::Value;
 use crate::dict::DictObject;
 use crate::dict::IndexEntry;
 use crate::dict::keys::Key;
+use crate::dict::keys::KeyRef;
 use crate::dict::slots::Slot;
 use crate::dict::slots::slot_hash;
 use crate::dict::slots::slot_matches_short_string;
@@ -23,6 +24,12 @@ impl DictObject {
     #[inline(always)]
     pub fn insert_short_string(&mut self, key: ShortString, value: Value) -> Option<Value> {
         self.materialize_index();
+        if self.live != 0
+            && self.index.capacity() == self.live
+            && let Some(existing) = self.get_mut_ref(KeyRef::ShortString(key))
+        {
+            return Some(mem::replace(existing, value));
+        }
         let hash_state = self.hash_state;
         // SAFETY: the heap-owned hash state outlives the dict.
         let hash_state = unsafe { hash_state.as_ref() };

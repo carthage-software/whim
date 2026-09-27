@@ -30,6 +30,8 @@ use crate::string::short::ShortString;
 
 mod insertion;
 pub mod keys;
+#[cfg(test)]
+mod replacement_tests;
 mod slots;
 
 use crate::dict::keys::Key;
@@ -453,6 +455,12 @@ impl DictObject {
 
     fn insert_indexed(&mut self, key: Key, value: Value) -> Option<Value> {
         self.materialize_index();
+        if self.live != 0
+            && self.index.capacity() == self.live
+            && let Some(existing) = self.get_mut_ref(KeyRef::from(&key))
+        {
+            return Some(mem::replace(existing, value));
+        }
         let hash_state = self.hash_state;
         // SAFETY: the heap-owned hash state outlives the dict.
         let hash_state = unsafe { hash_state.as_ref() };
