@@ -297,3 +297,11 @@ assert!(replace(18446744073709486080u, $values, 1) == (18446744073709551615u, $v
         "/unsigned-add-immediate-loops.whim",
     );
 }
+
+#[test]
+fn fused_literal_consumers_keep_values_live_on_branch_and_catch_edges() {
+    run_both_modes(
+        include_str!("../../../../tests/_fixtures/literal-consumer-liveness.whim"),
+        "/literal-consumer-liveness.whim",
+    );
+}

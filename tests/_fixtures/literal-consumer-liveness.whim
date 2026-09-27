@@ -1,0 +1,81 @@
+use Whim\Marker\NeverInline;
+
+#[NeverInline]
+function signed(int $value): vec {
+  $limit = 5;
+  if ($value < $limit) {
+    return vec[];
+  }
+
+  return vec[$limit];
+}
+
+#[NeverInline]
+function unsigned(uint $value): vec {
+  $limit = 5u;
+  if ($value < $limit) {
+    return vec[];
+  }
+
+  return vec[$limit];
+}
+
+#[NeverInline]
+function floating(float $value): vec {
+  $limit = 5.5;
+  if ($value < $limit) {
+    return vec[];
+  }
+
+  return vec[$limit];
+}
+
+#[NeverInline]
+function reversed(int $value): vec {
+  $limit = 5;
+  if ($limit < $value) {
+    return vec[];
+  }
+
+  return vec[$limit];
+}
+
+#[NeverInline]
+function overwritten(int $value): vec {
+  $one = 1;
+  try {
+    $one = $value + $one;
+  } catch (Whim\Unwind\OverflowError $_) {
+    return vec[$one];
+  }
+
+  return vec[$one];
+}
+
+#[NeverInline]
+function caught(mixed $value): vec {
+  $limit = 5.5;
+  try {
+    if ($value < $limit) {
+      return vec[];
+    }
+
+    return vec[];
+  } catch (Whim\Unwind\IncompatibleOperandsError $_) {
+    return vec[$limit];
+  }
+}
+
+assert!(signed(0) == vec[]);
+assert!(signed(7) == vec[5]);
+assert!(unsigned(0u) == vec[]);
+assert!(unsigned(7u) == vec[5u]);
+assert!(floating(0.0) == vec[]);
+assert!(floating(7.0) == vec[5.5]);
+assert!(reversed(7) == vec[]);
+assert!(reversed(0) == vec[5]);
+assert!(overwritten(2) == vec[3]);
+assert!(overwritten(9_223_372_036_854_775_807) == vec[1]);
+assert!(caught(1.0) == vec[]);
+assert!(caught(7.0) == vec[]);
+assert!(caught(vec[]) == vec[5.5]);

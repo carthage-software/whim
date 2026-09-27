@@ -73,19 +73,13 @@ pub(crate) fn optimize_chunk(
         let Some(replacement) = consumer(chunk.code[index + 1], temporary, immediate, kind) else {
             continue;
         };
-        let consumes_temporary = match replacement {
-            Instruction::AddImmediate { destination, .. }
-            | Instruction::SubtractImmediate { destination, .. }
-            | Instruction::IntegerMultiplyImmediate { destination, .. }
-            | Instruction::IntegerModuloImmediate { destination, .. } => destination == temporary,
-            Instruction::ReturnIntegerUnchecked { .. } => true,
-            _ => false,
-        };
-        if !consumes_temporary && !register_is_dead_after(chunk, temporary, index + 2) {
+        let original = chunk.code[index + 1];
+        chunk.code[index + 1] = replacement;
+        if !register_is_dead_after(chunk, temporary, index + 1) {
+            chunk.code[index + 1] = original;
             continue;
         }
 
-        chunk.code[index + 1] = replacement;
         *should_remove = true;
     }
 

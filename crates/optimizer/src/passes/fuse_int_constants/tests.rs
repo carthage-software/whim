@@ -3,11 +3,14 @@ use whim_bytecode::chunk::Chunk;
 use whim_bytecode::chunk::descriptors::CatchEntry;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
+use whim_bytecode::instruction::operands::Comparison;
 use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::instruction::operands::ShortJumpOffset;
 use whim_bytecode::reference_registers;
+use whim_bytecode::verify::verify;
 use whim_span::Position;
 use whim_span::Span;
 
@@ -264,4 +267,155 @@ fn a_loop_body_fuses_after_its_reference_mask_is_refined() {
             offset: JumpOffset::new(-1)
         }
     );
+}
+
+fn branch_fixture(kind: IntegerKind, reversed: bool, live_target: bool) -> Chunk {
+    let mut chunk = Chunk::new();
+    chunk.register_count = 2;
+    chunk.local_register_count = 1;
+    chunk.parameter_register_count = 1;
+    let (left, right) = if reversed {
+        (TEMPORARY, TARGET)
+    } else {
+        (TARGET, TEMPORARY)
+    };
+    let comparison = Comparison::LessThan;
+    let offset = ShortJumpOffset::new(2);
+    for instruction in [
+        Instruction::LoadInteger {
+            destination: TEMPORARY,
+            immediate: ImmediateInteger::unsigned(5),
+            kind,
+        },
+        if kind == IntegerKind::I64 {
+            Instruction::IntJumpUnless {
+                comparison,
+                left,
+                right,
+                offset,
+            }
+        } else {
+            Instruction::UintJumpUnless {
+                comparison,
+                left,
+                right,
+                offset,
+            }
+        },
+        Instruction::ReturnNull,
+        if live_target {
+            Instruction::ReturnScalarUnchecked { source: TEMPORARY }
+        } else {
+            Instruction::ReturnNull
+        },
+    ] {
+        chunk.emit(instruction, Span::zero());
+    }
+    verify(&chunk).unwrap();
+    chunk
+}
+
+#[test]
+fn branch_literals_live_on_either_edge_keep_the_load() {
+    for kind in [IntegerKind::I64, IntegerKind::U64] {
+        for reversed in [false, true] {
+            let chunk = branch_fixture(kind, reversed, true);
+            assert_unchanged(chunk);
+
+            let mut chunk = branch_fixture(kind, reversed, false);
+            chunk.code[2] = Instruction::ReturnScalarUnchecked { source: TEMPORARY };
+            verify(&chunk).unwrap();
+            assert_unchanged(chunk);
+        }
+    }
+}
+
+#[test]
+fn branch_literals_dead_on_both_edges_still_fuse() {
+    for kind in [IntegerKind::I64, IntegerKind::U64] {
+        for reversed in [false, true] {
+            let mut chunk = branch_fixture(kind, reversed, false);
+            rewrite(&mut chunk);
+            verify(&chunk).unwrap();
+            assert_eq!(chunk.code.len(), 3);
+            let expected = if reversed {
+                Comparison::LessThan.reversed()
+            } else {
+                Comparison::LessThan
+            };
+            match chunk.code[0] {
+                Instruction::IntJumpUnlessImmediate {
+                    comparison,
+                    source: TARGET,
+                    immediate,
+                    offset,
+                } if kind == IntegerKind::I64 => {
+                    assert_eq!(comparison, expected);
+                    assert_eq!(immediate.value(), 5);
+                    assert_eq!(offset.offset(), 2);
+                }
+                Instruction::UintJumpUnlessImmediate {
+                    comparison,
+                    source: TARGET,
+                    immediate,
+                    offset,
+                } if kind == IntegerKind::U64 => {
+                    assert_eq!(comparison, expected);
+                    assert_eq!(immediate.value(), 5);
+                    assert_eq!(offset.offset(), 2);
+                }
+                instruction => panic!("unexpected fused branch: {instruction:?}"),
+            }
+        }
+    }
+}
+
+#[test]
+fn overwriting_consumers_keep_literals_read_by_catch_handlers() {
+    let mut chunk = branch_fixture(IntegerKind::I64, false, true);
+    chunk.local_register_count = 2;
+    chunk.code[1] = Instruction::Add {
+        destination: TEMPORARY,
+        left: TARGET,
+        right: TEMPORARY,
+        kind: Some(IntegerKind::I64),
+    };
+    let type_descriptor = chunk.add_type_descriptor(TypeDescriptor::Mixed).unwrap();
+    chunk.catch_table.push(CatchEntry {
+        start: 1,
+        end: 2,
+        handler: 3,
+        type_descriptor,
+        temporary_floor: 2,
+        binding: None,
+    });
+    verify(&chunk).unwrap();
+    assert_unchanged(chunk);
+}
+
+#[test]
+fn integer_consumers_can_overwrite_their_literal_registers() {
+    for kind in [IntegerKind::I64, IntegerKind::U64] {
+        let mut chunk = branch_fixture(kind, false, false);
+        chunk.code[1] = Instruction::Add {
+            destination: TEMPORARY,
+            left: TARGET,
+            right: TEMPORARY,
+            kind: Some(kind),
+        };
+        chunk.code[2] = Instruction::ReturnScalarUnchecked { source: TEMPORARY };
+        verify(&chunk).unwrap();
+        rewrite(&mut chunk);
+        verify(&chunk).unwrap();
+        assert_eq!(chunk.code.len(), 3);
+        assert!(matches!(
+            chunk.code[0],
+            Instruction::AddImmediate {
+                destination: TEMPORARY,
+                source: TARGET,
+                kind: Some(actual),
+                immediate,
+            } if actual == kind && immediate.as_uint() == 5
+        ));
+    }
 }

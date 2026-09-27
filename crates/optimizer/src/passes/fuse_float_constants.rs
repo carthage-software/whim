@@ -33,7 +33,7 @@ pub(in crate::passes) fn optimize_chunk(
         let Literal::Float(value) = chunk.constants[usize::from(constant.index())] else {
             continue;
         };
-        if targets.contains(&index) || !register_is_dead_after(chunk, temporary, index + 2) {
+        if targets.contains(&index) || targets.contains(&(index + 1)) {
             continue;
         }
 
@@ -111,9 +111,18 @@ pub(in crate::passes) fn optimize_chunk(
             continue;
         };
 
+        let original = chunk.code[index + 1];
         chunk.code[index + 1] = replacement;
+        if !register_is_dead_after(chunk, temporary, index + 1) {
+            chunk.code[index + 1] = original;
+            continue;
+        }
+
         *removed = true;
     }
 
     compact_removed_instructions(chunk, &remove, statistics);
 }
+
+#[cfg(test)]
+mod tests;
