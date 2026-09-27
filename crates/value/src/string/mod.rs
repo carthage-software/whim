@@ -58,14 +58,22 @@ enum Repr {
 pub struct FlatStringSlices<'source> {
     base: &'source ManagedRef<ByteStringObject>,
     bytes: &'source [u8],
+    offset: usize,
 }
 
 impl<'source> FlatStringSlices<'source> {
     #[must_use]
     pub fn new(base: &'source ManagedRef<ByteStringObject>) -> Self {
+        let bytes = base.flatten();
+        // SAFETY: flatten keeps slices intact and their anchors remain flat while borrowed.
+        let (base, offset) = match unsafe { &*base.repr.get() } {
+            Repr::Slice { base, offset, .. } => (base, *offset),
+            _ => (base, 0),
+        };
         Self {
             base,
-            bytes: ByteStringObject::handle_bytes(base),
+            bytes,
+            offset,
         }
     }
 
@@ -89,7 +97,7 @@ impl<'source> FlatStringSlices<'source> {
                 hash: Cell::new(0),
                 repr: UnsafeCell::new(Repr::Slice {
                     base: self.base.clone(),
-                    offset,
+                    offset: self.offset + offset,
                     len,
                 }),
             },
@@ -158,7 +166,7 @@ impl ByteStringObject {
     /// buffer before copying `extra`.
     #[must_use]
     pub unsafe fn append_unique(string: &ManagedRef<Self>, extra: &[u8]) -> bool {
-        if !string.is_unique() {
+        if !string.is_unique() || !string.is_flat() {
             return false;
         }
         // SAFETY: the live string owns this payload, and the VM serializes representation access.
@@ -189,7 +197,7 @@ impl ByteStringObject {
         string: &ManagedRef<Self>,
         extra: &ManagedRef<Self>,
     ) -> bool {
-        if !string.is_unique() {
+        if !string.is_unique() || !string.is_flat() {
             return false;
         }
         debug_assert!(
@@ -279,23 +287,27 @@ impl ByteStringObject {
         self.len() == 0
     }
 
+    #[inline]
     pub fn flatten(&self) -> &[u8] {
-        if !self.is_flat() {
-            // SAFETY: the live string owns this payload, and the VM serializes representation access.
-            let buffer = unsafe { HeapBytes::from_fragments(self.len(), self.chunks()) };
-            // SAFETY: the live string owns this payload, and the VM serializes representation access.
-            unsafe { *self.repr.get() = Repr::Flat(buffer) };
+        if let Some(bytes) = self.contiguous_slice() {
+            return bytes;
         }
+        self.flatten_rope()
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn flatten_rope(&self) -> &[u8] {
+        // SAFETY: the live rope owns its chunks, whose total length is self.len().
+        let buffer = unsafe { HeapBytes::from_fragments(self.len(), self.chunks()) };
+        // SAFETY: a rope has no earlier byte borrow; later reads keep this flat buffer.
+        unsafe { *self.repr.get() = Repr::Flat(buffer) };
         // SAFETY: the live string owns this payload, and the VM serializes representation access.
         unsafe { self.flat_slice() }
     }
 
     #[must_use]
     pub fn handle_bytes(handle: &ManagedRef<Self>) -> &[u8] {
-        if handle.is_flat() {
-            // SAFETY: the live string owns this payload, and the VM serializes representation access.
-            return unsafe { handle.flat_slice() };
-        }
         handle.flatten()
     }
 
@@ -322,6 +334,7 @@ impl ByteStringObject {
         }
     }
 
+    #[inline]
     fn contiguous_slice(&self) -> Option<&[u8]> {
         // SAFETY: the live string owns this payload, and the VM serializes representation access.
         match unsafe { &*self.repr.get() } {
@@ -595,7 +608,7 @@ mod tests {
     }
 
     #[test]
-    fn prepared_slices_flatten_sources_and_retain_their_backing() {
+    fn prepared_slices_share_flat_anchors_and_retain_their_backing() {
         for representation in 0..3 {
             let heap = Heap::new();
             let string = match representation {
@@ -619,7 +632,9 @@ mod tests {
             let parts = {
                 let source = FlatStringSlices::new(&string);
                 assert_eq!(source.bytes(), CONTENT);
-                assert!(string.is_flat());
+                assert_eq!(string.is_flat(), representation != 2);
+                assert!(source.base.is_flat());
+                assert_eq!(source.offset, if representation == 2 { 6 } else { 0 });
                 assert!(
                     string.is_unique(),
                     "preparing slices only borrows the source"
@@ -629,16 +644,19 @@ mod tests {
                     source.slice(&heap, CONTENT.len() - 8, 8),
                     source.slice(&heap, CONTENT.len(), 0),
                 ];
-                for part in &parts {
+                for (part, expected_offset) in
+                    parts.iter().zip([0, CONTENT.len() - 8, CONTENT.len()])
+                {
                     // SAFETY: this live string is only inspected while its source is retained.
-                    let Repr::Slice { base, .. } = (unsafe { &*part.repr.get() }) else {
+                    let Repr::Slice { base, offset, .. } = (unsafe { &*part.repr.get() }) else {
                         panic!("prepared slices must keep the existing slice representation");
                     };
-                    assert!(base.ptr_eq(&string));
+                    assert!(base.ptr_eq(source.base));
+                    assert_eq!(*offset, source.offset + expected_offset);
                 }
                 parts
             };
-            assert!(string.has_other_strong_references());
+            assert_eq!(string.has_other_strong_references(), representation != 2);
             drop(string);
             assert_eq!(ByteStringObject::handle_bytes(&parts[0]), &CONTENT[..8]);
             assert_eq!(
@@ -647,6 +665,122 @@ mod tests {
             );
             assert_eq!(ByteStringObject::handle_bytes(&parts[2]), b"");
         }
+    }
+
+    #[test]
+    fn slice_byte_borrows_survive_flatten_with_a_sole_anchor() {
+        let heap = Heap::new();
+        let base = ByteStringObject::from_bytes(&heap, CONTENT);
+        let string = ByteStringObject::slice(&heap, &base, 3, 32);
+        let expected_pointer = base.flatten()[3..].as_ptr();
+        drop(base);
+
+        let bytes = ByteStringObject::handle_bytes(&string);
+        assert_eq!(bytes.as_ptr(), expected_pointer);
+        assert_eq!(string.flatten().as_ptr(), expected_pointer);
+        assert!(!string.is_flat());
+        let source = FlatStringSlices::new(&string);
+        assert_eq!(source.bytes().as_ptr(), expected_pointer);
+        assert_eq!(string.flatten(), &CONTENT[3..35]);
+        assert_eq!(bytes, &CONTENT[3..35]);
+    }
+
+    #[test]
+    fn nested_slices_keep_absolute_offsets_and_survive_parent_drops() {
+        let heap = Heap::new();
+        let base = ByteStringObject::from_bytes(&heap, CONTENT);
+        let first = ByteStringObject::slice(&heap, &base, 3, 32);
+        let second = ByteStringObject::slice(&heap, &first, 5, 16);
+        let source = FlatStringSlices::new(&second);
+        let prepared = source.slice(&heap, 4, 8);
+        let empty = source.slice(&heap, 16, 0);
+        let expected_pointer = base.flatten()[12..].as_ptr();
+        assert!(source.base.ptr_eq(&base));
+        assert_eq!(source.offset, 8);
+        assert_eq!(source.bytes(), &CONTENT[8..24]);
+        drop(second);
+        drop(first);
+        drop(base);
+
+        assert_eq!(prepared.flatten().as_ptr(), expected_pointer);
+        assert_eq!(prepared.flatten(), &CONTENT[12..20]);
+        assert!(!prepared.is_flat());
+        assert_eq!(empty.flatten(), b"");
+    }
+
+    #[test]
+    fn rope_byte_borrows_survive_repeated_flatten_and_slicing() {
+        let heap = Heap::new();
+        let left = ByteStringObject::from_bytes(&heap, &CONTENT[..19]);
+        let right = ByteStringObject::from_bytes(&heap, &CONTENT[19..]);
+        let rope = ByteStringObject::concat(&heap, &left, &right);
+        drop(left);
+        drop(right);
+        assert!(!rope.is_flat());
+
+        let bytes = ByteStringObject::handle_bytes(&rope);
+        let pointer = bytes.as_ptr();
+        assert!(rope.is_flat());
+        assert_eq!(rope.flatten().as_ptr(), pointer);
+        let part = FlatStringSlices::new(&rope).slice(&heap, 8, 16);
+        assert_eq!(part.flatten(), &CONTENT[8..24]);
+        assert_eq!(rope.flatten().as_ptr(), pointer);
+        assert_eq!(bytes, CONTENT);
+        drop(rope);
+        assert_eq!(part.flatten(), &CONTENT[8..24]);
+    }
+
+    #[test]
+    fn borrowed_slices_prevent_changes_to_their_flat_anchor() {
+        let heap = Heap::new();
+        let base = ByteStringObject::from_bytes(&heap, CONTENT);
+        let string = ByteStringObject::slice(&heap, &base, 3, 32);
+        let extra = ByteStringObject::from_bytes(&heap, b"!");
+        let bytes = ByteStringObject::handle_bytes(&string);
+
+        // SAFETY: the added byte does not overlap either string's buffer.
+        assert!(!unsafe { ByteStringObject::append_unique(&base, b"!") });
+        // SAFETY: the source and target are distinct strings.
+        assert!(!unsafe { ByteStringObject::append_unique_string(&base, &extra) });
+        // SAFETY: the added byte does not overlap the slice's buffer.
+        assert!(!unsafe { ByteStringObject::append_unique(&string, b"!") });
+        assert_eq!(bytes, &CONTENT[3..35]);
+        assert_eq!(base.flatten(), CONTENT);
+        drop(string);
+
+        // SAFETY: the added byte does not overlap the now-unshared buffer.
+        assert!(unsafe { ByteStringObject::append_unique(&base, b"!") });
+        assert_eq!(&base.flatten()[..CONTENT.len()], CONTENT);
+        assert_eq!(base.flatten()[CONTENT.len()], b'!');
+    }
+
+    #[test]
+    fn prepared_slice_anchor_survives_rejected_byte_append() {
+        let heap = Heap::new();
+        let base = ByteStringObject::from_bytes(&heap, CONTENT);
+        let string = ByteStringObject::slice(&heap, &base, 3, 32);
+        drop(base);
+        let source = FlatStringSlices::new(&string);
+        // SAFETY: the added byte does not overlap the slice's buffer.
+        assert!(!unsafe { ByteStringObject::append_unique(&string, b"!") });
+        let part = source.slice(&heap, 4, 8);
+        assert_eq!(part.flatten(), &CONTENT[7..15]);
+        assert_eq!(source.bytes(), &CONTENT[3..35]);
+    }
+
+    #[test]
+    fn prepared_slice_anchor_survives_rejected_string_append() {
+        let heap = Heap::new();
+        let base = ByteStringObject::from_bytes(&heap, CONTENT);
+        let string = ByteStringObject::slice(&heap, &base, 3, 32);
+        drop(base);
+        let source = FlatStringSlices::new(&string);
+        let extra = ByteStringObject::from_bytes(&heap, b"!");
+        // SAFETY: the source and target are distinct strings.
+        assert!(!unsafe { ByteStringObject::append_unique_string(&string, &extra) });
+        let part = source.slice(&heap, 4, 8);
+        assert_eq!(part.flatten(), &CONTENT[7..15]);
+        assert_eq!(source.bytes(), &CONTENT[3..35]);
     }
 
     #[cfg(debug_assertions)]
