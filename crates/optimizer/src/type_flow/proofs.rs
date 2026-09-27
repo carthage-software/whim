@@ -383,6 +383,14 @@ impl TypeFlow<'_> {
         mask != 0 && mask & !(INT | UINT) == 0
     }
 
+    pub(crate) fn proves_collection(&self, index: usize, register: Register) -> bool {
+        if index >= self.chunk.code.len() || !self.reachable[index] {
+            return false;
+        }
+        let mask = self.fact(index, register).mask;
+        mask != 0 && mask & !(VECTOR | DICTIONARY | TUPLE) == 0
+    }
+
     pub(crate) fn collection_type_test(
         &self,
         index: usize,

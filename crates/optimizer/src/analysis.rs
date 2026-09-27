@@ -100,6 +100,19 @@ impl<'a> Analysis<'a> {
         )
     }
 
+    pub(crate) fn of_property_consumers(
+        indexed: &'a IndexedUnit<'a>,
+        configuration: OptimizationConfiguration,
+        heap: &'a Heap,
+    ) -> Self {
+        Self::of_required(
+            indexed,
+            configuration,
+            heap,
+            Some(CandidateSet::PROPERTY_CONSUMER),
+        )
+    }
+
     fn of_required(
         indexed: &'a IndexedUnit<'a>,
         configuration: OptimizationConfiguration,

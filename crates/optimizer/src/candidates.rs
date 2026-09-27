@@ -3,6 +3,7 @@
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::IntegerKind;
+use whim_bytecode::instruction::operands::PropertyReadMode;
 
 use crate::OptimizationConfiguration;
 
@@ -23,11 +24,34 @@ impl CandidateSet {
     pub(crate) const PROPERTY: Self = Self(1 << 9);
     pub(crate) const TYPE_CHECK: Self = Self(1 << 10);
     pub(crate) const EARLY_OPERATION: Self = Self(1 << 11);
+    pub(crate) const PROPERTY_CONSUMER: Self = Self(1 << 12);
 
     pub(crate) fn of(chunk: &Chunk, configuration: OptimizationConfiguration) -> Self {
         let mut candidates = Self::default();
-        for instruction in &chunk.code {
-            candidates.insert(instruction_candidates(*instruction, configuration));
+        for (index, instruction) in chunk.code.iter().copied().enumerate() {
+            candidates.insert(instruction_candidates(instruction, configuration));
+            if configuration.reuse_temporaries
+                && !candidates.contains(Self::PROPERTY_CONSUMER)
+                && matches!(
+                    instruction,
+                    Instruction::PropertyGetUnchecked {
+                        value_mode: PropertyReadMode::Clone,
+                        ..
+                    }
+                )
+            {
+                let next = chunk.code.get(index + 1);
+                let consumer = match next {
+                    Some(Instruction::LoadInteger { .. }) => chunk.code.get(index + 2),
+                    _ => next,
+                };
+                if matches!(
+                    consumer,
+                    Some(Instruction::Length { .. } | Instruction::VecIndexGet { .. })
+                ) {
+                    candidates.insert(Self::PROPERTY_CONSUMER);
+                }
+            }
         }
 
         candidates
@@ -179,7 +203,6 @@ fn instruction_candidates(
                 | Instruction::IndexGet { .. }
                 | Instruction::IndexSet { .. }
                 | Instruction::DictIndexSet { .. }
-                | Instruction::VecIndexGet { .. }
                 | Instruction::Append { .. }
         )
     {

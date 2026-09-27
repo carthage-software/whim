@@ -25,6 +25,7 @@ use crate::passes::reuse_temporaries::coloring::coalesce_single_argument_call_re
 use crate::passes::reuse_temporaries::coloring::recolor_interference_graph;
 
 mod coloring;
+pub(crate) mod property_consumers;
 
 #[derive(Clone, Copy)]
 struct Interval {

@@ -609,6 +609,7 @@ fn optimize_unit_with_world(
     passes::fuse_concatenation::optimize_unit(unit, configuration, &mut statistics);
     passes::optimize_unit_numeric_loops(unit, configuration);
     passes::reuse_temporaries::optimize_unit(unit, configuration, &mut statistics);
+    passes::reuse_temporaries::property_consumers::optimize_unit(unit, world, heap, configuration);
     passes::finalize_property_moves::optimize_unit(unit, configuration);
     passes::refine_reference_registers::optimize_unit(unit, configuration);
     passes::prune_clears::optimize_unit(unit, configuration, &mut statistics);
