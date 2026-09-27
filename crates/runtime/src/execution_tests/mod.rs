@@ -199,3 +199,11 @@ for ($round = 0; $round < 4; $round++) {
         }
     }
 }
+
+#[test]
+fn scalar_replacement_preserves_objects_returned_by_branch_targets() {
+    run_both_modes(
+        include_str!("../../../../tests/_fixtures/scalar-object-branches.whim"),
+        "/scalar-object-branches.whim",
+    );
+}

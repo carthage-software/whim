@@ -231,7 +231,7 @@ fn candidate(
         }
 
         if is_block_boundary(instruction) {
-            if !register_is_dead_after(chunk, object, at + 1) {
+            if !register_is_dead_after(chunk, object, at) {
                 return None;
             }
             at += 1;
@@ -326,7 +326,7 @@ fn initialized_candidate(
         }
 
         if is_block_boundary(instruction) {
-            if !register_is_dead_after(chunk, object, at + 1) {
+            if !register_is_dead_after(chunk, object, at) {
                 return None;
             }
             at += 1;

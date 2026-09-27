@@ -4018,3 +4018,45 @@ function build(Token $object): fn(int): (int, Token, int) {
     }
     assert!(found, "{:?}", closure.chunk.code);
 }
+
+#[test]
+fn scalar_replacement_keeps_objects_live_on_branch_targets() {
+    let unit = compile(
+        include_str!("../../../../tests/_fixtures/scalar-object-branches.whim"),
+        OptimizationConfiguration::default(),
+    );
+    for name in ["plain_match", "promoted_match", "plain_conditional"] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name.as_bytes())
+            .unwrap();
+        let chunk = &function.chunk;
+        assert!(
+            chunk.code.iter().any(|instruction| match instruction {
+                Instruction::NewStatic { .. } => name != "promoted_match",
+                Instruction::InitializeProperties { descriptor, .. } => {
+                    name == "promoted_match"
+                        && chunk
+                            .property_initialization_descriptor(*descriptor)
+                            .allocates
+                }
+                _ => false,
+            }),
+            "{name}: {:?}",
+            chunk.code,
+        );
+        assert!(
+            chunk
+                .code
+                .iter()
+                .any(|instruction| if name == "plain_conditional" {
+                    matches!(instruction, Instruction::JumpIfFalse { .. })
+                } else {
+                    matches!(instruction, Instruction::SwitchString { .. })
+                }),
+            "{name}: {:?}",
+            chunk.code,
+        );
+    }
+}

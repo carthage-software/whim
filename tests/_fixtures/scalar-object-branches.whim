@@ -1,0 +1,70 @@
+use Whim\Marker\NeverInline;
+final class Plain {
+  public mixed $value;
+}
+
+final class Promoted {
+  public function __construct(public int $value, public int $other) {}
+}
+
+#[NeverInline]
+function plain_match(string $mode): vec {
+  $ready = new Plain();
+  $ready->value = 1;
+  return match ($mode) {
+    'yes' => vec[$ready],
+    'no' => vec[],
+    'other' => vec[],
+  };
+}
+
+#[NeverInline]
+function promoted_match(int $first, int $second, string $mode): vec {
+  $ready = new Promoted($first, $second);
+  $seen = $ready->value;
+  return match ($mode) {
+    'yes' => vec[$seen, $ready],
+    'no' => vec[],
+    'other' => vec[],
+  };
+}
+
+#[NeverInline]
+function plain_conditional(bool $empty): vec {
+  $ready = new Plain();
+  $ready->value = 3;
+  if ($empty) {
+    return vec[];
+  }
+
+  return vec[$ready];
+}
+
+$plain = plain_match('yes');
+assert!($plain[0] is Plain);
+assert!(1 == $plain[0]->value);
+$promoted = promoted_match(1, 2, 'yes');
+assert!(1 == $promoted[0] && $promoted[1] is Promoted);
+assert!(1 == $promoted[1]->value && 2 == $promoted[1]->other);
+$conditional = plain_conditional(false);
+assert!($conditional[0] is Plain && 3 == $conditional[0]->value);
+assert!(plain_conditional(true) == vec[]);
+foreach (vec['no', 'other'] as $mode) {
+  assert!(plain_match($mode) == vec[]);
+  assert!(promoted_match(1, 2, $mode) == vec[]);
+}
+
+$caught = 0;
+try {
+  plain_match('missing');
+} catch (Whim\Unwind\UnhandledMatchError $_) {
+  $caught++;
+}
+
+try {
+  promoted_match(1, 2, 'missing');
+} catch (Whim\Unwind\UnhandledMatchError $_) {
+  $caught++;
+}
+
+assert!(2 == $caught);
