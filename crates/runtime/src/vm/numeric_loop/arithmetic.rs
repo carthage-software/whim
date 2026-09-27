@@ -46,7 +46,8 @@ pub(in crate::vm::numeric_loop) fn equals_numeric(
             Some(left.bits == right.bits)
         }
         (NumericKind::Float, NumericKind::Float) => Some(left.float_value() == right.float_value()),
-        (NumericKind::Other, _) | (_, NumericKind::Other) => None,
+        (NumericKind::Other | NumericKind::Uint, _)
+        | (_, NumericKind::Other | NumericKind::Uint) => None,
         _ => Some(false),
     }
 }
@@ -94,8 +95,8 @@ pub(in crate::vm::numeric_loop) fn add(
         (NumericKind::Float, NumericKind::Int) => Some(Ok(NumericValue::float(
             left.float_value() + right.int_value() as f64,
         ))),
-        (NumericKind::Other | NumericKind::Bool, _)
-        | (_, NumericKind::Other | NumericKind::Bool) => None,
+        (NumericKind::Other | NumericKind::Bool | NumericKind::Uint, _)
+        | (_, NumericKind::Other | NumericKind::Bool | NumericKind::Uint) => None,
     }
 }
 
@@ -126,8 +127,8 @@ pub(in crate::vm::numeric_loop) fn subtract(
         (NumericKind::Float, NumericKind::Int) => Some(Ok(NumericValue::float(
             left.float_value() - right.int_value() as f64,
         ))),
-        (NumericKind::Other | NumericKind::Bool, _)
-        | (_, NumericKind::Other | NumericKind::Bool) => None,
+        (NumericKind::Other | NumericKind::Bool | NumericKind::Uint, _)
+        | (_, NumericKind::Other | NumericKind::Bool | NumericKind::Uint) => None,
     }
 }
 
@@ -156,8 +157,8 @@ pub(in crate::vm::numeric_loop) fn multiply(
         (NumericKind::Float, NumericKind::Int) => Some(Ok(NumericValue::float(
             left.float_value() * right.int_value() as f64,
         ))),
-        (NumericKind::Other | NumericKind::Bool, _)
-        | (_, NumericKind::Other | NumericKind::Bool) => None,
+        (NumericKind::Other | NumericKind::Bool | NumericKind::Uint, _)
+        | (_, NumericKind::Other | NumericKind::Bool | NumericKind::Uint) => None,
     }
 }
 
@@ -197,8 +198,8 @@ fn comparison_matches_non_float(
         (NumericKind::Float, NumericKind::Int) => {
             compare_int_float(right.int_value(), left.float_value()).map(Ordering::reverse)
         }
-        (NumericKind::Other | NumericKind::Bool, _)
-        | (_, NumericKind::Other | NumericKind::Bool) => return None,
+        (NumericKind::Other | NumericKind::Bool | NumericKind::Uint, _)
+        | (_, NumericKind::Other | NumericKind::Bool | NumericKind::Uint) => return None,
     };
     Some(ordered_comparison_matches(comparison, ordering))
 }
@@ -261,8 +262,8 @@ pub(in crate::vm::numeric_loop) fn step_counter(
                 ),
             )))
         }
-        (NumericKind::Other | NumericKind::Bool, _)
-        | (_, NumericKind::Other | NumericKind::Bool) => None,
+        (NumericKind::Other | NumericKind::Bool | NumericKind::Uint, _)
+        | (_, NumericKind::Other | NumericKind::Bool | NumericKind::Uint) => None,
     }
 }
 

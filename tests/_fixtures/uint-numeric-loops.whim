@@ -1,0 +1,83 @@
+use Whim\Marker\NeverInline;
+
+#[NeverInline]
+function sum_lengths(string $text, uint $sum, int $count): (uint, int) {
+    for ($index = 0; $index < $count; $index++) {
+        $sum += length!($text);
+    }
+    return ($sum, $index);
+}
+
+#[NeverInline]
+function sum_values(vec<uint> $values, uint $sum, int $count): (uint, int) {
+    for ($index = 0; $index < $count; $index++) {
+        $sum += $values[$index];
+    }
+    return ($sum, $index);
+}
+
+#[NeverInline]
+function overflow_state(uint $sum, uint $step, int $count): (uint, int) {
+    $index = 0;
+    try {
+        for (; $index < $count; $index++) {
+            $sum += $step;
+        }
+    } catch (Whim\Unwind\OverflowError $_) {
+        return ($sum, $index);
+    }
+    return ($sum, $index);
+}
+
+#[NeverInline]
+function equal_after_write(vec<uint> $values, uint $sum, mixed $expected, int $count): (uint, int, bool) {
+    $equal = false;
+    for ($index = 0; $index < $count; $index++) {
+        $sum += $values[$index];
+        $equal = $sum == $expected;
+    }
+    return ($sum, $index, $equal);
+}
+
+#[NeverInline]
+function order_after_write(vec<uint> $values, uint $sum, mixed $expected, int $count): (uint, int, bool) {
+    $less = false;
+    for ($index = 0; $index < $count; $index++) {
+        $sum += $values[$index];
+        $less = $sum < $expected;
+    }
+    return ($sum, $index, $less);
+}
+
+#[NeverInline]
+function arithmetic_after_write(vec<uint> $values, uint $sum, mixed $left, mixed $right, int $count): (uint, int, mixed) {
+    $result = null;
+    $index = 0;
+    try {
+        for (; $index < $count; $index++) {
+            $sum += $values[$index];
+            $result = $left + $right;
+        }
+    } catch (Whim\Unwind\IncompatibleOperandsError $error) {
+        return ($sum, $index, $error->getMessage());
+    }
+    return ($sum, $index, $result);
+}
+
+#[NeverInline]
+function break_after_write(vec<uint> $values, uint $sum, int $stop, int $count): (uint, int) {
+    for ($index = 0; $index < $count; $index++) {
+        $sum += $values[$index];
+        if ($index == $stop) { break; }
+    }
+    return ($sum, $index);
+}
+
+#[NeverInline]
+function return_after_write(vec<uint> $values, uint $sum, int $stop, int $count): uint {
+    for ($index = 0; $index < $count; $index++) {
+        $sum += $values[$index];
+        if ($index == $stop) { return $sum; }
+    }
+    return $sum;
+}

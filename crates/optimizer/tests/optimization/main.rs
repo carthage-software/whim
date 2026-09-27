@@ -13,6 +13,7 @@ mod scalar_alias_proofs;
 mod shape_indexing;
 mod string_length_proofs;
 mod uint;
+mod uint_numeric_loops;
 mod where_constraints;
 
 use std::ops::Deref;

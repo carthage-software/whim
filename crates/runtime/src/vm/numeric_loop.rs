@@ -28,6 +28,7 @@ use crate::vm::ArrayFault;
 use crate::vm::Fault;
 use crate::vm::VirtualMachine;
 use crate::vm::arithmetic::prepare_string_append;
+use crate::vm::arithmetic::unsigned_add;
 use crate::vm::int_position;
 use crate::vm::integer_add;
 use crate::vm::integer_modulo;
@@ -47,12 +48,16 @@ use crate::vm::unreachable_invariant;
 
 mod arithmetic;
 
+#[cfg(test)]
+mod tests;
+
 const BATCH_ITERATION_LIMIT: u32 = 65_536;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum NumericKind {
     Other,
     Int,
+    Uint,
     Float,
     Bool,
 }
@@ -153,6 +158,13 @@ impl NumericRegisters {
         // SAFETY: the surrounding invariant keeps this index in bounds.
         unsafe { *self.bits.get_unchecked(index).assume_init_ref() as i64 }
     }
+
+    #[inline(always)]
+    fn uint(&self, index: usize) -> u64 {
+        debug_assert!(self.kind(index) == NumericKind::Uint);
+        // SAFETY: the surrounding invariant keeps this index in bounds.
+        unsafe { *self.bits.get_unchecked(index).assume_init_ref() }
+    }
 }
 
 impl NumericValue {
@@ -166,6 +178,14 @@ impl NumericValue {
         NumericValue {
             bits: value as u64,
             kind: NumericKind::Int,
+        }
+    }
+
+    #[inline(always)]
+    fn uint(value: u64) -> NumericValue {
+        NumericValue {
+            bits: value,
+            kind: NumericKind::Uint,
         }
     }
 
@@ -199,6 +219,7 @@ impl NumericValue {
     fn from_value(value: &Value) -> NumericValue {
         match value.transparent() {
             ValueView::Int(value) => NumericValue::int(*value),
+            ValueView::Uint(value) => NumericValue::uint(*value),
             ValueView::Float(value) => NumericValue::float(*value),
             ValueView::Bool(value) => NumericValue::bool(*value),
             _ => NumericValue::OTHER,
@@ -208,6 +229,7 @@ impl NumericValue {
     fn into_value(self) -> Value {
         match self.kind {
             NumericKind::Int => Value::int(self.int_value()),
+            NumericKind::Uint => Value::uint(self.bits),
             NumericKind::Float => Value::float(self.float_value()),
             NumericKind::Bool => Value::bool(self.bits != 0),
             // SAFETY: the surrounding invariant makes this path unreachable.
@@ -1198,6 +1220,7 @@ impl VirtualMachine<'_> {
                 } => {
                     let value = match &chunk.constants[constant.index() as usize] {
                         Literal::Int(value) => NumericValue::int(*value),
+                        Literal::Uint(value) => NumericValue::uint(*value),
                         Literal::Float(value) => NumericValue::float(*value),
                         literal @ Literal::String(_) => {
                             // SAFETY: the destination is in the active numeric register window.
@@ -1259,6 +1282,20 @@ impl VirtualMachine<'_> {
                     destination,
                     immediate,
                 } => {
+                    if kind == IntegerKind::U64 {
+                        // SAFETY: the destination is in the active numeric register window.
+                        unsafe {
+                            assign(
+                                registers,
+                                &mut values,
+                                &mut dirty,
+                                &mut pins,
+                                destination,
+                                NumericValue::uint(u64::from(immediate.as_uint())),
+                            )
+                        }
+                        continue;
+                    }
                     require_int_kind!(kind, current);
                     // SAFETY: the destination is in the active numeric register window.
                     unsafe {
@@ -1311,6 +1348,41 @@ impl VirtualMachine<'_> {
                     };
                 }
                 Instruction::IntegerAddAssign { kind, target, source } => {
+                    if kind == IntegerKind::U64 {
+                        if values.kind(target.index() as usize) != NumericKind::Uint
+                            || values.kind(source.index() as usize) != NumericKind::Uint
+                        {
+                            // SAFETY: `dirty` contains only active-frame numeric registers.
+                            unsafe { flush(registers, &values, dirty) };
+                            return NumericLoopOutcome::Deoptimize(current);
+                        }
+                        let result = unsigned_add(
+                            values.uint(target.index() as usize),
+                            values.uint(source.index() as usize),
+                        );
+                        let value = match result {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                // SAFETY: `dirty` contains only active-frame numeric registers.
+                                unsafe { flush(registers, &values, dirty) };
+                                return NumericLoopOutcome::Fault {
+                                    resume_ip: cursor,
+                                    fault,
+                                    operator: "+",
+                                    left: target,
+                                    right: Some(source),
+                                };
+                            }
+                        };
+                        assign_existing_numeric(
+                            &mut values,
+                            &mut dirty,
+                            target,
+                            NumericValue::uint(value),
+                        );
+                        fused_counter_tail!(current, target);
+                        continue;
+                    }
                     require_int_kind!(kind, current);
                     let result = integer_add(
                         values.int(target.index() as usize),
@@ -2436,12 +2508,17 @@ unsafe fn string_length_operation(
         ValueView::ShortString(string) => string.as_bytes().len() as u64,
         _ => return false,
     };
-    let destination_index = destination.index() as usize;
     // SAFETY: the destination is in the active numeric register window.
-    unsafe { *registers.add(destination_index) = Value::uint(length) };
-    values.set(destination_index, NumericValue::OTHER);
-    *dirty &= !(1u64 << destination_index);
-    pins.invalidate(destination_index);
+    unsafe {
+        assign(
+            registers,
+            values,
+            dirty,
+            pins,
+            destination,
+            NumericValue::uint(length),
+        )
+    };
     true
 }
 
@@ -4530,6 +4607,7 @@ unsafe fn assign_array_element(
 ) {
     let value = match element.transparent() {
         ValueView::Int(element) => NumericValue::int(*element),
+        ValueView::Uint(element) => NumericValue::uint(*element),
         ValueView::Float(element) => NumericValue::float(*element),
         ValueView::Bool(element) => NumericValue::bool(*element),
         _ => {

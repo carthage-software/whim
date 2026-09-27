@@ -97,7 +97,7 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
                 ..
             }
             | Instruction::IntegerAddAssign {
-                kind: IntegerKind::I64,
+                kind: IntegerKind::I64 | IntegerKind::U64,
                 ..
             } if index < tail
                 && matches!(chunk.code[index + 1], Instruction::IntCounterLoop { .. }) =>
@@ -450,14 +450,14 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
             Instruction::LoadConstant { constant, .. } => {
                 if !matches!(
                     chunk.constants[constant.index() as usize],
-                    Literal::Int(_) | Literal::Float(_) | Literal::String(_)
+                    Literal::Int(_) | Literal::Uint(_) | Literal::Float(_) | Literal::String(_)
                 ) {
                     return false;
                 }
             }
             Instruction::StringLength { .. }
             | Instruction::LoadInteger {
-                kind: IntegerKind::I64,
+                kind: IntegerKind::I64 | IntegerKind::U64,
                 ..
             }
             | Instruction::LoadTrue { .. }
@@ -520,7 +520,7 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
                 ..
             }
             | Instruction::IntegerAddAssign {
-                kind: IntegerKind::I64,
+                kind: IntegerKind::I64 | IntegerKind::U64,
                 ..
             }
             | Instruction::FloatAdd { .. }

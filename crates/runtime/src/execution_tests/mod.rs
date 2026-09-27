@@ -9,6 +9,7 @@ mod nominal_refinement;
 mod object_shape_checks;
 mod returns;
 mod rope_append;
+mod uint_numeric_loops;
 
 use std::path::Path;
 
