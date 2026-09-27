@@ -3,6 +3,7 @@ mod callable_collections;
 mod collection_inlining;
 mod computed_captures;
 mod default_parameter_checks;
+mod integer_add_assign_constants;
 mod joined_lengths;
 mod matching;
 mod nested_record_proofs;

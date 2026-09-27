@@ -49,6 +49,8 @@ use crate::vm::unreachable_invariant;
 mod arithmetic;
 
 #[cfg(test)]
+mod add_immediate_tests;
+#[cfg(test)]
 mod tests;
 
 const BATCH_ITERATION_LIMIT: u32 = 65_536;
@@ -1411,6 +1413,37 @@ impl VirtualMachine<'_> {
                     fused_counter_tail!(current, target);
                 }
                 Instruction::AddImmediate { destination, source, immediate, kind } => {
+                    if kind == Some(IntegerKind::U64) {
+                        if values.kind(source.index() as usize) != NumericKind::Uint {
+                            // SAFETY: `dirty` contains only active-frame numeric registers.
+                            unsafe { flush(registers, &values, dirty) };
+                            return NumericLoopOutcome::Deoptimize(current);
+                        }
+                        let result = unsigned_add(
+                            values.uint(source.index() as usize),
+                            u64::from(immediate.as_uint()),
+                        );
+                        let value = match result {
+                            Ok(value) => value,
+                            Err(fault) => {
+                                // SAFETY: `dirty` contains only active-frame numeric registers.
+                                unsafe { flush(registers, &values, dirty) };
+                                return NumericLoopOutcome::Fault {
+                                    resume_ip: cursor,
+                                    fault,
+                                    operator: "+",
+                                    left: source,
+                                    right: None,
+                                };
+                            }
+                        };
+                        // SAFETY: the destination is a live register tracked by the shadow and pins.
+                        unsafe {
+                            assign(registers, &mut values, &mut dirty, &mut pins, destination, NumericValue::uint(value));
+                        }
+                        fused_counter_tail!(current, destination);
+                        continue;
+                    }
                     numeric_step!(current, destination, source, i64::from(immediate.as_int()), kind, "+");
                 }
                 Instruction::SubtractImmediate { destination, source, immediate, kind } => {

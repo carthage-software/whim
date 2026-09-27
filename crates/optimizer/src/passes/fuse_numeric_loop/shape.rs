@@ -89,7 +89,7 @@ pub(super) fn region_profits(chunk: &Chunk, header: usize, tail: usize) -> bool 
                 destination, left, ..
             } if destination == left => return true,
             Instruction::AddImmediate {
-                kind: None | Some(IntegerKind::I64),
+                kind: None | Some(IntegerKind::I64 | IntegerKind::U64),
                 ..
             }
             | Instruction::Step {
@@ -484,7 +484,7 @@ pub(super) fn closed_numeric_body(chunk: &Chunk, header: usize, tail: usize, exi
                 ..
             }
             | Instruction::AddImmediate {
-                kind: Some(IntegerKind::I64),
+                kind: Some(IntegerKind::I64 | IntegerKind::U64),
                 ..
             }
             | Instruction::SubtractImmediate {

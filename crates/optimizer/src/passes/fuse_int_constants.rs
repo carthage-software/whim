@@ -1,5 +1,6 @@
 //! Fusion of integer literal loads into adjacent proven consumers.
 
+use whim_bytecode::REFERENCE_REGISTER_LIMIT;
 use whim_bytecode::chunk::Chunk;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ImmediateInt;
@@ -8,6 +9,7 @@ use whim_bytecode::instruction::operands::ImmediateUint;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::PropertyStepMode;
 use whim_bytecode::instruction::operands::Register;
+use whim_bytecode::reference_registers;
 use whim_bytecode::rewrite::control_flow_targets;
 use whim_bytecode::unit::CompiledUnit;
 
@@ -38,6 +40,7 @@ pub(crate) fn optimize_chunk(
 
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
+    let mut reference_mask = None;
     for (index, should_remove) in remove.iter_mut().enumerate().take(chunk.code.len() - 1) {
         if targets.contains(&(index + 1)) {
             continue;
@@ -51,6 +54,32 @@ pub(crate) fn optimize_chunk(
         else {
             continue;
         };
+        if matches!(chunk.code[index + 1], Instruction::IntegerAddAssign { .. }) {
+            let reference_mask = *reference_mask.get_or_insert_with(|| {
+                chunk.code.iter().fold(
+                    chunk.reference_register_mask | reference_registers::mask(chunk),
+                    |mask, instruction| match instruction {
+                        Instruction::MoveOwned { destination, .. }
+                            if destination.index() < REFERENCE_REGISTER_LIMIT =>
+                        {
+                            mask | (1u64 << destination.index())
+                        }
+                        _ => mask,
+                    },
+                )
+            });
+            if temporary.index() < chunk.local_register_count
+                || chunk.trace_argument_registers.contains(&temporary)
+                || temporary.index() >= REFERENCE_REGISTER_LIMIT
+                || reference_mask & (1u64 << temporary.index()) != 0
+                || chunk.catch_table.iter().any(|entry| {
+                    index + 1 >= entry.start as usize && index + 1 < entry.end as usize
+                })
+            {
+                continue;
+            }
+        }
+
         let Some(replacement) = consumer(chunk.code[index + 1], temporary, immediate, kind) else {
             continue;
         };
@@ -150,6 +179,18 @@ fn consumer(
             immediate,
             kind: Some(kind),
         },
+        Instruction::IntegerAddAssign {
+            target,
+            source,
+            kind: operand_kind,
+        } if operand_kind == kind && source == temporary && target != temporary => {
+            Instruction::AddImmediate {
+                destination: target,
+                source: target,
+                immediate,
+                kind: Some(kind),
+            }
+        }
         Instruction::Subtract {
             destination,
             left,
@@ -201,3 +242,6 @@ fn other_operand(
         None
     }
 }
+
+#[cfg(test)]
+mod tests;

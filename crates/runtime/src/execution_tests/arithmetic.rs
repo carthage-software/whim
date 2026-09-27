@@ -171,3 +171,129 @@ assert!(OS != '');
 ";
     run_both_modes(source, "/stub-constant-proofs.whim");
 }
+
+#[test]
+fn inlined_compound_constants_keep_signed_unsigned_bits_and_tags() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+newtype Signed = int;
+newtype Unsigned = uint;
+function signed_value(): int { return -32768; }
+function unsigned_value(): uint { return 65535u; }
+#[NeverInline]
+function signed(int $value): int { $value += signed_value(); return $value; }
+#[NeverInline]
+function unsigned(uint $value): uint { $value += unsigned_value(); return $value; }
+assert!(signed(32770) == 2);
+assert!(signed(-9223372036854743040) == -9223372036854775808);
+assert!(unsigned(0u) == 65535u);
+assert!(unsigned(18446744073709486080u) == 18446744073709551615u);
+$signed = Signed(32770);
+$unsigned = Unsigned(0u);
+$first = signed($signed);
+$second = unsigned($unsigned);
+assert!($first == 2 && !($first is Signed));
+assert!($second == 65535u && !($second is Unsigned));
+assert!($signed is Signed && $unsigned is Unsigned);
+function length_value(string $value): uint { return length!($value); }
+#[NeverInline]
+function total(int $count): uint {
+    $sum = 0u;
+    for ($index = 0; $index < $count; $index++) { $sum += length_value('hallo'); }
+    return $sum;
+}
+assert!(total(0) == 0u && total(13) == 65u);
+",
+        "/inlined-integer-add-assign-constants.whim",
+    );
+}
+
+#[test]
+fn compound_overflow_keeps_values_tags_catches_and_error_messages() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\UnderflowError;
+newtype Signed = int;
+newtype Unsigned = uint;
+function positive(): int { return 5; }
+function negative(): int { return -5; }
+function unsigned_value(): uint { return 5u; }
+#[NeverInline]
+function signed(int $value): int { $value += positive(); return $value; }
+#[NeverInline]
+function lower(int $value): int { $value += negative(); return $value; }
+#[NeverInline]
+function unsigned(uint $value): uint { $value += unsigned_value(); return $value; }
+$signed = Signed(9223372036854775807);
+$unsigned = Unsigned(18446744073709551615u);
+$caught = 0;
+try { signed($signed); } catch (OverflowError $error) {
+    assert!($error->getMessage() == 'the integer result overflows the 64-bit range');
+    $caught++;
+}
+try { unsigned($unsigned); } catch (OverflowError $error) {
+    assert!($error->getMessage() == 'the integer result overflows the 64-bit range');
+    $caught++;
+}
+try { lower(-9223372036854775808); } catch (UnderflowError $error) {
+    assert!($error->getMessage() == 'the integer result underflows the 64-bit range');
+    $caught++;
+}
+assert!($caught == 3 && $signed is Signed && $unsigned is Unsigned);
+#[NeverInline]
+function caught_signed(int $value): (int, int, bool) {
+    $increment = 77;
+    try { $increment = 5; $value += $increment; }
+    catch (OverflowError $_) { return ($value, $increment, $value is Signed); }
+    return ($value, $increment, false);
+}
+#[NeverInline]
+function caught_unsigned(uint $value): (uint, uint, bool) {
+    $increment = 77u;
+    try { $increment = 5u; $value += $increment; }
+    catch (OverflowError $_) { return ($value, $increment, $value is Unsigned); }
+    return ($value, $increment, false);
+}
+assert!(caught_signed($signed) == ($signed, 5, true));
+assert!(caught_unsigned($unsigned) == ($unsigned, 5u, true));
+assert!(caught_signed(3) == (8, 5, false));
+assert!(caught_unsigned(3u) == (8u, 5u, false));
+",
+        "/integer-add-assign-overflow.whim",
+    );
+}
+
+#[test]
+fn unsigned_immediate_loops_keep_partial_overflow_and_reference_destinations() {
+    run_both_modes(
+        r"
+use Whim\Marker\NeverInline;
+use Whim\Unwind\OverflowError;
+#[NeverInline]
+function accumulate(uint $sum, int $count): (uint, int, bool) {
+    $index = 0;
+    try {
+        for (; $index < $count; $index++) { $sum += 65535u; }
+    } catch (OverflowError $_) { return ($sum, $index, true); }
+    return ($sum, $index, false);
+}
+#[NeverInline]
+function replace(uint $source, vec<string> $values, int $count): (mixed, vec<string>) {
+    $result = $values;
+    for ($index = 0; $index < $count; $index++) { $result = $source + 65535u; }
+    return ($result, $values);
+}
+assert!(accumulate(0u, 3) == (196605u, 3, false));
+assert!(accumulate(18446744073709420545u, 3) == (18446744073709551615u, 2, true));
+assert!(accumulate(18446744073709551615u, 1) == (18446744073709551615u, 0, true));
+$values = vec['a retained string longer than an inline value'];
+assert!(replace(2u, $values, 0) == ($values, $values));
+assert!(replace(2u, $values, 3) == (65537u, $values));
+assert!(replace(18446744073709486080u, $values, 1) == (18446744073709551615u, $values));
+",
+        "/unsigned-add-immediate-loops.whim",
+    );
+}
