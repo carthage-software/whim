@@ -6,10 +6,10 @@ use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
+use whim_bytecode::chunk::descriptors::ShapeKey;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::IcSlot;
-use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::ClassLikeKind;
 use whim_bytecode::unit::CompiledBuiltInFunction;
@@ -26,6 +26,7 @@ use crate::liveness::effect::changes_value;
 use crate::liveness::effect::effect_on;
 use crate::type_flow::BOOL;
 use crate::type_flow::CAPTURE_ORIGIN;
+use crate::type_flow::ConstantValue;
 use crate::type_flow::ExactClass;
 use crate::type_flow::FLOAT;
 use crate::type_flow::Fact;
@@ -187,11 +188,7 @@ impl<'a> TypeFlow<'a> {
         let origin = index as u32 + 1;
         if let Instruction::IndexGetOrNull { destination, .. }
         | Instruction::VecIndexGetOrNull { destination, .. }
-        | Instruction::DictIndexGetIntegerKeyOrNull {
-            kind: IntegerKind::I64,
-            destination,
-            ..
-        }
+        | Instruction::DictIndexGetIntegerKeyOrNull { destination, .. }
         | Instruction::DictIndexGetStringKeyOrNull { destination, .. }
         | Instruction::StringIndexGetOrNull { destination, .. }
         | Instruction::PropertyGetOrNull { destination, .. }
@@ -342,16 +339,19 @@ impl<'a> TypeFlow<'a> {
                 container,
                 ..
             }
+            | Instruction::DictIndexGetUintKey {
+                destination,
+                container,
+                ..
+            }
             | Instruction::DictIndexGetStringKey {
                 destination,
                 container,
                 ..
             } => {
                 let fact = self.fact(index, *container);
-                if let Some(container) = self.origin_type(fact.origin, 0)
-                    && let Some((_, element)) = array_shape(&container)
-                {
-                    return Some((*destination, self.descriptor_fact(element, origin)));
+                if let Some(element) = self.origin_type(origin, 0) {
+                    return Some((*destination, self.descriptor_fact(&element, origin)));
                 }
 
                 if fact.array != 0 {
@@ -620,7 +620,6 @@ impl<'a> TypeFlow<'a> {
                 ..
             }
             | Instruction::DictIndexGetIntegerKeyOrNull {
-                kind: IntegerKind::I64,
                 container,
                 index: key,
                 ..
@@ -642,11 +641,9 @@ impl<'a> TypeFlow<'a> {
                     | TypeDescriptor::Vector(Some(value)) => *value,
                     TypeDescriptor::String => TypeDescriptor::String,
                     _ => {
-                        let key = self
-                            .constant_value_fact(self.fact(index, key), depth + 1)?
-                            .position()?;
+                        let key = self.constant_value_fact(self.fact(index, key), depth + 1)?;
 
-                        Self::indexed_descriptor(&container, key)?.clone()
+                        Self::constant_indexed_descriptor(&container, &key)?.clone()
                     }
                 };
 
@@ -699,6 +696,11 @@ impl<'a> TypeFlow<'a> {
                 index: key,
                 ..
             }
+            | Instruction::DictIndexGetUintKey {
+                container,
+                index: key,
+                ..
+            }
             | Instruction::DictIndexGetStringKey {
                 container,
                 index: key,
@@ -709,11 +711,9 @@ impl<'a> TypeFlow<'a> {
                     return Some(element.clone());
                 }
 
-                let key = self
-                    .constant_value_fact(self.fact(index, key), depth + 1)?
-                    .position()?;
+                let key = self.constant_value_fact(self.fact(index, key), depth + 1)?;
 
-                Self::indexed_descriptor(&container, key).cloned()
+                Self::constant_indexed_descriptor(&container, &key).cloned()
             }
             Instruction::ElementGet {
                 subject,
@@ -870,24 +870,35 @@ impl<'a> TypeFlow<'a> {
                 container,
                 index: key,
                 ..
+            }
+            | Instruction::VecIndexGet {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::DictIndexGetIntKey {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::DictIndexGetUintKey {
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::DictIndexGetStringKey {
+                container,
+                index: key,
+                ..
             } => {
                 let container =
                     self.origin_descriptor(self.fact(index, container).origin, depth + 1)?;
-                let key = self
-                    .constant_value_fact(self.fact(index, key), depth + 1)?
-                    .position()?;
-                Self::indexed_descriptor(container, key)
-            }
-            Instruction::VecIndexGet { container, .. }
-            | Instruction::DictIndexGetIntKey { container, .. }
-            | Instruction::DictIndexGetStringKey { container, .. } => {
-                let container =
-                    self.origin_descriptor(self.fact(index, container).origin, depth + 1)?;
-                match container {
-                    TypeDescriptor::Vector(Some(element)) => Some(element),
-                    TypeDescriptor::Dictionary(Some((_, value))) => Some(value),
-                    _ => None,
+                if let Some((_, element)) = array_shape(container) {
+                    return Some(element);
                 }
+
+                let key = self.constant_value_fact(self.fact(index, key), depth + 1)?;
+                Self::constant_indexed_descriptor(container, &key)
             }
             Instruction::ElementGet {
                 subject,
@@ -946,6 +957,38 @@ impl<'a> TypeFlow<'a> {
         })
     }
 
+    fn constant_indexed_descriptor<'descriptor>(
+        container: &'descriptor TypeDescriptor,
+        key: &ConstantValue,
+    ) -> Option<&'descriptor TypeDescriptor> {
+        let TypeDescriptor::DictionaryShape { entries, rest } = container else {
+            return Self::indexed_descriptor(container, key.position()?);
+        };
+        if !matches!(
+            key,
+            ConstantValue::Bool(_)
+                | ConstantValue::Int(_)
+                | ConstantValue::Uint(_)
+                | ConstantValue::String(_)
+        ) {
+            return None;
+        }
+
+        entries
+            .iter()
+            .find(|(expected, _)| match (expected, key) {
+                (ShapeKey::Bool(expected), ConstantValue::Bool(actual)) => expected == actual,
+                (ShapeKey::Int(expected), ConstantValue::Int(actual)) => expected == actual,
+                (ShapeKey::Uint(expected), ConstantValue::Uint(actual)) => expected == actual,
+                (ShapeKey::String(expected), ConstantValue::String(actual)) => {
+                    same_atom(expected, actual)
+                }
+                _ => false,
+            })
+            .map(|(_, value)| value)
+            .or_else(|| rest.as_ref().map(|(_, value)| value.as_ref()))
+    }
+
     pub(crate) fn indexed_descriptor(
         container: &TypeDescriptor,
         key: usize,
@@ -953,6 +996,7 @@ impl<'a> TypeFlow<'a> {
         match container {
             TypeDescriptor::Tuple(members) => members.get(key),
             TypeDescriptor::TupleRest { elements, rest } => Some(elements.get(key).unwrap_or(rest)),
+            TypeDescriptor::VectorShape { elements, rest } => elements.get(key).or(rest.as_deref()),
             TypeDescriptor::Array(Some((_, value)))
             | TypeDescriptor::Dictionary(Some((_, value))) => Some(value),
             TypeDescriptor::Vector(Some(element)) => Some(element),

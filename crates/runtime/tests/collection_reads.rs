@@ -261,6 +261,7 @@ final class Token {
     public function __construct(public string $name) {}
     public function __destruct(): void { self::$drops++; }
 }
+
 function vector_item(vec<Token> $values, int $index): Token { return $values[$index]; }
 function dictionary_item(dict<string, Token> $values, string $key): Token { return $values[$key]; }
 function tuple_item((Token, int) $values): Token { return $values[0]; }
@@ -313,6 +314,126 @@ exercise_keys(dict[1 => 10, 1u => 20, '1' => 30]);
             ..EngineConfiguration::default()
         });
         let result = engine.run_source(source, Path::new("/collection-reads.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+    }
+}
+
+#[test]
+fn shape_indices_preserve_keys_mutation_newtypes_and_faults() {
+    let source = r"
+use Whim\Marker\NeverInline;
+use Whim\Unwind\OutOfBoundsError;
+use Whim\Unwind\TypeError;
+type Line = dict['quantity' => int, 'price' => int];
+type Order = dict['lines' => vec<Line>, 'shipping' => dict['price' => int]];
+newtype ShapeAmount = int;
+#[NeverInline]
+function total(Order $order): int {
+    $total = 0;
+    foreach ($order['lines'] as $line) { $total += $line['quantity'] * $line['price']; }
+    return $total + $order['shipping']['price'];
+}
+#[NeverInline]
+function keys(dict[1 => int, 1u => string, true => bool, '1' => float] $row): (int, string, bool, float) {
+    return ($row[1], $row[1u], $row[true], $row['1']);
+}
+#[NeverInline]
+function positions(vec[int, string, ...bool] $row): (int, string, bool|null) {
+    return ($row[0], $row[1u], $row[2u] ?? null);
+}
+#[NeverInline]
+function rest(dict['n' => int, ...<string, bool>] $row): (int, bool|null) {
+    return ($row['n'], $row['other'] ?? null);
+}
+#[NeverInline]
+function optional(dict['n' => int|null] $row): (int|null, mixed) {
+    return ($row['n'] ?? null, $row['absent'] ?? null);
+}
+#[NeverInline]
+function changed(dict['n' => int, 'child' => dict['n' => int]] $row, mixed $value): (mixed, int, mixed, int) {
+    $saved = $row;
+    $row['n'] = $value;
+    $row['child']['n'] = $value;
+    return ($row['n'], $saved['n'], $row['child']['n'], $saved['child']['n']);
+}
+#[NeverInline]
+function repeated(dict['n' => int] $row): vec<mixed> {
+    $values = vec[];
+    for ($index = 0; $index < 2; $index++) {
+        $values[] = $row['n'];
+        $row['n'] = 'changed';
+    }
+    return $values;
+}
+#[NeverInline]
+function wrong_return(dict['n' => int] $row, mixed $value): int {
+    $row['n'] = $value;
+    return $row['n'];
+}
+#[NeverInline]
+function absent(dict['n' => int] $row): mixed { return $row['absent']; }
+#[NeverInline]
+function removed(dict['n' => int] $row): mixed { remove!($row, 'n'); return $row['n']; }
+#[NeverInline]
+function beyond(vec[int, string] $row): mixed { return $row[2u]; }
+#[NeverInline]
+function scalar(dict['n' => int] $row): int { return $row['n']; }
+#[NeverInline]
+function nominal(dict['n' => ShapeAmount] $row): ShapeAmount { return $row['n']; }
+#[NeverInline]
+function selected(dict['n' => int]|dict['n' => string] $row): mixed { return $row['n']; }
+class MutableField {
+    public static int $accepted = 0;
+    public function __construct(public mixed $value) {}
+}
+#[NeverInline]
+function accept_shape(#{ value: int } $value): void { MutableField::$accepted++; }
+#[NeverInline]
+function changed_property(dict['child' => #{ value: int }] $row): void {
+    $item = $row['child'];
+    $item->value = 'wrong';
+    $caught = false;
+    try { accept_shape($row['child']); } catch (TypeError $_) { $caught = true; }
+    assert!($caught);
+    assert!(MutableField::$accepted == 0);
+}
+#[NeverInline]
+function property(dict['child' => #{ value: int }] $row): mixed {
+    $row['child']->value = 'changed';
+    return $row['child']->value;
+}
+assert!(total(dict['lines' => vec[dict['quantity' => 3, 'price' => 7], dict['quantity' => 2, 'price' => 11]], 'shipping' => dict['price' => 5]]) == 48);
+assert!(keys(dict[1 => 12, 1u => 'unsigned', true => false, '1' => 1.5]) == (12, 'unsigned', false, 1.5));
+assert!(positions(vec[12, 'text', true]) == (12, 'text', true));
+assert!(positions(vec[12, 'text']) == (12, 'text', null));
+assert!(rest(dict['n' => 7, 'other' => false]) == (7, false));
+assert!(rest(dict['n' => 7]) == (7, null));
+assert!(optional(dict['n' => 7]) == (7, null));
+assert!(optional(dict['n' => null]) == (null, null));
+assert!(changed(dict['n' => 7, 'child' => dict['n' => 8]], 'changed') == ('changed', 7, 'changed', 8));
+assert!(repeated(dict['n' => 7]) == vec[7, 'changed']);
+$caught = false;
+try { wrong_return(dict['n' => 7], 'changed'); } catch (TypeError $_) { $caught = true; }
+assert!($caught);
+foreach (vec[fn(): mixed => absent(dict['n' => 7]), fn(): mixed => removed(dict['n' => 7]), fn(): mixed => beyond(vec[7, 'text'])] as $operation) {
+    $caught = false;
+    try { $operation(); } catch (OutOfBoundsError $_) { $caught = true; }
+    assert!($caught);
+}
+$amount = ShapeAmount(9);
+assert!(scalar(dict['n' => $amount]) is ShapeAmount);
+assert!(nominal(dict['n' => $amount]) is ShapeAmount);
+assert!(selected(dict['n' => 7]) == 7);
+assert!(selected(dict['n' => 'text']) == 'text');
+assert!(property(dict['child' => new MutableField(7)]) == 'changed');
+changed_property(dict['child' => new MutableField(7)]);
+";
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        let result = engine.run_source(source, Path::new("/shape-indices.whim"));
         assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
     }
 }

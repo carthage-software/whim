@@ -5,6 +5,7 @@ mod computed_captures;
 mod joined_lengths;
 mod matching;
 mod return_proofs;
+mod shape_indexing;
 mod uint;
 mod where_constraints;
 
