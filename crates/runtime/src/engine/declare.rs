@@ -1,6 +1,7 @@
 //! Declaring a compiled unit's symbols.
 
 use std::iter;
+use std::ptr::fn_addr_eq;
 
 use hashbrown::HashSet;
 
@@ -27,6 +28,7 @@ use whim_value::object::InstanceObject;
 use whim_value::string::ByteStringObject;
 use whim_value::vec::VecObject;
 
+use crate::core::private::string::__whim_function_string_byte_at;
 use crate::engine::Engine;
 use crate::engine::ExecutionOutcome;
 use crate::engine::FunctionLocator;
@@ -888,6 +890,7 @@ pub(crate) fn prelink_exact_function_sites(
         });
     };
 
+    let string_byte_at = __whim_function_string_byte_at().callable;
     for (site, destination, argument_count) in iter::once(first).chain(sites) {
         let (name, has_type_arguments) = match &chunk.ic_descriptors[site] {
             IcDescriptor::Member {
@@ -934,6 +937,11 @@ pub(crate) fn prelink_exact_function_sites(
                 built_in_entries[site] = Some(ExactBuiltInFunctionEntry {
                     function,
                     direct_handler,
+                    string_byte_at: spec.name == string_byte_at.name
+                        && spec.signature == string_byte_at.signature
+                        && direct_handler
+                            .zip(string_byte_at.direct_handler)
+                            .is_some_and(|(handler, canonical)| fn_addr_eq(handler, canonical)),
                 });
             }
         }

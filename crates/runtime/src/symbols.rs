@@ -90,6 +90,7 @@ pub(crate) struct ExactFunctionEntry {
 pub(crate) struct ExactBuiltInFunctionEntry {
     pub(crate) function: BuiltInId,
     pub(crate) direct_handler: Option<BuiltInDirectHandler>,
+    pub(crate) string_byte_at: bool,
 }
 
 /// A whole-unit-proven final-class method target, with the immutable frame

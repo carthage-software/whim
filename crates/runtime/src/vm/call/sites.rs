@@ -427,12 +427,24 @@ impl VirtualMachine<'_> {
         if let Some(entry) = self.prelinked_built_in_function_site(site) {
             let function = entry.function;
             if let Some(handler) = entry.direct_handler {
-                let outcome = self.invoke_prelinked_direct_built_in_function_from_stack(
-                    handler,
-                    function,
-                    window_start,
-                    count,
-                );
+                let outcome = if entry.string_byte_at
+                    && count == 2
+                    && self.pending_exit.is_none()
+                    && let Some(bytes) = self.stack[window_start].as_string_bytes()
+                    && let Some(offset) = self.stack[window_start + 1].as_int()
+                    && let Ok(offset) = usize::try_from(offset)
+                    && let Some(byte) = bytes.get(offset).copied()
+                {
+                    self.remember_built_in_must_use("Whim\\Str\\byte_at");
+                    Ok(Value::int(i64::from(byte)))
+                } else {
+                    self.invoke_prelinked_direct_built_in_function_from_stack(
+                        handler,
+                        function,
+                        window_start,
+                        count,
+                    )
+                };
                 if !BORROWED {
                     self.clear_argument_window(window_start, count);
                 }
