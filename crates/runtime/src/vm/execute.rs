@@ -77,6 +77,7 @@ use crate::vm::advance_vec_cursor;
 use crate::vm::advance_vec_int_cursor;
 use crate::vm::append_value;
 use crate::vm::arithmetic::arithmetic_immediate;
+use crate::vm::arithmetic::prepare_string_append;
 use crate::vm::arithmetic::unsigned_add;
 use crate::vm::arithmetic::unsigned_modulo;
 use crate::vm::arithmetic::unsigned_multiply;
@@ -2163,6 +2164,7 @@ impl VirtualMachine<'_> {
                                     unsafe { &*registers.add(right.index() as usize) };
                                 match (left_value.transparent(), right_value.transparent()) {
                                     (ValueView::String(target), ValueView::String(extra)) => {
+                                        prepare_string_append(left_value);
                                         // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                                         unsafe {
                                             ByteStringObject::append_unique_string(target, extra)

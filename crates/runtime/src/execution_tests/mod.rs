@@ -5,6 +5,7 @@ mod matching;
 mod nominal_refinement;
 mod object_shape_checks;
 mod returns;
+mod rope_append;
 
 use std::path::Path;
 

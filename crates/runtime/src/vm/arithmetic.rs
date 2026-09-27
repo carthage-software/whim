@@ -441,6 +441,17 @@ pub(in crate::vm) fn integer_shift_right(left: i64, right: i64) -> Result<i64, F
 
 /// `.`: both operands stringify by the concatenation rules.
 pub(in crate::vm) fn concatenate(heap: &Heap, left: &Value, right: &Value) -> Result<Value, Fault> {
+    if let (Some(left_length), Some(right_length)) = (left.as_string_len(), right.as_string_len())
+        && let Some(length) = left_length.checked_add(right_length)
+        && length <= 32
+        && let (Some(left), Some(right)) = (left.as_string_bytes(), right.as_string_bytes())
+    {
+        let mut bytes = [0; 32];
+        bytes[..left_length].copy_from_slice(left);
+        bytes[left_length..length].copy_from_slice(right);
+        return Ok(Value::from_string_bytes(heap, &bytes[..length]));
+    }
+
     let Some(left_text) = ops::stringify_for_concat(heap, left) else {
         return Err(Fault::Incompatible);
     };
@@ -463,6 +474,16 @@ pub(in crate::vm) fn concatenate(heap: &Heap, left: &Value, right: &Value) -> Re
     )))
 }
 
+pub(in crate::vm) fn prepare_string_append(value: &Value) {
+    if value.newtype_id().is_none()
+        && let ValueView::String(string) = value.transparent()
+        && !string.is_flat()
+        && string.is_unique()
+    {
+        string.flatten();
+    }
+}
+
 #[inline(never)]
 pub(in crate::vm) fn concatenate_right_constant(
     heap: &Heap,
@@ -470,12 +491,12 @@ pub(in crate::vm) fn concatenate_right_constant(
     extra: &Atom,
     in_place: bool,
 ) -> Result<Option<Value>, Fault> {
-    if in_place
-        && let ValueView::String(target) = source.transparent()
+    if in_place && let ValueView::String(target) = source.transparent() {
+        prepare_string_append(source);
         // SAFETY: constant storage cannot overlap a uniquely owned target.
-        && unsafe { ByteStringObject::append_unique(target, extra.as_bytes()) }
-    {
-        return Ok(None);
+        if unsafe { ByteStringObject::append_unique(target, extra.as_bytes()) } {
+            return Ok(None);
+        }
     }
 
     let extra = Value::string(extra.to_handle());
@@ -598,5 +619,111 @@ pub(in crate::vm) fn compare_spaceship(
         })),
         Ok(None) => Err(Fault::Unordered),
         Err(_) => Err(Fault::Incompatible),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use whim_value::Value;
+    use whim_value::ValueView;
+    use whim_value::heap::Heap;
+    use whim_value::newtype::NewtypeValueId;
+    use whim_value::string::ByteStringObject;
+
+    use super::concatenate;
+    use super::prepare_string_append;
+
+    #[test]
+    fn short_concatenation_preserves_bytes_aliases_and_tags() {
+        let heap = Heap::new();
+        for left_length in [0, 1, 7, 8, 16, 31, 32, 33, 64] {
+            for right_length in [0, 1, 7, 8, 16, 32] {
+                let left_bytes = (0..left_length)
+                    .map(|index| index as u8)
+                    .collect::<Vec<_>>();
+                let right_bytes = (0..right_length)
+                    .map(|index| 255 - index as u8)
+                    .collect::<Vec<_>>();
+                let expected = [left_bytes.as_slice(), right_bytes.as_slice()].concat();
+                let base = ByteStringObject::from_bytes(
+                    &heap,
+                    &[b"prefix", left_bytes.as_slice(), b"suffix"].concat(),
+                );
+                for left in [
+                    Value::from_string_bytes(&heap, &left_bytes),
+                    Value::string(ByteStringObject::from_bytes(&heap, &left_bytes)),
+                    Value::string(ByteStringObject::slice(&heap, &base, 6, left_length)),
+                ] {
+                    let left = left.with_newtype(Some(NewtypeValueId(0)));
+                    for right in [
+                        Value::from_string_bytes(&heap, &right_bytes),
+                        Value::string(ByteStringObject::from_bytes(&heap, &right_bytes)),
+                    ] {
+                        let right = right.with_newtype(Some(NewtypeValueId(1)));
+                        let result = concatenate(&heap, &left, &right)
+                            .unwrap_or_else(|_| panic!("string concatenation must succeed"));
+                        assert_eq!(result.as_string_bytes().unwrap(), expected);
+                        assert!(result.newtype_id().is_none());
+                        assert_eq!(left.as_string_bytes().unwrap(), left_bytes);
+                        assert_eq!(right.as_string_bytes().unwrap(), right_bytes);
+                        assert_eq!(left.newtype_id(), Some(NewtypeValueId(0)));
+                        assert_eq!(right.newtype_id(), Some(NewtypeValueId(1)));
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            concatenate(
+                &heap,
+                &Value::from_string_bytes(&heap, b"x"),
+                &Value::int(-42)
+            )
+            .unwrap_or_else(|_| panic!("integer concatenation must succeed"))
+            .as_string_bytes()
+            .unwrap(),
+            b"x-42"
+        );
+        assert!(
+            concatenate(
+                &heap,
+                &Value::from_string_bytes(&heap, b"x"),
+                &Value::bool(true)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rope_append_preparation_flattens_only_unique_ropes() {
+        let heap = Heap::new();
+        let left = ByteStringObject::from_bytes(&heap, b"abcdefghijklmnopqrstuvwxyz");
+        let right = ByteStringObject::from_bytes(&heap, b"ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        let value = Value::string(ByteStringObject::concat(&heap, &left, &right));
+        let ValueView::String(string) = value.transparent() else {
+            panic!("the concatenation has heap storage");
+        };
+        assert!(!string.is_flat());
+        let alias = value.clone();
+        prepare_string_append(&value);
+        assert!(!string.is_flat());
+        drop(alias);
+        prepare_string_append(&value);
+        assert!(string.is_flat());
+        assert_eq!(
+            value.as_string_bytes().unwrap(),
+            b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        );
+        assert_eq!(left.flatten(), b"abcdefghijklmnopqrstuvwxyz");
+        assert_eq!(right.flatten(), b"ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        let slice = Value::string(ByteStringObject::slice(&heap, string, 3, 32));
+        prepare_string_append(&slice);
+        let ValueView::String(string) = slice.transparent() else {
+            panic!("the slice has heap storage");
+        };
+        assert!(!string.is_flat());
+        assert_eq!(
+            slice.as_string_bytes().unwrap(),
+            b"defghijklmnopqrstuvwxyzABCDEFGHI"
+        );
     }
 }

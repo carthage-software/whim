@@ -27,6 +27,7 @@ use whim_value::string::ByteStringObject;
 use crate::vm::ArrayFault;
 use crate::vm::Fault;
 use crate::vm::VirtualMachine;
+use crate::vm::arithmetic::prepare_string_append;
 use crate::vm::int_position;
 use crate::vm::integer_add;
 use crate::vm::integer_modulo;
@@ -2465,10 +2466,12 @@ unsafe fn concatenate_append(
             match (left_value.transparent(), right_value.transparent()) {
                 // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
                 (ValueView::String(target), ValueView::String(extra)) => unsafe {
+                    prepare_string_append(left_value);
                     ByteStringObject::append_unique_string(target, extra)
                 },
                 // SAFETY: the numeric-loop proof covers the instruction, registers, and types.
                 (ValueView::String(target), ValueView::ShortString(extra)) => unsafe {
+                    prepare_string_append(left_value);
                     ByteStringObject::append_unique(target, extra.as_bytes())
                 },
                 _ => false,
