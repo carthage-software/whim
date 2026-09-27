@@ -3014,17 +3014,22 @@ impl VirtualMachine<'_> {
                         self.sync_ip(ip);
                         let window_start = self.current_base() + first_argument.index() as usize;
                         let count = usize::from(argument_count.value());
-                        if let Err(control) = self.call_exact_function_site::<false>(
+                        let reload_required = match self.call_exact_function_site::<false>(
                             cache.index() as usize,
                             destination.index(),
                             window_start,
                             count,
                         ) {
-                            self.handle_control(control, floor)?;
-                            continue 'dispatch;
-                        }
+                            Ok(reload_required) => reload_required,
+                            Err(control) => {
+                                self.handle_control(control, floor)?;
+                                continue 'dispatch;
+                            }
+                        };
 
-                        reload_frame!(self, chunk, code, ip, registers);
+                        if reload_required {
+                            reload_frame!(self, chunk, code, ip, registers);
+                        }
                         continue 'instructions;
                     }
                     Instruction::CallNamedDirect {
@@ -3036,17 +3041,22 @@ impl VirtualMachine<'_> {
                         self.sync_ip(ip);
                         let window_start = self.current_base() + first_argument.index() as usize;
                         let count = usize::from(argument_count.value());
-                        if let Err(control) = self.call_exact_function_site::<true>(
+                        let reload_required = match self.call_exact_function_site::<true>(
                             cache.index() as usize,
                             destination.index(),
                             window_start,
                             count,
                         ) {
-                            self.handle_control(control, floor)?;
-                            continue 'dispatch;
-                        }
+                            Ok(reload_required) => reload_required,
+                            Err(control) => {
+                                self.handle_control(control, floor)?;
+                                continue 'dispatch;
+                            }
+                        };
 
-                        reload_frame!(self, chunk, code, ip, registers);
+                        if reload_required {
+                            reload_frame!(self, chunk, code, ip, registers);
+                        }
                         continue 'instructions;
                     }
                     Instruction::CallNamedConstantUnchecked {

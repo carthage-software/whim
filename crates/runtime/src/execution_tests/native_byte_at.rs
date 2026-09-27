@@ -2,6 +2,9 @@ use std::path::Path;
 
 use whim_bytecode::instruction::Instruction;
 use whim_value::Value;
+use whim_value::function::CallTarget;
+use whim_value::function::FuncId;
+use whim_value::function::FunctionObject;
 
 use super::run_both_modes;
 use crate::builtin::throw::Throw;
@@ -245,4 +248,201 @@ assert!(read('after', 0) == 98);
             assert_eq!(entry.function, current.function);
         }
     }
+}
+
+#[test]
+fn native_byte_at_keeps_result_aliases_and_finalizer_order() {
+    let source = r"
+use Whim\Marker\NeverInline;
+final class Events { public static vec<string> $items = vec[]; }
+final class Released {
+    public function __destruct(): void { Events::$items[] = 'drop'; }
+}
+final class Throwing {
+    public function __destruct(): void { throw new Whim\Unwind\Exception('drop failed'); }
+}
+#[NeverInline]
+function alias(string $text, 0.. $offset): int {
+    $text = Whim\Str\byte_at($text, $offset);
+    return $text + 1;
+}
+#[NeverInline]
+function released(string $text, 0.. $offset): int {
+    $result = new Released();
+    $result = Whim\Str\byte_at($text, $offset);
+    Events::$items[] = 'read';
+    return $result + 1;
+}
+#[NeverInline]
+function failed(string $text, 0.. $offset): void {
+    $result = new Throwing();
+    $result = Whim\Str\byte_at($text, $offset);
+    Events::$items[] = 'unreachable';
+}
+for ($round = 0; $round < 3; $round++) {
+    assert!(alias('a string with a heap buffer', 0) == 98);
+    assert!(released('valid', 0) == 119);
+}
+assert!(Events::$items == vec['drop', 'read', 'drop', 'read', 'drop', 'read']);
+$caught = false;
+try { failed('valid', 0); }
+catch (Whim\Unwind\Exception $error) {
+    assert!($error->getMessage() == 'drop failed');
+    $caught = true;
+}
+assert!($caught);
+assert!(Events::$items == vec['drop', 'read', 'drop', 'read', 'drop', 'read']);
+assert!(alias('after', 0) == 98);
+";
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        let result = engine.run_source(source, Path::new("/native-byte-at-reload-finalizers.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+        if optimize {
+            assert!(byte_site(&engine, b"alias").unwrap().string_byte_at);
+            // SAFETY: this test owns the idle engine and only reads its chunk.
+            let chunk = unsafe { function(&engine, b"alias").chunk.as_ref() };
+            assert!(chunk.code.iter().any(|instruction| {
+                matches!(instruction, Instruction::CallNamedDirect {
+                    destination,
+                    first_argument,
+                    ..
+                } if destination == first_argument)
+            }));
+        }
+    }
+}
+
+#[test]
+fn native_byte_at_reload_keeps_error_locations_and_caller_state() {
+    let source = r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function read(string $text, 0.. $offset): int {
+    $byte = Whim\Str\byte_at($text, $offset);
+    return $byte + 1;
+}
+";
+    let line = source
+        .lines()
+        .position(|line| line.contains("$byte = Whim\\Str\\byte_at"))
+        .unwrap()
+        + 1;
+    let source = format!(
+        r"{source}
+$total = 0;
+for ($round = 0; $round < 3; $round++) {{
+    $total += read('valid', 0);
+    $caught = false;
+    try {{ discard!(read('bad', 3)); }}
+    catch (Whim\Unwind\OutOfBoundsError $error) {{
+        assert!($error->getFile() == '/native-byte-at-reload-errors.whim');
+        assert!($error->getLine() == {line});
+        $trace = $error->getTrace();
+        assert!($trace[0]->function == 'Whim\Str\byte_at');
+        assert!($trace[0]->arguments == vec['bad', 3]);
+        assert!($trace[1]->function == 'read');
+        $caught = true;
+    }}
+    assert!($caught);
+    assert!($total == ($round + 1) * 119);
+}}
+assert!($total == 357);
+"
+    );
+    run_both_modes(&source, "/native-byte-at-reload-errors.whim");
+}
+
+fn reentrant_byte_at(vm: &mut VirtualMachine<'_>, _arguments: &[Value]) -> Result<Value, Throw> {
+    let position = vm
+        .engine
+        .tables
+        .functions
+        .iter()
+        .position(|function| function.name.as_bytes() == b"grow")
+        .unwrap();
+    let signature = vm.engine.tables.functions[position].signature.clone();
+    let callee = Value::function(FunctionObject::closure(
+        vm.heap(),
+        CallTarget::User(FuncId(u32::try_from(position).unwrap())),
+        [],
+        signature,
+        None,
+        Default::default(),
+    ));
+    let result = vm.call_function_value(&callee, &[Value::int(400)])?;
+    assert_eq!(result.as_int(), Some(400));
+    Ok(Value::int(17))
+}
+
+#[test]
+fn native_byte_at_replacement_reloads_after_reentrant_stack_growth() {
+    let mut engine = Engine::new(EngineConfiguration::default());
+    let BuiltInCallable::Function(spec) = engine
+        .tables
+        .built_in_functions
+        .iter_mut()
+        .find(|callable| {
+            matches!(callable, BuiltInCallable::Function(spec) if spec.name == "Whim\\Str\\byte_at")
+        })
+        .unwrap()
+    else {
+        unreachable!();
+    };
+    spec.direct_handler = Some(reentrant_byte_at);
+    let source = r"
+use Whim\Marker\NeverInline;
+final class Calls { public static int $count = 0; }
+#[NeverInline]
+function grow(int $depth): int {
+    $live = vec[$depth, $depth + 1, $depth + 2];
+    if ($depth == 0) { Calls::$count++; return 0; }
+    $result = grow($depth - 1);
+    assert!($live == vec[$depth, $depth + 1, $depth + 2]);
+    return $result + 1;
+}
+#[NeverInline]
+function borrowed(string $text, 0.. $offset): int {
+    $byte = Whim\Str\byte_at($text, $offset);
+    assert!($text == 'valid' && $offset == 0);
+    return $byte + 1;
+}
+#[NeverInline]
+function owned(0.. $offset, string $text): int {
+    $byte = Whim\Str\byte_at($text, $offset);
+    return $byte + 2;
+}
+$total = 0;
+for ($round = 0; $round < 3; $round++) {
+    $total += borrowed('valid', 0);
+    $total += owned(0, 'valid');
+    assert!($total == ($round + 1) * 37);
+}
+assert!(Calls::$count == 6);
+assert!($total == 111);
+";
+    let result = engine.run_source(source, Path::new("/native-byte-at-reload-reentrant.whim"));
+    assert_eq!(result.exit_code(), 0, "{result:?}");
+    for name in [b"borrowed".as_slice(), b"owned".as_slice()] {
+        assert!(!byte_site(&engine, name).unwrap().string_byte_at);
+    }
+    // SAFETY: this test owns the idle engine and only reads its chunks.
+    let borrowed = unsafe { function(&engine, b"borrowed").chunk.as_ref() };
+    assert!(
+        borrowed
+            .code
+            .iter()
+            .any(|instruction| { matches!(instruction, Instruction::CallNamedDirect { .. }) })
+    );
+    // SAFETY: this test owns the idle engine and only reads its chunks.
+    let owned = unsafe { function(&engine, b"owned").chunk.as_ref() };
+    assert!(
+        owned
+            .code
+            .iter()
+            .any(|instruction| { matches!(instruction, Instruction::CallNamedUnchecked { .. }) })
+    );
 }

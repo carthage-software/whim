@@ -414,8 +414,7 @@ impl VirtualMachine<'_> {
         )
     }
 
-    /// Pushes the narrow frame for a named function prelinked when its unit
-    /// was declared.
+    /// Calls an exact target and returns whether dispatch must reload its frame.
     #[inline(always)]
     pub(in crate::vm) fn call_exact_function_site<const BORROWED: bool>(
         &mut self,
@@ -423,11 +422,11 @@ impl VirtualMachine<'_> {
         destination: u16,
         window_start: usize,
         count: usize,
-    ) -> Result<(), VirtualMachineControl> {
+    ) -> Result<bool, VirtualMachineControl> {
         if let Some(entry) = self.prelinked_built_in_function_site(site) {
             let function = entry.function;
             if let Some(handler) = entry.direct_handler {
-                let outcome = if entry.string_byte_at
+                let (outcome, reload_required) = if entry.string_byte_at
                     && count == 2
                     && self.pending_exit.is_none()
                     && let Some(bytes) = self.stack[window_start].as_string_bytes()
@@ -436,13 +435,16 @@ impl VirtualMachine<'_> {
                     && let Some(byte) = bytes.get(offset).copied()
                 {
                     self.remember_built_in_must_use("Whim\\Str\\byte_at");
-                    Ok(Value::int(i64::from(byte)))
+                    (Ok(Value::int(i64::from(byte))), false)
                 } else {
-                    self.invoke_prelinked_direct_built_in_function_from_stack(
-                        handler,
-                        function,
-                        window_start,
-                        count,
+                    (
+                        self.invoke_prelinked_direct_built_in_function_from_stack(
+                            handler,
+                            function,
+                            window_start,
+                            count,
+                        ),
+                        true,
                     )
                 };
                 if !BORROWED {
@@ -451,7 +453,7 @@ impl VirtualMachine<'_> {
                 let value = outcome?;
                 let target = self.current_base() + usize::from(destination);
                 self.stack[target] = value;
-                return Ok(());
+                return Ok(reload_required);
             }
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
             let BuiltInCallable::Function(spec) = (unsafe {
@@ -504,7 +506,7 @@ impl VirtualMachine<'_> {
                 let value = outcome?;
                 let target = self.current_base() + usize::from(destination);
                 self.stack[target] = value;
-                return Ok(());
+                return Ok(true);
             }
             let exact_handler = count == spec.parameters.len();
             let outcome = if exact_handler && spec.direct_handler.is_some() {
@@ -518,7 +520,7 @@ impl VirtualMachine<'_> {
             let value = outcome?;
             let target = self.current_base() + usize::from(destination);
             self.stack[target] = value;
-            return Ok(());
+            return Ok(true);
         }
         let entry = self.prelinked_function_site(site);
         let function = entry.function;
@@ -541,16 +543,19 @@ impl VirtualMachine<'_> {
                 type_arguments,
                 outer,
             )?;
-            return self.push_exact_generic_function_frame::<BORROWED>(
-                function,
-                destination,
-                window_start,
-                count,
-                environment,
-                false,
-            );
+            return self
+                .push_exact_generic_function_frame::<BORROWED>(
+                    function,
+                    destination,
+                    window_start,
+                    count,
+                    environment,
+                    false,
+                )
+                .map(|()| true);
         }
         self.push_exact_function_frame::<BORROWED>(site, entry, destination, window_start, count)
+            .map(|()| true)
     }
 
     #[inline(always)]
