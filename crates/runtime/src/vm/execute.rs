@@ -577,6 +577,29 @@ fn mixed_integer_comparison_matches(
     }
 }
 
+#[inline]
+fn mixed_integer_counter_step(
+    comparison: BytecodeComparison,
+    counter: &Value,
+    limit: &Value,
+) -> Option<(Value, bool)> {
+    let (next, stepped, limit) = match (counter.transparent(), limit.transparent()) {
+        (ValueView::Int(counter), ValueView::Uint(limit)) => {
+            let next = counter.checked_add(1)?;
+            (Value::int(next), i128::from(next), i128::from(*limit))
+        }
+        (ValueView::Uint(counter), ValueView::Int(limit)) => {
+            let next = counter.checked_add(1)?;
+            (Value::uint(next), i128::from(next), i128::from(*limit))
+        }
+        _ => return None,
+    };
+    Some((
+        next,
+        mixed_integer_comparison_matches(comparison, stepped, limit),
+    ))
+}
+
 #[inline(always)]
 fn string_comparison_matches(comparison: BytecodeComparison, left: &[u8], right: &[u8]) -> bool {
     match comparison {
@@ -2297,6 +2320,20 @@ impl VirtualMachine<'_> {
                         limit,
                         offset,
                     } => {
+                        let fast_step = {
+                            // SAFETY: verified bytecode keeps both operands in the live frame.
+                            let counter_value = unsafe { &*registers.add(counter.index() as usize) };
+                            // SAFETY: verified bytecode keeps both operands in the live frame.
+                            let limit_value = unsafe { &*registers.add(limit.index() as usize) };
+                            mixed_integer_counter_step(comparison, counter_value, limit_value)
+                        };
+                        if let Some((next, matches)) = fast_step {
+                            write_register!(registers, counter, next);
+                            if matches {
+                                ip = jump_target(ip, i32::from(offset.offset()));
+                            }
+                            continue 'instructions;
+                        }
                         let outcome = {
                             // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                             let value = unsafe { &*registers.add(counter.index() as usize) };
@@ -7033,6 +7070,9 @@ impl VirtualMachine<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod mixed_counter_tests;
 
 #[cfg(test)]
 mod comparison_tests {
