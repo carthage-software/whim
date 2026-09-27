@@ -1,6 +1,7 @@
 //! Byte string functions.
 
 use memchr::memchr as find_byte;
+use memchr::memchr_iter as find_byte_positions;
 use memchr::memmem::find as find_bytes;
 use memchr::memmem::find_iter as find_bytes_positions;
 use memchr::memmem::rfind as find_bytes_reverse;
@@ -202,8 +203,41 @@ pub(crate) fn string_split<'call>(
     let haystack = arguments.bytes(0);
     let delimiter = arguments.bytes(1);
     let limit = arguments.uint(2);
-    let mut positions = find_bytes_positions(haystack, delimiter).peekable();
-    if delimiter.is_empty() || limit == 1 || positions.peek().is_none() {
+    if delimiter.is_empty() || limit == 1 {
+        return context.vec([arguments.local(0).with_newtype(None)]);
+    }
+
+    if let [byte] = delimiter {
+        split_at_positions(
+            context,
+            arguments,
+            haystack,
+            1,
+            limit,
+            find_byte_positions(*byte, haystack),
+        )
+    } else {
+        split_at_positions(
+            context,
+            arguments,
+            haystack,
+            delimiter.len(),
+            limit,
+            find_bytes_positions(haystack, delimiter),
+        )
+    }
+}
+
+fn split_at_positions<'call>(
+    context: &Context<'call, '_, '_>,
+    arguments: Arguments<'call>,
+    haystack: &[u8],
+    delimiter_length: usize,
+    limit: u64,
+    positions: impl Iterator<Item = usize>,
+) -> Value {
+    let mut positions = positions.peekable();
+    if positions.peek().is_none() {
         return context.vec([arguments.local(0).with_newtype(None)]);
     }
 
@@ -224,7 +258,7 @@ pub(crate) fn string_split<'call>(
             start,
             position,
         ));
-        start = position + delimiter.len();
+        start = position + delimiter_length;
     }
 
     parts.push(split_part(
@@ -327,26 +361,32 @@ pub(crate) fn string_replace<'call>(
     }
 
     let mut result = Vec::new();
+    let capacity = haystack
+        .len()
+        .saturating_sub(needle.len())
+        .saturating_add(replacement.len());
     let mut start = 0usize;
+    let mut append_match = |position| {
+        if start == 0 {
+            result.reserve(capacity);
+        }
+        result.extend_from_slice(&haystack[start..position]);
+        result.extend_from_slice(replacement);
+        start = position + needle.len();
+    };
     if ci {
         let folded_haystack = haystack.to_ascii_lowercase();
         let folded_needle = needle.to_ascii_lowercase();
         for position in find_bytes_positions(&folded_haystack, &folded_needle) {
-            if start == 0 {
-                result.reserve(haystack.len());
-            }
-            result.extend_from_slice(&haystack[start..position]);
-            result.extend_from_slice(replacement);
-            start = position + needle.len();
+            append_match(position);
+        }
+    } else if let [byte] = needle {
+        for position in find_byte_positions(*byte, haystack) {
+            append_match(position);
         }
     } else {
         for position in find_bytes_positions(haystack, needle) {
-            if start == 0 {
-                result.reserve(haystack.len());
-            }
-            result.extend_from_slice(&haystack[start..position]);
-            result.extend_from_slice(replacement);
-            start = position + needle.len();
+            append_match(position);
         }
     }
 
@@ -634,6 +674,7 @@ mod tests {
     use whim_value::ValueView;
     use whim_value::newtype::NewtypeValueId;
     use whim_value::object::TypeEnvironmentId;
+    use whim_value::string::ByteStringObject;
 
     use crate::builtin::Context;
     use crate::builtin::arguments::Arguments;
@@ -645,7 +686,79 @@ mod tests {
     use super::__whim_direct_handler_string_trim;
     use super::join_capacity;
     use super::string_lowercase;
+    use super::string_split;
     use super::string_uppercase;
+
+    #[test]
+    fn string_split_keeps_storage_limits_binary_bytes_and_tags() {
+        let mut engine = Engine::new(EngineConfiguration::default());
+        let mut vm = VirtualMachine::new(&mut engine);
+        let fields: &[&[u8]] = &[
+            b"",
+            b"a",
+            b"1234567",
+            b"12345678",
+            b"\xfe",
+            b"a longer final field",
+            b"",
+        ];
+        for delimiter in [b"|".as_slice(), b"::", b"\0", b"\xff"] {
+            let bytes = fields.join(delimiter);
+            for (needle, limit) in [
+                (delimiter, 0),
+                (delimiter, 1),
+                (delimiter, 2),
+                (delimiter, u64::MAX),
+                (b"".as_slice(), 0),
+                (b"\xfd".as_slice(), 0),
+            ] {
+                let expected = if needle != delimiter || limit == 1 {
+                    vec![bytes.as_slice()]
+                } else if limit == 2 {
+                    vec![b"".as_slice(), &bytes[delimiter.len()..]]
+                } else {
+                    fields.to_vec()
+                };
+                for representation in 0..3 {
+                    let source = match representation {
+                        0 => ByteStringObject::from_bytes(vm.heap(), &bytes),
+                        1 => {
+                            let middle = bytes.len() / 2;
+                            let left = ByteStringObject::from_bytes(vm.heap(), &bytes[..middle]);
+                            let right = ByteStringObject::from_bytes(vm.heap(), &bytes[middle..]);
+                            ByteStringObject::concat(vm.heap(), &left, &right)
+                        }
+                        _ => {
+                            let base = ByteStringObject::from_bytes(
+                                vm.heap(),
+                                &[b"prefix".as_slice(), &bytes, b"suffix"].concat(),
+                            );
+                            ByteStringObject::slice(vm.heap(), &base, 6, bytes.len())
+                        }
+                    };
+                    assert_eq!(source.is_flat(), representation == 0);
+                    let tag = NewtypeValueId(0);
+                    let values = [
+                        Value::string(source).with_newtype(Some(tag)),
+                        Value::from_string_bytes(vm.heap(), needle).with_newtype(Some(tag)),
+                        Value::uint(limit),
+                    ];
+                    let arguments = Arguments::new(&values, vm.heap());
+                    let context = Context::over_called(&mut vm, None, TypeEnvironmentId::default());
+                    let result = string_split(&context, arguments);
+                    assert_eq!(values[0].newtype_id(), Some(tag));
+                    assert_eq!(values[0].as_string_bytes(), Some(bytes.as_slice()));
+                    drop(values);
+                    let parts = result.as_vec().unwrap();
+                    assert_eq!(parts.len(), expected.len());
+                    for (part, expected) in parts.iter().zip(&expected) {
+                        assert_eq!(part.as_string_bytes(), Some(*expected));
+                        assert_eq!(part.newtype_id(), None);
+                    }
+                }
+            }
+        }
+    }
 
     #[test]
     fn string_transforms_keep_short_results_inline() {
