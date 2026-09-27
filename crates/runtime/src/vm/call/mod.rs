@@ -370,6 +370,9 @@ impl VirtualMachine<'_> {
         frame_start: usize,
         count: usize,
     ) {
+        if self.engine.declaration_depth != 0 {
+            return;
+        }
         // SAFETY: the caller's retained chunk owns this cache across call setup.
         if unsafe { &*cache.as_ref().argument_guards() }
             .get(site)

@@ -1,4 +1,8 @@
 use super::run_both_modes;
+use std::path::Path;
+
+use crate::engine::Engine;
+use crate::engine::EngineConfiguration;
 
 #[test]
 fn object_shape_checks_recheck_initialization_and_mutable_values() {
@@ -151,4 +155,115 @@ foreach (vec[null, false, 1, '', vec[], dict[], (1, 2)] as $value) {
 ",
         "/wildcard-object-shape-layouts.whim",
     );
+}
+
+#[test]
+fn object_shape_and_nominal_argument_caches_ignore_failed_declarations() {
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        let source = r"
+use Whim\Marker\NeverInline;
+final class Calls { public static int $count = 0; }
+#[NeverInline]
+function accept(Future $value): void { Calls::$count++; }
+#[NeverInline]
+function relay(mixed $value): void { accept($value); }
+#[NeverInline]
+function shape(mixed $value): bool { return $value is #{ value: _ }; }
+#[NeverInline]
+function stage(mixed $value): string {
+    assert!(shape($value));
+    relay($value);
+    return 'bad';
+}
+
+";
+        let result = engine.run_source(source, Path::new("/cache-rollback-functions.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+        let class_count = engine.tables.classes.len();
+        let source = r"
+final class Future { public int $value = 1; }
+final class Broken { public static int $value = stage(new Future()); }
+";
+        let result = engine.run_source(source, Path::new("/cache-rollback-failure.whim"));
+        assert_ne!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+        assert_eq!(engine.tables.classes.len(), class_count);
+        let source = r"
+final class Replacement { public int $other = 1; }
+final class Future { public int $value = 2; }
+assert!(Calls::$count == 1);
+$replacement = new Replacement();
+assert!(!shape($replacement));
+$caught = false;
+try { relay($replacement); } catch (Whim\Unwind\TypeError $_) { $caught = true; }
+assert!($caught);
+assert!(Calls::$count == 1);
+$valid = new Future();
+assert!(shape($valid));
+relay($valid);
+assert!(Calls::$count == 2);
+assert!(!shape($replacement));
+";
+        let result = engine.run_source(source, Path::new("/cache-rollback-reused-classes.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+        assert_eq!(
+            engine.tables.classes[class_count].name.as_bytes(),
+            b"Replacement"
+        );
+    }
+}
+
+#[test]
+fn nominal_is_caches_ignore_failed_declarations_and_changed_symbol_kinds() {
+    for optimize in [false, true] {
+        for replacement in [
+            r"
+final class Replacement {}
+final class Future {}
+assert!(!nominal(new Replacement()));
+assert!(nominal(new Future()));
+",
+            r"
+final class Filler {}
+final class Cell { public mixed $value = 1; }
+type Future = #{ value: int };
+$cell = new Cell();
+assert!(nominal($cell));
+$cell->value = 'changed';
+assert!(!nominal($cell));
+",
+        ] {
+            let mut engine = Engine::new(EngineConfiguration {
+                optimize,
+                ..EngineConfiguration::default()
+            });
+            let result = engine.run_source(
+                r"
+use Whim\Marker\NeverInline;
+#[NeverInline]
+function nominal(mixed $value): bool { return $value is Future; }
+#[NeverInline]
+function stage(mixed $value): string { assert!(nominal($value)); return 'bad'; }
+",
+                Path::new("/nominal-is-before-rollback.whim"),
+            );
+            assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+            let class_count = engine.tables.classes.len();
+            let result = engine.run_source(
+                r"
+final class Future {}
+final class Broken { public static int $value = stage(new Future()); }
+",
+                Path::new("/nominal-is-failed-declaration.whim"),
+            );
+            assert_ne!(result.exit_code(), 0);
+            assert_eq!(engine.tables.classes.len(), class_count);
+            let result =
+                engine.run_source(replacement, Path::new("/nominal-is-after-rollback.whim"));
+            assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+        }
+    }
 }

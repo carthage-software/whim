@@ -5469,7 +5469,7 @@ impl VirtualMachine<'_> {
                                 );
                             }
                             (
-                                if value.is_object() {
+                                if value.is_object() && self.engine.declaration_depth == 0 {
                                     cache[site].cacheable(frame_environment, frame_called)
                                 } else {
                                     Some(false)

@@ -42,7 +42,9 @@ impl Engine {
     #[cold]
     fn optimize_pending_callable(&mut self, function: FuncId) -> Result<(), VirtualMachineControl> {
         let position = function.0 as usize;
-        if self.tables.functions[position].optimization == CallableOptimization::Optimizing {
+        if self.declaration_depth != 0
+            || self.tables.functions[position].optimization == CallableOptimization::Optimizing
+        {
             return Ok(());
         }
 

@@ -204,7 +204,9 @@ impl VirtualMachine<'_> {
         &mut self,
         descriptor: &TypeDescriptor,
     ) -> Option<ArrayTypeCheckId> {
-        if !self.descriptor_check_is_cacheable(descriptor, false) {
+        if self.engine.declaration_depth != 0
+            || !self.descriptor_check_is_cacheable(descriptor, false)
+        {
             return None;
         }
 
