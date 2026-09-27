@@ -65,7 +65,7 @@ final class Connection implements WriteHandle {
     $this->capabilities = dict[];
     $this->maximumMessageSize = null;
     foreach (Str\split($reply->message, "\n") as $index => $line) {
-      if (0 == $index) {
+      if (0u == $index) {
         continue;
       }
 

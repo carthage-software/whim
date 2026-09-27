@@ -16,7 +16,7 @@ use Whim\Unwind\InvalidArgumentException;
 /** An immutable ordered collection of MIME parameters. */
 final readonly class Parameters implements
   Default,
-  ToIterator<int, Parameter>,
+  ToIterator<uint, Parameter>,
   ToString {
   #[AlwaysInline]
   private function __construct(private vec<Parameter> $pairs) {}
@@ -108,8 +108,8 @@ final readonly class Parameters implements
   /** Iterates over parameter pairs. */
   #[AlwaysInline]
   #[MustUse]
-  public function toIterator(): Iterator<int, Parameter> {
-    return new ArrayIterator::<int, Parameter>($this->pairs);
+  public function toIterator(): Iterator<uint, Parameter> {
+    return new ArrayIterator::<uint, Parameter>($this->pairs);
   }
 
   /** Serializes the parameter suffix of a MIME value. */

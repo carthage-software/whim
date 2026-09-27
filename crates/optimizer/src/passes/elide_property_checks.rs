@@ -214,7 +214,7 @@ fn analyze_chunk(position: usize, analyzed: &AnalyzedChunk<'_>, proven: &mut Vec
                         | TypeDescriptor::Dictionary(None),
                     ) => true,
                     Some(TypeDescriptor::Vector(element)) => {
-                        flow.proves(index, key, &TypeDescriptor::Int)
+                        flow.proves_positional_index(index, key)
                             && element
                                 .as_ref()
                                 .is_none_or(|element| flow.proves(index, value, element))

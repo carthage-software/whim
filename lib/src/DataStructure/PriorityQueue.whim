@@ -19,7 +19,7 @@ use Whim\Unwind\LogicException;
  * A priority that compares as `Ordering::Less` is removed first. Equal
  * priorities have no defined relative order.
  */
-final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
+final class PriorityQueue<T, P> implements ToIterator<uint, (T, P)> {
   private vec<(T, P)> $entries = vec[];
   private Comparator<P> $comparator;
   private bool $comparing = false;
@@ -111,8 +111,8 @@ final class PriorityQueue<T, P> implements ToIterator<int, (T, P)> {
 
   /** Creates a snapshot iterator in removal order. */
   #[TrackCaller]
-  public function toIterator(): ArrayIterator<int, (T, P)> {
-    return new ArrayIterator::<int, (T, P)>($this->toVec());
+  public function toIterator(): ArrayIterator<uint, (T, P)> {
+    return new ArrayIterator::<uint, (T, P)>($this->toVec());
   }
 
   /** Restores heap order throughout the initial entries. */

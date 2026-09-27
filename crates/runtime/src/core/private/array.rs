@@ -41,16 +41,9 @@ impl Iterator for ArrayEntries<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let entry = match &mut self.inner {
-            ArrayEntriesInner::Indexed(values) => values.next().map(|(index, value)| {
-                // SAFETY: the surrounding invariant proves this result is successful.
-                let index = unsafe {
-                    unwrap_result_invariant(
-                        i64::try_from(index),
-                        "an array index fits in a Whim integer",
-                    )
-                };
-                (Value::int(index), value.clone())
-            }),
+            ArrayEntriesInner::Indexed(values) => values
+                .next()
+                .map(|(index, value)| (Value::uint(index as u64), value.clone())),
             ArrayEntriesInner::Dict(values) => values
                 .next()
                 .map(|(key, value)| (key.to_value(), value.clone())),

@@ -318,6 +318,14 @@ impl TypeFlow<'_> {
         self.descriptor_proves(&actual, &expected, 0)
     }
 
+    pub(crate) fn proves_positional_index(&self, index: usize, register: Register) -> bool {
+        if index >= self.chunk.code.len() || !self.reachable[index] {
+            return false;
+        }
+        let mask = self.fact(index, register).mask;
+        mask != 0 && mask & !(INT | UINT) == 0
+    }
+
     pub(crate) fn collection_type_test(
         &self,
         index: usize,
@@ -541,7 +549,7 @@ impl TypeFlow<'_> {
                 .iter()
                 .all(|member| self.proves_constructed_array(index, register, member)),
             TypeDescriptor::Array(Some((key, value))) => {
-                self.descriptor_proves(&TypeDescriptor::integer_range(Some(0), None), key, 0)
+                self.descriptor_proves(&TypeDescriptor::Uint, key, 0)
                     && self.proves_constructed_vector(index, register, value)
                     || self.proves_constructed_dictionary(index, register, key, value)
             }
@@ -936,12 +944,18 @@ impl TypeFlow<'_> {
             TypeDescriptor::String => fact.mask & !STRING == 0,
             TypeDescriptor::Object => fact.mask & !OBJECT == 0,
             TypeDescriptor::IntRange { min, max }
-                if fact.positive && min.is_none_or(|min| min <= 1) && max.is_none() =>
+                if fact.mask == INT
+                    && fact.positive
+                    && min.is_none_or(|min| min <= 1)
+                    && max.is_none() =>
             {
                 true
             }
             TypeDescriptor::IntRange { min, max }
-                if fact.non_negative && min.is_none_or(|min| min <= 0) && max.is_none() =>
+                if fact.mask == INT
+                    && fact.non_negative
+                    && min.is_none_or(|min| min <= 0)
+                    && max.is_none() =>
             {
                 true
             }
@@ -964,7 +978,7 @@ impl TypeFlow<'_> {
             TypeDescriptor::StaticClass => fact.origin == THIS_ORIGIN,
             TypeDescriptor::Array(arguments) => match fact.mask {
                 VECTOR => arguments.as_ref().is_none_or(|(key, value)| {
-                    self.descriptor_proves(&TypeDescriptor::Int, key, depth + 1)
+                    self.descriptor_proves(&TypeDescriptor::Uint, key, depth + 1)
                         && self.array_proves(fact, Some(value), false, depth + 1)
                 }),
                 DICTIONARY => self.dictionary_proves(fact, arguments.as_ref(), depth + 1),
@@ -984,9 +998,9 @@ impl TypeFlow<'_> {
 
                     if element_count.value() != 0
                         && !self.descriptor_proves(
-                            &TypeDescriptor::integer_range(
+                            &TypeDescriptor::unsigned_integer_range(
                                 Some(0),
-                                Some(i64::from(element_count.value()) - 1),
+                                Some(u64::from(element_count.value()) - 1),
                             ),
                             key,
                             depth + 1,

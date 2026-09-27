@@ -495,7 +495,7 @@ $enumerable->get('/first', router_test_handler(200))->post(
 
 $registrations = vec[];
 foreach ($enumerable as $index => ($method, $pattern, $_handler)) {
-  assert!(($index as uint) == length!($registrations));
+  assert!($index == length!($registrations));
   $registrations[] = ($method, $pattern);
 }
 

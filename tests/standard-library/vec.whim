@@ -70,6 +70,14 @@ assert!($assertion_error_9 is TypeError);
 assert!(Vec\values::<int>(vec[1, 2]) == vec[1, 2]);
 assert!(Vec\values::<int>(dict['a' => 7, 'b' => 8]) == vec[7, 8]);
 assert!(Vec\keys::<string>(dict['a' => 1, 'b' => 2]) == vec['a', 'b']);
+assert!(Vec\keys::<uint>(vec['a', 'b']) == vec[0u, 1u]);
+assert!(Vec\enumerate::<string>(vec['a', 'b']) == vec[(0u, 'a'), (1u, 'b')]);
+assert!(
+  Vec\map_with_key::<uint, int, uint>(
+    vec[10, 20],
+    fn(uint $key, int $_value): uint => $key,
+  ) == vec[0u, 1u],
+);
 
 assert!(Vec\reverse::<int>(vec[1, 2, 3]) == vec[3, 2, 1]);
 assert!(Vec\unique::<int>(vec[1, 2, 1, 3, 2]) == vec[1, 2, 3]);

@@ -4,6 +4,95 @@ use whim_runtime::engine::Engine;
 use whim_runtime::engine::EngineConfiguration;
 
 #[test]
+fn specialized_positional_indices_accept_both_integer_kinds() {
+    let source = r"
+use Whim\Marker\NeverInline;
+use Whim\Unwind\OutOfBoundsError;
+#[NeverInline]
+function unsigned_read(vec<int> $values, uint $index): int { return $values[$index]; }
+#[NeverInline]
+function read(vec<int> $values, int|uint $index): int { return $values[$index]; }
+#[NeverInline]
+function write(vec<int> $values, int|uint $index, int $value): vec<int> {
+    $values[$index] = $value;
+    return $values;
+}
+#[NeverInline]
+function optional(vec<int|null> $values, int|uint $index): int {
+    return $values[$index] ?? 42;
+}
+#[NeverInline]
+function byte(string $value, int|uint $index): string { return $value[$index]; }
+#[NeverInline]
+function optional_byte(string $value, int|uint $index): string { return $value[$index] ?? 'x'; }
+#[NeverInline]
+function compare_byte(string $value, int|uint $index): vec<bool> {
+    return vec[$value[$index] == 'b', $value[$index] != 'b', $value[$index] < 'b',
+        $value[$index] <= 'b', $value[$index] > 'b', $value[$index] >= 'b'];
+}
+#[NeverInline]
+function branch_byte(string $value, int|uint $index): int {
+    if ($value[$index] == 'b') { return 1; }
+    if ($value[$index] != 'a') { return 3; }
+    return 2;
+}
+#[NeverInline]
+function numeric_read(vec<int> $values, int|uint $position): int {
+    $sum = 0;
+    for ($index = 0; $index < 4; $index++) { $sum += $values[$position]; }
+    return $sum;
+}
+#[NeverInline]
+function numeric_write(vec<int> $values, int|uint $position): vec<int> {
+    for ($index = 0; $index < 4; $index++) { $values[$position] = $index; }
+    return $values;
+}
+function fails(fn(): mixed $operation, int|uint $index): void {
+    $caught = false;
+    try { $operation(); } catch (OutOfBoundsError $error) {
+        assert!($error->getMessage() == 'the index ' . $index . ' is outside the range 0 to 1');
+        $caught = true;
+    }
+    assert!($caught);
+}
+assert!(unsigned_read(vec[10, 20], 1u) == 20);
+foreach (vec[1, 1u] as $index) {
+    assert!(read(vec[10, 20], $index) == 20);
+    assert!(write(vec[10, 20], $index, 30) == vec[10, 30]);
+    assert!(optional(vec[10, 20], $index) == 20);
+    assert!(optional(vec[10, null], $index) == 42);
+    assert!(byte('ab', $index) == 'b');
+    assert!(optional_byte('ab', $index) == 'b');
+    assert!(compare_byte('ab', $index) == vec[true, false, false, true, false, true]);
+    assert!(branch_byte('ab', $index) == 1);
+    assert!(branch_byte('aa', $index) == 2);
+    assert!(branch_byte('ac', $index) == 3);
+    assert!(numeric_read(vec[10, 20], $index) == 80);
+    assert!(numeric_write(vec[10, 20], $index) == vec[10, 3]);
+}
+foreach (vec[-1, 2u, 9_223_372_036_854_775_808u, 18_446_744_073_709_551_615u] as $index) {
+    fails(fn(): mixed => read(vec[10, 20], $index), $index);
+    fails(fn(): mixed => write(vec[10, 20], $index, 30), $index);
+    fails(fn(): mixed => byte('ab', $index), $index);
+    fails(fn(): mixed => compare_byte('ab', $index), $index);
+    fails(fn(): mixed => branch_byte('ab', $index), $index);
+    assert!(optional(vec[10, 20], $index) == 42);
+    assert!(optional_byte('ab', $index) == 'x');
+}
+assert!(numeric_read(vec[10, 20], 0u) == 40);
+assert!(numeric_write(vec[10, 20], 0u) == vec[3, 20]);
+";
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        let result = engine.run_source(source, Path::new("/positional-integer-indices.whim"));
+        assert_eq!(result.exit_code(), 0, "optimization {optimize}: {result:?}");
+    }
+}
+
+#[test]
 fn specialized_collection_reads_preserve_scalar_newtypes() {
     let source = r"
 use Whim\Marker\NeverInline;

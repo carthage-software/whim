@@ -131,7 +131,7 @@ share their storage until one value changes.
 
 ### Vec
 
-A mutable dense array with integer keys from zero.
+A mutable dense array with `uint` keys from zero.
 
 ### Weak reference
 

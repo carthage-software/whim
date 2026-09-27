@@ -8,6 +8,128 @@ use whim_optimizer::OptimizationConfiguration;
 use super::compile;
 
 #[test]
+fn positional_keys_and_indexes_preserve_unsigned_proofs() {
+    let unit = compile(
+        r"
+function vector_key(vec<int> $values): uint {
+    foreach ($values as $key => $_) { return $key; }
+    return 0u;
+}
+function tuple_key((int, int) $values): 0u..=1u {
+    foreach ($values as $key => $_) { return $key; }
+    panic!('the tuple is not empty');
+}
+function signed_key(vec<int> $values): int {
+    foreach ($values as $key => $_) { return $key; }
+    return -1;
+}
+function signed_length(string $value): 0.. { return length!($value); }
+function vector_view(vec<int> $values): array<uint, int> { return $values; }
+function signed_view(vec<int> $values): array<int, int> { return $values; }
+function tuple_view((int, int) $values): array<0u..=1u, int> { return $values; }
+function signed_tuple_view((int, int) $values): array<0..=1, int> { return $values; }
+function empty_view(vec<never> $values): array<string, bool> { return $values; }
+function unsigned_get(vec<int> $values, uint $key): int { return $values[$key]; }
+function union_get(vec<int> $values, int|uint $key): int { return $values[$key]; }
+function union_set(vec<int> $values, int|uint $key, int $value): vec<int> {
+    $values[$key] = $value;
+    return $values;
+}
+function string_get(string $value, int|uint $key): string { return $value[$key]; }
+function vector_coalesce(vec<int> $values, int|uint $key): int { return $values[$key] ?? -1; }
+function string_coalesce(string $value, int|uint $key): string { return $value[$key] ?? 'missing'; }
+function dictionary_get(dict<int|uint, int> $values, int|uint $key): int { return $values[$key]; }
+function literal_index(): (int, int, string) { return (vec[3][0u], (4, 5)[1u], 'ab'[1u]); }
+",
+        OptimizationConfiguration::default(),
+    );
+    verify_unit(&unit).unwrap();
+    let code = |name: &str| {
+        &unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name.as_bytes())
+            .unwrap()
+            .chunk
+            .code
+    };
+    for (names, checked) in [
+        (
+            [
+                "vector_key",
+                "tuple_key",
+                "vector_view",
+                "tuple_view",
+                "empty_view",
+            ]
+            .as_slice(),
+            false,
+        ),
+        (
+            [
+                "signed_key",
+                "signed_length",
+                "signed_view",
+                "signed_tuple_view",
+            ]
+            .as_slice(),
+            true,
+        ),
+    ] {
+        for name in names {
+            assert_eq!(
+                code(name)
+                    .iter()
+                    .any(|instruction| matches!(instruction, Instruction::Return { .. })),
+                checked,
+                "{name}: {:?}",
+                code(name),
+            );
+        }
+    }
+    for name in ["unsigned_get", "union_get"] {
+        assert!(
+            code(name)
+                .iter()
+                .any(|instruction| matches!(instruction, Instruction::VecIndexGet { .. })),
+            "{name}: {:?}",
+            code(name)
+        );
+    }
+    assert!(
+        code("union_set")
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::VecIndexSet { .. }))
+    );
+    assert!(
+        code("string_get")
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::StringIndexGet { .. }))
+    );
+    assert!(
+        code("vector_coalesce")
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::VecIndexCoalesce { .. }))
+    );
+    assert!(
+        code("string_coalesce")
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::StringIndexCoalesce { .. }))
+    );
+    assert!(!code("dictionary_get").iter().any(|instruction| matches!(
+        instruction,
+        Instruction::DictIndexGetIntKey { .. } | Instruction::DictIndexGetUintKey { .. }
+    )));
+    assert!(!code("literal_index").iter().any(|instruction| matches!(
+        instruction,
+        Instruction::IndexGet { .. }
+            | Instruction::VecIndexGet { .. }
+            | Instruction::StringIndexGet { .. }
+            | Instruction::ElementGet { .. }
+    )));
+}
+
+#[test]
 fn unsigned_constants_fold_without_narrowing_or_signed_return_proofs() {
     let unit = compile(
         r"

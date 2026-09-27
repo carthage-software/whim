@@ -13,6 +13,7 @@ assert!(length!($items) == 0u);
 
 $bindings = vec[];
 foreach (vec['a', 'b'] as $index => $letter) {
+  assert!($index is uint);
   $bindings[] = $index . $letter;
 }
 
@@ -21,6 +22,7 @@ foreach (dict['x' => 1, 'y' => 2] as $key => $number) {
 }
 
 foreach ((7, 8) as $position => $element) {
+  assert!($position is uint);
   $bindings[] = $position . $element;
 }
 

@@ -1,7 +1,7 @@
 # Iterators
 
-`foreach` can read an array, an `Iterator<K, V>`, or a
-`ToIterator<K, V>`.
+`foreach` can read an array, an `Iterator<K, V>`, or a `ToIterator<K, V>`.
+Vecs and tuples yield `uint` keys. Dicts and custom iterators keep their key types.
 
 ```whim
 $letters = dict['a' => 1, 'b' => 2];
@@ -54,11 +54,11 @@ use Whim\Iterate\ArrayIterator;
 use Whim\Iterate\Iterator;
 use Whim\Iterate\ToIterator;
 
-final class Names implements ToIterator<int, string> {
+final class Names implements ToIterator<uint, string> {
   public function __construct(private vec<string> $names) {}
 
-  public function toIterator(): Iterator<int, string> {
-    return new ArrayIterator::<int, string>($this->names);
+  public function toIterator(): Iterator<uint, string> {
+    return new ArrayIterator::<uint, string>($this->names);
   }
 }
 
@@ -100,9 +100,9 @@ short pipelines, or construct these types when an API needs a concrete adapter.
 ```whim
 use Whim\Iterate;
 
-$values = Iterate\take::<int, int>(
-  Iterate\filter::<int, int>(
-    Iterate\map::<int, int, int>(
+$values = Iterate\take::<uint, int>(
+  Iterate\filter::<uint, int>(
+    Iterate\map::<uint, int, int>(
       vec[1, 2, 3, 4],
       fn(int $value): int => $value * 2,
     ),
@@ -111,7 +111,7 @@ $values = Iterate\take::<int, int>(
   1u,
 );
 
-assert!(Iterate\to_vec::<int, int>($values) == vec[6]);
+assert!(Iterate\to_vec::<uint, int>($values) == vec[6]);
 ```
 
 Functions in `Whim\Vec` and `Whim\Dict` return complete arrays instead.

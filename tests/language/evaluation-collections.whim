@@ -68,9 +68,11 @@ assert!(vec[...$tuple, 7][0] == 5);
 assert!(length!(vec[...vec[]]) == 0u);
 
 $widened = dict['a' => 0, ...$numbers];
-assert!(($widened['a'], $widened[0], $widened[1]) == (0, 2, 3));
+assert!(($widened['a'], $widened[0u], $widened[1u]) == (0, 2, 3));
+assert!(!contains_key!($widened, 0));
 $positional = dict[...$tuple];
-assert!(($positional[0], $positional[1]) == (5, 6));
+assert!(($positional[0u], $positional[1u]) == (5, 6));
+assert!(!contains_key!($positional, 0));
 $merged = dict['w' => 9, ...$dictionary];
 assert!(($merged['w'], $merged['x'], $merged['y']) == (9, 1, 2));
 

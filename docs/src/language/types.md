@@ -37,7 +37,7 @@ Whim has three array forms:
 | Type | Meaning |
 | --- | --- |
 | `(A, B)` | an immutable, fixed-size tuple |
-| `vec<T>` | a mutable list with integer keys from zero |
+| `vec<T>` | a mutable list with `uint` keys from zero |
 | `dict<K, V>` | a mutable, ordered key-value map |
 
 `array<K, V>` accepts a tuple, vec, or dict whose keys and values fit `K` and

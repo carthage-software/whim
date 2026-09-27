@@ -460,6 +460,17 @@ impl TypeFlow<'_> {
                 destination,
                 container,
                 index: key,
+            }
+            | Instruction::VecIndexGet {
+                destination,
+                container,
+                index: key,
+                ..
+            }
+            | Instruction::StringIndexGet {
+                destination,
+                container,
+                index: key,
             } => Some((
                 destination,
                 self.constant_index(self.fact(index, container), value(key)?, depth + 1)?,
@@ -690,6 +701,14 @@ impl TypeFlow<'_> {
         if depth > MAX_TYPE_DEPTH {
             return None;
         }
+        if container.mask == super::STRING {
+            let ConstantValue::String(value) = self.constant_value_fact(container, depth + 1)?
+            else {
+                return None;
+            };
+            let byte = *value.as_bytes().get(key.position()?)?;
+            return Some(ConstantValue::String(self.allocator.intern(&[byte])));
+        }
         let index = instruction_index(container.origin)?;
         match self.chunk.code[index] {
             Instruction::NewArray {
@@ -698,10 +717,7 @@ impl TypeFlow<'_> {
                 first_element,
                 ..
             } => {
-                let ConstantValue::Int(key) = key else {
-                    return None;
-                };
-                let key = usize::try_from(key).ok()?;
+                let key = key.position()?;
                 if key >= usize::from(element_count.value()) {
                     return None;
                 }

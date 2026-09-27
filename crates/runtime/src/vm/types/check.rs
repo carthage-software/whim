@@ -1290,7 +1290,7 @@ impl VirtualMachine<'_> {
             ) => {
                 matches!(actual_value.as_ref(), TypeDescriptor::Never)
                     || self.descriptor_is_subtype(
-                        &TypeDescriptor::integer_range(Some(0), None),
+                        &TypeDescriptor::Uint,
                         expected_key,
                         environment,
                         depth + 1,
@@ -1313,7 +1313,7 @@ impl VirtualMachine<'_> {
                 if empty {
                     true
                 } else if !self.descriptor_is_subtype(
-                    &TypeDescriptor::integer_range(Some(0), None),
+                    &TypeDescriptor::Uint,
                     expected_key,
                     environment,
                     depth + 1,
@@ -1408,7 +1408,7 @@ impl VirtualMachine<'_> {
                 if actual.is_empty() {
                     true
                 } else if !self.descriptor_is_subtype(
-                    &TypeDescriptor::integer_range(Some(0), Some(actual.len() as i64 - 1)),
+                    &TypeDescriptor::unsigned_integer_range(Some(0), Some(actual.len() as u64 - 1)),
                     expected_key,
                     environment,
                     depth + 1,
@@ -1437,8 +1437,10 @@ impl VirtualMachine<'_> {
                 TypeDescriptor::TupleRest { elements, rest },
                 TypeDescriptor::Array(Some((expected_key, expected_value))),
             ) => {
-                if !self.descriptor_is_subtype(
-                    &TypeDescriptor::integer_range(Some(0), None),
+                if elements.is_empty() && matches!(rest.as_ref(), TypeDescriptor::Never) {
+                    true
+                } else if !self.descriptor_is_subtype(
+                    &TypeDescriptor::Uint,
                     expected_key,
                     environment,
                     depth + 1,
@@ -3004,7 +3006,7 @@ impl VirtualMachine<'_> {
                         if check_key
                             && !self.check_descriptor(
                                 key_type,
-                                &Value::int(index as i64),
+                                &Value::uint(index as u64),
                                 called,
                                 environment,
                                 0,
@@ -3048,7 +3050,7 @@ impl VirtualMachine<'_> {
                         if check_key
                             && !self.check_descriptor(
                                 key_type,
-                                &Value::int(index as i64),
+                                &Value::uint(index as u64),
                                 called,
                                 environment,
                                 0,

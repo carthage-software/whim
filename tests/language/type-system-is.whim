@@ -228,7 +228,9 @@ assert!(
   $openRecord is dict['id' => int, 'name' => string, ...<string, float|int>],
 );
 
-function collection_length<K: int|string|bool, V>(array<K, V> $values): int {
+function collection_length<K: int|uint|string|bool, V>(
+  array<K, V> $values,
+): int {
   return length!($values) as int;
 }
 
@@ -241,24 +243,28 @@ $dictionary = dict['one' => 1, 'two' => 2];
 $booleans = dict[true => 'yes', false => 'no'];
 $tuple = (1, 'two');
 
-assert!($vector is array<0.., int>);
-assert!($vector is array<int, int>);
+assert!($vector is array<0u.., int>);
+assert!($vector is array<uint, int>);
+assert!(!($vector is array<int, int>));
 assert!(!($vector is array<string, int>));
 assert!($dictionary is array<string, int>);
 assert!(!($dictionary is array<int, int>));
 assert!($booleans is array<bool, string>);
-assert!($tuple is array<0..=1, int|string>);
+assert!($tuple is array<0u..=1u, int|string>);
+assert!($tuple is array<uint, int|string>);
+assert!(!($tuple is array<int, int|string>));
 assert!(!($tuple is array<int, int>));
 
 $box = new Box::<vec<int>>($vector);
-assert!($box is Box<array<int, int>>);
+assert!($box is Box<array<uint, int>>);
+assert!(!($box is Box<array<int, int>>));
 
 assert!(vec[] is array<string, object>);
 assert!(dict[] is array<bool, object>);
 
-assert!(collection_length::<int, int>($vector) == 2);
+assert!(collection_length::<uint, int>($vector) == 2);
 assert!(collection_length::<string, int>($dictionary) == 2);
-assert!(collection_length::<int, int|string>($tuple) == 2);
+assert!(collection_length::<uint, int|string>($tuple) == 2);
 
 type Port = 1..=65535;
 type Percentage = 0..=100;

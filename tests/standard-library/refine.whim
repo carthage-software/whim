@@ -91,10 +91,11 @@ final class RefineIterator implements Whim\Iterate\Iterator<string, int> {
   }
 }
 
-assert!(vec[1] is Refine\Iterable<int, int>);
+assert!(vec[1] is Refine\Iterable<uint, int>);
+assert!(!(vec[1] is Refine\Iterable<int, int>));
 assert!(dict['value' => 1] is Refine\Iterable<string, int>);
 
-assert!((1, 'two') is Refine\Iterable<int, int|string>);
+assert!((1, 'two') is Refine\Iterable<uint, int|string>);
 assert!(new RefineIterator() is Refine\Iterable<string, int>);
 
 assert!(!(new RefineIterator() is Refine\Iterable<int, int>));

@@ -359,26 +359,21 @@ pub(crate) fn descriptor_proves(
             TypeDescriptor::Array(Some((expected_key, expected_value))),
         ) => {
             return matches!(actual_value.as_ref(), TypeDescriptor::Never)
-                || descriptor_proves(
-                    &TypeDescriptor::integer_range(Some(0), None),
-                    expected_key,
-                    unit,
-                    depth + 1,
-                ) && descriptor_proves(actual_value, expected_value, unit, depth + 1);
+                || descriptor_proves(&TypeDescriptor::Uint, expected_key, unit, depth + 1)
+                    && descriptor_proves(actual_value, expected_value, unit, depth + 1);
         }
         (
             TypeDescriptor::VectorShape { elements, rest },
             TypeDescriptor::Array(Some((expected_key, expected_value))),
         ) => {
-            return elements.is_empty() && rest.is_none()
-                || descriptor_proves(
-                    &TypeDescriptor::integer_range(Some(0), None),
-                    expected_key,
-                    unit,
-                    depth + 1,
-                ) && elements
-                    .iter()
-                    .all(|element| descriptor_proves(element, expected_value, unit, depth + 1))
+            return elements.is_empty()
+                && rest
+                    .as_deref()
+                    .is_none_or(|rest| matches!(rest, TypeDescriptor::Never))
+                || descriptor_proves(&TypeDescriptor::Uint, expected_key, unit, depth + 1)
+                    && elements.iter().all(|element| {
+                        descriptor_proves(element, expected_value, unit, depth + 1)
+                    })
                     && rest.as_deref().is_none_or(|rest| {
                         descriptor_proves(rest, expected_value, unit, depth + 1)
                     });
@@ -421,13 +416,24 @@ pub(crate) fn descriptor_proves(
         ) => {
             return actual.is_empty()
                 || descriptor_proves(
-                    &TypeDescriptor::integer_range(Some(0), Some(actual.len() as i64 - 1)),
+                    &TypeDescriptor::unsigned_integer_range(Some(0), Some(actual.len() as u64 - 1)),
                     expected_key,
                     unit,
                     depth + 1,
                 ) && actual
                     .iter()
                     .all(|member| descriptor_proves(member, expected_value, unit, depth + 1));
+        }
+        (
+            TypeDescriptor::TupleRest { elements, rest },
+            TypeDescriptor::Array(Some((expected_key, expected_value))),
+        ) => {
+            return elements.is_empty() && matches!(rest.as_ref(), TypeDescriptor::Never)
+                || descriptor_proves(&TypeDescriptor::Uint, expected_key, unit, depth + 1)
+                    && elements.iter().all(|element| {
+                        descriptor_proves(element, expected_value, unit, depth + 1)
+                    })
+                    && descriptor_proves(rest, expected_value, unit, depth + 1);
         }
         _ => {}
     }

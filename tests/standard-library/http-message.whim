@@ -66,9 +66,9 @@ foreach ($fields as $index => $field) {
 
 assert!(
   $iterated == vec[
-    (0, ('Content-Type', 'text/plain')),
-    (1, ('Set-Cookie', 'session=one')),
-    (2, ('set-cookie', 'theme=dark')),
+    (0u, ('Content-Type', 'text/plain')),
+    (1u, ('Set-Cookie', 'session=one')),
+    (2u, ('set-cookie', 'theme=dark')),
   ],
 );
 

@@ -15,7 +15,7 @@ use Whim\_Private\http_valid_token;
 use Whim\Str\lowercase;
 
 /** An immutable, ordered, case-insensitive collection of HTTP fields. */
-final readonly class FieldMap implements Default, ToIterator<int, Field> {
+final readonly class FieldMap implements Default, ToIterator<uint, Field> {
   private vec<Field> $fields;
   private dict<string, vec<FieldValue>> $values;
 
@@ -199,7 +199,7 @@ final readonly class FieldMap implements Default, ToIterator<int, Field> {
   /** Returns an iterator over field entries in insertion order. */
   #[AlwaysInline]
   #[MustUse]
-  public function toIterator(): Iterator<int, Field> {
+  public function toIterator(): Iterator<uint, Field> {
     return new _Private\FieldMapIterator($this->fields);
   }
 }

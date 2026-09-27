@@ -72,9 +72,9 @@ function flat_map<T, U>(
 /** Pairs every value with its sequential index. */
 #[MustUse]
 #[TrackCaller]
-function enumerate<T>(Iterable<_, T> $values): vec<(int, T)> {
+function enumerate<T>(Iterable<_, T> $values): vec<(uint, T)> {
   $result = vec[];
-  $index = 0;
+  $index = 0u;
   foreach ($values as $value) {
     $result[] = ($index, $value);
     $index++;

@@ -23,7 +23,7 @@ use Whim\_Private\http_valid_token;
 final class Router implements
   Handler,
   RouteCollection,
-  ToIterator<int, Registration> {
+  ToIterator<uint, Registration> {
   private dict<Method, dict<string, Route>> $routes = dict[];
   private null|Resolver $resolver = null;
 
@@ -90,7 +90,7 @@ final class Router implements
 
   /** Iterates over registered routes in registration order. */
   #[MustUse]
-  public function toIterator(): ArrayIterator<int, Registration> {
+  public function toIterator(): ArrayIterator<uint, Registration> {
     $registrations = vec[];
     foreach ($this->routes as $method => $routes) {
       foreach ($routes as $pattern => ($_pattern, $handler)) {
@@ -98,7 +98,7 @@ final class Router implements
       }
     }
 
-    return new ArrayIterator::<int, Registration>($registrations);
+    return new ArrayIterator::<uint, Registration>($registrations);
   }
 
   /** Returns the current compiled resolver. */

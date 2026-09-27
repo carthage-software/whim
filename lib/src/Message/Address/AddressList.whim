@@ -15,7 +15,7 @@ use Whim\Unwind\InvalidArgumentException;
 /** An immutable ordered list of mailboxes and groups. */
 final readonly class AddressList implements
   Default,
-  ToIterator<int, Address>,
+  ToIterator<uint, Address>,
   ToString {
   /** Creates an address list. */
   #[AlwaysInline]
@@ -129,8 +129,8 @@ final readonly class AddressList implements
   /** Iterates over top-level addresses. */
   #[AlwaysInline]
   #[MustUse]
-  public function toIterator(): Iterator<int, Address> {
-    return new ArrayIterator::<int, Address>($this->addresses);
+  public function toIterator(): Iterator<uint, Address> {
+    return new ArrayIterator::<uint, Address>($this->addresses);
   }
 
   /** Serializes the address list for a message header. */

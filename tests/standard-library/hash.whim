@@ -267,7 +267,7 @@ foreach ($checksum->getTrace() as $frame) {
 
   $redactedFrames++;
   foreach ($frame->arguments as $index => $argument) {
-    if ($index == 0) {
+    if ($index == 0u) {
       continue;
     }
 

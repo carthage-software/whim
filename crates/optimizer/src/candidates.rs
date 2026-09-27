@@ -310,6 +310,8 @@ fn constant_candidate(instruction: Instruction) -> bool {
             | Instruction::Length { .. }
             | Instruction::StringLength { .. }
             | Instruction::IndexGet { .. }
+            | Instruction::VecIndexGet { .. }
+            | Instruction::StringIndexGet { .. }
             | Instruction::ElementGet { .. }
             | Instruction::Add { .. }
             | Instruction::Subtract { .. }

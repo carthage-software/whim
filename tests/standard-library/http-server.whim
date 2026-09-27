@@ -399,7 +399,7 @@ foreach ($functionHandlers as $index => $functionHandler) {
     $functionCancellation,
   );
 
-  assert!($response->status == 200 + $index);
+  assert!($response->status == 200 + ($index as int));
 }
 
 $first = new HTTPServerTestStream($local, $peer);

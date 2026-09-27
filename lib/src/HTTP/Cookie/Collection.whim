@@ -15,7 +15,7 @@ use Whim\Unwind\InvalidArgumentException;
 use Whim;
 
 /** An immutable, ordered collection of Cookie header pairs. */
-final readonly class Collection implements ToIterator<int, Pair>, ToString {
+final readonly class Collection implements ToIterator<uint, Pair>, ToString {
   private vec<Pair> $pairs;
   private dict<string, vec<string>> $values;
 
@@ -132,7 +132,7 @@ final readonly class Collection implements ToIterator<int, Pair>, ToString {
   /** Returns an iterator over the stored pairs. */
   #[AlwaysInline]
   #[MustUse]
-  public function toIterator(): ArrayIterator<int, Pair> {
-    return new ArrayIterator::<int, Pair>($this->pairs);
+  public function toIterator(): ArrayIterator<uint, Pair> {
+    return new ArrayIterator::<uint, Pair>($this->pairs);
   }
 }

@@ -86,7 +86,7 @@ assert!('Ada' is string[3]);
 `string[0]` is the same type as `''`. `string[1..]` is the same type as
 `string&!''`.
 
-An index must be an in-range integer. An invalid index throws
+An index accepts `int` or `uint`. A negative or out-of-range index throws
 `OutOfBoundsError`. Strings are immutable, so indexed assignment fails.
 
 ## Concatenation

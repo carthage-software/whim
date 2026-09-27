@@ -6,6 +6,7 @@ use Whim\Unwind\ArithmeticError;
 use Whim\Unwind\DivisionByZeroError;
 use Whim\Unwind\IncompatibleOperandsError;
 use Whim\Unwind\OverflowError;
+use Whim\Unwind\OutOfBoundsError;
 use Whim\Unwind\Throwable;
 use Whim\Unwind\TypeError;
 use Whim\Unwind\UnderflowError;
@@ -427,8 +428,8 @@ assert!(
 );
 
 assert!(length!(Whim\Vec\unique::<int|uint|float>(vec[1, 1u, 1.0, 1u])) == 3u);
-expect_error::<TypeError>(fn() => vec['one'][0u]);
-expect_error::<TypeError>(fn() => 'one'[0u]);
+assert!(vec['one'][0u] == 'one');
+assert!('one'[0u] == 'o');
 
 $identifier = Identifier(MAXIMUM);
 assert!($identifier is Identifier);
@@ -481,10 +482,81 @@ assert!(
 );
 
 expect_error::<TypeError>(fn() => !unsigned(0u));
-expect_error::<TypeError>(fn() => vec[1][0u] ?? 2);
-expect_error::<TypeError>(fn() => contains_key!(vec[1], 0u));
+assert!((vec[1][0u] ?? 2) == 1);
+assert!(contains_key!(vec[1], 0u));
 assert!(contains_key!($keys, MAXIMUM));
 assert!(contains!(vec[1u], 1u));
 assert!(!contains!(vec[1u], 1));
 discard!(remove!($keys, MAXIMUM));
 assert!(!contains_key!($keys, MAXIMUM));
+
+#[NeverInline]
+function positional_access(int|uint $position): void {
+  $values = vec[10, 20, 30];
+  $copy = $values;
+  assert!($values[$position] == 20);
+  assert!(contains_key!($values, $position));
+  $values[$position] += 4;
+  assert!($values[$position] == 24);
+  assert!($copy == vec[10, 20, 30]);
+  assert!(remove!($values, $position) == 24);
+  assert!($values == vec[10, 30]);
+
+  $unordered = vec[10, 20, 30, 40];
+  assert!(swap_remove!($unordered, $position) == 20);
+  assert!($unordered == vec[10, 40, 30]);
+
+  $nullable = vec[10, null];
+  assert!(contains_key!($nullable, $position));
+  assert!(($nullable[$position] ?? 12) == 12);
+  $nullable[$position] ??= 14;
+  assert!($nullable == vec[10, 14]);
+
+  assert!((10, 'value')[$position] == 'value');
+  assert!(contains_key!((10, 'value'), $position));
+  assert!('abc'[$position] == 'b');
+  expect_error::<TypeError>(fn(): void {
+    $tuple = (10, 'value');
+    $tuple[$position] = 'changed';
+  });
+
+  expect_error::<TypeError>(fn(): void {
+    $text = 'abc';
+    $text[$position] = 'x';
+  });
+}
+
+positional_access(1);
+positional_access(1u);
+positional_access(Identifier(1u));
+
+#[NeverInline]
+function missing_position(int|uint $position): void {
+  $values = vec[1, 2];
+  assert!(!contains_key!($values, $position));
+  assert!(($values[$position] ?? 3) == 3);
+  assert!(!contains_key!((1, 2), $position));
+  assert!(((1, 2)[$position] ?? 3) == 3);
+  expect_error::<OutOfBoundsError>(fn() => $values[$position]);
+  expect_error::<OutOfBoundsError>(fn() => (1, 2)[$position]);
+  expect_error::<OutOfBoundsError>(fn() => 'ab'[$position]);
+  expect_error::<OutOfBoundsError>(fn() => $values[$position] = 3);
+  expect_error::<OutOfBoundsError>(fn() => remove!($values, $position));
+  expect_error::<OutOfBoundsError>(fn() => swap_remove!($values, $position));
+  assert!($values == vec[1, 2]);
+}
+
+missing_position(-1);
+missing_position(2);
+missing_position(2u);
+missing_position(Math\INT_MAX);
+missing_position(MAXIMUM);
+
+$strictPositions = dict[1 => 'signed', 1u => 'unsigned'];
+assert!(contains_key!($strictPositions, 1));
+assert!(contains_key!($strictPositions, 1u));
+assert!($strictPositions[1] == 'signed');
+assert!($strictPositions[1u] == 'unsigned');
+assert!(remove!($strictPositions, 1u) == 'unsigned');
+assert!($strictPositions == dict[1 => 'signed']);
+assert!(($strictPositions[1u] ?? 'absent') == 'absent');

@@ -686,7 +686,7 @@ pub(crate) fn transfer(
             value_mode,
         } => {
             if key_destination != Register::NONE {
-                write(key_destination, Fact::with_origin(INT, origin));
+                write(key_destination, Fact::with_origin(UINT, origin));
             }
 
             let array = read(iterator).array;

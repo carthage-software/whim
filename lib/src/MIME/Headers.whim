@@ -16,7 +16,7 @@ use Whim\Unwind\InvalidArgumentException;
 /** An immutable ordered collection of message headers. */
 final readonly class Headers implements
   Default,
-  ToIterator<int, Header>,
+  ToIterator<uint, Header>,
   ToString {
   private vec<Header> $headers;
   private dict<string, vec<string>> $values;
@@ -146,8 +146,8 @@ final readonly class Headers implements
   /** Iterates over headers in insertion order. */
   #[AlwaysInline]
   #[MustUse]
-  public function toIterator(): Iterator<int, Header> {
-    return new ArrayIterator::<int, Header>($this->headers);
+  public function toIterator(): Iterator<uint, Header> {
+    return new ArrayIterator::<uint, Header>($this->headers);
   }
 
   /** Serializes headers with CRLF line endings. */

@@ -48,7 +48,7 @@ assert!($both->getTypeParameter('U')->getBounds() == vec[]);
 $constraints = $both->getWhereConstraints();
 assert!(length!($constraints) == 3u);
 foreach ($constraints as $position => $constraint) {
-  assert!($constraint->getPosition() == $position);
+  assert!($constraint->getPosition() == ($position as int));
   assert!(
     $constraint->getParameter()->getName() == vec['T', 'U', 'T'][$position],
   );
@@ -127,7 +127,7 @@ $constraints = $method->getWhereConstraints();
 assert!(length!($constraints) == 3u);
 foreach ($constraints as $position => $constraint) {
   assert!($constraint is WhereConstraintReflection);
-  assert!($constraint->getPosition() == $position);
+  assert!($constraint->getPosition() == ($position as int));
   assert!($constraint->getDeclaringCallable()->getName() == 'inspect');
   assert!(
     $constraint

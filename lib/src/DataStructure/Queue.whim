@@ -9,7 +9,7 @@ use Whim\Refine\Iterable;
 use Whim\_Private\RingBuffer;
 
 /** Stores values in first-in, first-out order. */
-final class Queue<T> implements ToIterator<int, T> {
+final class Queue<T> implements ToIterator<uint, T> {
   private RingBuffer<T> $buffer;
 
   /** Creates a queue containing the yielded values. */
@@ -64,7 +64,7 @@ final class Queue<T> implements ToIterator<int, T> {
   }
 
   /** Creates a snapshot iterator from front to back. */
-  public function toIterator(): ArrayIterator<int, T> {
-    return new ArrayIterator::<int, T>($this->toVec());
+  public function toIterator(): ArrayIterator<uint, T> {
+    return new ArrayIterator::<uint, T>($this->toVec());
   }
 }

@@ -3,6 +3,14 @@ use Whim\Iterate\Iterator;
 use Whim\Refine\Iterable;
 use Whim\Unwind\RuntimeException;
 
+$positional = new Iterate\ArrayIterator::<uint, string>(vec['a', 'b']);
+assert!($positional->next() == (0u, 'a'));
+assert!($positional->next() == (1u, 'b'));
+assert!($positional->next() == null);
+assert!(
+  Iterate\to_dict::<uint, string>(('a', 'b')) == dict[0u => 'a', 1u => 'b'],
+);
+
 final class PullCounter {
   public int $count = 0;
 }
@@ -116,7 +124,7 @@ assert!($joinPulls->count == 1);
 $nested = vec[dict['first' => 1, 'second' => 2], dict['third' => 3]]
   as vec<Iterable<string, int>>;
 
-$joined = Iterate\join::<int, string, int>($nested);
+$joined = Iterate\join::<uint, string, int>($nested);
 assert!(
   Iterate\to_dict::<string, int>($joined) == dict[
     'first' => 1,
@@ -125,9 +133,9 @@ assert!(
   ],
 );
 
-assert!(Iterate\count::<int, string>(vec['a', 'b', 'c']) == 3u);
+assert!(Iterate\count::<uint, string>(vec['a', 'b', 'c']) == 3u);
 assert!(
-  Iterate\reduce::<int, int, int>(
+  Iterate\reduce::<uint, int, int>(
     vec[1, 2, 3, 4],
     fn(int $sum, int $value): int => $sum + $value,
     0,

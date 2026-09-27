@@ -26,7 +26,6 @@ use crate::liveness::effect::changes_value;
 use crate::liveness::effect::effect_on;
 use crate::type_flow::BOOL;
 use crate::type_flow::CAPTURE_ORIGIN;
-use crate::type_flow::ConstantValue;
 use crate::type_flow::ExactClass;
 use crate::type_flow::FLOAT;
 use crate::type_flow::Fact;
@@ -638,11 +637,9 @@ impl<'a> TypeFlow<'a> {
                     | TypeDescriptor::Vector(Some(value)) => *value,
                     TypeDescriptor::String => TypeDescriptor::String,
                     _ => {
-                        let ConstantValue::Int(key) =
-                            self.constant_value_fact(self.fact(index, key), depth + 1)?
-                        else {
-                            return None;
-                        };
+                        let key = self
+                            .constant_value_fact(self.fact(index, key), depth + 1)?
+                            .position()?;
 
                         Self::indexed_descriptor(&container, key)?.clone()
                     }
@@ -707,11 +704,9 @@ impl<'a> TypeFlow<'a> {
                     return Some(element.clone());
                 }
 
-                let ConstantValue::Int(key) =
-                    self.constant_value_fact(self.fact(index, key), depth + 1)?
-                else {
-                    return None;
-                };
+                let key = self
+                    .constant_value_fact(self.fact(index, key), depth + 1)?
+                    .position()?;
 
                 Self::indexed_descriptor(&container, key).cloned()
             }
@@ -721,7 +716,7 @@ impl<'a> TypeFlow<'a> {
                 ..
             } => {
                 let container = self.register_type_at(index, subject, depth + 1)?;
-                Self::indexed_descriptor(&container, i64::from(key.value())).cloned()
+                Self::indexed_descriptor(&container, usize::try_from(key.value()).ok()?).cloned()
             }
             Instruction::PropertyGet { object, cache, .. } => {
                 let resolved = self.property_class_specialization(index, object, depth + 1)?;
@@ -873,11 +868,9 @@ impl<'a> TypeFlow<'a> {
             } => {
                 let container =
                     self.origin_descriptor(self.fact(index, container).origin, depth + 1)?;
-                let ConstantValue::Int(key) =
-                    self.constant_value_fact(self.fact(index, key), depth + 1)?
-                else {
-                    return None;
-                };
+                let key = self
+                    .constant_value_fact(self.fact(index, key), depth + 1)?
+                    .position()?;
                 Self::indexed_descriptor(container, key)
             }
             Instruction::VecIndexGet { container, .. }
@@ -898,7 +891,7 @@ impl<'a> TypeFlow<'a> {
             } => {
                 let container =
                     self.origin_descriptor(self.fact(index, subject).origin, depth + 1)?;
-                Self::indexed_descriptor(container, i64::from(key.value()))
+                Self::indexed_descriptor(container, usize::try_from(key.value()).ok()?)
             }
             Instruction::CloneObject { source, .. } => {
                 self.origin_descriptor(self.fact(index, source).origin, depth + 1)
@@ -950,14 +943,11 @@ impl<'a> TypeFlow<'a> {
 
     pub(crate) fn indexed_descriptor(
         container: &TypeDescriptor,
-        key: i64,
+        key: usize,
     ) -> Option<&TypeDescriptor> {
         match container {
-            TypeDescriptor::Tuple(members) => members.get(usize::try_from(key).ok()?),
-            TypeDescriptor::TupleRest { elements, rest } => {
-                let key = usize::try_from(key).ok()?;
-                Some(elements.get(key).unwrap_or(rest))
-            }
+            TypeDescriptor::Tuple(members) => members.get(key),
+            TypeDescriptor::TupleRest { elements, rest } => Some(elements.get(key).unwrap_or(rest)),
             TypeDescriptor::Array(Some((_, value)))
             | TypeDescriptor::Dictionary(Some((_, value))) => Some(value),
             TypeDescriptor::Vector(Some(element)) => Some(element),
@@ -1299,7 +1289,7 @@ fn traversed_component(
             value_type.as_ref().clone()
         }),
         TypeDescriptor::Vector(Some(value)) => Some(if key {
-            TypeDescriptor::integer_range(Some(0), None)
+            TypeDescriptor::Uint
         } else {
             value.as_ref().clone()
         }),
@@ -1308,14 +1298,14 @@ fn traversed_component(
                 return Some(if members.is_empty() {
                     TypeDescriptor::Never
                 } else {
-                    TypeDescriptor::integer_range(Some(0), Some(members.len() as i64 - 1))
+                    TypeDescriptor::unsigned_integer_range(Some(0), Some(members.len() as u64 - 1))
                 });
             }
             Some(union_or_never(members.clone()))
         }
         TypeDescriptor::TupleRest { elements, rest } => {
             if key {
-                return Some(TypeDescriptor::integer_range(Some(0), None));
+                return Some(TypeDescriptor::Uint);
             }
             let mut members = elements.clone();
             members.push(rest.as_ref().clone());

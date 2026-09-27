@@ -25,7 +25,7 @@ function vector_tail(): vec[1, ...1..=3] { return vec[1, 2, 3]; }
 #[NeverInline]
 function tuple_tail(): (1, ...1..=3) { return (1, 2, 3); }
 #[NeverInline]
-function tuple_array(): array<0..=1, 1..=2> { return (1, 2); }
+function tuple_array(): array<0u..=1u, 1..=2> { return (1, 2); }
 #[NeverInline]
 function cow_alias(): dict['a' => 1] {
     $value = dict['a' => 1];

@@ -1875,7 +1875,13 @@ impl VirtualMachine<'_> {
                     index,
                     value_mode,
                 } => {
-                    let index_value = values.int(index.index() as usize);
+                    let index_register = index.index() as usize;
+                    if values.kind(index_register) != NumericKind::Int {
+                        // SAFETY: `dirty` contains only active-frame numeric registers.
+                        unsafe { flush(registers, &values, dirty) };
+                        return NumericLoopOutcome::Deoptimize(current);
+                    }
+                    let index_value = values.int(index_register);
                     vec_element_read!(current, destination, container, index_value, value_mode);
                     fused_array_comparison_tail!(destination, value_mode);
                 }
@@ -1904,7 +1910,13 @@ impl VirtualMachine<'_> {
                     index,
                     value,
                 } => {
-                    let index_value = values.int(index.index() as usize);
+                    let index_register = index.index() as usize;
+                    if values.kind(index_register) != NumericKind::Int {
+                        // SAFETY: `dirty` contains only active-frame numeric registers.
+                        unsafe { flush(registers, &values, dirty) };
+                        return NumericLoopOutcome::Deoptimize(current);
+                    }
+                    let index_value = values.int(index_register);
                     vec_element_write!(current, container, index_value, value);
                 }
                 Instruction::VecAppend { container, value } => {

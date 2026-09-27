@@ -1,5 +1,7 @@
 //! Indexing, updating, and iterating vecs and dicts.
 
+use std::fmt::Display;
+
 use whim_base::unwrap_result_invariant;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_value::Value;
@@ -135,8 +137,9 @@ pub(in crate::vm) fn index_get_or_null(
 fn probe_position(index: &Value) -> Result<usize, ArrayFault> {
     match index.transparent() {
         ValueView::Int(position) => Ok(usize::try_from(*position).unwrap_or(usize::MAX)),
+        ValueView::Uint(position) => Ok(usize::try_from(*position).unwrap_or(usize::MAX)),
         _ => Err(ArrayFault::type_error(format!(
-            "an index must be int, {} given",
+            "an index must be int or uint, {} given",
             index.kind_name()
         ))),
     }
@@ -145,7 +148,7 @@ fn probe_position(index: &Value) -> Result<usize, ArrayFault> {
 #[inline(always)]
 fn proven_probe_position(index: &Value) -> usize {
     // SAFETY: type flow proves the integer index of a specialized vec read.
-    usize::try_from(unsafe { index.as_int_unchecked() }).unwrap_or(usize::MAX)
+    usize::try_from(unsafe { index.as_integer_bits_unchecked() }).unwrap_or(usize::MAX)
 }
 
 #[inline(always)]
@@ -222,8 +225,9 @@ pub(in crate::vm) fn string_index_get_or_null(
 fn vec_position(index: &Value, length: usize) -> Result<usize, ArrayFault> {
     match index.transparent() {
         ValueView::Int(position) => int_position(*position, length),
+        ValueView::Uint(position) => uint_position(*position, length),
         _ => Err(ArrayFault::type_error(format!(
-            "an index must be int, {} given",
+            "an index must be int or uint, {} given",
             index.kind_name()
         ))),
     }
@@ -294,8 +298,9 @@ pub(in crate::vm) fn array_contains_key(array: &Value, key: &Value) -> Result<bo
 fn sequence_contains_key(length: usize, key: &Value) -> Result<bool, ArrayFault> {
     match key.transparent() {
         ValueView::Int(index) => Ok(usize::try_from(*index).is_ok_and(|index| index < length)),
+        ValueView::Uint(index) => Ok(usize::try_from(*index).is_ok_and(|index| index < length)),
         other => Err(ArrayFault::type_error(format!(
-            "a vec or tuple key must be int, {} given",
+            "a vec or tuple key must be int or uint, {} given",
             other.kind_name()
         ))),
     }
@@ -341,9 +346,39 @@ pub(in crate::vm) fn int_position(position: i64, length: usize) -> Result<usize,
     }
 }
 
+#[inline(always)]
+pub(in crate::vm) fn integer_position(index: &Value, length: usize) -> Result<usize, ArrayFault> {
+    // SAFETY: type flow proves the index is an int or uint.
+    let position = unsafe { index.as_integer_bits_unchecked() };
+    if position < length as u64 {
+        Ok(position as usize)
+    } else {
+        Err(out_of_bounds_integer_position(index, position, length))
+    }
+}
+
 #[cold]
 #[inline(never)]
-fn out_of_bounds_position(position: i64, length: usize) -> ArrayFault {
+fn out_of_bounds_integer_position(index: &Value, position: u64, length: usize) -> ArrayFault {
+    if index.is_int() {
+        out_of_bounds_position(position as i64, length)
+    } else {
+        out_of_bounds_position(position, length)
+    }
+}
+
+#[inline(always)]
+fn uint_position(position: u64, length: usize) -> Result<usize, ArrayFault> {
+    if position < length as u64 {
+        Ok(position as usize)
+    } else {
+        Err(out_of_bounds_position(position, length))
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn out_of_bounds_position(position: impl Display, length: usize) -> ArrayFault {
     ArrayFault::out_of_bounds(format!(
         "the index {position} is outside the range 0 to {}",
         length as i64 - 1
@@ -353,14 +388,14 @@ fn out_of_bounds_position(position: i64, length: usize) -> ArrayFault {
 /// Reads a vec through optimizer-proven container and index types.
 pub(in crate::vm) fn vec_index_get(
     container: &Value,
-    index: i64,
+    index: &Value,
     value_mode: ArrayValueMode,
 ) -> Result<Value, ArrayFault> {
     let Some(vec) = container.as_vec() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec read has a vec container") }
     };
-    let position = int_position(index, vec.len())?;
+    let position = integer_position(index, vec.len())?;
     // SAFETY: the surrounding invariant keeps this index in bounds.
     Ok(array_value(
         unsafe { vec.get_unchecked(position) },
@@ -369,12 +404,15 @@ pub(in crate::vm) fn vec_index_get(
 }
 
 /// Reads an integer element through optimizer-proven vec and element types.
-pub(in crate::vm) fn vec_int_index_get(container: &Value, index: i64) -> Result<Value, ArrayFault> {
+pub(in crate::vm) fn vec_int_index_get(
+    container: &Value,
+    index: &Value,
+) -> Result<Value, ArrayFault> {
     let Some(vec) = container.as_vec() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec read has a vec container") }
     };
-    let position = int_position(index, vec.len())?;
+    let position = integer_position(index, vec.len())?;
     // SAFETY: the position check bounds the index.
     Ok(array_value(
         unsafe { vec.get_unchecked(position) },
@@ -385,14 +423,14 @@ pub(in crate::vm) fn vec_int_index_get(container: &Value, index: i64) -> Result<
 /// Writes a vec through optimizer-proven container and index types.
 pub(in crate::vm) fn vec_index_set(
     container: &mut Value,
-    index: i64,
+    index: &Value,
     value: Value,
 ) -> Result<(), ArrayFault> {
     let Some(vec) = container.as_vec_mut() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec write has a vec container") }
     };
-    let position = int_position(index, vec.len())?;
+    let position = integer_position(index, vec.len())?;
     if vec.make_mut().set(position, value).is_none() {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("the position check bounds the vec write") }
@@ -892,7 +930,7 @@ pub(in crate::vm) fn spread_into(container: &mut Value, value: &Value) -> Result
             ValueView::Vec(source) => {
                 target.reserve_hint(source.len());
                 for (index, element) in source.iter().enumerate() {
-                    target.insert(Key::Int(index as i64), element.clone());
+                    target.insert(Key::Uint(index as u64), element.clone());
                 }
 
                 Ok(())
@@ -900,7 +938,7 @@ pub(in crate::vm) fn spread_into(container: &mut Value, value: &Value) -> Result
             ValueView::Tuple(source) => {
                 target.reserve_hint(source.len());
                 for (index, element) in source.iter().enumerate() {
-                    target.insert(Key::Int(index as i64), element.clone());
+                    target.insert(Key::Uint(index as u64), element.clone());
                 }
 
                 Ok(())
@@ -1008,7 +1046,7 @@ pub(in crate::vm) fn advance_cursor(cursor: &mut Value) -> Option<(Value, Value)
         // SAFETY: the surrounding invariant keeps this index in bounds.
         let value = unsafe { vec.get_unchecked(position) }.clone();
         *index = next_index(position);
-        return Some((Value::int(position as i64), value));
+        return Some((Value::uint(position as u64), value));
     }
 
     if let Some((tuple, index)) = cursor.as_tuple_cursor_mut() {
@@ -1020,7 +1058,7 @@ pub(in crate::vm) fn advance_cursor(cursor: &mut Value) -> Option<(Value, Value)
         // SAFETY: the surrounding invariant keeps this index in bounds.
         let value = unsafe { tuple.as_slice().get_unchecked(position) }.clone();
         *index = next_index(position);
-        return Some((Value::int(position as i64), value));
+        return Some((Value::uint(position as u64), value));
     }
 
     advance_dict_cursor(cursor, ArrayValueMode::Generic)
@@ -1044,11 +1082,11 @@ pub(in crate::vm) fn advance_vec_cursor(
     // SAFETY: the surrounding invariant keeps this index in bounds.
     let value = array_value(unsafe { vec.get_unchecked(position) }, value_mode);
     *index = next_index(position);
-    Some((Value::int(position as i64), value))
+    Some((Value::uint(position as u64), value))
 }
 
 /// Advances a proven vec cursor whose elements are all integers.
-pub(in crate::vm) fn advance_vec_int_cursor(cursor: &mut Value) -> Option<(i64, Value)> {
+pub(in crate::vm) fn advance_vec_int_cursor(cursor: &mut Value) -> Option<(u64, Value)> {
     let Some((vec, index)) = cursor.as_vec_cursor_mut() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized vec cursor traverses a vec") }
@@ -1062,7 +1100,7 @@ pub(in crate::vm) fn advance_vec_int_cursor(cursor: &mut Value) -> Option<(i64, 
     // SAFETY: the cursor position is below the vec length.
     let value = array_value(unsafe { vec.get_unchecked(position) }, ArrayValueMode::Int);
     *index = next_index(position);
-    Some((position as i64, value))
+    Some((position as u64, value))
 }
 
 /// Advances a cursor whose dict shape was proven by bytecode type flow.

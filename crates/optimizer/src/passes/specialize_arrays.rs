@@ -78,8 +78,11 @@ pub(crate) fn specialized_instruction(
     if let Some(replacement) = specialize_with(
         instruction,
         |register| flow.proves(index, register, &TypeDescriptor::String),
-        |register| flow.proves(index, register, &TypeDescriptor::Int),
-        |register| flow.proves(index, register, &TypeDescriptor::Uint),
+        |register, kind| match kind {
+            IntegerKind::I64 => flow.proves(index, register, &TypeDescriptor::Int),
+            IntegerKind::U64 => flow.proves(index, register, &TypeDescriptor::Uint),
+        },
+        |register| flow.proves_positional_index(index, register),
         |register| flow.proves(index, register, &vector),
         |register| flow.proves(index, register, &dictionary),
         |destination, array| array_value_mode(flow, index, destination, array),
@@ -218,12 +221,14 @@ pub(crate) fn specialized_instruction(
 pub(super) fn specialize_with(
     instruction: Instruction,
     is_string: impl Fn(Register) -> bool,
-    is_int: impl Fn(Register) -> bool,
-    is_uint: impl Fn(Register) -> bool,
+    is_integer: impl Fn(Register, IntegerKind) -> bool,
+    is_positional_index: impl Fn(Register) -> bool,
     is_vector: impl Fn(Register) -> bool,
     is_dictionary: impl Fn(Register) -> bool,
     value_mode: impl Fn(Register, Register) -> ArrayValueMode,
 ) -> Option<Instruction> {
+    let is_int = |register| is_integer(register, IntegerKind::I64);
+    let is_uint = |register| is_integer(register, IntegerKind::U64);
     match instruction {
         Instruction::IndexGetOrNull {
             destination,
@@ -273,20 +278,24 @@ pub(super) fn specialize_with(
             destination,
             container,
             index,
-        } if is_string(container) && is_int(index) => Some(Instruction::StringIndexGetOrNull {
-            destination,
-            container,
-            index,
-        }),
+        } if is_string(container) && is_positional_index(index) => {
+            Some(Instruction::StringIndexGetOrNull {
+                destination,
+                container,
+                index,
+            })
+        }
         Instruction::IndexGetOrNull {
             destination,
             container,
             index,
-        } if is_vector(container) && is_int(index) => Some(Instruction::VecIndexGetOrNull {
-            destination,
-            container,
-            index,
-        }),
+        } if is_vector(container) && is_positional_index(index) => {
+            Some(Instruction::VecIndexGetOrNull {
+                destination,
+                container,
+                index,
+            })
+        }
         Instruction::IndexGetOrNull {
             destination,
             container,
@@ -321,16 +330,18 @@ pub(super) fn specialize_with(
             destination,
             container,
             index,
-        } if is_string(container) && is_int(index) => Some(Instruction::StringIndexGet {
-            destination,
-            container,
-            index,
-        }),
+        } if is_string(container) && is_positional_index(index) => {
+            Some(Instruction::StringIndexGet {
+                destination,
+                container,
+                index,
+            })
+        }
         Instruction::IndexGet {
             destination,
             container,
             index,
-        } if is_vector(container) && is_int(index) => Some(Instruction::VecIndexGet {
+        } if is_vector(container) && is_positional_index(index) => Some(Instruction::VecIndexGet {
             destination,
             container,
             index,
@@ -362,7 +373,7 @@ pub(super) fn specialize_with(
             container,
             index,
             value,
-        } if is_vector(container) && is_int(index) => Some(Instruction::VecIndexSet {
+        } if is_vector(container) && is_positional_index(index) => Some(Instruction::VecIndexSet {
             container,
             index,
             value,
@@ -431,10 +442,11 @@ fn tuple_element_index(
     container: Register,
     subscript: Register,
 ) -> Option<ImmediateInt> {
-    let ConstantValue::Int(index) = flow.constant_value(instruction, subscript)? else {
-        return None;
+    let index = match flow.constant_value(instruction, subscript)? {
+        ConstantValue::Int(index) => usize::try_from(index).ok()?,
+        ConstantValue::Uint(index) => usize::try_from(index).ok()?,
+        _ => return None,
     };
-    let index = usize::try_from(index).ok()?;
     let required = index.checked_add(1)?;
     if !flow.proves(instruction, container, &TypeDescriptor::TupleAny)
         || !flow.destructure_proven(instruction, container, required, required, true)

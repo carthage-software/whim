@@ -5,7 +5,7 @@ use Whim\_Private;
 
 /** Iterates over a snapshot of a data structure. */
 final class ArrayIterator<K, V> implements Iterator<K, V> {
-  private int $index = 0;
+  private uint $index = 0u;
   private vec<(K, V)> $entries;
 
   /** Creates an iterator over the given values. */

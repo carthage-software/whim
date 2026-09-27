@@ -104,6 +104,16 @@ pub(crate) enum ConstantValue {
     String(Atom),
 }
 
+impl ConstantValue {
+    fn position(&self) -> Option<usize> {
+        match self {
+            Self::Int(value) => usize::try_from(*value).ok(),
+            Self::Uint(value) => usize::try_from(*value).ok(),
+            _ => None,
+        }
+    }
+}
+
 impl Fact {
     const UNKNOWN: Self = Self {
         mask: ALL,
@@ -898,10 +908,10 @@ impl<'a> TypeFlow<'a> {
                             .fact(index, Register::new((first + offset) as u16))
                             .mask
                     });
-                    (index as u32 + 1, mask, INT)
+                    (index as u32 + 1, mask, UINT)
                 }
                 Instruction::NewFilledVec { value, .. } => {
-                    (index as u32 + 1, self.fact(index, value).mask, INT)
+                    (index as u32 + 1, self.fact(index, value).mask, UINT)
                 }
                 Instruction::NewArray {
                     kind: ArrayKind::Dict,
@@ -937,14 +947,22 @@ impl<'a> TypeFlow<'a> {
                 } => (
                     self.fact(index, container).array,
                     self.fact(index, value).mask,
-                    self.fact(index, subscript).mask,
+                    if self.fact(index, container).mask & !(VECTOR | TUPLE) == 0 {
+                        UINT
+                    } else {
+                        self.fact(index, subscript).mask
+                    },
                 ),
                 Instruction::VecIndexSet {
                     container, value, ..
                 }
                 | Instruction::Append { container, value }
-                | Instruction::VecAppend { container, value }
-                | Instruction::DictIndexSetIntegerKey {
+                | Instruction::VecAppend { container, value } => (
+                    self.fact(index, container).array,
+                    self.fact(index, value).mask,
+                    UINT,
+                ),
+                Instruction::DictIndexSetIntegerKey {
                     kind: IntegerKind::I64,
                     container,
                     value,
@@ -1258,7 +1276,7 @@ fn array_shape(descriptor: &TypeDescriptor) -> Option<(u16, &TypeDescriptor)> {
             descriptor_mask(key).unwrap_or(INT | UINT | BOOL | STRING),
             value.as_ref(),
         )),
-        TypeDescriptor::Vector(Some(element)) => Some((INT, element.as_ref())),
+        TypeDescriptor::Vector(Some(element)) => Some((UINT, element.as_ref())),
         TypeDescriptor::Intersection(members) => members.iter().find_map(array_shape),
         _ => None,
     }

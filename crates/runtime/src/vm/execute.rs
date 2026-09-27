@@ -98,7 +98,7 @@ use crate::vm::arrays::dict_index_get_uint_key_or_null;
 use crate::vm::arrays::dict_index_set;
 use crate::vm::arrays::dict_index_set_uint_key;
 use crate::vm::arrays::index_get_or_null;
-use crate::vm::arrays::int_position;
+use crate::vm::arrays::integer_position;
 use crate::vm::arrays::reserve_array_hint;
 use crate::vm::arrays::string_index_get_or_null;
 use crate::vm::arrays::vec_index_get_or_null;
@@ -730,11 +730,10 @@ impl VirtualMachine<'_> {
                 };
                 // SAFETY: this opcode is emitted only for a proven string container.
                 let bytes = unsafe { container.as_string_bytes().unwrap_unchecked() };
-                // SAFETY: this opcode is emitted only for a proven int index.
-                let index = unsafe { int_register($registers, $index) };
-                match int_position(index, bytes.len()) {
+                let index = borrow_register!($registers, $index);
+                match integer_position(index, bytes.len()) {
                     Ok(position) => {
-                        // SAFETY: `int_position` checked the byte index.
+                        // SAFETY: `integer_position` checked the byte index.
                         let actual = unsafe { *bytes.get_unchecked(position) };
                         write_register!(
                             $registers,
@@ -1117,11 +1116,10 @@ impl VirtualMachine<'_> {
                             let bytes = unsafe {
                                 container.as_string_bytes().unwrap_unchecked()
                             };
-                            // SAFETY: this opcode is emitted only for a proven int index.
-                            let index = unsafe { int_register($registers, index) };
-                            match int_position(index, bytes.len()) {
+                            let index = borrow_register!($registers, index);
+                            match integer_position(index, bytes.len()) {
                                 Ok(position) => {
-                                    // SAFETY: `int_position` checked the byte index.
+                                    // SAFETY: `integer_position` checked the byte index.
                                     let actual = unsafe { *bytes.get_unchecked(position) };
                                     if actual $string_byte_jump_operator byte {
                                         let relative = i32::from(offset.offset());
@@ -4853,9 +4851,8 @@ impl VirtualMachine<'_> {
                         let container = unsafe { &*registers.add(container.index() as usize) };
                         // SAFETY: the value's tag proves this projection is valid.
                         let bytes = unsafe { container.as_string_bytes().unwrap_unchecked() };
-                        // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
-                        let index = unsafe { int_register(registers, index) };
-                        match int_position(index, bytes.len()) {
+                        let index = borrow_register!(registers, index);
+                        match integer_position(index, bytes.len()) {
                             Ok(position) => {
                                 // SAFETY: the surrounding invariant keeps this index in bounds.
                                 let byte = unsafe { *bytes.get_unchecked(position) };
@@ -4885,8 +4882,7 @@ impl VirtualMachine<'_> {
                         let container =
                             // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                             unsafe { &*registers.add(container.index() as usize) };
-                        // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
-                        let index = unsafe { int_register(registers, index) };
+                        let index = borrow_register!(registers, index);
                         let outcome = match value_mode {
                             ArrayValueMode::Generic | ArrayValueMode::Float | ArrayValueMode::Uint => {
                                 vec_index_get(container, index, value_mode)
@@ -5079,8 +5075,7 @@ impl VirtualMachine<'_> {
                         index,
                         value,
                     } => {
-                        // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
-                        let index = unsafe { int_register(registers, index) };
+                        let index = borrow_register!(registers, index);
                         let value = read_register!(registers, value);
                         let outcome = {
                             let container =
@@ -5858,7 +5853,7 @@ impl VirtualMachine<'_> {
                                         write_register!(
                                             registers,
                                             key_destination,
-                                            Value::int(key)
+                                            Value::uint(key)
                                         );
                                     }
 

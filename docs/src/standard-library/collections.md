@@ -10,6 +10,8 @@ Creation and access include `values`, `keys`, `fill`, `reproduce`, and integer
 `flat_map`, `enumerate`, `reductions`, and `reduce`.
 `fill` and `reproduce` take a uint size. The `reproduce` callback receives a
 uint index.
+`keys` and key-aware callbacks use `uint` keys for vecs and tuples.
+`enumerate` returns `(uint, T)` pairs.
 
 Filtering includes `filter`, key-aware filters, null removal, partitioning, and
 callback forms that keep non-null results.
@@ -38,6 +40,8 @@ preserves order; `swap_remove!` moves the last item into the removed index.
 `Whim\Dict` keeps keys. It creates dicts from iterables, entries, keys, value
 selectors, groups, and counts.
 `count_values` returns uint counts.
+Copying a vec or tuple into a dict keeps its `uint` keys; `0` and `0u` remain
+distinct dict keys.
 
 Transform tools map values or keys, flatten nested keyed values, reindex, and
 flip. Filters preserve keys. Slice tools take, drop, pull, select keys, and
@@ -67,6 +71,7 @@ the caller may stop early or the source is a stream. See
 Empty removals and peeks return `Option<T>` so a stored `null` remains distinct
 from no item. Each type reports `count`, `isEmpty`, supports `clear`, converts
 to a vec, and implements `ToIterator`. `count()` returns a uint.
+These containers yield `uint` keys during iteration.
 
 The heap and priority queue do not share an implementation. Equal values or
 priorities have no set relative order.

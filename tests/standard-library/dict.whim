@@ -3,7 +3,10 @@ use Whim\Dict;
 use Whim\Vec;
 
 assert!(
-  Dict\from_iterable::<int, string>(vec['a', 'b']) == dict[0 => 'a', 1 => 'b'],
+  Dict\from_iterable::<uint, string>(vec['a', 'b']) == dict[
+    0u => 'a',
+    1u => 'b',
+  ],
 );
 
 assert!(

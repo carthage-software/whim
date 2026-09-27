@@ -429,8 +429,11 @@ fn specialize_array(instruction: Instruction, facts: &Facts) -> Option<Instructi
     super::specialize_arrays::specialize_with(
         instruction,
         |register| facts.get(register) == KnownKind::String,
-        |register| facts.get(register) == KnownKind::Int,
-        |register| facts.get(register) == KnownKind::Uint,
+        |register, kind| match kind {
+            IntegerKind::I64 => facts.get(register) == KnownKind::Int,
+            IntegerKind::U64 => facts.get(register) == KnownKind::Uint,
+        },
+        |register| matches!(facts.get(register), KnownKind::Int | KnownKind::Uint),
         |register| facts.get(register) == KnownKind::Vec,
         |register| facts.get(register) == KnownKind::Dict,
         |_, _| ArrayValueMode::Generic,
@@ -826,7 +829,9 @@ fn transfer(
             destination,
             container,
             index,
-        } if facts.get(container) == KnownKind::String && facts.get(index) == KnownKind::Int => {
+        } if facts.get(container) == KnownKind::String
+            && matches!(facts.get(index), KnownKind::Int | KnownKind::Uint) =>
+        {
             (destination, KnownKind::String)
         }
         Instruction::VecIndexGet {

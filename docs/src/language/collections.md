@@ -35,7 +35,7 @@ assert!(read_row((7, 'a', 'b')) == 7);
 
 ## Vecs
 
-A vec has dense integer keys from zero:
+A vec has dense `uint` keys from zero:
 
 ```whim
 $names = vec['Ada', 'Grace'];
@@ -78,9 +78,10 @@ assert!(length!($scores) == 3u);
 ```
 
 Keys do not convert. `1`, `1u`, `'1'`, and `true` are four different keys.
-The unsigned maximum is a valid key. Vec, tuple, and string positions still
-require `int`, including coalescing and containment checks; cast a uint position
-explicitly. Collection lengths and iteration keys for vecs and tuples remain int.
+The unsigned maximum is a valid key. Vec, tuple, and string positions
+accept either `int` or `uint`. Both `1` and `1u` name position one. Negative
+positions and positions outside the value's length are out of bounds.
+Collection lengths and iteration keys for vecs and tuples use `uint`.
 
 Replacing a value keeps the key's place. Removing a key and adding it again
 moves it to the end.
@@ -93,7 +94,7 @@ $values = dict[$key => 1, 'b' => 2, $key => 3];
 assert!($values == dict['a' => 3, 'b' => 2]);
 ```
 
-A dict spread accepts a tuple, vec, or dict. A tuple or vec contributes integer
+A dict spread accepts a tuple, vec, or dict. A tuple or vec contributes `uint`
 keys. A dict keeps its keys.
 
 ## Reading entries
@@ -114,10 +115,11 @@ assert!(($values['missing'] ?? false) == false);
 ```whim
 $values = vec[10, 20];
 assert!(contains_key!($values, 1));
+assert!(contains_key!($values, 1u));
 assert!(contains!($values, 20));
 ```
 
-`length!` works on every array and on strings.
+`length!` works on every array and on strings and returns `uint`.
 
 ## Removing entries
 

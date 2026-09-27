@@ -18,7 +18,7 @@ use Whim\Unwind\LogicException;
  *
  * A value that compares as `Ordering::Less` is removed first.
  */
-final class BinaryHeap<T> implements ToIterator<int, T> {
+final class BinaryHeap<T> implements ToIterator<uint, T> {
   private vec<T> $values = vec[];
   private Comparator<T> $comparator;
   private bool $comparing = false;
@@ -109,8 +109,8 @@ final class BinaryHeap<T> implements ToIterator<int, T> {
 
   /** Creates a snapshot iterator in removal order. */
   #[TrackCaller]
-  public function toIterator(): ArrayIterator<int, T> {
-    return new ArrayIterator::<int, T>($this->toVec());
+  public function toIterator(): ArrayIterator<uint, T> {
+    return new ArrayIterator::<uint, T>($this->toVec());
   }
 
   /** Restores heap order throughout the initial values. */

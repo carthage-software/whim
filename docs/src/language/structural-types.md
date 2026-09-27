@@ -53,7 +53,7 @@ function scores(dict<string, int> $scores): void {}
 scores(dict['Ada' => 10, 'Grace' => 12]);
 ```
 
-Dict keys can be `int`, `string`, or `bool`. The type may use one of them, a
+Dict keys can be `int`, `uint`, `string`, or `bool`. The type may use one of them, a
 union, a range, or another type that fits those key kinds.
 
 An empty dict has type `dict<never, never>` and fits every valid dict key and
@@ -206,8 +206,9 @@ assert!(count_values(dict['one' => 1]) == 1);
 assert!(count_values((1, 'two')) == 2);
 ```
 
-For a vec, keys are non-negative integers. For a tuple, keys form the range of
-its positions. For a dict, keys keep their declared kinds.
+Vec and tuple keys are `uint` positions starting at `0u`. Nonempty vecs and
+tuples can satisfy `array<uint, V>` but cannot satisfy `array<int, V>`.
+Dict keys keep their declared kinds.
 
 `array<K, V>` is a read-only type view. It does not change the value into a new
 array form.
