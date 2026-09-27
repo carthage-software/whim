@@ -351,6 +351,7 @@ impl ByteStringObject {
         }
     }
 
+    #[inline]
     pub(crate) fn hash64(&self, state: &HashState) -> u64 {
         let cached = self.hash.get();
         if cached != 0 {
@@ -372,13 +373,20 @@ impl ByteStringObject {
     }
 
     #[must_use]
+    #[inline]
     pub fn eq_bytes(&self, other: &Self) -> bool {
         if ptr::eq(self, other) {
             return true;
         }
+
         if self.len() != other.len() {
             return false;
         }
+
+        if let (Some(left), Some(right)) = (self.contiguous_slice(), other.contiguous_slice()) {
+            return left == right;
+        }
+
         self.cmp_bytes(other) == Ordering::Equal
     }
 
@@ -401,12 +409,14 @@ impl ByteStringObject {
                     None => break,
                 }
             }
+
             while right_chunk.is_empty() {
                 match right.next() {
                     Some(chunk) => right_chunk = chunk,
                     None => break,
                 }
             }
+
             match (left_chunk.is_empty(), right_chunk.is_empty()) {
                 (true, true) => return Ordering::Equal,
                 (true, false) => return Ordering::Less,

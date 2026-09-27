@@ -125,12 +125,48 @@ impl BodyCompiler<'_, '_> {
 
         let mut accumulator = self.chain_foot(scope, foot)?;
         let link_count = links.len();
+        if link_count >= 2
+            && let Ok(count) = u8::try_from(link_count)
+            && links.iter().all(|link| match link {
+                ChainLink::Index(access) => match access.index {
+                    Expression::Literal(_) => true,
+                    Expression::Variable(variable) => self
+                        .local_position(variable.name)
+                        .is_some_and(|position| self.locals[position].defined),
+                    _ => false,
+                },
+                _ => false,
+            })
+        {
+            let destination = self.allocate(expression.span())?;
+            let mark = self.registers.mark();
+            let indexes = links.iter().rev().filter_map(|link| match link {
+                ChainLink::Index(access) => Some(access.index),
+                _ => None,
+            });
+
+            let first_index = self.window(scope, indexes, link_count, expression.span())?;
+            self.chunk.emit(
+                Instruction::IndexGetPath {
+                    index_count: Count::new(count),
+                    destination,
+                    container: accumulator,
+                    first_index,
+                },
+                expression.span(),
+            );
+
+            self.registers.release_to(mark);
+            return Ok(destination);
+        }
+
         for (index, link) in links.into_iter().rev().enumerate() {
             let link_use = if index + 1 == link_count {
                 value_use
             } else {
                 ValueUse::Needed
             };
+
             accumulator = self.chain_link(scope, &link, accumulator, start, escapes, link_use)?;
         }
 

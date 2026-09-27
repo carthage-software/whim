@@ -117,6 +117,14 @@ impl TypeFlow<'_> {
         let value =
             |register: Register| self.constant_value_fact(self.fact(index, register), depth + 1);
         match self.chunk.code[index] {
+            Instruction::Move {
+                destination,
+                source,
+            }
+            | Instruction::MoveOwned {
+                destination,
+                source,
+            } => Some((destination, value(source)?)),
             Instruction::LoadConstant {
                 destination,
                 constant,
@@ -643,6 +651,7 @@ impl TypeFlow<'_> {
         if depth > MAX_TYPE_DEPTH {
             return None;
         }
+
         if let Some(descriptor) = self.origin_descriptor(fact.origin, depth + 1) {
             return match descriptor {
                 TypeDescriptor::TrueLiteral => Some(ConstantValue::Bool(true)),
@@ -654,6 +663,7 @@ impl TypeFlow<'_> {
                 _ => None,
             };
         }
+
         let index = instruction_index(fact.origin)?;
         self.constant_result_at(index, depth + 1)
             .map(|(_, value)| value)

@@ -99,6 +99,9 @@ use crate::vm::arrays::dict_index_get_uint_key_or_null;
 use crate::vm::arrays::dict_index_set;
 use crate::vm::arrays::dict_index_set_uint_key;
 use crate::vm::arrays::index_get_or_null;
+use crate::vm::arrays::index_get_path;
+use crate::vm::arrays::index_set_path;
+use crate::vm::arrays::index_update_path;
 use crate::vm::arrays::integer_position;
 use crate::vm::arrays::reserve_array_hint;
 use crate::vm::arrays::string_index_get_or_null;
@@ -5062,6 +5065,77 @@ impl VirtualMachine<'_> {
                             // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                             let slot = unsafe { &mut *registers.add(container.index() as usize) };
                             index_set(slot, &index_value, new_value)
+                        };
+
+                        if let Err(fault) = outcome {
+                            fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                        }
+                    }
+                    Instruction::IndexGetPath {
+                        index_count,
+                        destination,
+                        container,
+                        first_index,
+                    } => {
+                        // SAFETY: verification bounds the container and the nonempty index window.
+                        let outcome = unsafe {
+                            index_get_path(
+                                &self.heap,
+                                &*registers.add(usize::from(container.index())),
+                                slice::from_raw_parts(
+                                    registers.add(usize::from(first_index.index())),
+                                    usize::from(index_count.value()),
+                                ),
+                            )
+                        };
+
+                        match outcome {
+                            Ok(value) => write_register!(registers, destination, value),
+                            Err(fault) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                        }
+                    }
+                    Instruction::IndexUpdatePath { index_count, operation, container, operand } => {
+                        // SAFETY: verification bounds the operand window and keeps it disjoint from the container.
+                        let outcome = unsafe {
+                            index_update_path(
+                                &self.heap,
+                                &mut *registers.add(usize::from(container.index())),
+                                slice::from_raw_parts(registers.add(usize::from(operand.index()) + 1), usize::from(index_count.value())),
+                                &*registers.add(usize::from(operand.index())),
+                                operation,
+                            )
+                        };
+
+                        match outcome {
+                            Ok(value) => write_register!(registers, operand, value),
+                            Err(IndexAddFault::Array(fault)) => {
+                                fail!(self, ip, floor, 'dispatch, self.array_fault(fault));
+                            }
+                            Err(IndexAddFault::Arithmetic { fault, left_kind, right_kind }) => {
+                                fail!(self, ip, floor, 'dispatch, self.binary_fault(fault, operation.symbol(), left_kind, right_kind));
+                            }
+                        }
+                    }
+                    Instruction::IndexSetPath {
+                        index_count,
+                        container,
+                        first_index,
+                        value,
+                    } => {
+                        let value = read_register!(registers, value);
+                        // SAFETY: verification bounds the nonempty index window and keeps it disjoint from the container.
+                        let outcome = unsafe {
+                            index_set_path(
+                                &self.heap,
+                                &mut *registers.add(usize::from(container.index())),
+                                slice::from_raw_parts(
+                                    registers.add(usize::from(first_index.index())),
+                                    usize::from(index_count.value()),
+                                ),
+                                value,
+                            )
                         };
 
                         if let Err(fault) = outcome {

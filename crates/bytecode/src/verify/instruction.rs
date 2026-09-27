@@ -64,6 +64,53 @@ pub(in crate::verify) fn verify_instruction(
     instruction.try_visit_operands(|operand| verify_operand(chunk, at, operand))?;
 
     match instruction {
+        Instruction::IndexUpdatePath {
+            index_count,
+            container,
+            operand,
+            ..
+        } => {
+            let first = u32::from(operand.index());
+            let count = u32::from(index_count.value()) + 1;
+            check_window(chunk, at, first, count as usize)?;
+            if count == 1 || (first..first + count).contains(&u32::from(container.index())) {
+                return Err(VerifyError::IndexPathInvalid { instruction: at });
+            }
+            Ok(())
+        }
+        Instruction::IndexGetPath {
+            index_count,
+            first_index,
+            ..
+        } => {
+            check_window(
+                chunk,
+                at,
+                u32::from(first_index.index()),
+                usize::from(index_count.value()),
+            )?;
+            if index_count.value() == 0 {
+                return Err(VerifyError::IndexPathInvalid { instruction: at });
+            }
+            Ok(())
+        }
+        Instruction::IndexSetPath {
+            index_count,
+            container,
+            first_index,
+            ..
+        } => {
+            let first = u32::from(first_index.index());
+            let count = usize::from(index_count.value());
+            check_window(chunk, at, first, count)?;
+            if count == 0
+                || (first..first + u32::from(index_count.value()))
+                    .contains(&u32::from(container.index()))
+            {
+                return Err(VerifyError::IndexPathInvalid { instruction: at });
+            }
+            Ok(())
+        }
         Instruction::ConcatenateRightConstant {
             constant: message, ..
         }

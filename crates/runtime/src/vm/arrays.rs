@@ -2,8 +2,10 @@
 
 use std::fmt::Display;
 
+use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_bytecode::instruction::operands::ArrayValueMode;
+use whim_bytecode::instruction::operands::IndexUpdateOperation;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::dict::keys::Key;
@@ -14,9 +16,22 @@ use whim_value::ops;
 use crate::vm::ArrayFault;
 use crate::vm::Fault;
 use crate::vm::arithmetic_add;
+use crate::vm::arithmetic_divide;
+use crate::vm::arithmetic_modulo;
+use crate::vm::arithmetic_multiply;
+use crate::vm::arithmetic_power;
+use crate::vm::arithmetic_subtract;
+use crate::vm::bitwise_and;
+use crate::vm::bitwise_or;
+use crate::vm::bitwise_xor;
 use crate::vm::debug_render;
 use crate::vm::integer_add;
+use crate::vm::shift_left;
+use crate::vm::shift_right;
 use crate::vm::unreachable_invariant;
+
+#[cfg(test)]
+mod path_tests;
 
 /// The dict key of a value, following the language's key strictness.
 #[inline(always)]
@@ -646,6 +661,181 @@ pub(in crate::vm) fn index_set(
         )),
         _ => Err(bad_container(container)),
     }
+}
+
+pub(in crate::vm) fn index_get_path(
+    heap: &Heap,
+    mut container: &Value,
+    indexes: &[Value],
+) -> Result<Value, ArrayFault> {
+    // SAFETY: verification rejects empty index paths.
+    let (last, parents) = unsafe {
+        unwrap_option_invariant(indexes.split_last(), "a verified index path is nonempty")
+    };
+    for (depth, index) in parents.iter().enumerate() {
+        container = match container.transparent() {
+            ValueView::Vec(values) => {
+                let position = vec_position(index, values.len())?;
+                // SAFETY: vec_position checked the bounds.
+                unsafe { unwrap_option_invariant(values.get(position), "the index is in bounds") }
+            }
+            ValueView::Tuple(values) => {
+                let position = vec_position(index, values.len())?;
+                // SAFETY: vec_position checked the bounds.
+                unsafe { unwrap_option_invariant(values.get(position), "the index is in bounds") }
+            }
+            ValueView::Dict(values) => values
+                .get_ref(dict_key_ref(index)?)
+                .ok_or_else(|| missing_dict_key(heap, index))?,
+            _ => {
+                let mut value = index_get(heap, container, index)?;
+                for index in &indexes[depth + 1..] {
+                    value = index_get(heap, &value, index)?;
+                }
+                return Ok(value);
+            }
+        };
+    }
+    index_get(heap, container, last)
+}
+
+pub(in crate::vm) fn index_set_path(
+    heap: &Heap,
+    mut container: &mut Value,
+    indexes: &[Value],
+    value: Value,
+) -> Result<(), ArrayFault> {
+    // SAFETY: verification rejects empty index paths.
+    let (last, parents) = unsafe {
+        unwrap_option_invariant(indexes.split_last(), "a verified index path is nonempty")
+    };
+
+    for (depth, index) in parents.iter().enumerate() {
+        if container.is_vec() {
+            // SAFETY: is_vec checked the container's tag.
+            let vector = unsafe {
+                unwrap_option_invariant(container.as_vec_mut(), "the container is a vector")
+            };
+            let position = vec_position(index, vector.len())?;
+            // SAFETY: vec_position checked the bounds, and make_mut preserves the length.
+            container = unsafe {
+                unwrap_option_invariant(
+                    vector.make_mut().get_mut(position),
+                    "the index is in bounds",
+                )
+            };
+        } else if container.is_dict() {
+            // SAFETY: is_dict checked the container's tag.
+            let dictionary = unsafe {
+                unwrap_option_invariant(container.as_dict_mut(), "the container is a dictionary")
+            };
+            let key = dict_key_ref(index)?;
+            container = dictionary
+                .make_mut()
+                .get_mut_ref(key)
+                .ok_or_else(|| missing_dict_key(heap, index))?;
+        } else {
+            return index_set_path_fallback(heap, container, &indexes[depth..], value);
+        }
+    }
+
+    index_set(container, last, value)
+}
+
+#[cold]
+fn index_set_path_fallback(
+    heap: &Heap,
+    container: &mut Value,
+    indexes: &[Value],
+    mut value: Value,
+) -> Result<(), ArrayFault> {
+    let mut levels = Vec::with_capacity(indexes.len());
+    levels.push(container.clone());
+    for index in &indexes[..indexes.len() - 1] {
+        // SAFETY: levels starts with the root and only grows here.
+        let parent = unsafe { unwrap_option_invariant(levels.last(), "the path has a root") };
+        levels.push(index_get(heap, parent, index)?);
+    }
+
+    for (mut level, index) in levels.into_iter().zip(indexes).rev() {
+        index_set(&mut level, index, value)?;
+        value = level;
+    }
+
+    *container = value;
+    Ok(())
+}
+
+pub(in crate::vm) fn index_update_path(
+    heap: &Heap,
+    mut container: &mut Value,
+    indexes: &[Value],
+    operand: &Value,
+    operation: IndexUpdateOperation,
+) -> Result<Value, IndexAddFault> {
+    for (depth, index) in indexes.iter().enumerate() {
+        if container.is_vec() {
+            // SAFETY: is_vec checked the container's tag.
+            let vector = unsafe {
+                unwrap_option_invariant(container.as_vec_mut(), "the container is a vector")
+            };
+            let position = vec_position(index, vector.len()).map_err(IndexAddFault::Array)?;
+            // SAFETY: vec_position checked the bounds, and make_mut preserves the length.
+            container = unsafe {
+                unwrap_option_invariant(
+                    vector.make_mut().get_mut(position),
+                    "the index is in bounds",
+                )
+            };
+        } else if container.is_dict() {
+            // SAFETY: is_dict checked the container's tag.
+            let dictionary = unsafe {
+                unwrap_option_invariant(container.as_dict_mut(), "the container is a dictionary")
+            };
+            let key = dict_key_ref(index).map_err(IndexAddFault::Array)?;
+            container = dictionary
+                .make_mut()
+                .get_mut_ref(key)
+                .ok_or_else(|| IndexAddFault::Array(missing_dict_key(heap, index)))?;
+        } else {
+            let current =
+                index_get_path(heap, container, &indexes[depth..]).map_err(IndexAddFault::Array)?;
+            let next = index_update_value(heap, &current, operand, operation)?;
+            index_set_path(heap, container, &indexes[depth..], next.clone())
+                .map_err(IndexAddFault::Array)?;
+            return Ok(next);
+        }
+    }
+
+    let next = index_update_value(heap, container, operand, operation)?;
+    *container = next.clone();
+    Ok(next)
+}
+
+fn index_update_value(
+    heap: &Heap,
+    current: &Value,
+    operand: &Value,
+    operation: IndexUpdateOperation,
+) -> Result<Value, IndexAddFault> {
+    match operation {
+        IndexUpdateOperation::Add => arithmetic_add(heap, current, operand),
+        IndexUpdateOperation::Subtract => arithmetic_subtract(heap, current, operand),
+        IndexUpdateOperation::Multiply => arithmetic_multiply(heap, current, operand),
+        IndexUpdateOperation::Divide => arithmetic_divide(heap, current, operand),
+        IndexUpdateOperation::Modulo => arithmetic_modulo(heap, current, operand),
+        IndexUpdateOperation::Power => arithmetic_power(heap, current, operand),
+        IndexUpdateOperation::BitwiseAnd => bitwise_and(heap, current, operand),
+        IndexUpdateOperation::BitwiseOr => bitwise_or(heap, current, operand),
+        IndexUpdateOperation::BitwiseXor => bitwise_xor(heap, current, operand),
+        IndexUpdateOperation::ShiftLeft => shift_left(heap, current, operand),
+        IndexUpdateOperation::ShiftRight => shift_right(heap, current, operand),
+    }
+    .map_err(|fault| IndexAddFault::Arithmetic {
+        fault,
+        left_kind: current.kind_name(),
+        right_kind: operand.kind_name(),
+    })
 }
 
 pub(in crate::vm) enum IndexSetRollback {

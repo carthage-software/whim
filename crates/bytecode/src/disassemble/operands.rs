@@ -561,6 +561,42 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(subscript),
             register(value)
         ),
+        Instruction::IndexGetPath {
+            index_count,
+            destination,
+            container,
+            first_index,
+        } => format!(
+            " {}, {}, r{}..r{}",
+            register(destination),
+            register(container),
+            first_index.index(),
+            u32::from(first_index.index()) + u32::from(index_count.value()),
+        ),
+        Instruction::IndexUpdatePath {
+            index_count,
+            operation,
+            container,
+            operand,
+        } => format!(
+            ".{operation:?} {}, {}, r{}..r{}",
+            register(container),
+            register(operand),
+            u32::from(operand.index()) + 1,
+            u32::from(operand.index()) + 1 + u32::from(index_count.value()),
+        ),
+        Instruction::IndexSetPath {
+            index_count,
+            container,
+            first_index,
+            value,
+        } => format!(
+            " {}, r{}..r{}, {}",
+            register(container),
+            first_index.index(),
+            u32::from(first_index.index()) + u32::from(index_count.value()),
+            register(value)
+        ),
         Instruction::IndexAddAssign {
             container,
             index: subscript,

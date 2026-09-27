@@ -115,6 +115,7 @@ pub(crate) fn with_destination(
         | Instruction::Not { destination, .. }
         | Instruction::NewArray { destination, .. }
         | Instruction::IndexGet { destination, .. }
+        | Instruction::IndexGetPath { destination, .. }
         | Instruction::StringIndexGet { destination, .. }
         | Instruction::StringByteEqual { destination, .. }
         | Instruction::StringByteNotEqual { destination, .. }

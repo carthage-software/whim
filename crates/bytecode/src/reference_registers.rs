@@ -71,6 +71,7 @@ pub fn mask_with_classification(
             | Instruction::NewArray { destination, .. }
             | Instruction::NewFilledVec { destination, .. }
             | Instruction::IndexGet { destination, .. }
+            | Instruction::IndexGetPath { destination, .. }
             | Instruction::Rest { destination, .. }
             | Instruction::Remove { destination, .. }
             | Instruction::SwapRemove { destination, .. }
@@ -222,6 +223,8 @@ pub fn mask_with_classification(
             | Instruction::BoolPatternBranch { .. }
             | Instruction::CheckDefined { .. }
             | Instruction::IndexSet { .. }
+            | Instruction::IndexSetPath { .. }
+            | Instruction::IndexUpdatePath { .. }
             | Instruction::Append { .. }
             | Instruction::Spread { .. }
             | Instruction::Length { .. }

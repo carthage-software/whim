@@ -255,6 +255,7 @@ impl DictObject {
     }
 
     #[must_use]
+    #[inline(always)]
     pub fn get_ref(&self, key: KeyRef<'_>) -> Option<&Value> {
         if let Some(values) = &self.packed {
             let KeyRef::Int(position) = key else {
@@ -333,6 +334,7 @@ impl DictObject {
         }
     }
 
+    #[inline(always)]
     pub fn get_mut_ref(&mut self, key: KeyRef<'_>) -> Option<&mut Value> {
         if self.packed.is_some() {
             let KeyRef::Int(position) = key else {

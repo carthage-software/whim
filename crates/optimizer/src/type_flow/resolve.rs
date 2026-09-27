@@ -331,6 +331,10 @@ impl<'a> TypeFlow<'a> {
                 let (_, element) = array_shape(&descriptor)?;
                 return Some((*value_destination, self.descriptor_fact(element, origin)));
             }
+            Instruction::IndexGetPath { destination, .. } => {
+                let descriptor = self.origin_type(origin, 0)?;
+                return Some((*destination, self.descriptor_fact(&descriptor, origin)));
+            }
             Instruction::IndexGet {
                 destination,
                 container,
@@ -737,6 +741,26 @@ impl<'a> TypeFlow<'a> {
                 let key = self.constant_value_fact(self.fact(index, key), depth + 1)?;
 
                 Self::constant_indexed_descriptor(&container, &key).cloned()
+            }
+            Instruction::IndexGetPath {
+                container,
+                first_index,
+                index_count,
+                ..
+            } => {
+                let mut descriptor = self.register_type_at(index, container, depth + 1)?;
+                for offset in 0..u16::from(index_count.value()) {
+                    descriptor = self.expand_aliases_owned(descriptor);
+                    descriptor = if let Some((_, element)) = array_shape(&descriptor) {
+                        element.clone()
+                    } else {
+                        let key = Register::new(first_index.index() + offset);
+                        let key = self.constant_value_fact(self.fact(index, key), depth + 1)?;
+                        Self::constant_indexed_descriptor(&descriptor, &key)?.clone()
+                    };
+                }
+
+                Some(descriptor)
             }
             Instruction::ElementGet {
                 subject,

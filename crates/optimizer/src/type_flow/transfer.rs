@@ -6,6 +6,7 @@ use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::ArrayValueMode;
 use whim_bytecode::instruction::operands::Comparison;
+use whim_bytecode::instruction::operands::IndexUpdateOperation;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::Register;
 
@@ -516,6 +517,9 @@ pub(crate) fn transfer(
         | Instruction::StaticPropertyCoalesce { destination, .. } => {
             write(destination, Fact::UNKNOWN)
         }
+        Instruction::IndexGetPath { destination, .. } => {
+            write(destination, Fact::with_origin(ALL, origin));
+        }
         Instruction::IndexGet {
             destination,
             container,
@@ -664,6 +668,35 @@ pub(crate) fn transfer(
             let mut current = read(container);
             current.observable_release |= read(value).observable_release;
             write(container, current.without_origin());
+        }
+        Instruction::IndexUpdatePath {
+            container,
+            operand,
+            operation,
+            ..
+        } => {
+            let mut current = Fact::known(read(container).mask);
+            current.observable_release = read(container).observable_release;
+            write(container, current);
+            let mask = match operation {
+                IndexUpdateOperation::Divide => FLOAT,
+                IndexUpdateOperation::Modulo
+                | IndexUpdateOperation::BitwiseAnd
+                | IndexUpdateOperation::BitwiseOr
+                | IndexUpdateOperation::BitwiseXor
+                | IndexUpdateOperation::ShiftLeft
+                | IndexUpdateOperation::ShiftRight => INT | UINT,
+                _ => INT | UINT | FLOAT,
+            };
+            write(operand, Fact::known(mask));
+        }
+        Instruction::IndexSetPath {
+            container, value, ..
+        } => {
+            let mut current = Fact::known(read(container).mask);
+            current.observable_release =
+                read(container).observable_release | read(value).observable_release;
+            write(container, current);
         }
         Instruction::IndexAddAssign { container, .. } => {
             let current = read(container);

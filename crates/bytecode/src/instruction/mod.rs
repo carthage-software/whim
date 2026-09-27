@@ -29,6 +29,7 @@ use crate::instruction::operands::ImmediateInt;
 use crate::instruction::operands::ImmediateInteger;
 use crate::instruction::operands::ImmediateUint;
 use crate::instruction::operands::IndexAddMode;
+use crate::instruction::operands::IndexUpdateOperation;
 use crate::instruction::operands::IntStepLoopDescriptorIndex;
 use crate::instruction::operands::IntegerKind;
 use crate::instruction::operands::JumpOffset;
@@ -151,6 +152,7 @@ macro_rules! instruction_set {
             Length { destination: Register, source: Register } = 99,
             ElementGet { destination: Register, subject: Register, index: ImmediateInt } = 100,
             IndexGet { destination: Register, container: Register, index: Register } = 101,
+            IndexGetPath { index_count: Count, destination: Register, container: Register, first_index: Register } = 210,
             VecIndexGet { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode } = 102,
             DictIndexGetIntKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode } = 103,
             DictIndexGetUintKey { destination: Register, container: Register, index: Register, value_mode: ArrayValueMode } = 104,
@@ -165,6 +167,8 @@ macro_rules! instruction_set {
             DictIndexCoalesceUintKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 113,
             DictIndexCoalesceStringKey { destination: Register, container: Register, index: Register, offset: NearJumpOffset } = 114,
             IndexSet { container: Register, index: Register, value: Register } = 115,
+            IndexSetPath { index_count: Count, container: Register, first_index: Register, value: Register } = 209,
+            IndexUpdatePath { index_count: Count, operation: IndexUpdateOperation, container: Register, operand: Register } = 211,
             VecIndexSet { container: Register, index: Register, value: Register } = 116,
             DictIndexSet { container: Register, index: Register, value: Register } = 117,
             DictIndexSetIntegerKey { container: Register, index: Register, value: Register, kind: IntegerKind } = 118,

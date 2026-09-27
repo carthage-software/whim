@@ -117,6 +117,9 @@ pub enum VerifyError {
         first: u32,
         count: usize,
     },
+    IndexPathInvalid {
+        instruction: u32,
+    },
     ForeachNextWithoutJump {
         instruction: u32,
     },

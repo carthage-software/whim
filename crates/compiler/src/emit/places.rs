@@ -6,10 +6,12 @@ use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::AsMode;
+use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::IcSlot;
 use whim_bytecode::instruction::operands::ImmediateInt;
 use whim_bytecode::instruction::operands::ImmediateInteger;
 use whim_bytecode::instruction::operands::IndexAddMode;
+use whim_bytecode::instruction::operands::IndexUpdateOperation;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::PropertyIndexUpdateMode;
@@ -171,7 +173,22 @@ impl BodyCompiler<'_, '_> {
             AssignmentOperator::Assign(_) => {
                 let place = self.prepare_place(scope, &assignment.target)?;
                 let value = self.expression(scope, assignment.value)?;
-                self.write_place(scope, &place, value, assignment.span())?;
+                if let Some((container, first_index, index_count)) =
+                    self.index_path(&place, None, assignment.span())?
+                {
+                    self.chunk.emit(
+                        Instruction::IndexSetPath {
+                            index_count,
+                            container,
+                            first_index,
+                            value,
+                        },
+                        assignment.span(),
+                    );
+                } else {
+                    self.write_place(scope, &place, value, assignment.span())?;
+                }
+
                 Ok(value)
             }
             AssignmentOperator::Coalesce(_)
@@ -206,6 +223,12 @@ impl BodyCompiler<'_, '_> {
             _ => {
                 let mut place = self.prepare_place(scope, &assignment.target)?;
                 let value = self.expression(scope, assignment.value)?;
+                if let Some(result) =
+                    self.compound_index_path(&place, assignment.operator, value, assignment.span())?
+                {
+                    return Ok(result);
+                }
+
                 self.materialize_place(&mut place, assignment.span())?;
                 let current = self.read_place(&place, assignment.span())?;
                 if let Place::Local { name } = &place {
@@ -668,6 +691,7 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 );
+
                 Ok(())
             }
             Place::StaticProperty { cache } => {
@@ -678,6 +702,7 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 );
+
                 Ok(())
             }
             Place::Temporary { .. } => Ok(()),
@@ -687,6 +712,94 @@ impl BodyCompiler<'_, '_> {
             }
             Place::Dict { entries } => self.write_dict(scope, entries, value, span, refresh_chain),
         }
+    }
+
+    fn compound_index_path(
+        &mut self,
+        place: &Place<'_>,
+        operator: AssignmentOperator,
+        value: Register,
+        span: Span,
+    ) -> Result<Option<Register>, CompileError> {
+        let operation = match operator {
+            AssignmentOperator::Addition(_) => IndexUpdateOperation::Add,
+            AssignmentOperator::Subtraction(_) => IndexUpdateOperation::Subtract,
+            AssignmentOperator::Multiplication(_) => IndexUpdateOperation::Multiply,
+            AssignmentOperator::Division(_) => IndexUpdateOperation::Divide,
+            AssignmentOperator::Modulo(_) => IndexUpdateOperation::Modulo,
+            AssignmentOperator::Exponentiation(_) => IndexUpdateOperation::Power,
+            AssignmentOperator::BitwiseAnd(_) => IndexUpdateOperation::BitwiseAnd,
+            AssignmentOperator::BitwiseOr(_) => IndexUpdateOperation::BitwiseOr,
+            AssignmentOperator::BitwiseXor(_) => IndexUpdateOperation::BitwiseXor,
+            AssignmentOperator::LeftShift(_) => IndexUpdateOperation::ShiftLeft,
+            AssignmentOperator::RightShift(_) => IndexUpdateOperation::ShiftRight,
+            _ => return Ok(None),
+        };
+
+        let Some((container, first_index, index_count)) =
+            self.index_path(place, Some(value), span)?
+        else {
+            return Ok(None);
+        };
+
+        let operand = Register::new(first_index.index() - 1);
+        self.chunk.emit(
+            Instruction::IndexUpdatePath {
+                index_count,
+                operation,
+                container,
+                operand,
+            },
+            span,
+        );
+
+        Ok(Some(operand))
+    }
+
+    fn index_path(
+        &mut self,
+        place: &Place<'_>,
+        operand: Option<Register>,
+        span: Span,
+    ) -> Result<Option<(Register, Register, Count)>, CompileError> {
+        let Place::Chain { root, steps, .. } = place else {
+            return Ok(None);
+        };
+
+        if !matches!(root.as_ref(), Place::Local { .. })
+            || steps.len() < 2
+            || steps.iter().any(|step| matches!(step, ChainStep::Append))
+        {
+            return Ok(None);
+        }
+
+        let Ok(count) = u8::try_from(steps.len()) else {
+            return Ok(None);
+        };
+
+        let container = self.read_place(root, span)?;
+        if let Some(value) = operand {
+            let operand = self.allocate(span)?;
+            self.move_into(operand, value, span);
+        }
+
+        let first_index = self.allocate(span)?;
+        for (offset, step) in steps.iter().enumerate() {
+            let ChainStep::Index(index) = step else {
+                // SAFETY: the check above excludes append steps.
+                unsafe { unreachable_invariant("appending paths use write_chain") }
+            };
+
+            let target = if offset == 0 {
+                first_index
+            } else {
+                self.allocate(span)?
+            };
+
+            self.move_into(target, *index, span);
+        }
+
+        Ok(Some((container, first_index, Count::new(count))))
     }
 
     fn write_chain(
@@ -721,6 +834,7 @@ impl BodyCompiler<'_, '_> {
         } else {
             None
         };
+
         // SAFETY: the surrounding invariant proves this option contains a value.
         let levels = unsafe {
             unwrap_option_invariant(
@@ -728,6 +842,7 @@ impl BodyCompiler<'_, '_> {
                 "a chain is materialized before it is written",
             )
         };
+
         let leaf = levels[levels.len() - 1];
         match steps.last() {
             Some(ChainStep::Index(index)) => self.chunk.emit(
@@ -748,11 +863,13 @@ impl BodyCompiler<'_, '_> {
             // SAFETY: the surrounding invariant makes this path unreachable.
             None => unsafe { unreachable_invariant("a chain has at least one step") },
         };
+
         for level in (1..levels.len()).rev() {
             let ChainStep::Index(index) = steps[level - 1] else {
                 // SAFETY: the surrounding invariant makes this path unreachable.
                 unsafe { unreachable_invariant("only the leaf step appends") }
             };
+
             self.chunk.emit(
                 Instruction::IndexSet {
                     container: levels[level - 1],
@@ -762,6 +879,7 @@ impl BodyCompiler<'_, '_> {
                 span,
             );
         }
+
         self.write_place(scope, root, levels[0], span)
     }
 

@@ -41,6 +41,7 @@ const R2: Operand = operand(2, Access::Read);
 const R3: Operand = operand(3, Access::Read);
 const R4: Operand = operand(4, Access::Read);
 const R5: Operand = operand(5, Access::Read);
+const R6: Operand = operand(6, Access::Read);
 const W1: Operand = operand(1, Access::Write);
 const W2: Operand = operand(2, Access::Write);
 const W3: Operand = operand(3, Access::Write);
@@ -99,6 +100,9 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
         InstructionKind::CallNamedUnchecked
         | InstructionKind::CallSelfUnchecked
         | InstructionKind::Require => Some(&[R4, W2]),
+        InstructionKind::IndexSetPath => Some(&[R2, R4, R6]),
+        InstructionKind::IndexGetPath => Some(&[W2, R4, R6]),
+        InstructionKind::IndexUpdatePath => Some(&[R3, R5, W5]),
         InstructionKind::CallValue
         | InstructionKind::CallValueUnchecked
         | InstructionKind::CallValueDiscarded => Some(&[W2, R4]),
@@ -280,6 +284,21 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
 /// [`operands`]; this returns only its implicit successors.
 pub(crate) fn implicit_reads(instruction: Instruction) -> Option<(Register, usize)> {
     match instruction {
+        Instruction::IndexUpdatePath {
+            operand,
+            index_count,
+            ..
+        } => Some((operand, usize::from(index_count.value()) + 1)),
+        Instruction::IndexSetPath {
+            first_index,
+            index_count,
+            ..
+        }
+        | Instruction::IndexGetPath {
+            first_index,
+            index_count,
+            ..
+        } => Some((first_index, usize::from(index_count.value()))),
         Instruction::Assert {
             operand_count,
             first_value,

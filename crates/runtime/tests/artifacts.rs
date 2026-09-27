@@ -57,6 +57,22 @@ assert!(match (MAXIMUM) { 18446744073709551615u => true, _ => false });
 }
 
 #[test]
+fn nested_index_paths_survive_artifacts() {
+    let artifact = compile(
+        "$data = dict['rows' => vec[dict['count' => 1]]];
+         $saved = $data;
+         $data['rows'][0]['count'] += 2;
+         $data['rows'][0]['extra'] = 4;
+         assert!($data['rows'][0]['count'] == 3);
+         assert!($data['rows'][0]['extra'] == 4);
+         assert!($saved['rows'][0] == dict['count' => 1]);",
+        "/artifact/nested-index-paths.whim",
+    );
+    let mut engine = Engine::new(EngineConfiguration::default());
+    engine.load_artifact(&artifact).unwrap();
+}
+
+#[test]
 fn windows_signal_artifact_rejects_unsupported_operations() {
     let root = env!("CARGO_MANIFEST_DIR");
     let mut sources: Vec<_> = [
@@ -276,21 +292,21 @@ assert!($secondAttribute->getTarget()->getPath() == '/attributes/second.whim');
 }
 
 #[test]
-fn artifact_loading_rejects_old_reference_ownership_metadata() {
+fn artifact_loading_rejects_old_instruction_encodings() {
     let mut artifact = compile("assert!(true);", "/artifact/old-ownership-mask.whim");
     let mut engine = Engine::new(EngineConfiguration::default());
     engine
         .load_artifact(&artifact)
         .expect("the current artifact loads");
 
-    artifact[8..12].copy_from_slice(&20_u32.to_le_bytes());
+    artifact[8..12].copy_from_slice(&21_u32.to_le_bytes());
     let error = engine
         .load_artifact(&artifact)
-        .expect_err("version 20 may contain incomplete reference ownership masks");
+        .expect_err("version 21 uses the old instruction encoding");
     assert!(
         error
             .to_string()
-            .contains("artifact format version 20 is unsupported")
+            .contains("artifact format version 21 is unsupported")
     );
 }
 

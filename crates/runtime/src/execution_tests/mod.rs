@@ -5,6 +5,7 @@ mod declaration_optimization;
 mod final_class_checks;
 mod matching;
 mod native_byte_at;
+mod nested_writes;
 mod nominal_refinement;
 mod object_shape_checks;
 mod returns;

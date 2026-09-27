@@ -22,6 +22,63 @@ use crate::type_flow::World;
 const INPUT: Register = Register::new(0);
 const CONDITION: Register = Register::new(1);
 
+#[test]
+fn constant_keys_load_into_their_consuming_window() {
+    let heap = Heap::new();
+    let mut chunk = Chunk::new();
+    chunk.register_count = 6;
+    chunk.local_register_count = 1;
+    let row = chunk
+        .add_constant(Literal::String(heap.intern(b"row")))
+        .unwrap();
+    let value = chunk
+        .add_constant(Literal::String(heap.intern(b"value")))
+        .unwrap();
+    for instruction in [
+        Instruction::LoadConstant {
+            destination: Register::new(1),
+            constant: row,
+        },
+        Instruction::LoadConstant {
+            destination: Register::new(2),
+            constant: value,
+        },
+        Instruction::Move {
+            destination: Register::new(3),
+            source: Register::new(1),
+        },
+        Instruction::MoveOwned {
+            destination: Register::new(4),
+            source: Register::new(2),
+        },
+        Instruction::IndexGetPath {
+            index_count: Count::new(2),
+            destination: Register::new(5),
+            container: Register::new(0),
+            first_index: Register::new(3),
+        },
+        Instruction::Return {
+            source: Register::new(5),
+        },
+    ] {
+        chunk.emit(instruction, Span::zero());
+    }
+    optimize_chunk(
+        &mut chunk,
+        &heap,
+        OptimizationConfiguration::default(),
+        &mut OptimizationStatistics::default(),
+    );
+    verify(&chunk).unwrap();
+    assert_eq!(chunk.code.len(), 4, "{:?}", chunk.code);
+    assert!(
+        matches!(chunk.code[0], Instruction::LoadConstant { destination, constant } if destination == Register::new(3) && constant == row)
+    );
+    assert!(
+        matches!(chunk.code[1], Instruction::LoadConstant { destination, constant } if destination == Register::new(4) && constant == value)
+    );
+}
+
 fn assertion_chunk(heap: &Heap, success: bool) -> Chunk {
     let mut chunk = Chunk::new();
     chunk.register_count = 2;

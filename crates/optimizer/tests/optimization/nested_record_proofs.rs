@@ -96,7 +96,23 @@ fn numeric_index_modes_use_the_producer_even_before_unrelated_instructions() {
                 }
             ))
             .count(),
-        4,
+        3,
+        "{:?}",
+        total.chunk.code
+    );
+    assert!(
+        total
+            .chunk
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::IndexGetPath { .. }))
+    );
+    assert!(
+        total
+            .chunk
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::ReturnScalarUnchecked { .. })),
         "{:?}",
         total.chunk.code
     );

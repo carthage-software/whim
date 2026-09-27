@@ -43,6 +43,7 @@ pub(in crate::dict) fn slot_matches(slot: &Slot, key: &Key) -> bool {
     }
 }
 
+#[inline(always)]
 pub(in crate::dict) fn slot_matches_ref(slot: &Slot, key: KeyRef<'_>) -> bool {
     match slot {
         Slot::Occupied { key: occupied, .. } => match (occupied, key) {

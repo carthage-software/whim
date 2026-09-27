@@ -297,6 +297,21 @@ fn pinned_window_registers(chunk: &Chunk) -> HashSet<u16> {
     let mut registers = HashSet::new();
     for instruction in &chunk.code {
         let window = match *instruction {
+            Instruction::IndexUpdatePath {
+                operand,
+                index_count,
+                ..
+            } => Some((operand, usize::from(index_count.value()) + 1)),
+            Instruction::IndexSetPath {
+                first_index,
+                index_count,
+                ..
+            }
+            | Instruction::IndexGetPath {
+                first_index,
+                index_count,
+                ..
+            } => Some((first_index, usize::from(index_count.value()))),
             Instruction::Assert {
                 operand_count,
                 first_value,

@@ -65,6 +65,12 @@ impl VecObject {
         self.elements.get(index)
     }
 
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Value> {
+        let value = self.elements.get_mut(index)?;
+        self.type_check.note_mutation(index);
+        Some(value)
+    }
+
     /// Returns the element without checking that `index` is in bounds.
     ///
     /// # Safety

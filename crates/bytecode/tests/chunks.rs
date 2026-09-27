@@ -5,6 +5,7 @@ use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::DescriptorIndex;
 use whim_bytecode::instruction::operands::ImmediateInteger;
+use whim_bytecode::instruction::operands::IndexUpdateOperation;
 use whim_bytecode::instruction::operands::IntegerKind;
 use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
@@ -167,6 +168,137 @@ fn array_operands_preserve_kind_and_register_windows() {
                 ));
             }
         }
+    }
+}
+
+#[test]
+fn indexed_write_paths_verify_their_register_windows() {
+    for count in [1, 2, u8::MAX] {
+        let instruction = Instruction::IndexSetPath {
+            index_count: Count::new(count),
+            container: Register::new(0),
+            first_index: Register::new(1),
+            value: Register::new(0),
+        };
+
+        assert_round_trip(instruction);
+        let mut chunk = Chunk::new();
+        chunk.register_count = 1 + u16::from(count);
+        chunk.emit(instruction, Span::zero());
+        chunk.emit(Instruction::ReturnNull, Span::zero());
+        verify(&chunk).unwrap();
+        chunk.register_count -= 1;
+        assert!(verify(&chunk).is_err());
+    }
+
+    for (count, container) in [(0, 0), (2, 1), (2, 2)] {
+        let mut chunk = Chunk::new();
+        chunk.register_count = 3;
+        chunk.emit(
+            Instruction::IndexSetPath {
+                index_count: Count::new(count),
+                container: Register::new(container),
+                first_index: Register::new(1),
+                value: Register::new(0),
+            },
+            Span::zero(),
+        );
+
+        chunk.emit(Instruction::ReturnNull, Span::zero());
+        assert_eq!(
+            verify(&chunk),
+            Err(VerifyError::IndexPathInvalid { instruction: 0 })
+        );
+    }
+}
+
+#[test]
+fn indexed_read_paths_verify_windows_and_allow_overlapping_destinations() {
+    for count in [1, 2, u8::MAX] {
+        for destination in [0, 1, u16::from(count)] {
+            let instruction = Instruction::IndexGetPath {
+                index_count: Count::new(count),
+                destination: Register::new(destination),
+                container: Register::new(0),
+                first_index: Register::new(1),
+            };
+            assert_round_trip(instruction);
+            let mut chunk = Chunk::new();
+            chunk.register_count = 1 + u16::from(count);
+            chunk.emit(instruction, Span::zero());
+            chunk.emit(Instruction::ReturnNull, Span::zero());
+            verify(&chunk).unwrap();
+            chunk.register_count -= 1;
+            assert!(verify(&chunk).is_err());
+        }
+    }
+    let mut chunk = Chunk::new();
+    chunk.register_count = 1;
+    chunk.emit(
+        Instruction::IndexGetPath {
+            index_count: Count::new(0),
+            destination: Register::new(0),
+            container: Register::new(0),
+            first_index: Register::new(0),
+        },
+        Span::zero(),
+    );
+    chunk.emit(Instruction::ReturnNull, Span::zero());
+    assert_eq!(
+        verify(&chunk),
+        Err(VerifyError::IndexPathInvalid { instruction: 0 })
+    );
+}
+
+#[test]
+fn indexed_update_paths_verify_windows_and_operations() {
+    for operation in [
+        IndexUpdateOperation::Add,
+        IndexUpdateOperation::Subtract,
+        IndexUpdateOperation::Multiply,
+        IndexUpdateOperation::Divide,
+        IndexUpdateOperation::Modulo,
+        IndexUpdateOperation::Power,
+        IndexUpdateOperation::BitwiseAnd,
+        IndexUpdateOperation::BitwiseOr,
+        IndexUpdateOperation::BitwiseXor,
+        IndexUpdateOperation::ShiftLeft,
+        IndexUpdateOperation::ShiftRight,
+    ] {
+        for count in [1, 2, u8::MAX] {
+            let instruction = Instruction::IndexUpdatePath {
+                index_count: Count::new(count),
+                operation,
+                container: Register::new(0),
+                operand: Register::new(1),
+            };
+            assert_round_trip(instruction);
+            let mut chunk = Chunk::new();
+            chunk.register_count = 2 + u16::from(count);
+            chunk.emit(instruction, Span::zero());
+            chunk.emit(Instruction::ReturnNull, Span::zero());
+            verify(&chunk).unwrap();
+            chunk.register_count -= 1;
+            assert!(verify(&chunk).is_err());
+        }
+    }
+    for (count, container) in [(0, 0), (2, 1), (2, 2), (2, 3)] {
+        let mut chunk = Chunk::new();
+        chunk.register_count = 4;
+        chunk.emit(
+            Instruction::IndexUpdatePath {
+                index_count: Count::new(count),
+                operation: IndexUpdateOperation::Add,
+                container: Register::new(container),
+                operand: Register::new(1),
+            },
+            Span::zero(),
+        );
+        chunk.emit(Instruction::ReturnNull, Span::zero());
+        assert_eq!(
+            verify(&chunk),
+            Err(VerifyError::IndexPathInvalid { instruction: 0 })
+        );
     }
 }
 

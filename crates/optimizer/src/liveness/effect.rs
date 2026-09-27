@@ -10,6 +10,8 @@ use crate::liveness::Effect;
 pub(crate) fn changes_value(chunk: &Chunk, instruction: Instruction, register: Register) -> bool {
     match instruction {
         Instruction::IndexSet { container, .. }
+        | Instruction::IndexSetPath { container, .. }
+        | Instruction::IndexUpdatePath { container, .. }
         | Instruction::VecIndexSet { container, .. }
         | Instruction::DictIndexSetIntegerKey { container, .. }
         | Instruction::DictIndexSetStringKey { container, .. }
@@ -61,6 +63,39 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
     };
 
     match instruction {
+        Instruction::IndexUpdatePath {
+            operand,
+            index_count,
+            container,
+            ..
+        } => read_then_write(
+            reads(container) || window(operand, usize::from(index_count.value()) + 1),
+            writes(operand),
+        ),
+        Instruction::IndexGetPath {
+            destination,
+            container,
+            first_index,
+            index_count,
+        } => read_then_write(
+            reads(container) || window(first_index, usize::from(index_count.value())),
+            writes(destination),
+        ),
+        Instruction::IndexSetPath {
+            container,
+            first_index,
+            index_count,
+            value,
+        } => {
+            if reads(container)
+                || reads(value)
+                || window(first_index, usize::from(index_count.value()))
+            {
+                Effect::Read
+            } else {
+                Effect::None
+            }
+        }
         instructions!(
             Coalesce | Move | Negate | UnaryPlus | BitwiseNot | Not | Length | StringLength | CloneObject | AddImmediate | SubtractImmediate | Step | IntegerMultiplyImmediate | IntegerModuloImmediate | FloatMultiplyConstant | ConcatenateRightConstant | ConcatenateLeftConstant | Is | AsCheck | AsOrNull;
             { destination, source, .. }
