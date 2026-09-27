@@ -11,11 +11,14 @@ use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::function::BuiltInId;
 use whim_value::function::CallTarget;
+use whim_value::function::PresetArg;
 use whim_value::newtype::NewtypeId;
 use whim_value::object::TypeEnvironmentId;
 
 use crate::symbols::CachedNewtypeConstructor;
 use crate::symbols::ExactBuiltInFunctionEntry;
+use crate::symbols::ExactFunctionEntry;
+use crate::symbols::ExactMethodEntry;
 use crate::symbols::NewtypeConstructorWays;
 use crate::vm::call::BuiltInCallable;
 use crate::vm::call::CacheEntry;
@@ -600,7 +603,11 @@ impl VirtualMachine<'_> {
         arguments_proven: bool,
     ) -> Result<(), VirtualMachineControl> {
         if let ValueView::Function(function) = callee.transparent()
-            && function.presets().is_empty()
+            && (function.presets().is_empty()
+                || (function.presets().len() == count
+                    && function.presets().iter().enumerate().all(|(position, preset)| {
+                        matches!(preset, PresetArg::Hole(order) if *order as usize == position)
+                    })))
             && let CallTarget::User(id) = function.target()
         {
             if function.this().is_none()
@@ -628,6 +635,33 @@ impl VirtualMachine<'_> {
                 return self.push_exact_generic_function_frame::<false>(
                     id,
                     destination,
+                    window_start,
+                    count,
+                    function.type_environment(),
+                    discard_result,
+                );
+            }
+
+            let runtime = &self.engine.tables.functions[id.0 as usize];
+            if arguments_proven
+                && function.captures().is_empty()
+                && !runtime.captures_this
+                && usize::from(runtime.required_parameters) <= count
+                && count <= usize::from(runtime.declared_parameters)
+                && (function.type_arguments_bound() || runtime.type_parameters().is_empty())
+                && let Some(receiver) = function.this()
+                && let Some(method) = self.method_context_for(function)
+            {
+                let entry = ExactMethodEntry {
+                    function: ExactFunctionEntry::from_runtime(id, runtime, false),
+                    scope: method.scope,
+                    called: method.called,
+                    is_constructor: method.is_constructor,
+                };
+                return self.push_exact_method_frame(
+                    entry,
+                    destination,
+                    receiver.clone(),
                     window_start,
                     count,
                     function.type_environment(),

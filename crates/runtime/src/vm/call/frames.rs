@@ -192,9 +192,8 @@ impl VirtualMachine<'_> {
         )
     }
 
-    /// Pushes the narrow frame shape emitted for a whole-unit-proven exact
-    /// method call. The call-site proof has already established a
-    /// non-generic bytecode target, valid arity, and every argument type.
+    /// Pushes a resolved bytecode method with proven arity and argument types.
+    /// The supplied environment already binds its class and method arguments.
     #[inline(always)]
     #[expect(
         clippy::too_many_arguments,

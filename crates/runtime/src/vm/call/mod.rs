@@ -47,6 +47,7 @@ use crate::vm::unreachable_invariant;
 use crate::vm::visibility_allows;
 use crate::vm::visibility_name;
 
+#[inline]
 fn live_parameter_mask(
     stack: &[Value],
     base: usize,
