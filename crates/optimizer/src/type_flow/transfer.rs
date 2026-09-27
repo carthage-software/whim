@@ -654,6 +654,7 @@ pub(crate) fn transfer(
                     non_negative: false,
                     positive: false,
                     foreach_key: false,
+                    nominal: None,
                 },
             );
         }

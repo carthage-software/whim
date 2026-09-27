@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
+use std::num::NonZeroU16;
 use std::ptr;
 
 use whim_bytecode::chunk::Chunk;
@@ -91,6 +92,7 @@ struct Fact {
     non_negative: bool,
     positive: bool,
     foreach_key: bool,
+    nominal: Option<NonZeroU16>,
     origin: u32,
     array: u32,
 }
@@ -126,6 +128,7 @@ impl Fact {
         non_negative: false,
         positive: false,
         foreach_key: false,
+        nominal: None,
     };
 
     const fn known(mask: u16) -> Self {
@@ -137,6 +140,7 @@ impl Fact {
             non_negative: false,
             positive: false,
             foreach_key: false,
+            nominal: None,
         }
     }
 
@@ -149,6 +153,7 @@ impl Fact {
             non_negative: false,
             positive: false,
             foreach_key: false,
+            nominal: None,
         }
     }
 
@@ -161,6 +166,7 @@ impl Fact {
             non_negative: false,
             positive: false,
             foreach_key: false,
+            nominal: None,
         }
     }
 
@@ -173,6 +179,7 @@ impl Fact {
             non_negative: value >= 0,
             positive: value > 0,
             foreach_key: false,
+            nominal: None,
         }
     }
 
@@ -203,6 +210,7 @@ impl Fact {
             non_negative: self.non_negative,
             positive: self.positive,
             foreach_key: false,
+            nominal: self.nominal,
         }
     }
 
@@ -228,6 +236,11 @@ impl Fact {
             non_negative: self.non_negative && other.non_negative,
             positive: self.positive && other.positive,
             foreach_key: self.foreach_key && other.foreach_key,
+            nominal: if self.nominal == other.nominal {
+                self.nominal
+            } else {
+                None
+            },
         }
     }
 }
@@ -327,6 +340,7 @@ impl<'a> TypeFlow<'a> {
             origin,
             array: NO_ORIGIN,
             foreach_key: false,
+            nominal: None,
             observable_release: descriptor_may_release_observably(descriptor),
             non_negative: matches!(
                 descriptor,
@@ -809,9 +823,23 @@ impl<'a> TypeFlow<'a> {
             return None;
         }
 
-        let descriptor = &self.chunk.type_descriptors[usize::from(descriptor.index())];
+        let descriptor_index = descriptor.index();
+        let descriptor = &self.chunk.type_descriptors[usize::from(descriptor_index)];
         let descriptor = self.expanded_aliases(descriptor);
-        Some((source, self.descriptor_fact(&descriptor, origin)))
+        let mut fact = self.descriptor_fact(&descriptor, origin);
+        if producer + 1 == index
+            && destination != source
+            && let TypeDescriptor::Named {
+                name, arguments, ..
+            } = descriptor.as_ref()
+            && arguments.as_ref().is_none_or(Vec::is_empty)
+            && self
+                .final_class(name)
+                .is_some_and(|class| class.type_parameters.is_empty())
+        {
+            fact.nominal = descriptor_index.checked_add(1).and_then(NonZeroU16::new);
+        }
+        Some((source, fact))
     }
 
     fn integer_lower_bound_edge(
@@ -1193,6 +1221,16 @@ impl<'a> TypeFlow<'a> {
             {
                 merged.origin = current.origin;
             }
+            if merged.nominal.is_none()
+                && let (Some(current), Some(incoming)) = (current.nominal, incoming.nominal)
+                && descriptors_equal(
+                    &self.chunk.type_descriptors[usize::from(current.get() - 1)],
+                    &self.chunk.type_descriptors[usize::from(incoming.get() - 1)],
+                    0,
+                )
+            {
+                merged.nominal = Some(current);
+            }
             changed |= merged != current;
             self.block_states[start + position] = merged;
         }
@@ -1387,6 +1425,7 @@ fn unary_numeric_result(source: Fact) -> Fact {
 fn with_origin(mut fact: Fact, origin: u32) -> Fact {
     fact.origin = origin;
     fact.foreach_key = false;
+    fact.nominal = None;
     fact
 }
 
@@ -1408,6 +1447,11 @@ fn refine_aliases(
 
         previous.push((index, *fact));
         fact.mask &= refinement.mask;
+        fact.nominal = if fact.mask & OBJECT == 0 {
+            None
+        } else {
+            refinement.nominal.or(fact.nominal)
+        };
         fact.non_negative |= refinement.non_negative;
         fact.positive |= refinement.positive;
         if fact.mask & MAY_BE_REFERENCE_COUNTED == 0 {
@@ -1488,6 +1532,7 @@ fn fact_bits(fact: Fact) -> impl Iterator<Item = Fact> {
             non_negative: fact.non_negative,
             positive: fact.positive,
             foreach_key: fact.foreach_key,
+            nominal: (mask == OBJECT).then_some(fact.nominal).flatten(),
         })
     })
 }

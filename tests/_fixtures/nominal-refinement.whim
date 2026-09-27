@@ -1,0 +1,214 @@
+abstract class Expression {}
+
+final class Number extends Expression {
+  public function __construct(public int $value) {}
+}
+
+final class Sum extends Expression {
+  public function __construct(public Expression $left, public Expression $right) {}
+}
+
+final class Text {
+  public function __construct(public string $value) {}
+}
+
+final class Slot {
+  public function __construct(public mixed $value) {}
+}
+
+class OpenNumber {
+  public function __construct(public int $value) {}
+}
+
+final class Box<T> {
+  public function __construct(public T $value) {}
+}
+
+final class Hidden {
+  public function __construct(private int $value) {}
+
+  public function match_value(mixed $item): int {
+    return match ($item) {
+      Hidden #{ $value } => $value,
+      _ => 0,
+    };
+  }
+}
+
+type NumberAlias = Number;
+
+function evaluate(Expression $expression): int {
+  return match ($expression) {
+    Number #{ $value } => $value,
+    Sum #{ $left, $right } => evaluate($left) + evaluate($right),
+  };
+}
+
+function immediate(mixed $item): int {
+  if ($item is Number) {
+    return $item->value + 1;
+  }
+  return 0;
+}
+
+function aliases(mixed $item): int {
+  $before = $item;
+  if ($item is NumberAlias) {
+    $after = $item;
+    return $before->value + $after->value;
+  }
+  return 0;
+}
+
+function foreach_values(vec<Expression> $items): int {
+  $total = 0;
+  foreach ($items as $key => $item) {
+    if ($item is Number) {
+      $copy = $item;
+      $total += $copy->value + ($key as int);
+    }
+  }
+  return $total;
+}
+
+function selected(mixed $first, mixed $second, bool $flag): int {
+  if ($flag) {
+    if (!($first is Number)) {
+      return 0;
+    }
+    $item = $first;
+  } else {
+    if (!($second is Number)) {
+      return 0;
+    }
+    $item = $second;
+  }
+  return $item->value;
+}
+
+#[Whim\Marker\NeverInline]
+function change(Number $item): void {
+  $item->value += 1;
+}
+
+function after_call(mixed $item): int {
+  if ($item is Number) {
+    $item->value = 40;
+    change($item);
+    return $item->value;
+  }
+  return 0;
+}
+
+function saved_test(mixed $item, mixed $replacement): int {
+  $yes = $item is Number;
+  $item = $replacement;
+  if ($yes) {
+    return $item->value;
+  }
+  return 0;
+}
+
+function overwritten_test(mixed $item): bool {
+  $item = $item is Number;
+  if ($item) {
+    return $item is Number;
+  }
+  return false;
+}
+
+function reassigned(mixed $item, mixed $replacement): int {
+  if ($item is Number) {
+    $item = $replacement;
+    return $item->value;
+  }
+  return 0;
+}
+
+function failed_test(mixed $item): mixed {
+  if ($item is Number) {
+    return null;
+  }
+  return $item->value;
+}
+
+function one_path(mixed $item, bool $flag): mixed {
+  if ($flag) {
+    if (!($item is Number)) {
+      return null;
+    }
+  }
+  return $item->value;
+}
+
+function different_classes(mixed $first, mixed $second, bool $flag): mixed {
+  if ($flag) {
+    if (!($first is Number)) {
+      return null;
+    }
+    $item = $first;
+  } else {
+    if (!($second is Text)) {
+      return null;
+    }
+    $item = $second;
+  }
+  return $item->value;
+}
+
+function open_class(mixed $item): int {
+  if ($item is OpenNumber) {
+    return $item->value;
+  }
+  return 0;
+}
+
+function generic_class(mixed $item): int {
+  if ($item is Box<int>) {
+    return $item->value;
+  }
+  return 0;
+}
+
+function hidden_property(mixed $item): int {
+  if ($item is Hidden) {
+    return $item->value;
+  }
+  return 0;
+}
+
+#[Whim\Marker\NeverInline]
+function accept_shape(#{ value: int } $item): void {}
+
+function changed_shape(mixed $item): void {
+  if ($item is Slot) {
+    if ($item is #{ value: int }) {
+      $copy = $item;
+      $copy->value = 'wrong';
+      accept_shape($item);
+    }
+  }
+}
+
+function changed_return(mixed $item): int {
+  if ($item is Slot) {
+    if ($item is #{ value: int }) {
+      $copy = $item;
+      $copy->value = 'wrong';
+      return $item->value;
+    }
+  }
+  return 0;
+}
+
+function different_iterations(vec<mixed> $items): string {
+  $result = '';
+  foreach ($items as $item) {
+    if ($item is Number) {
+      $result .= $item->value;
+    } else {
+      $result .= $item->value;
+    }
+  }
+  return $result;
+}

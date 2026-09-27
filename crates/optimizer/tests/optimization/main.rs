@@ -4,6 +4,7 @@ mod collection_inlining;
 mod computed_captures;
 mod joined_lengths;
 mod matching;
+mod nominal_refinement;
 mod return_proofs;
 mod shape_indexing;
 mod uint;

@@ -19,6 +19,7 @@ use whim_bytecode::unit::CompiledMethod;
 use whim_bytecode::unit::CompiledProperty;
 use whim_bytecode::unit::ConstantInitializer;
 use whim_bytecode::unit::SlotPlacement;
+use whim_bytecode::unit::Visibility;
 use whim_bytecode::unit::slot_placement;
 use whim_value::atom::Atom;
 
@@ -58,6 +59,9 @@ impl<'a> TypeFlow<'a> {
             return None;
         }
         let fact = self.fact(index, register);
+        if fact.nominal.is_some() {
+            return self.origin_type_matching_mask(fact, depth + 1);
+        }
         if let Some(producer) = instruction_index(fact.origin) {
             let iterator = match self.chunk.code[producer] {
                 Instruction::ForeachNext { iterator, .. }
@@ -83,8 +87,12 @@ impl<'a> TypeFlow<'a> {
     }
 
     fn origin_type_matching_mask(&self, fact: Fact, depth: usize) -> Option<TypeDescriptor> {
-        let descriptor = self
-            .origin_type(fact.origin, depth + 1)
+        let descriptor = fact
+            .nominal
+            .map(|descriptor| {
+                self.chunk.type_descriptors[usize::from(descriptor.get() - 1)].clone()
+            })
+            .or_else(|| self.origin_type(fact.origin, depth + 1))
             .or_else(|| match fact.mask {
                 NULL => Some(TypeDescriptor::Null),
                 BOOL => Some(TypeDescriptor::Bool),
@@ -95,7 +103,6 @@ impl<'a> TypeFlow<'a> {
                 _ => None,
             })?;
         let descriptor = self.expand_aliases_owned(descriptor);
-
         self.descriptor_matching_mask(descriptor, fact.mask)
     }
 
@@ -423,8 +430,26 @@ impl<'a> TypeFlow<'a> {
             return None;
         }
         let class = self.property_class_specialization(index, object, 0)?.class;
-        let name = self.member_name(cache)?;
-        self.instance_slot_of(class, name)
+        self.cached_property(class, cache)
+    }
+
+    fn cached_property(
+        &self,
+        class: &'a CompiledClassLike,
+        cache: IcSlot,
+    ) -> Option<ResolvedProperty<'a>> {
+        let descriptor = self.chunk.ic_descriptors.get(usize::from(cache.index()))?;
+        let (IcDescriptor::Member { name, .. } | IcDescriptor::PublicProperty(name)) = descriptor
+        else {
+            return None;
+        };
+        let property = self.instance_slot_of(class, name)?;
+        if matches!(descriptor, IcDescriptor::PublicProperty(_))
+            && property.property.visibility != Visibility::Public
+        {
+            return None;
+        }
+        Some(property)
     }
 
     fn property_class_specialization(
@@ -651,9 +676,7 @@ impl<'a> TypeFlow<'a> {
             }
             Instruction::PropertyGetOrNull { object, cache, .. } => {
                 let resolved = self.property_class_specialization(index, object, depth + 1)?;
-                let property = self
-                    .instance_slot_of(resolved.class, self.member_name(cache)?)?
-                    .property;
+                let property = self.cached_property(resolved.class, cache)?.property;
                 let value = substitute_parameters(
                     property.declared_type.as_ref()?,
                     &resolved.class.type_parameters,
@@ -725,8 +748,7 @@ impl<'a> TypeFlow<'a> {
             }
             Instruction::PropertyGet { object, cache, .. } => {
                 let resolved = self.property_class_specialization(index, object, depth + 1)?;
-                let name = self.member_name(cache)?;
-                let property = self.instance_slot_of(resolved.class, name)?;
+                let property = self.cached_property(resolved.class, cache)?;
                 self.property_value_type(
                     index,
                     object,
