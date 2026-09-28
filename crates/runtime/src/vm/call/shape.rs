@@ -62,6 +62,12 @@ impl VirtualMachine<'_> {
         match descriptor {
             CalleeDescriptor::Value => self.resolve_callee_shape(callee),
             CalleeDescriptor::Function | CalleeDescriptor::StaticMethod(_) => {
+                if let CalleeDescriptor::StaticMethod(member) = descriptor
+                    && let Some(receiver) = callee.as_object()
+                {
+                    return self.static_method_shape(receiver.class(), member.clone());
+                }
+
                 let Some(bytes) = callee.as_string_bytes() else {
                     return Err(self.throw_well_known(
                         self.engine.tables.well_known.type_error,
