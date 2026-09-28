@@ -220,7 +220,7 @@ impl BodyCompiler<'_, '_> {
         value_use: ValueUse,
     ) -> Result<Register, CompileError> {
         let span = call.span();
-        let class = self.static_call_class_atom(scope, &call.class)?;
+        let class = self.static_call_class(scope, &call.class)?;
         let destination = self.allocate(span)?;
         let mark = self.registers.mark();
         let count = argument_gate(call.argument_list.arguments.len(), span)?;
@@ -260,8 +260,9 @@ impl BodyCompiler<'_, '_> {
             call.type_arguments.as_ref(),
         )?;
         let named = has_named_arguments(&call.argument_list);
-        let type_arguments = self.lower_turbofish(scope, call.type_arguments.as_ref())?;
-        if call.type_arguments.is_some() && named {
+        if call.type_arguments.is_some()
+            && (named || matches!(&call.class, ClassReference::Expression(_)))
+        {
             return self.specialized_static_call(scope, call, value_use);
         }
         if named {
@@ -279,6 +280,7 @@ impl BodyCompiler<'_, '_> {
         if matches!(&call.class, ClassReference::Expression(_)) {
             return self.dynamic_static_call(scope, call, value_use);
         }
+        let type_arguments = self.lower_turbofish(scope, call.type_arguments.as_ref())?;
         self.direct_static_call(scope, call, type_arguments, value_use)
     }
 

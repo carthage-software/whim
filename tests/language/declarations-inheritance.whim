@@ -197,7 +197,7 @@ class ExemptBase {
 
 class ExemptUser extends ExemptBase {
   public function __construct(int $id, public string $name) {
-    parent::__construct($id);
+    parent::__construct(id: $id);
   }
 }
 

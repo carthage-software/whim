@@ -3,6 +3,7 @@
 use hashbrown::HashMap;
 use hashbrown::HashSet;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::PropertyInitializationDescriptor;
 use whim_bytecode::chunk::descriptors::PropertyInitializationEntry;
@@ -218,8 +219,10 @@ fn eligible_origin(
                 can_delay = false;
             }
             Instruction::NewStatic { destination, cache } if destination == register => {
-                let Some(IcDescriptor::Member { name, .. }) =
-                    chunk.ic_descriptors.get(usize::from(cache.index()))
+                let Some(IcDescriptor::Class {
+                    class: ClassDescriptor::Named(name),
+                    ..
+                }) = chunk.ic_descriptors.get(usize::from(cache.index()))
                 else {
                     return None;
                 };

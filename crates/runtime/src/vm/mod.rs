@@ -12,6 +12,7 @@ use whim_base::unwrap_option_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_bytecode::REFERENCE_REGISTER_LIMIT;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
@@ -476,7 +477,7 @@ fn name_atom(chunk: &Chunk, site: usize) -> &Atom {
     match &chunk.ic_descriptors[site] {
         IcDescriptor::Member { name, .. } | IcDescriptor::PublicProperty(name) => name,
         // SAFETY: the surrounding invariant makes this path unreachable.
-        IcDescriptor::ClassMember { .. } => unsafe {
+        IcDescriptor::Class { .. } | IcDescriptor::ClassMember { .. } => unsafe {
             unreachable_invariant("the site resolves a member descriptor")
         },
     }
@@ -486,28 +487,27 @@ fn site_type_arguments(chunk: &Chunk, site: usize) -> Option<&[TypeDescriptor]> 
     match &chunk.ic_descriptors[site] {
         IcDescriptor::PublicProperty(_) => None,
         IcDescriptor::Member { type_arguments, .. }
+        | IcDescriptor::Class { type_arguments, .. }
         | IcDescriptor::ClassMember { type_arguments, .. } => type_arguments.as_deref(),
     }
 }
 
-/// The class and member atoms of a class-member inline-cache site.
-fn class_member_atoms(chunk: &Chunk, site: usize) -> (&Atom, &Atom) {
+fn class_member_descriptor(chunk: &Chunk, site: usize) -> (&ClassDescriptor, &Atom) {
     match &chunk.ic_descriptors[site] {
         IcDescriptor::ClassMember { class, member, .. } => (class, member),
-        // SAFETY: the surrounding invariant makes this path unreachable.
-        IcDescriptor::Member { .. } | IcDescriptor::PublicProperty(_) => unsafe {
-            unreachable_invariant("the site resolves a class-member descriptor")
-        },
+        IcDescriptor::Member { .. }
+        | IcDescriptor::Class { .. }
+        | IcDescriptor::PublicProperty(_) => {
+            // SAFETY: the surrounding invariant makes this path unreachable.
+            unsafe { unreachable_invariant("the site resolves a class-member descriptor") }
+        }
     }
 }
 
 /// The class and member texts of a class-member inline-cache site.
 fn class_member_names(chunk: &Chunk, site: usize) -> (String, String) {
-    let (class, member) = class_member_atoms(chunk, site);
-    (
-        class.to_string_lossy().into_owned(),
-        member.to_string_lossy().into_owned(),
-    )
+    let (class, member) = class_member_descriptor(chunk, site);
+    (class.to_string(), member.to_string_lossy().into_owned())
 }
 
 pub(crate) struct ArrayFault {

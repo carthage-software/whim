@@ -5,6 +5,7 @@ use std::cmp::Reverse;
 
 use whim_bytecode::aliases::alias_bindings;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
@@ -260,7 +261,7 @@ pub(crate) fn inline_generic_statics(
                 };
 
                 let IcDescriptor::ClassMember {
-                    class: class_name,
+                    class: ClassDescriptor::Named(class_name),
                     member,
                     type_arguments: Some(arguments),
                 } = &chunk.ic_descriptors[usize::from(cache.index())]

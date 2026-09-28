@@ -245,16 +245,23 @@ fn callee_descriptor(descriptor: &CalleeDescriptor) -> String {
         CalleeDescriptor::Value => "value".to_string(),
         CalleeDescriptor::Function => "function".to_string(),
         CalleeDescriptor::Method(name) => format!("method {name}"),
-        CalleeDescriptor::StaticMethod(name) => format!("static method {name}"),
+        CalleeDescriptor::StaticMethod {
+            class: Some(class),
+            name,
+        } => format!("static method {class}::{name}"),
+        CalleeDescriptor::StaticMethod { class: None, name } => {
+            format!("dynamic static method {name}")
+        }
     }
 }
 
 pub(crate) fn ic_descriptor(descriptor: &IcDescriptor) -> String {
     match descriptor {
         IcDescriptor::Member { name, .. } => name.to_string_lossy().into_owned(),
+        IcDescriptor::Class { class, .. } => class.to_string(),
         IcDescriptor::PublicProperty(name) => format!("public {}", name.to_string_lossy()),
         IcDescriptor::ClassMember { class, member, .. } => {
-            format!("{}::{}", class.to_string_lossy(), member.to_string_lossy())
+            format!("{class}::{member}")
         }
     }
 }

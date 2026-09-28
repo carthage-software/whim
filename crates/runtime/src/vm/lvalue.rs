@@ -4,6 +4,7 @@ use std::io;
 use std::mem;
 
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::chunk::descriptors::check_trivial_descriptor;
@@ -35,7 +36,7 @@ use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::call::argument_guard;
 use crate::vm::call::guard_allows;
-use crate::vm::class_member_atoms;
+use crate::vm::class_member_descriptor;
 use crate::vm::name_atom;
 use crate::vm::unreachable_invariant;
 use crate::vm::visibility_allows;
@@ -899,13 +900,13 @@ impl VirtualMachine<'_> {
             return Ok((*class, *slot));
         }
 
-        let (class_atom, member) = class_member_atoms(chunk, site);
-        let named_class = self.resolve_class_reference(class_atom.clone())?;
+        let (reference, member) = class_member_descriptor(chunk, site);
+        let named_class = self.resolve_class_reference(reference)?;
         let mut current = Some(named_class);
         let found = loop {
             let Some(class) = current else {
                 if OPTIONAL {
-                    if *class_atom != self.engine.tables.static_atom {
+                    if matches!(reference, ClassDescriptor::Named(_)) {
                         // SAFETY: the active frame owns its inline cache.
                         let cache = unsafe { &mut *cache_cell.entries() };
                         cache[site] = CacheEntry::StaticSlot {
@@ -954,7 +955,7 @@ impl VirtualMachine<'_> {
             ));
         }
 
-        if *class_atom != self.engine.tables.static_atom {
+        if matches!(reference, ClassDescriptor::Named(_)) {
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
             let cache = unsafe { &mut *cache_cell.entries() };
             cache[site] = CacheEntry::StaticSlot {
@@ -987,8 +988,8 @@ impl VirtualMachine<'_> {
             return Ok(value.clone());
         }
 
-        let (class_atom, member) = class_member_atoms(chunk, site);
-        let class = self.resolve_class_reference(class_atom.clone())?;
+        let (reference, member) = class_member_descriptor(chunk, site);
+        let class = self.resolve_class_reference(reference)?;
         let (value, forced) = if let Some(case) = self.enum_case_instance(class, member.clone()) {
             (case, false)
         } else {
@@ -1023,7 +1024,7 @@ impl VirtualMachine<'_> {
             (self.force_class_constant(class, member.clone())?, true)
         };
 
-        if *class_atom != self.engine.tables.static_atom
+        if matches!(reference, ClassDescriptor::Named(_))
             && (!forced || self.class_constant_evaluated(class, member.clone()))
         {
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.

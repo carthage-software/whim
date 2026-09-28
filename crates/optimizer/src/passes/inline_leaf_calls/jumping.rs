@@ -494,6 +494,18 @@ fn remap_cache(
                     .collect()
             }),
         },
+        IcDescriptor::Class {
+            class,
+            type_arguments,
+        } => IcDescriptor::Class {
+            class: class.clone(),
+            type_arguments: type_arguments.as_ref().map(|arguments| {
+                arguments
+                    .iter()
+                    .map(|argument| substitute(argument, bindings, 0))
+                    .collect()
+            }),
+        },
         IcDescriptor::ClassMember {
             class,
             member,

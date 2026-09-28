@@ -17,8 +17,10 @@ use whim_value::function::FunctionObject;
 use whim_value::function::PresetArg;
 use whim_value::heap::handle::ManagedRef;
 use whim_value::object::ClassId;
+use whim_value::object::InstanceObject;
 use whim_value::object::TypeEnvironmentId;
 
+use crate::classes::MethodEntry;
 use crate::symbols::CachedNamedArguments;
 use crate::vm::call::ArgumentSlot;
 use crate::vm::call::BuiltInCallable;
@@ -61,13 +63,7 @@ impl VirtualMachine<'_> {
     ) -> Result<CalleeShape, VirtualMachineControl> {
         match descriptor {
             CalleeDescriptor::Value => self.resolve_callee_shape(callee),
-            CalleeDescriptor::Function | CalleeDescriptor::StaticMethod(_) => {
-                if let CalleeDescriptor::StaticMethod(member) = descriptor
-                    && let Some(receiver) = callee.as_object()
-                {
-                    return self.static_method_shape(receiver.class(), member.clone());
-                }
-
+            CalleeDescriptor::Function => {
                 let Some(bytes) = callee.as_string_bytes() else {
                     return Err(self.throw_well_known(
                         self.engine.tables.well_known.type_error,
@@ -81,11 +77,6 @@ impl VirtualMachine<'_> {
                 };
 
                 let atom = self.heap.intern(bytes);
-                if let CalleeDescriptor::StaticMethod(member) = descriptor {
-                    let class = self.resolve_class_reference(atom)?;
-                    return self.static_method_shape(class, member.clone());
-                }
-
                 let target = match self.resolve_function(atom)? {
                     CacheEntry::Function(id) => CallTarget::User(id),
                     CacheEntry::BuiltInCallable(index) => CallTarget::BuiltIn(BuiltInId(index)),
@@ -98,6 +89,28 @@ impl VirtualMachine<'_> {
                     holder: None,
                     method: None,
                 })
+            }
+            CalleeDescriptor::StaticMethod { class, name } => {
+                let resolved = match class {
+                    Some(class) => self.resolve_class_reference(class)?,
+                    None => match callee.as_object() {
+                        Some(receiver) => receiver.class(),
+                        None => {
+                            let Some(bytes) = callee.as_string_bytes() else {
+                                return Err(self.throw_well_known(
+                                    self.engine.tables.well_known.type_error,
+                                    format!(
+                                        "expected a class name or object, {} given",
+                                        callee.kind_name()
+                                    ),
+                                ));
+                            };
+                            let name = self.heap.intern(bytes.strip_prefix(b"\\").unwrap_or(bytes));
+                            self.resolve_class_name(name)?
+                        }
+                    },
+                };
+                self.static_method_shape(resolved, name.clone(), class.is_some())
             }
             CalleeDescriptor::Method(name) => {
                 let Some(receiver) = callee.as_object() else {
@@ -197,11 +210,11 @@ impl VirtualMachine<'_> {
         Ok((environment, false))
     }
 
-    pub(in crate::vm) fn static_method_shape(
+    pub(in crate::vm) fn static_method_entry(
         &mut self,
         class: ClassId,
-        member: Atom,
-    ) -> Result<CalleeShape, VirtualMachineControl> {
+        member: &Atom,
+    ) -> Result<MethodEntry, VirtualMachineControl> {
         let runtime = &self.engine.tables.classes[class.0 as usize];
         let entry = self
             .current_frame()
@@ -213,7 +226,7 @@ impl VirtualMachine<'_> {
                     .get(&(scope, member.clone()))
                     .copied()
             })
-            .or_else(|| runtime.method(&member));
+            .or_else(|| runtime.method(member));
         let Some(entry) = entry else {
             let class_text = self.engine.tables.classes[class.0 as usize]
                 .name
@@ -224,11 +237,11 @@ impl VirtualMachine<'_> {
                 format!("call to undefined method {class_text}::{member_text}"),
             ));
         };
-        if !entry.is_static {
+        if entry.is_abstract {
             let member_text = member.to_string_lossy().into_owned();
             return Err(self.throw_well_known(
                 self.engine.tables.well_known.type_error,
-                format!("cannot reference the instance method {member_text} statically"),
+                format!("cannot call the abstract method {member_text}"),
             ));
         }
         if !visibility_allows(
@@ -244,6 +257,50 @@ impl VirtualMachine<'_> {
                 format!("cannot reference {visibility} method {member_text}"),
             ));
         }
+        Ok(entry)
+    }
+
+    pub(in crate::vm) fn static_method_context(
+        &mut self,
+        class: ClassId,
+        member: &Atom,
+        entry: MethodEntry,
+        allow_instance: bool,
+    ) -> Result<(Option<ManagedRef<InstanceObject>>, MethodContext), VirtualMachineControl> {
+        let this = if entry.is_static {
+            None
+        } else {
+            match self.current_this().filter(|_| allow_instance).cloned() {
+                Some(this) => Some(this),
+                None => {
+                    return Err(self.throw_well_known(
+                        self.engine.tables.well_known.type_error,
+                        format!("cannot call the instance method {member} statically"),
+                    ));
+                }
+            }
+        };
+        let called = if this.is_some() {
+            self.current_frame().called_class.get().unwrap_or(class)
+        } else {
+            class
+        };
+        let context = MethodContext {
+            scope: entry.declaring_class,
+            called,
+            is_constructor: this.is_some() && *member == self.engine.tables.constructor_name,
+        };
+        Ok((this, context))
+    }
+
+    fn static_method_shape(
+        &mut self,
+        class: ClassId,
+        member: Atom,
+        allow_instance: bool,
+    ) -> Result<CalleeShape, VirtualMachineControl> {
+        let entry = self.static_method_entry(class, &member)?;
+        let (this, context) = self.static_method_context(class, &member, entry, allow_instance)?;
         let target = match entry.body {
             MethodBodyKind::Bytecode(function) => CallTarget::User(function),
             MethodBodyKind::BuiltIn(_) => {
@@ -252,13 +309,9 @@ impl VirtualMachine<'_> {
         };
         Ok(CalleeShape {
             target,
-            this: None,
+            this,
             holder: None,
-            method: Some(MethodContext {
-                scope: entry.declaring_class,
-                called: class,
-                is_constructor: false,
-            }),
+            method: Some(context),
         })
     }
 

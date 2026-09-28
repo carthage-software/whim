@@ -77,6 +77,9 @@ class Calls {
 $calls = new Calls();
 $methodResult = $calls->method::<int>(1);
 $staticResult = Calls::statically::<string>('static');
+$className = 'Calls';
+assert!($className::statically::<int>(42) == 42);
+assert!($calls::statically::<string>('object') == 'object');
 $methodMissing = false;
 try {
   $calls->method(1);

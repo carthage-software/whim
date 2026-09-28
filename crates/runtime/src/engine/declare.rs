@@ -703,14 +703,11 @@ impl Engine {
     pub(in crate::engine) fn invalid_exact_function_target(
         &mut self,
         path: &Atom,
-        name: &Atom,
+        name: &str,
     ) -> VirtualMachineControl {
         VirtualMachineControl::Throw(self.declaration_error(
             self.tables.well_known.linker_error,
-            format!(
-                "the optimized call target {} is not a declared user function",
-                name.to_string_lossy()
-            ),
+            format!("the optimized call target {name} is not a declared user function"),
             path,
         ))
     }
@@ -857,7 +854,7 @@ pub(crate) fn prelink_exact_function_sites(
     symbols: &HashMap<Atom, SymbolEntry>,
     functions: &[RuntimeFunction],
     built_in_functions: &[BuiltInCallable],
-) -> Result<PrelinkedFunctionSites, Atom> {
+) -> Result<PrelinkedFunctionSites, String> {
     let mut entries = vec![None; chunk.ic_descriptors.len()];
     let mut built_in_entries = vec![None; chunk.ic_descriptors.len()];
     let mut sites = chunk.code.iter().filter_map(|instruction| {
@@ -897,16 +894,18 @@ pub(crate) fn prelink_exact_function_sites(
                 name,
                 type_arguments,
             } => (name, type_arguments.is_some()),
-            IcDescriptor::ClassMember { class, .. } => return Err(class.clone()),
-            IcDescriptor::PublicProperty(name) => return Err(name.clone()),
+            IcDescriptor::Class { class, .. } | IcDescriptor::ClassMember { class, .. } => {
+                return Err(class.to_string());
+            }
+            IcDescriptor::PublicProperty(name) => return Err(name.to_string()),
         };
 
         let Some(symbol) = symbols.get(name) else {
-            return Err(name.clone());
+            return Err(name.to_string());
         };
 
         if symbol.kind != SymbolKind::Function {
-            return Err(name.clone());
+            return Err(name.to_string());
         }
 
         match symbol.table {
@@ -927,7 +926,7 @@ pub(crate) fn prelink_exact_function_sites(
                     // SAFETY: the surrounding invariant keeps this index in bounds.
                     (unsafe { built_in_functions.get_unchecked(function.0 as usize) })
                 else {
-                    return Err(name.clone());
+                    return Err(name.to_string());
                 };
                 let direct_handler = (!has_type_arguments
                     && spec.type_parameters.is_empty()
@@ -959,7 +958,7 @@ pub(crate) fn prelink_exact_function_cache(
     symbols: &HashMap<Atom, SymbolEntry>,
     functions: &[RuntimeFunction],
     built_in_functions: &[BuiltInCallable],
-) -> Result<(), Atom> {
+) -> Result<(), String> {
     let sites = prelink_exact_function_sites(chunk, symbols, functions, built_in_functions)?;
     sites.install(cache);
     Ok(())

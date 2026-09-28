@@ -1175,7 +1175,7 @@ impl BodyCompiler<'_, '_> {
         scope: &Scope<'_>,
         access: &StaticPropertyAccess<'_>,
     ) -> Result<IcSlot, CompileError> {
-        let class = self.class_reference_atom(scope, &access.class)?;
+        let class = self.class_reference(scope, &access.class)?;
         let member = self.heap.intern(
             access
                 .property

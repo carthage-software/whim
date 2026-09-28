@@ -2564,7 +2564,7 @@ fn exact_call_results_only_request_reference_teardown_when_needed() {
             IcDescriptor::Member { name, .. } | IcDescriptor::PublicProperty(name) => {
                 name.as_bytes()
             }
-            IcDescriptor::ClassMember { .. } => unreachable!(),
+            IcDescriptor::Class { .. } | IcDescriptor::ClassMember { .. } => unreachable!(),
         };
         let owns_reference = unit.main.reference_register_mask & (1u64 << destination.index()) != 0;
         match name {

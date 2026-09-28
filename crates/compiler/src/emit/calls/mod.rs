@@ -1,6 +1,7 @@
 //! Call sites: arguments, chains, and partial application.
 
 use whim_bytecode::chunk::descriptors::CalleeDescriptor;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::PresetDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
@@ -10,7 +11,6 @@ use whim_bytecode::instruction::operands::IcSlot;
 use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::atom::Identifier;
 use whim_syn::cst::r#type::TypeArgumentList;
-use whim_value::atom::Atom;
 
 use crate::emit::Access;
 use crate::emit::Argument;
@@ -368,23 +368,25 @@ impl BodyCompiler<'_, '_> {
         Ok(None)
     }
 
-    pub(crate) fn static_call_class_atom(
+    pub(crate) fn static_call_class(
         &self,
         scope: &Scope<'_>,
         reference: &ClassReference<'_>,
-    ) -> Result<Atom, CompileError> {
+    ) -> Result<ClassDescriptor, CompileError> {
         if let Some(binder) = Self::class_reference_binder(scope, reference)? {
-            return Ok(self.heap.intern(format!("@{binder}").as_bytes()));
+            return Ok(ClassDescriptor::Parameter(
+                self.heap.intern(binder.as_bytes()),
+            ));
         }
 
-        self.class_reference_atom(scope, reference)
+        self.class_reference(scope, reference)
     }
 
-    pub(crate) fn class_reference_atom(
+    pub(crate) fn class_reference(
         &self,
         scope: &Scope<'_>,
         reference: &ClassReference<'_>,
-    ) -> Result<Atom, CompileError> {
+    ) -> Result<ClassDescriptor, CompileError> {
         if let Some(binder) = Self::class_reference_binder(scope, reference)? {
             return Err(CompileError::new(
                 CompileErrorKind::TypeParameterClassReference,
@@ -404,21 +406,34 @@ impl BodyCompiler<'_, '_> {
                     named.type_arguments.as_ref(),
                 )?;
 
-                Ok(scope.resolver.resolve(self.heap, &named.identifier))
+                Ok(ClassDescriptor::Named(
+                    scope.resolver.resolve(self.heap, &named.identifier),
+                ))
             }
             ClassReference::Self_(keyword) => {
                 let class = require_class_context(scope, "self", keyword.span())?;
-                Ok(self.heap.intern(class.name.as_bytes()))
+                Ok(ClassDescriptor::Named(
+                    self.heap.intern(class.name.as_bytes()),
+                ))
             }
             ClassReference::Parent(keyword) => {
                 let class = require_class_context(scope, "parent", keyword.span())?;
-                Ok(self
-                    .heap
-                    .intern(class.parent.as_deref().unwrap_or("parent").as_bytes()))
+                let parent = class.parent.as_ref().ok_or_else(|| {
+                    CompileError::new(
+                        CompileErrorKind::ClassContextRequired,
+                        format!(
+                            "`parent` refers to the enclosing class's parent, but {} has no parent",
+                            class.name
+                        ),
+                        keyword.span(),
+                    )
+                })?;
+
+                Ok(ClassDescriptor::Named(self.heap.intern(parent.as_bytes())))
             }
             ClassReference::Static(keyword) => {
                 require_class_context(scope, "static", keyword.span())?;
-                Ok(self.heap.intern(b"static"))
+                Ok(ClassDescriptor::LateStatic)
             }
             ClassReference::Expression(expression) => Err(CompileError::new(
                 CompileErrorKind::DynamicClassMemberAccess,

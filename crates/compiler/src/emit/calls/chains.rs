@@ -318,7 +318,7 @@ impl BodyCompiler<'_, '_> {
                 Ok(destination)
             }
             Expression::Access(Access::ClassConstant(access)) => {
-                let class = self.class_reference_atom(scope, &access.class)?;
+                let class = self.class_reference(scope, &access.class)?;
                 let cache = self.add_ic_descriptor(
                     IcDescriptor::ClassMember {
                         class,

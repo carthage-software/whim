@@ -2,6 +2,7 @@
 
 use hashbrown::HashSet;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::IcSlot;
@@ -158,8 +159,10 @@ fn optimize_chunk(chunk: &mut Chunk, classes: &[Atom], statistics: &mut Optimiza
 }
 
 fn cache_names_class(chunk: &Chunk, cache: IcSlot, classes: &[Atom]) -> bool {
-    let Some(IcDescriptor::Member { name, .. }) =
-        chunk.ic_descriptors.get(usize::from(cache.index()))
+    let Some(IcDescriptor::Class {
+        class: ClassDescriptor::Named(name),
+        ..
+    }) = chunk.ic_descriptors.get(usize::from(cache.index()))
     else {
         return false;
     };

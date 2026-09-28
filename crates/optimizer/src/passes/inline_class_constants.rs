@@ -1,6 +1,7 @@
 //! Inlining of public literal class constants declared in the same unit.
 
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::instruction::Instruction;
@@ -141,8 +142,11 @@ fn optimize_chunk(
         let Instruction::ClassConstantGet { destination, cache } = chunk.code[index] else {
             continue;
         };
-        let IcDescriptor::ClassMember { class, member, .. } =
-            &chunk.ic_descriptors[usize::from(cache.index())]
+        let IcDescriptor::ClassMember {
+            class: ClassDescriptor::Named(class),
+            member,
+            ..
+        } = &chunk.ic_descriptors[usize::from(cache.index())]
         else {
             continue;
         };

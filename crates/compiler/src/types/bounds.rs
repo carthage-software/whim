@@ -7,6 +7,7 @@ use whim_bytecode::aliases::TypeAliasIndex;
 use whim_bytecode::aliases::expand_aliases_using;
 use whim_bytecode::aliases::substitute;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
@@ -67,8 +68,8 @@ fn validate_chunk(indexes: &UnitIndexes<'_>, chunk: &Chunk) -> Result<(), Compil
             continue;
         };
 
-        let Some(IcDescriptor::Member {
-            name,
+        let Some(IcDescriptor::Class {
+            class: ClassDescriptor::Named(name),
             type_arguments: Some(arguments),
         }) = chunk.ic_descriptors.get(usize::from(cache.index()))
         else {

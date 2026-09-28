@@ -3,6 +3,7 @@
 use std::mem;
 
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::PropertyReadMode;
@@ -35,7 +36,7 @@ use crate::vm::NonNull;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
 use crate::vm::call::guard_allows;
-use crate::vm::class_member_atoms;
+use crate::vm::class_member_descriptor;
 use crate::vm::name_atom;
 use crate::vm::site_type_arguments;
 use crate::vm::types::descriptor_same;
@@ -1609,7 +1610,7 @@ impl VirtualMachine<'_> {
         count: usize,
         discard_result: bool,
     ) -> Result<(), VirtualMachineControl> {
-        let (class_atom, member) = class_member_atoms(chunk, site);
+        let (reference, member) = class_member_descriptor(chunk, site);
         let caller_cache = self.current_frame().cache;
         let caller_environment = self.current_frame().type_environment;
         let caller_class = self.current_frame().called_class.0;
@@ -1619,7 +1620,7 @@ impl VirtualMachine<'_> {
             if let Some(cached) = entries.get(site).copied().flatten()
                 && cached.caller_environment == caller_environment
                 && cached.caller_class == caller_class
-                && (*class_atom != self.engine.tables.static_atom
+                && (!matches!(reference, ClassDescriptor::LateStatic)
                     || self.current_frame().called_class.get() == Some(cached.receiver_class))
                 && self.cached_argument_guards_match(
                     caller_cache,
@@ -1641,10 +1642,8 @@ impl VirtualMachine<'_> {
             }
         }
 
-        let class = if *class_atom == self.engine.tables.static_atom
-            || class_atom.as_bytes().starts_with(b"@")
-        {
-            self.resolve_class_reference(class_atom.clone())?
+        let class = if !matches!(reference, ClassDescriptor::Named(_)) {
+            self.resolve_class_reference(reference)?
         } else {
             // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
             let cache_cell = unsafe { self.current_frame().cache.as_ref() };
@@ -1663,7 +1662,7 @@ impl VirtualMachine<'_> {
             match cached {
                 Some(class) => class,
                 None => {
-                    let class = self.resolve_class_reference(class_atom.clone())?;
+                    let class = self.resolve_class_reference(reference)?;
                     // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
                     let cache = unsafe { &mut *cache_cell.entries() };
                     cache[site] = CacheEntry::Class(class);
@@ -1672,68 +1671,8 @@ impl VirtualMachine<'_> {
             }
         };
 
-        let entry = self.engine.tables.classes[class.0 as usize].method(member);
-        let Some(entry) = entry else {
-            let class_text = self.engine.tables.classes[class.0 as usize]
-                .name
-                .to_string();
-            let member_text = member.to_string_lossy().into_owned();
-            return Err(self.throw_well_known(
-                self.engine.tables.well_known.type_error,
-                format!("call to undefined method {class_text}::{member_text}"),
-            ));
-        };
-
-        if entry.is_abstract {
-            let member_text = member.to_string_lossy().into_owned();
-            return Err(self.throw_well_known(
-                self.engine.tables.well_known.type_error,
-                format!("cannot call the abstract method {member_text}"),
-            ));
-        }
-
-        if !visibility_allows(
-            &self.engine.tables.classes,
-            entry.visibility,
-            entry.declaring_class,
-            self.current_frame().class_scope.get(),
-        ) {
-            let rendered = visibility_name(entry.visibility);
-            let member_text = member.to_string_lossy().into_owned();
-            return Err(self.throw_well_known(
-                self.engine.tables.well_known.visibility_error,
-                format!("cannot call {rendered} method {member_text}"),
-            ));
-        }
-
-        let (this, context) = if entry.is_static {
-            (
-                None,
-                MethodContext {
-                    scope: entry.declaring_class,
-                    called: class,
-                    is_constructor: false,
-                },
-            )
-        } else {
-            let Some(this) = self.current_this().cloned() else {
-                let member_text = member.to_string_lossy().into_owned();
-                return Err(self.throw_well_known(
-                    self.engine.tables.well_known.type_error,
-                    format!("cannot call the instance method {member_text} statically"),
-                ));
-            };
-
-            let called = self.current_frame().called_class.get().unwrap_or(class);
-            (
-                Some(this),
-                MethodContext {
-                    scope: entry.declaring_class,
-                    called,
-                    is_constructor: *member == self.engine.tables.constructor_name,
-                },
-            )
-        };
+        let entry = self.static_method_entry(class, member)?;
+        let (this, context) = self.static_method_context(class, member, entry, true)?;
 
         let type_environment = match &this {
             Some(this) => self

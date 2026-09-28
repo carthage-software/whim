@@ -33,7 +33,7 @@ use crate::symbols::UnitSourceFile;
 use crate::vm::VirtualMachineControl;
 
 const MAGIC: &[u8; 8] = b"WHIM\0\0\0\0";
-const FORMAT_VERSION: u32 = 23;
+const FORMAT_VERSION: u32 = 24;
 
 mod merge;
 

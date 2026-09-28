@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use whim_bytecode::aliases::expand_aliases_using as expand_aliases;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::ClassLikeKind;
@@ -67,24 +68,26 @@ impl VirtualMachine<'_> {
         chunk: &Chunk,
         outer: TypeEnvironmentId,
     ) -> Result<Value, VirtualMachineControl> {
-        let (name, written_arguments) = match &chunk.ic_descriptors[site] {
-            IcDescriptor::Member {
-                name,
+        let (reference, written_arguments) = match &chunk.ic_descriptors[site] {
+            IcDescriptor::Class {
+                class,
                 type_arguments,
-            } => (name.clone(), type_arguments.clone()),
-            // SAFETY: the surrounding invariant makes this path unreachable.
-            IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => unsafe {
-                unreachable_invariant("a NewStatic site resolves a class name")
-            },
+            } => (class.clone(), type_arguments.clone()),
+            IcDescriptor::Member { .. }
+            | IcDescriptor::ClassMember { .. }
+            | IcDescriptor::PublicProperty(_) => {
+                // SAFETY: the surrounding invariant makes this path unreachable.
+                unsafe { unreachable_invariant("a NewStatic site resolves a class name") }
+            }
         };
-        if name != self.engine.tables.static_atom {
-            let entry = match self.engine.tables.symbols.get(&name).copied() {
+        if let ClassDescriptor::Named(name) = &reference {
+            let entry = match self.engine.tables.symbols.get(name).copied() {
                 Some(entry) => Some(entry),
                 None => self.resolve_checked_name(name.clone())?,
             };
             if entry.is_some_and(|entry| entry.kind == SymbolKind::TypeAlias) {
                 let descriptor = TypeDescriptor::Named {
-                    name,
+                    name: name.clone(),
                     arguments: written_arguments,
                     recursive: false,
                 };
@@ -95,7 +98,7 @@ impl VirtualMachine<'_> {
                     TypeDescriptor::Named {
                         name, arguments, ..
                     } => {
-                        let class = self.resolve_class_reference(name)?;
+                        let class = self.resolve_class_name(name)?;
                         let environment = self.instantiation_environment(
                             site,
                             class,
@@ -116,11 +119,13 @@ impl VirtualMachine<'_> {
         }
 
         let type_arguments = match &chunk.ic_descriptors[site] {
-            IcDescriptor::Member { type_arguments, .. } => type_arguments.as_deref(),
-            // SAFETY: the surrounding invariant makes this path unreachable.
-            IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => unsafe {
-                unreachable_invariant("a NewStatic site resolves a class name")
-            },
+            IcDescriptor::Class { type_arguments, .. } => type_arguments.as_deref(),
+            IcDescriptor::Member { .. }
+            | IcDescriptor::ClassMember { .. }
+            | IcDescriptor::PublicProperty(_) => {
+                // SAFETY: the surrounding invariant makes this path unreachable.
+                unsafe { unreachable_invariant("a NewStatic site resolves a class name") }
+            }
         };
 
         if type_arguments.is_some_and(|arguments| !arguments.is_empty()) {
@@ -149,7 +154,7 @@ impl VirtualMachine<'_> {
             return self.new_instance_in_environment(class, environment);
         }
 
-        if name != self.engine.tables.static_atom {
+        if matches!(reference, ClassDescriptor::Named(_)) {
             let entry = &self.engine.tables.classes[class.0 as usize];
             if entry.allocates_plainly {
                 self.record_instantiation_environment(

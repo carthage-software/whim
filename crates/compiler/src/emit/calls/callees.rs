@@ -196,25 +196,23 @@ impl BodyCompiler<'_, '_> {
                 CalleeDescriptor::Method(self.heap.intern(name.as_bytes())),
             )),
             CalleeSource::Static { class, name } => {
-                let register = match class {
-                    ClassReference::Expression(expression) => self.expression(scope, expression)?,
+                let (register, class) = match class {
+                    ClassReference::Expression(expression) => {
+                        (self.expression(scope, expression)?, None)
+                    }
                     reference => {
-                        let class = self.class_reference_atom(scope, reference)?;
-                        let constant = self.string_constant(class.as_bytes(), span)?;
+                        let class = self.static_call_class(scope, reference)?;
                         let destination = self.allocate(span)?;
-                        self.chunk.emit(
-                            Instruction::LoadConstant {
-                                destination,
-                                constant,
-                            },
-                            span,
-                        );
-                        destination
+                        self.chunk.emit(Instruction::LoadNull { destination }, span);
+                        (destination, Some(class))
                     }
                 };
                 Ok((
                     register,
-                    CalleeDescriptor::StaticMethod(self.heap.intern(name.as_bytes())),
+                    CalleeDescriptor::StaticMethod {
+                        class,
+                        name: self.heap.intern(name.as_bytes()),
+                    },
                 ))
             }
         }
@@ -501,7 +499,7 @@ impl BodyCompiler<'_, '_> {
                 named.span(),
             )?;
         }
-        let class = self.class_reference_atom(scope, reference)?;
+        let class = self.class_reference(scope, reference)?;
         let type_arguments = match reference {
             ClassReference::Named(named) => {
                 self.lower_turbofish(scope, named.type_arguments.as_ref())?
@@ -512,8 +510,8 @@ impl BodyCompiler<'_, '_> {
             ClassReference::Expression(_) => None,
         };
         let cache = self.add_ic_descriptor(
-            IcDescriptor::Member {
-                name: class,
+            IcDescriptor::Class {
+                class,
                 type_arguments,
             },
             span,

@@ -3269,7 +3269,7 @@ impl VirtualMachine<'_> {
                             TypeDescriptor::Named {
                                 name, arguments, ..
                             } => {
-                                self.resolve_class_reference(name).and_then(|class| {
+                                self.resolve_class_name(name).and_then(|class| {
                                     self.new_instance_typed(
                                         class,
                                         arguments.as_deref(),
@@ -6348,7 +6348,7 @@ impl VirtualMachine<'_> {
                             Ok(TypeDescriptor::Named {
                                 name, arguments, ..
                             }) => {
-                                self.resolve_class_reference(name).and_then(|class| {
+                                self.resolve_class_name(name).and_then(|class| {
                                     self.new_instance_typed(
                                         class,
                                         arguments.as_deref(),

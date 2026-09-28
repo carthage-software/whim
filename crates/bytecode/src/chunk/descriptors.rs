@@ -1,6 +1,8 @@
 //! The side-table payload types a chunk references: literals, type
 //! descriptors, and the inline-cache, switch, preset, and catch entries.
 
+use std::fmt;
+
 use serde::Deserialize;
 use serde::Serialize;
 use serde_seeded::DeserializeSeeded;
@@ -783,11 +785,32 @@ pub struct FunctionTypeParameterDescriptor {
 
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
+pub enum ClassDescriptor {
+    Named(Atom),
+    Parameter(Atom),
+    LateStatic,
+}
+
+impl fmt::Display for ClassDescriptor {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Named(name) => write!(formatter, "{name}"),
+            Self::Parameter(name) => write!(formatter, "type parameter {name}"),
+            Self::LateStatic => formatter.write_str("static"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, DeserializeSeeded)]
+#[seeded(de(seed(Heap)))]
 pub enum CalleeDescriptor {
     Value,
     Function,
     Method(Atom),
-    StaticMethod(Atom),
+    StaticMethod {
+        class: Option<ClassDescriptor>,
+        name: Atom,
+    },
 }
 
 /// Positionals in the register window, followed by values for named arguments.
@@ -960,12 +983,14 @@ pub struct CatchEntry {
 pub enum IcDescriptor {
     Member {
         name: Atom,
-        /// Class type arguments for an instantiation site; absent for every
-        /// other member cache.
+        type_arguments: Option<Vec<TypeDescriptor>>,
+    },
+    Class {
+        class: ClassDescriptor,
         type_arguments: Option<Vec<TypeDescriptor>>,
     },
     ClassMember {
-        class: Atom,
+        class: ClassDescriptor,
         member: Atom,
         /// A turbofish written on a static call; absent for every other
         /// class-member cache, and for a call that writes none.

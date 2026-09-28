@@ -4,6 +4,7 @@ use std::mem;
 
 use whim_base::unwrap_result_invariant;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Comparison;
@@ -388,14 +389,23 @@ fn is_cold_call(chunk: &Chunk, instruction: Instruction, callables: &ColdCallabl
 fn descriptor_member(chunk: &Chunk, cache: IcSlot) -> Option<&Atom> {
     match &chunk.ic_descriptors[usize::from(cache.index())] {
         IcDescriptor::Member { name, .. } => Some(name),
-        IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => None,
+        IcDescriptor::Class { .. }
+        | IcDescriptor::ClassMember { .. }
+        | IcDescriptor::PublicProperty(_) => None,
     }
 }
 
 fn descriptor_class_member(chunk: &Chunk, cache: IcSlot) -> Option<(&Atom, &Atom)> {
     match &chunk.ic_descriptors[usize::from(cache.index())] {
-        IcDescriptor::ClassMember { class, member, .. } => Some((class, member)),
-        IcDescriptor::Member { .. } | IcDescriptor::PublicProperty(_) => None,
+        IcDescriptor::ClassMember {
+            class: ClassDescriptor::Named(class),
+            member,
+            ..
+        } => Some((class, member)),
+        IcDescriptor::Member { .. }
+        | IcDescriptor::Class { .. }
+        | IcDescriptor::ClassMember { .. }
+        | IcDescriptor::PublicProperty(_) => None,
     }
 }
 

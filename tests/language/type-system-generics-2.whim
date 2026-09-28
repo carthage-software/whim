@@ -371,6 +371,9 @@ class Negator implements Buildable {
 }
 
 function construct_buildable<T: Buildable>(int $seed): T {
+  assert!(T::build(seed: $seed) is T);
+  $build = T::build(...);
+  assert!($build($seed) is T);
   return T::build($seed);
 }
 

@@ -3,6 +3,7 @@
 use std::mem;
 
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::ConstantInitializer;
@@ -51,10 +52,12 @@ impl VirtualMachine<'_> {
     ) -> Result<Value, VirtualMachineControl> {
         let name = match &chunk.ic_descriptors[slot] {
             IcDescriptor::Member { name, .. } => name.clone(),
-            // SAFETY: the surrounding invariant makes this path unreachable.
-            IcDescriptor::ClassMember { .. } | IcDescriptor::PublicProperty(_) => unsafe {
-                unreachable_invariant("a ConstantGet site resolves a member descriptor")
-            },
+            IcDescriptor::Class { .. }
+            | IcDescriptor::ClassMember { .. }
+            | IcDescriptor::PublicProperty(_) => {
+                // SAFETY: the surrounding invariant makes this path unreachable.
+                unsafe { unreachable_invariant("a ConstantGet site resolves a member descriptor") }
+            }
         };
 
         let cache_pointer = self.current_frame().cache;
@@ -271,33 +274,32 @@ impl VirtualMachine<'_> {
         Some(value)
     }
 
-    /// Resolves a class reference atom: `static` binds to the frame's called
-    /// class, anything else resolves through the symbol table, with the
-    /// autoload chain consulted on a miss.
     pub(in crate::vm) fn resolve_class_reference(
         &mut self,
-        class_atom: Atom,
+        class: &ClassDescriptor,
     ) -> Result<ClassId, VirtualMachineControl> {
-        if let Some(binder) = class_atom.as_bytes().strip_prefix(b"@") {
-            let name = self.heap.intern(binder);
-            return self.resolve_type_parameter_class(&name);
-        }
-
-        if class_atom == self.engine.tables.static_atom {
-            return match self.current_frame().called_class.get() {
+        match class {
+            ClassDescriptor::Named(name) => self.resolve_class_name(name.clone()),
+            ClassDescriptor::Parameter(name) => self.resolve_type_parameter_class(name),
+            ClassDescriptor::LateStatic => match self.current_frame().called_class.get() {
                 Some(class) => Ok(class),
                 None => Err(self.throw_well_known(
                     self.engine.tables.well_known.type_error,
                     "`static` is not bound outside a class context".to_string(),
                 )),
-            };
+            },
         }
+    }
 
-        match self.lookup_class_autoloading(class_atom.clone())? {
+    pub(in crate::vm) fn resolve_class_name(
+        &mut self,
+        name: Atom,
+    ) -> Result<ClassId, VirtualMachineControl> {
+        match self.lookup_class_autoloading(name.clone())? {
             Some(class) => Ok(class),
             None => Err(self.throw_well_known(
                 self.engine.tables.well_known.undefined_symbol_error,
-                format!("the class {} is not defined", class_atom.to_string_lossy()),
+                format!("the class {} is not defined", name.to_string_lossy()),
             )),
         }
     }
@@ -359,13 +361,13 @@ impl VirtualMachine<'_> {
         slot: usize,
         chunk: &Chunk,
     ) -> Result<ClassId, VirtualMachineControl> {
-        let IcDescriptor::Member { name, .. } = &chunk.ic_descriptors[slot] else {
+        let IcDescriptor::Class { class, .. } = &chunk.ic_descriptors[slot] else {
             // SAFETY: the surrounding invariant makes this path unreachable.
-            unsafe { unreachable_invariant("a NewStatic site resolves a member descriptor") }
+            unsafe { unreachable_invariant("a NewStatic site resolves a class descriptor") }
         };
 
-        if *name == self.engine.tables.static_atom {
-            return self.resolve_class_reference(name.clone());
+        if !matches!(class, ClassDescriptor::Named(_)) {
+            return self.resolve_class_reference(class);
         }
 
         let cache_pointer = self.current_frame().cache;
@@ -381,7 +383,7 @@ impl VirtualMachine<'_> {
             return Ok(class);
         }
 
-        let class = self.resolve_class_reference(name.clone())?;
+        let class = self.resolve_class_reference(class)?;
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let cache = unsafe { &mut *cache_cell.entries() };
         cache[slot] = CacheEntry::Class(class);

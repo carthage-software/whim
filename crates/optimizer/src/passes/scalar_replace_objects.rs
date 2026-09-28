@@ -2,6 +2,7 @@
 
 use hashbrown::HashSet;
 use whim_bytecode::chunk::Chunk;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::LiteralKey;
@@ -111,8 +112,8 @@ fn optimize_chunk(chunk: &mut Chunk, classes: &[Atom], statistics: &mut Optimiza
             }
         };
 
-        let IcDescriptor::Member {
-            name,
+        let IcDescriptor::Class {
+            class: ClassDescriptor::Named(name),
             type_arguments,
         } = &chunk.ic_descriptors[usize::from(cache.index())]
         else {

@@ -2,6 +2,7 @@
 //! callee lookups.
 
 use whim_base::limits::MAX_TYPE_DEPTH;
+use whim_bytecode::chunk::descriptors::ClassDescriptor;
 use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
@@ -969,7 +970,7 @@ impl<'a> TypeFlow<'a> {
 
     fn static_property_type(&self, cache: IcSlot, depth: usize) -> Option<TypeDescriptor> {
         let IcDescriptor::ClassMember {
-            class,
+            class: ClassDescriptor::Named(class),
             member,
             type_arguments: None,
         } = self.chunk.ic_descriptors.get(usize::from(cache.index()))?
@@ -1300,10 +1301,14 @@ impl<'a> TypeFlow<'a> {
         &self,
         cache: IcSlot,
     ) -> Option<(&'a Atom, Option<&'a [TypeDescriptor]>)> {
-        let IcDescriptor::Member {
+        let (IcDescriptor::Member {
             name,
             type_arguments,
-        } = self.chunk.ic_descriptors.get(usize::from(cache.index()))?
+        }
+        | IcDescriptor::Class {
+            class: ClassDescriptor::Named(name),
+            type_arguments,
+        }) = self.chunk.ic_descriptors.get(usize::from(cache.index()))?
         else {
             return None;
         };
@@ -1321,7 +1326,7 @@ impl<'a> TypeFlow<'a> {
 
     fn class_constant_type(&self, cache: IcSlot) -> Option<TypeDescriptor> {
         let IcDescriptor::ClassMember {
-            class,
+            class: ClassDescriptor::Named(class),
             member,
             type_arguments,
         } = self.chunk.ic_descriptors.get(usize::from(cache.index()))?
