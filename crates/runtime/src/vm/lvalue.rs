@@ -368,13 +368,12 @@ impl VirtualMachine<'_> {
         slot: u32,
     ) -> Result<(), VirtualMachineControl> {
         let frame = self.current_frame();
-        let constructor_initialization = frame.in_constructor()
-            && receiver.slot_is_uninitialized(slot as usize)
+        let constructor_receiver = frame.in_constructor()
             && self
                 .current_this()
                 .is_some_and(|this| this.ptr_eq(receiver));
 
-        if constructor_initialization {
+        if constructor_receiver && receiver.slot_is_uninitialized(slot as usize) {
             return Ok(());
         }
 
@@ -399,6 +398,13 @@ impl VirtualMachine<'_> {
                 &self.engine.tables.classes[class.0 as usize].slots[slot as usize].name;
             format!("{}::${property_name}", declaring_class.name)
         };
+
+        if constructor_receiver {
+            return Err(self.throw_well_known(
+                self.engine.tables.well_known.readonly_error,
+                format!("cannot write readonly property {qualified} twice"),
+            ));
+        }
 
         if !self.engine.tables.classes[class.0 as usize].is_readonly {
             return Err(self.throw_well_known(

@@ -184,6 +184,22 @@ impl ReturnKind {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LifecycleMethod {
+    Constructor,
+    Destructor,
+}
+
+impl LifecycleMethod {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "__construct" => Some(Self::Constructor),
+            "__destruct" => Some(Self::Destructor),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct BodyShape {
     pub where_clause: Option<Span>,
@@ -191,9 +207,7 @@ pub(crate) struct BodyShape {
     pub is_instance_method: bool,
     /// The body's return contract.
     pub return_kind: ReturnKind,
-    /// Whether the body is a constructor whose promoted parameters write
-    /// their properties in the prologue.
-    pub promote_parameters: bool,
+    pub lifecycle_method: Option<LifecycleMethod>,
     /// Whether the body belongs to trusted code whose written return types
     /// are guaranteed by review, so returns compile unchecked. Only the
     /// standard library compiles this way.
@@ -750,7 +764,9 @@ impl<'compilation, 'arena> BodyCompiler<'compilation, 'arena> {
             );
         }
 
-        if self.shape.promote_parameters {
+        if self.shape.lifecycle_method == Some(LifecycleMethod::Constructor)
+            && self.shape.is_instance_method
+        {
             for parameter in &parameter_list.parameters {
                 if !parameter.is_promoted_property() {
                     continue;

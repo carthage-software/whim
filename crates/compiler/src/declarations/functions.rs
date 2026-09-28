@@ -147,7 +147,7 @@ pub(in crate::declarations) fn compile_function_declaration(
                 where_clause: None,
                 is_instance_method: false,
                 return_kind: lowered_return.kind,
-                promote_parameters: false,
+                lifecycle_method: None,
                 trusted_returns: scope.trusted_returns,
             },
         )?
@@ -494,7 +494,7 @@ pub(crate) fn compile_initializer(
             where_clause: None,
             is_instance_method: false,
             return_kind: ReturnKind::Value,
-            promote_parameters: false,
+            lifecycle_method: None,
             trusted_returns: scope.trusted_returns,
         },
     );

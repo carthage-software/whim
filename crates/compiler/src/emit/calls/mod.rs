@@ -24,6 +24,7 @@ use crate::emit::CompileError;
 use crate::emit::CompileErrorKind;
 use crate::emit::Expression;
 use crate::emit::HasSpan;
+use crate::emit::LifecycleMethod;
 use crate::emit::MethodCall;
 use crate::emit::NullSafeMethodCall;
 use crate::emit::NullSafePropertyAccess;
@@ -45,6 +46,35 @@ use crate::types::lowering::reject_return_only_annotation;
 mod callees;
 mod chains;
 mod invocations;
+
+impl BodyCompiler<'_, '_> {
+    fn check_lifecycle_call(
+        &self,
+        name: &str,
+        parent: bool,
+        span: Span,
+    ) -> Result<(), CompileError> {
+        let Some(method) = LifecycleMethod::from_name(name) else {
+            return Ok(());
+        };
+        if parent && self.shape.is_instance_method && self.shape.lifecycle_method == Some(method) {
+            return Ok(());
+        }
+
+        Err(CompileError::new(
+            CompileErrorKind::InvalidLifecycleCall,
+            match method {
+                LifecycleMethod::Constructor => {
+                    "cannot call a constructor directly; use new, or parent::__construct() inside a constructor"
+                }
+                LifecycleMethod::Destructor => {
+                    "cannot call a destructor directly; only parent::__destruct() inside a destructor is allowed"
+                }
+            },
+            span,
+        ))
+    }
+}
 
 const fn call_value_instruction(
     value_use: ValueUse,

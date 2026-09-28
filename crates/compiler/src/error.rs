@@ -78,6 +78,7 @@ pub enum CompileErrorKind {
     SealedPermissionViolation,
     ParameterModifierOutsideConstructor,
     InvalidLifecycleMethod,
+    InvalidLifecycleCall,
     NonConstantAttributeArgument,
     NonConstantParameterDefault,
     NonConstantInitializer,

@@ -778,4 +778,60 @@ assert!($assertion_error_49 is RuntimeException);
 
 Async\drain();
 
+foreach (dict[
+  '__construct' => 'constructor',
+  '__destruct' => 'destructor',
+] as $method => $kind) {
+  foreach (vec[
+    '$box->' . $method . '()',
+    '$box?->' . $method . '()',
+    '$box->' . $method . '(...)',
+    '$box::' . $method . '()',
+    'Box::' . $method . '(...)',
+  ] as $index => $call) {
+    rejects(
+      $work,
+      'direct-' . $method . '-' . $index,
+      'class Box {'
+      . ' public function __construct() {}'
+      . ' public function __destruct() {}'
+      . '} $box = new Box(); '
+      . $call
+      . ';',
+      'cannot call a ' . $kind . ' directly',
+    );
+  }
+
+  rejects(
+    $work,
+    'closure-' . $method,
+    'class Base {} class Child extends Base {'
+    . ' public function '
+    . $method
+    . '() {'
+    . ' $call = fn() => parent::'
+    . $method
+    . '();'
+    . ' } }',
+    'cannot call a ' . $kind . ' directly',
+  );
+}
+
+foreach (vec['', 'readonly '] as $index => $modifier) {
+  rejects(
+    $work,
+    'promoted-readonly-twice-' . $index,
+    $modifier
+    . 'class Base {'
+    . ' public function __construct(public readonly int $value) {}'
+    . '} '
+    . $modifier
+    . 'class Child extends Base {'
+    . ' public function __construct() {'
+    . ' parent::__construct(1); parent::__construct(2);'
+    . ' } } new Child();',
+    'cannot write readonly property Base::$value twice',
+  );
+}
+
 Filesystem\delete_directory($work, true);

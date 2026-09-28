@@ -156,11 +156,13 @@ fn analyze_chunk(position: usize, analyzed: &AnalyzedChunk<'_>, proven: &mut Vec
             continue;
         }
 
-        if !raw_initialization
-            && (property.is_readonly
-                || resolved.class.is_readonly
-                || (property.visibility != Visibility::Public
-                    && class_name != Some(&resolved.class.name)))
+        let fresh_receiver = raw_initialization
+            && resolved.class.is_final
+            && class_name == Some(&resolved.class.name);
+        if ((property.is_readonly || resolved.class.is_readonly) && !fresh_receiver)
+            || (!raw_initialization
+                && property.visibility != Visibility::Public
+                && class_name != Some(&resolved.class.name))
         {
             continue;
         }
@@ -251,7 +253,7 @@ fn analyze_chunk(position: usize, analyzed: &AnalyzedChunk<'_>, proven: &mut Vec
                     }
                     _ => false,
                 },
-                fresh_receiver: matches!(instruction, Instruction::PropertyInitRaw { .. }),
+                fresh_receiver,
             });
         }
     }

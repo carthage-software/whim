@@ -47,6 +47,7 @@ use crate::declarations::generics::compile_type_parameters;
 use crate::declarations::generics::compile_where_constraints;
 use crate::declarations::generics::enclosing_where_clause_span;
 use crate::emit::BodyShape;
+use crate::emit::LifecycleMethod;
 use crate::emit::ReturnKind;
 use crate::emit::Scope;
 use crate::error::CompileError;
@@ -576,7 +577,7 @@ impl<'compiler, 'scope> MemberCompiler<'compiler, 'scope> {
                         ),
                         is_instance_method: !method.is_static(),
                         return_kind: metadata.return_kind,
-                        promote_parameters: is_constructor && !method.is_static(),
+                        lifecycle_method: LifecycleMethod::from_name(method.name.value),
                         trusted_returns: method_scope.trusted_returns,
                     },
                 )?,

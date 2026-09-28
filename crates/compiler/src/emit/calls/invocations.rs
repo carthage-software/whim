@@ -252,6 +252,11 @@ impl BodyCompiler<'_, '_> {
         call: &StaticMethodCall<'_>,
         value_use: ValueUse,
     ) -> Result<Register, CompileError> {
+        self.check_lifecycle_call(
+            call.method.value,
+            matches!(call.class, ClassReference::Parent(_)),
+            call.method.span(),
+        )?;
         check_named_arguments(&call.argument_list)?;
         Self::check_method_turbofish(
             scope,

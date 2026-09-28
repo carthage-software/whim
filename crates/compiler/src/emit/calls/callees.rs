@@ -309,6 +309,11 @@ impl BodyCompiler<'_, '_> {
                 self.materialize_callee(scope, &application.function)
             }
             PartialApplication::Method(application) => {
+                self.check_lifecycle_call(
+                    application.method.value,
+                    false,
+                    application.method.span(),
+                )?;
                 let receiver = self.expression(scope, application.object)?;
                 self.callee_value(
                     scope,
@@ -320,6 +325,11 @@ impl BodyCompiler<'_, '_> {
                 )
             }
             PartialApplication::StaticMethod(application) => {
+                self.check_lifecycle_call(
+                    application.method.value,
+                    false,
+                    application.method.span(),
+                )?;
                 if application.type_arguments.is_some() {
                     Self::check_method_turbofish(
                         scope,

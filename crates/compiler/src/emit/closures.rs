@@ -284,7 +284,7 @@ impl BodyCompiler<'_, '_> {
                 ),
                 is_instance_method: captured_this,
                 return_kind,
-                promote_parameters: false,
+                lifecycle_method: None,
                 trusted_returns: function_scope.trusted_returns,
             },
         );

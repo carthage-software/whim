@@ -353,6 +353,7 @@ impl BodyCompiler<'_, '_> {
             // SAFETY: the surrounding invariant makes this path unreachable.
             unsafe { unreachable_invariant("a method call has a method callee") }
         };
+        self.check_lifecycle_call(name, false, span)?;
         let receiver = *receiver;
         check_named_arguments(argument_list)?;
         let count = argument_gate(argument_list.arguments.len(), span)?;
