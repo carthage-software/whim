@@ -1051,6 +1051,11 @@ impl VirtualMachine<'_> {
 
         let target = shape.target;
         let called_class = shape.method.map(|method| method.called);
+        let partial_application = !slots.is_empty()
+            || shape
+                .holder
+                .as_ref()
+                .is_some_and(|holder| holder.is_partial_application());
         let callable = FunctionObject::partial(
             &self.heap,
             target,
@@ -1062,6 +1067,7 @@ impl VirtualMachine<'_> {
             called_class,
             type_environment,
             type_arguments_bound,
+            partial_application,
         );
         if cacheable {
             self.cache_bound_callable(site, target, argument_environment, callable.clone());

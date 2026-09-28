@@ -3,7 +3,6 @@ namespace Whim\Reflection;
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
-use Whim\Reflection\Symbol\NewtypeReflection;
 use Whim\Reflection\Type\SymbolTypeReflection;
 
 /** Describes the outer nominal layer carried by one newtype value. */

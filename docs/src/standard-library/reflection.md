@@ -118,7 +118,7 @@ attribute.
 
 ## Symbols and members
 
-The `Whim\Reflection\Symbol` namespace has one reflection class for each named
+The `Whim\Reflection` namespace has one reflection class for each named
 symbol kind.
 
 On a class-like reflection, `getMethods()`, `getProperties()`, and
@@ -136,9 +136,9 @@ gives its type, default value, and promoted, readonly, and static flags.
 ## Invoke callables and create instances
 
 `FunctionReflection::invoke($typeArguments = vec[], $arguments = vec[])` calls
-the reflected function. `CallableValueReflection::invoke()` takes the same
-arguments and calls the fn value retained by `reflect_callable()`. Both
-implement `Whim\Reflection\Callable\InvokableReflection`.
+the reflected function. `CallableReflection::invoke()` takes the same
+arguments and calls the `fn` value retained by `reflect_callable()`. Both
+implement `Whim\Reflection\InvokableReflection`.
 
 Type arguments are a `vec<TypeReflection>` in type parameter order. Value
 arguments are a `vec<mixed>` in parameter order. Omitted arguments use the
@@ -162,12 +162,12 @@ $greet = Reflection\reflect_callable(fn(string $name): string => $prefix . $name
 assert!($greet->invoke(vec[], vec['world']) == 'Hello, world');
 ```
 
-A callable value keeps its captures, bound receiver, class scope, type
+A callable keeps its captures, bound receiver, class scope, type
 bindings, and partial arguments. Pass only the remaining arguments to a
-partial application. A specialized fn uses its stored type arguments; passing
-more type arguments throws `TypeError`. `ClosureReflection` describes a
-closure declaration. To invoke a closure with its captures, reflect the fn
-value with `reflect_callable()`.
+partial application. A specialized `fn` uses its stored type arguments; passing
+more type arguments throws `TypeError`. `ClosureReflection`
+describes a closure declaration. To invoke a closure with its captures,
+reflect the `fn` value with `reflect_callable()`.
 
 `MethodReflection::invoke($target, $typeArguments = vec[], $arguments = vec[])`
 requires an object for an instance method and a `classname<object>` for a
@@ -200,7 +200,7 @@ A generic declaration lists its type parameters in source order. Each
 `TypeParameterReflection` gives its owner, position, variance, bounds, and
 default.
 
-`CallableReflection::getWhereConstraints()` returns
+`FunctionLikeReflection::getWhereConstraints()` returns
 `Whim\Reflection\Generic\WhereConstraintReflection` entries in source order,
 including repeated constraints. Functions, methods, and closures without a clause
 return an empty vector.
@@ -208,7 +208,7 @@ Each constraint provides:
 
 - `getParameter()`: the exact `TypeParameterReflection` it constrains.
 - `getBound()`: its upper bound as a `TypeReflection`, with generic parameters left unresolved.
-- `getDeclaringCallable()`: the function, method, or closure that declares the constraint.
+- `getDeclaringFunctionLike()`: the function, method, or closure that declares the constraint.
 - `getPosition()`: its zero-based position in the clause.
 - `getLocation()`: its source span for user code, or `null` for an artifact.
 
@@ -269,8 +269,25 @@ type ID nor valid source code. `getId()` and `equals()` compare types.
 `PropertyValueReflection::getValue()` throws `UninitializedPropertyError` when
 the property is uninitialized.
 
-`reflect_callable()` reports a callable's declaration, function type, type
-bindings, bound object, called class, captured values, and bound arguments.
+`reflect_callable()` returns a `CallableReflection` for a `fn` value. It reports
+the declaration, function type, type bindings, bound object, called class,
+captured values, and bound arguments. Its `getDeclaration()` returns a
+`FunctionReflection`, `MethodReflection`, or `ClosureReflection`. These share
+the `FunctionLikeReflection` interface for declaration metadata.
+
+Three predicates distinguish callable values:
+
+| Value | `isClosure()` | `isFirstClassCallable()` | `isPartialFunctionApplication()` |
+| --- | --- | --- | --- |
+| `fn(int $x): int => $x` | `true` | `false` | `false` |
+| `foo(...)` or `$object->method(...)` | `false` | `true` | `false` |
+| `foo::<int>(...)` | `false` | `true` | `false` |
+| `foo(?, 'fixed')` or `foo(?, ?)` | `false` | `false` | `true` |
+
+Exactly one predicate returns `true`. Partial function application reports
+`isPartialFunctionApplication()` even when it binds no values or starts from a
+closure. `getDeclaration()` still reports the original declaration. Binding
+type arguments or using `(...)` on an existing callable preserves its kind.
 
 `reflect_newtype_value()` returns the outer newtype reflection, or `null` for a
 value that has no newtype. `getBackingValue()` returns the value inside that

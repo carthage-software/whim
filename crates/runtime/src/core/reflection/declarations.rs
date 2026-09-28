@@ -391,7 +391,7 @@ pub(crate) fn parameter_dispatch(
     match operation {
         Operation::Name => Ok(Value::string(parameter.name.to_handle())),
         Operation::Position => Ok(index_value(position)),
-        Operation::DeclaringCallable => {
+        Operation::DeclaringFunctionLike => {
             objects::declaration(context, callable_declaration(callable))
         }
         Operation::DeclaredType => optional_declared_type(
@@ -591,7 +591,7 @@ pub(crate) fn where_constraint_dispatch(
             context,
             ReflectedType::owned(constraint.bound, owner).in_optional_class(info.declaring_class),
         ),
-        Operation::DeclaringCallable => {
+        Operation::DeclaringFunctionLike => {
             objects::declaration(context, callable_declaration(callable))
         }
         Operation::Position => Ok(index_value(position)),

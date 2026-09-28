@@ -253,9 +253,9 @@ macro_rules! reflection_class_methods {
             interfaces = [$($interface),*];
             methods = [
                 $($method : $signature => $operation;)*
-                get_parameters: "getParameters(): vec<Whim\\Reflection\\Callable\\ParameterReflection>" => Parameters;
+                get_parameters: "getParameters(): vec<Whim\\Reflection\\ParameterReflection>" => Parameters;
                 get_where_constraints: "getWhereConstraints(): vec<Whim\\Reflection\\Generic\\WhereConstraintReflection>" => WhereConstraints;
-                get_parameter: "getParameter(int|string $parameter): null|Whim\\Reflection\\Callable\\ParameterReflection" => Parameter;
+                get_parameter: "getParameter(int|string $parameter): null|Whim\\Reflection\\ParameterReflection" => Parameter;
                 get_required_parameter_count: "getRequiredParameterCount(): uint" => RequiredParameterCount;
                 get_return_type: "getReturnType(): null|Whim\\Reflection\\Type\\TypeReflection" => ReturnType;
                 get_callable_type: "getCallableType(null|Whim\\Reflection\\Generic\\TypeEnvironmentReflection $environment = null, null|Whim\\Reflection\\Type\\ClassTypeReflection $calledType = null): Whim\\Reflection\\Type\\FunctionTypeReflection" => CallableType;
@@ -282,7 +282,7 @@ macro_rules! reflection_class_methods {
             methods = [
                 $($method : $signature => $operation;)*
                 get_name: "getName(): string" => Name;
-                get_declaring_type: "getDeclaringType(): Whim\\Reflection\\Symbol\\ClassLikeReflection" => DeclaringType;
+                get_declaring_type: "getDeclaringType(): Whim\\Reflection\\ClassLikeReflection" => DeclaringType;
                 get_visibility: "getVisibility(): Whim\\Reflection\\Member\\Visibility" => Visibility;
             ];
             calls = [$($calls)*];
@@ -336,7 +336,7 @@ macro_rules! reflection_class_methods {
             interfaces = [$($interface),*];
             methods = [
                 $($method : $signature => $operation;)*
-                get_declaration: "getDeclaration(): Whim\\Reflection\\Symbol\\SymbolReflection|Whim\\Reflection\\Member\\MethodReflection|Whim\\Reflection\\Member\\ClassConstantReflection|Whim\\Reflection\\Member\\EnumCaseReflection" => Declaration;
+                get_declaration: "getDeclaration(): Whim\\Reflection\\SymbolReflection|Whim\\Reflection\\Member\\MethodReflection|Whim\\Reflection\\Member\\ClassConstantReflection|Whim\\Reflection\\Member\\EnumCaseReflection" => Declaration;
                 get_type_arguments: "getTypeArguments(): vec<Whim\\Reflection\\Type\\TypeReflection>" => TypeArguments;
                 get_type_environment: "getTypeEnvironment(): Whim\\Reflection\\Generic\\TypeEnvironmentReflection" => TypeEnvironment;
                 is_recursive_reference: "isRecursiveReference(): bool" => IsRecursiveReference;
@@ -364,14 +364,14 @@ reflection_class! {
     implements ["Whim\\Reflection\\DeclarationReflection"]
     with [declaration] {
         get_path: "getPath(): null|string" => Path;
-        get_symbols: "getSymbols(null|Whim\\Symbol\\SymbolKind $kind = null): vec<Whim\\Reflection\\Symbol\\SymbolReflection>" => Symbols;
+        get_symbols: "getSymbols(null|Whim\\Symbol\\SymbolKind $kind = null): vec<Whim\\Reflection\\SymbolReflection>" => Symbols;
         has_top_level_code: "hasTopLevelCode(): bool" => HasTopLevelCode;
     }
 }
 
 reflection_class! {
-    ClassReflection = "Whim\\Reflection\\Symbol\\ClassReflection"
-    implements ["Whim\\Reflection\\Symbol\\ClassLikeReflection"]
+    ClassReflection = "Whim\\Reflection\\ClassReflection"
+    implements ["Whim\\Reflection\\ClassLikeReflection"]
     with [declaration, symbol, generic, class_like] {
         is_abstract: "isAbstract(): bool" => IsAbstract;
         is_final: "isFinal(): bool" => IsFinal;
@@ -391,8 +391,8 @@ reflection_class! {
 }
 
 reflection_class! {
-    InterfaceReflection = "Whim\\Reflection\\Symbol\\InterfaceReflection"
-    implements ["Whim\\Reflection\\Symbol\\ClassLikeReflection"]
+    InterfaceReflection = "Whim\\Reflection\\InterfaceReflection"
+    implements ["Whim\\Reflection\\ClassLikeReflection"]
     with [declaration, symbol, generic, class_like] {
         get_direct_parent_types: "getDirectParentTypes(): vec<Whim\\Reflection\\Type\\ClassTypeReflection>" => DirectParentTypes;
         get_parent_types: "getParentTypes(): vec<Whim\\Reflection\\Type\\ClassTypeReflection>" => ParentTypes;
@@ -400,8 +400,8 @@ reflection_class! {
 }
 
 reflection_class! {
-    EnumReflection = "Whim\\Reflection\\Symbol\\EnumReflection"
-    implements ["Whim\\Reflection\\Symbol\\ClassLikeReflection"]
+    EnumReflection = "Whim\\Reflection\\EnumReflection"
+    implements ["Whim\\Reflection\\ClassLikeReflection"]
     with [declaration, symbol, generic, class_like] {
         get_backing_type: "getBackingType(): null|Whim\\Reflection\\Type\\TypeReflection" => BackingType;
         get_cases: "getCases(): vec<Whim\\Reflection\\Member\\EnumCaseReflection>" => Cases;
@@ -412,9 +412,9 @@ reflection_class! {
 }
 
 reflection_class! {
-    TypeAliasReflection = "Whim\\Reflection\\Symbol\\TypeAliasReflection"
+    TypeAliasReflection = "Whim\\Reflection\\TypeAliasReflection"
     implements [
-        "Whim\\Reflection\\Symbol\\SymbolReflection",
+        "Whim\\Reflection\\SymbolReflection",
         "Whim\\Reflection\\Generic\\GenericDeclarationReflection",
     ]
     with [declaration, symbol, generic] {
@@ -424,9 +424,9 @@ reflection_class! {
 }
 
 reflection_class! {
-    NewtypeReflection = "Whim\\Reflection\\Symbol\\NewtypeReflection"
+    NewtypeReflection = "Whim\\Reflection\\NewtypeReflection"
     implements [
-        "Whim\\Reflection\\Symbol\\SymbolReflection",
+        "Whim\\Reflection\\SymbolReflection",
         "Whim\\Reflection\\Generic\\GenericDeclarationReflection",
     ]
     with [declaration, symbol, generic] {
@@ -436,11 +436,11 @@ reflection_class! {
 }
 
 reflection_class! {
-    FunctionReflection = "Whim\\Reflection\\Symbol\\FunctionReflection"
+    FunctionReflection = "Whim\\Reflection\\FunctionReflection"
     implements [
-        "Whim\\Reflection\\Symbol\\SymbolReflection",
-        "Whim\\Reflection\\Callable\\CallableReflection",
-        "Whim\\Reflection\\Callable\\InvokableReflection",
+        "Whim\\Reflection\\SymbolReflection",
+        "Whim\\Reflection\\FunctionLikeReflection",
+        "Whim\\Reflection\\InvokableReflection",
     ]
     with [declaration, symbol, generic, callable] {
         get_type: "getType(): Whim\\Reflection\\Type\\SymbolTypeReflection" => Type;
@@ -451,8 +451,8 @@ reflection_class! {
 }
 
 reflection_class! {
-    ConstantReflection = "Whim\\Reflection\\Symbol\\ConstantReflection"
-    implements ["Whim\\Reflection\\Symbol\\SymbolReflection"]
+    ConstantReflection = "Whim\\Reflection\\ConstantReflection"
+    implements ["Whim\\Reflection\\SymbolReflection"]
     with [declaration, symbol] {
         get_value_type: "getValueType(): Whim\\Reflection\\Type\\TypeReflection" => ValueType;
         get_value: "getValue(): mixed" => Value;
@@ -464,7 +464,7 @@ reflection_class! {
     MethodReflection = "Whim\\Reflection\\Member\\MethodReflection"
     implements [
         "Whim\\Reflection\\Member\\MemberReflection",
-        "Whim\\Reflection\\Callable\\CallableReflection",
+        "Whim\\Reflection\\FunctionLikeReflection",
     ]
     with [declaration, member, generic, callable] {
         is_static: "isStatic(): bool" => IsStatic;
@@ -512,7 +512,7 @@ reflection_class! {
     EnumCaseReflection = "Whim\\Reflection\\Member\\EnumCaseReflection"
     implements ["Whim\\Reflection\\Member\\MemberReflection"]
     with [declaration, member] {
-        get_enum: "getEnum(): Whim\\Reflection\\Symbol\\EnumReflection" => Enum;
+        get_enum: "getEnum(): Whim\\Reflection\\EnumReflection" => Enum;
         get_backing_value: "getBackingValue(): null|int|uint|string" => BackingValue;
         get_value: "getValue(): object" => Value;
         get_type: "getType(): Whim\\Reflection\\Type\\MemberTypeReflection" => Type;
@@ -520,12 +520,12 @@ reflection_class! {
 }
 
 reflection_class! {
-    ParameterReflection = "Whim\\Reflection\\Callable\\ParameterReflection"
+    ParameterReflection = "Whim\\Reflection\\ParameterReflection"
     implements ["Whim\\Reflection\\DeclarationReflection"]
     with [declaration] {
         get_name: "getName(): string" => Name;
         get_position: "getPosition(): (0..)" => Position;
-        get_declaring_callable: "getDeclaringCallable(): Whim\\Reflection\\Callable\\CallableReflection" => DeclaringCallable;
+        get_declaring_function_like: "getDeclaringFunctionLike(): Whim\\Reflection\\FunctionLikeReflection" => DeclaringFunctionLike;
         get_declared_type: "getDeclaredType(): null|Whim\\Reflection\\Type\\TypeReflection" => DeclaredType;
         get_type: "getType(null|Whim\\Reflection\\Generic\\TypeEnvironmentReflection $environment = null): null|Whim\\Reflection\\Type\\TypeReflection" => Type;
         is_optional: "isOptional(): bool" => IsOptional;
@@ -537,15 +537,15 @@ reflection_class! {
 }
 
 reflection_class! {
-    ClosureReflection = "Whim\\Reflection\\Callable\\ClosureReflection"
-    implements ["Whim\\Reflection\\Callable\\CallableReflection"]
+    ClosureReflection = "Whim\\Reflection\\ClosureReflection"
+    implements ["Whim\\Reflection\\FunctionLikeReflection"]
     with [declaration, generic, callable_name, callable] {
-        get_captures: "getCaptures(): vec<Whim\\Reflection\\Callable\\CaptureReflection>" => Captures;
+        get_captures: "getCaptures(): vec<Whim\\Reflection\\CaptureReflection>" => Captures;
     }
 }
 
 reflection_class! {
-    CaptureReflection = "Whim\\Reflection\\Callable\\CaptureReflection" {
+    CaptureReflection = "Whim\\Reflection\\CaptureReflection" {
         get_name: "getName(): string" => Name;
         get_position: "getPosition(): (0..)" => Position;
         is_receiver: "isReceiver(): bool" => IsReceiver;
@@ -554,17 +554,19 @@ reflection_class! {
 }
 
 reflection_class! {
-    CallableValueReflection = "Whim\\Reflection\\Callable\\CallableValueReflection"
-    implements ["Whim\\Reflection\\Callable\\InvokableReflection"] {
-        get_kind: "getKind(): Whim\\Reflection\\Callable\\CallableKind" => CallableKind;
-        get_declaration: "getDeclaration(): Whim\\Reflection\\Callable\\CallableReflection" => Declaration;
+    CallableReflection = "Whim\\Reflection\\CallableReflection"
+    implements ["Whim\\Reflection\\InvokableReflection"] {
+        is_closure: "isClosure(): bool" => IsClosure;
+        is_first_class_callable: "isFirstClassCallable(): bool" => IsFirstClassCallable;
+        is_partial_function_application: "isPartialFunctionApplication(): bool" => IsPartialFunctionApplication;
+        get_declaration: "getDeclaration(): Whim\\Reflection\\FunctionLikeReflection" => Declaration;
         get_type: "getType(): Whim\\Reflection\\Type\\FunctionTypeReflection" => Type;
         get_type_environment: "getTypeEnvironment(): Whim\\Reflection\\Generic\\TypeEnvironmentReflection" => TypeEnvironment;
         get_bound_object: "getBoundObject(): null|object" => BoundObject;
-        get_scope_class: "getScopeClass(): null|Whim\\Reflection\\Symbol\\ClassLikeReflection" => ScopeClass;
+        get_scope_class: "getScopeClass(): null|Whim\\Reflection\\ClassLikeReflection" => ScopeClass;
         get_called_type: "getCalledType(): null|Whim\\Reflection\\Type\\ClassTypeReflection" => CalledType;
-        get_captures: "getCaptures(): vec<Whim\\Reflection\\Callable\\CaptureValueReflection>" => Captures;
-        get_bound_arguments: "getBoundArguments(): vec<Whim\\Reflection\\Callable\\BoundArgumentReflection>" => BoundArguments;
+        get_captures: "getCaptures(): vec<Whim\\Reflection\\CaptureValueReflection>" => Captures;
+        get_bound_arguments: "getBoundArguments(): vec<Whim\\Reflection\\BoundArgumentReflection>" => BoundArguments;
     }
     calls {
         invoke: "invoke(vec<Whim\\Reflection\\Type\\TypeReflection> $typeArguments = vec[], vec<mixed> $arguments = vec[]): mixed" => Invoke;
@@ -572,16 +574,16 @@ reflection_class! {
 }
 
 reflection_class! {
-    CaptureValueReflection = "Whim\\Reflection\\Callable\\CaptureValueReflection" {
-        get_capture: "getCapture(): Whim\\Reflection\\Callable\\CaptureReflection" => Capture;
+    CaptureValueReflection = "Whim\\Reflection\\CaptureValueReflection" {
+        get_capture: "getCapture(): Whim\\Reflection\\CaptureReflection" => Capture;
         get_type: "getType(): Whim\\Reflection\\Type\\TypeReflection" => Type;
         get_value: "getValue(): mixed" => Value;
     }
 }
 
 reflection_class! {
-    BoundArgumentReflection = "Whim\\Reflection\\Callable\\BoundArgumentReflection" {
-        get_parameter: "getParameter(): Whim\\Reflection\\Callable\\ParameterReflection" => Parameter;
+    BoundArgumentReflection = "Whim\\Reflection\\BoundArgumentReflection" {
+        get_parameter: "getParameter(): Whim\\Reflection\\ParameterReflection" => Parameter;
         get_type: "getType(): Whim\\Reflection\\Type\\TypeReflection" => Type;
         get_value: "getValue(): mixed" => Value;
     }
@@ -604,7 +606,7 @@ reflection_class! {
     WhereConstraintReflection = "Whim\\Reflection\\Generic\\WhereConstraintReflection" {
         get_parameter: "getParameter(): Whim\\Reflection\\Generic\\TypeParameterReflection" => Parameter;
         get_bound: "getBound(): Whim\\Reflection\\Type\\TypeReflection" => Bound;
-        get_declaring_callable: "getDeclaringCallable(): Whim\\Reflection\\Callable\\CallableReflection" => DeclaringCallable;
+        get_declaring_function_like: "getDeclaringFunctionLike(): Whim\\Reflection\\FunctionLikeReflection" => DeclaringFunctionLike;
         get_position: "getPosition(): (0..)" => Position;
         get_location: "getLocation(): null|Whim\\Reflection\\SourceLocation" => Location;
     }
@@ -650,7 +652,7 @@ impl AttributeReflection {
     #[whim_method("__construct(): void", visibility = "private")]
     const fn construct() {}
 
-    #[whim_method("getClass(): Whim\\Reflection\\Symbol\\ClassReflection", must_use)]
+    #[whim_method("getClass(): Whim\\Reflection\\ClassReflection", must_use)]
     fn get_class(
         context: &mut Context<'_, '_, '_>,
         arguments: Arguments<'_>,
@@ -701,7 +703,7 @@ impl AttributeReflection {
 
 reflection_class! {
     AttributeDefinitionReflection = "Whim\\Reflection\\Attribute\\DefinitionReflection" {
-        get_class: "getClass(): Whim\\Reflection\\Symbol\\ClassReflection" => Class;
+        get_class: "getClass(): Whim\\Reflection\\ClassReflection" => Class;
         get_targets: "getTargets(): vec<Whim\\Reflection\\Attribute\\Target>" => Targets;
         is_repeatable: "isRepeatable(): bool" => IsRepeatable;
     }
@@ -709,13 +711,13 @@ reflection_class! {
 
 reflection_class! {
     ObjectReflection = "Whim\\Reflection\\ObjectReflection" {
-        get_class: "getClass(): Whim\\Reflection\\Symbol\\ClassReflection|Whim\\Reflection\\Symbol\\EnumReflection" => Class;
+        get_class: "getClass(): Whim\\Reflection\\ClassReflection|Whim\\Reflection\\EnumReflection" => Class;
         get_enum_case: "getEnumCase(): null|Whim\\Reflection\\Member\\EnumCaseReflection" => EnumCase;
         get_type: "getType(): Whim\\Reflection\\Type\\ClassTypeReflection" => Type;
         get_type_environment: "getTypeEnvironment(): Whim\\Reflection\\Generic\\TypeEnvironmentReflection" => TypeEnvironment;
         get_type_argument: "getTypeArgument(Whim\\Reflection\\Generic\\TypeParameterReflection $parameter): null|Whim\\Reflection\\Type\\TypeReflection" => TypeArgument;
         is_instance_of: "isInstanceOf(Whim\\Reflection\\Type\\ClassTypeReflection $type): bool" => IsInstanceOf;
-        get_specialization: "getSpecialization(Whim\\Reflection\\Symbol\\ClassLikeReflection $declaration): null|Whim\\Reflection\\Type\\ClassTypeReflection" => Specialization;
+        get_specialization: "getSpecialization(Whim\\Reflection\\ClassLikeReflection $declaration): null|Whim\\Reflection\\Type\\ClassTypeReflection" => Specialization;
         get_properties: "getProperties(): vec<Whim\\Reflection\\PropertyValueReflection>" => PropertyValues;
         get_property: "getProperty(Whim\\Reflection\\Member\\PropertyReflection $property): null|Whim\\Reflection\\PropertyValueReflection" => PropertyValue;
     }
@@ -733,7 +735,7 @@ reflection_class! {
 
 reflection_class! {
     NewtypeValueReflection = "Whim\\Reflection\\NewtypeValueReflection" {
-        get_declaration: "getDeclaration(): Whim\\Reflection\\Symbol\\NewtypeReflection" => Declaration;
+        get_declaration: "getDeclaration(): Whim\\Reflection\\NewtypeReflection" => Declaration;
         get_type: "getType(): Whim\\Reflection\\Type\\SymbolTypeReflection" => Type;
         get_type_environment: "getTypeEnvironment(): Whim\\Reflection\\Generic\\TypeEnvironmentReflection" => TypeEnvironment;
         get_backing_value: "getBackingValue(): mixed" => BackingValue;
@@ -776,8 +778,8 @@ reflection_class! {
     ClassTypeReflection = "Whim\\Reflection\\Type\\ClassTypeReflection"
     implements ["Whim\\Reflection\\Type\\NamedTypeReflection"]
     with [type_reflection, named_type] {
-        get_class_like: "getClassLike(): Whim\\Reflection\\Symbol\\ClassLikeReflection" => ClassLike;
-        get_specialization: "getSpecialization(Whim\\Reflection\\Symbol\\ClassLikeReflection $declaration): null|Whim\\Reflection\\Type\\ClassTypeReflection" => Specialization;
+        get_class_like: "getClassLike(): Whim\\Reflection\\ClassLikeReflection" => ClassLike;
+        get_specialization: "getSpecialization(Whim\\Reflection\\ClassLikeReflection $declaration): null|Whim\\Reflection\\Type\\ClassTypeReflection" => Specialization;
         get_base_types: "getBaseTypes(): vec<Whim\\Reflection\\Type\\ClassTypeReflection>" => BaseTypes;
     }
 }
@@ -808,7 +810,7 @@ reflection_class! {
     StaticTypeReflection = "Whim\\Reflection\\Type\\StaticTypeReflection"
     implements ["Whim\\Reflection\\Type\\TypeReflection"]
     with [type_reflection] {
-        get_declaring_type: "getDeclaringType(): Whim\\Reflection\\Symbol\\ClassLikeReflection" => DeclaringType;
+        get_declaring_type: "getDeclaringType(): Whim\\Reflection\\ClassLikeReflection" => DeclaringType;
     }
 }
 
@@ -972,7 +974,7 @@ pub(crate) fn state(value: &Value) -> Option<&ReflectionState> {
         ParameterReflection,
         ClosureReflection,
         CaptureReflection,
-        CallableValueReflection,
+        CallableReflection,
         CaptureValueReflection,
         BoundArgumentReflection,
         TypeParameterReflection,

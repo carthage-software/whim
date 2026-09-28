@@ -211,8 +211,8 @@ An override must accept every set of type arguments that the inherited method
 accepts. It may keep or weaken inherited bounds, but must not strengthen them.
 This applies whether a bound appears in the type parameter list or a where clause.
 
-[`CallableReflection::getWhereConstraints()`](../standard-library/reflection.md#generics)
-exposes the callable's where constraints in source order. Reflection keeps inline
+[`FunctionLikeReflection::getWhereConstraints()`](../standard-library/reflection.md#generics)
+exposes the function's where constraints in source order. Reflection keeps inline
 bounds in `TypeParameterReflection::getBounds()` and does not combine the two forms.
 
 ## Constructing a type parameter

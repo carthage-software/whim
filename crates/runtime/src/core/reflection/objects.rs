@@ -119,13 +119,13 @@ fn class_name(
                 return Err(context.type_error("the reflected symbol is no longer loaded"));
             };
             match entry.kind {
-                SymbolKind::Class => "Whim\\Reflection\\Symbol\\ClassReflection",
-                SymbolKind::Interface => "Whim\\Reflection\\Symbol\\InterfaceReflection",
-                SymbolKind::Enum => "Whim\\Reflection\\Symbol\\EnumReflection",
-                SymbolKind::TypeAlias => "Whim\\Reflection\\Symbol\\TypeAliasReflection",
-                SymbolKind::Newtype => "Whim\\Reflection\\Symbol\\NewtypeReflection",
-                SymbolKind::Function => "Whim\\Reflection\\Symbol\\FunctionReflection",
-                SymbolKind::Constant => "Whim\\Reflection\\Symbol\\ConstantReflection",
+                SymbolKind::Class => "Whim\\Reflection\\ClassReflection",
+                SymbolKind::Interface => "Whim\\Reflection\\InterfaceReflection",
+                SymbolKind::Enum => "Whim\\Reflection\\EnumReflection",
+                SymbolKind::TypeAlias => "Whim\\Reflection\\TypeAliasReflection",
+                SymbolKind::Newtype => "Whim\\Reflection\\NewtypeReflection",
+                SymbolKind::Function => "Whim\\Reflection\\FunctionReflection",
+                SymbolKind::Constant => "Whim\\Reflection\\ConstantReflection",
             }
         }
         ReflectionData::Member(member) => match member.kind {
@@ -134,14 +134,12 @@ fn class_name(
             MemberKind::ClassConstant => "Whim\\Reflection\\Member\\ClassConstantReflection",
             MemberKind::EnumCase => "Whim\\Reflection\\Member\\EnumCaseReflection",
         },
-        ReflectionData::Parameter { .. } => "Whim\\Reflection\\Callable\\ParameterReflection",
-        ReflectionData::Closure(_) => "Whim\\Reflection\\Callable\\ClosureReflection",
-        ReflectionData::Capture { .. } => "Whim\\Reflection\\Callable\\CaptureReflection",
-        ReflectionData::CallableValue => "Whim\\Reflection\\Callable\\CallableValueReflection",
-        ReflectionData::CaptureValue { .. } => "Whim\\Reflection\\Callable\\CaptureValueReflection",
-        ReflectionData::BoundArgument { .. } => {
-            "Whim\\Reflection\\Callable\\BoundArgumentReflection"
-        }
+        ReflectionData::Parameter { .. } => "Whim\\Reflection\\ParameterReflection",
+        ReflectionData::Closure(_) => "Whim\\Reflection\\ClosureReflection",
+        ReflectionData::Capture { .. } => "Whim\\Reflection\\CaptureReflection",
+        ReflectionData::CallableValue => "Whim\\Reflection\\CallableReflection",
+        ReflectionData::CaptureValue { .. } => "Whim\\Reflection\\CaptureValueReflection",
+        ReflectionData::BoundArgument { .. } => "Whim\\Reflection\\BoundArgumentReflection",
         ReflectionData::TypeParameter(_) => "Whim\\Reflection\\Generic\\TypeParameterReflection",
         ReflectionData::WhereConstraint { .. } => {
             "Whim\\Reflection\\Generic\\WhereConstraintReflection"

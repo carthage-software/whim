@@ -6,7 +6,7 @@ use Whim\Marker\TrackCaller;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\SourceLocation;
-use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\ClassLikeReflection;
 use Whim\Reflection\Type\TypeReflection;
 
 /** Describes one instance or static property declaration. */

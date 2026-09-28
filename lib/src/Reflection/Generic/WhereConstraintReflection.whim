@@ -2,11 +2,11 @@ namespace Whim\Reflection\Generic;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\Callable\CallableReflection;
+use Whim\Reflection\FunctionLikeReflection;
 use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Type\TypeReflection;
 
-/** Describes one upper bound in a callable's where clause. */
+/** Describes one upper bound in a where clause. */
 #[Stub]
 final class WhereConstraintReflection {
   private function __construct() {}
@@ -19,11 +19,11 @@ final class WhereConstraintReflection {
   #[MustUse]
   public function getBound(): TypeReflection {}
 
-  /** Returns the callable that declares this constraint. */
+  /** Returns the function, method, or closure that declares this constraint. */
   #[MustUse]
-  public function getDeclaringCallable(): CallableReflection {}
+  public function getDeclaringFunctionLike(): FunctionLikeReflection {}
 
-  /** Returns the zero-based position in the callable's where clause. */
+  /** Returns the zero-based position in the where clause. */
   #[MustUse]
   public function getPosition(): 0.. {}
 

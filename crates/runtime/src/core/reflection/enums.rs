@@ -36,20 +36,6 @@ pub(crate) enum AttributeTarget {
     File,
 }
 
-#[whim_enum("Whim\\Reflection\\Callable\\CallableKind")]
-pub(crate) enum CallableKind {
-    #[whim_case("Function")]
-    Function,
-    #[whim_case("StaticMethod")]
-    StaticMethod,
-    #[whim_case("InstanceMethod")]
-    InstanceMethod,
-    #[whim_case("Closure")]
-    Closure,
-    #[whim_case("Partial")]
-    Partial,
-}
-
 #[whim_enum("Whim\\Reflection\\Generic\\Variance")]
 pub(crate) enum Variance {
     #[whim_case("Invariant")]

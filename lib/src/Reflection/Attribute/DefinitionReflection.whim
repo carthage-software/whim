@@ -2,7 +2,7 @@ namespace Whim\Reflection\Attribute;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\Symbol\ClassReflection;
+use Whim\Reflection\ClassReflection;
 
 /** Describes a class's attribute contract. */
 #[Stub]

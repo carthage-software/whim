@@ -4,7 +4,6 @@ use Whim\Attribute\Attribute;
 use Whim\Marker\SensitiveParameter;
 use Whim\Reflection;
 use Whim\Reflection\Attribute\Target;
-use Whim\Reflection\Callable\CallableKind;
 use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\Generic\Variance;
 use Whim\Reflection\Member\Visibility;
@@ -104,7 +103,7 @@ final class Incomplete {
 }
 
 function assert_complete_interface_contract(
-  Reflection\Symbol\ClassReflection $class,
+  Reflection\ClassReflection $class,
 ): void {
   $declared = dict[];
   foreach ($class->getDeclaredMethods() as $method) {
@@ -184,7 +183,7 @@ assert!($properties[0]->getValueType()?->toString() == 'int');
 assert!($properties[0]->getValue() == 10);
 
 $callable = Reflection\reflect_callable(identity::<int>(...));
-assert!($callable->getKind() == CallableKind::Function);
+assert!($callable->isFirstClassCallable());
 assert!($callable->getDeclaration()->getName() == 'ReflectionTest\\identity');
 assert!($callable->getType()->toString() == 'fn(int): int');
 assert!(
@@ -255,7 +254,7 @@ assert!($foundFile);
 assert!(
   Reflection\reflect_symbol(
     'ReflectionTest\\Box',
-  ) is Reflection\Symbol\ClassReflection,
+  ) is Reflection\ClassReflection,
 );
 
 assert!(Reflection\reflect_symbol('ReflectionTest\\Missing', false) == null);
@@ -491,7 +490,7 @@ assert!($missingError is UninitializedPropertyError);
 
 // Callable values expose their declaration, binding, captures, and presets.
 $instanceCallable = Reflection\reflect_callable($integer->value(...));
-assert!($instanceCallable->getKind() == CallableKind::InstanceMethod);
+assert!($instanceCallable->isFirstClassCallable());
 assert!($instanceCallable->getDeclaration()->getName() == 'value');
 assert!($instanceCallable->getBoundObject() == $integer);
 assert!(
@@ -507,7 +506,7 @@ assert!(length!($instanceCallable->getCaptures()) == 0u);
 assert!(length!($instanceCallable->getBoundArguments()) == 0u);
 
 $staticCallable = Reflection\reflect_callable(Box::label(...));
-assert!($staticCallable->getKind() == CallableKind::StaticMethod);
+assert!($staticCallable->isFirstClassCallable());
 assert!($staticCallable->getBoundObject() == null);
 assert!($staticCallable->getScopeClass()?->getName() == 'ReflectionTest\\Box');
 assert!(
@@ -521,8 +520,8 @@ $closureValue = fn(int $offset = 1): int {
 };
 
 $closure = Reflection\reflect_callable($closureValue);
-assert!($closure->getKind() == CallableKind::Closure);
-assert!($closure->getDeclaration() is Reflection\Callable\ClosureReflection);
+assert!($closure->isClosure());
+assert!($closure->getDeclaration() is Reflection\ClosureReflection);
 assert!(length!($closure->getDeclaration()->getCaptures()) == 1u);
 assert!($closure->getDeclaration()->getCaptures()[0]->getName() == 'captured');
 assert!($closure->getDeclaration()->getCaptures()[0]->getPosition() == 0);
@@ -534,11 +533,11 @@ assert!($closure->getCaptures()[0]->getValue() == 12);
 
 $expressionClosureValue = fn(int $offset): int => $captured + $offset;
 $expressionClosure = Reflection\reflect_callable($expressionClosureValue);
-assert!($expressionClosure->getKind() == CallableKind::Closure);
+assert!($expressionClosure->isClosure());
 assert!($expressionClosure->getType()->toString() == 'fn(int): int');
 
 $partial = Reflection\reflect_callable(describe('sum=', ?, 10));
-assert!($partial->getKind() == CallableKind::Partial);
+assert!($partial->isPartialFunctionApplication());
 $boundArguments = $partial->getBoundArguments();
 assert!(length!($boundArguments) == 2u);
 assert!($boundArguments[0]->getParameter()->getName() == 'prefix');
@@ -546,6 +545,68 @@ assert!($boundArguments[0]->getType()->toString() == 'string');
 assert!($boundArguments[0]->getValue() == 'sum=');
 assert!($boundArguments[1]->getParameter()->getName() == 'right');
 assert!($boundArguments[1]->getValue() == 10);
+
+$genericClosure = fn<T>(T $value): T => $value;
+$unboundPartial = identity(?);
+$closurePartial = $closureValue(?);
+assert!(
+  Reflection\reflect_callable(
+    $closurePartial,
+  )->getDeclaration() is Reflection\ClosureReflection,
+);
+
+assert!(
+  Reflection\reflect_callable($unboundPartial)->getBoundArguments() == vec[],
+);
+
+foreach (vec[
+  (
+    (true, false, false),
+    vec[$closureValue, $expressionClosureValue, $genericClosure::<int>(...)],
+  ),
+  (
+    (false, true, false),
+    vec[
+      identity(...),
+      identity::<int>(...),
+      $integer->value(...),
+      Box::label(...),
+      Str\length(...),
+      Str\lowercase(...),
+    ],
+  ),
+  (
+    (false, false, true),
+    vec[
+      $unboundPartial,
+      $unboundPartial::<int>(...),
+      describe(?, ?, ?),
+      describe(?, ...),
+      describe(right: ?, prefix: ?, left: ?),
+      describe('sum=', ?, 10),
+      describe('sum=', ?, 10)(...),
+      describe('sum=', ?, ?)(?, 10),
+      $closurePartial,
+      $closurePartial(...),
+      $integer->value(?),
+      Str\lowercase(?),
+      configured::<int>(?),
+    ],
+  ),
+] as ($expectedKind, $callableValues)) {
+  foreach ($callableValues as $candidate) {
+    $reflectedCallable = Reflection\reflect_callable($candidate);
+    assert!($reflectedCallable is Reflection\CallableReflection);
+    assert!(
+      (
+        $reflectedCallable->isClosure(),
+        $reflectedCallable->isFirstClassCallable(),
+        $reflectedCallable->isPartialFunctionApplication(),
+      )
+      == $expectedKind,
+    );
+  }
+}
 
 // Each newtype reflection exposes one nominal layer at a time.
 $outerValue = Outer::<int>(Inner::<int>(5));

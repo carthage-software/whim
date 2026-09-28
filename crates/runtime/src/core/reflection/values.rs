@@ -171,11 +171,26 @@ pub(crate) fn callable_dispatch(
     let function = reflected_callable(context, values)?;
     let callable = callable_key(context.vm, &function)
         .ok_or_else(|| context.type_error("the reflected callable has no declaration"))?;
+    match operation {
+        Operation::IsClosure => {
+            return Ok(Value::bool(
+                !function.is_partial_application() && matches!(callable, CallableKey::Closure(_)),
+            ));
+        }
+        Operation::IsFirstClassCallable => {
+            return Ok(Value::bool(
+                !function.is_partial_application() && !matches!(callable, CallableKey::Closure(_)),
+            ));
+        }
+        Operation::IsPartialFunctionApplication => {
+            return Ok(Value::bool(function.is_partial_application()));
+        }
+        _ => {}
+    }
     let info = support::callable_info(context.vm, &callable).ok_or_else(|| {
         context.type_error("the reflected callable declaration is no longer loaded")
     })?;
     match operation {
-        Operation::CallableKind => callable_kind(context, &function, &callable),
         Operation::Declaration => objects::declaration(context, callable_declaration(&callable)),
         Operation::Type => {
             let value = values
@@ -472,32 +487,6 @@ fn callable_key(
             }
         }
     }
-}
-
-fn callable_kind(
-    context: &mut Context<'_, '_, '_>,
-    function: &ManagedRef<FunctionObject>,
-    callable: &CallableKey,
-) -> Result<Value, Throw> {
-    let partial = function
-        .presets()
-        .iter()
-        .enumerate()
-        .any(|(position, preset)| match preset {
-            PresetArg::Hole(order) => u32::try_from(position).ok() != Some(*order),
-            PresetArg::Given(_) => true,
-        });
-    let name = if partial {
-        b"Partial".as_slice()
-    } else {
-        match callable {
-            CallableKey::Function(_) => b"Function".as_slice(),
-            CallableKey::Method { .. } if function.this().is_some() => b"InstanceMethod".as_slice(),
-            CallableKey::Method { .. } => b"StaticMethod".as_slice(),
-            CallableKey::Closure(_) => b"Closure".as_slice(),
-        }
-    };
-    objects::enum_case(context, b"Whim\\Reflection\\Callable\\CallableKind", name)
 }
 
 fn callable_environment(

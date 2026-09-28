@@ -42,7 +42,7 @@
 
 - [Functions](language/functions.md)
 - [Closures](language/closures.md)
-- [First-Class and Partial Calls](language/partial-calls.md)
+- [First-Class Callables and Partial Function Application](language/partial-calls.md)
 
 # 6. Classes, Interfaces, and Enums
 

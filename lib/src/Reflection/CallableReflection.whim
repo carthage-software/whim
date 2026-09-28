@@ -1,17 +1,16 @@
-namespace Whim\Reflection\Callable;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
 use Whim\Reflection\Type\ClassTypeReflection;
 use Whim\Reflection\Type\FunctionTypeReflection;
 use Whim\Reflection\Type\TypeReflection;
 
 /** Describes one callable value, including reified and bound state. */
 #[Stub]
-final class CallableValueReflection implements InvokableReflection {
+final class CallableReflection implements InvokableReflection {
   private function __construct() {}
 
   /** Invokes the callable with its captures, receiver, and bound arguments. */
@@ -21,13 +20,21 @@ final class CallableValueReflection implements InvokableReflection {
     vec<mixed> $arguments = vec[],
   ): mixed {}
 
-  /** Returns how this callable value was formed. */
+  /** Returns whether this is a closure without partial application. */
   #[MustUse]
-  public function getKind(): CallableKind {}
+  public function isClosure(): bool {}
+
+  /** Returns whether this is a first-class function or method callable. */
+  #[MustUse]
+  public function isFirstClassCallable(): bool {}
+
+  /** Returns whether this callable comes from partial function application. */
+  #[MustUse]
+  public function isPartialFunctionApplication(): bool {}
 
   /** Returns the originating function, method, or closure declaration. */
   #[MustUse]
-  public function getDeclaration(): CallableReflection {}
+  public function getDeclaration(): FunctionLikeReflection {}
 
   /** Returns the callable's current structural type. */
   #[MustUse]
@@ -52,7 +59,7 @@ final class CallableValueReflection implements InvokableReflection {
   #[MustUse]
   public function getCalledType(): null|ClassTypeReflection {}
 
-  /** Returns this callable value's captured values. */
+  /** Returns this callable's captured values. */
   #[MustUse]
   public function getCaptures(): vec<CaptureValueReflection> {}
 

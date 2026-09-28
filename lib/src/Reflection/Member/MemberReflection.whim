@@ -3,7 +3,7 @@ namespace Whim\Reflection\Member;
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Reflection\DeclarationReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\ClassLikeReflection;
 
 /** Describes a method, property, constant, or case declared in a class-like. */
 #[Stub]

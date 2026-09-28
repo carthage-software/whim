@@ -2,7 +2,6 @@ namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\Symbol\SymbolReflection;
 use Whim\Symbol\SymbolKind;
 
 /** Describes one loaded source file. */

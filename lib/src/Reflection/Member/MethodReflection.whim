@@ -4,14 +4,14 @@ use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
 use Whim\Reflection\AttributeReflection;
-use Whim\Reflection\Callable\ParameterReflection;
+use Whim\Reflection\ParameterReflection;
 use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Generic\TypeParameterReflection;
 use Whim\Reflection\Generic\WhereConstraintReflection;
 use Whim\Reflection\SourceLocation;
-use Whim\Reflection\Callable\CallableReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\FunctionLikeReflection;
+use Whim\Reflection\ClassLikeReflection;
 use Whim\Reflection\Type\ClassTypeReflection;
 use Whim\Reflection\Type\FunctionTypeReflection;
 use Whim\Reflection\Type\MemberTypeReflection;
@@ -19,7 +19,9 @@ use Whim\Reflection\Type\TypeReflection;
 
 /** Describes one method declaration. */
 #[Stub]
-final class MethodReflection implements MemberReflection, CallableReflection {
+final class MethodReflection implements
+  MemberReflection,
+  FunctionLikeReflection {
   private function __construct() {}
 
   /** Invokes on a related object, or a related classname for a static method. */

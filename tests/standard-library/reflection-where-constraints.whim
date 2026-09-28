@@ -38,7 +38,7 @@ assert!($where->getWhereConstraints()[0]->getBound()->toString() == '!null');
 assert!(
   $where
     ->getWhereConstraints()[0]
-    ->getDeclaringCallable()
+    ->getDeclaringFunctionLike()
     ->getName() == $where->getName(),
 );
 
@@ -66,7 +66,7 @@ foreach (vec[
   assert!($constraint->getParameter()->getName() == 'T');
   assert!($constraint->getBound()->toString() == '!null');
   assert!(
-    $constraint->getDeclaringCallable()->getName() == $declaration->getName(),
+    $constraint->getDeclaringFunctionLike()->getName() == $declaration->getName(),
   );
 
   if ($declaration->getOrigin() == DeclarationOrigin::User) {
@@ -128,10 +128,10 @@ assert!(length!($constraints) == 3u);
 foreach ($constraints as $position => $constraint) {
   assert!($constraint is WhereConstraintReflection);
   assert!($constraint->getPosition() == ($position as int));
-  assert!($constraint->getDeclaringCallable()->getName() == 'inspect');
+  assert!($constraint->getDeclaringFunctionLike()->getName() == 'inspect');
   assert!(
     $constraint
-      ->getDeclaringCallable()
+      ->getDeclaringFunctionLike()
       ->getDeclaringType()
       ->getName() == $class->getName(),
   );
@@ -196,7 +196,7 @@ $inherited = Reflection\reflect_class(
 assert!(length!($inherited) == 3u);
 assert!(
   $inherited[0]
-    ->getDeclaringCallable()
+    ->getDeclaringFunctionLike()
     ->getDeclaringType()
     ->getName() == $class->getName(),
 );

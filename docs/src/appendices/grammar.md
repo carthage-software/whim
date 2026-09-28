@@ -352,8 +352,8 @@ dict-item       := expression "=>" expression | "..." expression
 ```
 
 See [Expressions](../language/expressions.md), [Operators and
-Arithmetic](../language/operators.md), and [First-Class and Partial
-Calls](../language/partial-calls.md).
+Arithmetic](../language/operators.md), and [First-Class Callables and Partial
+Function Application](../language/partial-calls.md).
 
 ## Match patterns
 

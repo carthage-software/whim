@@ -21,12 +21,10 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Promise`              | the read-only async result contract                                     |
 | `Whim\Reference`            | weak references and weak maps                                           |
 | `Whim\Refine`               | common aliases, ranges, and callable types                              |
-| `Whim\Reflection`           | read-only access to loaded files, declarations, types, and values       |
+| `Whim\Reflection`           | files, declarations, types, values, and invocation                       |
 | `Whim\Reflection\Attribute` | attribute rules and target kinds                                        |
-| `Whim\Reflection\Callable`  | functions, methods, closures, captures, and bound arguments             |
 | `Whim\Reflection\Generic`   | type parameters, bindings, and type environments                        |
 | `Whim\Reflection\Member`    | methods, properties, constants, and enum cases                          |
-| `Whim\Reflection\Symbol`    | classes, interfaces, enums, aliases, newtypes, functions, and constants |
 | `Whim\Reflection\Type`      | type forms and their parts                                              |
 | `Whim\Result`               | `Ok`, `Err`, and throwable capture                                      |
 | `Whim\Symbol`               | symbol lookup and symbol kinds                                          |

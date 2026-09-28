@@ -5,7 +5,7 @@ use Whim\Marker\Stub;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\SourceLocation;
-use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\ClassLikeReflection;
 use Whim\Reflection\Type\MemberTypeReflection;
 use Whim\Reflection\Type\TypeReflection;
 

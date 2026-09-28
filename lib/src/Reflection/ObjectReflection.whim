@@ -6,9 +6,6 @@ use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Generic\TypeParameterReflection;
 use Whim\Reflection\Member\EnumCaseReflection;
 use Whim\Reflection\Member\PropertyReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
-use Whim\Reflection\Symbol\ClassReflection;
-use Whim\Reflection\Symbol\EnumReflection;
 use Whim\Reflection\Type\ClassTypeReflection;
 use Whim\Reflection\Type\TypeReflection;
 

@@ -96,7 +96,7 @@ pub(crate) fn reflect_file(
 }
 
 #[whim_function(
-    "Whim\\Reflection\\get_loaded_symbols(null|Whim\\Symbol\\SymbolKind $kind = null): vec<Whim\\Reflection\\Symbol\\SymbolReflection>",
+    "Whim\\Reflection\\get_loaded_symbols(null|Whim\\Symbol\\SymbolKind $kind = null): vec<Whim\\Reflection\\SymbolReflection>",
     must_use
 )]
 pub(crate) fn get_loaded_symbols(
@@ -129,7 +129,7 @@ pub(crate) fn get_loaded_symbols(
 }
 
 #[whim_function(
-    "Whim\\Reflection\\reflect_symbol(string $name, bool $autoload = true): null|Whim\\Reflection\\Symbol\\SymbolReflection",
+    "Whim\\Reflection\\reflect_symbol(string $name, bool $autoload = true): null|Whim\\Reflection\\SymbolReflection",
     must_use
 )]
 pub(crate) fn reflect_symbol(
@@ -142,7 +142,7 @@ pub(crate) fn reflect_symbol(
 }
 
 #[whim_function(
-    "Whim\\Reflection\\reflect_class_like(string|object $class): null|Whim\\Reflection\\Symbol\\ClassLikeReflection",
+    "Whim\\Reflection\\reflect_class_like(string|object $class): null|Whim\\Reflection\\ClassLikeReflection",
     must_use
 )]
 pub(crate) fn reflect_class_like(
@@ -154,7 +154,7 @@ pub(crate) fn reflect_class_like(
 }
 
 #[whim_function(
-    "Whim\\Reflection\\reflect_class(string|object $class): null|Whim\\Reflection\\Symbol\\ClassReflection",
+    "Whim\\Reflection\\reflect_class(string|object $class): null|Whim\\Reflection\\ClassReflection",
     must_use
 )]
 pub(crate) fn reflect_class(
@@ -166,7 +166,7 @@ pub(crate) fn reflect_class(
 }
 
 #[whim_function(
-    "Whim\\Reflection\\reflect_interface(string $interface): null|Whim\\Reflection\\Symbol\\InterfaceReflection",
+    "Whim\\Reflection\\reflect_interface(string $interface): null|Whim\\Reflection\\InterfaceReflection",
     must_use
 )]
 pub(crate) fn reflect_interface(
@@ -178,7 +178,7 @@ pub(crate) fn reflect_interface(
 }
 
 #[whim_function(
-    "Whim\\Reflection\\reflect_enum(string|object $enum): null|Whim\\Reflection\\Symbol\\EnumReflection",
+    "Whim\\Reflection\\reflect_enum(string|object $enum): null|Whim\\Reflection\\EnumReflection",
     must_use
 )]
 pub(crate) fn reflect_enum(
@@ -204,22 +204,22 @@ macro_rules! named_reflector {
 
 named_reflector!(
     reflect_type_alias,
-    "Whim\\Reflection\\reflect_type_alias(string $alias): null|Whim\\Reflection\\Symbol\\TypeAliasReflection",
+    "Whim\\Reflection\\reflect_type_alias(string $alias): null|Whim\\Reflection\\TypeAliasReflection",
     TypeAlias
 );
 named_reflector!(
     reflect_newtype,
-    "Whim\\Reflection\\reflect_newtype(string $newtype): null|Whim\\Reflection\\Symbol\\NewtypeReflection",
+    "Whim\\Reflection\\reflect_newtype(string $newtype): null|Whim\\Reflection\\NewtypeReflection",
     Newtype
 );
 named_reflector!(
     reflect_function,
-    "Whim\\Reflection\\reflect_function(string $function): null|Whim\\Reflection\\Symbol\\FunctionReflection",
+    "Whim\\Reflection\\reflect_function(string $function): null|Whim\\Reflection\\FunctionReflection",
     Function
 );
 named_reflector!(
     reflect_constant,
-    "Whim\\Reflection\\reflect_constant(string $constant): null|Whim\\Reflection\\Symbol\\ConstantReflection",
+    "Whim\\Reflection\\reflect_constant(string $constant): null|Whim\\Reflection\\ConstantReflection",
     Constant
 );
 
@@ -235,7 +235,7 @@ pub(crate) fn reflect_object(
 }
 
 #[whim_function(
-    "Whim\\Reflection\\reflect_callable(fn $callable): Whim\\Reflection\\Callable\\CallableValueReflection",
+    "Whim\\Reflection\\reflect_callable(fn $callable): Whim\\Reflection\\CallableReflection",
     must_use
 )]
 pub(crate) fn reflect_callable(

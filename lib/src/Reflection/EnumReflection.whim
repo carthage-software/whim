@@ -1,24 +1,22 @@
-namespace Whim\Reflection\Symbol;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\AttributeReflection;
-use Whim\Reflection\DeclarationOrigin;
-use Whim\Reflection\FileReflection;
 use Whim\Reflection\Generic\TypeParameterReflection;
 use Whim\Reflection\Member\ClassConstantReflection;
+use Whim\Reflection\Member\EnumCaseReflection;
 use Whim\Reflection\Member\MethodReflection;
 use Whim\Reflection\Member\PropertyReflection;
-use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
 use Whim\Symbol\SymbolKind;
 
-/** Describes one interface declaration. */
+/** Describes one enum declaration. */
 #[Stub]
-final class InterfaceReflection implements ClassLikeReflection {
+final class EnumReflection implements ClassLikeReflection {
   private function __construct() {}
 
-  /** Returns where this interface was defined. */
+  /** Returns where this enum was defined. */
   #[MustUse]
   public function getOrigin(): DeclarationOrigin {}
 
@@ -26,11 +24,11 @@ final class InterfaceReflection implements ClassLikeReflection {
   #[MustUse]
   public function getFile(): null|FileReflection {}
 
-  /** Returns this interface's source span, when defined by user code. */
+  /** Returns this enum's source span, when defined by user code. */
   #[MustUse]
   public function getLocation(): null|SourceLocation {}
 
-  /** Returns this interface's documentation text, when retained. */
+  /** Returns this enum's documentation text, when retained. */
   #[MustUse]
   public function getDocumentation(): null|string {}
 
@@ -45,11 +43,11 @@ final class InterfaceReflection implements ClassLikeReflection {
     string $class,
   ): vec<AttributeReflection<object>> {}
 
-  /** Returns the fully qualified interface name. */
+  /** Returns the fully qualified enum name. */
   #[MustUse]
   public function getName(): string {}
 
-  /** Returns the interface name without its namespace. */
+  /** Returns the enum name without its namespace. */
   #[MustUse]
   public function getShortName(): string {}
 
@@ -57,7 +55,7 @@ final class InterfaceReflection implements ClassLikeReflection {
   #[MustUse]
   public function getNamespaceName(): string {}
 
-  /** Returns the interface symbol kind. */
+  /** Returns the enum symbol kind. */
   #[MustUse]
   public function getKind(): SymbolKind {}
 
@@ -71,15 +69,15 @@ final class InterfaceReflection implements ClassLikeReflection {
     int|string $parameter,
   ): null|TypeParameterReflection {}
 
-  /** Returns this interface applied to references to its own parameters. */
+  /** Returns this enum applied to references to its own parameters. */
   #[MustUse]
   public function getType(): ClassTypeReflection {}
 
-  /** Returns directly extended interface types. */
+  /** Returns directly declared interface types. */
   #[MustUse]
   public function getDirectBaseTypes(): vec<ClassTypeReflection> {}
 
-  /** Returns every transitive parent interface specialization. */
+  /** Returns every transitive interface specialization. */
   #[MustUse]
   public function getBaseTypes(): vec<ClassTypeReflection> {}
 
@@ -87,11 +85,11 @@ final class InterfaceReflection implements ClassLikeReflection {
   #[MustUse]
   public function getPermittedSubtypeNames(): null|vec<string> {}
 
-  /** Returns methods declared directly by this interface. */
+  /** Returns methods declared directly by this enum. */
   #[MustUse]
   public function getDeclaredMethods(): vec<MethodReflection> {}
 
-  /** Returns effective methods after inheritance and overriding. */
+  /** Returns effective methods after inheritance. */
   #[MustUse]
   public function getMethods(): vec<MethodReflection> {}
 
@@ -99,7 +97,7 @@ final class InterfaceReflection implements ClassLikeReflection {
   #[MustUse]
   public function getMethod(string $name): null|MethodReflection {}
 
-  /** Returns properties declared directly by this interface. */
+  /** Returns properties declared directly by this enum. */
   #[MustUse]
   public function getDeclaredProperties(): vec<PropertyReflection> {}
 
@@ -111,7 +109,7 @@ final class InterfaceReflection implements ClassLikeReflection {
   #[MustUse]
   public function getProperty(string $name): null|PropertyReflection {}
 
-  /** Returns constants declared directly by this interface. */
+  /** Returns constants declared directly by this enum. */
   #[MustUse]
   public function getDeclaredConstants(): vec<ClassConstantReflection> {}
 
@@ -123,11 +121,23 @@ final class InterfaceReflection implements ClassLikeReflection {
   #[MustUse]
   public function getConstant(string $name): null|ClassConstantReflection {}
 
-  /** Returns interfaces extended directly by this declaration. */
+  /** Returns the int or string backing type, when present. */
   #[MustUse]
-  public function getDirectParentTypes(): vec<ClassTypeReflection> {}
+  public function getBackingType(): null|TypeReflection {}
 
-  /** Returns every transitively extended interface specialization. */
+  /** Returns declared cases in source order. */
   #[MustUse]
-  public function getParentTypes(): vec<ClassTypeReflection> {}
+  public function getCases(): vec<EnumCaseReflection> {}
+
+  /** Returns the case with the given name, when present. */
+  #[MustUse]
+  public function getCase(string $name): null|EnumCaseReflection {}
+
+  /** Returns interfaces implemented directly by this enum. */
+  #[MustUse]
+  public function getDirectInterfaceTypes(): vec<ClassTypeReflection> {}
+
+  /** Returns every interface specialization satisfied by this enum. */
+  #[MustUse]
+  public function getInterfaceTypes(): vec<ClassTypeReflection> {}
 }

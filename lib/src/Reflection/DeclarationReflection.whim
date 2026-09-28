@@ -7,24 +7,24 @@ use Whim\Marker\Stub;
 #[Stub]
 interface DeclarationReflection for
   FileReflection,
-  Symbol\SymbolReflection,
-  Symbol\ClassLikeReflection,
+  SymbolReflection,
+  ClassLikeReflection,
   Generic\GenericDeclarationReflection,
   Member\MemberReflection,
-  Callable\CallableReflection,
-  Callable\ParameterReflection,
-  Symbol\ClassReflection,
-  Symbol\InterfaceReflection,
-  Symbol\EnumReflection,
-  Symbol\TypeAliasReflection,
-  Symbol\NewtypeReflection,
-  Symbol\FunctionReflection,
-  Symbol\ConstantReflection,
+  FunctionLikeReflection,
+  ParameterReflection,
+  ClassReflection,
+  InterfaceReflection,
+  EnumReflection,
+  TypeAliasReflection,
+  NewtypeReflection,
+  FunctionReflection,
+  ConstantReflection,
   Member\MethodReflection,
   Member\PropertyReflection,
   Member\ClassConstantReflection,
   Member\EnumCaseReflection,
-  Callable\ClosureReflection {
+  ClosureReflection {
   /** Returns where the declaration was defined. */
   #[MustUse]
   public function getOrigin(): DeclarationOrigin;

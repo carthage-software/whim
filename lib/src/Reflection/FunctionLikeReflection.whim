@@ -1,4 +1,4 @@
-namespace Whim\Reflection\Callable;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
@@ -6,19 +6,18 @@ use Whim\Reflection\Generic\GenericDeclarationReflection;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Generic\WhereConstraintReflection;
 use Whim\Reflection\Member\MethodReflection;
-use Whim\Reflection\Symbol\FunctionReflection;
 use Whim\Reflection\Type\ClassTypeReflection;
 use Whim\Reflection\Type\FunctionTypeReflection;
 use Whim\Reflection\Type\TypeReflection;
 
 /** Describes a function, method, or closure declaration. */
 #[Stub]
-interface CallableReflection extends
+interface FunctionLikeReflection extends
   GenericDeclarationReflection for
   FunctionReflection,
   MethodReflection,
   ClosureReflection {
-  /** Returns the declared or synthesized callable name. */
+  /** Returns the declared or synthesized name. */
   #[MustUse]
   public function getName(): string;
 

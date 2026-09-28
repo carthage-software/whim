@@ -3,16 +3,6 @@ namespace Whim\Reflection;
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
-use Whim\Reflection\Callable\CallableValueReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
-use Whim\Reflection\Symbol\ClassReflection;
-use Whim\Reflection\Symbol\ConstantReflection;
-use Whim\Reflection\Symbol\EnumReflection;
-use Whim\Reflection\Symbol\FunctionReflection;
-use Whim\Reflection\Symbol\InterfaceReflection;
-use Whim\Reflection\Symbol\NewtypeReflection;
-use Whim\Reflection\Symbol\SymbolReflection;
-use Whim\Reflection\Symbol\TypeAliasReflection;
 use Whim\Reflection\Type\TypeReflection;
 use Whim\Symbol\SymbolKind;
 use Whim\Type\TypeId;
@@ -101,7 +91,7 @@ function reflect_object(object $object): ObjectReflection {}
 /** Reflects one callable value and its bound state. */
 #[Stub]
 #[MustUse]
-function reflect_callable(fn $callable): CallableValueReflection {}
+function reflect_callable(fn $callable): CallableReflection {}
 
 /** Reflects the outer nominal layer of a newtype value, when present. */
 #[Stub]

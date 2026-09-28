@@ -1,9 +1,10 @@
-# First-Class and Partial Calls
+# First-Class Callables and Partial Function Application
 
-Whim can turn a known function or method into a callable without wrapping it in
-a closure.
+Whim creates a first-class callable with `foo(...)`. Partial function application
+uses `?` to leave arguments open. Both produce `fn` values, as closure expressions
+do.
 
-## First-class functions
+## First-class callables
 
 Write `(...)` in place of the argument list:
 
@@ -48,7 +49,7 @@ assert!($greet('Hello, ') == 'Hello, Ada');
 Static methods use `ClassName::method(...)`. Whim checks visibility when it
 creates the callable.
 
-## Partial calls
+## Partial function application
 
 `?` leaves one argument open:
 
@@ -94,5 +95,5 @@ assert!($deep('cube', 4) == 'cube:4:deep');
 Without the trailing `...`, parameters without holes keep their defaults or no
 longer belong to the partial callable.
 
-A partial callable may itself be partially called. Whim preserves the bound
-values and the order of the remaining holes.
+You can apply partial function application to an existing callable. Whim
+preserves the bound values and the order of the remaining holes.

@@ -108,6 +108,7 @@ impl VirtualMachine<'_> {
             None,
             TypeEnvironmentId::default(),
             false,
+            false,
         );
 
         let task = self

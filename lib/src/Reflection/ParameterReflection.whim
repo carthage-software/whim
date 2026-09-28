@@ -1,17 +1,13 @@
-namespace Whim\Reflection\Callable;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
-use Whim\Reflection\AttributeReflection;
-use Whim\Reflection\DeclarationReflection;
-use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Member\PropertyReflection;
-use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Type\TypeReflection;
 
-/** Describes one callable parameter. */
+/** Describes one parameter of a function, method, or closure. */
 #[Stub]
 final class ParameterReflection implements DeclarationReflection {
   private function __construct() {}
@@ -47,9 +43,9 @@ final class ParameterReflection implements DeclarationReflection {
   #[MustUse]
   public function getPosition(): 0.. {}
 
-  /** Returns the callable that declares this parameter. */
+  /** Returns the function, method, or closure that declares this parameter. */
   #[MustUse]
-  public function getDeclaringCallable(): CallableReflection {}
+  public function getDeclaringFunctionLike(): FunctionLikeReflection {}
 
   /** Returns the explicitly declared type, when present. */
   #[MustUse]

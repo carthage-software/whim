@@ -127,6 +127,7 @@ impl<'call, 'vm, 'engine: 'vm> Context<'call, 'vm, 'engine> {
             None,
             self.type_environment,
             false,
+            false,
         );
         Value::function(function)
     }

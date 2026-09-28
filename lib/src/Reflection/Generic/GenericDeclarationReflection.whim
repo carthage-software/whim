@@ -2,24 +2,24 @@ namespace Whim\Reflection\Generic;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\Callable\CallableReflection;
-use Whim\Reflection\Callable\ClosureReflection;
+use Whim\Reflection\ClosureReflection;
+use Whim\Reflection\FunctionLikeReflection;
 use Whim\Reflection\DeclarationReflection;
 use Whim\Reflection\Member\MethodReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
-use Whim\Reflection\Symbol\ClassReflection;
-use Whim\Reflection\Symbol\EnumReflection;
-use Whim\Reflection\Symbol\FunctionReflection;
-use Whim\Reflection\Symbol\InterfaceReflection;
-use Whim\Reflection\Symbol\NewtypeReflection;
-use Whim\Reflection\Symbol\TypeAliasReflection;
+use Whim\Reflection\ClassLikeReflection;
+use Whim\Reflection\ClassReflection;
+use Whim\Reflection\EnumReflection;
+use Whim\Reflection\FunctionReflection;
+use Whim\Reflection\InterfaceReflection;
+use Whim\Reflection\NewtypeReflection;
+use Whim\Reflection\TypeAliasReflection;
 
 /** Describes a declaration that may introduce reified type parameters. */
 #[Stub]
 interface GenericDeclarationReflection extends
   DeclarationReflection for
   ClassLikeReflection,
-  CallableReflection,
+  FunctionLikeReflection,
   ClassReflection,
   InterfaceReflection,
   EnumReflection,

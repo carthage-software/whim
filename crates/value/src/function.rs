@@ -49,6 +49,7 @@ pub struct FunctionObject {
     type_environment: TypeEnvironmentId,
     /// Whether this callable's own type parameters have already been bound.
     type_arguments_bound: bool,
+    partial_application: bool,
 }
 
 impl FunctionObject {
@@ -74,6 +75,7 @@ impl FunctionObject {
                 called: None,
                 type_environment,
                 type_arguments_bound: false,
+                partial_application: false,
             },
         )
     }
@@ -94,6 +96,7 @@ impl FunctionObject {
         called: Option<ClassId>,
         type_environment: TypeEnvironmentId,
         type_arguments_bound: bool,
+        partial_application: bool,
     ) -> ManagedRef<Self> {
         let capture_storage: Vec<Value> = captures.into_iter().collect();
         let preset_storage: Vec<PresetArg> = presets.into_iter().collect();
@@ -109,6 +112,7 @@ impl FunctionObject {
                 called,
                 type_environment,
                 type_arguments_bound,
+                partial_application,
             },
         )
     }
@@ -156,6 +160,11 @@ impl FunctionObject {
     #[must_use]
     pub const fn type_arguments_bound(&self) -> bool {
         self.type_arguments_bound
+    }
+
+    #[must_use]
+    pub const fn is_partial_application(&self) -> bool {
+        self.partial_application
     }
 }
 

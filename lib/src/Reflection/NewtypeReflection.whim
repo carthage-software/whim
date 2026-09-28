@@ -1,13 +1,9 @@
-namespace Whim\Reflection\Symbol;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\AttributeReflection;
-use Whim\Reflection\DeclarationOrigin;
-use Whim\Reflection\FileReflection;
 use Whim\Reflection\Generic\GenericDeclarationReflection;
 use Whim\Reflection\Generic\TypeParameterReflection;
-use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Type\SymbolTypeReflection;
 use Whim\Reflection\Type\TypeReflection;
 use Whim\Symbol\SymbolKind;

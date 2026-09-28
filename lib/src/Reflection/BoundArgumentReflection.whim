@@ -1,15 +1,15 @@
-namespace Whim\Reflection\Callable;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Reflection\Type\TypeReflection;
 
-/** Describes one argument fixed by a partial callable application. */
+/** Describes one argument fixed by partial function application. */
 #[Stub]
 final class BoundArgumentReflection {
   private function __construct() {}
 
-  /** Returns the original callable parameter. */
+  /** Returns the original parameter. */
   #[MustUse]
   public function getParameter(): ParameterReflection {}
 

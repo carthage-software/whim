@@ -1,9 +1,7 @@
-namespace Whim\Reflection\Symbol;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\DeclarationReflection;
-use Whim\Reflection\FileReflection;
 use Whim\Symbol\SymbolKind;
 
 /** Describes one named symbol in the engine's symbol table. */

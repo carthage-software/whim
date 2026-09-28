@@ -5,8 +5,8 @@ use Whim\Marker\Stub;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\SourceLocation;
-use Whim\Reflection\Symbol\ClassLikeReflection;
-use Whim\Reflection\Symbol\EnumReflection;
+use Whim\Reflection\ClassLikeReflection;
+use Whim\Reflection\EnumReflection;
 use Whim\Reflection\Type\MemberTypeReflection;
 
 /** Describes one enum case declaration. */

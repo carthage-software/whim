@@ -6,7 +6,7 @@ use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Member\ClassConstantReflection;
 use Whim\Reflection\Member\EnumCaseReflection;
 use Whim\Reflection\Member\MethodReflection;
-use Whim\Reflection\Symbol\SymbolReflection;
+use Whim\Reflection\SymbolReflection;
 
 /** Describes a type that names a symbol or class-like member. */
 #[Stub]

@@ -1,4 +1,4 @@
-namespace Whim\Reflection\Callable;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;

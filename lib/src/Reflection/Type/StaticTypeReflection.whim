@@ -4,7 +4,7 @@ use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
+use Whim\Reflection\ClassLikeReflection;
 use Whim\Type\TypeId;
 
 /** Describes late-bound `static` in a class-like declaration. */

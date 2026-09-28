@@ -7,8 +7,8 @@ use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Member\ClassConstantReflection;
 use Whim\Reflection\Member\EnumCaseReflection;
 use Whim\Reflection\Member\MethodReflection;
-use Whim\Reflection\Symbol\ClassLikeReflection;
-use Whim\Reflection\Symbol\SymbolReflection;
+use Whim\Reflection\ClassLikeReflection;
+use Whim\Reflection\SymbolReflection;
 use Whim\Type\TypeId;
 
 /**

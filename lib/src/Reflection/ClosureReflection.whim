@@ -1,56 +1,32 @@
-namespace Whim\Reflection\Symbol;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Marker\TrackCaller;
 use Whim\Reflection\Generic\WhereConstraintReflection;
-use Whim\Reflection\AttributeReflection;
-use Whim\Reflection\Callable\CallableReflection;
-use Whim\Reflection\Callable\InvokableReflection;
-use Whim\Reflection\Callable\ParameterReflection;
-use Whim\Reflection\DeclarationOrigin;
-use Whim\Reflection\FileReflection;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Generic\TypeParameterReflection;
-use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Type\ClassTypeReflection;
 use Whim\Reflection\Type\FunctionTypeReflection;
-use Whim\Reflection\Type\SymbolTypeReflection;
 use Whim\Reflection\Type\TypeReflection;
-use Whim\Symbol\SymbolKind;
 
-/** Describes one named function declaration. */
+/** Describes one closure declaration and its capture layout. */
 #[Stub]
-final class FunctionReflection implements
-  SymbolReflection,
-  CallableReflection,
-  InvokableReflection {
+final class ClosureReflection implements FunctionLikeReflection {
   private function __construct() {}
-
-  /** Invokes the function with type and value arguments in declaration order. */
-  #[TrackCaller]
-  public function invoke(
-    vec<TypeReflection> $typeArguments = vec[],
-    vec<mixed> $arguments = vec[],
-  ): mixed {}
 
   /** Returns where constraints in source order, including repeated bounds. */
   #[MustUse]
   public function getWhereConstraints(): vec<WhereConstraintReflection> {}
 
-  /** Returns where this function was defined. */
+  /** Returns where this closure was defined. */
   #[MustUse]
   public function getOrigin(): DeclarationOrigin {}
 
-  /** Returns the source file, or null for a symbol defined in Rust. */
-  #[MustUse]
-  public function getFile(): null|FileReflection {}
-
-  /** Returns this function's source span, when defined by user code. */
+  /** Returns this closure's source span, when defined by user code. */
   #[MustUse]
   public function getLocation(): null|SourceLocation {}
 
-  /** Returns this function's documentation text, when retained. */
+  /** Returns this closure's documentation text, when retained. */
   #[MustUse]
   public function getDocumentation(): null|string {}
 
@@ -65,22 +41,6 @@ final class FunctionReflection implements
     string $class,
   ): vec<AttributeReflection<object>> {}
 
-  /** Returns the fully qualified function name. */
-  #[MustUse]
-  public function getName(): string {}
-
-  /** Returns the function name without its namespace. */
-  #[MustUse]
-  public function getShortName(): string {}
-
-  /** Returns the namespace name, or an empty string in the global namespace. */
-  #[MustUse]
-  public function getNamespaceName(): string {}
-
-  /** Returns the function symbol kind. */
-  #[MustUse]
-  public function getKind(): SymbolKind {}
-
   /** Returns type parameters in declaration order. */
   #[MustUse]
   public function getTypeParameters(): vec<TypeParameterReflection> {}
@@ -90,6 +50,10 @@ final class FunctionReflection implements
   public function getTypeParameter(
     int|string $parameter,
   ): null|TypeParameterReflection {}
+
+  /** Returns the synthesized closure name. */
+  #[MustUse]
+  public function getName(): string {}
 
   /** Returns parameters in declaration order. */
   #[MustUse]
@@ -116,7 +80,7 @@ final class FunctionReflection implements
     null|ClassTypeReflection $calledType = null,
   ): FunctionTypeReflection {}
 
-  /** Returns this function family's named type. */
+  /** Returns capture declarations in capture-window order. */
   #[MustUse]
-  public function getType(): SymbolTypeReflection {}
+  public function getCaptures(): vec<CaptureReflection> {}
 }

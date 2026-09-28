@@ -3,7 +3,6 @@ namespace Whim\Reflection;
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
 use Whim\Marker\TrackCaller;
-use Whim\Reflection\Symbol\ClassReflection;
 
 /** Describes one applied attribute without constructing its instance. */
 #[Stub]

@@ -26,7 +26,8 @@ A type rule that limits a generic type argument.
 
 ### Callable
 
-A closure, first-class function, bound method, or partial call.
+A `fn` value created by a closure expression, first-class callable syntax, or
+partial function application.
 
 ### Cancellation token
 
@@ -55,6 +56,11 @@ A call stack that may pause and later continue on the event loop.
 
 A mutable ordered array with bool, int, uint, or string keys.
 
+### First-class callable
+
+A function or method saved as a `fn` value with `foo(...)` or
+`$object->method(...)`.
+
 ### Future
 
 A read-only view of a value or throwable that will arrive later.
@@ -80,9 +86,10 @@ A runtime tag placed on a value that must fit a backing type.
 
 A union of `null` and another type, written `null|T`.
 
-### Partial call
+### Partial function application
 
-A callable made from a call expression whose `?` arguments remain open.
+A call expression that creates a callable with selected arguments left open,
+such as `foo(?, 'fixed')`.
 
 ### Reified generic
 

@@ -1,8 +1,7 @@
-namespace Whim\Reflection\Callable;
+namespace Whim\Reflection;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
-use Whim\Reflection\SourceLocation;
 
 /** Describes one capture in a closure declaration. */
 #[Stub]

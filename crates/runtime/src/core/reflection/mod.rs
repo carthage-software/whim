@@ -43,7 +43,6 @@ pub(crate) enum Operation {
     BoundArguments,
     BoundObject,
     Bounds,
-    CallableKind,
     CallableType,
     CalledType,
     Capture,
@@ -61,7 +60,7 @@ pub(crate) enum Operation {
     DeclaredMethods,
     DeclaredProperties,
     DeclaredType,
-    DeclaringCallable,
+    DeclaringFunctionLike,
     DeclaringDeclaration,
     DeclaringType,
     Default,
@@ -88,13 +87,16 @@ pub(crate) enum Operation {
     Invoke,
     IsAbstract,
     IsCloneable,
+    IsClosure,
     IsConstructor,
     IsDestructor,
     IsFinal,
+    IsFirstClassCallable,
     IsInitialized,
     IsInstanceOf,
     IsInstantiable,
     IsOptional,
+    IsPartialFunctionApplication,
     IsPromoted,
     IsReadonly,
     IsReceiver,
@@ -183,13 +185,13 @@ mod tests {
     #[test]
     fn sealed_reflection_interfaces_permit_their_public_leaves() {
         let engine = Engine::new(EngineConfiguration::default());
-        let callable = engine
+        let function_like = engine
             .heap
-            .intern(b"Whim\\Reflection\\Callable\\CallableReflection");
+            .intern(b"Whim\\Reflection\\FunctionLikeReflection");
         let method = engine
             .heap
             .intern(b"Whim\\Reflection\\Member\\MethodReflection");
-        let entry = engine.tables.symbols[&callable];
+        let entry = engine.tables.symbols[&function_like];
         let permitted = engine.tables.classes[entry.index as usize]
             .sealed_to
             .as_ref()
@@ -197,7 +199,7 @@ mod tests {
 
         assert!(
             permitted.contains(&method),
-            "CallableReflection does not permit MethodReflection: {permitted:?}",
+            "FunctionLikeReflection does not permit MethodReflection: {permitted:?}",
         );
 
         let named = engine

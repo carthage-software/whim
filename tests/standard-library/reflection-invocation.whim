@@ -4,7 +4,7 @@ use Whim\Async;
 use Whim\Marker\MustUse;
 use Whim\Math;
 use Whim\Reflection;
-use Whim\Reflection\Callable\InvokableReflection;
+use Whim\Reflection\InvokableReflection;
 use Whim\Reflection\Member\MethodReflection;
 use Whim\Unwind\ArgumentCountError;
 use Whim\Unwind\DiscardedResultError;
@@ -441,17 +441,17 @@ $static = Reflection\reflect_callable(ChildFactory::make(...));
 assert!($static->invoke() is ChildFactory);
 
 foreach (vec[
-  Reflection\reflect_class(
-    'Whim\\Reflection\\Symbol\\ClassReflection',
-  )->getMethod('instantiate'),
-  Reflection\reflect_class(
-    'Whim\\Reflection\\Symbol\\FunctionReflection',
-  )->getMethod('invoke'),
-  Reflection\reflect_class(
-    'Whim\\Reflection\\Callable\\CallableValueReflection',
-  )->getMethod('invoke'),
+  Reflection\reflect_class('Whim\\Reflection\\ClassReflection')->getMethod(
+    'instantiate',
+  ),
+  Reflection\reflect_class('Whim\\Reflection\\FunctionReflection')->getMethod(
+    'invoke',
+  ),
+  Reflection\reflect_class('Whim\\Reflection\\CallableReflection')->getMethod(
+    'invoke',
+  ),
   Reflection\reflect_interface(
-    'Whim\\Reflection\\Callable\\InvokableReflection',
+    'Whim\\Reflection\\InvokableReflection',
   )->getMethod('invoke'),
 ] as $api) {
   foreach ($api->getParameters() as $parameter) {
