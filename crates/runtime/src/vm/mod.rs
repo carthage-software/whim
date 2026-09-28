@@ -471,10 +471,6 @@ pub(crate) struct VirtualMachine<'engine> {
     draining_finalizers: bool,
 }
 
-fn find_double_colon(bytes: &[u8]) -> Option<usize> {
-    bytes.windows(2).position(|pair| pair == b"::")
-}
-
 /// The member name atom of an inline-cache site.
 fn name_atom(chunk: &Chunk, site: usize) -> &Atom {
     match &chunk.ic_descriptors[site] {

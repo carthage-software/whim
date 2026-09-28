@@ -781,12 +781,20 @@ pub struct FunctionTypeParameterDescriptor {
     pub optional: bool,
 }
 
-/// The shape of a call passing named arguments: named values follow the
-/// positionals in the register window, in descriptor order; the VM maps
-/// names to parameters.
+#[derive(Debug, Clone, Serialize, DeserializeSeeded)]
+#[seeded(de(seed(Heap)))]
+pub enum CalleeDescriptor {
+    Value,
+    Function,
+    Method(Atom),
+    StaticMethod(Atom),
+}
+
+/// Positionals in the register window, followed by values for named arguments.
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
 pub struct CallDescriptor {
+    pub callee: CalleeDescriptor,
     #[seeded(with(serde_seeded::unseeded))]
     pub positional: u8,
     pub named: Vec<Atom>,
@@ -922,6 +930,7 @@ pub enum PresetSlot {
 #[derive(Debug, Clone, Serialize, DeserializeSeeded)]
 #[seeded(de(seed(Heap)))]
 pub struct PresetDescriptor {
+    pub callee: CalleeDescriptor,
     /// Given values and holes in call order.
     pub slots: Vec<PresetSlot>,
     /// Whether a trailing `...` exposes every parameter not otherwise named.

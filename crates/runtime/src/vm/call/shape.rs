@@ -5,6 +5,7 @@ use std::mem;
 use std::rc::Rc;
 
 use whim_bytecode::chunk::descriptors::CallDescriptor;
+use whim_bytecode::chunk::descriptors::CalleeDescriptor;
 use whim_bytecode::chunk::descriptors::PresetDescriptor;
 use whim_bytecode::chunk::descriptors::PresetSlot;
 use whim_value::Value;
@@ -29,17 +30,12 @@ use crate::vm::call::MethodContext;
 use crate::vm::call::VirtualMachine;
 use crate::vm::call::VirtualMachineControl;
 use crate::vm::call::built_in_type_parameters;
-use crate::vm::call::find_double_colon;
 use crate::vm::call::reduce_signature;
 use crate::vm::call::unreachable_invariant;
 use crate::vm::call::visibility_allows;
 use crate::vm::call::visibility_name;
 
 impl VirtualMachine<'_> {
-    /// The resolved callee of a value: a function value keeps its target,
-    /// receiver, captures, and presets; a `'name'` string resolves a
-    /// function; a `'Class::method'` string resolves a static method; a
-    /// `(receiver, 'method')` tuple resolves an instance method.
     pub(in crate::vm) fn resolve_callee_shape(
         &mut self,
         callee: &Value,
@@ -51,20 +47,39 @@ impl VirtualMachine<'_> {
                 holder: Some(function.clone()),
                 method: self.method_context_for(function),
             }),
-            ValueView::String(_) | ValueView::ShortString(_) => {
-                // SAFETY: the value's tag proves this projection is valid.
-                let bytes = unsafe { callee.as_string_bytes().unwrap_unchecked() };
+            other => Err(self.throw_well_known(
+                self.engine.tables.well_known.type_error,
+                format!("a {} value is not callable", other.kind_name()),
+            )),
+        }
+    }
+
+    fn resolve_described_callee(
+        &mut self,
+        callee: &Value,
+        descriptor: &CalleeDescriptor,
+    ) -> Result<CalleeShape, VirtualMachineControl> {
+        match descriptor {
+            CalleeDescriptor::Value => self.resolve_callee_shape(callee),
+            CalleeDescriptor::Function | CalleeDescriptor::StaticMethod(_) => {
+                let Some(bytes) = callee.as_string_bytes() else {
+                    return Err(self.throw_well_known(
+                        self.engine.tables.well_known.type_error,
+                        format!("expected a name string, {} given", callee.kind_name()),
+                    ));
+                };
+
                 let bytes = match bytes.first() {
                     Some(b'\\') => &bytes[1..],
                     _ => bytes,
                 };
-                if let Some(split) = find_double_colon(bytes) {
-                    let class_atom = self.heap.intern(&bytes[..split]);
-                    let member = self.heap.intern(&bytes[split + 2..]);
-                    let class = self.resolve_class_reference(class_atom)?;
-                    return self.static_method_shape(class, member);
-                }
+
                 let atom = self.heap.intern(bytes);
+                if let CalleeDescriptor::StaticMethod(member) = descriptor {
+                    let class = self.resolve_class_reference(atom)?;
+                    return self.static_method_shape(class, member.clone());
+                }
+
                 let target = match self.resolve_function(atom)? {
                     CacheEntry::Function(id) => CallTarget::User(id),
                     CacheEntry::BuiltInCallable(index) => CallTarget::BuiltIn(BuiltInId(index)),
@@ -78,39 +93,39 @@ impl VirtualMachine<'_> {
                     method: None,
                 })
             }
-            ValueView::Tuple(pair) => {
-                let receiver = pair.get(0).and_then(Value::as_object).cloned();
-                let member = pair.get(1).and_then(Value::as_string_bytes);
-                let (Some(receiver), Some(member)) = (receiver, member) else {
+            CalleeDescriptor::Method(name) => {
+                let Some(receiver) = callee.as_object() else {
                     return Err(self.throw_well_known(
                         self.engine.tables.well_known.type_error,
-                        "a callable tuple pairs a receiver with a method name".to_string(),
+                        format!("expected an object, {} given", callee.kind_name()),
                     ));
                 };
-                if pair.len() != 2 {
-                    return Err(self.throw_well_known(
-                        self.engine.tables.well_known.type_error,
-                        "a callable tuple pairs a receiver with a method name".to_string(),
-                    ));
-                }
-                let name = self.heap.intern(member);
+
                 let class = &self.engine.tables.classes[receiver.class().0 as usize];
                 let entry = self
                     .current_frame()
                     .class_scope
                     .get()
                     .and_then(|scope| class.private_methods.get(&(scope, name.clone())).copied())
-                    .or_else(|| class.method(&name));
+                    .or_else(|| class.method(name));
                 let Some(entry) = entry else {
                     return Err(self.throw_well_known(
                         self.engine.tables.well_known.type_error,
                         format!(
                             "call to undefined method {}::{}",
-                            self.value_type_name(&Value::object(receiver)),
+                            self.value_type_name(callee),
                             name.to_string_lossy()
                         ),
                     ));
                 };
+
+                if entry.is_static {
+                    return Err(self.throw_well_known(
+                        self.engine.tables.well_known.type_error,
+                        format!("cannot call the static method {name} through an instance"),
+                    ));
+                }
+
                 if !visibility_allows(
                     &self.engine.tables.classes,
                     entry.visibility,
@@ -126,21 +141,17 @@ impl VirtualMachine<'_> {
                         ),
                     ));
                 }
-                let this = if entry.is_static {
-                    None
-                } else {
-                    Some(receiver.clone())
-                };
-                let is_constructor = name == self.engine.tables.constructor_name;
+                let is_constructor = *name == self.engine.tables.constructor_name;
                 let target = match entry.body {
                     MethodBodyKind::Bytecode(function) => CallTarget::User(function),
                     MethodBodyKind::BuiltIn(_) => {
-                        CallTarget::BuiltIn(self.built_in_id_for_method(&entry, name))
+                        CallTarget::BuiltIn(self.built_in_id_for_method(&entry, name.clone()))
                     }
                 };
+
                 Ok(CalleeShape {
                     target,
-                    this,
+                    this: Some(receiver.clone()),
                     holder: None,
                     method: Some(MethodContext {
                         scope: entry.declaring_class,
@@ -149,10 +160,6 @@ impl VirtualMachine<'_> {
                     }),
                 })
             }
-            other => Err(self.throw_well_known(
-                self.engine.tables.well_known.type_error,
-                format!("a {} value is not callable", other.kind_name()),
-            )),
         }
     }
 
@@ -441,7 +448,7 @@ impl VirtualMachine<'_> {
         destination: u16,
         discard_result: bool,
     ) -> Result<(), VirtualMachineControl> {
-        let shape = self.resolve_callee_shape(callee)?;
+        let shape = self.resolve_described_callee(callee, &descriptor.callee)?;
         let count = usize::from(descriptor.positional) + descriptor.named.len();
         if let CallTarget::User(function) = shape.target
             && shape
@@ -739,7 +746,7 @@ impl VirtualMachine<'_> {
         window_start: usize,
     ) -> Result<Value, VirtualMachineControl> {
         let argument_environment = self.current_frame().type_environment;
-        let shape = self.resolve_callee_shape(callee)?;
+        let shape = self.resolve_described_callee(callee, &descriptor.callee)?;
         let slots = &descriptor.slots;
         let cacheable = slots.is_empty()
             && !descriptor.open_remaining

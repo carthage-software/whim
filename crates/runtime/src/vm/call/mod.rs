@@ -40,7 +40,6 @@ use crate::vm::OptionalFuncId;
 use crate::vm::UserCallContext;
 use crate::vm::VirtualMachine;
 use crate::vm::VirtualMachineControl;
-use crate::vm::find_double_colon;
 use crate::vm::frame_argument_count;
 use crate::vm::frame_stack_floor_offset;
 use crate::vm::is_instance_of;

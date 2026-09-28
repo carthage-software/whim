@@ -1,3 +1,4 @@
+use crate::chunk::descriptors::CalleeDescriptor;
 use crate::disassemble::CallDescriptor;
 use crate::disassemble::CallDescriptorIndex;
 use crate::disassemble::Chunk;
@@ -81,6 +82,14 @@ pub(crate) fn preset_reference(chunk: &Chunk, index: PresetDescriptorIndex) -> S
 }
 
 pub(crate) fn preset_shape(descriptor: &PresetDescriptor) -> String {
+    format!(
+        "{} {}",
+        callee_descriptor(&descriptor.callee),
+        preset_arguments(descriptor)
+    )
+}
+
+fn preset_arguments(descriptor: &PresetDescriptor) -> String {
     let slots = &descriptor.slots;
     if slots.is_empty() && !descriptor.open_remaining {
         return descriptor.type_arguments.as_ref().map_or_else(
@@ -224,7 +233,20 @@ pub(crate) fn call_descriptor(descriptor: &CallDescriptor) -> String {
         .map(|name| name.to_string_lossy().into_owned())
         .collect::<Vec<String>>()
         .join(", ");
-    format!("positional {}, named [{names}]", descriptor.positional)
+    format!(
+        "{}, positional {}, named [{names}]",
+        callee_descriptor(&descriptor.callee),
+        descriptor.positional
+    )
+}
+
+fn callee_descriptor(descriptor: &CalleeDescriptor) -> String {
+    match descriptor {
+        CalleeDescriptor::Value => "value".to_string(),
+        CalleeDescriptor::Function => "function".to_string(),
+        CalleeDescriptor::Method(name) => format!("method {name}"),
+        CalleeDescriptor::StaticMethod(name) => format!("static method {name}"),
+    }
 }
 
 pub(crate) fn ic_descriptor(descriptor: &IcDescriptor) -> String {

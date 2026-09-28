@@ -200,30 +200,16 @@ impl BodyCompiler<'_, '_> {
         call: &StaticMethodCall<'_>,
         value_use: ValueUse,
     ) -> Result<Register, CompileError> {
-        let span = call.span();
-        let destination = self.allocate(span)?;
-        let mark = self.registers.mark();
-        let callee = self.callee_value(
+        self.shaped_call(
             scope,
             &CalleeSource::Static {
                 class: &call.class,
                 name: call.method.value,
             },
-            span,
-        )?;
-        let count = argument_gate(call.argument_list.arguments.len(), span)?;
-        let first = self.window(
-            scope,
-            call.argument_list.arguments.iter().map(Argument::value),
-            call.argument_list.arguments.len(),
-            span,
-        )?;
-        self.chunk.emit(
-            call_value_instruction(value_use, Count::new(count), destination, callee, first),
-            span,
-        );
-        self.registers.release_to(mark);
-        Ok(destination)
+            &call.argument_list,
+            call.span(),
+            value_use,
+        )
     }
 
     fn direct_static_call(

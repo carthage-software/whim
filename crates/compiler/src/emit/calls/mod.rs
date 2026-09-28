@@ -1,5 +1,6 @@
 //! Call sites: arguments, chains, and partial application.
 
+use whim_bytecode::chunk::descriptors::CalleeDescriptor;
 use whim_bytecode::chunk::descriptors::PresetDescriptor;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
@@ -253,20 +254,22 @@ impl BodyCompiler<'_, '_> {
     fn specialize_callee(
         &mut self,
         scope: &Scope<'_>,
-        callee: Register,
+        (callee, source): (Register, CalleeDescriptor),
         arguments: Option<&TypeArgumentList<'_>>,
         span: Span,
     ) -> Result<Register, CompileError> {
-        let Some(type_arguments) = self.lower_turbofish(scope, arguments)? else {
+        let type_arguments = self.lower_turbofish(scope, arguments)?;
+        if type_arguments.is_none() && matches!(source, CalleeDescriptor::Value) {
             return Ok(callee);
-        };
+        }
 
         let destination = self.allocate(span)?;
         let descriptor = self.add_preset_descriptor(
             PresetDescriptor {
+                callee: source,
                 slots: Vec::new(),
                 open_remaining: false,
-                type_arguments: Some(type_arguments),
+                type_arguments,
             },
             span,
         )?;

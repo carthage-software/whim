@@ -1,12 +1,12 @@
 //! Callee values, shaped calls, partial application, and instantiation.
 
 use whim_bytecode::chunk::descriptors::CallDescriptor;
+use whim_bytecode::chunk::descriptors::CalleeDescriptor;
 use whim_bytecode::chunk::descriptors::IcDescriptor;
 use whim_bytecode::chunk::descriptors::PresetDescriptor;
 use whim_bytecode::chunk::descriptors::PresetSlot;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
-use whim_bytecode::instruction::operands::ArrayKind;
 use whim_bytecode::instruction::operands::Count;
 use whim_bytecode::instruction::operands::Register;
 use whim_syn::cst::call::PartialArgumentList;
@@ -122,8 +122,12 @@ impl BodyCompiler<'_, '_> {
         for (call, destination, mark, count, span) in spine.into_iter().rev() {
             let callee = self.allocate(span)?;
             self.move_into(callee, accumulator, span);
-            let callee =
-                self.specialize_callee(scope, callee, call.type_arguments.as_ref(), span)?;
+            let callee = self.specialize_callee(
+                scope,
+                (callee, CalleeDescriptor::Value),
+                call.type_arguments.as_ref(),
+                span,
+            )?;
 
             let first = self.window(
                 scope,
@@ -154,7 +158,7 @@ impl BodyCompiler<'_, '_> {
         &mut self,
         scope: &Scope<'_>,
         callee: &Callee<'_>,
-    ) -> Result<Register, CompileError> {
+    ) -> Result<(Register, CalleeDescriptor), CompileError> {
         match callee {
             Callee::Identifier(identifier) => {
                 let text = scope.resolver.resolve_text(identifier);
@@ -168,9 +172,12 @@ impl BodyCompiler<'_, '_> {
                     identifier.span(),
                 );
 
-                Ok(destination)
+                Ok((destination, CalleeDescriptor::Function))
             }
-            Callee::Expression(expression) => self.callee_expression_value(scope, expression),
+            Callee::Expression(expression) => Ok((
+                self.callee_expression_value(scope, expression)?,
+                CalleeDescriptor::Value,
+            )),
         }
     }
 
@@ -180,77 +187,36 @@ impl BodyCompiler<'_, '_> {
         scope: &Scope<'_>,
         source: &CalleeSource<'_, '_>,
         span: Span,
-    ) -> Result<Register, CompileError> {
+    ) -> Result<(Register, CalleeDescriptor), CompileError> {
         match source {
             CalleeSource::Function(callee) => self.materialize_callee(scope, callee),
-            CalleeSource::Value(register) => Ok(*register),
-            CalleeSource::Method { receiver, name } => {
-                let destination = self.allocate(span)?;
-                let first = self.allocate(span)?;
-                let second = self.allocate(span)?;
-                self.move_into(first, *receiver, span);
-                let constant = self.string_constant(name.as_bytes(), span)?;
-                self.chunk.emit(
-                    Instruction::LoadConstant {
-                        destination: second,
-                        constant,
-                    },
-                    span,
-                );
-
-                self.chunk.emit(
-                    Instruction::NewArray {
-                        kind: ArrayKind::Tuple,
-                        count: Count::new(2),
-                        destination,
-                        first_element: first,
-                    },
-                    span,
-                );
-
-                Ok(destination)
+            CalleeSource::Value(register) => Ok((*register, CalleeDescriptor::Value)),
+            CalleeSource::Method { receiver, name } => Ok((
+                *receiver,
+                CalleeDescriptor::Method(self.heap.intern(name.as_bytes())),
+            )),
+            CalleeSource::Static { class, name } => {
+                let register = match class {
+                    ClassReference::Expression(expression) => self.expression(scope, expression)?,
+                    reference => {
+                        let class = self.class_reference_atom(scope, reference)?;
+                        let constant = self.string_constant(class.as_bytes(), span)?;
+                        let destination = self.allocate(span)?;
+                        self.chunk.emit(
+                            Instruction::LoadConstant {
+                                destination,
+                                constant,
+                            },
+                            span,
+                        );
+                        destination
+                    }
+                };
+                Ok((
+                    register,
+                    CalleeDescriptor::StaticMethod(self.heap.intern(name.as_bytes())),
+                ))
             }
-            CalleeSource::Static { class, name } => match class {
-                ClassReference::Expression(expression) => {
-                    let destination = self.allocate(span)?;
-                    let class_value = self.expression(scope, expression)?;
-                    let suffix_slot = self.allocate(span)?;
-                    let constant = self.string_constant(format!("::{name}").as_bytes(), span)?;
-                    self.chunk.emit(
-                        Instruction::LoadConstant {
-                            destination: suffix_slot,
-                            constant,
-                        },
-                        span,
-                    );
-
-                    self.chunk.emit(
-                        Instruction::Concatenate {
-                            destination,
-                            left: class_value,
-                            right: suffix_slot,
-                        },
-                        span,
-                    );
-
-                    Ok(destination)
-                }
-                reference => {
-                    let class = self.class_reference_atom(scope, reference)?;
-                    let rendered = format!("{class}::{name}");
-                    let constant = self.string_constant(rendered.as_bytes(), span)?;
-                    let destination = self.allocate(span)?;
-                    self.chunk.emit(
-                        Instruction::LoadConstant {
-                            destination,
-                            constant,
-                        },
-                        span,
-                    );
-
-                    Ok(destination)
-                }
-            },
         }
     }
 
@@ -265,7 +231,7 @@ impl BodyCompiler<'_, '_> {
     ) -> Result<Register, CompileError> {
         let destination = self.allocate(span)?;
         let mark = self.registers.mark();
-        let callee = self.callee_value(scope, source, span)?;
+        let (callee, source) = self.callee_value(scope, source, span)?;
         let callee_slot = self.allocate(span)?;
         self.move_into(callee_slot, callee, span);
         argument_gate(argument_list.arguments.len(), span)?;
@@ -311,7 +277,14 @@ impl BodyCompiler<'_, '_> {
             self.registers.release_to(inner);
         }
 
-        let descriptor = self.add_call_descriptor(CallDescriptor { positional, named }, span)?;
+        let descriptor = self.add_call_descriptor(
+            CallDescriptor {
+                callee: source,
+                positional,
+                named,
+            },
+            span,
+        )?;
         self.chunk.emit(
             call_with_names_instruction(value_use, destination, callee_slot, descriptor),
             span,
@@ -325,7 +298,7 @@ impl BodyCompiler<'_, '_> {
         &mut self,
         scope: &Scope<'_>,
         application: &PartialApplication<'_>,
-    ) -> Result<Register, CompileError> {
+    ) -> Result<(Register, CalleeDescriptor), CompileError> {
         match application {
             PartialApplication::Function(application) => {
                 if application.type_arguments.is_some() {
@@ -446,13 +419,14 @@ impl BodyCompiler<'_, '_> {
         };
 
         let type_arguments = self.lower_turbofish(scope, type_argument_list)?;
-        let callee = self.partial_callee(scope, application)?;
+        let (callee, source) = self.partial_callee(scope, application)?;
         let callee_slot = self.allocate(application.span())?;
         self.move_into(callee_slot, callee, application.span());
         let plan = self.partial_plan(argument_list);
         self.compile_partial_arguments(scope, &plan.given, application.span())?;
         let descriptor = self.add_preset_descriptor(
             PresetDescriptor {
+                callee: source,
                 slots: plan.slots,
                 open_remaining: plan.open_remaining,
                 type_arguments,
