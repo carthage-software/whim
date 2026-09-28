@@ -579,6 +579,15 @@ fn note_symbol<'source>(
 fn check_lifecycle_method(method: &Method<'_>) -> Result<(), CompileError> {
     match method.name.value {
         "__construct" => {
+            if let Some(type_parameters) = method.type_parameters
+                && !type_parameters.parameters.is_empty()
+            {
+                return Err(CompileError::new(
+                    CompileErrorKind::InvalidLifecycleMethod,
+                    "a constructor cannot declare type parameters",
+                    type_parameters.span(),
+                ));
+            }
             if let Some(return_type) = &method.return_type {
                 return Err(CompileError::new(
                     CompileErrorKind::InvalidLifecycleMethod,

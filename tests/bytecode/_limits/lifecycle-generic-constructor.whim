@@ -1,0 +1,3 @@
+class Box<T> {
+  public function __construct<Y>(public T $val) {}
+}

@@ -657,6 +657,11 @@ raises(
 );
 
 raises(
+  'lifecycle-generic-constructor',
+  'a constructor cannot declare type parameters',
+);
+
+raises(
   'lifecycle-constructor-return',
   'a constructor cannot declare a return type',
 );
