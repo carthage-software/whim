@@ -9,6 +9,18 @@ use crate::builtin::throw::Throw;
 use crate::core::reflection::Operation;
 use crate::core::reflection::dispatch;
 
+#[whim_interface("Whim\\Reflection\\Callable\\InvokableReflection")]
+#[whim_permits(
+    "Whim\\Reflection\\Symbol\\FunctionReflection",
+    "Whim\\Reflection\\Callable\\CallableValueReflection"
+)]
+trait InvokableReflection {
+    #[whim_method(
+        "invoke(vec<Whim\\Reflection\\Type\\TypeReflection> $typeArguments = vec[], vec<mixed> $arguments = vec[]): mixed"
+    )]
+    fn invoke();
+}
+
 macro_rules! reflection_interface {
     (
         $(#[$attribute:meta])*

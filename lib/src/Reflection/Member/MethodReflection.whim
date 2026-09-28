@@ -2,6 +2,7 @@ namespace Whim\Reflection\Member;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\Callable\ParameterReflection;
 use Whim\Reflection\DeclarationOrigin;
@@ -20,6 +21,14 @@ use Whim\Reflection\Type\TypeReflection;
 #[Stub]
 final class MethodReflection implements MemberReflection, CallableReflection {
   private function __construct() {}
+
+  /** Invokes on a related object, or a related classname for a static method. */
+  #[TrackCaller]
+  public function invoke(
+    classname<object>|object $target,
+    vec<TypeReflection> $typeArguments = vec[],
+    vec<mixed> $arguments = vec[],
+  ): mixed {}
 
   /** Returns where this method was defined. */
   #[MustUse]

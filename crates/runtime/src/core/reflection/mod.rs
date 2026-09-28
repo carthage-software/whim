@@ -1,5 +1,4 @@
-//! Native, read-only reflection over the engine's loaded declarations and
-//! values.
+//! Native reflection over loaded declarations and values.
 
 mod attributes;
 mod classes;
@@ -8,6 +7,7 @@ mod enums;
 mod files;
 pub(crate) mod functions;
 mod interfaces;
+mod invocation;
 mod metadata;
 mod model;
 mod objects;
@@ -83,7 +83,9 @@ pub(crate) enum Operation {
     HasDefaultValue,
     HasTopLevelCode,
     InnerType,
+    Instantiate,
     InterfaceTypes,
+    Invoke,
     IsAbstract,
     IsCloneable,
     IsConstructor,

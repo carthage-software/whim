@@ -525,6 +525,7 @@ whim_core! {
         reflection::SymbolReflection,
         reflection::ClassLikeReflection,
         reflection::CallableReflection,
+        reflection::InvokableReflection,
         reflection::MemberReflection,
         reflection::TypeReflection,
         reflection::NamedTypeReflection,

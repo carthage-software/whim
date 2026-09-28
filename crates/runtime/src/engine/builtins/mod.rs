@@ -203,7 +203,8 @@ pub(crate) fn built_in_parameters(
             default: parameter
                 .default
                 .as_ref()
-                .map(|default| ConstantInitializer::Literal(parameter_default(heap, default))),
+                .and_then(|default| parameter_default(heap, default))
+                .map(ConstantInitializer::Literal),
             declared_type: Some(descriptor_from_built_in_spec(heap, &parameter.type_spec)),
             sensitive: parameter.sensitive,
             attributes: Vec::new(),
@@ -211,15 +212,16 @@ pub(crate) fn built_in_parameters(
         .collect()
 }
 
-fn parameter_default(heap: &Heap, default: &ParameterDefaultSpec) -> Literal {
-    match default {
+pub(crate) fn parameter_default(heap: &Heap, default: &ParameterDefaultSpec) -> Option<Literal> {
+    Some(match default {
+        ParameterDefaultSpec::EmptyVec => return None,
         ParameterDefaultSpec::Null => Literal::Null,
         ParameterDefaultSpec::Bool(value) => Literal::Bool(*value),
         ParameterDefaultSpec::Int(value) => Literal::Int(*value),
         ParameterDefaultSpec::Uint(value) => Literal::Uint(*value),
         ParameterDefaultSpec::Float(value) => Literal::Float(*value),
         ParameterDefaultSpec::String(value) => Literal::String(heap.intern(value)),
-    }
+    })
 }
 
 pub(in crate::engine) fn text_of(value: &Value) -> String {

@@ -585,14 +585,19 @@ impl<'engine> VirtualMachine<'engine> {
     }
 
     #[inline]
-    pub(crate) fn remember_built_in_must_use(&mut self, name: &str) {
+    fn caller_discards_result(&self) -> bool {
         let frame = self.current_frame();
         // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
         let chunk = unsafe { frame.chunk.as_ref() };
-        if !matches!(
+        matches!(
             chunk.code.get(frame.ip as usize),
             Some(Instruction::CheckDiscardedResult { .. })
-        ) {
+        )
+    }
+
+    #[inline]
+    pub(crate) fn remember_built_in_must_use(&mut self, name: &str) {
+        if !self.caller_discards_result() {
             return;
         }
 

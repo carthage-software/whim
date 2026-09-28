@@ -15,6 +15,7 @@ use whim_value::object::ClassId;
 use whim_value::object::InstanceObject;
 use whim_value::object::TypeEnvironmentId;
 
+use crate::vm::CalleeShape;
 use crate::vm::call::BuiltInCallable;
 use crate::vm::call::Frame;
 use crate::vm::call::FrameFlags;
@@ -492,8 +493,18 @@ impl VirtualMachine<'_> {
         arguments: &[Value],
     ) -> Result<Value, VirtualMachineControl> {
         let shape = self.resolve_callee_shape(callee)?;
-        let final_arguments = self.build_final_arguments(&shape, arguments.to_vec(), &[])?;
         let (type_environment, type_arguments_bound) = self.callee_type_environment(&shape)?;
+        self.call_shape_reentrant(shape, arguments, type_environment, type_arguments_bound)
+    }
+
+    pub(in crate::vm) fn call_shape_reentrant(
+        &mut self,
+        shape: CalleeShape,
+        arguments: &[Value],
+        type_environment: TypeEnvironmentId,
+        type_arguments_bound: bool,
+    ) -> Result<Value, VirtualMachineControl> {
+        let final_arguments = self.build_final_arguments(&shape, arguments.to_vec(), &[])?;
         match shape.target {
             CallTarget::User(id) => {
                 let captures: Vec<Value> = match &shape.holder {

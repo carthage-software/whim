@@ -2,6 +2,7 @@ namespace Whim\Reflection\Symbol;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\Attribute\DefinitionReflection;
 use Whim\Reflection\DeclarationOrigin;
@@ -12,12 +13,20 @@ use Whim\Reflection\Member\MethodReflection;
 use Whim\Reflection\Member\PropertyReflection;
 use Whim\Reflection\SourceLocation;
 use Whim\Reflection\Type\ClassTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
 use Whim\Symbol\SymbolKind;
 
 /** Describes one class declaration. */
 #[Stub]
 final class ClassReflection implements ClassLikeReflection {
   private function __construct() {}
+
+  /** Creates an instance with class type arguments and constructor arguments. */
+  #[TrackCaller]
+  public function instantiate(
+    vec<TypeReflection> $typeArguments = vec[],
+    vec<mixed> $arguments = vec[],
+  ): object {}
 
   /** Returns where this class was defined. */
   #[MustUse]

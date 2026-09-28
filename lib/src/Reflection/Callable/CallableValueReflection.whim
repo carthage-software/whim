@@ -2,15 +2,24 @@ namespace Whim\Reflection\Callable;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
 use Whim\Reflection\Generic\TypeEnvironmentReflection;
 use Whim\Reflection\Symbol\ClassLikeReflection;
 use Whim\Reflection\Type\ClassTypeReflection;
 use Whim\Reflection\Type\FunctionTypeReflection;
+use Whim\Reflection\Type\TypeReflection;
 
 /** Describes one callable value, including reified and bound state. */
 #[Stub]
-final class CallableValueReflection {
+final class CallableValueReflection implements InvokableReflection {
   private function __construct() {}
+
+  /** Invokes the callable with its captures, receiver, and bound arguments. */
+  #[TrackCaller]
+  public function invoke(
+    vec<TypeReflection> $typeArguments = vec[],
+    vec<mixed> $arguments = vec[],
+  ): mixed {}
 
   /** Returns how this callable value was formed. */
   #[MustUse]

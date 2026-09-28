@@ -8,6 +8,7 @@ use whim_bytecode::chunk::descriptors::CallDescriptor;
 use whim_bytecode::chunk::descriptors::CalleeDescriptor;
 use whim_bytecode::chunk::descriptors::PresetDescriptor;
 use whim_bytecode::chunk::descriptors::PresetSlot;
+use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::atom::Atom;
@@ -56,7 +57,7 @@ impl VirtualMachine<'_> {
         }
     }
 
-    fn resolve_described_callee(
+    pub(in crate::vm) fn resolve_described_callee(
         &mut self,
         callee: &Value,
         descriptor: &CalleeDescriptor,
@@ -208,6 +209,60 @@ impl VirtualMachine<'_> {
                 .unwrap_or_else(TypeEnvironmentId::default);
         }
         Ok((environment, false))
+    }
+
+    pub(in crate::vm) fn bind_callee_type_arguments(
+        &mut self,
+        shape: &CalleeShape,
+        supplied: Option<&[TypeDescriptor]>,
+        argument_environment: TypeEnvironmentId,
+    ) -> Result<(TypeEnvironmentId, bool), VirtualMachineControl> {
+        let (outer, already_bound) = self.callee_type_environment(shape)?;
+        let Some(arguments) = supplied else {
+            return Ok((outer, already_bound));
+        };
+
+        if already_bound {
+            return Err(self.throw_well_known(
+                self.engine.tables.well_known.type_error,
+                "the callable is already specialized and takes no type arguments".to_string(),
+            ));
+        }
+
+        let (mut parameters, subject) = match shape.target {
+            CallTarget::User(id) => {
+                let function = &self.engine.tables.functions[id.0 as usize];
+                (function.type_parameters().to_vec(), function.name.clone())
+            }
+            CallTarget::BuiltIn(id) => {
+                let callable = &self.engine.tables.built_in_functions[id.0 as usize];
+                (
+                    built_in_type_parameters(&self.heap, callable.type_parameters()),
+                    self.heap.intern(callable.display_name().as_bytes()),
+                )
+            }
+        };
+
+        if let Some(called) = shape.method.map(|method| method.called) {
+            self.resolve_parameter_bounds(
+                &mut parameters,
+                called,
+                shape
+                    .this
+                    .as_ref()
+                    .map_or(outer, |receiver| receiver.type_environment()),
+            );
+        }
+
+        let environment = self.bind_type_parameters_from(
+            &parameters,
+            Some(arguments),
+            argument_environment,
+            outer,
+            subject.as_bytes(),
+        )?;
+
+        Ok((environment, true))
     }
 
     pub(in crate::vm) fn static_method_entry(
@@ -988,61 +1043,12 @@ impl VirtualMachine<'_> {
             .as_ref()
             .and_then(|holder| holder.scope())
             .or_else(|| shape.method.map(|method| method.scope));
-        let (outer_environment, already_bound) = self.callee_type_environment(&shape)?;
-        let (type_environment, type_arguments_bound) = match &descriptor.type_arguments {
-            Some(arguments) => {
-                if already_bound {
-                    return Err(self.throw_well_known(
-                        self.engine.tables.well_known.type_error,
-                        "the callable is already specialized and takes no type arguments"
-                            .to_string(),
-                    ));
-                }
-                let type_environment = match shape.target {
-                    CallTarget::User(id) => {
-                        let (mut parameters, subject) = {
-                            let function = &self.engine.tables.functions[id.0 as usize];
-                            (function.type_parameters().to_vec(), function.name.clone())
-                        };
-                        if let Some(called) = shape
-                            .method
-                            .map(|method| method.called)
-                            .or_else(|| shape.this.as_ref().map(|receiver| receiver.class()))
-                        {
-                            self.resolve_parameter_bounds(
-                                &mut parameters,
-                                called,
-                                shape.this.as_ref().map_or(outer_environment, |receiver| {
-                                    receiver.type_environment()
-                                }),
-                            );
-                        }
-                        self.bind_type_parameters_from(
-                            &parameters,
-                            Some(arguments),
-                            argument_environment,
-                            outer_environment,
-                            subject.as_bytes(),
-                        )?
-                    }
-                    CallTarget::BuiltIn(id) => {
-                        let callable = self.engine.tables.built_in_functions[id.0 as usize].clone();
-                        let parameters =
-                            built_in_type_parameters(&self.heap, callable.type_parameters());
-                        let subject = callable.display_name();
-                        self.bind_type_parameters_from(
-                            &parameters,
-                            Some(arguments),
-                            argument_environment,
-                            outer_environment,
-                            subject.as_bytes(),
-                        )?
-                    }
-                };
-                (type_environment, true)
-            }
-            None => (outer_environment, already_bound),
-        };
+        let (type_environment, type_arguments_bound) = self.bind_callee_type_arguments(
+            &shape,
+            descriptor.type_arguments.as_deref(),
+            argument_environment,
+        )?;
+
         let target = shape.target;
         let called_class = shape.method.map(|method| method.called);
         let callable = FunctionObject::partial(

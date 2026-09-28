@@ -413,9 +413,13 @@ pub(crate) fn parameter_dispatch(
                 types::resolve_type(context.vm, &reflected, &bindings, None),
             )
         }
-        Operation::IsOptional => Ok(Value::bool(parameter.has_default)),
-        Operation::HasDefaultValue => Ok(Value::bool(parameter.default.is_some())),
+        Operation::IsOptional | Operation::HasDefaultValue => {
+            Ok(Value::bool(parameter.has_default))
+        }
         Operation::DefaultValue => {
+            if let Some(value) = support::native_parameter_default(context.vm, callable, position) {
+                return Ok(value);
+            }
             let Some(default) = parameter.default.as_ref() else {
                 return Ok(Value::null());
             };
@@ -1308,7 +1312,7 @@ fn compiled_property<'a>(
         .find(|property| property.name == member.name)
 }
 
-fn method_entry(vm: &VirtualMachine<'_>, member: &MemberKey) -> Option<MethodEntry> {
+pub(super) fn method_entry(vm: &VirtualMachine<'_>, member: &MemberKey) -> Option<MethodEntry> {
     let runtime = &vm.engine.tables.classes[member.class.0 as usize];
     runtime
         .private_methods

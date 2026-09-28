@@ -1,0 +1,17 @@
+namespace Whim\Reflection\Callable;
+
+use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
+use Whim\Reflection\Symbol\FunctionReflection;
+use Whim\Reflection\Type\TypeReflection;
+
+/** Calls a reflected function or callable value. */
+#[Stub]
+interface InvokableReflection for FunctionReflection, CallableValueReflection {
+  /** Invokes the callable with type and value arguments in declaration order. */
+  #[TrackCaller]
+  public function invoke(
+    vec<TypeReflection> $typeArguments = vec[],
+    vec<mixed> $arguments = vec[],
+  ): mixed;
+}

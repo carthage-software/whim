@@ -114,6 +114,7 @@ pub(crate) struct ParameterSpec {
     reason = "the signature macros support every scalar parameter default"
 )]
 pub(crate) enum ParameterDefaultSpec {
+    EmptyVec,
     Null,
     Bool(bool),
     Int(i64),

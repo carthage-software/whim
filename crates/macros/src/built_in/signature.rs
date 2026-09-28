@@ -150,6 +150,9 @@ fn lower_parameters(list: &ParameterList<'_>, names: &HashSet<String>) -> syn::R
 
 fn lower_parameter_default(default: &ParameterDefault<'_>) -> syn::Result<TokenStream> {
     let value = match default.value.unparenthesized() {
+        Expression::Vec(vector) if vector.elements.is_empty() => {
+            quote!(crate::builtin::spec::ParameterDefaultSpec::EmptyVec)
+        }
         Expression::Literal(Literal::Null(_)) => {
             quote!(crate::builtin::spec::ParameterDefaultSpec::Null)
         }
@@ -191,7 +194,7 @@ fn lower_parameter_default(default: &ParameterDefault<'_>) -> syn::Result<TokenS
         _ => {
             return Err(syn::Error::new(
                 Span::call_site(),
-                "a built-in parameter default must be a scalar literal or null",
+                "a built-in parameter default must be a scalar literal, null, or vec[]",
             ));
         }
     };

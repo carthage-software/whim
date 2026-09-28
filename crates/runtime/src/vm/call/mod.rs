@@ -219,6 +219,7 @@ pub(in crate::vm) fn argument_guard(
 }
 
 mod frames;
+mod reflection;
 mod shape;
 mod sites;
 mod user;

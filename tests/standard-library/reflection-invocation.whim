@@ -1,0 +1,500 @@
+namespace ReflectionInvocationTest;
+
+use Whim\Async;
+use Whim\Marker\MustUse;
+use Whim\Math;
+use Whim\Reflection;
+use Whim\Reflection\Callable\InvokableReflection;
+use Whim\Reflection\Member\MethodReflection;
+use Whim\Unwind\ArgumentCountError;
+use Whim\Unwind\DiscardedResultError;
+use Whim\Unwind\InstantiationError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\VisibilityError;
+
+function failure(fn $call): Throwable {
+  try {
+    $call();
+  } catch (Throwable $error) {
+    return $error;
+  }
+
+  throw new RuntimeException('expected the call to fail');
+}
+
+function same_failure(fn $direct, fn $reflected): void {
+  $expected = failure($direct);
+  $actual = failure($reflected);
+  assert!($actual->getMessage() == $expected->getMessage());
+  assert!(
+    Reflection\reflect_object(
+      $actual,
+    )->getClass()->getName() == Reflection\reflect_object(
+      $expected,
+    )->getClass()->getName(),
+  );
+}
+
+function pair<T: int|string, U = string>(T $first, U $second): (T, U) {
+  return ($first, $second);
+}
+
+function defaulted<T = int>(T $value = 7): T {
+  return $value;
+}
+
+function constrained<T>(T $value): T where T: !null {
+  return $value;
+}
+
+function bad_return(): int {
+  return 'wrong';
+}
+
+#[MustUse('keep this result')]
+function important(): int {
+  return 42;
+}
+
+function nothing(): void {}
+
+function captured<T>(T $outer): fn {
+  return fn<U>(U $value): (T, U) => ($outer, $value);
+}
+
+interface Named {
+  public function name(): string;
+}
+
+class Box<T> implements Named {
+  public function __construct(public readonly T $value) {}
+
+  public function pair<U>(U $other): (T, U) where T: !null, U: string {
+    return ($this->value, $other);
+  }
+
+  public function name(): string {
+    return 'base';
+  }
+
+  private function secret(): T {
+    return $this->value;
+  }
+
+  protected function protectedValue(): T {
+    return $this->value;
+  }
+
+  public function callPrivate(MethodReflection $method): mixed {
+    return $method->invoke($this);
+  }
+
+  public function privateCallable(): fn {
+    return $this->secret(...);
+  }
+
+  public function privateReflection(): MethodReflection {
+    return Reflection\reflect_class($this)->getMethod('secret');
+  }
+
+  public function __destruct() {}
+}
+
+final class StringBox extends Box<string> {
+  public function name(): string {
+    return 'child';
+  }
+
+  public function callProtected(MethodReflection $method): mixed {
+    return $method->invoke($this);
+  }
+}
+
+class Factory {
+  public static function make(): static {
+    return new static();
+  }
+
+  public static function choose<T>(T $value): T where T: int {
+    return $value;
+  }
+
+  public static function accept<T>(T $value): T where T: static {
+    return $value;
+  }
+
+  public static function lexical(): self {
+    return new self();
+  }
+}
+
+final class ChildFactory extends Factory {}
+
+final class Unrelated {
+  public static function make(): self {
+    return new self();
+  }
+
+  public function name(): string {
+    return 'unrelated';
+  }
+}
+
+final class PrivateConstructor {
+  private function __construct() {}
+
+  public static function create(): self {
+    return Reflection\reflect_class(
+      'ReflectionInvocationTest\\PrivateConstructor',
+    )->instantiate();
+  }
+}
+
+abstract class AbstractClass {}
+
+final class DefaultBox<T = int> {
+  public function __construct(public T $value = 12) {}
+}
+
+$int = Reflection\reflect_type::<int>();
+$string = Reflection\reflect_type::<string>();
+$null = Reflection\reflect_type::<null>();
+$pair = Reflection\reflect_function('ReflectionInvocationTest\\pair');
+assert!($pair is InvokableReflection);
+assert!($pair->invoke(vec[$int, $string], vec[3, 'four']) == (3, 'four'));
+assert!($pair->invoke(vec[$string, $int], vec['three', 4]) == ('three', 4));
+assert!($pair->invoke(vec[$int], vec[3, 'four']) == (3, 'four'));
+
+$defaulted = Reflection\reflect_function('ReflectionInvocationTest\\defaulted');
+assert!($defaulted->invoke() == 7);
+assert!($defaulted->invoke(vec[$string], vec['seven']) == 'seven');
+assert!(failure(fn() => $pair->invoke(vec[], vec[3, 'four'])) is TypeError);
+assert!(
+  failure(
+    fn() => $pair->invoke(vec[$int, $string, $int], vec[3, 'four']),
+  ) is TypeError,
+);
+
+same_failure(
+  fn() => pair::<null>(null, 'four'),
+  fn() => $pair->invoke(vec[$null], vec[null, 'four']),
+);
+
+same_failure(fn() => pair::<int>(), fn() => $pair->invoke(vec[$int]));
+same_failure(
+  fn() => pair::<int>(3, 'four', 5),
+  fn() => $pair->invoke(vec[$int], vec[3, 'four', 5]),
+);
+
+same_failure(
+  fn() => pair::<int>('three', 'four'),
+  fn() => $pair->invoke(vec[$int], vec['three', 'four']),
+);
+
+$constrained = Reflection\reflect_function(
+  'ReflectionInvocationTest\\constrained',
+);
+
+assert!($constrained->invoke(vec[$int], vec[5]) == 5);
+same_failure(
+  fn() => constrained::<null>(null),
+  fn() => $constrained->invoke(vec[$null], vec[null]),
+);
+
+same_failure(
+  fn() => bad_return(),
+  fn() => (
+    Reflection\reflect_function(
+      'ReflectionInvocationTest\\bad_return',
+    )->invoke()
+  ),
+);
+
+$unbound = $pair->getTypeParameter('T')->getType();
+assert!(
+  failure(fn() => $pair->invoke(vec[$unbound], vec[3, 'four'])) is TypeError,
+);
+
+$round = Reflection\reflect_function('Whim\\Math\\round');
+assert!($round->invoke(vec[], vec[1.25, 1]) == 1.3);
+same_failure(
+  fn() => Math\round('bad'),
+  fn() => $round->invoke(vec[], vec['bad']),
+);
+
+assert!(failure(fn() => $round->invoke(vec[$int], vec[1.0])) is TypeError);
+
+assert!(
+  Reflection\reflect_function('Whim\\Reflection\\reflect_type')->invoke(vec[
+    $int,
+  ])->equals($int),
+);
+
+$boxClass = Reflection\reflect_class('ReflectionInvocationTest\\Box');
+$box = $boxClass->instantiate(vec[$string], vec['value']);
+assert!($box is Box<string>);
+assert!($box->value == 'value');
+$child = Reflection\reflect_class(
+  'ReflectionInvocationTest\\StringBox',
+)->instantiate(vec[], vec['child value']);
+
+$method = $boxClass->getMethod('pair');
+assert!(
+  Reflection\reflect_class(
+    'ReflectionInvocationTest\\DefaultBox',
+  )->instantiate()->value
+  == 12,
+);
+
+assert!(
+  $method->invoke($child, vec[$string], vec['other']) == (
+    'child value',
+    'other',
+  ),
+);
+
+assert!(failure(fn() => $boxClass->instantiate()) is TypeError);
+same_failure(
+  fn() => new Box::<string>(),
+  fn() => $boxClass->instantiate(vec[$string]),
+);
+
+same_failure(
+  fn() => new Box::<string>(5),
+  fn() => $boxClass->instantiate(vec[$string], vec[5]),
+);
+
+assert!(
+  failure(
+    fn() => $boxClass->instantiate(vec[$string, $int], vec['x']),
+  ) is TypeError,
+);
+
+same_failure(
+  fn() => $child->pair::<int>(5),
+  fn() => $method->invoke($child, vec[$int], vec[5]),
+);
+
+same_failure(fn() => $child->pair(), fn() => $method->invoke($child));
+assert!(
+  failure(
+    fn() => (
+      $method->invoke(
+        'ReflectionInvocationTest\\StringBox',
+        vec[$string],
+        vec['other'],
+      )
+    ),
+  ) is TypeError,
+);
+
+$named = Reflection\reflect_interface(
+  'ReflectionInvocationTest\\Named',
+)->getMethod('name');
+
+assert!($named->invoke($child) == 'child');
+assert!($boxClass->getMethod('name')->invoke($child) == 'child');
+assert!(failure(fn() => $named->invoke(new Unrelated())) is TypeError);
+
+$make = Reflection\reflect_class(
+  'ReflectionInvocationTest\\Factory',
+)->getMethod('make');
+
+assert!(
+  $make->invoke('ReflectionInvocationTest\\ChildFactory') is ChildFactory,
+);
+
+assert!(
+  failure(
+    fn() => $make->invoke('ReflectionInvocationTest\\Unrelated'),
+  ) is TypeError,
+);
+
+assert!(failure(fn() => $make->invoke(new ChildFactory())) is TypeError);
+assert!(failure(fn() => $make->invoke(null)) is TypeError);
+$choose = Reflection\reflect_class(
+  'ReflectionInvocationTest\\Factory',
+)->getMethod('choose');
+
+assert!(
+  $choose->invoke('ReflectionInvocationTest\\ChildFactory', vec[$int], vec[8])
+  == 8,
+);
+
+same_failure(
+  fn() => ChildFactory::choose::<string>('bad'),
+  fn() => (
+    $choose->invoke(
+      'ReflectionInvocationTest\\ChildFactory',
+      vec[$string],
+      vec['bad'],
+    )
+  ),
+);
+
+$factory = Reflection\reflect_class('ReflectionInvocationTest\\Factory');
+$lexical = $factory->getMethod('lexical')->invoke(
+  'ReflectionInvocationTest\\ChildFactory',
+);
+
+assert!(
+  Reflection\reflect_object($lexical)->getClass()->getName()
+  == 'ReflectionInvocationTest\\Factory',
+);
+
+$accept = $factory->getMethod('accept');
+$childType = Reflection\reflect_type::<ChildFactory>();
+assert!(
+  $accept->invoke(
+    'ReflectionInvocationTest\\ChildFactory',
+    vec[$childType],
+    vec[new ChildFactory()],
+  ) is ChildFactory,
+);
+
+same_failure(
+  fn() => ChildFactory::accept::<Factory>(new Factory()),
+  fn() => (
+    $accept->invoke(
+      'ReflectionInvocationTest\\ChildFactory',
+      vec[Reflection\reflect_type::<Factory>()],
+      vec[new Factory()],
+    )
+  ),
+);
+
+$private = $box->privateReflection();
+assert!($box->callPrivate($private) == 'value');
+assert!($child->callPrivate($private) == 'child value');
+assert!(failure(fn() => $private->invoke($box)) is VisibilityError);
+$protected = $boxClass->getMethod('protectedValue');
+assert!($child->callProtected($protected) == 'child value');
+assert!(failure(fn() => $protected->invoke($child)) is VisibilityError);
+assert!(
+  Reflection\reflect_callable($child->privateCallable())->invoke()
+  == 'child value',
+);
+
+assert!(PrivateConstructor::create() is PrivateConstructor);
+assert!(
+  failure(
+    fn() => (
+      Reflection\reflect_class(
+        'ReflectionInvocationTest\\PrivateConstructor',
+      )->instantiate()
+    ),
+  ) is VisibilityError,
+);
+
+assert!(
+  failure(
+    fn() => (
+      Reflection\reflect_class(
+        'ReflectionInvocationTest\\AbstractClass',
+      )->instantiate()
+    ),
+  ) is InstantiationError,
+);
+
+same_failure(
+  fn() => new Unrelated(1),
+  fn() => (
+    Reflection\reflect_class(
+      'ReflectionInvocationTest\\Unrelated',
+    )->instantiate(vec[], vec[1])
+  ),
+);
+
+foreach (vec[
+  $boxClass->getConstructor(),
+  $boxClass->getDestructor(),
+] as $lifecycle) {
+  assert!(failure(fn() => $lifecycle->invoke($box)) is TypeError);
+}
+
+$captured = 'captured';
+$closure = Reflection\reflect_callable(
+  fn<T>(T $value): (string, T) => ($captured, $value),
+);
+
+assert!($closure is InvokableReflection);
+assert!($closure->invoke(vec[$int], vec[9]) == ('captured', 9));
+assert!(
+  Reflection\reflect_callable(captured::<string>('outer'))->invoke(
+    vec[$int],
+    vec[9],
+  ) == ('outer', 9),
+);
+
+$partial = Reflection\reflect_callable(pair::<int>(?, 'fixed'));
+assert!($partial->invoke(vec[], vec[10]) == (10, 'fixed'));
+assert!(failure(fn() => $partial->invoke(vec[$int], vec[10])) is TypeError);
+assert!(
+  failure(fn() => $partial->invoke(vec[], vec[10, 11])) is ArgumentCountError,
+);
+
+$bound = Reflection\reflect_callable($child->pair::<string>(...));
+assert!($bound->invoke(vec[], vec['bound']) == ('child value', 'bound'));
+$static = Reflection\reflect_callable(ChildFactory::make(...));
+assert!($static->invoke() is ChildFactory);
+
+foreach (vec[
+  Reflection\reflect_class(
+    'Whim\\Reflection\\Symbol\\ClassReflection',
+  )->getMethod('instantiate'),
+  Reflection\reflect_class(
+    'Whim\\Reflection\\Symbol\\FunctionReflection',
+  )->getMethod('invoke'),
+  Reflection\reflect_class(
+    'Whim\\Reflection\\Callable\\CallableValueReflection',
+  )->getMethod('invoke'),
+  Reflection\reflect_interface(
+    'Whim\\Reflection\\Callable\\InvokableReflection',
+  )->getMethod('invoke'),
+] as $api) {
+  foreach ($api->getParameters() as $parameter) {
+    assert!($parameter->isOptional());
+    assert!($parameter->hasDefaultValue());
+    assert!($parameter->getDefaultValue() == vec[]);
+  }
+}
+
+$exception = new RuntimeException('original');
+$throwing = Reflection\reflect_callable(fn(): never => throw $exception);
+assert!(failure(fn() => $throwing->invoke()) == $exception);
+assert!(
+  Reflection\reflect_function('ReflectionInvocationTest\\nothing')->invoke()
+  == null,
+);
+
+Reflection\reflect_function('ReflectionInvocationTest\\nothing')->invoke();
+Reflection\reflect_callable(fn(): int => 1)->invoke();
+$important = Reflection\reflect_function('ReflectionInvocationTest\\important');
+assert!($important->invoke() == 42);
+assert!(failure(fn(): void {
+  $important->invoke();
+}) is DiscardedResultError);
+
+assert!(failure(fn(): void {
+  Reflection\reflect_function('Whim\\Reflection\\reflect_type')->invoke(vec[
+    $int,
+  ]);
+}) is DiscardedResultError);
+
+discard!($important->invoke());
+
+$work = Reflection\reflect_callable(fn(): string {
+  Async\later();
+  return 'resumed';
+});
+
+assert!(
+  Async\spawn::<string>(fn(): string => $work->invoke())->await() == 'resumed',
+);
+
+$exceptionClass = Reflection\reflect_class('Whim\\Unwind\\RuntimeException');
+$native = $exceptionClass->instantiate(vec[], vec['native', 17]);
+assert!($exceptionClass->getMethod('getMessage')->invoke($native) == 'native');
+assert!($exceptionClass->getMethod('getCode')->invoke($native) == 17);

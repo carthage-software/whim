@@ -15,6 +15,7 @@ use crate::core::reflection::attributes;
 use crate::core::reflection::classes;
 use crate::core::reflection::declarations;
 use crate::core::reflection::files;
+use crate::core::reflection::invocation;
 use crate::core::reflection::metadata;
 use crate::core::reflection::model::DeclarationKey;
 use crate::core::reflection::model::ReflectionData;
@@ -62,6 +63,9 @@ pub(crate) fn dispatch(
     operation: Operation,
 ) -> Result<Value, Throw> {
     let (data, values) = receiver_snapshot(context)?;
+    if matches!(operation, Operation::Invoke | Operation::Instantiate) {
+        return invocation::dispatch(context, arguments, operation, &data, &values);
+    }
     match data {
         ReflectionData::SourceLocation(location) => {
             metadata::source_location_dispatch(context, operation, &location)

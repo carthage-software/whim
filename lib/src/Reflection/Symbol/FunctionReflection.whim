@@ -2,9 +2,11 @@ namespace Whim\Reflection\Symbol;
 
 use Whim\Marker\MustUse;
 use Whim\Marker\Stub;
+use Whim\Marker\TrackCaller;
 use Whim\Reflection\Generic\WhereConstraintReflection;
 use Whim\Reflection\AttributeReflection;
 use Whim\Reflection\Callable\CallableReflection;
+use Whim\Reflection\Callable\InvokableReflection;
 use Whim\Reflection\Callable\ParameterReflection;
 use Whim\Reflection\DeclarationOrigin;
 use Whim\Reflection\FileReflection;
@@ -19,8 +21,18 @@ use Whim\Symbol\SymbolKind;
 
 /** Describes one named function declaration. */
 #[Stub]
-final class FunctionReflection implements SymbolReflection, CallableReflection {
+final class FunctionReflection implements
+  SymbolReflection,
+  CallableReflection,
+  InvokableReflection {
   private function __construct() {}
+
+  /** Invokes the function with type and value arguments in declaration order. */
+  #[TrackCaller]
+  public function invoke(
+    vec<TypeReflection> $typeArguments = vec[],
+    vec<mixed> $arguments = vec[],
+  ): mixed {}
 
   /** Returns where constraints in source order, including repeated bounds. */
   #[MustUse]

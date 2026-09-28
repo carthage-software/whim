@@ -25,6 +25,7 @@ macro_rules! reflection_class {
         {
             $($method:ident : $signature:literal => $operation:ident;)*
         }
+        $(calls { $($call:ident : $call_signature:literal => $call_operation:ident;)* })?
     ) => {
         reflection_class_methods! {
             @collect
@@ -32,6 +33,7 @@ macro_rules! reflection_class {
             whim_name = $whim_name;
             interfaces = [$($($interface),*)?];
             methods = [$($method : $signature => $operation;)*];
+            calls = [$($($call : $call_signature => $call_operation;)*)?];
             groups = [$($($group),*)?];
         }
     };
@@ -44,6 +46,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($call:ident : $call_signature:literal => $call_operation:ident;)*];
         groups = [];
     ) => {
         #[whim_class($whim_name, final, traced)]
@@ -85,6 +88,16 @@ macro_rules! reflection_class_methods {
                     dispatch(context, arguments, Operation::$operation)
                 }
             )*
+
+            $(
+                #[whim_method($call_signature)]
+                fn $call(
+                    context: &mut Context<'_, '_, '_>,
+                    arguments: Arguments<'_>,
+                ) -> Result<Value, Throw> {
+                    dispatch(context, arguments, Operation::$call_operation)
+                }
+            )*
         }
     };
 
@@ -94,6 +107,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [declaration $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -109,6 +123,7 @@ macro_rules! reflection_class_methods {
                 get_attributes: "getAttributes<T: object = object>(): vec<Whim\\Reflection\\AttributeReflection<T>>" => Attributes;
                 get_attributes_by_name: "getAttributesByName(string $class): vec<Whim\\Reflection\\AttributeReflection<object>>" => AttributesByName;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -119,6 +134,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [generic $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -131,6 +147,7 @@ macro_rules! reflection_class_methods {
                 get_type_parameters: "getTypeParameters(): vec<Whim\\Reflection\\Generic\\TypeParameterReflection>" => TypeParameters;
                 get_type_parameter: "getTypeParameter(int|string $parameter): null|Whim\\Reflection\\Generic\\TypeParameterReflection" => TypeParameter;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -141,6 +158,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [symbol $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -156,6 +174,7 @@ macro_rules! reflection_class_methods {
                 get_kind: "getKind(): Whim\\Symbol\\SymbolKind" => SymbolKind;
                 get_file: "getFile(): null|Whim\\Reflection\\FileReflection" => File;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -166,6 +185,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [class_like $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -189,6 +209,7 @@ macro_rules! reflection_class_methods {
                 get_constants: "getConstants(): vec<Whim\\Reflection\\Member\\ClassConstantReflection>" => Constants;
                 get_constant: "getConstant(string $name): null|Whim\\Reflection\\Member\\ClassConstantReflection" => Constant;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -199,6 +220,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [callable_name $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -210,6 +232,7 @@ macro_rules! reflection_class_methods {
                 $($method : $signature => $operation;)*
                 get_name: "getName(): string" => Name;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -220,6 +243,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [callable $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -236,6 +260,7 @@ macro_rules! reflection_class_methods {
                 get_return_type: "getReturnType(): null|Whim\\Reflection\\Type\\TypeReflection" => ReturnType;
                 get_callable_type: "getCallableType(null|Whim\\Reflection\\Generic\\TypeEnvironmentReflection $environment = null, null|Whim\\Reflection\\Type\\ClassTypeReflection $calledType = null): Whim\\Reflection\\Type\\FunctionTypeReflection" => CallableType;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -246,6 +271,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [member $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -259,6 +285,7 @@ macro_rules! reflection_class_methods {
                 get_declaring_type: "getDeclaringType(): Whim\\Reflection\\Symbol\\ClassLikeReflection" => DeclaringType;
                 get_visibility: "getVisibility(): Whim\\Reflection\\Member\\Visibility" => Visibility;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -269,6 +296,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [type_reflection $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -287,6 +315,7 @@ macro_rules! reflection_class_methods {
                 equals: "equals(Whim\\Reflection\\Type\\TypeReflection $other): bool" => Equals;
                 is_subtype_of: "isSubtypeOf(Whim\\Reflection\\Type\\TypeReflection $other): bool" => IsSubtypeOf;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -297,6 +326,7 @@ macro_rules! reflection_class_methods {
         whim_name = $whim_name:literal;
         interfaces = [$($interface:literal),*];
         methods = [$($method:ident : $signature:literal => $operation:ident;)*];
+        calls = [$($calls:tt)*];
         groups = [named_type $(, $rest:ident)*];
     ) => {
         reflection_class_methods! {
@@ -311,6 +341,7 @@ macro_rules! reflection_class_methods {
                 get_type_environment: "getTypeEnvironment(): Whim\\Reflection\\Generic\\TypeEnvironmentReflection" => TypeEnvironment;
                 is_recursive_reference: "isRecursiveReference(): bool" => IsRecursiveReference;
             ];
+            calls = [$($calls)*];
             groups = [$($rest),*];
         }
     };
@@ -353,6 +384,9 @@ reflection_class! {
         get_interface_types: "getInterfaceTypes(): vec<Whim\\Reflection\\Type\\ClassTypeReflection>" => InterfaceTypes;
         get_constructor: "getConstructor(): null|Whim\\Reflection\\Member\\MethodReflection" => Constructor;
         get_destructor: "getDestructor(): null|Whim\\Reflection\\Member\\MethodReflection" => Destructor;
+    }
+    calls {
+        instantiate: "instantiate(vec<Whim\\Reflection\\Type\\TypeReflection> $typeArguments = vec[], vec<mixed> $arguments = vec[]): object" => Instantiate;
     }
 }
 
@@ -406,9 +440,13 @@ reflection_class! {
     implements [
         "Whim\\Reflection\\Symbol\\SymbolReflection",
         "Whim\\Reflection\\Callable\\CallableReflection",
+        "Whim\\Reflection\\Callable\\InvokableReflection",
     ]
     with [declaration, symbol, generic, callable] {
         get_type: "getType(): Whim\\Reflection\\Type\\SymbolTypeReflection" => Type;
+    }
+    calls {
+        invoke: "invoke(vec<Whim\\Reflection\\Type\\TypeReflection> $typeArguments = vec[], vec<mixed> $arguments = vec[]): mixed" => Invoke;
     }
 }
 
@@ -436,6 +474,9 @@ reflection_class! {
         is_destructor: "isDestructor(): bool" => IsDestructor;
         get_prototypes: "getPrototypes(): vec<Whim\\Reflection\\Member\\MethodReflection>" => Prototypes;
         get_type: "getType(): Whim\\Reflection\\Type\\MemberTypeReflection" => Type;
+    }
+    calls {
+        invoke: "invoke(classname<object>|object $target, vec<Whim\\Reflection\\Type\\TypeReflection> $typeArguments = vec[], vec<mixed> $arguments = vec[]): mixed" => Invoke;
     }
 }
 
@@ -513,7 +554,8 @@ reflection_class! {
 }
 
 reflection_class! {
-    CallableValueReflection = "Whim\\Reflection\\Callable\\CallableValueReflection" {
+    CallableValueReflection = "Whim\\Reflection\\Callable\\CallableValueReflection"
+    implements ["Whim\\Reflection\\Callable\\InvokableReflection"] {
         get_kind: "getKind(): Whim\\Reflection\\Callable\\CallableKind" => CallableKind;
         get_declaration: "getDeclaration(): Whim\\Reflection\\Callable\\CallableReflection" => Declaration;
         get_type: "getType(): Whim\\Reflection\\Type\\FunctionTypeReflection" => Type;
@@ -523,6 +565,9 @@ reflection_class! {
         get_called_type: "getCalledType(): null|Whim\\Reflection\\Type\\ClassTypeReflection" => CalledType;
         get_captures: "getCaptures(): vec<Whim\\Reflection\\Callable\\CaptureValueReflection>" => Captures;
         get_bound_arguments: "getBoundArguments(): vec<Whim\\Reflection\\Callable\\BoundArgumentReflection>" => BoundArguments;
+    }
+    calls {
+        invoke: "invoke(vec<Whim\\Reflection\\Type\\TypeReflection> $typeArguments = vec[], vec<mixed> $arguments = vec[]): mixed" => Invoke;
     }
 }
 

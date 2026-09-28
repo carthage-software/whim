@@ -1,7 +1,6 @@
 # Reflection
 
-`Whim\Reflection` gives read-only access to loaded files, declarations, types,
-and values.
+`Whim\Reflection` inspects loaded files, declarations, types, and values.
 
 ## Files
 
@@ -115,7 +114,7 @@ docblock, including `/**` and `*/`.
 Declarations list their attributes. `getAttributes::<T>()` returns
 attributes whose class fits `T`. `getAttributesByName()` matches an exact class
 name. `AttributeReflection::newInstance()` creates an instance of the
-attribute. No other reflection call constructs a user value.
+attribute.
 
 ## Symbols and members
 
@@ -133,6 +132,67 @@ The `Whim\Reflection\Member` namespace covers methods, properties, class
 constants, and enum cases. Member lookup functions return `null` for a missing
 name. A method lists the parent or interface methods it implements. A property
 gives its type, default value, and promoted, readonly, and static flags.
+
+## Invoke callables and create instances
+
+`FunctionReflection::invoke($typeArguments = vec[], $arguments = vec[])` calls
+the reflected function. `CallableValueReflection::invoke()` takes the same
+arguments and calls the fn value retained by `reflect_callable()`. Both
+implement `Whim\Reflection\Callable\InvokableReflection`.
+
+Type arguments are a `vec<TypeReflection>` in type parameter order. Value
+arguments are a `vec<mixed>` in parameter order. Omitted arguments use the
+callable's defaults. Whim checks argument counts, types, bounds, where
+constraints, and return types as it does for a direct call. It does not infer
+type arguments from values.
+
+```whim
+use Whim\Reflection;
+
+function identity<T>(T $value): T {
+  return $value;
+}
+
+$function = Reflection\reflect_function('identity');
+$int = Reflection\reflect_type::<int>();
+assert!($function->invoke(vec[$int], vec[42]) == 42);
+
+$prefix = 'Hello, ';
+$greet = Reflection\reflect_callable(fn(string $name): string => $prefix . $name);
+assert!($greet->invoke(vec[], vec['world']) == 'Hello, world');
+```
+
+A callable value keeps its captures, bound receiver, class scope, type
+bindings, and partial arguments. Pass only the remaining arguments to a
+partial application. A specialized fn uses its stored type arguments; passing
+more type arguments throws `TypeError`. `ClosureReflection` describes a
+closure declaration. To invoke a closure with its captures, reflect the fn
+value with `reflect_callable()`.
+
+`MethodReflection::invoke($target, $typeArguments = vec[], $arguments = vec[])`
+requires an object for an instance method and a `classname<object>` for a
+static method. The target's class must be the declaring class or one of its
+subtypes. An unrelated class fails even if it has a method with the same name.
+The call uses the target's override when one exists. For a static call, the
+target class binds `static`, including `new static()` and a `static` return
+type. The method's declaring class still determines `self` and `parent`.
+
+Visibility uses the scope that calls `invoke()`. Holding a reflection of a
+private or protected method grants no extra access. Instance methods get
+class type arguments from the object; the supplied type arguments bind only
+the method's own type parameters.
+
+`ClassReflection::instantiate($typeArguments = vec[], $arguments = vec[])`
+creates an object and runs its constructor. Type arguments bind the class;
+value arguments go to the constructor. Normal constructor visibility and
+instantiation rules apply. Constructors and destructors cannot be called
+through `MethodReflection::invoke()`.
+
+Every supplied `TypeReflection` must be resolved. Use `resolve()` with a type
+environment to replace unbound parameters before passing them. Invocation
+returns the callable's result, or `null` for a `void` callable. Exceptions
+propagate to the caller, and calls may suspend as usual. Discarding an invoked
+callable's result still enforces its `#[MustUse]` attribute.
 
 ## Generics
 

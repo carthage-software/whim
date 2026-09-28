@@ -22,7 +22,9 @@ use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::FuncId;
 use whim_value::object::ClassId;
+use whim_value::vec::VecObject;
 
+use crate::builtin::spec::ParameterDefaultSpec;
 use crate::builtin::throw::Throw;
 use crate::classes::MethodBodyKind;
 use crate::core::reflection::model::CallableKey;
@@ -34,6 +36,7 @@ use crate::core::reflection::model::MemberKind;
 use crate::core::reflection::model::TypeParameterKey;
 use crate::engine::builtins::built_in_parameters;
 use crate::engine::builtins::built_in_type_parameters;
+use crate::engine::builtins::parameter_default;
 use crate::linker::descriptors::descriptor_from_built_in_spec;
 use crate::symbols::FunctionLocator;
 use crate::symbols::FunctionTable;
@@ -71,6 +74,46 @@ pub(crate) fn callable_info(vm: &VirtualMachine<'_>, key: &CallableKey) -> Optio
         CallableKey::Function(name) => function_info(vm, name),
         CallableKey::Method { class, name } => method_info(vm, *class, name),
         CallableKey::Closure(function) => user_function_info(vm, *function, None),
+    }
+}
+
+pub(super) fn native_parameter_default(
+    vm: &VirtualMachine<'_>,
+    callable: &CallableKey,
+    position: usize,
+) -> Option<Value> {
+    let parameters = match callable {
+        CallableKey::Function(name) => {
+            let entry = vm.engine.tables.symbols.get(name)?;
+            if entry.table != FunctionTable::BuiltIn {
+                return None;
+            }
+
+            vm.engine
+                .tables
+                .built_in_functions
+                .get(entry.index as usize)?
+                .parameters()
+        }
+        CallableKey::Method { class, name } => {
+            let MethodBodyKind::BuiltIn(body) = vm.engine.tables.classes[class.0 as usize]
+                .method(name)?
+                .body
+            else {
+                return None;
+            };
+
+            body.parameters
+        }
+        CallableKey::Closure(_) => return None,
+    };
+
+    let default = parameters.get(position)?.default.as_ref()?;
+    match default {
+        ParameterDefaultSpec::EmptyVec => Some(Value::vec(VecObject::new(vm.heap()))),
+        other => parameter_default(vm.heap(), other)
+            .as_ref()
+            .map(literal_value),
     }
 }
 
