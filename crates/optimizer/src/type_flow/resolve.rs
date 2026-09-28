@@ -10,6 +10,7 @@ use whim_bytecode::chunk::descriptors::ShapeKey;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::IcSlot;
+use whim_bytecode::instruction::operands::IndexUpdateOperation;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::ClassLikeKind;
 use whim_bytecode::unit::CompiledBuiltInFunction;
@@ -47,6 +48,7 @@ use crate::type_flow::descriptors::substitute_parameters;
 use crate::type_flow::instruction_index;
 use crate::type_flow::ptr;
 use crate::type_flow::same_atom;
+use crate::type_flow::transfer::numeric_result;
 
 impl<'a> TypeFlow<'a> {
     pub(crate) fn register_type_at(
@@ -207,6 +209,9 @@ impl<'a> TypeFlow<'a> {
         }
         let substituted;
         let (destination, descriptor) = match self.chunk.code.get(index)? {
+            Instruction::IndexSetPath { .. } | Instruction::IndexUpdatePath { .. } => {
+                return self.preserved_path_fact(index);
+            }
             Instruction::AsCheck {
                 destination,
                 descriptor,
@@ -1033,6 +1038,82 @@ impl<'a> TypeFlow<'a> {
             })
             .map(|(_, value)| value)
             .or_else(|| rest.as_ref().map(|(_, value)| value.as_ref()))
+    }
+
+    fn preserved_path_fact(&self, index: usize) -> Option<(Register, Fact)> {
+        let (container, first, count, value, operation) = match self.chunk.code[index] {
+            Instruction::IndexSetPath {
+                container,
+                first_index,
+                index_count,
+                value,
+            } => (container, first_index, index_count, value, None),
+            Instruction::IndexUpdatePath {
+                container,
+                operand,
+                index_count,
+                operation,
+            } => (
+                container,
+                Register::new(operand.index() + 1),
+                index_count,
+                operand,
+                Some(operation),
+            ),
+            _ => return None,
+        };
+
+        let current = self.fact(index, container);
+        let mut descriptor = self.origin_type(current.origin, 0)?;
+        for offset in 0..u16::from(count.value()) {
+            let key = self.fact(index, Register::new(first.index() + offset));
+            descriptor = self.expand_aliases_owned(descriptor);
+            descriptor = match &descriptor {
+                TypeDescriptor::Vector(Some(element)) => element.as_ref().clone(),
+                TypeDescriptor::Dictionary(Some((key_type, element)))
+                | TypeDescriptor::Array(Some((key_type, element)))
+                    if self.fact_proves(key, key_type, 0) =>
+                {
+                    element.as_ref().clone()
+                }
+                TypeDescriptor::VectorShape { .. }
+                | TypeDescriptor::DictionaryShape { rest: None, .. } => {
+                    let key = self.constant_value_fact(key, 0)?;
+                    Self::constant_indexed_descriptor(&descriptor, &key)?.clone()
+                }
+                _ => return None,
+            };
+        }
+
+        descriptor = self.expand_aliases_owned(descriptor);
+        let operand = self.fact(index, value);
+        let updated = match operation {
+            None => operand,
+            Some(operation) => {
+                let left = self.descriptor_fact(&descriptor, 0);
+                match operation {
+                    IndexUpdateOperation::Divide => Fact::known(FLOAT),
+                    IndexUpdateOperation::Modulo
+                    | IndexUpdateOperation::BitwiseAnd
+                    | IndexUpdateOperation::BitwiseOr
+                    | IndexUpdateOperation::BitwiseXor
+                    | IndexUpdateOperation::ShiftLeft
+                    | IndexUpdateOperation::ShiftRight => Fact::known(left.mask & (INT | UINT)),
+                    IndexUpdateOperation::Power => {
+                        let mut result = numeric_result(left, operand);
+                        if result.mask == INT && !operand.non_negative {
+                            result = Fact::known(INT | FLOAT);
+                        }
+
+                        result
+                    }
+                    _ => numeric_result(left, operand),
+                }
+            }
+        };
+
+        self.fact_proves(updated, &descriptor, 0)
+            .then_some((container, current))
     }
 
     pub(crate) fn indexed_descriptor(

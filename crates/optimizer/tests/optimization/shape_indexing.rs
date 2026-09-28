@@ -143,6 +143,73 @@ fn writes_discard_shape_field_proofs() {
 }
 
 #[test]
+fn nested_writes_keep_only_proven_element_types() {
+    for (shape, assignment, proven) in [
+        (
+            "dict['child' => dict['n' => int]]",
+            "$row['child']['n'] += 1;",
+            true,
+        ),
+        (
+            "dict['child' => dict['n' => int]]",
+            "$row['child']['n'] = 2;",
+            true,
+        ),
+        (
+            "dict['child' => dict['n' => uint]]",
+            "$row['child']['n'] *= 2u;",
+            true,
+        ),
+        ("vec<dict<string, int>>", "$row[0]['n'] &= 3;", true),
+        (
+            "dict['child' => dict['n' => int]]",
+            "$row['child']['n'] = $value;",
+            false,
+        ),
+        (
+            "dict['child' => dict['n' => int]]",
+            "$row['child']['n'] **= -1;",
+            false,
+        ),
+        (
+            "dict['child' => dict['n' => int]]",
+            "$row['child']['n'] /= 2;",
+            false,
+        ),
+        (
+            "dict['child' => dict['n' => 1]]",
+            "$row['child']['n'] = 2;",
+            false,
+        ),
+        (
+            "dict['child' => dict['n' => 0..=10]]",
+            "$row['child']['n'] += 1;",
+            false,
+        ),
+        ("vec<dict<string, int>>", "$row[0][1] = 2;", false),
+        (
+            "dict['child' => dict[1 => int, 1u => string]]",
+            "$row['child'][1u] = 2;",
+            false,
+        ),
+    ] {
+        let source = format!(
+            "function update({shape} $row, mixed $value): {shape} {{ for ($i = 0; $i < 2; $i++) {{ {assignment} }} return $row; }}"
+        );
+
+        let unit = compile(&source, OptimizationConfiguration::default());
+        verify_unit(&unit).unwrap();
+        let code = &unit.functions[0].chunk.code;
+        assert_eq!(
+            code.iter()
+                .any(|instruction| matches!(instruction, Instruction::Return { .. })),
+            !proven,
+            "{source}: {code:#?}"
+        );
+    }
+}
+
+#[test]
 fn mutable_properties_inside_shapes_keep_argument_checks() {
     let unit = compile(
         r"

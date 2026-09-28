@@ -108,18 +108,26 @@ impl<T: Trace> ManagedRef<T> {
         }
     }
 
+    #[inline]
     pub fn make_mut(&mut self) -> &mut T
     where
         T: CowClone,
     {
         if !self.is_unique() {
-            let separated = (**self).cow_clone();
-            let fresh = Self::new_in(self.heap_ref(), separated);
-            *self = fresh;
+            self.separate();
         }
 
         // SAFETY: the single-threaded heap owns this live allocation and serializes this access.
         unsafe { &mut self.0.as_mut().payload }
+    }
+
+    #[inline(never)]
+    fn separate(&mut self)
+    where
+        T: CowClone,
+    {
+        let separated = (**self).cow_clone();
+        *self = Self::new_in(self.heap_ref(), separated);
     }
 
     pub(in crate::heap) const fn header(&self) -> &Header {

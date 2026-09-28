@@ -15,11 +15,15 @@ use crate::OptimizationConfiguration;
 use crate::OptimizationStatistics;
 use crate::analysis::Analysis;
 use crate::candidates::CandidateSet;
+use crate::cfg::branches_or_terminates;
 use crate::cfg::successors;
 use crate::liveness::LivenessQueries;
 use crate::liveness::LivenessScratch;
+use crate::liveness::effect::changes_value;
+use crate::liveness::effect::effect_on;
 use crate::liveness::register_is_dead_after;
 use crate::liveness::register_is_dead_after_removals_with_scratch;
+use crate::operands::for_each_register;
 use crate::passes::compact_removed_instructions;
 use crate::passes::dead_store::PreviousValueSafety;
 use crate::passes::dead_store::scalar_write_is_unobservable;
@@ -205,8 +209,111 @@ pub(in crate::passes) fn prepare_chunk(
     statistics: &mut OptimizationStatistics,
 ) {
     if configuration.const_fold {
+        remove_redundant_loads(chunk, statistics);
         fold_joined_string_lengths(chunk, statistics);
     }
+}
+
+fn remove_redundant_loads(chunk: &mut Chunk, statistics: &mut OptimizationStatistics) {
+    let targets = control_flow_targets(chunk);
+    let mut values = vec![None; usize::from(chunk.register_count)];
+    let mut remove = vec![false; chunk.code.len()];
+    for (index, instruction) in chunk.code.iter().copied().enumerate() {
+        if targets.contains(&index) {
+            values.fill(None);
+        }
+
+        let assigned = match instruction {
+            Instruction::LoadConstant {
+                destination,
+                constant,
+            } if matches!(
+                chunk.constants[usize::from(constant.index())],
+                Literal::Null
+                    | Literal::Bool(_)
+                    | Literal::Int(_)
+                    | Literal::Uint(_)
+                    | Literal::Float(_)
+                    | Literal::String(_)
+            ) =>
+            {
+                Some((
+                    destination,
+                    Some(Instruction::LoadConstant {
+                        destination: Register::new(0),
+                        constant,
+                    }),
+                ))
+            }
+            Instruction::LoadInteger {
+                destination,
+                kind,
+                immediate,
+            } => Some((
+                destination,
+                Some(Instruction::LoadInteger {
+                    destination: Register::new(0),
+                    kind,
+                    immediate,
+                }),
+            )),
+            Instruction::LoadNull { destination } => Some((
+                destination,
+                Some(Instruction::LoadNull {
+                    destination: Register::new(0),
+                }),
+            )),
+            Instruction::LoadTrue { destination } => Some((
+                destination,
+                Some(Instruction::LoadTrue {
+                    destination: Register::new(0),
+                }),
+            )),
+            Instruction::LoadFalse { destination } => Some((
+                destination,
+                Some(Instruction::LoadFalse {
+                    destination: Register::new(0),
+                }),
+            )),
+            Instruction::Move {
+                destination,
+                source,
+            }
+            | Instruction::MoveOwned {
+                destination,
+                source,
+            } => Some((destination, values[usize::from(source.index())])),
+            _ => None,
+        };
+
+        if let Some((destination, Some(value))) = assigned
+            && values[usize::from(destination.index())] == Some(value)
+            && !matches!(instruction, Instruction::MoveOwned { .. })
+        {
+            remove[index] = true;
+            continue;
+        }
+
+        if !for_each_register(instruction, |register| {
+            if effect_on(chunk, instruction, register).writes()
+                || changes_value(chunk, instruction, register)
+            {
+                values[usize::from(register.index())] = None;
+            }
+        }) {
+            values.fill(None);
+        }
+
+        if let Some((destination, value)) = assigned {
+            values[usize::from(destination.index())] = value;
+        }
+
+        if branches_or_terminates(instruction) {
+            values.fill(None);
+        }
+    }
+
+    compact_removed_instructions(chunk, &remove, statistics);
 }
 
 pub(in crate::passes) fn optimize_chunk(

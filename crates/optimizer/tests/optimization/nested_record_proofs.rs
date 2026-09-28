@@ -56,6 +56,30 @@ fn nested_records_and_vector_shapes_skip_repeated_argument_checks() {
 }
 
 #[test]
+fn nested_updates_keep_specialized_reads_iteration_and_arithmetic() {
+    let unit = compile(FIXTURE, OptimizationConfiguration::default());
+    verify_unit(&unit).unwrap();
+    let code = &function(&unit, "updated").chunk.code;
+    assert!(
+        code.iter()
+            .any(|instruction| matches!(instruction, Instruction::VecForeachNext { .. })),
+        "{code:#?}"
+    );
+
+    assert!(
+        !code.iter().any(|instruction| matches!(
+            instruction,
+            Instruction::IndexGet { .. }
+                | Instruction::ForeachNext { .. }
+                | Instruction::Multiply { kind: None, .. }
+                | Instruction::Add { kind: None, .. }
+                | Instruction::Return { .. }
+        )),
+        "{code:#?}"
+    );
+}
+
+#[test]
 fn numeric_index_modes_use_the_producer_even_before_unrelated_instructions() {
     let unit = compile(FIXTURE, OptimizationConfiguration::default());
     verify_unit(&unit).unwrap();

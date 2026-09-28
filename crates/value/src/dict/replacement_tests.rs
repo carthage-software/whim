@@ -81,6 +81,49 @@ fn replacements_keep_full_capacity_and_order_but_new_keys_grow() {
 }
 
 #[test]
+fn cow_copies_all_key_forms_and_vacant_slots() {
+    let heap = Heap::new();
+    let child = ByteStringObject::from_bytes(&heap, b"retained through both copies");
+    let tag = NewtypeValueId(0);
+    let keys = [
+        Key::Int(0),
+        Key::Uint(0),
+        Key::Bool(false),
+        Key::String(ByteStringObject::from_bytes(&heap, b"a heap string key")),
+        Key::ShortString(short(b"short")),
+    ];
+
+    let mut original = DictObject::new(&heap);
+    for key in &keys {
+        drop(original.make_mut().insert(
+            key.clone(),
+            Value::string(child.clone()).with_newtype(Some(tag)),
+        ));
+    }
+
+    drop(original.make_mut().remove(&Key::Bool(false)));
+    let mut copy = original.clone();
+    copy.make_mut();
+    drop(original);
+    for key in &keys {
+        if matches!(key, Key::Bool(false)) {
+            assert!(copy.get(key).is_none());
+        } else {
+            let value = copy.get(key).unwrap();
+            assert_eq!(value.newtype_id(), Some(tag));
+            assert_eq!(
+                value.as_string_bytes(),
+                Some(b"retained through both copies".as_slice())
+            );
+        }
+    }
+
+    assert!(!child.is_unique());
+    drop(copy);
+    assert!(child.is_unique());
+}
+
+#[test]
 fn full_replacements_keep_key_kinds_and_match_both_string_forms() {
     let heap = Heap::new();
     let original_keys = [

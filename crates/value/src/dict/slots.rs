@@ -6,6 +6,9 @@
     reason = "slot probes run inside dictionary hash-table lookups"
 )]
 
+use std::mem;
+use std::ptr;
+
 use whim_base::unreachable_invariant;
 
 use crate::Value;
@@ -17,10 +20,20 @@ use crate::string::ByteStringObject;
 use crate::string::short::ShortString;
 
 /// One position in the insertion-ordered entry vector.
-#[derive(Clone)]
 pub(in crate::dict) enum Slot {
     Occupied { key: Key, value: Value },
     Vacant,
+}
+
+impl Clone for Slot {
+    fn clone(&self) -> Self {
+        if let Self::Occupied { key, value } = self {
+            mem::forget((key.clone(), value.clone_inline_scalar()));
+        }
+
+        // SAFETY: the clones retained both owned fields before copying the slot.
+        unsafe { ptr::read(self) }
+    }
 }
 
 #[inline(always)]

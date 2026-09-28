@@ -4,6 +4,7 @@ use whim_bytecode::chunk::descriptors::Literal;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::instruction::Instruction;
 use whim_bytecode::instruction::operands::Count;
+use whim_bytecode::instruction::operands::JumpOffset;
 use whim_bytecode::instruction::operands::Register;
 use whim_bytecode::unit::CompiledUnit;
 use whim_bytecode::verify::verify;
@@ -12,6 +13,7 @@ use whim_value::heap::Heap;
 
 use super::optimize_chunk;
 use super::optimize_unit;
+use super::prepare_chunk;
 use crate::OptimizationConfiguration;
 use crate::OptimizationStatistics;
 use crate::analysis::Analysis;
@@ -21,6 +23,93 @@ use crate::type_flow::World;
 
 const INPUT: Register = Register::new(0);
 const CONDITION: Register = Register::new(1);
+
+#[test]
+fn repeated_path_keys_survive_mutations_but_not_register_writes_or_joins() {
+    let heap = Heap::new();
+    let mut chunk = Chunk::new();
+    chunk.register_count = 6;
+    chunk.local_register_count = 2;
+    let field = chunk
+        .add_constant(Literal::String(heap.intern(b"field")))
+        .unwrap();
+    let key = Register::new(2);
+    let copy = Register::new(3);
+    let other = Register::new(4);
+    let output = Register::new(5);
+    let load = Instruction::LoadConstant {
+        destination: key,
+        constant: field,
+    };
+
+    let repeated = Instruction::Move {
+        destination: copy,
+        source: key,
+    };
+
+    let path = Instruction::IndexSetPath {
+        index_count: Count::new(2),
+        container: INPUT,
+        first_index: key,
+        value: CONDITION,
+    };
+
+    for instruction in [
+        load,
+        repeated,
+        path,
+        load,
+        repeated,
+        path,
+        Instruction::MoveOwned {
+            destination: other,
+            source: key,
+        },
+        load,
+        Instruction::JumpIfFalse {
+            condition: CONDITION,
+            offset: JumpOffset::new(2),
+        },
+        load,
+        load,
+        Instruction::IndexGetPath {
+            index_count: Count::new(2),
+            destination: output,
+            container: INPUT,
+            first_index: key,
+        },
+        Instruction::Return { source: output },
+    ] {
+        chunk.emit(instruction, Span::zero());
+    }
+
+    let mut statistics = OptimizationStatistics::default();
+    prepare_chunk(
+        &mut chunk,
+        OptimizationConfiguration::default(),
+        &mut statistics,
+    );
+
+    verify(&chunk).unwrap();
+    assert_eq!(statistics.instructions_removed, 2);
+    assert_eq!(
+        chunk
+            .code
+            .iter()
+            .filter(|instruction| **instruction == load)
+            .count(),
+        4
+    );
+
+    assert_eq!(
+        chunk
+            .code
+            .iter()
+            .filter(|instruction| **instruction == repeated)
+            .count(),
+        1
+    );
+}
 
 #[test]
 fn constant_keys_load_into_their_consuming_window() {

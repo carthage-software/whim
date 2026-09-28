@@ -105,7 +105,9 @@ impl DropQueue {
     }
 
     pub fn release_value(&self, value: Value, mode: TeardownMode) {
-        if mode == TeardownMode::CycleMember && value.collectable_box().is_some() {
+        if !value.is_reference_counted()
+            || (mode == TeardownMode::CycleMember && value.collectable_box().is_some())
+        {
             mem::forget(value);
         } else {
             drop(value);

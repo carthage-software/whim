@@ -358,6 +358,11 @@ impl ByteStringObject {
             return cached;
         }
 
+        self.compute_hash(state)
+    }
+
+    #[inline(never)]
+    fn compute_hash(&self, state: &HashState) -> u64 {
         #[expect(
             clippy::option_if_let_else,
             reason = "the contiguous path avoids constructing rope traversal state"
@@ -375,10 +380,11 @@ impl ByteStringObject {
     #[must_use]
     #[inline]
     pub fn eq_bytes(&self, other: &Self) -> bool {
-        if ptr::eq(self, other) {
-            return true;
-        }
+        ptr::eq(self, other) || self.eq_content(other)
+    }
 
+    #[inline(never)]
+    fn eq_content(&self, other: &Self) -> bool {
         if self.len() != other.len() {
             return false;
         }

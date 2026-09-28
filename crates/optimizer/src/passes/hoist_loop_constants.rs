@@ -15,6 +15,7 @@ use crate::OptimizationConfiguration;
 use crate::cfg::is_block_boundary;
 use crate::cfg::successors;
 use crate::liveness::register_is_dead_after;
+use crate::operands::replace_read_register;
 use crate::rewrite::splice::can_insert_straight_line_before;
 use crate::rewrite::splice::insert_straight_line_before;
 
@@ -72,7 +73,8 @@ fn hoist_one_loop(chunk: &mut Chunk) -> bool {
                         )
                     },
             );
-            let Some(consumer) = replace_binary_read(chunk.code[index + 1], destination, invariant)
+
+            let Some(consumer) = replace_scalar_read(chunk.code[index + 1], destination, invariant)
             else {
                 continue;
             };
@@ -226,7 +228,7 @@ fn scalar_load(chunk: &Chunk, instruction: Instruction) -> Option<(Register, Sca
     }
 }
 
-fn replace_binary_read(
+fn replace_scalar_read(
     instruction: Instruction,
     expected: Register,
     replacement: Register,
@@ -251,6 +253,16 @@ fn replace_binary_read(
     }
 
     match instruction {
+        Instruction::IndexGet { index, .. }
+        | Instruction::VecIndexGet { index, .. }
+        | Instruction::DictIndexGetIntKey { index, .. }
+        | Instruction::DictIndexGetUintKey { index, .. }
+        | Instruction::DictIndexGetStringKey { index, .. }
+        | Instruction::StringIndexGet { index, .. }
+            if index == expected =>
+        {
+            replace_read_register(instruction, expected, replacement)
+        }
         Instruction::Concatenate {
             destination,
             left,

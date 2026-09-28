@@ -64,6 +64,30 @@ function changed_cell(dict['item' => #{ value: int }] $row): void {
     accepts_cell($row);
 }
 
+#[NeverInline]
+function updated(Order $order): int {
+    for ($i = 0; $i < 3; $i++) {
+        $order['shipping']['price'] += 5;
+        $order['lines'][0]['quantity'] = 4;
+    }
+
+    $total = $order['shipping']['price'];
+    foreach ($order['lines'] as $line) { $total += $line['quantity'] * $line['price']; }
+    return $total;
+}
+
+#[NeverInline]
+function corrupted(Order $order, mixed $value): int {
+    $order['shipping']['price'] = $value;
+    return $order['shipping']['price'];
+}
+
+#[NeverInline]
+function negative_power(dict['child' => dict['n' => int]] $row): int {
+    $row['child']['n'] **= -1;
+    return $row['child']['n'];
+}
+
 newtype Signed = int;
 newtype Unsigned = uint;
 newtype Floating = float;
@@ -74,6 +98,15 @@ $order = dict[
     'discount' => 10,
 ];
 assert!(total($order) == 360);
+assert!(updated($order) == 585);
+assert!(total($order) == 360);
+assert!(corrupted($order, 42) == 42);
+$caught = false;
+try { corrupted($order, 'wrong'); } catch (TypeError $_error) { $caught = true; }
+assert!($caught);
+$caught = false;
+try { negative_power(dict['child' => dict['n' => 2]]); } catch (TypeError $_error) { $caught = true; }
+assert!($caught);
 assert!(totals(vec[$order, $order]) == 720);
 assert!(fields(dict['a' => -3, 'b' => 4u, 'c' => 2.5]) == (-3, 4u, 2.5));
 assert!(positions(vec[-3, 4u, 2.5]) == (-3, 4u, 2.5));
