@@ -39,6 +39,61 @@ rejects(
 
 rejects(
   $work,
+  'missing-transitive-method',
+  'interface Required { public function value(): uint; }'
+  . 'interface Indirect extends Required {}'
+  . 'final class Incomplete implements Indirect {}',
+  'Incomplete declares that it implements Required, and does not provide value',
+);
+
+rejects(
+  $work,
+  'wrong-transitive-generic-method',
+  'interface Required<T> { public function value(): T; }'
+  . 'interface Indirect<T> extends Required<T> {}'
+  . 'final class Wrong implements Indirect<uint> {'
+  . 'public function value(): string { return "wrong"; }'
+  . '}',
+  'is not compatible with Required::value',
+);
+
+rejects(
+  $work,
+  'missing-transitive-property',
+  'interface Required { public readonly uint $value; }'
+  . 'interface Indirect extends Required {}'
+  . 'final class Incomplete implements Indirect {}',
+  'does not provide the readonly property $value',
+);
+
+interface RequiredValue<T> {
+  public readonly T $stored;
+
+  public function value(): T;
+}
+
+interface LeftValue<T> extends RequiredValue<T> {}
+interface RightValue<T> extends RequiredValue<T> {}
+interface DiamondValue<T> extends LeftValue<T>, RightValue<T> {}
+
+class StoredValue<T> {
+  public function __construct(public readonly T $stored) {}
+
+  public function value(): T {
+    return $this->stored;
+  }
+}
+
+final class CompleteValue extends StoredValue<uint> implements
+  DiamondValue<uint> {}
+
+$complete = new CompleteValue(42u);
+assert!($complete is RequiredValue<uint>);
+assert!($complete->value() == 42u);
+assert!($complete->stored == 42u);
+
+rejects(
+  $work,
   'invariant-readonly-property',
   'interface HasName {'
   . "\n"

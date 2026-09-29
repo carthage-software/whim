@@ -1161,24 +1161,7 @@ impl Engine {
             name: name_text,
             path,
         };
-        let inherited_contracts = !class.is_abstract
-            && class
-                .parent
-                .is_some_and(|parent| self.tables.classes[parent.0 as usize].is_abstract);
-        let interfaces: Vec<_> = if inherited_contracts {
-            class.interfaces.iter().copied().collect()
-        } else {
-            class
-                .direct_bases
-                .iter()
-                .filter(|base| {
-                    self.tables.classes[base.class.0 as usize].kind == ClassLikeKind::Interface
-                })
-                .map(|base| base.class)
-                .collect()
-        };
-
-        for interface_id in interfaces {
+        for interface_id in &class.interfaces {
             let interface = &self.tables.classes[interface_id.0 as usize];
             let requirement = InterfaceRequirements {
                 name: interface.name.to_string_lossy().into_owned(),
