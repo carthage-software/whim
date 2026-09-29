@@ -1,12 +1,20 @@
 use Whim\Autoload;
 use Whim\File;
 use Whim\Filesystem;
+use Whim\Reflection;
+use Whim\Str;
 use Whim\Symbol\SymbolKind;
 use Whim\Unwind\Error;
+use Whim\Unwind\LinkerError;
 use Whim\Unwind\TypeError;
 use Whim\Unwind\UndefinedSymbolError;
 
 final class AutoloadFallbackRecorder {
+  public vec<string> $seen = vec[];
+}
+
+final class AutoloadAttributeRecorder {
+  public static uint $instances = 0u;
   public vec<string> $seen = vec[];
 }
 
@@ -197,6 +205,111 @@ assert!($talker->name() == 'talker');
 assert!($talker->speak() == 'speaking');
 assert!($talker->greet() == 'hello from talker');
 Autoload\unregister($inheritedBasesLoader);
+
+$attributeRecorder = new AutoloadAttributeRecorder();
+$attributeLoader = new Autoload\Autoloader()->withFallback(
+  fn(SymbolKind $kind, string $name): bool {
+    if (!Str\starts_with($name, 'AutoloadTag')) {
+      return false;
+    }
+
+    assert!(SymbolKind::Class == $kind);
+    $attributeRecorder->seen[] = $name;
+    require_once!($work . '/' . $name . '.whim');
+    return true;
+  },
+);
+
+Autoload\register($attributeLoader);
+foreach (dict[
+  'file' => '#![Tag] function target(): void {}',
+  'class' => '#[Tag] class Target {}',
+  'interface' => '#[Tag] interface Target {}',
+  'property' => 'class Target { #[Tag] public int $value = 0; }',
+  'constant' => 'class Target { #[Tag] public const VALUE = 1; }',
+  'case' => 'enum Target { #[Tag] case Value; }',
+  'method' => 'class Target { #[Tag("/")] public function target(): void {} }',
+  'methodParameter' => 'class Target { public function target(#[Tag] int $value): void {} }',
+  'promotedParameter' => 'class Target { public function __construct(#[Tag] public int $value) {} }',
+  'function' => '#[Tag] function target(): void {}',
+  'parameter' => 'function target(#[Tag] int $value): void {}',
+  'closure' => '$closure = #[Tag] fn(): void {};',
+  'closureParameter' => '$closure = fn(#[Tag] int $value): void {};',
+  'alias' => '#[Tag] type Target = int;',
+  'newtype' => '#[Tag] newtype Target = int;',
+  'globalConstant' => '#[Tag] const VALUE = 1;',
+] as $target => $source) {
+  $attribute = 'AutoloadTag' . $target;
+  File\write(
+    $work . '/' . $attribute . '.whim',
+    '#[Whim\Attribute\Attribute] final class '
+    . $attribute
+    . ' { public function __construct(public string $path = "") {'
+    . ' AutoloadAttributeRecorder::$instances++; } }',
+  );
+
+  $fixture = $work . '/attribute-' . $target . '.whim';
+  File\write(
+    $fixture,
+    'namespace AutoloadTarget'
+    . $target
+    . '; use '
+    . $attribute
+    . ' as Tag;'
+    . $source,
+  );
+
+  $attributeRecorder->seen = vec[];
+  require_once!($fixture);
+  assert!(vec[$attribute] == $attributeRecorder->seen);
+  assert!(0u == AutoloadAttributeRecorder::$instances);
+}
+
+$route = Reflection\reflect_class('AutoloadTargetmethod\\Target')->getMethod(
+  'target',
+)->getAttributes()[0u];
+
+assert!(0u == AutoloadAttributeRecorder::$instances);
+assert!('/' == $route->newInstance()->path);
+assert!(1u == AutoloadAttributeRecorder::$instances);
+assert!('/' == $route->newInstance()->path);
+assert!(2u == AutoloadAttributeRecorder::$instances);
+
+File\write(
+  $work . '/attribute-local.whim',
+  '#[AutoloadTagmethod] #[AutoloadTagLocal] function local_attribute_target(): void {}'
+  . ' #[Whim\Attribute\Attribute] final class AutoloadTagLocal {}',
+);
+
+$attributeRecorder->seen = vec[];
+require_once!($work . '/attribute-local.whim');
+assert!(vec[] == $attributeRecorder->seen);
+
+File\write(
+  $work . '/AutoloadTagMethodOnly.whim',
+  '#[Whim\Attribute\Attribute(Whim\Attribute\Attribute::TARGET_METHOD)]'
+  . ' final class AutoloadTagMethodOnly {}',
+);
+
+File\write(
+  $work . '/attribute-invalid.whim',
+  '#[AutoloadTagMethodOnly] function invalid_attribute_target(): void {}',
+);
+
+$invalidAttribute = null;
+try {
+  require_once!($work . '/attribute-invalid.whim');
+} catch (LinkerError $error) {
+  $invalidAttribute = $error;
+}
+
+assert!($invalidAttribute is LinkerError);
+assert!(
+  Str\contains($invalidAttribute->getMessage(), 'does not target functions'),
+);
+
+assert!(vec['AutoloadTagMethodOnly'] == $attributeRecorder->seen);
+Autoload\unregister($attributeLoader);
 
 File\write(
   $work . '/newtype-id.whim',

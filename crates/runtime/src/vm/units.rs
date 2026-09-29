@@ -1,6 +1,7 @@
 //! Loading compiled units, `require`, and the autoload chain.
 
 use std::fs;
+use std::iter;
 use std::path::Path;
 
 use whim_bytecode::unit::CompiledUnit;
@@ -131,7 +132,7 @@ impl VirtualMachine<'_> {
             )
         };
 
-        self.autoload_unit_bases(&unit)?;
+        self.autoload_unit_dependencies(&unit)?;
         let context =
             self.engine
                 .declare_compiled(&unit, line_starts, Some(source), lazy_callables)?;
@@ -141,7 +142,7 @@ impl VirtualMachine<'_> {
         Ok(Some(context))
     }
 
-    fn autoload_unit_bases(
+    fn autoload_unit_dependencies(
         &mut self,
         unit: &Rc<CompiledUnit>,
     ) -> Result<(), VirtualMachineControl> {
@@ -149,24 +150,63 @@ impl VirtualMachine<'_> {
             return Ok(());
         }
 
-        for class in &unit.classes {
-            let parent = class
+        let bases = unit.classes.iter().flat_map(|class| {
+            class
                 .parent
                 .iter()
-                .map(|base| (SymbolKind::Class, &base.name));
-            let interfaces = class
-                .interfaces
-                .iter()
-                .map(|base| (SymbolKind::Interface, &base.name));
-            for (kind, name) in parent.chain(interfaces) {
-                if self.engine.tables.symbols.contains_key(name)
-                    || unit.classes.iter().any(|other| other.name == *name)
-                {
-                    continue;
-                }
+                .map(|base| (SymbolKind::Class, &base.name))
+                .chain(
+                    class
+                        .interfaces
+                        .iter()
+                        .map(|base| (SymbolKind::Interface, &base.name)),
+                )
+        });
 
-                self.run_autoload_chain(kind, name.clone())?;
+        let class_attributes = unit.classes.iter().flat_map(|class| {
+            iter::once(&class.attributes)
+                .chain(class.constants.iter().map(|constant| &constant.attributes))
+                .chain(class.properties.iter().map(|property| &property.attributes))
+                .chain(class.cases.iter().map(|case| &case.attributes))
+        });
+
+        let function_attributes = unit
+            .functions
+            .iter()
+            .chain(
+                unit.classes
+                    .iter()
+                    .flat_map(|class| class.methods.iter().map(|method| &method.function)),
+            )
+            .flat_map(|function| {
+                iter::once(&function.attributes).chain(
+                    function
+                        .parameters
+                        .iter()
+                        .map(|parameter| &parameter.attributes),
+                )
+            });
+
+        let attributes = unit
+            .files
+            .iter()
+            .map(|file| &file.attributes)
+            .chain(class_attributes)
+            .chain(function_attributes)
+            .chain(unit.type_aliases.iter().map(|alias| &alias.attributes))
+            .chain(unit.newtypes.iter().map(|newtype| &newtype.attributes))
+            .chain(unit.constants.iter().map(|constant| &constant.attributes))
+            .flatten()
+            .map(|attribute| (SymbolKind::Class, &attribute.class));
+
+        for (kind, name) in bases.chain(attributes) {
+            if self.engine.tables.symbols.contains_key(name)
+                || unit.classes.iter().any(|other| other.name == *name)
+            {
+                continue;
             }
+
+            self.run_autoload_chain(kind, name.clone())?;
         }
 
         Ok(())
