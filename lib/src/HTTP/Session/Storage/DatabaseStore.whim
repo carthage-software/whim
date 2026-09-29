@@ -6,6 +6,7 @@ use Whim\Database\Connection;
 use Whim\Database\Connector;
 use Whim\Database\QueryException;
 use Whim\Database\Row;
+use Whim\Database\Value;
 use Whim\HTTP\Session\ConflictException;
 use Whim\HTTP\Session\Data;
 use Whim\Json;
@@ -84,36 +85,12 @@ final readonly class DatabaseStore implements Store {
     null|CancellationToken $cancellation = null,
   ): void {
     $this->validateTtl($ttl);
-    $now = SystemTime::now();
-    $expiresAt = $now->plus($ttl);
-
+    ($query, $parameters) = $this->createQuery($identifier, $data, $ttl);
     using ($connection = $this->connector->connect($cancellation)) {
       using (
-        $result = $connection->execute(
-          'INSERT INTO whim_http_sessions ('
-          . 'identifier, data, revision, '
-          . 'expires_at_seconds, expires_at_nanoseconds'
-          . ') VALUES ($1, $2, 0, $3, $4) '
-          . 'ON CONFLICT (identifier) DO UPDATE SET '
-          . 'data = excluded.data, revision = 0, '
-          . 'expires_at_seconds = excluded.expires_at_seconds, '
-          . 'expires_at_nanoseconds = excluded.expires_at_nanoseconds '
-          . 'WHERE whim_http_sessions.expires_at_seconds < $5 OR ('
-          . 'whim_http_sessions.expires_at_seconds = $5 AND '
-          . 'whim_http_sessions.expires_at_nanoseconds <= $6'
-          . ')',
-          vec[
-            $identifier,
-            Json\encode($data),
-            $expiresAt->seconds,
-            $expiresAt->nanoseconds,
-            $now->seconds,
-            $now->nanoseconds,
-          ],
-          $cancellation,
-        ),
+        $result = $connection->execute($query, $parameters, $cancellation),
       ) {
-        if ($result->getAffectedRows() != 1u) {
+        if (1u != $result->getAffectedRows()) {
           throw new ConflictException('the session record already exists');
         }
       }
@@ -162,6 +139,60 @@ final readonly class DatabaseStore implements Store {
     }
   }
 
+  /** Atomically moves a matching record to a new identifier. */
+  #[TrackCaller]
+  public function rotate(
+    NonEmptyString $identifier,
+    uint $revision,
+    NonEmptyString $newIdentifier,
+    Data $data,
+    Duration $ttl,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $this->validateTtl($ttl);
+    if ($identifier == $newIdentifier) {
+      throw new ConflictException('the session record already exists');
+    }
+
+    ($query, $parameters) = $this->createQuery($newIdentifier, $data, $ttl);
+    using ($connection = $this->connector->connect($cancellation)) {
+      using ($transaction = $connection->begin(cancellation: $cancellation)) {
+        $now = SystemTime::now();
+        using (
+          $result = $transaction->execute(
+            'DELETE FROM whim_http_sessions '
+            . 'WHERE identifier = $1 AND revision = $2 AND ('
+            . 'expires_at_seconds > $3 OR ('
+            . 'expires_at_seconds = $3 AND expires_at_nanoseconds > $4'
+            . '))',
+            vec[
+              $identifier,
+              $revision as int,
+              $now->seconds,
+              $now->nanoseconds,
+            ],
+            $cancellation,
+          ),
+        ) {
+          if (1u != $result->getAffectedRows()) {
+            throw new ConflictException('the session record has changed');
+          }
+        }
+
+        using (
+          $result = $transaction->execute($query, $parameters, $cancellation),
+        ) {
+          if (1u != $result->getAffectedRows()) {
+            throw new ConflictException('the session record already exists');
+          }
+        }
+
+        $cancellation?->throwIfCancellationRequested();
+        $transaction->commit();
+      }
+    }
+  }
+
   /** Deletes a record when it exists. */
   #[TrackCaller]
   public function delete(
@@ -177,6 +208,38 @@ final readonly class DatabaseStore implements Store {
         ),
       ) {}
     }
+  }
+
+  #[TrackCaller]
+  private function createQuery(
+    NonEmptyString $identifier,
+    Data $data,
+    Duration $ttl,
+  ): (NonEmptyString, vec<Value>) {
+    $now = SystemTime::now();
+    $expiresAt = $now->plus($ttl);
+    return (
+      'INSERT INTO whim_http_sessions ('
+      . 'identifier, data, revision, '
+      . 'expires_at_seconds, expires_at_nanoseconds'
+      . ') VALUES ($1, $2, 0, $3, $4) '
+      . 'ON CONFLICT (identifier) DO UPDATE SET '
+      . 'data = excluded.data, revision = 0, '
+      . 'expires_at_seconds = excluded.expires_at_seconds, '
+      . 'expires_at_nanoseconds = excluded.expires_at_nanoseconds '
+      . 'WHERE whim_http_sessions.expires_at_seconds < $5 OR ('
+      . 'whim_http_sessions.expires_at_seconds = $5 AND '
+      . 'whim_http_sessions.expires_at_nanoseconds <= $6'
+      . ')',
+      vec[
+        $identifier,
+        Json\encode($data),
+        $expiresAt->seconds,
+        $expiresAt->nanoseconds,
+        $now->seconds,
+        $now->nanoseconds,
+      ],
+    );
   }
 
   /** Removes one expired record. */

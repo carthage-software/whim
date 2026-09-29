@@ -1,4 +1,6 @@
+use Whim\Async;
 use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
 use Whim\Async\SignalCancellationToken;
 use Whim\Database\SQLite\Connector as SQLiteConnector;
 use Whim\Filesystem;
@@ -65,6 +67,16 @@ function http_session_request(null|string $identifier = null): Request {
   };
 
   return Request::fromParts('GET', headers: $headers);
+}
+
+function http_session_conflict(fn(): void $operation): void {
+  try {
+    $operation();
+  } catch (ConflictException $_) {
+    return;
+  }
+
+  panic!('expected a session conflict');
 }
 
 $session = new Session(dict['nullable' => null]);
@@ -353,5 +365,145 @@ $databaseStore->create(
 assert!($databaseStore->load('expired') == null);
 $databaseStore->create('expired', dict['fresh' => true], $ttl);
 assert!($databaseStore->load('expired')?->data == dict['fresh' => true]);
+
+foreach (vec[new MemoryStore(), $databaseStore] as $rotationStore) {
+  $rotationStore->create('source', dict['account' => 42], $ttl);
+  $rotationStore->create('taken', dict['account' => 84], $ttl);
+  foreach (vec[
+    ('source', 0u, 'taken'),
+    ('source', 1u, 'fresh'),
+    ('missing', 0u, 'fresh'),
+    ('source', 0u, 'source'),
+  ] as ($source, $revision, $destination)) {
+    http_session_conflict(fn(): void {
+      $rotationStore->rotate($source, $revision, $destination, dict[], $ttl);
+    });
+
+    assert!(dict['account' => 42] == $rotationStore->load('source')?->data);
+    assert!(0u == $rotationStore->load('source')?->revision);
+    assert!(dict['account' => 84] == $rotationStore->load('taken')?->data);
+    assert!(null == $rotationStore->load('fresh'));
+  }
+
+  $rotationStore->create('expired-source', dict[], Duration::nanosecond());
+  http_session_conflict(fn(): void {
+    $rotationStore->rotate('expired-source', 0u, 'fresh', dict[], $ttl);
+  });
+
+  assert!(null == $rotationStore->load('fresh'));
+  $rotationStore->replace('source', 0u, dict['account' => 43], $ttl);
+  $rotationStore->rotate('source', 1u, 'fresh', dict['account' => 44], $ttl);
+  assert!(null == $rotationStore->load('source'));
+  assert!(dict['account' => 44] == $rotationStore->load('fresh')?->data);
+  assert!(0u == $rotationStore->load('fresh')?->revision);
+
+  $rotationStore->create('expired-target', dict[], Duration::nanosecond());
+  $rotationStore->rotate('fresh', 0u, 'expired-target', dict[], $ttl);
+  assert!(null == $rotationStore->load('fresh'));
+  assert!(dict[] == $rotationStore->load('expired-target')?->data);
+
+  $cancelled = new SignalCancellationToken();
+  $cancelled->cancel();
+  $caught = null;
+  try {
+    $rotationStore->rotate('taken', 0u, 'fresh', dict[], $ttl, $cancelled);
+  } catch (CancelledException $error) {
+    $caught = $error;
+  }
+
+  assert!($caught is CancelledException);
+  assert!(dict['account' => 84] == $rotationStore->load('taken')?->data);
+  assert!(null == $rotationStore->load('fresh'));
+
+  $rotationStore->create('contended', dict['account' => 42], $ttl);
+  $rotations = vec[];
+  foreach (vec['first', 'second'] as $destination) {
+    $rotations[] = Async\spawn::<bool>(fn(): bool {
+      try {
+        $rotationStore->rotate('contended', 0u, $destination, dict[], $ttl);
+        return true;
+      } catch (ConflictException $_) {
+        return false;
+      }
+    });
+  }
+
+  $winners = 0u;
+  foreach ($rotations as $rotation) {
+    if ($rotation->await()) {
+      $winners++;
+    }
+  }
+
+  assert!(1u == $winners);
+  assert!(null == $rotationStore->load('contended'));
+  assert!(
+    (null != $rotationStore->load('first'))
+    != (null != $rotationStore->load('second')),
+  );
+
+  $rotationMiddleware = new SessionMiddleware($rotationStore);
+  foreach (vec['delete', 'replace', 'rotate'] as $operation) {
+    $rotationStore->create('rotation', dict['account' => 42], $ttl);
+    http_session_conflict(fn(): void {
+      $rotationMiddleware->handle(
+        http_session_test_context(),
+        http_session_request('rotation'),
+        new FunctionHandler(fn(Context\Context $context): Response {
+          ($context->getSession() as Session)->regenerateIdentifier();
+          if ('delete' == $operation) {
+            $rotationStore->delete('rotation');
+          } else if ('replace' == $operation) {
+            $rotationStore->replace(
+              'rotation',
+              0u,
+              dict['account' => 84],
+              $ttl,
+            );
+          } else {
+            $rotationStore->rotate(
+              'rotation',
+              0u,
+              'winner',
+              dict['account' => 84],
+              $ttl,
+            );
+          }
+
+          return new Response(204);
+        }),
+        $cancellation,
+      );
+    });
+
+    assert!(
+      $rotationStore->load('rotation')?->data == match ($operation) {
+        'delete' | 'rotate' => null,
+        'replace' => dict['account' => 84],
+      },
+    );
+
+    $rotationStore->delete('rotation');
+  }
+
+  assert!(dict['account' => 84] == $rotationStore->load('winner')?->data);
+  foreach (vec[null, 'unknown'] as $identifier) {
+    $response = $rotationMiddleware->handle(
+      http_session_test_context(),
+      http_session_request($identifier),
+      new FunctionHandler(fn(Context\Context $context): Response {
+        $session = $context->getSession() as Session;
+        $session->set('account', 42);
+        $session->regenerateIdentifier();
+        return new Response(204);
+      }),
+      $cancellation,
+    );
+
+    $fresh = http_session_identifier($response);
+    assert!(dict['account' => 42] == $rotationStore->load($fresh)?->data);
+    assert!(0u == $rotationStore->load($fresh)?->revision);
+  }
+}
 
 Filesystem\delete_directory($directory, true);

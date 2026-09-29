@@ -72,6 +72,35 @@ final class MemoryStore implements Store {
     );
   }
 
+  /** Atomically moves a matching record to a new identifier. */
+  #[TrackCaller]
+  public function rotate(
+    NonEmptyString $identifier,
+    uint $revision,
+    NonEmptyString $newIdentifier,
+    Data $data,
+    Duration $ttl,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+    $this->validateTtl($ttl);
+    $entry = $this->getEntry($identifier);
+    if (null == $entry || $entry->record->revision != $revision) {
+      throw new ConflictException('the session record has changed');
+    }
+
+    if (null != $this->getEntry($newIdentifier)) {
+      throw new ConflictException('the session record already exists');
+    }
+
+    $this->entries[$newIdentifier] = new Entry(
+      new Record($data, 0u),
+      SystemTime::now()->plus($ttl),
+    );
+
+    remove!($this->entries, $identifier);
+  }
+
   /** Deletes a record when it exists. */
   #[TrackCaller]
   public function delete(

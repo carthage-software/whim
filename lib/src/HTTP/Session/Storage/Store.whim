@@ -36,6 +36,21 @@ interface Store {
     null|CancellationToken $cancellation = null,
   ): void;
 
+  /**
+   * Atomically moves an unexpired record to a new identifier at revision 0u.
+   *
+   * @throws \Whim\HTTP\Session\ConflictException when the old record is missing,
+   * expired, or changed, or the new identifier already holds a live record.
+   */
+  public function rotate(
+    NonEmptyString $identifier,
+    uint $revision,
+    NonEmptyString $newIdentifier,
+    Data $data,
+    Duration $ttl,
+    null|CancellationToken $cancellation = null,
+  ): void;
+
   /** Deletes a record when it exists. */
   public function delete(
     NonEmptyString $identifier,

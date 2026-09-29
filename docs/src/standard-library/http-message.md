@@ -91,6 +91,13 @@ database contracts. Store writes use a revision check; a conflict throws
 Record revisions and the revision passed to `Store::replace` use `uint`,
 starting at `0u`.
 
+`Store::rotate` takes the old identifier, expected revision, new identifier,
+data, and TTL. It replaces the old record with the new one atomically and
+starts the new record at revision `0u`. A missing, expired, or changed source,
+or a live record at the new identifier, causes `ConflictException`. A conflict
+leaves live records unchanged. The session middleware uses this operation when
+a loaded session requests a new identifier.
+
 The server session middleware loads a record, attaches the session to the
 request context, and writes or deletes it after the handler. The context gives
 the handler `getSession()`.
