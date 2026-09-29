@@ -155,6 +155,7 @@ pub(crate) mod units;
 #[cfg(test)]
 mod verification_tests;
 
+#[derive(Clone)]
 pub(crate) enum VirtualMachineControl {
     Throw(Value),
     Exit(u8),

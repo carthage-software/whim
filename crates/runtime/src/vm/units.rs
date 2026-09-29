@@ -1,7 +1,9 @@
 //! Loading compiled units, `require`, and the autoload chain.
 
+use std::cell::RefCell;
 use std::fs;
 use std::iter;
+use std::mem;
 use std::path::Path;
 
 use whim_bytecode::unit::CompiledUnit;
@@ -19,6 +21,8 @@ use whim_value::atom::Atom;
 use whim_value::object::TypeEnvironmentId;
 
 use crate::core::symbols::strip_leading_backslash;
+use crate::engine::LoadOwner;
+use crate::engine::PendingLoad;
 use crate::engine::declare::CachedUnit;
 use crate::engine::diagnostics::DiagnosticLabel;
 use crate::engine::diagnostics::DiagnosticLabels;
@@ -78,8 +82,7 @@ impl VirtualMachine<'_> {
         }
     }
 
-    /// Loads and declares a file. The loaded set prevents circular loads and
-    /// makes later `require_once!` calls return `null`.
+    /// Loads and declares a file, waiting for loads owned by another coroutine.
     pub(crate) fn load_unit(
         &mut self,
         requested: &[u8],
@@ -112,6 +115,12 @@ impl VirtualMachine<'_> {
             }
         };
 
+        if let Some(pending) = self.engine.loading_paths.get(&canonical).cloned()
+            && !self.wait_for_load(&pending)?
+        {
+            return Ok(None);
+        }
+
         if once && self.engine.loaded_paths.contains(&canonical) {
             return Ok(None);
         }
@@ -121,7 +130,6 @@ impl VirtualMachine<'_> {
             self.engine.unit_cache.insert(canonical.clone(), cached);
         }
 
-        self.engine.loaded_paths.insert(canonical.clone());
         let (unit, line_starts, source, lazy_callables) = {
             let cached = &self.engine.unit_cache[&canonical];
             (
@@ -132,10 +140,23 @@ impl VirtualMachine<'_> {
             )
         };
 
-        self.autoload_unit_dependencies(&unit)?;
-        let context =
+        let pending = self.pending_load();
+        self.engine
+            .loading_paths
+            .insert(canonical.clone(), Rc::clone(&pending));
+        let outcome = (|| {
+            self.autoload_unit_dependencies(&unit)?;
             self.engine
-                .declare_compiled(&unit, line_starts, Some(source), lazy_callables)?;
+                .declare_compiled(&unit, line_starts, Some(source), lazy_callables)
+        })();
+
+        self.engine.loading_paths.remove(&canonical);
+        if outcome.is_ok() {
+            self.engine.loaded_paths.insert(canonical);
+        }
+
+        self.finish_load(&pending, &outcome);
+        let context = outcome?;
         if self.engine.configuration.optimize && !self.frames.is_empty() {
             self.world_refinement_pending = true;
         }
@@ -331,16 +352,111 @@ impl VirtualMachine<'_> {
             return Ok(false);
         };
 
-        if !self.engine.autoload_in_flight.insert((kind, name.clone())) {
-            return Ok(false);
+        let key = (kind, name.clone());
+        if let Some(pending) = self.engine.autoload_in_flight.get(&key).cloned() {
+            return self.wait_for_load(&pending);
         }
 
+        let pending = self.pending_load();
+        self.engine
+            .autoload_in_flight
+            .insert(key.clone(), Rc::clone(&pending));
         let kind_value = Value::int(kind as i64);
         let name_value = Value::string(name.to_handle());
         let outcome = self.call_callee_reentrant(&autoloader, &[kind_value, name_value]);
-        self.engine.autoload_in_flight.remove(&(kind, name));
+        self.engine.autoload_in_flight.remove(&key);
+        self.finish_load(&pending, &outcome);
         outcome?;
         Ok(true)
+    }
+
+    fn load_owner(&self) -> LoadOwner {
+        self.engine
+            .coroutine_stack
+            .last()
+            .map(|coroutine| NonNull::from(&**coroutine))
+    }
+
+    fn pending_load(&self) -> Rc<RefCell<PendingLoad>> {
+        Rc::new(RefCell::new(PendingLoad {
+            owner: self.load_owner(),
+            waiters: Vec::new(),
+            outcome: None,
+        }))
+    }
+
+    fn wait_for_load(
+        &mut self,
+        pending: &Rc<RefCell<PendingLoad>>,
+    ) -> Result<bool, VirtualMachineControl> {
+        let owner = self.load_owner();
+        let mut dependency = Rc::clone(pending);
+        loop {
+            let next = {
+                let dependency = dependency.borrow();
+                if dependency.outcome.is_some() {
+                    break;
+                }
+
+                dependency.owner
+            };
+
+            if next == owner {
+                return Ok(false);
+            }
+
+            let Some(waiting) = self.engine.load_waits.get(&next) else {
+                break;
+            };
+
+            dependency = Rc::clone(waiting);
+        }
+
+        self.engine.load_waits.insert(owner, Rc::clone(pending));
+        let outcome = (|| loop {
+            if let Some(outcome) = pending.borrow().outcome.clone() {
+                return outcome.map(|()| true);
+            }
+
+            if let Some(task) = self.loop_current_task() {
+                pending.borrow_mut().waiters.push(task);
+                let outcome = self.loop_suspend();
+                pending
+                    .borrow_mut()
+                    .waiters
+                    .retain(|waiter| *waiter != task);
+                outcome.map_err(|error| VirtualMachineControl::Throw(error.0))?;
+            } else if !self.loop_run_once().map_err(|error| {
+                self.pending_exit.take().map_or(
+                    VirtualMachineControl::Throw(error.0),
+                    VirtualMachineControl::Exit,
+                )
+            })? {
+                return Err(self.throw_well_known(
+                    self.engine.tables.well_known.coroutine_error,
+                    "the event loop drained without completing the pending load".to_string(),
+                ));
+            }
+        })();
+
+        self.engine.load_waits.remove(&owner);
+        outcome
+    }
+
+    fn finish_load<T>(
+        &mut self,
+        pending: &Rc<RefCell<PendingLoad>>,
+        outcome: &Result<T, VirtualMachineControl>,
+    ) {
+        let waiters = {
+            let mut pending = pending.borrow_mut();
+            pending.outcome = Some(outcome.as_ref().map(|_| ()).map_err(Clone::clone));
+            mem::take(&mut pending.waiters)
+        };
+
+        for waiter in waiters {
+            self.loop_resume(waiter, Value::null());
+        }
     }
 }
 

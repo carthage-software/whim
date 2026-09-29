@@ -234,6 +234,11 @@ try {
 
 assert!($assertion_error_12 is LinkerError);
 
+File\write($work . '/missing-parent.whim', 'class Missing {}');
+require_once!($work . '/missing-parent.whim');
+require_once!($unlinkableUnit);
+assert!(new Orphan() is Missing);
+
 $binary = Env\current_binary();
 assert!($binary is string);
 File\write(

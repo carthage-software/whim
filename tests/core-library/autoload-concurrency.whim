@@ -1,0 +1,229 @@
+use Whim\Async;
+use Whim\Async\Deferred;
+use Whim\Autoload;
+use Whim\File;
+use Whim\Filesystem;
+use Whim\Reference\Strong;
+use Whim\Symbol;
+use Whim\Symbol\SymbolKind;
+use Whim\Unwind\CoroutineError;
+use Whim\Unwind\LinkerError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\_Private;
+
+$work = Filesystem\create_temporary_directory(null, 'whim-autoload-');
+
+foreach (vec['success', 'failure', 'cancel'] as $mode) {
+  $baseName = 'Concurrent' . $mode . 'Base';
+  $childName = 'Concurrent' . $mode . 'Child';
+  $siblingName = 'Concurrent' . $mode . 'Sibling';
+  $files = dict[
+    $baseName => $work . '/' . $baseName . '.whim',
+    $childName => $work . '/' . $childName . '.whim',
+    $siblingName => $work . '/' . $childName . '.whim',
+  ];
+
+  File\write($files[$baseName], 'class ' . $baseName . ' {}');
+  File\write(
+    $files[$childName],
+    'class '
+    . $childName
+    . ' extends '
+    . $baseName
+    . ' {}'
+    . ' class '
+    . $siblingName
+    . ' extends '
+    . $baseName
+    . ' {}',
+  );
+
+  $started = new Deferred::<null>();
+  $finish = new Deferred::<null>();
+  $attempts = new Strong::<uint>(0u);
+  $failure = new RuntimeException('autoload failed');
+  $loader = new Autoload\Autoloader()->withFallback(
+    fn(SymbolKind $kind, string $name): bool {
+      if (SymbolKind::Class != $kind || !contains_key!($files, $name)) {
+        return false;
+      }
+
+      if ($name == $baseName) {
+        $attempts->value++;
+        if (1u == $attempts->value) {
+          $started->complete(null);
+          $finish->getFuture()->await();
+          if ('failure' == $mode) {
+            throw $failure;
+          }
+        }
+      }
+
+      require_once!($files[$name]);
+      return true;
+    },
+  );
+
+  Autoload\register($loader);
+  $parent = new Deferred::<bool>();
+  $owner = _Private\defer_task(fn(): void {
+    try {
+      $loaded = Autoload\load_symbol(SymbolKind::Class, $baseName);
+      if ('success' == $mode) {
+        assert!(Autoload\load_symbol(SymbolKind::Class, $childName));
+      }
+
+      $parent->complete($loaded);
+    } catch (Throwable $error) {
+      $parent->error($error);
+    }
+  });
+
+  $started->getFuture()->await();
+  $child = Async\spawn::<bool>(
+    fn(): bool => Autoload\load_symbol(SymbolKind::Class, $childName),
+  );
+
+  $childWaiter = Async\spawn::<bool>(
+    fn(): bool => Autoload\load_symbol(SymbolKind::Class, $childName),
+  );
+
+  $baseWaiter = Async\spawn::<bool>(
+    fn(): bool => Autoload\load_symbol(SymbolKind::Class, $baseName),
+  );
+
+  $sibling = Async\spawn::<bool>(
+    fn(): bool => Autoload\load_symbol(SymbolKind::Class, $siblingName),
+  );
+
+  $cancelled = new Deferred::<null>();
+  $waiter = _Private\defer_task(fn(): void {
+    try {
+      Autoload\load_symbol(SymbolKind::Class, $baseName);
+      panic!('the waiter should be cancelled');
+    } catch (CoroutineError $_) {
+      $cancelled->complete(null);
+    }
+  });
+
+  Async\later();
+  _Private\cancel_task($waiter);
+  $cancelled->getFuture()->await();
+  if ('cancel' == $mode) {
+    _Private\cancel_task($owner);
+  } else {
+    $finish->complete(null);
+  }
+
+  $mainError = null;
+  try {
+    assert!(Autoload\load_symbol(SymbolKind::Class, $childName));
+  } catch (Throwable $error) {
+    $mainError = $error;
+  }
+
+  foreach (vec[
+    $parent->getFuture(),
+    $child,
+    $childWaiter,
+    $baseWaiter,
+    $sibling,
+  ] as $future) {
+    $caught = null;
+    try {
+      assert!($future->await());
+    } catch (Throwable $error) {
+      $caught = $error;
+    }
+
+    match ($mode) {
+      'success' => assert!(null == $caught && null == $mainError),
+      'failure' => assert!($failure == $caught && $failure == $mainError),
+      'cancel' => assert!($caught is CoroutineError && $mainError == $caught),
+    };
+  }
+
+  assert!(1u == $attempts->value);
+  assert!(Symbol\exists($childName, false) == ('success' == $mode));
+  assert!(Autoload\load_symbol(SymbolKind::Class, $childName));
+  assert!(Symbol\exists($baseName, false));
+  assert!(Symbol\exists($siblingName, false));
+  assert!(
+    $attempts->value == match ($mode) {
+      'success' => 1u,
+      _ => 2u,
+    },
+  );
+
+  Autoload\unregister($loader);
+}
+
+File\write($work . '/MainOwned.whim', 'class MainOwned {}');
+$attempts = new Strong::<uint>(0u);
+$mainLoader = new Autoload\Autoloader()->withFallback(
+  fn(SymbolKind $kind, string $name): bool {
+    if (SymbolKind::Class != $kind || 'MainOwned' != $name) {
+      return false;
+    }
+
+    $attempts->value++;
+    Async\later();
+    require_once!($work . '/MainOwned.whim');
+    return true;
+  },
+);
+
+Autoload\register($mainLoader);
+$task = Async\spawn::<bool>(
+  fn(): bool => Autoload\load_symbol(SymbolKind::Class, 'MainOwned'),
+);
+
+assert!(Autoload\load_symbol(SymbolKind::Class, 'MainOwned'));
+assert!($task->await());
+assert!(1u == $attempts->value);
+Autoload\unregister($mainLoader);
+
+File\write($work . '/CycleA.whim', 'class CycleA extends CycleB {}');
+File\write($work . '/CycleB.whim', 'class CycleB extends CycleA {}');
+$cycles = new Autoload\Autoloader()->withFallback(
+  fn(SymbolKind $kind, string $name): bool {
+    if (SymbolKind::Class != $kind || !($name is 'CycleA'|'CycleB')) {
+      return false;
+    }
+
+    Async\later();
+    require_once!($work . '/' . $name . '.whim');
+    return true;
+  },
+);
+
+Autoload\register($cycles);
+foreach (vec[false, true] as $concurrent) {
+  $tasks = vec[];
+  if ($concurrent) {
+    foreach (vec['CycleA', 'CycleB'] as $name) {
+      $tasks[] = Async\spawn::<bool>(
+        fn(): bool => Autoload\load_symbol(SymbolKind::Class, $name),
+      );
+    }
+  } else {
+    $tasks[] = Async\spawn::<bool>(
+      fn(): bool => Autoload\load_symbol(SymbolKind::Class, 'CycleA'),
+    );
+  }
+
+  foreach ($tasks as $task) {
+    $caught = null;
+    try {
+      $task->await();
+    } catch (LinkerError $error) {
+      $caught = $error;
+    }
+
+    assert!($caught is LinkerError);
+  }
+}
+
+Autoload\unregister($cycles);
+Filesystem\delete_directory($work, true);

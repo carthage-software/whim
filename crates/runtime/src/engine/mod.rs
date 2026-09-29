@@ -6,6 +6,7 @@
     reason = "engine state is shared across sibling runtime modules"
 )]
 
+use std::cell::RefCell;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Write as _;
@@ -203,8 +204,10 @@ pub struct Engine {
     pub(crate) declaration_depth: usize,
     pub(crate) unit_cache: HashMap<PathBuf, CachedUnit>,
     pub(crate) loaded_paths: HashSet<PathBuf>,
+    pub(crate) loading_paths: HashMap<PathBuf, Rc<RefCell<PendingLoad>>>,
     pub(crate) autoloader: Option<Value>,
-    pub(crate) autoload_in_flight: HashSet<(SymbolKind, Atom)>,
+    pub(crate) autoload_in_flight: HashMap<(SymbolKind, Atom), Rc<RefCell<PendingLoad>>>,
+    pub(crate) load_waits: HashMap<LoadOwner, Rc<RefCell<PendingLoad>>>,
     pub(crate) coroutine_stack: Vec<Rc<CoroutineObject>>,
     pub(crate) coroutine_stack_pool: Vec<Stack>,
     pub(crate) scheduler: Option<Scheduler<Rc<CoroutineObject>, Value>>,
@@ -216,6 +219,14 @@ pub struct Engine {
     pub(crate) script: Option<Vec<u8>>,
     pub(crate) output_failure: Option<io::Error>,
     pub(crate) heap: Rc<Heap>,
+}
+
+pub(crate) type LoadOwner = Option<NonNull<CoroutineObject>>;
+
+pub(crate) struct PendingLoad {
+    pub(crate) owner: LoadOwner,
+    pub(crate) waiters: Vec<TaskId>,
+    pub(crate) outcome: Option<Result<(), VirtualMachineControl>>,
 }
 
 #[derive(Clone, Copy)]
@@ -299,8 +310,10 @@ impl Engine {
             declaration_depth: 0,
             unit_cache: HashMap::new(),
             loaded_paths: HashSet::new(),
+            loading_paths: HashMap::new(),
             autoloader: None,
-            autoload_in_flight: HashSet::new(),
+            autoload_in_flight: HashMap::new(),
+            load_waits: HashMap::new(),
             coroutine_stack: Vec::new(),
             coroutine_stack_pool: Vec::new(),
             scheduler: None,
