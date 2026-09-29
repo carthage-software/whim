@@ -24,6 +24,9 @@ interface Context {
   /** Attaches a session to this request. */
   public function setSession(Session $session): void;
 
-  /** Registers work to run after the response has been sent. */
+  /**
+   * Registers work to run when response processing ends, even on failure.
+   * For an upgraded connection, work runs when the upgrade handler ends.
+   */
   public function onResponseComplete(fn(): void $callback): void;
 }

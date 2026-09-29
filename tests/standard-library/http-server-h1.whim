@@ -6,12 +6,14 @@ use Whim\HTTP\Message\Response;
 use Whim\HTTP\Server\Configuration;
 use Whim\HTTP\Server\Context\Context;
 use Whim\HTTP\Server\Context\Informational;
+use Whim\HTTP\Server\Context\Upgrade;
 use Whim\HTTP\Server\Handler\FunctionHandler;
 use Whim\HTTP\Server\Handler\Handler;
 use Whim\HTTP\Server\_Private\H1Driver;
 use Whim\IP\Address;
 use Whim\IO\MemoryHandle;
 use Whim\IO\ReadHandle;
+use Whim\IO\WriteHandle;
 use Whim\Network\InternetEndpoint;
 use Whim\Network\ShutdownDirection;
 use Whim\Network\Stream;
@@ -35,11 +37,13 @@ final class HTTPServerH1ParityStream implements Stream<InternetEndpoint> {
   private int $offset = 0;
   private bool $closed = false;
   public string $written = '';
+  public uint $writes = 0u;
 
   public function __construct(
     private string $incoming,
     private InternetEndpoint $localEndpoint,
     private InternetEndpoint $peerEndpoint,
+    private null|uint $failWrite = null,
   ) {}
 
   public function getLocalEndpoint(): InternetEndpoint {
@@ -86,6 +90,11 @@ final class HTTPServerH1ParityStream implements Stream<InternetEndpoint> {
   }
 
   public function tryWrite(string $bytes): uint {
+    $this->writes++;
+    if ($this->writes == $this->failWrite) {
+      throw new RuntimeException('response write failed');
+    }
+
     $this->written .= $bytes;
     return length!($bytes);
   }
@@ -114,6 +123,7 @@ final class HTTPServerH1ParityState {
   public null|Request $request = null;
   public null|string $trailer = null;
   public int $completed = 0;
+  public int $upgraded = 0;
 }
 
 final class HTTPServerH1FailingBody implements ReadHandle {
@@ -423,6 +433,14 @@ $drained = http_server_h1_serve(
       Request $request,
       CancellationToken $cancellation,
     ): Response {
+      assert!(
+        $drainedState->completed == (length!($drainedState->targets) as int),
+      );
+
+      $context->onResponseComplete(fn(): void {
+        $drainedState->completed++;
+      });
+
       $drainedState->targets[] = $request->requestTarget;
       return new Response(
         200,
@@ -434,28 +452,125 @@ $drained = http_server_h1_serve(
 );
 
 assert!($drainedState->targets == vec['/first', '/second']);
+assert!(2 == $drainedState->completed);
 assert!(Str\search($drained->written, 'HTTP/1.0 200 OK') != null);
 
-$completedState = new HTTPServerH1ParityState();
-$completed = http_server_h1_serve(
-  "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
-  new FunctionHandler(
+foreach (dict[
+  'response' => (null, 204),
+  'handler-failure' => (null, 500),
+  'head-write-failure' => (1u, 0),
+  'body-write-failure' => (2u, 200),
+  'forced-cancellation' => (null, 0),
+  'upgrade' => (null, 101),
+  'upgrade-write-failure' => (1u, 0),
+  'upgrade-handler-failure' => (null, 101),
+] as $case => ($failWrite, $status)) {
+  $completedState = new HTTPServerH1ParityState();
+  $forced = new SignalCancellationToken();
+  $stream = new HTTPServerH1ParityStream(
+    "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: Upgrade\r\nUpgrade: test\r\n\r\n",
+    new InternetEndpoint(Address::v4('127.0.0.1'), 8080u),
+    new InternetEndpoint(Address::v4('127.0.0.2'), 60_000u),
+    $failWrite,
+  );
+
+  $handler = new FunctionHandler(
     fn(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
     ): Response {
+      $completedState->calls++;
       $context->onResponseComplete(fn(): void {
         $completedState->completed++;
       });
 
+      if ('forced-cancellation' == $case) {
+        $forced->cancel();
+        $cancellation->throwIfCancellationRequested();
+      }
+
+      if ('handler-failure' == $case) {
+        throw new RuntimeException('handler failed');
+      }
+
+      if (Str\starts_with($case, 'upgrade')) {
+        assert!($context is Upgrade);
+        $context->upgrade(
+          fn(
+            Stream<_> $connection,
+            ReadHandle $read,
+            WriteHandle $write,
+            CancellationToken $token,
+          ): void {
+            $completedState->upgraded++;
+            assert!(0 == $completedState->completed);
+            if ('upgrade-handler-failure' == $case) {
+              throw new RuntimeException('upgrade failed');
+            }
+
+            $write->writeAll('upgraded', $token);
+            assert!(0 == $completedState->completed);
+          },
+        );
+
+        return new Response(
+          101,
+          headers: FieldMap::from(vec[
+            ('Connection', 'Upgrade'),
+            ('Upgrade', 'test'),
+          ]),
+        );
+      }
+
+      if ('body-write-failure' == $case) {
+        return new Response(200, body: new MemoryHandle('body'));
+      }
+
       return new Response(204);
     },
-  ),
-);
+  );
 
-assert!(http_server_h1_status($completed->written, 204));
-assert!($completedState->completed == 1);
+  $upgradeFailed = false;
+  try {
+    new H1Driver()->serve(
+      $stream,
+      false,
+      $handler,
+      new Configuration(keepAlive: false),
+      new SignalCancellationToken(),
+      $forced,
+    );
+  } catch (RuntimeException $error) {
+    assert!('upgrade failed' == $error->getMessage());
+    $upgradeFailed = true;
+  }
+
+  assert!(1 == $completedState->calls, $case);
+  assert!(1 == $completedState->completed, $case);
+  assert!($upgradeFailed == ('upgrade-handler-failure' == $case), $case);
+  assert!(
+    $completedState->upgraded == match ($case) {
+      'upgrade' | 'upgrade-handler-failure' => 1,
+      _ => 0,
+    },
+    $case,
+  );
+
+  if (null != $failWrite) {
+    assert!($stream->writes == $failWrite, $case);
+  }
+
+  if (0 == $status) {
+    assert!('' == $stream->written, $case);
+  } else {
+    assert!(http_server_h1_status($stream->written, $status), $case);
+  }
+
+  if ('upgrade' == $case) {
+    assert!('upgraded' == http_server_h1_body($stream->written));
+  }
+}
 
 $shortBody = http_server_h1_serve(
   "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
@@ -476,6 +591,7 @@ $shortBody = http_server_h1_serve(
 
 assert!(http_server_h1_body($shortBody->written) == 'abc');
 
+$failingState = new HTTPServerH1ParityState();
 $failingBody = http_server_h1_serve(
   "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n",
   new FunctionHandler(
@@ -483,12 +599,19 @@ $failingBody = http_server_h1_serve(
       Context $context,
       Request $request,
       CancellationToken $cancellation,
-    ): Response => new Response(200, body: new HTTPServerH1FailingBody()),
+    ): Response {
+      $context->onResponseComplete(fn(): void {
+        $failingState->completed++;
+      });
+
+      return new Response(200, body: new HTTPServerH1FailingBody());
+    },
   ),
 );
 
 assert!(http_server_h1_status($failingBody->written, 200));
 assert!(Str\search($failingBody->written, 'partial') != null);
+assert!(1 == $failingState->completed);
 
 foreach (vec[
   'transfer-encoding',

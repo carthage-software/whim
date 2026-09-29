@@ -31,6 +31,7 @@ use Whim\_Private\http1_serialize_response_head;
 type PendingUpgrade = (
   fn(Stream<_>, ReadHandle, WriteHandle, CancellationToken): void,
   Reader,
+  H1Context,
 );
 
 /** Serves HTTP/1 requests over one byte stream. */
@@ -89,8 +90,12 @@ final class H1Driver implements StreamDriver {
       return;
     }
 
-    ($callback, $reader) = $upgrade;
-    $callback($stream, $reader, $stream, $forced);
+    ($callback, $reader, $context) = $upgrade;
+    try {
+      $callback($stream, $reader, $stream, $forced);
+    } finally {
+      $context->completeResponse();
+    }
   }
 
   #[TrackCaller]
@@ -295,69 +300,80 @@ final class H1Driver implements StreamDriver {
           && !$head->connectionKeepAlive
         );
 
+      $upgraded = false;
       try {
-        $response = $handler->handle($context, $request, $handlerCancellation);
-      } catch (CancelledException $error) {
-        if ($forced->isCancellationRequested()) {
-          return null;
-        }
-
-        $response = $configuration->errorResponder->respond(504, $error);
-        $shouldClose = true;
-      } catch (Throwable $error) {
-        $status = 500;
-        if ($error is HTTPException) {
-          $status = $error->status;
-        }
-
-        $response = $configuration->errorResponder->respond($status, $error);
-        $shouldClose = true;
-      }
-
-      if (null != $body) {
         try {
-          $body->readAll();
+          $response = $handler->handle(
+            $context,
+            $request,
+            $handlerCancellation,
+          );
+        } catch (CancelledException $error) {
+          if ($forced->isCancellationRequested()) {
+            return null;
+          }
+
+          $response = $configuration->errorResponder->respond(504, $error);
+          $shouldClose = true;
         } catch (Throwable $error) {
-          $response = $configuration->errorResponder->respond(400, $error);
+          $status = 500;
+          if ($error is HTTPException) {
+            $status = $error->status;
+          }
+
+          $response = $configuration->errorResponder->respond($status, $error);
           $shouldClose = true;
         }
-      }
 
-      $upgrade = $context->takeUpgrade();
-      if (
-        $response->status is 100..=199
-        && !(101 == $response->status && null != $upgrade)
-      ) {
-        $response = $configuration->errorResponder->respond(500, null);
-        $shouldClose = true;
-      }
+        if (null != $body) {
+          try {
+            $body->readAll();
+          } catch (Throwable $error) {
+            $response = $configuration->errorResponder->respond(400, $error);
+            $shouldClose = true;
+          }
+        }
 
-      $writeCancellation = h1_cancellation(
-        $forced,
-        $configuration->responseWriteTimeout,
-      );
+        $upgrade = $context->takeUpgrade();
+        if (
+          $response->status is 100..=199
+          && !(101 == $response->status && null != $upgrade)
+        ) {
+          $response = $configuration->errorResponder->respond(500, null);
+          $shouldClose = true;
+        }
 
-      if (101 == $response->status && null != $upgrade) {
-        $this->writeUpgrade($stream, $response, $writeCancellation);
-        return ($upgrade, $reader);
-      }
+        $writeCancellation = h1_cancellation(
+          $forced,
+          $configuration->responseWriteTimeout,
+        );
 
-      if ($draining->isCancellationRequested()) {
-        $shouldClose = true;
-      }
+        if (101 == $response->status && null != $upgrade) {
+          $this->writeUpgrade($stream, $response, $writeCancellation);
+          $upgraded = true;
+          return ($upgrade, $reader, $context);
+        }
 
-      $complete = $this->writeResponse(
-        $stream,
-        $head->method,
-        $head->protocolVersion,
-        $response,
-        $shouldClose,
-        $writeCancellation,
-      );
+        if ($draining->isCancellationRequested()) {
+          $shouldClose = true;
+        }
 
-      $context->completeResponse();
-      if ($shouldClose || !$complete) {
-        return null;
+        $complete = $this->writeResponse(
+          $stream,
+          $head->method,
+          $head->protocolVersion,
+          $response,
+          $shouldClose,
+          $writeCancellation,
+        );
+
+        if ($shouldClose || !$complete) {
+          return null;
+        }
+      } finally {
+        if (!$upgraded) {
+          $context->completeResponse();
+        }
       }
     }
 
