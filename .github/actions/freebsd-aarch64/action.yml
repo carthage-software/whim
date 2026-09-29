@@ -1,4 +1,5 @@
 name: FreeBSD aarch64
+description: Build Whim for FreeBSD aarch64 on Linux
 
 runs:
   using: composite
@@ -15,6 +16,7 @@ runs:
     - uses: Swatinem/rust-cache@v2
       with:
         key: freebsd-aarch64
+        save-if: ${{ github.ref == 'refs/heads/main' }}
     - uses: vmactions/freebsd-vm@v1
       with:
         release: '14.4'
@@ -28,16 +30,14 @@ runs:
           set -eu
           mkdir -p /usr/local/etc/pkg/repos
           echo 'FreeBSD: { url: "pkg+https://pkg.FreeBSD.org/${ABI}/latest" }' > /usr/local/etc/pkg/repos/FreeBSD.conf
-          pkg install -y ca_root_nss curl git postgresql18-client rsync
-    - name: Copy sources and FreeBSD libpq
+          pkg install -y postgresql18-client
+    - name: Copy FreeBSD libpq
       shell: bash
       run: |
-        ssh freebsd "mkdir -p '$GITHUB_WORKSPACE'"
-        rsync -a --rsync-path=/usr/local/bin/rsync --exclude=/target/ --exclude=/.git/ "$GITHUB_WORKSPACE/" "freebsd:$GITHUB_WORKSPACE/"
         mkdir -p target/freebsd-libs
         scp freebsd:/usr/local/lib/libpq.so.5 target/freebsd-libs/libpq.so
     - name: Build Whim
       shell: bash
       env:
         PQ_LIB_DIR_AARCH64_UNKNOWN_FREEBSD: ${{ github.workspace }}/target/freebsd-libs
-      run: cargo zigbuild --locked --release --target aarch64-unknown-freebsd --bin whim
+      run: cargo zigbuild --locked --release --target aarch64-unknown-freebsd --bin whim --timings

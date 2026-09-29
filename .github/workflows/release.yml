@@ -6,6 +6,8 @@ on:
       - "[0-9]*.[0-9]*.[0-9]*"
       - "v[0-9]*.[0-9]*.[0-9]*"
   workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1,4'
 
 concurrency:
   group: release-${{ github.ref }}
@@ -47,13 +49,12 @@ jobs:
         with:
           key: release-verify
           cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo test --locked --workspace --all-features
-      - run: cargo build --locked --release --bin whim
-      - run: target/release/whim tests/run.whim '' 2
 
   build:
     name: ${{ matrix.target }}
-    needs: [metadata, verify]
+    needs: metadata
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -118,13 +119,14 @@ jobs:
         with:
           key: release-${{ matrix.target }}
           cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - if: matrix.builder == 'cross'
         uses: taiki-e/install-action@v2
         with:
           tool: cross@0.2.5
       - name: Build
         if: ${{ !startsWith(matrix.builder, 'freebsd') }}
-        run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim
+        run: ${{ matrix.builder }} build --locked --release --target ${{ matrix.target }} --bin whim --timings
       - if: matrix.builder == 'freebsd-aarch64'
         uses: ./.github/actions/freebsd-aarch64
       - name: Build FreeBSD
@@ -133,8 +135,8 @@ jobs:
         with:
           release: '14.4'
           arch: ${{ matrix.arch }}
-          mem: 5120
-          cpu: 2
+          mem: 8192
+          cpu: 4
           cache-after-prepare: true
           prepare: |
             set -eu
@@ -143,13 +145,17 @@ jobs:
             pkg install -y ca_root_nss cmake curl git pkgconf postgresql18-client rust
           run: |
             set -eu
-            export CARGO_BUILD_JOBS=2
-            cargo build --locked --release --target ${{ matrix.target }} --bin whim
+            export CARGO_BUILD_JOBS=4
+            cargo build --locked --release --target ${{ matrix.target }} --bin whim --timings
+      - name: Test Linux build
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: target/${{ matrix.target }}/release/whim tests/run.whim '' 2
       - name: Test Windows build
         if: runner.os == 'Windows'
         run: target/${{ matrix.target }}/release/whim.exe tests/run.whim '' 2
       - id: package
         name: Package
+        if: github.event_name != 'schedule'
         shell: bash
         run: |
           set -euo pipefail
@@ -174,19 +180,28 @@ jobs:
           fi
           echo "archive=dist/${archive}" >> "$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@v4
+        if: github.event_name != 'schedule'
         with:
           subject-path: ${{ steps.package.outputs.archive }}
       - uses: actions/upload-artifact@v7
+        if: github.event_name != 'schedule'
         with:
           name: whim-${{ matrix.target }}
           path: |
             ${{ steps.package.outputs.archive }}
             ${{ steps.package.outputs.archive }}.sha256
           if-no-files-found: error
+      - name: Upload build timings
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-timings-${{ matrix.target }}
+          path: target/cargo-timings/
+          if-no-files-found: ignore
 
   publish:
     if: github.ref_type == 'tag'
-    needs: [metadata, build]
+    needs: [metadata, verify, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -220,7 +235,7 @@ jobs:
 
   container:
     if: github.ref_type == 'tag'
-    needs: [metadata, build]
+    needs: [metadata, verify, build]
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -282,6 +297,8 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/carthage-software/whim:latest
+          cache-to: type=inline
       - name: Verify images
         shell: bash
         run: |
