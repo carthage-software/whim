@@ -573,6 +573,79 @@ try {
 
 assert!($assertion_error_37 is RuntimeException);
 
+final class BatchResource {
+  public static vec<string> $events = vec[];
+
+  public function __construct(
+    private string $name,
+    private null|RuntimeException $failure,
+    private null|BatchResource $child = null,
+  ) {}
+
+  public function __destruct(): void {
+    self::$events[] = $this->name;
+    if (null != $this->failure) {
+      throw $this->failure;
+    }
+  }
+}
+
+function make_cleanup_batch(
+  RuntimeException $first,
+  RuntimeException $second,
+): vec<BatchResource> {
+  return vec[
+    new BatchResource('first', $first),
+    new BatchResource('second', $second, new BatchResource('child', null)),
+  ];
+}
+
+function release_cleanup_batch(
+  null|RuntimeException $primary,
+  RuntimeException $first,
+  RuntimeException $second,
+): void {
+  $owner = make_cleanup_batch($first, $second);
+  try {
+    if (null != $primary) {
+      throw $primary;
+    }
+
+    $owner = null;
+  } catch (RuntimeException $error) {
+    try {
+      $owner = null;
+    } catch (RuntimeException $cleanup) {
+      assert!($cleanup == $first);
+      BatchResource::$events[] = 'cleanup caught';
+    }
+
+    BatchResource::$events[] = 'caught';
+    throw $error;
+  }
+}
+
+foreach (vec[null, new RuntimeException('primary')] as $primary) {
+  $first = new RuntimeException('first cleanup');
+  $second = new RuntimeException('second cleanup');
+  BatchResource::$events = vec[];
+  $caught = null;
+  try {
+    release_cleanup_batch($primary, $first, $second);
+  } catch (RuntimeException $error) {
+    $caught = $error;
+  }
+
+  assert!($caught == ($primary ?? $first));
+  $expected = vec['first', 'second', 'child'];
+  if (null != $primary) {
+    $expected[] = 'cleanup caught';
+  }
+
+  $expected[] = 'caught';
+  assert!(BatchResource::$events == $expected);
+}
+
 $work = Filesystem\create_temporary_directory(null, 'whim-test-');
 $binary = Env\current_binary();
 assert!($binary is string);

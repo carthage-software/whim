@@ -28,6 +28,8 @@ final class WebSocketServerTestStream implements Stream<InternetEndpoint> {
   private int $offset = 0;
   private bool $closed = false;
   public string $written = '';
+  public null|RuntimeException $closeFailure = null;
+  public uint $closeAttempts = 0u;
 
   public function __construct(private string $incoming) {}
 
@@ -75,6 +77,13 @@ final class WebSocketServerTestStream implements Stream<InternetEndpoint> {
   }
 
   public function tryWrite(string $bytes): uint {
+    if (Str\starts_with($bytes, "\x88")) {
+      $this->closeAttempts++;
+      if (null != $this->closeFailure) {
+        throw $this->closeFailure;
+      }
+    }
+
     $this->written .= $bytes;
     return length!($bytes);
   }
@@ -269,6 +278,31 @@ try {
 }
 
 assert!($assertion_error_1 is RuntimeException);
+
+foreach (vec[null, new RuntimeException('handler failed')] as $primary) {
+  $stream = new WebSocketServerTestStream(websocket_server_request());
+  $stream->closeFailure = new RuntimeException('close failed');
+  $observed = null;
+  try {
+    new H1Driver()->serve(
+      $stream,
+      false,
+      new Handler(new FunctionConnectionHandler(fn(Connection $_): void {
+        if (null != $primary) {
+          throw $primary;
+        }
+      })),
+      new HTTPConfiguration(),
+      new SignalCancellationToken(),
+      new SignalCancellationToken(),
+    );
+  } catch (RuntimeException $error) {
+    $observed = $error;
+  }
+
+  assert!($observed == ($primary ?? $stream->closeFailure));
+  assert!($stream->closeAttempts == 1u);
+}
 
 ($connectionStream, $peerStream) = Unix\pair();
 $connection = new ConnectionImpl(

@@ -129,6 +129,7 @@ impl VirtualMachine<'_> {
 
         self.draining_finalizers = true;
         let mut deferred = false;
+        let mut failure = None;
 
         loop {
             let pending = self.heap.take_pending_finalizers();
@@ -153,23 +154,23 @@ impl VirtualMachine<'_> {
                 let outcome = self.invoke_destructor(&object);
                 drop(object);
                 if let Err(control) = outcome {
-                    self.draining_finalizers = false;
                     match control {
                         VirtualMachineControl::Exit(code) => {
+                            self.draining_finalizers = false;
                             self.heap.abandon_finalizers();
                             drop(pending);
                             drop(self.heap.take_pending_finalizers());
                             return Err(VirtualMachineControl::Exit(code));
                         }
                         VirtualMachineControl::Throw(value) if terminating => {
+                            self.draining_finalizers = false;
                             self.heap.abandon_finalizers();
                             drop(pending);
                             drop(self.heap.take_pending_finalizers());
                             return Err(VirtualMachineControl::Throw(value));
                         }
                         VirtualMachineControl::Throw(value) => {
-                            self.heap.return_pending_finalizers(pending);
-                            return Err(VirtualMachineControl::Throw(value));
+                            failure.get_or_insert(value);
                         }
                     }
                 }
@@ -188,7 +189,7 @@ impl VirtualMachine<'_> {
         }
 
         self.draining_finalizers = false;
-        Ok(())
+        failure.map_or(Ok(()), |value| Err(VirtualMachineControl::Throw(value)))
     }
 
     /// Releases the stack, schedules every live finalizable object, and runs

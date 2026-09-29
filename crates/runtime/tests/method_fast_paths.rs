@@ -6,6 +6,66 @@ use std::process;
 use whim_runtime::engine::Engine;
 use whim_runtime::engine::EngineConfiguration;
 
+#[test]
+fn reentrant_calls_enable_finalizers_in_the_caller() {
+    let fixture = r"
+use Whim\Reflection;
+use Whim\Unwind\TypeError;
+final class CleanupBox {
+    public mixed $value = null;
+    public uint $released = 0u;
+}
+final class CleanupProbe {
+    public function __construct(private CleanupBox $box, private TypeError $error) {}
+    public function __destruct(): void {
+        $this->box->released++;
+        throw $this->error;
+    }
+}
+final class CleanupTask {
+    public function __construct(CleanupBox $box, fn(CleanupBox): void $work) { $work($box); }
+    public static function run(CleanupBox $box, fn(CleanupBox): void $work): void { $work($box); }
+}
+function cleanup_task(CleanupBox $box, fn(CleanupBox): void $work): void { $work($box); }
+$box = new CleanupBox();
+$error = new TypeError('cleanup');
+$work = fn(CleanupBox $owner): void { $owner->value = new CleanupProbe($owner, $error); };
+$method = Reflection\reflect_class('CleanupTask')->getMethod('run');
+";
+    let calls = [
+        "CleanupTask::run($box, $work);",
+        "discard!($method->invoke('CleanupTask', arguments: vec[$box, $work]));",
+        "discard!($method->invoke('CleanupTask', vec[], vec[$box, $work]));",
+        "$invoke = $method->invoke(...); discard!($invoke('CleanupTask', vec[], vec[$box, $work]));",
+        "discard!(Reflection\\reflect_function('cleanup_task')->invoke(vec[], vec[$box, $work]));",
+        "discard!(Reflection\\reflect_callable($work)->invoke(vec[], vec[$box]));",
+        "discard!(Reflection\\reflect_class('CleanupTask')->instantiate(vec[], vec[$box, $work]));",
+    ];
+    let assertions = r"
+$caught = null;
+try { $box->value = null; } catch (TypeError $failure) { $caught = $failure; }
+assert!($caught == $error);
+assert!($box->released == 1u);
+";
+
+    for optimize in [false, true] {
+        for call in calls {
+            let mut engine = Engine::new(EngineConfiguration {
+                optimize,
+                ..EngineConfiguration::default()
+            });
+
+            let source = [fixture, call, assertions].concat();
+            let result = engine.run_source(&source, Path::new("/reentrant-finalizers.whim"));
+            assert_eq!(
+                result.exit_code(),
+                0,
+                "optimization {optimize}, {call}: {result:?}"
+            );
+        }
+    }
+}
+
 const FAST_PATH_SOURCE: &str = r"
 use Whim\Marker\NeverInline;
 final class GetterTarget<T> {

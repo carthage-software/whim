@@ -763,7 +763,9 @@ impl VirtualMachine<'_> {
     ) -> Result<Value, VirtualMachineControl> {
         macro_rules! enter_finalizer_dispatch {
             ($self:ident, $ip:ident, $floor:ident) => {
-                if !FINALIZERS && $self.heap.has_finalizable_objects() {
+                if !FINALIZERS
+                    && ($self.heap.has_finalizable_objects() || $self.heap.has_pending_finalizers())
+                {
                     $self.sync_ip($ip);
                     return $self.run_with_finalizers($floor);
                 }
@@ -1209,6 +1211,7 @@ impl VirtualMachine<'_> {
             let mut ip = self.current_frame().ip as usize;
             // SAFETY: the current frame base lies within the live VM stack.
             let mut registers = unsafe { self.stack.as_mut_ptr().add(self.current_base()) };
+            enter_finalizer_dispatch!(self, ip, floor);
             'instructions: loop {
                 if FINALIZERS && !self.draining_finalizers && self.heap.has_pending_finalizers() {
                     self.sync_ip(ip);
@@ -2940,6 +2943,7 @@ impl VirtualMachine<'_> {
                                 continue 'dispatch;
                             }
 
+                            enter_finalizer_dispatch!(self, ip, floor);
                             if stack_pointer == self.stack.as_ptr()
                                 && self.current_frame().chunk == NonNull::from(chunk)
                             {
@@ -2985,6 +2989,7 @@ impl VirtualMachine<'_> {
                                 continue 'dispatch;
                             }
 
+                            enter_finalizer_dispatch!(self, ip, floor);
                             if stack_pointer == self.stack.as_ptr()
                                 && self.current_frame().chunk == NonNull::from(chunk)
                             {
@@ -3032,6 +3037,7 @@ impl VirtualMachine<'_> {
 
                         if reload_required {
                             reload_frame!(self, chunk, code, ip, registers);
+                            enter_finalizer_dispatch!(self, ip, floor);
                         }
                         continue 'instructions;
                     }
@@ -3059,6 +3065,7 @@ impl VirtualMachine<'_> {
 
                         if reload_required {
                             reload_frame!(self, chunk, code, ip, registers);
+                            enter_finalizer_dispatch!(self, ip, floor);
                         }
                         continue 'instructions;
                     }
@@ -3087,6 +3094,7 @@ impl VirtualMachine<'_> {
                         }
 
                         reload_frame!(self, chunk, code, ip, registers);
+                        enter_finalizer_dispatch!(self, ip, floor);
                         continue 'instructions;
                     }
                     Instruction::CallSelfUnchecked {
@@ -3130,6 +3138,7 @@ impl VirtualMachine<'_> {
                         }
 
                         reload_frame!(self, chunk, code, ip, registers);
+                        enter_finalizer_dispatch!(self, ip, floor);
                         continue 'instructions;
                     }
                     Instruction::CallValueUnchecked {
@@ -3154,6 +3163,7 @@ impl VirtualMachine<'_> {
                         }
 
                         reload_frame!(self, chunk, code, ip, registers);
+                        enter_finalizer_dispatch!(self, ip, floor);
                         continue 'instructions;
                     }
                     Instruction::CallValueDiscarded {
@@ -3181,6 +3191,7 @@ impl VirtualMachine<'_> {
                         }
 
                         reload_frame!(self, chunk, code, ip, registers);
+                        enter_finalizer_dispatch!(self, ip, floor);
                         continue 'instructions;
                     }
                     Instruction::CallMethodUnchecked {
@@ -3204,6 +3215,7 @@ impl VirtualMachine<'_> {
                         }
 
                         reload_frame!(self, chunk, code, ip, registers);
+                        enter_finalizer_dispatch!(self, ip, floor);
                         continue 'instructions;
                     }
                     Instruction::CallMethodDirect {
@@ -3227,6 +3239,7 @@ impl VirtualMachine<'_> {
                         }
 
                         reload_frame!(self, chunk, code, ip, registers);
+                        enter_finalizer_dispatch!(self, ip, floor);
                         continue 'instructions;
                     }
                     Instruction::ConstantGet { destination, cache } => {

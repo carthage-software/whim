@@ -17,6 +17,7 @@ use Whim\IO\WriteHandle;
 use Whim\Marker\TrackCaller;
 use Whim\Network\Stream;
 use Whim\Str;
+use Whim\Unwind\Throwable;
 use Whim\_Private\http_valid_token;
 use Whim\_Private\websocket_accept_key;
 
@@ -97,12 +98,25 @@ final readonly class Handler implements HTTPHandler {
           $subprotocol,
         );
 
+        $failure = null;
         try {
           $handler->handle($connection, $context, $request, $cancellation);
+        } catch (Throwable $error) {
+          $failure = $error;
         } finally {
-          if (!$connection->isClosed()) {
-            $connection->close(1000);
+          try {
+            if (!$connection->isClosed()) {
+              $connection->close(1000);
+            }
+          } catch (Throwable $error) {
+            if (null == $failure) {
+              throw $error;
+            }
           }
+        }
+
+        if (null != $failure) {
+          throw $failure;
         }
       },
     );
