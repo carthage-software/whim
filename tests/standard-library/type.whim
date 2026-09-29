@@ -1,3 +1,4 @@
+use Whim\Reflection;
 use Whim\Type;
 use Whim\Type\TypeId;
 use Whim\Unwind\ValueError;
@@ -10,10 +11,30 @@ final class T {}
 
 newtype TypeUserId = int;
 type TypeInteger = int;
+type TypeIntegerOrString = int|string;
 
 /** Returns the identity of its reified type argument. */
 function reified_type_id<T>(): TypeId {
   return Type\id::<T>();
+}
+
+function assert_same_type<L, R>(): void {
+  $left = Reflection\reflect_type::<L>();
+  $right = Reflection\reflect_type::<R>();
+  assert!(Type\id::<L>() == Type\id::<R>());
+  assert!($left->getId() == $right->getId());
+  assert!($left->equals($right));
+  assert!($right->equals($left));
+  assert!(Reflection\reflect_type_id($left->getId())?->equals($right));
+}
+
+function assert_reordered_union<A, B, C>(): void {
+  assert_same_type::<A|B|C, C|A|B>();
+}
+
+#[Whim\Marker\NeverInline]
+function cast_reified_type<T>(float $value): T {
+  return $value as T;
 }
 
 assert!(Type\of(1) == Type\id::<int>());
@@ -32,6 +53,37 @@ assert!(Type\id::<TypeInteger>() == Type\id::<int>());
 
 assert!(reified_type_id::<int>() == Type\id::<int>());
 assert!(reified_type_id::<int>() != Type\id::<T>());
+
+assert_same_type::<int|string, string|int>();
+assert_same_type::<int|uint|string, string|int|uint>();
+assert_reordered_union::<int, string, int>();
+assert_same_type::<TypeIntegerOrString, string|int>();
+assert_same_type::<object&TypeBox<int>, TypeBox<int>&object>();
+assert_same_type::<object&TypeBox<int>&!null, !null&object&TypeBox<int>>();
+assert_same_type::<TypeBox<vec<int|string>>, TypeBox<vec<string|int>>>();
+assert_same_type::<dict['value' => int|string], dict['value' => string|int]>();
+assert_same_type::<
+  fn(int|uint): vec<object&TypeBox<int>>,
+  fn(uint|int): vec<TypeBox<int>&object>,
+>();
+
+assert_same_type::<!(int|string), !(string|int)>();
+assert!(Type\id::<int|string>() != Type\id::<int|float>());
+assert!(Type\id::<object|TypeBox<int>>() != Type\id::<object&TypeBox<int>>());
+assert!(Type\id::<(int, string)>() != Type\id::<(string, int)>());
+assert!(Type\id::<dict<int, string>>() != Type\id::<dict<string, int>>());
+assert!(
+  Type\id::<fn(int, string): void>() != Type\id::<fn(string, int): void>(),
+);
+
+assert_same_type::<int|uint, uint|int>();
+assert!(cast_reified_type::<int|uint>(1.0) is int);
+assert!(cast_reified_type::<uint|int>(1.0) is uint);
+assert!(cast_reified_type::<int|uint>(1.0) is int);
+
+$unionBox = new TypeBox::<int|string>(1);
+assert!($unionBox is TypeBox<string|int>);
+assert!(Type\of($unionBox) == Type\id::<TypeBox<string|int>>());
 
 $registry = dict[] as dict<int, string>;
 $registry[Type\id::<TypeBox<int>>()] = 'integer';

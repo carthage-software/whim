@@ -57,7 +57,16 @@ impl VirtualMachine<'_> {
         name: &Atom,
         descriptor: &TypeDescriptor,
     ) -> TypeEnvironmentId {
-        let hash = type_environment_hash(parent, name, descriptor);
+        self.intern_type_binding::<true>(parent, name, descriptor)
+    }
+
+    fn intern_type_binding<const ORDERED: bool>(
+        &mut self,
+        parent: TypeEnvironmentId,
+        name: &Atom,
+        descriptor: &TypeDescriptor,
+    ) -> TypeEnvironmentId {
+        let hash = type_environment_hash::<ORDERED>(parent, name, descriptor);
         if let Some(candidates) = self.engine.tables.type_environment_cache.get(&hash) {
             for candidate in candidates {
                 // SAFETY: verified bytecode and VM state prove the index, type, and lifetime.
@@ -71,7 +80,7 @@ impl VirtualMachine<'_> {
                     && environment.binding.as_ref().is_some_and(
                         |(candidate_name, candidate_descriptor)| {
                             candidate_name == name
-                                && descriptor_same(candidate_descriptor, descriptor)
+                                && descriptor_equal::<ORDERED>(candidate_descriptor, descriptor)
                         },
                     )
                 {
@@ -109,7 +118,7 @@ impl VirtualMachine<'_> {
         descriptor: &TypeDescriptor,
     ) -> TypeEnvironmentId {
         let name = self.engine.tables.type_id_atom.clone();
-        self.intern_type_environment(TypeEnvironmentId::default(), &name, descriptor)
+        self.intern_type_binding::<false>(TypeEnvironmentId::default(), &name, descriptor)
     }
 
     /// Binds a declaration's type parameters over an outer lexical or class
@@ -549,7 +558,7 @@ impl VirtualMachine<'_> {
     }
 }
 
-fn type_environment_hash(
+fn type_environment_hash<const ORDERED: bool>(
     parent: TypeEnvironmentId,
     name: &Atom,
     descriptor: &TypeDescriptor,
@@ -557,14 +566,14 @@ fn type_environment_hash(
     let mut state = DESCRIPTOR_HASHER.build_hasher();
     parent.hash(&mut state);
     name.hash(&mut state);
-    hash_descriptor(descriptor, &mut state);
+    hash_descriptor::<ORDERED>(descriptor, &mut state);
     state.finish()
 }
 
 /// The hasher the environment cache keys on.
 static DESCRIPTOR_HASHER: FixedState = FixedState::with_seed(0x9e37_79b9_7f4a_7c15);
 
-fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
+fn hash_descriptor<const ORDERED: bool>(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
     discriminant(descriptor).hash(state);
     match descriptor {
         TypeDescriptor::Wildcard
@@ -606,7 +615,7 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
             name.hash(state);
             arguments.is_some().hash(state);
             if let Some(arguments) = arguments {
-                hash_descriptors(arguments, state);
+                hash_descriptors::<ORDERED>(arguments, state);
             }
         }
         TypeDescriptor::Member {
@@ -618,35 +627,35 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
             class.hash(state);
             class_arguments.is_some().hash(state);
             if let Some(arguments) = class_arguments {
-                hash_descriptors(arguments, state);
+                hash_descriptors::<ORDERED>(arguments, state);
             }
             member.hash(state);
             member_arguments.is_some().hash(state);
             if let Some(arguments) = member_arguments {
-                hash_descriptors(arguments, state);
+                hash_descriptors::<ORDERED>(arguments, state);
             }
         }
         TypeDescriptor::Array(arguments) | TypeDescriptor::Dictionary(arguments) => {
             arguments.is_some().hash(state);
             if let Some((key, value)) = arguments {
-                hash_descriptor(key, state);
-                hash_descriptor(value, state);
+                hash_descriptor::<ORDERED>(key, state);
+                hash_descriptor::<ORDERED>(value, state);
             }
         }
         TypeDescriptor::Vector(element) => {
             element.is_some().hash(state);
             if let Some(element) = element {
-                hash_descriptor(element, state);
+                hash_descriptor::<ORDERED>(element, state);
             }
         }
         TypeDescriptor::VectorShape { elements, rest } => {
             elements.len().hash(state);
             for element in elements {
-                hash_descriptor(element, state);
+                hash_descriptor::<ORDERED>(element, state);
             }
             rest.is_some().hash(state);
             if let Some(rest) = rest {
-                hash_descriptor(rest, state);
+                hash_descriptor::<ORDERED>(rest, state);
             }
         }
         TypeDescriptor::ObjectShape { entries, open } => {
@@ -654,7 +663,7 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
             open.hash(state);
             for (name, value) in entries {
                 name.hash(state);
-                hash_descriptor(value, state);
+                hash_descriptor::<ORDERED>(value, state);
             }
         }
         TypeDescriptor::DictionaryShape { entries, rest } => {
@@ -678,12 +687,12 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
                         key.hash(state);
                     }
                 }
-                hash_descriptor(value, state);
+                hash_descriptor::<ORDERED>(value, state);
             }
             rest.is_some().hash(state);
             if let Some((key, value)) = rest {
-                hash_descriptor(key, state);
-                hash_descriptor(value, state);
+                hash_descriptor::<ORDERED>(key, state);
+                hash_descriptor::<ORDERED>(value, state);
             }
         }
         TypeDescriptor::Callable(signature) => {
@@ -692,32 +701,45 @@ fn hash_descriptor(descriptor: &TypeDescriptor, state: &mut impl Hasher) {
                 signature.parameters.len().hash(state);
                 for parameter in &signature.parameters {
                     parameter.optional.hash(state);
-                    hash_descriptor(&parameter.r#type, state);
+                    hash_descriptor::<ORDERED>(&parameter.r#type, state);
                 }
-                hash_descriptor(&signature.return_type, state);
+                hash_descriptor::<ORDERED>(&signature.return_type, state);
             }
         }
         TypeDescriptor::Classname(inner) | TypeDescriptor::Negated(inner) => {
-            hash_descriptor(inner, state);
+            hash_descriptor::<ORDERED>(inner, state);
+        }
+        TypeDescriptor::Union(members) | TypeDescriptor::Intersection(members) if !ORDERED => {
+            members.len().hash(state);
+            let hash = members.iter().fold(0u64, |hash, member| {
+                let mut state = DESCRIPTOR_HASHER.build_hasher();
+                hash_descriptor::<ORDERED>(member, &mut state);
+                hash.wrapping_add(state.finish())
+            });
+            hash.hash(state);
         }
         TypeDescriptor::Tuple(members)
         | TypeDescriptor::Union(members)
-        | TypeDescriptor::Intersection(members) => hash_descriptors(members, state),
+        | TypeDescriptor::Intersection(members) => hash_descriptors::<ORDERED>(members, state),
         TypeDescriptor::TupleRest { elements, rest } => {
-            hash_descriptors(elements, state);
-            hash_descriptor(rest, state);
+            hash_descriptors::<ORDERED>(elements, state);
+            hash_descriptor::<ORDERED>(rest, state);
         }
     }
 }
 
-fn hash_descriptors(descriptors: &[TypeDescriptor], state: &mut impl Hasher) {
+fn hash_descriptors<const ORDERED: bool>(descriptors: &[TypeDescriptor], state: &mut impl Hasher) {
     descriptors.len().hash(state);
     for descriptor in descriptors {
-        hash_descriptor(descriptor, state);
+        hash_descriptor::<ORDERED>(descriptor, state);
     }
 }
 
 pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> bool {
+    descriptor_equal::<false>(left, right)
+}
+
+fn descriptor_equal<const ORDERED: bool>(left: &TypeDescriptor, right: &TypeDescriptor) -> bool {
     match (left, right) {
         (TypeDescriptor::Wildcard, TypeDescriptor::Wildcard)
         | (TypeDescriptor::Mixed, TypeDescriptor::Mixed)
@@ -784,7 +806,10 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
             },
         ) => {
             left_name == right_name
-                && optional_descriptors_same(left_arguments.as_deref(), right_arguments.as_deref())
+                && optional_descriptors_same::<ORDERED>(
+                    left_arguments.as_deref(),
+                    right_arguments.as_deref(),
+                )
         }
         (
             TypeDescriptor::Member {
@@ -801,23 +826,24 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
             },
         ) => {
             left_class == right_class
-                && optional_descriptors_same(
+                && optional_descriptors_same::<ORDERED>(
                     left_class_arguments.as_deref(),
                     right_class_arguments.as_deref(),
                 )
                 && left_member == right_member
-                && optional_descriptors_same(
+                && optional_descriptors_same::<ORDERED>(
                     left_member_arguments.as_deref(),
                     right_member_arguments.as_deref(),
                 )
         }
         (TypeDescriptor::Vector(left), TypeDescriptor::Vector(right)) => {
-            optional_box_same(left.as_deref(), right.as_deref())
+            optional_box_same::<ORDERED>(left.as_deref(), right.as_deref())
         }
         (TypeDescriptor::Array(left), TypeDescriptor::Array(right)) => match (left, right) {
             (None, None) => true,
             (Some((left_key, left_value)), Some((right_key, right_value))) => {
-                descriptor_same(left_key, right_key) && descriptor_same(left_value, right_value)
+                descriptor_equal::<ORDERED>(left_key, right_key)
+                    && descriptor_equal::<ORDERED>(left_value, right_value)
             }
             _ => false,
         },
@@ -831,14 +857,15 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
                 rest: right_rest,
             },
         ) => {
-            descriptors_same(left_elements, right_elements)
-                && optional_box_same(left_rest.as_deref(), right_rest.as_deref())
+            descriptors_same::<ORDERED>(left_elements, right_elements)
+                && optional_box_same::<ORDERED>(left_rest.as_deref(), right_rest.as_deref())
         }
         (TypeDescriptor::Dictionary(left), TypeDescriptor::Dictionary(right)) => {
             match (left, right) {
                 (None, None) => true,
                 (Some((left_key, left_value)), Some((right_key, right_value))) => {
-                    descriptor_same(left_key, right_key) && descriptor_same(left_value, right_value)
+                    descriptor_equal::<ORDERED>(left_key, right_key)
+                        && descriptor_equal::<ORDERED>(left_value, right_value)
                 }
                 _ => false,
             }
@@ -857,14 +884,14 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
                 && left_entries.iter().zip(right_entries).all(
                     |((left_key, left_value), (right_key, right_value))| {
                         shape_keys_same(left_key, right_key)
-                            && descriptor_same(left_value, right_value)
+                            && descriptor_equal::<ORDERED>(left_value, right_value)
                     },
                 )
                 && match (left_rest, right_rest) {
                     (None, None) => true,
                     (Some((left_key, left_value)), Some((right_key, right_value))) => {
-                        descriptor_same(left_key, right_key)
-                            && descriptor_same(left_value, right_value)
+                        descriptor_equal::<ORDERED>(left_key, right_key)
+                            && descriptor_equal::<ORDERED>(left_value, right_value)
                     }
                     _ => false,
                 }
@@ -885,7 +912,7 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
                     .iter()
                     .zip(right)
                     .all(|((left_name, left), (right_name, right))| {
-                        left_name == right_name && descriptor_same(left, right)
+                        left_name == right_name && descriptor_equal::<ORDERED>(left, right)
                     })
         }
         (TypeDescriptor::Callable(left), TypeDescriptor::Callable(right)) => match (left, right) {
@@ -898,20 +925,26 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
                         .zip(&right.parameters)
                         .all(|(left, right)| {
                             left.optional == right.optional
-                                && descriptor_same(&left.r#type, &right.r#type)
+                                && descriptor_equal::<ORDERED>(&left.r#type, &right.r#type)
                         })
-                    && descriptor_same(&left.return_type, &right.return_type)
+                    && descriptor_equal::<ORDERED>(&left.return_type, &right.return_type)
             }
             _ => false,
         },
         (TypeDescriptor::Classname(left), TypeDescriptor::Classname(right))
         | (TypeDescriptor::Negated(left), TypeDescriptor::Negated(right)) => {
-            descriptor_same(left, right)
+            descriptor_equal::<ORDERED>(left, right)
+        }
+        (TypeDescriptor::Union(left), TypeDescriptor::Union(right))
+        | (TypeDescriptor::Intersection(left), TypeDescriptor::Intersection(right))
+            if !ORDERED =>
+        {
+            unordered_descriptors_same(left, right)
         }
         (TypeDescriptor::Tuple(left), TypeDescriptor::Tuple(right))
         | (TypeDescriptor::Union(left), TypeDescriptor::Union(right))
         | (TypeDescriptor::Intersection(left), TypeDescriptor::Intersection(right)) => {
-            descriptors_same(left, right)
+            descriptors_same::<ORDERED>(left, right)
         }
         (
             TypeDescriptor::TupleRest {
@@ -923,8 +956,8 @@ pub(crate) fn descriptor_same(left: &TypeDescriptor, right: &TypeDescriptor) -> 
                 rest: right_rest,
             },
         ) => {
-            descriptors_same(left_elements, right_elements)
-                && descriptor_same(left_rest, right_rest)
+            descriptors_same::<ORDERED>(left_elements, right_elements)
+                && descriptor_equal::<ORDERED>(left_rest, right_rest)
         }
         _ => false,
     }
@@ -940,29 +973,55 @@ fn shape_keys_same(left: &ShapeKey, right: &ShapeKey) -> bool {
     }
 }
 
-fn optional_box_same(left: Option<&TypeDescriptor>, right: Option<&TypeDescriptor>) -> bool {
+fn optional_box_same<const ORDERED: bool>(
+    left: Option<&TypeDescriptor>,
+    right: Option<&TypeDescriptor>,
+) -> bool {
     match (left, right) {
         (None, None) => true,
-        (Some(left), Some(right)) => descriptor_same(left, right),
+        (Some(left), Some(right)) => descriptor_equal::<ORDERED>(left, right),
         _ => false,
     }
 }
 
-fn optional_descriptors_same(
+fn optional_descriptors_same<const ORDERED: bool>(
     left: Option<&[TypeDescriptor]>,
     right: Option<&[TypeDescriptor]>,
 ) -> bool {
     match (left, right) {
         (None, None) => true,
-        (Some(left), Some(right)) => descriptors_same(left, right),
+        (Some(left), Some(right)) => descriptors_same::<ORDERED>(left, right),
         _ => false,
     }
 }
 
-fn descriptors_same(left: &[TypeDescriptor], right: &[TypeDescriptor]) -> bool {
+fn descriptors_same<const ORDERED: bool>(
+    left: &[TypeDescriptor],
+    right: &[TypeDescriptor],
+) -> bool {
     left.len() == right.len()
         && left
             .iter()
             .zip(right)
-            .all(|(left, right)| descriptor_same(left, right))
+            .all(|(left, right)| descriptor_equal::<ORDERED>(left, right))
+}
+
+fn unordered_descriptors_same(left: &[TypeDescriptor], right: &[TypeDescriptor]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+
+    if descriptors_same::<false>(left, right) {
+        return true;
+    }
+
+    left.iter().all(|member| {
+        left.iter()
+            .filter(|candidate| descriptor_same(member, candidate))
+            .count()
+            == right
+                .iter()
+                .filter(|candidate| descriptor_same(member, candidate))
+                .count()
+    })
 }

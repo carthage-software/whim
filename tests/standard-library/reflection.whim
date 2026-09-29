@@ -857,9 +857,21 @@ assert!(length!($union->getTypes()) == 2u);
 assert!($union->getTypes()[0]->toString() == 'int');
 assert!($union->getTypes()[1]->toString() == 'string');
 
+$reversedUnion = Reflection\reflect_type::<string|int>();
+assert!($union->equals($reversedUnion));
+assert!($union->getId() == $reversedUnion->getId());
+assert!('string' == $reversedUnion->getTypes()[0u]->toString());
+assert!('int' == $reversedUnion->getTypes()[1u]->toString());
+
 $intersection = Reflection\reflect_type::<object&Box<int>>();
 assert!($intersection is Reflection\Type\IntersectionTypeReflection);
 assert!(length!($intersection->getTypes()) == 2u);
+
+$reversedIntersection = Reflection\reflect_type::<Box<int>&object>();
+assert!($intersection->equals($reversedIntersection));
+assert!($intersection->getId() == $reversedIntersection->getId());
+assert!('object' == $intersection->getTypes()[0u]->toString());
+assert!('object' == $reversedIntersection->getTypes()[1u]->toString());
 
 $negated = Reflection\reflect_type::<!int>();
 assert!($negated is Reflection\Type\NegatedTypeReflection);
