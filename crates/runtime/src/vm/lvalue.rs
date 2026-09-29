@@ -1098,7 +1098,7 @@ impl VirtualMachine<'_> {
             ConstantInitializer::Literal(literal) => Ok(literal_value(literal)),
             ConstantInitializer::Thunk(chunk) => {
                 let chunk_pointer = NonNull::from(&**chunk);
-                self.run_initializer(chunk_pointer, &context)
+                self.run_initializer(chunk_pointer, &context, TypeEnvironmentId::default())
             }
         };
 

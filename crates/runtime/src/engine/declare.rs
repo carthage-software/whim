@@ -25,6 +25,7 @@ use whim_value::function::FuncId;
 use whim_value::heap::handle::ManagedRef;
 use whim_value::object::ClassId;
 use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
 use whim_value::string::ByteStringObject;
 use whim_value::vec::VecObject;
 
@@ -722,7 +723,7 @@ impl Engine {
             ConstantInitializer::Thunk(chunk) => {
                 let chunk_pointer = NonNull::from(&**chunk);
                 let mut vm = VirtualMachine::new(self);
-                vm.run_initializer(chunk_pointer, context)
+                vm.run_initializer(chunk_pointer, context, TypeEnvironmentId::default())
             }
         }
     }

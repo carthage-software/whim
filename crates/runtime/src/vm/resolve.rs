@@ -14,6 +14,7 @@ use whim_value::function::FuncId;
 use whim_value::newtype::NewtypeId;
 use whim_value::object::ClassId;
 use whim_value::object::InstanceObject;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::core::symbols::CHECKED_KIND_ORDER;
 use crate::core::symbols::CLASS_LIKE_KIND_ORDER;
@@ -148,7 +149,7 @@ impl VirtualMachine<'_> {
             ConstantInitializer::Literal(literal) => Ok(literal_value(literal)),
             ConstantInitializer::Thunk(chunk) => {
                 let chunk_pointer = NonNull::from(&**chunk);
-                self.run_initializer(chunk_pointer, &context)
+                self.run_initializer(chunk_pointer, &context, TypeEnvironmentId::default())
             }
         };
 

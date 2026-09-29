@@ -651,9 +651,11 @@ impl<'engine> VirtualMachine<'engine> {
         &mut self,
         chunk: NonNull<Chunk>,
         context: &Rc<UnitContext>,
+        environment: TypeEnvironmentId,
     ) -> Result<Value, VirtualMachineControl> {
         let cache = Box::new(InlineCache::new());
         self.push_detached_frame(chunk, NonNull::from(&*cache), context);
+        self.current_frame_mut().type_environment = environment;
         let floor = self.frames.len() - 1;
         let result = self.run(floor);
         drop(cache);

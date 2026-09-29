@@ -22,6 +22,7 @@ use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::FuncId;
 use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
 use whim_value::vec::VecObject;
 
 use crate::builtin::spec::ParameterDefaultSpec;
@@ -521,6 +522,7 @@ pub(crate) fn evaluate_initializer(
     vm: &mut VirtualMachine<'_>,
     initializer: &ConstantInitializer,
     unit: Option<&Rc<UnitContext>>,
+    environment: TypeEnvironmentId,
 ) -> Result<Value, Throw> {
     match initializer {
         ConstantInitializer::Literal(literal) => Ok(literal_value(literal)),
@@ -531,7 +533,8 @@ pub(crate) fn evaluate_initializer(
                     "a core reflection initializer cannot contain bytecode".to_string(),
                 ));
             };
-            vm.run_initializer(NonNull::from(&**chunk), unit)
+
+            vm.run_initializer(NonNull::from(&**chunk), unit, environment)
                 .map_err(|control| vm.control_to_throw(control))
         }
     }

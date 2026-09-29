@@ -12,6 +12,7 @@ use whim_value::Value;
 use whim_value::atom::Atom;
 use whim_value::function::FuncId;
 use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -423,12 +424,49 @@ pub(crate) fn parameter_dispatch(
             let Some(default) = parameter.default.as_ref() else {
                 return Ok(Value::null());
             };
-            support::evaluate_initializer(context.vm, default, info.unit.as_ref())
+
+            let bindings = environment_argument(context, &arguments, 0)?;
+            let environment = parameter_environment(context, callable, &bindings)?;
+            support::evaluate_initializer(context.vm, default, info.unit.as_ref(), environment)
         }
         Operation::IsSensitive => Ok(Value::bool(parameter.sensitive)),
         Operation::PromotedProperty => promoted_property(context, callable, parameter),
         _ => Err(context.type_error("the operation is not valid for this reflected parameter")),
     }
+}
+
+fn parameter_environment(
+    context: &mut Context<'_, '_, '_>,
+    callable: &CallableKey,
+    bindings: &[(TypeParameterKey, ReflectedType)],
+) -> Result<TypeEnvironmentId, Throw> {
+    let owner = GenericOwner::Callable(callable.clone());
+    let mut environment = TypeEnvironmentId::default();
+    for (key, argument) in bindings {
+        let Some(parameters) = support::type_parameters(context.vm, &key.owner) else {
+            continue;
+        };
+
+        let Some(parameter) = parameters.get(key.position) else {
+            continue;
+        };
+
+        if support::type_parameter_key(context.vm, &owner, &parameter.name).as_ref() != Some(key) {
+            continue;
+        }
+
+        let argument = types::resolve_type(context.vm, argument, bindings, None);
+        if !argument.descriptor.is_resolved() {
+            return Err(context.type_error("the default value's type environment is not resolved"));
+        }
+
+        environment =
+            context
+                .vm
+                .intern_type_environment(environment, &parameter.name, &argument.descriptor);
+    }
+
+    Ok(environment)
 }
 
 pub(crate) fn closure_dispatch(
@@ -1154,8 +1192,14 @@ fn property_default(context: &mut Context<'_, '_, '_>, member: &MemberKey) -> Re
         let unit = context.vm.engine.tables.classes[member.class.0 as usize]
             .attribute_unit
             .clone();
-        return support::evaluate_initializer(context.vm, &default, unit.as_ref());
+        return support::evaluate_initializer(
+            context.vm,
+            &default,
+            unit.as_ref(),
+            TypeEnvironmentId::default(),
+        );
     }
+
     let default = info.default.clone();
     match default {
         Some(PropertyDefault::Value(value)) => Ok(value),
@@ -1171,7 +1215,13 @@ fn property_default(context: &mut Context<'_, '_, '_>, member: &MemberKey) -> Re
             let Some(initializer) = initializer else {
                 return Ok(Value::null());
             };
-            support::evaluate_initializer(context.vm, &initializer, Some(&unit))
+
+            support::evaluate_initializer(
+                context.vm,
+                &initializer,
+                Some(&unit),
+                TypeEnvironmentId::default(),
+            )
         }
         None => Ok(Value::null()),
     }

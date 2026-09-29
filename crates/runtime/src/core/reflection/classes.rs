@@ -530,7 +530,7 @@ reflection_class! {
         get_type: "getType(null|Whim\\Reflection\\Generic\\TypeEnvironmentReflection $environment = null): null|Whim\\Reflection\\Type\\TypeReflection" => Type;
         is_optional: "isOptional(): bool" => IsOptional;
         has_default_value: "hasDefaultValue(): bool" => HasDefaultValue;
-        get_default_value: "getDefaultValue(): mixed" => DefaultValue;
+        get_default_value: "getDefaultValue(null|Whim\\Reflection\\Generic\\TypeEnvironmentReflection $environment = null): mixed" => DefaultValue;
         is_sensitive: "isSensitive(): bool" => IsSensitive;
         get_promoted_property: "getPromotedProperty(): null|Whim\\Reflection\\Member\\PropertyReflection" => PromotedProperty;
     }

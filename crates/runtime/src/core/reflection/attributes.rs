@@ -7,6 +7,7 @@ use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::CompiledAttribute;
 use whim_value::Value;
 use whim_value::object::ClassId;
+use whim_value::object::TypeEnvironmentId;
 
 use crate::builtin::Context;
 use crate::builtin::arguments::Arguments;
@@ -144,7 +145,12 @@ fn positional_arguments(
 ) -> Result<Value, Throw> {
     let mut values = Vec::with_capacity(declaration.arguments.len());
     for argument in &declaration.arguments {
-        values.push(support::evaluate_initializer(context.vm, argument, unit)?);
+        values.push(support::evaluate_initializer(
+            context.vm,
+            argument,
+            unit,
+            TypeEnvironmentId::default(),
+        )?);
     }
     Ok(context.vec(values))
 }
@@ -158,7 +164,12 @@ fn named_arguments(
     for (name, argument) in &declaration.named_arguments {
         values.push((
             Value::string(name.to_handle()),
-            support::evaluate_initializer(context.vm, argument, unit)?,
+            support::evaluate_initializer(
+                context.vm,
+                argument,
+                unit,
+                TypeEnvironmentId::default(),
+            )?,
         ));
     }
     Ok(context.dict(values))

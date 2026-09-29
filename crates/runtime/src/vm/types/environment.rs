@@ -51,7 +51,7 @@ impl VirtualMachine<'_> {
         }
     }
 
-    fn intern_type_environment(
+    pub(crate) fn intern_type_environment(
         &mut self,
         parent: TypeEnvironmentId,
         name: &Atom,

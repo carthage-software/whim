@@ -65,10 +65,12 @@ final class ParameterReflection implements DeclarationReflection {
   #[MustUse]
   public function hasDefaultValue(): bool {}
 
-  /** Evaluates and returns the default value. */
+  /** Evaluates the default value with the supplied type bindings. */
   #[MustUse]
   #[TrackCaller]
-  public function getDefaultValue(): mixed {}
+  public function getDefaultValue(
+    null|TypeEnvironmentReflection $environment = null,
+  ): mixed {}
 
   /** Reports whether traces redact values passed to this parameter. */
   #[MustUse]

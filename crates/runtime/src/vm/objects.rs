@@ -652,9 +652,11 @@ impl VirtualMachine<'_> {
                         .default;
                     match initializer {
                         Some(ConstantInitializer::Literal(literal)) => literal_value(literal),
-                        Some(ConstantInitializer::Thunk(chunk)) => {
-                            self.run_initializer(NonNull::from(&**chunk), &context)?
-                        }
+                        Some(ConstantInitializer::Thunk(chunk)) => self.run_initializer(
+                            NonNull::from(&**chunk),
+                            &context,
+                            TypeEnvironmentId::default(),
+                        )?,
                         // SAFETY: the surrounding invariant makes this path unreachable.
                         None => unsafe {
                             unreachable_invariant(

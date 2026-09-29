@@ -223,6 +223,12 @@ The declaration forms part of a type parameter's identity, so two parameters
 named `T` use separate keys. Object and callable reflections include bindings
 from parent classes and interfaces.
 
+`ParameterReflection::getDefaultValue($environment = null)` evaluates a
+parameter's default with the supplied type bindings. Pass the callable's type
+environment for a generic function or method, or the object's or specialized
+class type's environment for a constructor parameter. Each call evaluates the
+default again, including any object or closure it creates.
+
 `getSpecialization()` returns the type arguments that a class or object passes
 to a parent class or interface. `TypeReflection::resolve()` replaces type
 parameters with arguments from a type environment. Its second argument

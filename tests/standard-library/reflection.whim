@@ -97,6 +97,44 @@ function describe(string $prefix, int $left, int $right): string {
   return $prefix . ($left + $right);
 }
 
+final class DefaultValue<T> {
+  public function __construct(public vec<T> $values = vec[]) {}
+}
+
+interface TypedDefault<T> {}
+
+class Defaults<T> implements TypedDefault<int> {
+  public function __construct(
+    public DefaultValue<T> $value = new DefaultValue::<T>(),
+  ) {}
+
+  public function pair<U>(
+    DefaultValue<(T, U)> $value = new DefaultValue::<(T, U)>(),
+  ): DefaultValue<(T, U)> {
+    return $value;
+  }
+
+  public function shadow<T>(
+    DefaultValue<T> $value = new DefaultValue::<T>(),
+  ): DefaultValue<T> {
+    return $value;
+  }
+}
+
+final class StringDefaults extends Defaults<string> {}
+
+function default_value<T>(
+  DefaultValue<T> $value = new DefaultValue::<T>(),
+): DefaultValue<T> {
+  return $value;
+}
+
+function default_factory<T>(
+  fn $factory = fn(): DefaultValue<T> => new DefaultValue::<T>(),
+): fn {
+  return $factory;
+}
+
 final class Incomplete {
   public int $initialized = 1;
   public string $missing;
@@ -432,6 +470,86 @@ assert!($secretParameter->getDefaultValue() == 'secret');
 assert!($secretParameter->isSensitive());
 assert!($secretParameter->getPromotedProperty() == null);
 assert!($configured->getCallableType()->toString() == 'fn(T, =string): T');
+
+$genericDefault = fn<T>(
+  DefaultValue<T> $value = new DefaultValue::<T>(),
+): DefaultValue<T> => $value;
+
+foreach (vec[
+  default_value::<string>(...),
+  $genericDefault::<string>(...),
+] as $defaultCall) {
+  $reflectedDefault = Reflection\reflect_callable($defaultCall);
+  $defaultParameter = $reflectedDefault->getDeclaration()->getParameters()[0u];
+  $defaultBindings = $reflectedDefault->getTypeEnvironment();
+  $defaultValue = $defaultParameter->getDefaultValue($defaultBindings);
+  assert!($defaultValue is DefaultValue<string>);
+  assert!($defaultParameter->getType($defaultBindings)->accepts($defaultValue));
+  assert!(
+    $defaultParameter->getDefaultValue($defaultBindings) != $defaultValue,
+  );
+
+  assert!($defaultCall() is DefaultValue<string>);
+  assert!($reflectedDefault->invoke() is DefaultValue<string>);
+}
+
+$integerDefault = Reflection\reflect_callable(default_value::<int>(...));
+assert!(
+  $integerDefault
+    ->getDeclaration()
+    ->getParameters()[0u]
+    ->getDefaultValue($integerDefault->getTypeEnvironment()) is DefaultValue<
+      int,
+    >,
+);
+
+$factory = Reflection\reflect_callable(default_factory::<string>(...));
+$defaultFactory = $factory
+  ->getDeclaration()
+  ->getParameters()[0u]
+  ->getDefaultValue($factory->getTypeEnvironment());
+
+assert!($defaultFactory() is DefaultValue<string>);
+
+$defaults = new StringDefaults();
+$defaultsReflection = Reflection\reflect_object($defaults);
+$constructorDefault = $defaultsReflection
+  ->getClass()
+  ->getConstructor()
+  ->getParameters()[0u];
+
+assert!(
+  $constructorDefault->getDefaultValue(
+    $defaultsReflection->getTypeEnvironment(),
+  ) is DefaultValue<string>,
+);
+
+$defaultsType = Reflection\reflect_type::<Defaults<int>>();
+assert!(
+  $constructorDefault->getDefaultValue(
+    $defaultsType->getTypeEnvironment(),
+  ) is DefaultValue<int>,
+);
+
+$pairDefaults = Reflection\reflect_callable($defaults->pair::<int>(...));
+assert!(
+  $pairDefaults
+    ->getDeclaration()
+    ->getParameters()[0u]
+    ->getDefaultValue($pairDefaults->getTypeEnvironment()) is DefaultValue<
+      (string, int),
+    >,
+);
+
+$shadowDefaults = Reflection\reflect_callable($defaults->shadow::<int>(...));
+assert!(
+  $shadowDefaults
+    ->getDeclaration()
+    ->getParameters()[0u]
+    ->getDefaultValue($shadowDefaults->getTypeEnvironment()) is DefaultValue<
+      int,
+    >,
+);
 
 $coreReflectSymbol = Reflection\reflect_function(
   'Whim\\Reflection\\reflect_symbol',
