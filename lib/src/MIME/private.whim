@@ -5,6 +5,7 @@ use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\SecureRandom;
 use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
 
 /** Reports whether bytes form an RFC 2045 token. */
 #[AlwaysInline]
@@ -180,30 +181,37 @@ function fold_header(
     return $line . "\r\n";
   }
 
-  $result = $name . ':';
-  $lineLength = (length!($name) as int) + 1;
-  foreach (Str\words($value) as $word) {
-    $length = (length!($word) as int) + 1;
-    if ($lineLength + $length > $softLimit) {
-      $result .= "\r\n ";
-      $lineLength = 1;
-    } else {
-      $result .= ' ';
-      $lineLength++;
+  $result = '';
+  $start = 0;
+  $fold = null;
+  $whitespace = false;
+  $escaped = false;
+  $contentEnd = length!(Str\trim_right($line, " \t"));
+  $index = 0;
+  while ($index < length!($line)) {
+    $isWhitespace = !$escaped && ($line[$index] is ' '|"\t");
+    if ($isWhitespace && !$whitespace && $index < $contentEnd) {
+      $fold = $index;
     }
 
-    while ((length!($word) as int) + $lineLength > $hardLimit) {
-      $available = $hardLimit - $lineLength;
-      $result .= Str\slice($word, 0, $available as uint) . "\r\n ";
-      $word = Str\slice($word, $available);
-      $lineLength = 1;
+    $whitespace = $isWhitespace;
+    $escaped = !$escaped && '\\' == $line[$index];
+    if ($index - $start >= $softLimit && null != $fold) {
+      $result .= Str\slice($line, $start, ($fold - $start) as uint) . "\r\n";
+      $start = $fold;
+      $fold = null;
     }
 
-    $result .= $word;
-    $lineLength += length!($word) as int;
+    if ($index - $start >= $hardLimit) {
+      throw new InvalidArgumentException(
+        'cannot fold message header `' . $name . '` within the hard line limit',
+      );
+    }
+
+    $index++;
   }
 
-  return $result . "\r\n";
+  return $result . Str\slice($line, $start) . "\r\n";
 }
 
 /** Generates a MIME multipart boundary. */

@@ -7,6 +7,9 @@ use Whim\Message\Message;
 use Whim\Message\MessageId;
 use Whim\Message\parse;
 use Whim\Message\serialize;
+use Whim\MIME\MultiPart\MultiPart;
+use Whim\MIME\MultiPart\Parser;
+use Whim\MIME\Part\Part;
 use Whim\MIME\Part\Text;
 use Whim\MIME\TransferEncoding;
 use Whim\IO\MemoryHandle;
@@ -94,6 +97,27 @@ assert!($parsed->content->body()->readAll() == 'hello world');
 $parsedFromHandle = parse(new MemoryHandle($serialized));
 assert!($parsedFromHandle->headers->toVec() == $parsed->headers->toVec());
 assert!($parsedFromHandle->content->body()->readAll() == 'hello world');
+
+foreach (vec[
+  null,
+  '00112233445566778899aabbccddeeff0011223344556677',
+] as $boundary) {
+  $multipart = new MultiPart(
+    'alternative',
+    vec[new Text('hello', encoding: TransferEncoding::SevenBit)],
+    $boundary,
+  );
+
+  $bytes = serialize(Message::create($multipart))->readAll();
+  $parsed = parse($bytes);
+  $mediaType = $parsed->content->mediaType();
+  assert!($mediaType->toString() == $multipart->mediaType()->toString());
+  assert!($mediaType->parameters->get('boundary') == $multipart->boundary);
+  $parts = new Parser($multipart->boundary)->parse($parsed->content->body());
+  ($_, $part) = $parts->next() as (int, Part);
+  assert!($part->body()->readAll() == 'hello');
+  assert!($parts->next() == null);
+}
 
 $sources = vec[
   "X-Test: value\r\n\r\nbody",

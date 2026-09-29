@@ -20,6 +20,7 @@ use Whim\MIME\Part\Text;
 use Whim\MIME\Sniff;
 use Whim\MIME\TransferEncoding;
 use Whim\Str;
+use Whim\Unwind\InvalidArgumentException;
 use Whim\Unwind\TypeError;
 
 final class MIMEStreamingReadHandle implements ReadHandle {
@@ -118,6 +119,59 @@ assert!($headers->getAll('X-VALUE') == vec['first', 'second']);
 assert!(
   EncodedWord\decode($headers->get('subject') as string) == 'Bonjour, été',
 );
+
+foreach (vec[
+  (
+    'Subject',
+    'Receipt R-1234567890 for order 1234567890: paid 1234567890 EUR on 2026-09-29',
+  ),
+  (
+    'To',
+    'first-person@example.test, second-person@example.test, third-person@example.test',
+  ),
+  (
+    'Content-Type',
+    'multipart/alternative; boundary=00112233445566778899aabbccddeeff0011223344556677',
+  ),
+  ('X-Numbers', Str\repeat('12345 67890 ', 20u)),
+  ('X-Token', Str\repeat('x', 997u)),
+] as ($name, $value)) {
+  $folded = Headers::fromPairs(vec[($name, $value)])->toFoldedString();
+  assert!(Str\replace($folded, "\r\n", '') == $name . ': ' . $value);
+  assert!(Str\contains($folded, "\r\n "));
+  foreach (Str\split($folded, "\r\n") as $line) {
+    assert!(length!($line) <= 998u);
+  }
+}
+
+assert!(
+  Headers::fromPairs(vec[('X-Test', "12\t34  56!\t ")])->toFoldedString(14)
+  == "X-Test: 12\t34\r\n  56!\t \r\n",
+);
+
+assert!(
+  Headers::fromPairs(vec[('X-Test', "12\t34\t56!")])->toFoldedString(14)
+  == "X-Test: 12\t34\r\n\t56!\r\n",
+);
+
+assert!(
+  Headers::fromPairs(vec[('X-Test', '"abc\\ def"')])->toFoldedString(14)
+  == "X-Test:\r\n \"abc\\ def\"\r\n",
+);
+
+foreach (vec[
+  ('X-Token', Str\repeat('x', 998u)),
+  (Str\repeat('X', 998u), ''),
+] as $pair) {
+  $failed = false;
+  try {
+    discard!(Headers::fromPairs(vec[$pair])->toFoldedString());
+  } catch (InvalidArgumentException $_) {
+    $failed = true;
+  }
+
+  assert!($failed);
+}
 
 $quoted = QuotedPrintable\encode("hello\x00world", true);
 assert!(QuotedPrintable\decode($quoted) == "hello\x00world");

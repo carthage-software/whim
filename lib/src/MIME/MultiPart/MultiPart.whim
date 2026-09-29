@@ -5,6 +5,7 @@ use Whim\MIME\Headers;
 use Whim\MIME\MediaType;
 use Whim\MIME\Parameters;
 use Whim\MIME\Part\Part;
+use Whim\MIME\_Private\generate_boundary;
 use Whim\Marker\AlwaysInline;
 use Whim\Marker\MustUse;
 use Whim\Marker\TrackCaller;
@@ -24,7 +25,7 @@ final class MultiPart implements Part {
     vec<Part> $parts = vec[],
     null|NonEmptyString $boundary = null,
   ) {
-    $this->boundary = $boundary ?? _Private\generate_boundary();
+    $this->boundary = $boundary ?? generate_boundary();
     $this->parts = $parts;
     $this->mediaType = MediaType::fromParts(
       'multipart',
