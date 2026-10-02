@@ -1321,11 +1321,19 @@ impl TypeFlow<'_> {
         (0..usize::from(pair_count.value())).all(|position| {
             let register = usize::from(first_pair.index()) + position * 2 + offset;
             register < usize::from(self.chunk.register_count)
-                && self.fact_proves(
-                    self.fact(index, Register::new(register as u16)),
-                    expected,
-                    depth + 1,
-                )
+                && if offset == 0 {
+                    self.register_dictionary_key_descriptor_proves(
+                        index,
+                        Register::new(register as u16),
+                        expected,
+                    )
+                } else {
+                    self.fact_proves(
+                        self.fact(index, Register::new(register as u16)),
+                        expected,
+                        depth + 1,
+                    )
+                }
         })
     }
 

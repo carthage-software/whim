@@ -68,3 +68,30 @@ fn cloning_preserves_tags_and_owns_one_reference() {
         }
     }
 }
+
+#[test]
+fn collection_equality_checks_nan_even_when_storage_is_shared() {
+    use crate::dict::DictObject;
+    use crate::ops::equals;
+    use crate::tuple::TupleObject;
+    use crate::vec::VecObject;
+
+    let heap = Heap::new();
+    for number in [f64::NAN, 1.0] {
+        let mut dictionary = DictObject::new(&heap);
+        dictionary.make_mut().insert_int(0, Value::float(number));
+        let vector = Value::vec(VecObject::with_elements(&heap, [Value::float(number)]));
+        for value in [
+            vector.clone(),
+            Value::dict(dictionary),
+            Value::tuple(TupleObject::with_pair(
+                &heap,
+                Value::float(number),
+                Value::null(),
+            )),
+            Value::vec(VecObject::with_elements(&heap, [vector])),
+        ] {
+            assert_eq!(equals(&value, &value.clone()), !number.is_nan());
+        }
+    }
+}

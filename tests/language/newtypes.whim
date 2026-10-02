@@ -311,4 +311,37 @@ try {
 
 assert!($assertion_error_50 is TypeError);
 
+#[Whim\Marker\NeverInline]
+function inspect_newtype_key_dictionary(
+  dict<NewtypeDictKey, string> $values,
+): void {
+  assert!($values is dict<NewtypeDictKey, string>);
+}
+
+function invalid_newtype_key_literal(): dict<NewtypeDictKey, string> {
+  return dict[NewtypeDictKey(1) => 'value'];
+}
+
+$normalized = dict[NewtypeDictKey(1) => 'value'];
+assert!($normalized is dict<int, string>);
+assert!(!($normalized is dict<NewtypeDictKey, string>));
+
+$argumentError = null;
+try {
+  inspect_newtype_key_dictionary($normalized);
+} catch (TypeError $error) {
+  $argumentError = $error;
+}
+
+assert!($argumentError is TypeError);
+
+$returnError = null;
+try {
+  invalid_newtype_key_literal();
+} catch (TypeError $error) {
+  $returnError = $error;
+}
+
+assert!($returnError is TypeError);
+
 Filesystem\delete_directory($work, true);

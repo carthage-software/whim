@@ -56,6 +56,29 @@ assert!($nan != $nan);
 assert!(0.0 == -0.0);
 assert!($infinity == $infinity);
 
+$nanVector = vec[$nan];
+$nanVectorCopy = $nanVector;
+assert!($nanVector != $nanVectorCopy);
+$nanVectorCopy[0] = $nan;
+assert!($nanVector != $nanVectorCopy);
+
+$nanDictionary = dict['value' => $nan];
+$nanDictionaryCopy = $nanDictionary;
+assert!($nanDictionary != $nanDictionaryCopy);
+$nanDictionaryCopy['value'] = $nan;
+assert!($nanDictionary != $nanDictionaryCopy);
+
+$nanTuple = ($nan, 1);
+$nanTupleCopy = $nanTuple;
+assert!($nanTuple != $nanTupleCopy);
+assert!($nanTuple != ($nan, 1));
+
+$nestedNan = vec[vec[$nan]];
+$nestedNanCopy = $nestedNan;
+assert!($nestedNan != $nestedNanCopy);
+$nestedNanCopy[0][0] = $nan;
+assert!($nestedNan != $nestedNanCopy);
+
 assert!(vec[vec[1], dict['k' => (1, 2)]] == vec[vec[1], dict['k' => (1, 2)]]);
 
 assert!(vec[1, 2] != vec[2, 1]);

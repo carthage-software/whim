@@ -1414,6 +1414,56 @@ fn dictionary_key_normalization_preserves_newtype_return_checks() {
 }
 
 #[test]
+fn dictionary_literals_normalize_keys_before_proving_contracts() {
+    let unit = compile(
+        r"
+        newtype Key = int;
+
+        #[Whim\Marker\NeverInline]
+        function inspect(dict<Key, string> $values): void {}
+
+        function invalid(): dict<Key, string> {
+            return dict[Key(1) => 'value'];
+        }
+
+        function valid(): dict<int, string> {
+            return dict[Key(1) => 'value'];
+        }
+
+        inspect(dict[Key(1) => 'value']);
+        ",
+        OptimizationConfiguration::default(),
+    );
+
+    for (name, checked) in [(b"invalid".as_slice(), true), (b"valid".as_slice(), false)] {
+        let function = unit
+            .functions
+            .iter()
+            .find(|function| function.name.as_bytes() == name)
+            .unwrap();
+        assert_eq!(
+            function
+                .chunk
+                .code
+                .iter()
+                .any(|instruction| matches!(instruction, Instruction::Return { .. })),
+            checked,
+            "{:#?}",
+            function.chunk.code,
+        );
+    }
+    assert!(
+        !unit
+            .main
+            .code
+            .iter()
+            .any(|instruction| matches!(instruction, Instruction::CallNamedDirect { .. })),
+        "{:#?}",
+        unit.main.code,
+    );
+}
+
+#[test]
 fn mutable_array_masks_do_not_prove_literal_members() {
     let unit = compile(
         r"

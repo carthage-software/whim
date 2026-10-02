@@ -227,9 +227,6 @@ fn equals_shallow<'a>(
             left.as_string_bytes() == right.as_string_bytes()
         }
         (ValueView::Vec(left), ValueView::Vec(right)) => {
-            if left.ptr_eq(right) {
-                return true;
-            }
             if left.len() != right.len() {
                 return false;
             }
@@ -239,9 +236,6 @@ fn equals_shallow<'a>(
             true
         }
         (ValueView::Dict(left), ValueView::Dict(right)) => {
-            if left.ptr_eq(right) {
-                return true;
-            }
             if left.len() != right.len() {
                 return false;
             }
@@ -254,9 +248,6 @@ fn equals_shallow<'a>(
             true
         }
         (ValueView::Tuple(left), ValueView::Tuple(right)) => {
-            if left.ptr_eq(right) {
-                return true;
-            }
             if left.len() != right.len() {
                 return false;
             }

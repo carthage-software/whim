@@ -7,6 +7,7 @@ use whim_syn::arena::Arena;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::node::Node;
 use whim_syn::cst::node::NodeKind;
+use whim_syn::cst::operation::AssignmentTarget;
 use whim_syn::cst::operation::BinaryOperator;
 
 use crate::category::Category;
@@ -94,7 +95,9 @@ impl LintRule for UseCompoundAssignmentRule {
             return;
         };
 
-        if !assignment.operator.is_assign() {
+        if !assignment.operator.is_assign()
+            || !matches!(assignment.target, AssignmentTarget::Variable(_))
+        {
             return;
         }
 
@@ -144,4 +147,32 @@ fn get_compound_operator(operator: &BinaryOperator) -> Option<&'static str> {
         BinaryOperator::NullCoalesce(_) => "??=",
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UseCompoundAssignmentRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = repeated_targets_with_side_effects_are_not_rewritten,
+        rule = UseCompoundAssignmentRule,
+        code = r"
+            $values[$i++] = $values[$i++] + 1;
+            $values[next()] = $values[next()] + 1;
+            get_object()->value = get_object()->value + 1;
+        ",
+    }
+
+    test_lint_failure! {
+        name = plain_variables_still_use_compound_assignment,
+        rule = UseCompoundAssignmentRule,
+        count = 3,
+        code = r"
+            $count = $count + 1;
+            $message = $message . 'suffix';
+            $bits = $bits & $mask;
+        ",
+    }
 }
