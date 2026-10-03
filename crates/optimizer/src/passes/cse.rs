@@ -17,6 +17,7 @@ use crate::cfg::successors;
 use crate::liveness::effect::changes_value;
 use crate::liveness::effect::effect_on;
 use crate::liveness::effect::overwrites_register;
+use crate::liveness::register_is_dead_after_removals;
 use crate::operands::replace_read_register;
 use crate::passes::for_each_mutable_chunk;
 
@@ -428,6 +429,8 @@ fn propagate_available_value(
         for edge in edges {
             if edge > original {
                 work.push(edge);
+            } else if !register_is_dead_after_removals(chunk, replaced, edge, removed) {
+                return false;
             }
         }
     }

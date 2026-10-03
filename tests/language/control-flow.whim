@@ -388,3 +388,25 @@ for ($for_index = 0; match ($for_index) {
 
 assert!($for_index == 2);
 assert!($for_bodies == 1);
+
+class OffsetBox {
+  public uint $value = 1u;
+}
+
+function loop_carried_property_value(): vec<uint> {
+  $out = vec[];
+  $offset = 0u;
+  $box = new OffsetBox();
+  for ($i = 0; $i < 3; $i++) {
+    $out[] = $offset;
+    if ($offset == $box->value) {
+      break;
+    } else {
+      $offset = $box->value;
+    }
+  }
+
+  return $out;
+}
+
+assert!(loop_carried_property_value() == vec[0u, 1u]);
