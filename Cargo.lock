@@ -3284,7 +3284,7 @@ dependencies = [
 
 [[package]]
 name = "whim"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "annotate-snippets",
  "blake3",
@@ -3324,11 +3324,11 @@ dependencies = [
 
 [[package]]
 name = "whim-base"
-version = "0.18.0"
+version = "0.18.1"
 
 [[package]]
 name = "whim-bytecode"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "bincode",
  "hashbrown 0.17.1",
@@ -3342,7 +3342,7 @@ dependencies = [
 
 [[package]]
 name = "whim-compiler"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "hashbrown 0.17.1",
  "whim-base",
@@ -3356,7 +3356,7 @@ dependencies = [
 
 [[package]]
 name = "whim-formatter"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "serde",
  "unicode-width",
@@ -3366,7 +3366,7 @@ dependencies = [
 
 [[package]]
 name = "whim-lib"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "whim-compiler",
  "whim-runtime",
@@ -3374,7 +3374,7 @@ dependencies = [
 
 [[package]]
 name = "whim-linter"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "annotate-snippets",
  "globset",
@@ -3388,7 +3388,7 @@ dependencies = [
 
 [[package]]
 name = "whim-loop"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "corosensei",
  "hashbrown 0.17.1",
@@ -3397,7 +3397,7 @@ dependencies = [
 
 [[package]]
 name = "whim-macros"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3408,7 +3408,7 @@ dependencies = [
 
 [[package]]
 name = "whim-optimizer"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "hashbrown 0.17.1",
  "itoa",
@@ -3423,7 +3423,7 @@ dependencies = [
 
 [[package]]
 name = "whim-pgsql"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "itoa",
  "openssl-sys",
@@ -3436,7 +3436,7 @@ dependencies = [
 
 [[package]]
 name = "whim-runtime"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "argon2",
  "base16ct",
@@ -3515,7 +3515,7 @@ dependencies = [
 
 [[package]]
 name = "whim-span"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "memchr",
  "serde",
@@ -3523,14 +3523,14 @@ dependencies = [
 
 [[package]]
 name = "whim-sqlite"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "rusqlite",
 ]
 
 [[package]]
 name = "whim-syn"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "allocator-api2",
  "annotate-snippets",
@@ -3542,7 +3542,7 @@ dependencies = [
 
 [[package]]
 name = "whim-sys"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "fs2",
  "libc",
@@ -3557,7 +3557,7 @@ dependencies = [
 
 [[package]]
 name = "whim-value"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "bincode",
  "hashbrown 0.17.1",
