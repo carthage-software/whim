@@ -139,11 +139,12 @@ fn missing_manifest_reports_an_error_and_keeps_open_file_features() {
             .new_text
             .contains("\n  return 1;\n")
     );
-    assert!(
+    assert_eq!(
         server
             .document_diagnostics(&fixture.uri("closed.whim"))
             .unwrap()
-            .is_empty()
+            .len(),
+        0,
     );
     let WorkspaceDiagnosticReportResult::Report(report) = server
         .workspace_diagnostics(&serde_json::from_value(json!({"previousResultIds": []})).unwrap())
@@ -276,7 +277,7 @@ fn invalid_configs_report_errors_without_using_default_filters() {
     let uri = fixture.uri("open.whim");
     open(&mut server, &uri);
     assert!(format(&server, &uri).is_none());
-    assert!(server.document_diagnostics(&uri).unwrap().is_empty());
+    assert_eq!(server.document_diagnostics(&uri).unwrap().len(), 0);
     let WorkspaceDiagnosticReportResult::Report(report) = server
         .workspace_diagnostics(&serde_json::from_value(json!({"previousResultIds": []})).unwrap())
         .unwrap()

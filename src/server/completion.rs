@@ -267,9 +267,9 @@ mod tests {
     #[test]
     fn strings_and_comments_have_no_completion() {
         let string = "'inside'";
-        assert!(labels(string, 3).is_empty());
+        assert_eq!(labels(string, 3).len(), 0);
         let comment = "// inside";
-        assert!(labels(comment, 5).is_empty());
+        assert_eq!(labels(comment, 5).len(), 0);
     }
 
     #[test]
@@ -280,9 +280,9 @@ mod tests {
     #[test]
     fn imports_do_not_offer_statement_snippets() {
         let complete = "use Whim\\Str;";
-        assert!(labels(complete, complete.len() - 1).is_empty());
+        assert_eq!(labels(complete, complete.len() - 1).len(), 0);
 
         let incomplete = "use Whim\\";
-        assert!(labels(incomplete, incomplete.len()).is_empty());
+        assert_eq!(labels(incomplete, incomplete.len()).len(), 0);
     }
 }

@@ -135,7 +135,7 @@ fn mark_roots(roots: &mut Roots) {
 /// Paints a subgraph gray, trial-decrementing the target of every edge
 /// traversed, so counts reflect only external references.
 fn mark_gray(start: ErasedBox, stack: &mut Vec<ErasedBox>) {
-    debug_assert!(stack.is_empty());
+    debug_assert_eq!(stack.len(), 0);
     stack.push(start);
     while let Some(node) = stack.pop() {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
@@ -165,7 +165,7 @@ fn scan_roots(roots: &[ErasedBox]) {
 }
 
 fn scan(start: ErasedBox, stack: &mut Vec<ErasedBox>, black_stack: &mut Vec<ErasedBox>) {
-    debug_assert!(stack.is_empty());
+    debug_assert_eq!(stack.len(), 0);
     stack.push(start);
     while let Some(node) = stack.pop() {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.
@@ -187,7 +187,7 @@ fn scan(start: ErasedBox, stack: &mut Vec<ErasedBox>, black_stack: &mut Vec<Eras
 }
 
 fn scan_black(start: ErasedBox, stack: &mut Vec<ErasedBox>) {
-    debug_assert!(stack.is_empty());
+    debug_assert_eq!(stack.len(), 0);
     stack.push(start);
     while let Some(node) = stack.pop() {
         // SAFETY: the tag and managed handle prove the payload type and lifetime.

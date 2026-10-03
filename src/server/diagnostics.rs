@@ -290,7 +290,7 @@ mod tests {
                 ),
             )
             .unwrap();
-        assert!(published(&client).diagnostics.is_empty());
+        assert_eq!(published(&client).diagnostics.len(), 0);
     }
 
     #[test]
@@ -329,9 +329,9 @@ mod tests {
             };
             if item.uri == open {
                 assert_eq!(item.version, Some(7));
-                assert!(item.full_document_diagnostic_report.items.is_empty());
+                assert_eq!(item.full_document_diagnostic_report.items.len(), 0);
             } else if item.uri == removed {
-                assert!(item.full_document_diagnostic_report.items.is_empty());
+                assert_eq!(item.full_document_diagnostic_report.items.len(), 0);
             } else {
                 assert!(item.uri.as_str().ends_with("closed.whim"));
                 assert_eq!(item.full_document_diagnostic_report.items.len(), 1);

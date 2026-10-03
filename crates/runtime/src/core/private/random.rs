@@ -37,7 +37,7 @@ pub(crate) fn random_string(scope: &Context<'_, '_, '_>, arguments: Arguments<'_
         return Value::null();
     };
     let alphabet = arguments.bytes(1);
-    let bits = usize::BITS - (alphabet.len() - 1).leading_zeros();
+    let bits = (alphabet.len() - 1).bit_width();
     let width = bits.div_ceil(8) as usize;
     let mask = usize::MAX >> (usize::BITS - bits);
     let mut result = Vec::with_capacity(length);

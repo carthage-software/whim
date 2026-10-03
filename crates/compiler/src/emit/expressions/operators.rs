@@ -631,8 +631,6 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 );
-
-                Ok(())
             }
             Expression::ArrayAccess(access) if step == 1 => {
                 let Expression::Access(Access::Property(property)) = access.array.unparenthesized()
@@ -660,14 +658,13 @@ impl BodyCompiler<'_, '_> {
                     },
                     span,
                 );
-
-                Ok(())
             }
             _ => {
                 self.step_target(scope, operand, step, span, StepResult::New)?;
-                Ok(())
             }
         }
+
+        Ok(())
     }
 
     fn step_target(

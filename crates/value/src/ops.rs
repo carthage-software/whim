@@ -171,7 +171,7 @@ pub fn structural_hash(value: &Value, heap: &Heap) -> u64 {
                 let mut sum = 0u64;
                 let mut xor = 0u64;
                 let (pairs, remainder) = completed[start..].as_chunks::<2>();
-                debug_assert!(remainder.is_empty());
+                debug_assert_eq!(remainder.len(), 0);
                 for pair in pairs {
                     let mut hasher = state.structural_hasher();
                     hasher.write_u8(HASH_PAIR);

@@ -448,7 +448,7 @@ impl Heap {
         // SAFETY: collection excludes buffering new roots, and the collector no
         // longer borrows either root vector when returning this empty storage.
         let buffer = unsafe { &mut *self.roots.get() };
-        debug_assert!(buffer.is_empty());
+        debug_assert_eq!(buffer.len(), 0);
         *buffer = roots;
     }
 
@@ -1029,7 +1029,7 @@ impl Heap {
 }
 
 fn trim_empty_roots(roots: &mut Roots) {
-    debug_assert!(roots.is_empty());
+    debug_assert_eq!(roots.len(), 0);
     if roots.capacity() > ROOT_BUFFER_RETAIN_LIMIT {
         *roots = Vec::new();
     }

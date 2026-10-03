@@ -80,7 +80,7 @@ On Windows, download the `x86_64-pc-windows-msvc` ZIP archive from
 On FreeBSD, install `bash`, `curl`, and `postgresql18-client` before using the
 installer. Release builds target FreeBSD 14.4 or later.
 
-To build Whim from source, install Rust 1.98 or later and run:
+To build Whim from source, install Rust 1.99 or later and run:
 
 ```console
 cargo build --locked --release

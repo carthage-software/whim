@@ -611,13 +611,7 @@ impl ConnectionShared {
     }
 
     fn close(self: &Arc<Self>) {
-        if self
-            .status
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |status| {
-                (!matches!(status, STATUS_CLOSING | STATUS_CLOSED)).then_some(STATUS_CLOSING)
-            })
-            .is_err()
-        {
+        if self.status.fetch_max(STATUS_CLOSING, Ordering::AcqRel) >= STATUS_CLOSING {
             return;
         }
 

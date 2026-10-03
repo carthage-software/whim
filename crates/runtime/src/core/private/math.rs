@@ -6,7 +6,7 @@
 )]
 
 use std::cmp::Ordering;
-use std::f64;
+use std::f64::consts;
 use std::slice;
 use std::vec;
 
@@ -716,10 +716,10 @@ const INF: f64 = f64::INFINITY;
 const INFINITY: f64 = f64::INFINITY;
 
 #[whim_constant("Whim\\Math\\E", "float")]
-const E: f64 = f64::consts::E;
+const E: f64 = consts::E;
 
 #[whim_constant("Whim\\Math\\PI", "float")]
-const PI: f64 = f64::consts::PI;
+const PI: f64 = consts::PI;
 
 #[whim_constant("Whim\\Math\\FLOAT32_MAX", "float")]
 const FLOAT32_MAX: f64 = f32::MAX as f64;

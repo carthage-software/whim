@@ -4,7 +4,7 @@ description: Build Whim for FreeBSD aarch64 on Linux
 runs:
   using: composite
   steps:
-    - uses: dtolnay/rust-toolchain@1.98.0
+    - uses: dtolnay/rust-toolchain@1.99.0
       with:
         targets: aarch64-unknown-freebsd
     - uses: taiki-e/install-action@v2

@@ -128,7 +128,7 @@ final class Holder {
     fn invalid_source_keeps_lexical_tokens() {
         let analysis = Analysis::new("final class {");
         assert!(analysis.elements().is_empty());
-        assert!(!analysis.tokens().is_empty());
+        assert_ne!(analysis.tokens().len(), 0);
     }
 
     #[test]

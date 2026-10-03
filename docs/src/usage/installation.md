@@ -92,7 +92,7 @@ Each release publishes `latest`, the full version, and the major-minor version.
 
 ## Build from source
 
-Install Rust 1.98 or later. From the repository root, run:
+Install Rust 1.99 or later. From the repository root, run:
 
 ```console
 cargo build --locked --release
@@ -106,7 +106,7 @@ The build produces `target\release\whim.exe`. Release builds set
 `RUSTFLAGS=-C target-feature=+crt-static` to include the C runtime.
 The package manager needs Git for Windows on `PATH`.
 
-On FreeBSD, use the `latest` package repository for Rust 1.98 or later, then
+On FreeBSD, use the `latest` package repository for Rust 1.99 or later, then
 install the build tools and PostgreSQL client library:
 
 ```sh
