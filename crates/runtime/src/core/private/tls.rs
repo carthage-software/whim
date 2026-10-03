@@ -1259,14 +1259,21 @@ fn optional_bytes(arguments: Arguments<'_>, index: usize) -> Option<&[u8]> {
 
 fn key_text(cx: &mut Context<'_, '_, '_>, key: KeyRef<'_>) -> Result<String, Throw> {
     let text = match key {
-        KeyRef::String(string) => {
+        KeyRef::String(string) | KeyRef::NewtypeString(string, _) => {
             from_utf8(ByteStringObject::handle_bytes(string)).map(str::to_owned)
         }
-        KeyRef::ShortString(string) => from_utf8(string.as_bytes()).map(str::to_owned),
-        // SAFETY: the surrounding invariant makes this path unreachable.
-        KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) => unsafe {
-            unreachable_invariant("validated TLS server identity keys are strings")
-        },
+        KeyRef::ShortString(string) | KeyRef::NewtypeShortString(string, _) => {
+            from_utf8(string.as_bytes()).map(str::to_owned)
+        }
+        KeyRef::Int(_)
+        | KeyRef::Uint(_)
+        | KeyRef::Bool(_)
+        | KeyRef::NewtypeInt(_, _)
+        | KeyRef::NewtypeUint(_, _)
+        | KeyRef::NewtypeBool(_, _) => {
+            // SAFETY: built-in dispatch checked the string key type.
+            unsafe { unreachable_invariant("validated TLS server identity keys are strings") }
+        }
     };
 
     text.map_err(|_| cx.type_error("a server name identity is not valid UTF-8"))

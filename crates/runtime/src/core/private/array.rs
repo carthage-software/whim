@@ -606,6 +606,7 @@ fn unique_values<'value>(
                 }
             },
             |key| {
+                let key = key.without_newtype();
                 let keys = keys.get_or_insert_with(|| {
                     let mut keys = DictObject::new(heap);
                     keys.make_mut().reserve_for_build(length);

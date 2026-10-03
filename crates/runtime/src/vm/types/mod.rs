@@ -14,7 +14,6 @@ use whim_bytecode::render;
 use whim_value::Value;
 use whim_value::ValueView;
 use whim_value::array::ArrayTypeCheckId;
-use whim_value::dict::keys::KeyRef;
 use whim_value::function::CallTarget;
 use whim_value::function::FunctionObject;
 use whim_value::function::PresetArg;
@@ -462,12 +461,7 @@ impl VirtualMachine<'_> {
                 for (key, value) in dictionary.iter() {
                     push_runtime_union_member(
                         &mut keys,
-                        match key {
-                            KeyRef::Int(_) => TypeDescriptor::Int,
-                            KeyRef::Uint(_) => TypeDescriptor::Uint,
-                            KeyRef::Bool(_) => TypeDescriptor::Bool,
-                            KeyRef::String(_) | KeyRef::ShortString(_) => TypeDescriptor::String,
-                        },
+                        self.runtime_type_descriptor(&key.to_value(), depth + 1),
                     );
                     push_runtime_union_member(
                         &mut values,

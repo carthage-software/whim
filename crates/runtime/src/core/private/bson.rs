@@ -158,6 +158,11 @@ fn write_document(
             KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) => {
                 return Err(CodecError::new("document keys in BSON must be strings"));
             }
+            _ => {
+                return Err(CodecError::new(
+                    "BSON document keys cannot carry newtype tags",
+                ));
+            }
         }
         bytes[element_type] = write_value(context, value, depth, bytes)?;
     }

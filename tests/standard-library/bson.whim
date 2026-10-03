@@ -340,3 +340,10 @@ try {
 }
 
 assert!($largeError is DecodingException);
+
+newtype BsonField = string;
+rejects_bson_value(dict['x' => 1, BsonField('x') => 2]);
+rejects_bson_value(dict[
+  'a longer field name' => 1,
+  BsonField('a longer field name') => 2,
+]);

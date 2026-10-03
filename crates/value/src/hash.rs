@@ -5,10 +5,13 @@ use std::collections::hash_map::RandomState;
 use std::hash::BuildHasher;
 use std::hash::Hasher;
 
+use crate::newtype::NewtypeValueId;
+
 const INT_SEED_DOMAIN: u64 = 0x7df2_720f_8d2d_878d;
 const UINT_SEED_DOMAIN: u64 = 0x8c91_b41e_6de2_571b;
 const BOOL_SEED_DOMAIN: u64 = 0xf8d2_84dd_44bd_aebd;
 const SHORT_STRING_SEED_DOMAIN: u64 = 0x65a1_14da_5446_886d;
+const NEWTYPE_SEED_DOMAIN: u64 = 0xa29f_b31c_0876_45ed;
 const STRING_HASH_DOMAIN: u8 = 2;
 
 pub(crate) struct HashState {
@@ -17,6 +20,7 @@ pub(crate) struct HashState {
     uint_seed: u64,
     bool_seed: u64,
     short_string_seed: u64,
+    newtype_seed: u64,
 }
 
 #[expect(
@@ -32,6 +36,7 @@ impl HashState {
             uint_seed: derive_seed(&random, UINT_SEED_DOMAIN),
             bool_seed: derive_seed(&random, BOOL_SEED_DOMAIN),
             short_string_seed: derive_seed(&random, SHORT_STRING_SEED_DOMAIN),
+            newtype_seed: derive_seed(&random, NEWTYPE_SEED_DOMAIN),
             random,
         }
     }
@@ -58,6 +63,12 @@ impl HashState {
     #[inline(always)]
     pub(crate) const fn hash_short_string(&self, packed: u64) -> u64 {
         permute(packed, self.short_string_seed)
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub(crate) fn hash_newtype(&self, hash: u64, tag: NewtypeValueId) -> u64 {
+        permute(hash, self.newtype_seed ^ u64::from(tag.0))
     }
 
     pub(crate) fn string_hasher(&self, len: usize) -> impl Hasher {

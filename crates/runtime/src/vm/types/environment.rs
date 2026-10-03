@@ -4,6 +4,7 @@
 use std::rc::Rc;
 
 use whim_base::limits::MAX_TYPE_DEPTH_U32;
+use whim_base::unwrap_option_invariant;
 use whim_bytecode::aliases::expand_aliases_using as expand_aliases;
 use whim_bytecode::chunk::descriptors::FunctionTypeDescriptor;
 use whim_bytecode::chunk::descriptors::FunctionTypeParameterDescriptor;
@@ -11,6 +12,8 @@ use whim_bytecode::chunk::descriptors::ShapeKey;
 use whim_bytecode::chunk::descriptors::TypeDescriptor;
 use whim_bytecode::unit::CompiledTypeParameter;
 use whim_value::atom::Atom;
+use whim_value::newtype::NewtypeId;
+use whim_value::newtype::NewtypeValueId;
 use whim_value::object::ClassId;
 use whim_value::object::TypeEnvironmentId;
 
@@ -25,6 +28,36 @@ use crate::vm::types::VirtualMachineControl;
 use crate::vm::types::discriminant;
 
 impl VirtualMachine<'_> {
+    pub(in crate::vm) fn intern_newtype_value(
+        &mut self,
+        declaration: NewtypeId,
+        environment: TypeEnvironmentId,
+        parent: Option<NewtypeValueId>,
+    ) -> NewtypeValueId {
+        // Tag identity depends on the declared arguments, not the caller's bindings.
+        let count = self.engine.tables.newtypes[declaration.0 as usize]
+            .type_parameters
+            .len();
+        let mut canonical = TypeEnvironmentId::default();
+        for index in 0..count {
+            let name = self.engine.tables.newtypes[declaration.0 as usize].type_parameters[index]
+                .name
+                .clone();
+            // SAFETY: construction and casts bind every declared type parameter first.
+            let descriptor = unsafe {
+                unwrap_option_invariant(
+                    self.type_environment_binding(environment, &name),
+                    "a newtype's declared type arguments are bound",
+                )
+            }
+            .clone();
+            canonical = self.intern_type_binding::<false>(canonical, &name, &descriptor);
+        }
+        self.engine
+            .tables
+            .intern_newtype_value(declaration, canonical, parent)
+    }
+
     /// Resolves the innermost binding by walking immutable environment
     /// parents. Canonical environments share those parents, so lookup depth
     /// is the number of active binders rather than the number of calls that

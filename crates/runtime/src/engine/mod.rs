@@ -646,13 +646,13 @@ impl Engine {
                     .iter()
                     .map(|(key, value)| {
                         let key = match key {
-                            KeyRef::Int(key) => key.to_string(),
-                            KeyRef::Uint(key) => format!("{key}u"),
-                            KeyRef::Bool(key) => key.to_string(),
-                            KeyRef::String(key) => {
+                            KeyRef::Int(key) | KeyRef::NewtypeInt(key, _) => key.to_string(),
+                            KeyRef::Uint(key) | KeyRef::NewtypeUint(key, _) => format!("{key}u"),
+                            KeyRef::Bool(key) | KeyRef::NewtypeBool(key, _) => key.to_string(),
+                            KeyRef::String(key) | KeyRef::NewtypeString(key, _) => {
                                 format!("'{}'", String::from_utf8_lossy(key.flatten()))
                             }
-                            KeyRef::ShortString(key) => {
+                            KeyRef::ShortString(key) | KeyRef::NewtypeShortString(key, _) => {
                                 format!("'{}'", String::from_utf8_lossy(key.as_bytes()))
                             }
                         };

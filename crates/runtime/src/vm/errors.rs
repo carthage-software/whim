@@ -170,13 +170,19 @@ pub(crate) fn debug_render(heap: &Heap, value: &Value, depth: u32) -> String {
                 .iter()
                 .map(|(key, entry)| {
                     let key = match key {
-                        KeyRef::Int(rendered) => rendered.to_string(),
-                        KeyRef::Uint(rendered) => format!("{rendered}u"),
-                        KeyRef::Bool(rendered) => rendered.to_string(),
-                        KeyRef::String(rendered) => {
+                        KeyRef::Int(rendered) | KeyRef::NewtypeInt(rendered, _) => {
+                            rendered.to_string()
+                        }
+                        KeyRef::Uint(rendered) | KeyRef::NewtypeUint(rendered, _) => {
+                            format!("{rendered}u")
+                        }
+                        KeyRef::Bool(rendered) | KeyRef::NewtypeBool(rendered, _) => {
+                            rendered.to_string()
+                        }
+                        KeyRef::String(rendered) | KeyRef::NewtypeString(rendered, _) => {
                             format!("'{}'", String::from_utf8_lossy(rendered.flatten()))
                         }
-                        KeyRef::ShortString(rendered) => {
+                        KeyRef::ShortString(rendered) | KeyRef::NewtypeShortString(rendered, _) => {
                             format!("'{}'", String::from_utf8_lossy(rendered.as_bytes()))
                         }
                     };
@@ -281,7 +287,7 @@ impl<'vm, 'engine> DetailedDebugRenderer<'vm, 'engine> {
         let mut rendered = format!("{name} [\n");
         for (key, entry) in value.iter().take(DEBUG_ITEM_LIMIT) {
             rendered.push_str(&indent);
-            rendered.push_str(&Self::render_key(key));
+            rendered.push_str(&self.render_key(key, depth + 1));
             rendered.push_str(" => ");
             rendered.push_str(&self.render(entry, depth + 1));
             rendered.push_str(",\n");
@@ -334,13 +340,14 @@ impl<'vm, 'engine> DetailedDebugRenderer<'vm, 'engine> {
         );
     }
 
-    fn render_key(key: KeyRef<'_>) -> String {
+    fn render_key(&mut self, key: KeyRef<'_>, depth: u32) -> String {
         match key {
             KeyRef::Int(value) => value.to_string(),
             KeyRef::Uint(value) => format!("{value}u"),
             KeyRef::Bool(value) => value.to_string(),
             KeyRef::String(value) => render_debug_string(value.flatten()),
             KeyRef::ShortString(value) => render_debug_string(value.as_bytes()),
+            _ => self.render(&key.to_value(), depth),
         }
     }
 
@@ -701,6 +708,7 @@ impl VirtualMachine<'_> {
                             rendered.push_bytes(value.as_bytes());
                             rendered.push("'");
                         }
+                        _ => self.assertion_debug_render_into(&key.to_value(), depth + 1, rendered),
                     }
 
                     rendered.push(" => ");

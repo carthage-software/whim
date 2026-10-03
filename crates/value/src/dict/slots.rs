@@ -25,6 +25,8 @@ pub(in crate::dict) enum Slot {
     Vacant,
 }
 
+const _: () = assert!(size_of::<Slot>() == 32);
+
 impl Clone for Slot {
     fn clone(&self) -> Self {
         if let Self::Occupied { key, value } = self {
@@ -65,6 +67,21 @@ pub(in crate::dict) fn slot_matches_ref(slot: &Slot, key: KeyRef<'_>) -> bool {
             (Key::Bool(left), KeyRef::Bool(right)) => *left == right,
             (Key::String(left), KeyRef::String(right)) => left.eq_bytes(right),
             (Key::ShortString(left), KeyRef::ShortString(right)) => *left == right,
+            (Key::NewtypeInt(left, a), KeyRef::NewtypeInt(right, b)) => *a == b && *left == right,
+            (Key::NewtypeUint(left, a), KeyRef::NewtypeUint(right, b)) => *a == b && *left == right,
+            (Key::NewtypeBool(left, a), KeyRef::NewtypeBool(right, b)) => *a == b && *left == right,
+            (Key::NewtypeString(left, a), KeyRef::NewtypeString(right, b)) => {
+                *a == b && left.eq_bytes(right)
+            }
+            (Key::NewtypeShortString(left, a), KeyRef::NewtypeShortString(right, b)) => {
+                *a == b && *left == right
+            }
+            (Key::NewtypeString(left, a), KeyRef::NewtypeShortString(right, b)) => {
+                *a == b && ByteStringObject::handle_bytes(left) == right.as_bytes()
+            }
+            (Key::NewtypeShortString(left, a), KeyRef::NewtypeString(right, b)) => {
+                *a == b && left.as_bytes() == ByteStringObject::handle_bytes(right)
+            }
             (Key::String(left), KeyRef::ShortString(right)) => {
                 ByteStringObject::handle_bytes(left) == right.as_bytes()
             }

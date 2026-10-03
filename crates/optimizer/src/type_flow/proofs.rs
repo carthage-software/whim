@@ -848,55 +848,10 @@ impl TypeFlow<'_> {
         let Some(actual) = self.register_type_at(index, register, 0) else {
             return false;
         };
-        let Some(actual) = self.stored_dictionary_key_descriptor(&actual, 0) else {
-            return false;
-        };
+
         let expected = self.expanded_aliases(expected);
 
         self.descriptor_proves(&actual, &expected, 0)
-    }
-
-    fn stored_dictionary_key_descriptor(
-        &self,
-        descriptor: &TypeDescriptor,
-        depth: usize,
-    ) -> Option<TypeDescriptor> {
-        if depth > MAX_TYPE_DEPTH {
-            return None;
-        }
-        let descriptor = self.expanded_aliases(descriptor);
-
-        match descriptor.as_ref() {
-            TypeDescriptor::Named {
-                name, arguments, ..
-            } => {
-                let Some(unit) = self.unit else {
-                    return Some(descriptor.as_ref().clone());
-                };
-                let Some(newtype) = unit.newtype_by_name(name) else {
-                    return Some(descriptor.as_ref().clone());
-                };
-                let backing = substitute_parameters(
-                    &newtype.backing,
-                    &newtype.type_parameters,
-                    arguments.as_deref(),
-                    depth + 1,
-                );
-                self.stored_dictionary_key_descriptor(&backing, depth + 1)
-            }
-            TypeDescriptor::Parameter(_) => None,
-            TypeDescriptor::Union(members) => members
-                .iter()
-                .map(|member| self.stored_dictionary_key_descriptor(member, depth + 1))
-                .collect::<Option<Vec<_>>>()
-                .map(TypeDescriptor::Union),
-            TypeDescriptor::Intersection(members) => members
-                .iter()
-                .map(|member| self.stored_dictionary_key_descriptor(member, depth + 1))
-                .collect::<Option<Vec<_>>>()
-                .map(TypeDescriptor::Intersection),
-            _ => Some(descriptor.as_ref().clone()),
-        }
     }
 
     pub(crate) fn proves_array_element(

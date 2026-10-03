@@ -591,13 +591,8 @@ fn check_dictionary_shape(
         {
             continue;
         }
-        let key = match key {
-            KeyRef::Int(key) => Value::int(key),
-            KeyRef::Uint(key) => Value::uint(key),
-            KeyRef::Bool(key) => Value::bool(key),
-            KeyRef::String(key) => Value::string(key.clone()),
-            KeyRef::ShortString(key) => Value::short_string(key),
-        };
+
+        let key = key.to_value();
         if !check_trivial_descriptor(key_descriptor, &key)?
             || !check_trivial_descriptor(value_descriptor, value)?
         {

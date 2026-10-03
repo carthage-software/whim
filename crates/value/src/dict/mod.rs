@@ -233,14 +233,13 @@ impl DictObject {
             return values.get(usize::try_from(key).ok()?);
         }
 
-        let key = KeyRef::Int(key);
-        let hash = key.hash64(self.hash_state());
+        let hash = self.hash_state().hash_int(key);
         let position = self.index.find(hash, |entry| {
             entry.matches(hash)
-                && slot_matches_ref(
+                && matches!(
                     // SAFETY: the surrounding invariant keeps this index in bounds.
                     unsafe { self.entries.get_unchecked(entry.slot as usize) },
-                    key,
+                    Slot::Occupied { key: Key::Int(stored), .. } if *stored == key
                 )
         })?;
 
@@ -350,14 +349,32 @@ impl DictObject {
         }
 
         let hash = key.hash64(self.hash_state());
-        let position = self.index.find(hash, |entry| {
-            entry.matches(hash)
-                && slot_matches_ref(
-                    // SAFETY: the surrounding invariant keeps this index in bounds.
-                    unsafe { self.entries.get_unchecked(entry.slot as usize) },
-                    key,
-                )
-        })?;
+        let position = match key {
+            KeyRef::String(key) => self.index.find(hash, |entry| {
+                entry.matches(hash)
+                    && slot_matches_string(
+                        // SAFETY: the index only references live entries.
+                        unsafe { self.entries.get_unchecked(entry.slot as usize) },
+                        key,
+                    )
+            }),
+            KeyRef::ShortString(key) => self.index.find(hash, |entry| {
+                entry.matches(hash)
+                    && slot_matches_short_string(
+                        // SAFETY: the index only references live entries.
+                        unsafe { self.entries.get_unchecked(entry.slot as usize) },
+                        key,
+                    )
+            }),
+            key => self.index.find(hash, |entry| {
+                entry.matches(hash)
+                    && slot_matches_ref(
+                        // SAFETY: the surrounding invariant keeps this index in bounds.
+                        unsafe { self.entries.get_unchecked(entry.slot as usize) },
+                        key,
+                    )
+            }),
+        }?;
         let position = position.slot;
         self.note_type_check_mutation(position);
         // SAFETY: the surrounding invariant keeps this index in bounds.
@@ -724,7 +741,7 @@ impl Trace for DictObject {
         let entries = mem::take(&mut self.entries);
         for slot in entries {
             if let Slot::Occupied { key, value, .. } = slot {
-                if let Key::String(string) = key {
+                if let Key::String(string) | Key::NewtypeString(string, _) = key {
                     queue.release_child(string, mode);
                 }
                 queue.release_value(value, mode);
@@ -757,8 +774,12 @@ mod tests {
     use crate::Value;
     use crate::dict::DictObject;
     use crate::dict::keys::Key;
+    use crate::dict::keys::KeyRef;
     use crate::heap::Heap;
     use crate::heap::handle::ManagedRef;
+    use crate::newtype::NewtypeValueId;
+    use crate::string::ByteStringObject;
+    use crate::string::short::ShortString;
 
     fn packed_dict(heap: &Heap) -> ManagedRef<DictObject> {
         let mut dict = DictObject::new(heap);
@@ -798,5 +819,53 @@ mod tests {
 
         assert_eq!(removed.and_then(|value| value.as_int()), Some(20));
         assert!(dict.packed_values().is_none());
+    }
+
+    #[test]
+    fn tagged_string_keys_match_across_storage_forms_and_keep_ownership() {
+        let heap = Heap::new();
+        let tag = NewtypeValueId(1);
+        let short = ShortString::from_bytes(b"key").unwrap();
+        let flat = ByteStringObject::from_bytes(&heap, b"key");
+        let owned = Key::NewtypeString(flat.clone(), tag);
+        let inline = Key::NewtypeShortString(short, tag);
+        assert!(owned == inline);
+        assert_eq!(
+            owned.hash64(heap.hash_state()),
+            inline.hash64(heap.hash_state())
+        );
+
+        let mut dict = DictObject::new(&heap);
+        assert!(dict.make_mut().insert(owned, Value::int(10)).is_none());
+        drop(flat);
+        assert_eq!(
+            dict.get_ref(KeyRef::NewtypeShortString(short, tag))
+                .and_then(Value::as_int),
+            Some(10)
+        );
+        assert!(
+            dict.get_ref(KeyRef::NewtypeShortString(short, NewtypeValueId(2)))
+                .is_none()
+        );
+        assert!(dict.get_short_string(short).is_none());
+
+        let copy = dict.clone();
+        assert_eq!(
+            dict.make_mut()
+                .insert(inline, Value::int(20))
+                .and_then(|value| value.as_int()),
+            Some(10)
+        );
+        assert_eq!(
+            copy.get_ref(KeyRef::NewtypeShortString(short, tag))
+                .and_then(Value::as_int),
+            Some(10)
+        );
+        let (key, _) = copy.iter().next().unwrap();
+        let value = key.to_value();
+        drop(copy);
+        drop(dict);
+        assert_eq!(value.newtype_id(), Some(tag));
+        assert_eq!(value.as_string_bytes(), Some(b"key".as_slice()));
     }
 }

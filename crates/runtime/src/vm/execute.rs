@@ -94,9 +94,12 @@ use crate::vm::arrays::array_contains_key;
 use crate::vm::arrays::array_length_hint;
 use crate::vm::arrays::dict_index_get_int_key_or_null;
 use crate::vm::arrays::dict_index_get_string_key_or_null;
+use crate::vm::arrays::dict_index_get_tagged_key;
+use crate::vm::arrays::dict_index_get_tagged_key_or_null;
 use crate::vm::arrays::dict_index_get_uint_key;
 use crate::vm::arrays::dict_index_get_uint_key_or_null;
 use crate::vm::arrays::dict_index_set;
+use crate::vm::arrays::dict_index_set_tagged_key;
 use crate::vm::arrays::dict_index_set_uint_key;
 use crate::vm::arrays::index_get_or_null;
 use crate::vm::arrays::index_get_path;
@@ -1336,11 +1339,17 @@ impl VirtualMachine<'_> {
                                 Err(fault) => fail!(self, ip, floor, 'dispatch, self.array_fault(fault)),
                             },
                             IntegerKind::U64 => {
-                                // SAFETY: type flow proves the active-frame index is a uint.
-                                let index = unsafe { uint_register(registers, index) };
-                                dict_index_get_uint_key_or_null(borrow_register!(registers, container), index)
+                                let key = borrow_register!(registers, index);
+                                if key.newtype_id().is_some() {
+                                    dict_index_get_tagged_key_or_null(borrow_register!(registers, container), key)
+                                } else {
+                                    // SAFETY: type flow proves the active-frame index is a uint.
+                                    let index = unsafe { uint_register(registers, index) };
+                                    dict_index_get_uint_key_or_null(borrow_register!(registers, container), index)
+                                }
                             }
                         };
+
                         write_register!(registers, destination, value);
                     }
                     Instruction::DictIndexGetStringKeyOrNull {
@@ -1431,12 +1440,15 @@ impl VirtualMachine<'_> {
                         index,
                         offset,
                     } => {
-                        // SAFETY: type flow proves the active-frame index is a uint.
-                        let index = unsafe { uint_register(registers, index) };
-                        let value = dict_index_get_uint_key_or_null(
-                            borrow_register!(registers, container),
-                            index,
-                        );
+                        let key = borrow_register!(registers, index);
+                        let value = if key.newtype_id().is_some() {
+                            dict_index_get_tagged_key_or_null(borrow_register!(registers, container), key)
+                        } else {
+                            // SAFETY: type flow proves the active-frame index is a uint.
+                            let index = unsafe { uint_register(registers, index) };
+                            dict_index_get_uint_key_or_null(borrow_register!(registers, container), index)
+                        };
+
                         if !value.is_null() {
                             ip = jump_target(ip, i32::from(offset.offset()));
                         }
@@ -5020,15 +5032,20 @@ impl VirtualMachine<'_> {
                         let container =
                             // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                             unsafe { &*registers.add(container.index() as usize) };
+                        let key = borrow_register!(registers, index);
                         // SAFETY: verified bytecode keeps operands in the live frame and proves their types.
                         let index = unsafe { int_register(registers, index) };
 
-                        let outcome = match value_mode {
-                            ArrayValueMode::Generic | ArrayValueMode::Float | ArrayValueMode::Uint => {
-                                dict_index_get_int_key(container, index, value_mode)
-                            }
-                            ArrayValueMode::Int => {
-                                dict_index_get_int_key_int_value(container, index)
+                        let outcome = if key.newtype_id().is_some() {
+                            dict_index_get_tagged_key(&self.heap, container, key)
+                        } else {
+                            match value_mode {
+                                ArrayValueMode::Generic | ArrayValueMode::Float | ArrayValueMode::Uint => {
+                                    dict_index_get_int_key(container, index, value_mode)
+                                }
+                                ArrayValueMode::Int => {
+                                    dict_index_get_int_key_int_value(container, index)
+                                }
                             }
                         };
 
@@ -5271,24 +5288,38 @@ impl VirtualMachine<'_> {
                         index,
                         value_mode,
                     } => {
-                        // SAFETY: type flow proves the active-frame index is a uint.
-                        let index = unsafe { uint_register(registers, index) };
-                        match dict_index_get_uint_key(
-                            borrow_register!(registers, container), index, value_mode,
-                        ) {
+                        let key = borrow_register!(registers, index);
+                        let outcome = if key.newtype_id().is_some() {
+                            dict_index_get_tagged_key(&self.heap, borrow_register!(registers, container), key)
+                        } else {
+                            // SAFETY: type flow proves the active-frame index is a uint.
+                            let index = unsafe { uint_register(registers, index) };
+                            dict_index_get_uint_key(borrow_register!(registers, container), index, value_mode)
+                        };
+
+                        match outcome {
                             Ok(value) => write_register!(registers, destination, value),
                             Err(fault) => fail!(self, ip, floor, 'dispatch, self.array_fault(fault)),
                         }
                     }
                     Instruction::DictIndexSetIntegerKey { container, index, value, kind } => {
+                        let tag = borrow_register!(registers, index).newtype_id();
                         // SAFETY: type flow proves the active-frame index is an integer.
                         let index = unsafe { (&*registers.add(index.index() as usize)).as_integer_bits_unchecked() };
                         let value = read_register!(registers, value);
                         // SAFETY: verified bytecode keeps the container in the active frame.
                         let container = unsafe { &mut *registers.add(container.index() as usize) };
-                        match kind {
-                            IntegerKind::I64 => dict_index_set_int_key(container, index as i64, value),
-                            IntegerKind::U64 => dict_index_set_uint_key(container, index, value),
+                        if let Some(tag) = tag {
+                            let key = match kind {
+                                IntegerKind::I64 => Value::int(index as i64),
+                                IntegerKind::U64 => Value::uint(index),
+                            }.with_newtype(Some(tag));
+                            dict_index_set_tagged_key(container, key, value);
+                        } else {
+                            match kind {
+                                IntegerKind::I64 => dict_index_set_int_key(container, index as i64, value),
+                                IntegerKind::U64 => dict_index_set_uint_key(container, index, value),
+                            }
                         }
                     }
                     Instruction::DictIndexSetStringKey {

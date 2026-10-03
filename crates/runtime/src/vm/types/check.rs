@@ -87,23 +87,11 @@ impl Deref for ResolvedElementDescriptor<'_> {
 }
 
 fn key_ref_value(key: KeyRef<'_>) -> Value {
-    match key {
-        KeyRef::Int(key) => Value::int(key),
-        KeyRef::Uint(key) => Value::uint(key),
-        KeyRef::Bool(key) => Value::bool(key),
-        KeyRef::String(key) => Value::string(key.clone()),
-        KeyRef::ShortString(key) => Value::short_string(key),
-    }
+    key.to_value()
 }
 
 fn key_value(key: Key) -> Value {
-    match key {
-        Key::Int(key) => Value::int(key),
-        Key::Uint(key) => Value::uint(key),
-        Key::Bool(key) => Value::bool(key),
-        Key::String(key) => Value::string(key),
-        Key::ShortString(key) => Value::short_string(key),
-    }
+    KeyRef::from(&key).to_value()
 }
 
 fn numeric_cast_candidate(target: &TypeDescriptor, value: &Value) -> Option<Value> {
@@ -834,11 +822,8 @@ impl VirtualMachine<'_> {
             if !self.check_descriptor(&backing, &candidate, called, target_environment, 0)? {
                 return Ok(None);
             }
-            let value_id = self.engine.tables.intern_newtype_value(
-                id,
-                target_environment,
-                candidate.newtype_id(),
-            );
+            let value_id =
+                self.intern_newtype_value(id, target_environment, candidate.newtype_id());
             return Ok(Some(Value::newtype(candidate, value_id)));
         }
 
@@ -3398,13 +3383,7 @@ impl VirtualMachine<'_> {
                             }) {
                                 continue;
                             }
-                            let key_value = match key {
-                                KeyRef::Int(key) => Value::int(key),
-                                KeyRef::Uint(key) => Value::uint(key),
-                                KeyRef::Bool(key) => Value::bool(key),
-                                KeyRef::String(key) => Value::string(key.clone()),
-                                KeyRef::ShortString(key) => Value::short_string(key),
-                            };
+                            let key_value = key.to_value();
                             if !self.check_descriptor(
                                 key_type,
                                 &key_value,

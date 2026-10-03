@@ -371,10 +371,7 @@ impl VirtualMachine<'_> {
             return Err(self.newtype_construction_type_error(id, &value, backing.as_ref()));
         }
 
-        let tag = self
-            .engine
-            .tables
-            .intern_newtype_value(id, environment, parent);
+        let tag = self.intern_newtype_value(id, environment, parent);
         let entry = CachedNewtypeConstructor {
             outer,
             caller_class: self.current_frame().called_class.get(),

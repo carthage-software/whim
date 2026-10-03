@@ -44,8 +44,13 @@ newtype UserId = int;
 newtype PostId = int;
 
 $taggedKeys = dict[UserId(7) => 'user', PostId(7) => 'post'];
-assert!(length!($taggedKeys) == 1u);
-assert!($taggedKeys[7] == 'post');
+assert!(length!($taggedKeys) == 2u);
+assert!($taggedKeys[UserId(7)] == 'user');
+assert!($taggedKeys[PostId(7)] == 'post');
+assert!(!contains_key!($taggedKeys, 7));
+assert!(dynamic_length(UserId(7), UserId(7)) == 1u);
+assert!(dynamic_length(UserId(7), PostId(7)) == 2u);
+assert!(dynamic_length(UserId(7), 7) == 2u);
 
 final class KeySource {
   public int $calls = 0;

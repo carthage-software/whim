@@ -152,9 +152,14 @@ assert!(!($numbers is Numbers));
 Whim does not freeze the backing vec. It checks the type again when code crosses
 a typed boundary.
 
-Dict keys are different. A dict stores normalized scalar keys, so a newtype tag
-on an integer, string, or boolean key does not remain in the dict. Do not use a
-newtype as a dict key type when the returned dict must still satisfy that tag.
+Dict keys retain their newtype tags. The tag forms part of the key's identity:
+`UserId(42)`, `OrderId(42)`, and plain `42` can name three distinct entries.
+Lookup requires the same tag and backing value. Iteration returns the tagged
+key, and a dict with tagged keys can satisfy `dict<UserId, string>`.
+
+JSON and BSON object names must be plain strings. Cast tagged keys to `string`
+before encoding them; these formats cannot preserve distinct newtype keys with
+the same text.
 
 ## Attributes
 

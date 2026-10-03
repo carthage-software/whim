@@ -267,49 +267,27 @@ assert!($assertion_error_48 is LinkerError);
 
 newtype NewtypeDictKey = int;
 
-/** Returns a dictionary whose normalized keys violate its declared type. */
-function invalid_newtype_key_dictionary(): dict<NewtypeDictKey, string> {
+/** Keeps the key's newtype through insertion and a typed return. */
+function newtype_key_dictionary(): dict<NewtypeDictKey, string> {
   $values = dict[];
   $values[NewtypeDictKey(1)] = 'value';
   return $values;
 }
 
-/** Builds the same invalid dictionary through a generic key type. */
-function invalid_generic_newtype_key_dictionary<T: int>(
-  T $key,
-): dict<T, string> {
+/** Keeps the key's type through a generic return. */
+function generic_newtype_key_dictionary<T: int>(T $key): dict<T, string> {
   $values = dict[];
   $values[$key] = 'value';
   return $values;
 }
 
-$assertion_value_49 = fn(): dict<NewtypeDictKey, string> {
-  return invalid_newtype_key_dictionary();
-};
-
-$assertion_error_49 = null;
-try {
-  $assertion_value_49();
-} catch (TypeError $assertion_caught_49) {
-  $assertion_error_49 = $assertion_caught_49;
-}
-
-assert!($assertion_error_49 is TypeError);
-
-$assertion_value_50 = fn(): dict<NewtypeDictKey, string> {
-  return invalid_generic_newtype_key_dictionary::<NewtypeDictKey>(
-    NewtypeDictKey(1),
-  );
-};
-
-$assertion_error_50 = null;
-try {
-  $assertion_value_50();
-} catch (TypeError $assertion_caught_50) {
-  $assertion_error_50 = $assertion_caught_50;
-}
-
-assert!($assertion_error_50 is TypeError);
+assert!(newtype_key_dictionary()[NewtypeDictKey(1)] == 'value');
+assert!(
+  generic_newtype_key_dictionary::<NewtypeDictKey>(NewtypeDictKey(1)) is dict<
+      NewtypeDictKey,
+      string,
+    >,
+);
 
 #[Whim\Marker\NeverInline]
 function inspect_newtype_key_dictionary(
@@ -318,17 +296,26 @@ function inspect_newtype_key_dictionary(
   assert!($values is dict<NewtypeDictKey, string>);
 }
 
-function invalid_newtype_key_literal(): dict<NewtypeDictKey, string> {
+function newtype_key_literal(): dict<NewtypeDictKey, string> {
   return dict[NewtypeDictKey(1) => 'value'];
 }
 
-$normalized = dict[NewtypeDictKey(1) => 'value'];
-assert!($normalized is dict<int, string>);
-assert!(!($normalized is dict<NewtypeDictKey, string>));
+function invalid_newtype_key_literal(): dict<NewtypeDictKey, string> {
+  return dict[1 => 'value'];
+}
+
+$tagged = dict[NewtypeDictKey(1) => 'value'];
+assert!($tagged is dict<int, string>);
+assert!($tagged is dict<NewtypeDictKey, string>);
+assert!(newtype_key_literal() == $tagged);
+inspect_newtype_key_dictionary($tagged);
+foreach ($tagged as $key => $_) {
+  assert!($key is NewtypeDictKey);
+}
 
 $argumentError = null;
 try {
-  inspect_newtype_key_dictionary($normalized);
+  inspect_newtype_key_dictionary(dict[1 => 'value']);
 } catch (TypeError $error) {
   $argumentError = $error;
 }

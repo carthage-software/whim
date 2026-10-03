@@ -36,14 +36,7 @@ mod path_tests;
 /// The dict key of a value, following the language's key strictness.
 #[inline(always)]
 pub(in crate::vm) fn dict_key(value: &Value) -> Result<Key, ArrayFault> {
-    match value.transparent() {
-        ValueView::Int(key) => Ok(Key::Int(*key)),
-        ValueView::Uint(key) => Ok(Key::Uint(*key)),
-        ValueView::Bool(key) => Ok(Key::Bool(*key)),
-        ValueView::String(key) => Ok(Key::String(key.clone())),
-        ValueView::ShortString(key) => Ok(Key::ShortString(*key)),
-        _ => Err(bad_dict_key(value)),
-    }
+    Key::from_value(value).ok_or_else(|| bad_dict_key(value))
 }
 
 #[cold]
@@ -114,14 +107,56 @@ pub(in crate::vm) fn index_get(
 
 #[inline(always)]
 fn dict_key_ref(value: &Value) -> Result<KeyRef<'_>, ArrayFault> {
-    match value.transparent() {
-        ValueView::Int(key) => Ok(KeyRef::Int(*key)),
-        ValueView::Uint(key) => Ok(KeyRef::Uint(*key)),
-        ValueView::Bool(key) => Ok(KeyRef::Bool(*key)),
-        ValueView::String(key) => Ok(KeyRef::String(key)),
-        ValueView::ShortString(key) => Ok(KeyRef::ShortString(*key)),
-        _ => Err(bad_dict_key(value)),
-    }
+    KeyRef::from_value(value).ok_or_else(|| bad_dict_key(value))
+}
+
+#[cold]
+#[inline(never)]
+pub(in crate::vm) fn dict_index_get_tagged_key(
+    heap: &Heap,
+    container: &Value,
+    index: &Value,
+) -> Result<Value, ArrayFault> {
+    index_get(heap, container, index)
+}
+
+#[cold]
+#[inline(never)]
+pub(in crate::vm) fn dict_index_get_tagged_key_or_null(container: &Value, index: &Value) -> Value {
+    // SAFETY: specialized reads prove both the dictionary and scalar key types.
+    let dict = unsafe {
+        unwrap_option_invariant(container.as_dict(), "a specialized read has a dictionary")
+    };
+    // SAFETY: specialized reads prove that the key is int, uint, or string.
+    let key = unsafe {
+        unwrap_option_invariant(
+            KeyRef::from_value(index),
+            "a specialized read has a dictionary key",
+        )
+    };
+    dict.get_ref(key)
+        .map(Value::clone_inline_scalar)
+        .unwrap_or_else(Value::null)
+}
+
+#[cold]
+#[inline(never)]
+pub(in crate::vm) fn dict_index_set_tagged_key(container: &mut Value, index: Value, value: Value) {
+    // SAFETY: specialized writes prove both the dictionary and scalar key types.
+    let dict = unsafe {
+        unwrap_option_invariant(
+            container.as_dict_mut(),
+            "a specialized write has a dictionary",
+        )
+    };
+    // SAFETY: specialized writes prove that the key is int, uint, or string.
+    let key = unsafe {
+        unwrap_option_invariant(
+            Key::from_owned_value(index),
+            "a specialized write has a dictionary key",
+        )
+    };
+    dict.make_mut().insert(key, value);
 }
 
 #[inline(always)]
@@ -192,6 +227,9 @@ pub(in crate::vm) fn dict_index_get_int_key_or_null(
         // SAFETY: type flow proves the container type for this specialized read.
         unsafe { unreachable_invariant("a specialized probe has its proven container") }
     };
+    if index.newtype_id().is_some() {
+        return Ok(dict_index_get_tagged_key_or_null(container, index));
+    }
     // SAFETY: type flow proves the integer key.
     let key = unsafe { index.as_int_unchecked() };
     Ok(values
@@ -210,6 +248,9 @@ pub(in crate::vm) fn dict_index_get_string_key_or_null(
         // SAFETY: type flow proves the container type for this specialized read.
         unsafe { unreachable_invariant("a specialized probe has its proven container") }
     };
+    if index.newtype_id().is_some() {
+        return Ok(dict_index_get_tagged_key_or_null(container, index));
+    }
     let found = match index.transparent() {
         ValueView::String(key) => values.get_string(key),
         ValueView::ShortString(key) => values.get_short_string(*key),
@@ -566,6 +607,9 @@ pub(in crate::vm) fn dict_index_get_string_key(
         unsafe { unreachable_invariant("a specialized dict read has a dict container") }
     };
 
+    if index.newtype_id().is_some() {
+        return dict_index_get_tagged_key(heap, container, index);
+    }
     let found = match index.transparent() {
         ValueView::String(string) => dict.get_string(string),
         ValueView::ShortString(string) => dict.get_short_string(*string),
@@ -592,6 +636,10 @@ pub(in crate::vm) fn dict_index_set_string_key(container: &mut Value, index: Val
         unsafe { unreachable_invariant("a specialized dict write has a dict container") }
     };
 
+    if index.newtype_id().is_some() {
+        dict_index_set_tagged_key(container, index, value);
+        return;
+    }
     if let Some(key) = index.as_short_string() {
         dict.make_mut().insert_short_string(key, value);
         return;
@@ -1016,6 +1064,9 @@ pub(in crate::vm) fn dict_add_assign_any_key_int_value(
     index: &Value,
     increment: i64,
 ) -> Result<(), IndexAddFault> {
+    if index.newtype_id().is_some() {
+        return dict_add_assign_tagged_key_int_value(heap, container, index, increment);
+    }
     let Some(dict) = container.as_dict_mut() else {
         // SAFETY: the surrounding invariant makes this path unreachable.
         unsafe { unreachable_invariant("a specialized indexed add has a dict container") }
@@ -1027,12 +1078,7 @@ pub(in crate::vm) fn dict_add_assign_any_key_int_value(
         ValueView::Bool(key) => KeyRef::Bool(*key),
         ValueView::String(key) => KeyRef::String(key),
         ValueView::ShortString(key) => KeyRef::ShortString(*key),
-        other => {
-            return Err(IndexAddFault::Array(ArrayFault::type_error(format!(
-                "a dict key must be int, uint, bool, or string, {} given",
-                other.kind_name()
-            ))));
-        }
+        _ => return Err(IndexAddFault::Array(bad_dict_key(index))),
     };
 
     let slot = dict.make_mut().get_mut_ref(key).ok_or_else(|| {
@@ -1052,6 +1098,17 @@ pub(in crate::vm) fn dict_add_assign_any_key_int_value(
 
     *slot = Value::int(next);
     Ok(())
+}
+
+#[cold]
+#[inline(never)]
+fn dict_add_assign_tagged_key_int_value(
+    heap: &Heap,
+    container: &mut Value,
+    index: &Value,
+    increment: i64,
+) -> Result<(), IndexAddFault> {
+    index_add_assign(heap, container, index, &Value::int(increment))
 }
 
 /// Replaces an element already proven to exist and returns its old value.
@@ -1308,13 +1365,7 @@ pub(in crate::vm) fn advance_dict_cursor(
         match dict.entry_at_slot(position)? {
             None => position += 1,
             Some((key, value)) => {
-                let key = match key {
-                    KeyRef::Int(value) => Value::int(value),
-                    KeyRef::Uint(value) => Value::uint(value),
-                    KeyRef::Bool(value) => Value::bool(value),
-                    KeyRef::String(value) => Value::string(value.clone()),
-                    KeyRef::ShortString(value) => Value::short_string(value),
-                };
+                let key = key.to_value();
                 let value = array_value(value, value_mode);
                 *cursor_position = next_index(position);
                 return Some((key, value));
@@ -1338,14 +1389,7 @@ pub(in crate::vm) fn advance_dict_cursor_int_values(
         match dict.entry_at_slot(position)? {
             None => position += 1,
             Some((key, value)) => {
-                let key = include_key.then(|| match key {
-                    KeyRef::Int(value) => Value::int(value),
-                    KeyRef::Uint(value) => Value::uint(value),
-                    KeyRef::Bool(value) => Value::bool(value),
-                    KeyRef::String(value) => Value::string(value.clone()),
-                    KeyRef::ShortString(value) => Value::short_string(value),
-                });
-
+                let key = include_key.then(|| key.to_value());
                 let value = array_value(value, ArrayValueMode::Int);
                 *cursor_position = next_index(position);
                 return Some((key, value));

@@ -1347,12 +1347,12 @@ fn foreach_preserves_vec_element_types() {
 }
 
 #[test]
-fn dictionary_key_normalization_preserves_newtype_return_checks() {
+fn dictionary_insertions_retain_newtype_keys_when_proving_returns() {
     let unit = compile(
         r"
         newtype Key = int;
 
-        function invalid(): dict<Key, string> {
+        function nominal(): dict<Key, string> {
             $values = dict[];
             $values[Key(1)] = 'value';
             return $values;
@@ -1364,7 +1364,7 @@ fn dictionary_key_normalization_preserves_newtype_return_checks() {
             return $values;
         }
 
-        function generic_invalid<T: int>(T $key): dict<T, string> {
+        function generic<T: int>(T $key): dict<T, string> {
             $values = dict[];
             $values[$key] = 'value';
             return $values;
@@ -1372,49 +1372,29 @@ fn dictionary_key_normalization_preserves_newtype_return_checks() {
         ",
         OptimizationConfiguration::default(),
     );
-    let invalid_function = unit
-        .functions
-        .iter()
-        .find(|function| function.name.as_bytes() == b"invalid")
-        .expect("the invalid function exists");
-    let invalid = &invalid_function.chunk.code;
-    let valid = &unit
-        .functions
-        .iter()
-        .find(|function| function.name.as_bytes() == b"valid")
-        .expect("the valid function exists")
-        .chunk
-        .code;
-
-    assert!(
-        invalid
+    for (name, checked) in [
+        (b"nominal".as_slice(), false),
+        (b"valid".as_slice(), false),
+        (b"generic".as_slice(), true),
+    ] {
+        let code = &unit
+            .functions
             .iter()
-            .any(|instruction| matches!(instruction, Instruction::Return { .. })),
-        "{invalid:#?}",
-    );
-    let generic_invalid = &unit
-        .functions
-        .iter()
-        .find(|function| function.name.as_bytes() == b"generic_invalid")
-        .expect("the generic invalid function exists")
-        .chunk
-        .code;
-    assert!(
-        generic_invalid
-            .iter()
-            .any(|instruction| matches!(instruction, Instruction::Return { .. })),
-        "{generic_invalid:#?}",
-    );
-    assert!(
-        valid
-            .iter()
-            .any(|instruction| matches!(instruction, Instruction::ReturnReferenceUnchecked { .. })),
-        "{valid:#?}"
-    );
+            .find(|function| function.name.as_bytes() == name)
+            .unwrap()
+            .chunk
+            .code;
+        assert_eq!(
+            code.iter()
+                .any(|instruction| matches!(instruction, Instruction::Return { .. })),
+            checked,
+            "{code:#?}"
+        );
+    }
 }
 
 #[test]
-fn dictionary_literals_normalize_keys_before_proving_contracts() {
+fn dictionary_literals_retain_newtype_keys_when_proving_contracts() {
     let unit = compile(
         r"
         newtype Key = int;
@@ -1423,10 +1403,14 @@ fn dictionary_literals_normalize_keys_before_proving_contracts() {
         function inspect(dict<Key, string> $values): void {}
 
         function invalid(): dict<Key, string> {
-            return dict[Key(1) => 'value'];
+            return dict[1 => 'value'];
         }
 
         function valid(): dict<int, string> {
+            return dict[Key(1) => 'value'];
+        }
+
+        function nominal(): dict<Key, string> {
             return dict[Key(1) => 'value'];
         }
 
@@ -1435,7 +1419,11 @@ fn dictionary_literals_normalize_keys_before_proving_contracts() {
         OptimizationConfiguration::default(),
     );
 
-    for (name, checked) in [(b"invalid".as_slice(), true), (b"valid".as_slice(), false)] {
+    for (name, checked) in [
+        (b"invalid".as_slice(), true),
+        (b"valid".as_slice(), false),
+        (b"nominal".as_slice(), false),
+    ] {
         let function = unit
             .functions
             .iter()
@@ -1453,11 +1441,10 @@ fn dictionary_literals_normalize_keys_before_proving_contracts() {
         );
     }
     assert!(
-        !unit
-            .main
+        unit.main
             .code
             .iter()
-            .any(|instruction| matches!(instruction, Instruction::CallNamedDirect { .. })),
+            .any(|instruction| matches!(instruction, Instruction::CallNamedUnchecked { .. })),
         "{:#?}",
         unit.main.code,
     );

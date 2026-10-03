@@ -89,6 +89,11 @@ impl Serialize for JsonSource<'_> {
                                 "the value holds a dictionary key that is not a string",
                             ));
                         }
+                        _ => {
+                            return Err(S::Error::custom(
+                                "JSON object keys cannot carry newtype tags",
+                            ));
+                        }
                     };
 
                     let Ok(text) = from_utf8(bytes) else {

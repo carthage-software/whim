@@ -162,3 +162,15 @@ try {
 }
 
 assert!($assertion_error_43 is DecodingException);
+
+newtype JsonField = string;
+foreach (vec['x', 'a longer field name'] as $field) {
+  $keyError = null;
+  try {
+    Json\encode(dict[$field => 1, JsonField($field) => 2]);
+  } catch (EncodingException $caught) {
+    $keyError = $caught;
+  }
+
+  assert!($keyError is EncodingException);
+}
