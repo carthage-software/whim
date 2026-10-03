@@ -563,8 +563,7 @@ fn render_integer_range(range: &IntegerRangeType<'_>) -> String {
     let lower = range
         .lower
         .as_ref()
-        .map(render_integer_range_bound)
-        .unwrap_or_default();
+        .map_or_default(render_integer_range_bound);
     let operator = match range.operator {
         IntegerRangeOperator::Exclusive(_) => "..",
         IntegerRangeOperator::Inclusive(_) => "..=",
@@ -572,8 +571,7 @@ fn render_integer_range(range: &IntegerRangeType<'_>) -> String {
     let upper = range
         .upper
         .as_ref()
-        .map(render_integer_range_bound)
-        .unwrap_or_default();
+        .map_or_default(render_integer_range_bound);
     format!("{lower}{operator}{upper}")
 }
 
@@ -1064,15 +1062,14 @@ fn alias_substitution(
     expanding_aliases: &mut Vec<String>,
     alias_rendering: AliasRendering,
 ) -> Result<HashMap<String, String>, CompileError> {
-    let provided: Vec<&Type<'_>> = arguments
-        .map(|arguments| {
-            arguments
-                .arguments
-                .iter()
-                .map(|argument| argument.r#type)
-                .collect()
-        })
-        .unwrap_or_default();
+    let provided: Vec<&Type<'_>> = arguments.map_or_default(|arguments| {
+        arguments
+            .arguments
+            .iter()
+            .map(|argument| argument.r#type)
+            .collect()
+    });
+
     let mut substitution = HashMap::new();
     if let Some(parameters) = alias.type_parameters {
         for (index, parameter) in parameters.parameters.iter().enumerate() {

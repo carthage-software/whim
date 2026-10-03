@@ -229,14 +229,12 @@ fn qualify_in(namespace: &str, name: &str) -> String {
 /// The binder names a type-parameter list introduces, in declaration order.
 /// Empty when the declaration is not generic.
 pub(crate) fn binder_names(type_parameters: Option<&TypeParameterList<'_>>) -> Vec<String> {
-    type_parameters
-        .map(|list| {
-            list.parameters
-                .iter()
-                .map(|parameter| parameter.name.value.to_string())
-                .collect()
-        })
-        .unwrap_or_default()
+    type_parameters.map_or_default(|list| {
+        list.parameters
+            .iter()
+            .map(|parameter| parameter.name.value.to_string())
+            .collect()
+    })
 }
 
 /// The binder names in scope inside a type-parameter list's own bounds and

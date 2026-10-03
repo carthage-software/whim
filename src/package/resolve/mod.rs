@@ -141,8 +141,7 @@ pub(crate) fn resolve_graph_with_refreshed(
 
     if let Some(conflict) = first_conflict {
         let suffix = last_failure
-            .map(|failure| format!("; no compatible selection exists: {failure}"))
-            .unwrap_or_default();
+            .map_or_default(|failure| format!("; no compatible selection exists: {failure}"));
         Err(Error::NoSolution(format!("{conflict}{suffix}")))
     } else {
         Err(Error::NoSolution(last_failure.unwrap_or_else(|| {

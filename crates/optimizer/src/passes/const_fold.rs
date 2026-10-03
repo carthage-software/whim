@@ -331,11 +331,11 @@ pub(in crate::passes) fn optimize_chunk(
     let mut folds = vec![];
     let mut branches = Vec::new();
     let flow = TypeFlow::analyze(chunk, &[], false, None, &[], allocator);
-    for index in 0..chunk.code.len() {
+    for (index, &instruction) in chunk.code.iter().enumerate() {
         if let Some(offset) = flow.constant_branch_offset(index) {
             branches.push((index, offset));
         }
-        folds.push(if foldable(chunk.code[index]) {
+        folds.push(if foldable(instruction) {
             flow.constant_result(index)
         } else {
             None

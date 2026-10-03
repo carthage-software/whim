@@ -119,12 +119,18 @@ pub(in crate::passes) fn optimize_chunk(
             offset,
         };
 
-        for index in header + 2..exit {
-            match chunk.code[index] {
+        for (index, instruction) in chunk
+            .code
+            .iter_mut()
+            .enumerate()
+            .take(exit)
+            .skip(header + 2)
+        {
+            match *instruction {
                 Instruction::Jump { offset }
                     if relative_target(index, offset.offset()) == header =>
                 {
-                    chunk.code[index] = Instruction::Jump {
+                    *instruction = Instruction::Jump {
                         offset: JumpOffset::new(offset.offset() + 1),
                     };
                 }
@@ -133,7 +139,7 @@ pub(in crate::passes) fn optimize_chunk(
                     immediate,
                     offset,
                 } if relative_target(index, i32::from(offset.offset())) == header => {
-                    chunk.code[index] = Instruction::IncrementJump {
+                    *instruction = Instruction::IncrementJump {
                         target,
                         immediate,
                         offset: ShortJumpOffset::new(offset.offset() + 1),

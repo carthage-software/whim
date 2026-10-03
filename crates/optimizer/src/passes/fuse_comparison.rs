@@ -183,11 +183,7 @@ fn fuse_null_comparison(chunk: &mut Chunk, statistics: &mut OptimizationStatisti
 
     let targets = control_flow_targets(chunk);
     let mut remove = vec![false; chunk.code.len()];
-    #[expect(
-        clippy::needless_range_loop,
-        reason = "the pass mutates code and its parallel removal mask by index"
-    )]
-    for index in 0..chunk.code.len() - 1 {
+    for (index, removed) in remove.iter_mut().enumerate().take(chunk.code.len() - 1) {
         let Instruction::LoadNull {
             destination: temporary,
         } = chunk.code[index]
@@ -234,7 +230,7 @@ fn fuse_null_comparison(chunk: &mut Chunk, statistics: &mut OptimizationStatisti
             Instruction::JumpIfNull { subject, offset }
         };
 
-        remove[index] = true;
+        *removed = true;
     }
 
     compact_removed_instructions(chunk, &remove, statistics);

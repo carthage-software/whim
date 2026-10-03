@@ -475,14 +475,14 @@ fn foreach_reservation_target(
         .then_some(initialization + 1)
     })?;
 
-    for index in next + 2..chunk.code.len() {
-        if let Instruction::Jump { offset } = chunk.code[index]
+    for (index, &instruction) in chunk.code.iter().enumerate().skip(next + 2) {
+        if let Instruction::Jump { offset } = instruction
             && relative_target(index, offset.offset()) <= next
         {
             break;
         }
 
-        let target = match chunk.code[index] {
+        let target = match instruction {
             Instruction::IndexSet { container, .. }
             | Instruction::VecIndexSet { container, .. }
             | Instruction::DictIndexSetIntegerKey {

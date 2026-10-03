@@ -209,13 +209,13 @@ fn interior_rewrite(
 ) -> Option<InteriorRewrite> {
     let invariant = Register::new(chunk.register_count);
     let mut definitions = Vec::new();
-    for index in header..=tail {
+    for (index, &instruction) in chunk.code.iter().enumerate().take(tail + 1).skip(header) {
         let Instruction::PropertyGetUnchecked {
             destination,
             object: read_object,
             slot: read_slot,
             value_mode: PropertyReadMode::Clone,
-        } = chunk.code[index]
+        } = instruction
         else {
             continue;
         };

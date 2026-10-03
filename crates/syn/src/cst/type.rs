@@ -744,44 +744,6 @@ impl HasSpan for Newtype<'_> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use whim_span::HasSpan;
-
-    use crate::arena::LocalArena;
-    use crate::cst::statement::TopLevelStatement;
-    use crate::parser::parse;
-    use crate::unreachable_invariant;
-
-    #[test]
-    fn span_covers_a_long_union_chain_without_recursing() {
-        let arena = LocalArena::new();
-        let source = format!("type T = int{};", "|int".repeat(1_000));
-        let program = match parse(&arena, &source) {
-            Ok(program) => program,
-            // SAFETY: the fixture source parses.
-            Err(_) => unsafe { unreachable_invariant("fixture source parses") },
-        };
-
-        let Some(TopLevelStatement::TypeAlias(alias)) = program.statements.first() else {
-            // SAFETY: the fixture has one type alias.
-            unsafe { unreachable_invariant("fixture is a single type alias") }
-        };
-
-        let span = alias.aliased.span();
-        assert_eq!(
-            span.start.offset,
-            "type T = ".len() as u32,
-            "the span starts at the first `int`"
-        );
-        assert_eq!(
-            span.end.offset,
-            source.len() as u32 - 1,
-            "the span ends at the last `int`, before the semicolon"
-        );
-    }
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ObjectShapeType<'arena> {
     pub hash_left_brace: Span,
@@ -819,5 +781,43 @@ impl HasSpan for ObjectShapeRest {
     fn span(&self) -> Span {
         self.trailing_comma
             .map_or(self.ellipsis, |comma| self.ellipsis.join(comma))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use whim_span::HasSpan;
+
+    use crate::arena::LocalArena;
+    use crate::cst::statement::TopLevelStatement;
+    use crate::parser::parse;
+    use crate::unreachable_invariant;
+
+    #[test]
+    fn span_covers_a_long_union_chain_without_recursing() {
+        let arena = LocalArena::new();
+        let source = format!("type T = int{};", "|int".repeat(1_000));
+        let program = match parse(&arena, &source) {
+            Ok(program) => program,
+            // SAFETY: the fixture source parses.
+            Err(_) => unsafe { unreachable_invariant("fixture source parses") },
+        };
+
+        let Some(TopLevelStatement::TypeAlias(alias)) = program.statements.first() else {
+            // SAFETY: the fixture has one type alias.
+            unsafe { unreachable_invariant("fixture is a single type alias") }
+        };
+
+        let span = alias.aliased.span();
+        assert_eq!(
+            span.start.offset,
+            "type T = ".len() as u32,
+            "the span starts at the first `int`"
+        );
+        assert_eq!(
+            span.end.offset,
+            source.len() as u32 - 1,
+            "the span ends at the last `int`, before the semicolon"
+        );
     }
 }
