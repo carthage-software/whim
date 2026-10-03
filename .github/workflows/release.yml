@@ -142,9 +142,13 @@ jobs:
             set -eu
             mkdir -p /usr/local/etc/pkg/repos
             echo 'FreeBSD: { url: "pkg+https://pkg.FreeBSD.org/${ABI}/latest" }' > /usr/local/etc/pkg/repos/FreeBSD.conf
-            pkg install -y ca_root_nss cmake curl git pkgconf postgresql18-client rust
+            pkg install -y ca_root_nss cmake curl git pkgconf postgresql18-client
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -o /tmp/rustup-init.sh
+            sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain 1.99.0
           run: |
             set -eu
+            . "$HOME/.cargo/env"
+            rustc --version
             export CARGO_BUILD_JOBS=4
             cargo build --locked --release --target ${{ matrix.target }} --bin whim --timings
       - name: Test Linux build
