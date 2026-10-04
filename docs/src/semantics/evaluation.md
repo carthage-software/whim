@@ -45,6 +45,8 @@ These forms may skip work:
 - a present, initialized, non-null left side of `??` skips the right side;
 - a null receiver for `?->` skips the member access and call arguments;
 - `match` evaluates only the chosen arm result;
+- `condition ? then : otherwise` checks a boolean condition once and evaluates
+  only the chosen branch;
 - a destructuring default runs only for a missing position.
 
 `0`, `false`, and `''` are not null, so `??` keeps them.

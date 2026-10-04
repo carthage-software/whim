@@ -46,7 +46,8 @@ mod tests {
     #[test]
     fn precedence_orders_loosest_to_tightest() {
         assert!(Precedence::Assignment > Precedence::Lowest);
-        assert!(Precedence::Coalesce > Precedence::Assignment);
+        assert!(Precedence::Conditional > Precedence::Assignment);
+        assert!(Precedence::Coalesce > Precedence::Conditional);
         assert!(Precedence::Or > Precedence::Coalesce);
         assert!(Precedence::And > Precedence::Or);
         assert!(Precedence::Comparison > Precedence::And);
@@ -89,10 +90,6 @@ mod tests {
     fn type_operations_share_one_level() {
         assert_eq!(Precedence::infix(&TokenKind::Is), Precedence::TypeOperation);
         assert_eq!(Precedence::infix(&TokenKind::As), Precedence::TypeOperation);
-        assert_eq!(
-            Precedence::infix(&TokenKind::Question),
-            Precedence::TypeOperation
-        );
         assert!(Precedence::TypeOperation.is_non_associative());
     }
 
@@ -100,6 +97,7 @@ mod tests {
     fn every_infix_level_has_associativity() {
         let infix_kinds = [
             TokenKind::Equal,
+            TokenKind::Question,
             TokenKind::QuestionQuestion,
             TokenKind::PipePipe,
             TokenKind::AmpersandAmpersand,

@@ -114,6 +114,27 @@ case!(method_where_clauses);
 case!(method_where_clause_breaks);
 case!(method_where_clause_comments);
 case!(callable_where_clauses);
+case!(conditional_expressions);
+
+#[test]
+fn conditional_expressions_keep_comments_and_stay_stable() {
+    let source = include_str!("cases/conditional_expressions/before.whim");
+    for print_width in [32, 48, 80, 120] {
+        for use_tabs in [false, true] {
+            let settings = FormatSettings {
+                print_width,
+                use_tabs,
+                ..FormatSettings::default()
+            };
+            let arena = LocalArena::new();
+            let formatted = format(&arena, source, settings).unwrap();
+            let next_arena = LocalArena::new();
+            let repeated = format(&next_arena, formatted, settings).unwrap();
+            assert_eq!(formatted, repeated, "width {print_width}, tabs {use_tabs}");
+            assert_comments_survive("conditional_expressions", source, formatted);
+        }
+    }
+}
 
 #[test]
 fn method_where_clauses_stay_stable_across_widths_and_indentation() {

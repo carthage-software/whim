@@ -397,6 +397,15 @@ impl<'ast, 'arena> Visitor<'ast, 'arena> for ReferencedNames<'_, 'arena> {
 
                 Flow::Skip
             }
+            Node::Conditional(expression) if self.locals.is_some() => {
+                walk(Node::Expression(expression.condition), self);
+                self.branches([
+                    Node::Expression(expression.then),
+                    Node::Expression(expression.otherwise),
+                ]);
+
+                Flow::Skip
+            }
             Node::For(statement) if self.locals.is_some() => {
                 for expression in statement
                     .initializations

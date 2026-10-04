@@ -1,0 +1,12 @@
+$result=$ready?1:2;
+$nested=$a?$b?$c:$d:$e?$f:$g;
+$assigned=$a?$b=1:$c=2;
+$cast=$value?as bool?$left?as int:$right?as int;
+function choose(bool $ready): string {return $ready?'a fairly long result for the true branch':'a fairly long result for the false branch';}
+foreach($values as $a){return $a?break:continue;}
+$comments = $condition // condition
+  ? /* before true */ $yes // after true
+  : /* before false */ $no; // after false
+$operatorComments = $condition /* before question */ ? // after question
+  $yes /* before colon */ : // after colon
+  $no;

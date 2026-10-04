@@ -1,0 +1,225 @@
+use Whim\Unwind\Exception;
+use Whim\Unwind\TypeError;
+use Whim\Unwind\UndefinedVariableError;
+
+assert!((true ? 1 : 2) == 1);
+assert!((false ? 1 : 'two') == 'two');
+assert!((false ? 1 : false ? 2 : 3) == 3);
+assert!((true ? false ? 1 : 2 : 3) == 2);
+assert!((false || true ? 1 : 2) == 1);
+assert!((null ?? true ? 1 : 2) == 1);
+assert!((true ?as bool ? 1 ?as int : 2) == 1);
+
+const CONDITIONAL_DEFAULT = true ? 7 : 8;
+function default_value(int $value = false ? 9 : CONDITIONAL_DEFAULT): int {
+  return $value;
+}
+
+assert!(default_value() == 7);
+
+class ConditionalTrace {
+  public vec<string> $events = vec[];
+
+  public function condition(mixed $value): mixed {
+    $this->events[] = 'condition';
+    return $value;
+  }
+
+  public function branch(string $name): string {
+    $this->events[] = $name;
+    return $name;
+  }
+}
+
+$trace = new ConditionalTrace();
+assert!(
+  ($trace->condition(true) ? $trace->branch('yes') : $trace->branch('no'))
+  == 'yes',
+);
+
+assert!(
+  ($trace->condition(false) ? $trace->branch('yes') : $trace->branch('no'))
+  == 'no',
+);
+
+assert!($trace->events == vec['condition', 'yes', 'condition', 'no']);
+
+foreach (vec[
+  0,
+  1,
+  null,
+  '',
+  'true',
+  vec[],
+  dict[],
+  new ConditionalTrace(),
+] as $invalid) {
+  $trace->events = vec[];
+  $caught = false;
+  try {
+    $_ = $trace->condition($invalid)
+      ? $trace->branch('yes')
+      : $trace->branch('no');
+  } catch (TypeError) {
+    $caught = true;
+  }
+
+  assert!($caught);
+  assert!($trace->events == vec['condition']);
+}
+
+$trace->events = vec[];
+$caught = false;
+try {
+  $_ = 1 ? $trace->branch('yes') : $trace->branch('no');
+} catch (TypeError) {
+  $caught = true;
+}
+
+assert!($caught);
+assert!($trace->events == vec[]);
+
+function returning_condition(): int {
+  return (return 33) ? 1 : 2;
+}
+
+assert!(returning_condition() == 33);
+
+$flag = false;
+$_ = $flag ? $only_yes = 1 : $only_no = 2;
+assert!($only_no == 2);
+$caught = false;
+try {
+  $_ = $only_yes;
+} catch (UndefinedVariableError) {
+  $caught = true;
+}
+
+assert!($caught);
+
+$outer = 42;
+$choose = fn(bool $flag): int {
+  return $flag ? $outer = 7 : $outer;
+};
+
+assert!($choose(false) == 42);
+assert!($choose(true) == 7);
+assert!($outer == 42);
+
+function loop_control(vec<bool> $values, ConditionalTrace $trace): string {
+  foreach ($values as $value) {
+    try {
+      return $value ? break : continue;
+    } finally {
+      $trace->events[] = 'finally';
+    }
+  }
+
+  $trace->events[] = 'after loop';
+  return 'after';
+}
+
+$trace->events = vec[];
+assert!(loop_control(vec[false, true, false], $trace) == 'after');
+assert!($trace->events == vec['finally', 'finally', 'after loop']);
+
+function return_or_continue(vec<bool> $values): int {
+  foreach ($values as $value) {
+    return $value ? 42 : continue;
+  }
+
+  return 7;
+}
+
+assert!(return_or_continue(vec[false, true]) == 42);
+assert!(return_or_continue(vec[false]) == 7);
+
+function nested_return(bool $value, ConditionalTrace $trace): int {
+  try {
+    return $value ? return 11 : 12;
+  } finally {
+    $trace->events[] = 'return cleanup';
+  }
+}
+
+$trace->events = vec[];
+assert!(nested_return(true, $trace) == 11);
+assert!(nested_return(false, $trace) == 12);
+assert!($trace->events == vec['return cleanup', 'return cleanup']);
+
+function guarded(bool $value): int {
+  return $value ? 42 : throw new Exception('conditional failure');
+}
+
+assert!(guarded(true) == 42);
+$caught = false;
+try {
+  guarded(false);
+} catch (Exception $error) {
+  assert!($error->getMessage() == 'conditional failure');
+  $caught = true;
+}
+
+assert!($caught);
+
+function checked_result(bool $value): int {
+  return $value ? 42 : 'wrong';
+}
+
+assert!(checked_result(true) == 42);
+$caught = false;
+try {
+  checked_result(false);
+} catch (TypeError) {
+  $caught = true;
+}
+
+assert!($caught);
+
+$seen = vec[];
+foreach (true ? vec[1, 2] : vec[3] as $item) {
+  $seen[] = $item;
+}
+
+assert!($seen == vec[1, 2]);
+
+$events = vec[];
+foreach (vec[false, true] as $value) {
+  foreach (vec[0] as $_) {
+    $value ? break 2 : continue 2;
+  }
+
+  $events[] = 'unreachable';
+}
+
+assert!($events == vec[]);
+
+final class ConditionalGuard {
+  public function __construct(private ConditionalTrace $trace) {}
+
+  public function __destruct(): void {
+    $this->trace->events[] = 'closed';
+  }
+}
+
+function resource_control(vec<bool> $values, ConditionalTrace $trace): int {
+  foreach ($values as $value) {
+    using ($guard = new ConditionalGuard($trace)) {
+      return $value ? break : continue;
+    }
+  }
+
+  return 17;
+}
+
+$trace->events = vec[];
+assert!(resource_control(vec[false, true, false], $trace) == 17);
+assert!($trace->events == vec['closed', 'closed']);
+
+$flag = true;
+$trace->events = vec[];
+using (
+  $guard = $flag ? new ConditionalGuard($trace) : new ConditionalGuard($trace),
+) {}
+
+assert!($trace->events == vec['closed']);

@@ -356,6 +356,15 @@ pub(crate) fn analyze<'arena, A: Arena>(
                     stack.push(Step::EnterArm);
                     stack.push(Step::Visit(Node::Expression(statement.condition)));
                 }
+                Node::Conditional(expression) => {
+                    stack.push(Step::ExitArm);
+                    stack.push(Step::Visit(Node::Expression(expression.otherwise)));
+                    stack.push(Step::EnterArm);
+                    stack.push(Step::ExitArm);
+                    stack.push(Step::Visit(Node::Expression(expression.then)));
+                    stack.push(Step::EnterArm);
+                    stack.push(Step::Visit(Node::Expression(expression.condition)));
+                }
                 Node::Binary(binary)
                     if matches!(
                         binary.operator,

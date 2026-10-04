@@ -240,6 +240,7 @@ fn complexity(root: Node<'_, '_>) -> usize {
             | Node::DoWhile(_)
             | Node::TryCatchClause(_)
             | Node::TryCatchGuard(_)
+            | Node::Conditional(_)
             | Node::MatchArm(_) => 1,
             Node::Binary(binary) => match binary.operator {
                 BinaryOperator::And(_)
@@ -275,6 +276,15 @@ mod tests {
             settings.rules.cyclomatic_complexity.config.threshold = 1;
         },
         code = "function f(): void { if ($a) {} while ($b) {} }",
+    }
+
+    test_lint_failure! {
+        name = conditional_expressions_add_paths,
+        rule = CyclomaticComplexityRule,
+        settings = |settings: &mut Settings| {
+            settings.rules.cyclomatic_complexity.config.threshold = 0;
+        },
+        code = "function f(bool $value): int { return $value ? 1 : 2; }",
     }
 
     test_lint_failure! {

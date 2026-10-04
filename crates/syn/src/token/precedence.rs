@@ -16,6 +16,7 @@ pub enum Associativity {
 pub enum Precedence {
     Lowest,
     Assignment,
+    Conditional,
     Coalesce,
     Or,
     And,
@@ -65,6 +66,7 @@ impl Precedence {
             | TokenKind::AmpersandAmpersandEqual
             | TokenKind::PipePipeEqual => Self::Assignment,
             TokenKind::QuestionQuestion => Self::Coalesce,
+            TokenKind::Question => Self::Conditional,
             TokenKind::PipePipe => Self::Or,
             TokenKind::AmpersandAmpersand => Self::And,
             TokenKind::EqualEqual
@@ -74,7 +76,7 @@ impl Precedence {
             | TokenKind::GreaterThan
             | TokenKind::GreaterThanEqual
             | TokenKind::LessThanEqualGreaterThan => Self::Comparison,
-            TokenKind::Is | TokenKind::As | TokenKind::Question => Self::TypeOperation,
+            TokenKind::Is | TokenKind::As => Self::TypeOperation,
             TokenKind::PipeGreaterThan => Self::Pipe,
             TokenKind::Dot => Self::Concat,
             TokenKind::Pipe => Self::BitwiseOr,
@@ -137,9 +139,11 @@ impl Precedence {
             | Self::Additive
             | Self::Multiplicative
             | Self::Postfix => Associativity::Left,
-            Self::Assignment | Self::Coalesce | Self::Unary | Self::Exponent => {
-                Associativity::Right
-            }
+            Self::Assignment
+            | Self::Conditional
+            | Self::Coalesce
+            | Self::Unary
+            | Self::Exponent => Associativity::Right,
             Self::Comparison | Self::TypeOperation => Associativity::NonAssociative,
             Self::Lowest | Self::Highest => return None,
         })

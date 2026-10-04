@@ -145,6 +145,7 @@ use crate::cst::declaration::UseItemList;
 use crate::cst::declaration::UseItemSequence;
 use crate::cst::declaration::UseItems;
 use crate::cst::expression::Break;
+use crate::cst::expression::Conditional;
 use crate::cst::expression::Continue;
 use crate::cst::expression::Expression;
 use crate::cst::expression::Instantiation;
@@ -374,6 +375,7 @@ define_nodes! {
     ElementBindingTarget(ElementBindingTarget<'arena>),
     TrailingBindingTarget(TrailingBindingTarget<'arena>),
     Expression(Expression<'arena>),
+    Conditional(Conditional<'arena>),
     Parenthesized(Parenthesized<'arena>),
     InterpolatedString(InterpolatedString<'arena>),
     InterpolatedStringPart(InterpolatedStringPart<'arena>),

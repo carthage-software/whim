@@ -38,6 +38,22 @@ pub struct Parenthesized<'arena> {
     pub right_parenthesis: Span,
 }
 
+/// Chooses one expression from a boolean condition.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Conditional<'arena> {
+    pub condition: &'arena Expression<'arena>,
+    pub question: Span,
+    pub then: &'arena Expression<'arena>,
+    pub colon: Span,
+    pub otherwise: &'arena Expression<'arena>,
+}
+
+impl HasSpan for Conditional<'_> {
+    fn span(&self) -> Span {
+        self.condition.leftmost_span().join(self.otherwise.span())
+    }
+}
+
 /// A double-quoted string containing variable or expression interpolations.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct InterpolatedString<'arena> {
@@ -74,6 +90,7 @@ pub struct InterpolatedStringExpression<'arena> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Expression<'arena> {
     Binary(Binary<'arena>),
+    Conditional(Conditional<'arena>),
     UnaryPrefix(UnaryPrefix<'arena>),
     UnaryPostfix(UnaryPostfix<'arena>),
     TypeOperation(TypeOperation<'arena>),
@@ -206,6 +223,7 @@ impl<'arena> Expression<'arena> {
     fn leftmost_step(&self) -> LeftmostStep<'arena> {
         match self {
             Expression::Binary(binary) => ControlFlow::Continue(binary.lhs),
+            Expression::Conditional(conditional) => ControlFlow::Continue(conditional.condition),
             Expression::UnaryPostfix(postfix) => ControlFlow::Continue(postfix.operand),
             Expression::TypeOperation(operation) => ControlFlow::Continue(operation.operand),
             Expression::ArrayAccess(access) => ControlFlow::Continue(access.array),
@@ -223,6 +241,7 @@ impl HasSpan for Expression<'_> {
     fn span(&self) -> Span {
         match self {
             Expression::Binary(expression) => expression.span(),
+            Expression::Conditional(expression) => expression.span(),
             Expression::UnaryPrefix(expression) => expression.span(),
             Expression::UnaryPostfix(expression) => expression.span(),
             Expression::TypeOperation(expression) => expression.span(),

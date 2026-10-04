@@ -329,6 +329,77 @@ fn type_operations() {
 }
 
 #[test]
+fn conditionals_are_right_associative_and_allow_assignments_in_both_branches() {
+    let arena = LocalArena::new();
+    let Expression::Assignment(assignment) =
+        expression(&arena, "$result = $a ? $b : $c ? $d : $e;")
+    else {
+        panic!("expected an assignment");
+    };
+    let Expression::Conditional(conditional) = assignment.value else {
+        panic!("expected a conditional");
+    };
+    assert!(matches!(conditional.condition, Expression::Variable(_)));
+    assert!(matches!(conditional.otherwise, Expression::Conditional(_)));
+
+    let Expression::Conditional(conditional) = expression(&arena, "$a ? $b = 1 : $c = 2;") else {
+        panic!("expected a conditional");
+    };
+    assert!(matches!(conditional.then, Expression::Assignment(_)));
+    assert!(matches!(conditional.otherwise, Expression::Assignment(_)));
+}
+
+#[test]
+fn conditional_conditions_include_boolean_and_coalesce_operators() {
+    let arena = LocalArena::new();
+    for source in ["$a || $b ? 1 : 2;", "$a ?? false ? 1 : 2;"] {
+        let Expression::Conditional(conditional) = expression(&arena, source) else {
+            panic!("expected a conditional");
+        };
+        assert!(matches!(conditional.condition, Expression::Binary(_)));
+    }
+
+    let Expression::Conditional(conditional) =
+        expression(&arena, "$a ?as bool ? $b ?as int : $c ?as int;")
+    else {
+        panic!("expected a conditional");
+    };
+    assert!(matches!(
+        conditional.condition,
+        Expression::TypeOperation(_)
+    ));
+    assert!(matches!(conditional.then, Expression::TypeOperation(_)));
+    assert!(matches!(
+        conditional.otherwise,
+        Expression::TypeOperation(_)
+    ));
+}
+
+#[test]
+fn conditional_branches_accept_control_flow_and_require_all_three_operands() {
+    let arena = LocalArena::new();
+    let Expression::Return(outer) = expression(&arena, "return $a ? break : continue;") else {
+        panic!("expected a return");
+    };
+    assert!(
+        matches!(outer.value, Some(Expression::Conditional(conditional))
+        if matches!(conditional.then, Expression::Break(_))
+            && matches!(conditional.otherwise, Expression::Continue(_)))
+    );
+
+    let Expression::Conditional(conditional) = expression(&arena, "$a ? return 1 : throw $error;")
+    else {
+        panic!("expected a conditional");
+    };
+    assert!(matches!(conditional.then, Expression::Return(_)));
+    assert!(matches!(conditional.otherwise, Expression::Throw(_)));
+
+    for source in ["$a ?: $b;", "$a ? $b;", "$a ? $b :;"] {
+        assert!(matches!(error(source), ParseError::UnexpectedToken(..)));
+    }
+}
+
+#[test]
 fn type_operation_binds_looser_than_arithmetic() {
     let arena = LocalArena::new();
     let Expression::TypeOperation(operation) = expression(&arena, "$a + $b as float;") else {

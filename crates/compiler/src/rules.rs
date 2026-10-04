@@ -923,6 +923,11 @@ fn check_constant_expression_at(
             check_constant_expression_at(binary.lhs, position)?;
             check_constant_expression_at(binary.rhs, position)
         }
+        Expression::Conditional(conditional) => {
+            check_constant_expression_at(conditional.condition, position)?;
+            check_constant_expression_at(conditional.then, position)?;
+            check_constant_expression_at(conditional.otherwise, position)
+        }
         Expression::UnaryPrefix(unary) => check_constant_expression_at(unary.operand, position),
         Expression::Vec(vector) => check_constant_vec(vector, position),
         Expression::Dict(dictionary) => check_constant_dict(dictionary, position),

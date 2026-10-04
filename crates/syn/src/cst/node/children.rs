@@ -685,6 +685,7 @@ impl Node<'_, '_> {
             }
             Node::Expression(node) => match node {
                 Expression::Binary(inner) => f(Node::Binary(inner)),
+                Expression::Conditional(inner) => f(Node::Conditional(inner)),
                 Expression::UnaryPrefix(inner) => f(Node::UnaryPrefix(inner)),
                 Expression::UnaryPostfix(inner) => f(Node::UnaryPostfix(inner)),
                 Expression::TypeOperation(inner) => f(Node::TypeOperation(inner)),
@@ -712,6 +713,11 @@ impl Node<'_, '_> {
                 Expression::Construct(inner) => f(Node::Construct(inner)),
             },
             Node::Parenthesized(node) => f(Node::Expression(node.expression)),
+            Node::Conditional(node) => {
+                f(Node::Expression(node.condition));
+                f(Node::Expression(node.then));
+                f(Node::Expression(node.otherwise));
+            }
             Node::InterpolatedString(node) => {
                 for part in node.parts {
                     f(Node::InterpolatedStringPart(part));

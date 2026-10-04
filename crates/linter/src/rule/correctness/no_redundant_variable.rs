@@ -188,6 +188,18 @@ mod tests {
     }
 
     test_lint_success! {
+        name = conditional_branches_do_not_overwrite_each_other,
+        rule = NoRedundantVariableRule,
+        code = "function f(bool $condition) { $value = 1; return $condition ? $value = 2 : $value; }",
+    }
+
+    test_lint_success! {
+        name = conditional_writes_are_read_after_the_join,
+        rule = NoRedundantVariableRule,
+        code = "function f(bool $condition) { $_ = $condition ? $value = 1 : $value = 2; return $value; }",
+    }
+
+    test_lint_success! {
         name = finally_reads_value_before_return_finishes,
         rule = NoRedundantVariableRule,
         code = "function f() { try { $value = compute(); return; } finally { debug!($value); } }",

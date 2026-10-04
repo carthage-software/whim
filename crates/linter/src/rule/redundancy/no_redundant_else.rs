@@ -155,6 +155,11 @@ fn expression_always_terminates(expression: &Expression<'_>) -> bool {
             .arguments
             .iter()
             .any(|argument| expression_always_terminates(argument.value())),
+        Expression::Conditional(conditional) => {
+            expression_always_terminates(conditional.condition)
+                || (expression_always_terminates(conditional.then)
+                    && expression_always_terminates(conditional.otherwise))
+        }
         Expression::Match(matching) => {
             expression_always_terminates(matching.expression)
                 || matching
@@ -163,5 +168,24 @@ fn expression_always_terminates(expression: &Expression<'_>) -> bool {
                     .all(|arm| expression_always_terminates(arm.expression))
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NoRedundantElseRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_failure! {
+        name = both_conditional_branches_terminate,
+        rule = NoRedundantElseRule,
+        code = "function f(bool $condition) { if (ready()) { $condition ? return 1 : throw new Error(); } else { work(); } }",
+    }
+
+    test_lint_success! {
+        name = one_conditional_branch_can_complete,
+        rule = NoRedundantElseRule,
+        code = "function f(bool $condition) { if (ready()) { $condition ? return 1 : work(); } else { work(); } }",
     }
 }

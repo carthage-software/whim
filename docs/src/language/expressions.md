@@ -191,7 +191,49 @@ function add(int $left, int $right): int {
 assert!((3 |> add(?, 4)) == 7);
 ```
 
-Whim has no ternary operator. Use `if` for statements or `match` for a value.
+## Conditional expressions
+
+`$condition ? $then : $otherwise` chooses one expression:
+
+```whim
+$ready = true;
+$label = $ready ? 'ready' : 'waiting';
+assert!($label == 'ready');
+```
+
+Whim evaluates the condition once and requires `bool`, just like `if`. A
+non-boolean condition throws `TypeError` before either branch runs. Only the
+chosen branch runs, and its value becomes the result. The branches may produce
+different types; ordinary boundary checks still apply to the chosen value.
+
+The chosen branch may instead transfer control with `return`, `break`,
+`continue`, or `throw`. It then produces no value for the enclosing expression:
+
+```whim
+function first_true(vec<bool> $values): int {
+  foreach ($values as $value) {
+    return $value ? 42 : continue;
+  }
+
+  return 0;
+}
+
+assert!(first_true(vec[false, true]) == 42);
+```
+
+In `return $value ? break : continue`, either branch leaves the expression, so
+the outer return does not run. `break` and `continue` keep their enclosing loop
+targets. Existing `finally` and `using` cleanup rules apply. A condition that
+transfers control also skips the branches. Both branches must still be legal
+in their surrounding scope.
+
+The operator binds more tightly than assignment and more loosely than `??`,
+`||`, and `&&`. It associates to the right: `$a ? $b : $c ? $d : $e` means
+`$a ? $b : ($c ? $d : $e)`. Both branches allow assignments. All three operands
+are required; use `??` when choosing a fallback for null.
+
+Conditional expressions are also valid in constant-expression positions when
+the condition and both branches meet those positions' existing rules.
 
 ## `return`
 

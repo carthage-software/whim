@@ -25,6 +25,7 @@ use whim_syn::cst::binding::TupleBindingTarget;
 use whim_syn::cst::control_flow::Match;
 use whim_syn::cst::control_flow::MatchArm;
 use whim_syn::cst::expression::Break;
+use whim_syn::cst::expression::Conditional;
 use whim_syn::cst::expression::Continue;
 use whim_syn::cst::expression::Expression;
 use whim_syn::cst::expression::Instantiation;
@@ -144,6 +145,7 @@ where
 
     {
         match expression {
+            Expression::Conditional(node) => node.format(f),
             Expression::UnaryPrefix(node) => node.format(f),
             Expression::Assignment(node) => node.format(f),
             Expression::Parenthesized(node) => {
@@ -177,6 +179,31 @@ where
                 unreachable!("expression spine nodes are formatted before the fallback")
             }
         }
+    }
+}
+
+impl<'arena, A> Format<'arena, A> for Conditional<'arena>
+where
+    A: Arena,
+{
+    fn format(&self, f: &mut FormatterState<'arena, A>) -> Document<'arena, A> {
+        let condition = self.condition.format(f);
+        let then = self.then.format(f);
+        let otherwise = self.otherwise.format(f);
+        let mut branches = f.vec();
+        branches.extend([
+            f.line(),
+            f.text("? "),
+            then,
+            f.line(),
+            f.text(": "),
+            otherwise,
+        ]);
+
+        let mut contents = f.vec();
+        contents.push(condition);
+        contents.push(f.indent(branches));
+        Document::Group(Group::new(contents))
     }
 }
 
@@ -214,7 +241,10 @@ where
         };
         let value = value.unparenthesized();
         let document = value.format(f);
-        if !matches!(value, Expression::Binary(_) | Expression::TypeOperation(_)) {
+        if !matches!(
+            value,
+            Expression::Binary(_) | Expression::TypeOperation(_) | Expression::Conditional(_)
+        ) {
             return f.concat([f.text("return"), f.space(), document]);
         }
 

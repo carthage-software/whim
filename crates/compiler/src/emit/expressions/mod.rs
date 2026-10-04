@@ -1,6 +1,7 @@
 //! Expressions, operators, and literals.
 
 use hashbrown::HashSet;
+
 use whim_base::unreachable_invariant;
 use whim_base::unwrap_result_invariant;
 use whim_bytecode::chunk::descriptors::Literal as BytecodeLiteral;
@@ -21,6 +22,7 @@ use whim_syn::cst::array::VecExpression;
 use whim_syn::cst::array::VecFillExpression;
 use whim_syn::cst::atom::Literal;
 use whim_syn::cst::expression::Break;
+use whim_syn::cst::expression::Conditional;
 use whim_syn::cst::expression::Continue;
 use whim_syn::cst::expression::InterpolatedString;
 use whim_syn::cst::expression::InterpolatedStringLiteral;
@@ -99,6 +101,7 @@ impl BodyCompiler<'_, '_> {
             )),
             Expression::ArrayAccess(_) => self.chain_root(scope, expression),
             Expression::Binary(binary) => self.binary(scope, binary),
+            Expression::Conditional(conditional) => self.conditional(scope, conditional),
             Expression::UnaryPrefix(unary) => self.unary_prefix(scope, unary),
             Expression::UnaryPostfix(unary) => self.unary_postfix(scope, unary),
             Expression::TypeOperation(operation) => self.type_operation(scope, operation),
@@ -151,6 +154,44 @@ impl BodyCompiler<'_, '_> {
                 Ok(())
             }
         }
+    }
+
+    fn conditional(
+        &mut self,
+        scope: &Scope<'_>,
+        conditional: &Conditional<'_>,
+    ) -> Result<Register, CompileError> {
+        let result = self.allocate(conditional.span())?;
+        let mark = self.registers.mark();
+        let condition = self.expression(scope, conditional.condition)?;
+        let otherwise = self.chunk.emit(
+            Instruction::JumpIfFalse {
+                condition,
+                offset: JumpOffset::new(0),
+            },
+            conditional.condition.span(),
+        );
+        self.registers.release_to(mark);
+        let before = self.save_defined();
+        let value = self.expression(scope, conditional.then)?;
+        self.move_into(result, value, conditional.then.span());
+        let then_defined = self.save_defined();
+        self.restore_defined(before);
+        self.registers.release_to(mark);
+        let end = self.chunk.emit(
+            Instruction::Jump {
+                offset: JumpOffset::new(0),
+            },
+            conditional.question,
+        );
+        self.chunk.patch_jump(otherwise, self.code_position());
+        let value = self.expression(scope, conditional.otherwise)?;
+        self.move_into(result, value, conditional.otherwise.span());
+        self.intersect_defined(&then_defined);
+        self.registers.release_to(mark);
+        self.chunk.patch_jump(end, self.code_position());
+
+        Ok(result)
     }
 
     fn vector(

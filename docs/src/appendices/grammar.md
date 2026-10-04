@@ -300,12 +300,16 @@ expression      := literal
                  | "throw" expression
                  | unary-expression
                  | binary-expression
+                 | conditional-expression
                  | assignment-expression
                  | call-expression
                  | partial-call
                  | member-expression
                  | index-expression
                  | construct-expression
+
+conditional-expression
+                := expression "?" expression ":" expression
 ```
 
 `class-expression` is a named class, `self`, `parent`, `static`, a type

@@ -6,6 +6,7 @@ order.
 | Level | Operators | Association |
 | --- | --- | --- |
 | Assignment | `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `**=`, `.=` and compound bit, shift, coalesce, and Boolean assignments | right |
+| Conditional | `? :` | right |
 | Coalesce | `??` | right |
 | Boolean or | `||` | left |
 | Boolean and | `&&` | left |

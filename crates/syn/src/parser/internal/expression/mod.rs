@@ -28,6 +28,7 @@ use crate::cst::call::NullSafeMethodCall;
 use crate::cst::call::PartialApplication;
 use crate::cst::call::PartialArgumentList;
 use crate::cst::expression::Break;
+use crate::cst::expression::Conditional;
 use crate::cst::expression::Continue;
 use crate::cst::expression::Expression;
 use crate::cst::expression::InterpolatedString;
@@ -121,7 +122,16 @@ where
                 break;
             }
 
-            let operator_precedence = Precedence::infix(&kind);
+            let operator_precedence = if kind == TokenKind::Question
+                && self
+                    .lookahead(1)?
+                    .is_some_and(|token| token.kind == TokenKind::As)
+            {
+                Precedence::TypeOperation
+            } else {
+                Precedence::infix(&kind)
+            };
+
             if matches!(operator_precedence, Precedence::Lowest) {
                 break;
             }
@@ -653,7 +663,7 @@ where
                     r#type: self.parse_type()?,
                 }));
             }
-            TokenKind::Question => {
+            TokenKind::Question if precedence == Precedence::TypeOperation => {
                 return Ok(Expression::TypeOperation(TypeOperation {
                     operand: self.arena.alloc(left),
                     operator: TypeOperator::AssertOrNull(
@@ -661,6 +671,20 @@ where
                         self.expect_keyword(TokenKind::As)?,
                     ),
                     r#type: self.parse_type()?,
+                }));
+            }
+            TokenKind::Question => {
+                let question = self.expect_span(TokenKind::Question)?;
+                let then = self.parse_expression_bp_ref(Precedence::Lowest)?;
+                let colon = self.expect_span(TokenKind::Colon)?;
+                let otherwise = self.parse_expression_bp_ref(Precedence::Assignment)?;
+
+                return Ok(Expression::Conditional(Conditional {
+                    condition: self.arena.alloc(left),
+                    question,
+                    then,
+                    colon,
+                    otherwise,
                 }));
             }
             _ => {}

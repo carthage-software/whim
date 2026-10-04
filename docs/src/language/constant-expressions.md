@@ -22,6 +22,8 @@ constant expressions. Such an expression may use:
 - the [platform information constructs](constructs.md#platform-information);
 - `embed!` with a literal relative path;
 - unary and binary operators;
+- conditional expressions whose condition and both branches are constant
+  expressions;
 - tuple, vec, and dict literals, including vec and dict spreads;
 - a `fn` closure with no captures;
 - a named class construction;
