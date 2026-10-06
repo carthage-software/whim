@@ -252,7 +252,33 @@ values, literals, integer ranges, string lengths, named types, unions,
 intersections, negation, functions, collections, shapes, class names, tuples,
 wildcards, type parameters, and `static`.
 
-The primitive `fresh` has kind `TypeKind::Fresh` and uses `PrimitiveTypeReflection`.
+The primitive `fresh` uses `PrimitiveTypeReflection`, like `int` and `uint`.
+Its kind is `TypeKind::Fresh`:
+
+```whim
+use Whim\Reflection;
+use Whim\Reflection\Type\PrimitiveTypeReflection;
+use Whim\Reflection\Type\TypeKind;
+use Whim\Type;
+
+$identity = fresh!();
+$type = Reflection\reflect_type::<fresh>();
+assert!($type is PrimitiveTypeReflection);
+assert!($type->getKind() == TypeKind::Fresh);
+assert!($type->toString() == 'fresh');
+assert!($type->accepts($identity));
+assert!(!$type->accepts($identity as uint));
+assert!($type->equals(Reflection\reflect_type_of($identity)));
+assert!($type->getId() == Type\of($identity));
+assert!(Reflection\reflect_type_id($type->getId())?->equals($type));
+```
+
+Every fresh identity has the same type ID. That ID identifies the `fresh`
+type; `$identity as uint` gives the value's representation. Reflection keeps
+`fresh` in collection types, generic arguments, properties, and callable
+signatures. A fresh-backed newtype keeps its tag; reflecting its
+`getBackingValue()` returns the `fresh` type.
+
 The primitive `uint` has kind `TypeKind::Uint`. Literal, integer-range, enum
 backing-value, and dict-shape-key reflection preserve unsigned values and their
 full 64-bit magnitude. Their value and bound results can therefore be `uint`.

@@ -1,0 +1,190 @@
+namespace FreshReflectionTest;
+
+use Whim\Marker\NeverInline;
+use Whim\Reflection;
+use Whim\Reflection\Type\PrimitiveTypeReflection;
+use Whim\Reflection\Type\TypeKind;
+use Whim\Type;
+use Whim\Unwind\TypeError;
+
+type Identity = fresh;
+newtype Ticket = fresh;
+newtype Token<T: fresh = fresh> = T;
+
+#[NeverInline]
+function accept(fresh $value): fresh {
+  return $value;
+}
+
+#[NeverInline]
+function identity<T: fresh = fresh>(T $value): T {
+  return $value;
+}
+
+function choose(fresh $value, bool $keep): null|fresh {
+  return $keep ? $value : null;
+}
+
+final class Box<T: fresh = fresh> {
+  public function __construct(public T $value) {}
+
+  public function get(): T {
+    return $this->value;
+  }
+}
+
+function rejects(fn(): mixed $operation): void {
+  $caught = false;
+  try {
+    discard!($operation());
+  } catch (TypeError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+$a = fresh!();
+$b = fresh!();
+$type = Reflection\reflect_type::<fresh>();
+assert!($type is PrimitiveTypeReflection);
+assert!($type->getKind() == TypeKind::Fresh);
+assert!($type->isResolved());
+assert!($type->toString() == 'fresh');
+assert!($type->resolve()->equals($type));
+assert!($type->accepts($a));
+assert!($type->accepts($b));
+assert!($type->equals(Reflection\reflect_type_of($a)));
+assert!($type->equals(Reflection\reflect_type_of($b)));
+assert!($type->getId() == Type\id::<fresh>());
+assert!(Type\of($a) == $type->getId());
+assert!(Type\of($b) == $type->getId());
+assert!(Type\to_debug_string($type->getId()) == 'fresh');
+assert!(Reflection\reflect_type_id($type->getId())?->equals($type));
+assert!(Reflection\reflect_type_id(Type\of($a))?->getKind() == TypeKind::Fresh);
+assert!($type->isSubtypeOf(Reflection\reflect_type::<mixed>()));
+assert!($type->isSubtypeOf(Reflection\reflect_type::<fresh|uint>()));
+assert!(!$type->isSubtypeOf(Reflection\reflect_type::<uint>()));
+assert!(!Reflection\reflect_type::<uint>()->isSubtypeOf($type));
+assert!(Reflection\reflect_type::<fresh&!uint>()->accepts($a));
+assert!(!Reflection\reflect_type::<!fresh>()->accepts($a));
+foreach (vec[
+  $a as uint,
+  0,
+  0.0,
+  false,
+  null,
+  'fresh',
+  vec[],
+  dict[],
+] as $value) {
+  assert!(!$type->accepts($value));
+  assert!(!$type->equals(Reflection\reflect_type_of($value)));
+  assert!(Type\of($value) != $type->getId());
+}
+
+assert!(
+  Reflection\reflect_type_alias(
+    'FreshReflectionTest\\Identity',
+  )->getAliasedType()->equals($type),
+);
+
+assert!(Reflection\reflect_type::<Identity>()->accepts($a));
+assert!(
+  Reflection\reflect_newtype(
+    'FreshReflectionTest\\Ticket',
+  )->getBackingType()->equals($type),
+);
+
+$ticket = Ticket($a);
+$ticketType = Reflection\reflect_type::<Ticket>();
+assert!($type->accepts($ticket));
+assert!($ticketType->isSubtypeOf($type));
+assert!($ticketType->equals(Reflection\reflect_type_of($ticket)));
+assert!(!$ticketType->equals($type));
+assert!(!$ticketType->accepts($a));
+assert!(Reflection\reflect_newtype_value($ticket)->getBackingValue() == $a);
+
+$token = Token::<fresh>($a);
+$nominal = Reflection\reflect_newtype_value($token);
+assert!($nominal->getType()->getTypeArguments()[0]->equals($type));
+assert!($nominal->getBackingValue() == $a);
+assert!(Reflection\reflect_type_of($nominal->getBackingValue())->equals($type));
+assert!(
+  $nominal
+    ->getDeclaration()
+    ->getBackingType()
+    ->resolve($nominal->getTypeEnvironment())
+    ->equals($type),
+);
+
+assert!(
+  Reflection\reflect_type_id(Type\of($token))?->equals($nominal->getType()),
+);
+
+$vector = Reflection\reflect_type_of(vec[$a, $b]);
+assert!($vector->getKind() == TypeKind::Vec);
+assert!($vector->getValueType()?->equals($type));
+assert!($vector->equals(Reflection\reflect_type::<vec<fresh>>()));
+$dictionary = Reflection\reflect_type_of(dict[$a => $b]);
+assert!($dictionary->getKind() == TypeKind::Dict);
+assert!($dictionary->getKeyType()?->equals($type));
+assert!($dictionary->getValueType()?->equals($type));
+assert!($dictionary->equals(Reflection\reflect_type::<dict<fresh, fresh>>()));
+assert!(!$dictionary->accepts(dict[($a as uint) => $b]));
+$taggedKeys = Reflection\reflect_type_of(dict[$ticket => $a]);
+assert!($taggedKeys->getKeyType()?->equals($ticketType));
+assert!(!$taggedKeys->accepts(dict[$a => $a]));
+$tuple = Reflection\reflect_type_of(($a, $a as uint));
+assert!($tuple->getTypes()[0]->equals($type));
+assert!($tuple->getTypes()[1]->equals(Reflection\reflect_type::<uint>()));
+
+$function = Reflection\reflect_function('FreshReflectionTest\\accept');
+assert!($function->getParameter('value')?->getDeclaredType()?->equals($type));
+assert!($function->getReturnType()?->equals($type));
+assert!($function->invoke(vec[], vec[$a]) == $a);
+rejects(fn(): mixed => $function->invoke(vec[], vec[$a as uint]));
+$generic = Reflection\reflect_function('FreshReflectionTest\\identity');
+assert!($generic->getTypeParameter(0)?->getBounds()[0]->equals($type));
+assert!($generic->getTypeParameter(0)?->getDefault()?->equals($type));
+assert!($generic->invoke(vec[], vec[$a]) == $a);
+assert!($generic->invoke(vec[$type], vec[$a]) == $a);
+rejects(
+  fn(): mixed => (
+    $generic->invoke(vec[Reflection\reflect_type::<uint>()], vec[$a as uint])
+  ),
+);
+
+$class = Reflection\reflect_class('FreshReflectionTest\\Box');
+$instance = $class->instantiate(vec[$type], vec[$a]);
+$object = Reflection\reflect_object($instance);
+assert!($object->getType()->equals(Reflection\reflect_type::<Box<fresh>>()));
+assert!($object->getTypeArgument($class->getTypeParameter(0))?->equals($type));
+$property = $object->getProperty($class->getProperty('value'));
+assert!($property->getDeclaredType()?->equals($type));
+assert!($property->getValueType()?->equals($type));
+assert!($property->getValue() == $a);
+assert!(
+  $class
+    ->getMethod('get')
+    ->getReturnType()
+    ->resolve($object->getTypeEnvironment())
+    ->equals($type),
+);
+
+assert!($class->getMethod('get')->invoke($instance) == $a);
+rejects(fn(): mixed => $class->instantiate(vec[$type], vec[$a as uint]));
+
+$closure = Reflection\reflect_callable(fn(): fresh => $a);
+assert!($closure->getType()->getReturnType()?->equals($type));
+assert!($closure->getCaptures()[0]->getType()->equals($type));
+assert!($closure->getCaptures()[0]->getValue() == $a);
+assert!($closure->invoke() == $a);
+$partial = Reflection\reflect_callable(choose($a, ?));
+assert!($partial->getBoundArguments()[0]->getType()->equals($type));
+assert!($partial->getBoundArguments()[0]->getValue() == $a);
+assert!($partial->invoke(vec[], vec[true]) == $a);
+$specialized = Reflection\reflect_callable(identity::<fresh>(...));
+assert!($specialized->getType()->getParameters()[0]->getType()->equals($type));
+assert!($specialized->getType()->getReturnType()?->equals($type));
+assert!($specialized->invoke(vec[], vec[$a]) == $a);

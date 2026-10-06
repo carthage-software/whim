@@ -73,6 +73,44 @@ function keys(dict $values): void {
 keys($seen);
 ";
 
+const REFLECTION: &str = include_str!("../../../tests/standard-library/reflection-fresh.whim");
+
+#[test]
+fn fresh_reflection_preserves_types_and_values() {
+    for optimize in [false, true] {
+        let mut engine = Engine::new(EngineConfiguration {
+            optimize,
+            ..EngineConfiguration::default()
+        });
+        let outcome = engine.run_source(REFLECTION, Path::new("/fresh-reflection.whim"));
+        assert_eq!(
+            outcome.exit_code(),
+            0,
+            "optimization {optimize}: {outcome:?}"
+        );
+    }
+}
+
+#[test]
+fn artifacts_preserve_fresh_reflection() {
+    for optimize in [false, true] {
+        let mut compiler = Engine::new(EngineConfiguration::default());
+        let artifact = compiler
+            .compile_artifact(
+                "/fresh-reflection.whim",
+                &[SourceFile::new("/fresh-reflection.whim", REFLECTION)],
+                ArtifactConfiguration {
+                    optimize,
+                    ..ArtifactConfiguration::default()
+                },
+            )
+            .unwrap()
+            .into_bytes();
+        let mut engine = Engine::new(EngineConfiguration::default());
+        engine.load_artifact(&artifact).unwrap();
+    }
+}
+
 #[test]
 fn fresh_identities_survive_copies_casts_and_dictionary_operations() {
     for optimize in [false, true] {
