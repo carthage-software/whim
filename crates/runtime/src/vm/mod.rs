@@ -658,7 +658,9 @@ impl<'engine> VirtualMachine<'engine> {
         self.push_detached_frame(chunk, NonNull::from(&*cache), context);
         self.current_frame_mut().type_environment = environment;
         let floor = self.frames.len() - 1;
+        self.engine.initializer_depth += 1;
         let result = self.run(floor);
+        self.engine.initializer_depth -= 1;
         drop(cache);
         result
     }

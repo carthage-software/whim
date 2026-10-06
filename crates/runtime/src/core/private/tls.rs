@@ -1267,9 +1267,11 @@ fn key_text(cx: &mut Context<'_, '_, '_>, key: KeyRef<'_>) -> Result<String, Thr
         }
         KeyRef::Int(_)
         | KeyRef::Uint(_)
+        | KeyRef::Fresh(_)
         | KeyRef::Bool(_)
         | KeyRef::NewtypeInt(_, _)
         | KeyRef::NewtypeUint(_, _)
+        | KeyRef::NewtypeFresh(_, _)
         | KeyRef::NewtypeBool(_, _) => {
             // SAFETY: built-in dispatch checked the string key type.
             unsafe { unreachable_invariant("validated TLS server identity keys are strings") }

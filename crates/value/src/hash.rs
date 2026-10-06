@@ -55,6 +55,12 @@ impl HashState {
 
     #[must_use]
     #[inline(always)]
+    pub(crate) const fn hash_fresh(&self, identity: u64) -> u64 {
+        permute(identity, self.uint_seed ^ 0x418d_73a9_fcd6_02b5)
+    }
+
+    #[must_use]
+    #[inline(always)]
     pub(crate) const fn hash_bool(&self, value: bool) -> u64 {
         permute(value as u64, self.bool_seed)
     }

@@ -31,6 +31,7 @@ use crate::cst::construct::DropConstruct;
 use crate::cst::construct::EmbedConstruct;
 use crate::cst::construct::ExitConstruct;
 use crate::cst::construct::FileConstruct;
+use crate::cst::construct::FreshConstruct;
 use crate::cst::construct::LengthConstruct;
 use crate::cst::construct::PanicConstruct;
 use crate::cst::construct::RemoveConstruct;
@@ -61,6 +62,7 @@ where
         };
 
         Ok(match token.value {
+            "fresh" => Construct::Fresh(self.parse_fresh_construct()?),
             "require" => Construct::Require(self.parse_require_construct()?),
             "require_once" => Construct::RequireOnce(self.parse_require_once_construct()?),
             "length" => Construct::Length(self.parse_length_construct()?),
@@ -567,6 +569,15 @@ where
             bang,
             left_parenthesis,
             right_parenthesis,
+        })
+    }
+
+    fn parse_fresh_construct(&mut self) -> Result<FreshConstruct<'arena>, ParseError> {
+        Ok(FreshConstruct {
+            name: self.expect_keyword(TokenKind::Fresh)?,
+            bang: self.expect_span(TokenKind::Bang)?,
+            left_parenthesis: self.expect_span(TokenKind::LeftParenthesis)?,
+            right_parenthesis: self.expect_span(TokenKind::RightParenthesis)?,
         })
     }
 

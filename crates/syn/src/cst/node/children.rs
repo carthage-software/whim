@@ -740,6 +740,7 @@ impl Node<'_, '_> {
                 f(Node::Expression(node.exception));
             }
             Node::Construct(node) => match node {
+                Construct::Fresh(inner) => f(Node::FreshConstruct(inner)),
                 Construct::Require(inner) => f(Node::RequireConstruct(inner)),
                 Construct::RequireOnce(inner) => f(Node::RequireOnceConstruct(inner)),
                 Construct::Length(inner) => f(Node::LengthConstruct(inner)),
@@ -899,6 +900,7 @@ impl Node<'_, '_> {
                 }
             }
             Node::FileConstruct(node) => f(Node::LocalIdentifier(&node.name)),
+            Node::FreshConstruct(node) => f(Node::Keyword(&node.name)),
             Node::DirectoryConstruct(node) => f(Node::LocalIdentifier(&node.name)),
             Node::EmbedConstruct(node) => {
                 f(Node::LocalIdentifier(&node.name));
@@ -1188,6 +1190,7 @@ impl Node<'_, '_> {
                 Type::String(inner)
                 | Type::Int(inner)
                 | Type::Uint(inner)
+                | Type::Fresh(inner)
                 | Type::Float(inner)
                 | Type::Bool(inner)
                 | Type::Void(inner)

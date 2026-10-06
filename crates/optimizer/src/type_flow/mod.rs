@@ -77,6 +77,7 @@ const DICTIONARY: u16 = 1 << 7;
 const TUPLE: u16 = 1 << 8;
 const CALLABLE: u16 = 1 << 9;
 const UINT: u16 = 1 << 10;
+const FRESH: u16 = 1 << 11;
 const ALL: u16 = u16::MAX;
 const NUMERIC: u16 = INT | UINT | FLOAT;
 const ALWAYS_REFERENCE_COUNTED: u16 = OBJECT | VECTOR | DICTIONARY | TUPLE | CALLABLE;
@@ -193,6 +194,7 @@ impl Fact {
             ValueView::Bool(_) => Self::known(BOOL),
             ValueView::Int(value) => Self::integer(*value, NO_ORIGIN),
             ValueView::Uint(_) => Self::known(UINT),
+            ValueView::Fresh(_) => Self::known(FRESH),
             ValueView::Float(_) => Self::known(FLOAT),
             ValueView::String(_) | ValueView::ShortString(_) => Self::known(STRING),
             ValueView::Object(_) => Self::known(OBJECT),
@@ -1328,7 +1330,7 @@ fn array_shape(descriptor: &TypeDescriptor) -> Option<(u16, &TypeDescriptor)> {
     match descriptor {
         TypeDescriptor::Array(Some((key, value)))
         | TypeDescriptor::Dictionary(Some((key, value))) => Some((
-            descriptor_mask(key).unwrap_or(INT | UINT | BOOL | STRING),
+            descriptor_mask(key).unwrap_or(INT | UINT | BOOL | STRING | FRESH),
             value.as_ref(),
         )),
         TypeDescriptor::Vector(Some(element)) => Some((UINT, element.as_ref())),

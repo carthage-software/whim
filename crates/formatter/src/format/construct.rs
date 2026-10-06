@@ -148,6 +148,9 @@ where
             Construct::File(c) => {
                 f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
             }
+            Construct::Fresh(c) => {
+                f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
+            }
             Construct::Directory(c) => {
                 f.format_construct(c.name.value, &[], c.right_parenthesis.start.offset)
             }

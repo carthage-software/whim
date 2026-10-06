@@ -3,6 +3,22 @@
 A language construct looks like `name!(...)`, but it is not a function. The
 compiler knows its rules and may emit direct bytecode for it.
 
+## Fresh identities
+
+`fresh!()` takes no arguments and creates a [fresh scalar](types.md#scalar-values).
+Every executed call creates a distinct identity within the VM lifetime. Copies
+keep their identity, and skipped branches create none:
+
+```whim
+$a = fresh!();
+$b = fresh!();
+assert!($a != $b);
+```
+
+The construct runs at runtime. It cannot run in a constant expression, even
+through a function call. Compiled artifacts store the generation instruction
+and create identities when executed.
+
 ## Array and string constructs
 
 - `length!($value)` returns the byte length of a string or the item count of an

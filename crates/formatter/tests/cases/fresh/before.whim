@@ -1,0 +1,4 @@
+function token( fresh $value ):fresh {return $value;}
+$a=fresh! ( );
+$b= $a as uint ;
+assert!($a is fresh);

@@ -252,6 +252,7 @@ values, literals, integer ranges, string lengths, named types, unions,
 intersections, negation, functions, collections, shapes, class names, tuples,
 wildcards, type parameters, and `static`.
 
+The primitive `fresh` has kind `TypeKind::Fresh` and uses `PrimitiveTypeReflection`.
 The primitive `uint` has kind `TypeKind::Uint`. Literal, integer-range, enum
 backing-value, and dict-shape-key reflection preserve unsigned values and their
 full 64-bit magnitude. Their value and bound results can therefore be `uint`.

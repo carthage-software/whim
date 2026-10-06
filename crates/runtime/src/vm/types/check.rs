@@ -116,6 +116,7 @@ fn numeric_cast_candidate(target: &TypeDescriptor, value: &Value) -> Option<Valu
         | TypeDescriptor::UintRange { .. } => {
             let converted = match value.transparent() {
                 ValueView::Uint(value) => Some(*value),
+                ValueView::Fresh(value) => Some(*value),
                 ValueView::Int(value) => u64::try_from(*value).ok(),
                 ValueView::Float(value)
                     if value.fract() == 0.0
@@ -713,6 +714,7 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::Bool
             | TypeDescriptor::Int
             | TypeDescriptor::Uint
+            | TypeDescriptor::Fresh
             | TypeDescriptor::UintLiteral(_)
             | TypeDescriptor::UintRange { .. }
             | TypeDescriptor::Float
@@ -851,7 +853,9 @@ impl VirtualMachine<'_> {
         environment: TypeEnvironmentId,
         depth: u32,
     ) -> Result<[Option<Value>; 3], VirtualMachineControl> {
-        if depth > MAX_TYPE_DEPTH_U32 || !(value.is_int() || value.is_uint() || value.is_float()) {
+        if depth > MAX_TYPE_DEPTH_U32
+            || !(value.is_int() || value.is_uint() || value.is_float() || value.is_fresh())
+        {
             return Ok([None, None, None]);
         }
         let target = self.substitute_descriptor(target, environment, depth + 1);
@@ -2190,6 +2194,7 @@ impl VirtualMachine<'_> {
     ) -> Result<Option<u8>, VirtualMachineControl> {
         Ok(match descriptor {
             TypeDescriptor::Null => Some(0),
+            TypeDescriptor::Fresh => Some(11),
             TypeDescriptor::Uint
             | TypeDescriptor::UintLiteral(_)
             | TypeDescriptor::UintRange { .. } => Some(10),
@@ -2879,6 +2884,7 @@ impl VirtualMachine<'_> {
             TypeDescriptor::Bool => value.is_bool(),
             TypeDescriptor::Int => value.is_int(),
             TypeDescriptor::Uint => value.is_uint(),
+            TypeDescriptor::Fresh => value.is_fresh(),
             TypeDescriptor::UintLiteral(expected) => value.as_uint() == Some(*expected),
             TypeDescriptor::UintRange { min, max } => value.as_uint().is_some_and(|value| {
                 min.is_none_or(|min| value >= min) && max.is_none_or(|max| value <= max)

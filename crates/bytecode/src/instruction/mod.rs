@@ -262,6 +262,7 @@ macro_rules! instruction_set {
             Debug { value_count: Count, first_value: Register } = 206,
             Require { once: bool, destination: Register, path: Register } = 207,
             DrainFinalizers = 208,
+            Fresh { destination: Register } = 212,
         }
     };
 }

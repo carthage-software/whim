@@ -72,6 +72,8 @@ pub(crate) enum TypeKind {
     Int,
     #[whim_case("Uint")]
     Uint,
+    #[whim_case("Fresh")]
+    Fresh,
     #[whim_case("Float")]
     Float,
     #[whim_case("String")]

@@ -34,6 +34,10 @@ Calls may run code, inspect state, and throw. “Constant expression” names th
 source forms allowed at the use site. It does not mean pure or compile-time
 work. The expression itself cannot read a local variable or `$this` directly.
 
+`fresh!()` cannot appear in a constant expression. An indirect call that reaches
+it during an initializer throws `TypeError`. Create and store a fresh value in
+ordinary runtime code instead.
+
 ```whim
 final class Box {
   public function __construct(public int $value) {}

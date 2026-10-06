@@ -26,6 +26,7 @@ use crate::type_flow::BOOL;
 use crate::type_flow::CALLABLE;
 use crate::type_flow::DICTIONARY;
 use crate::type_flow::FLOAT;
+use crate::type_flow::FRESH;
 use crate::type_flow::Fact;
 use crate::type_flow::INT;
 use crate::type_flow::IndexedUnit;
@@ -467,8 +468,9 @@ impl TypeFlow<'_> {
         expected: &TypeDescriptor,
     ) -> bool {
         let scalar = |descriptor: &TypeDescriptor| {
-            exact_descriptor_mask(descriptor)
-                .is_some_and(|mask| mask & !(NULL | BOOL | INT | UINT | FLOAT | STRING) == 0)
+            exact_descriptor_mask(descriptor).is_some_and(|mask| {
+                mask & !(NULL | BOOL | INT | UINT | FLOAT | STRING | FRESH) == 0
+            })
         };
 
         let kind = match expected {
@@ -960,6 +962,7 @@ impl TypeFlow<'_> {
             TypeDescriptor::Bool => fact.mask & !BOOL == 0,
             TypeDescriptor::Int => fact.mask & !INT == 0,
             TypeDescriptor::Uint => fact.mask & !UINT == 0,
+            TypeDescriptor::Fresh => fact.mask & !FRESH == 0,
             TypeDescriptor::Float => fact.mask & !FLOAT == 0,
             TypeDescriptor::String => fact.mask & !STRING == 0,
             TypeDescriptor::Object => fact.mask & !OBJECT == 0,
@@ -1142,8 +1145,9 @@ impl TypeFlow<'_> {
         }
         let bindings = alias_bindings(&alias.type_parameters, arguments.as_deref())?;
         let scalar = |descriptor: &TypeDescriptor| {
-            exact_descriptor_mask(descriptor)
-                .is_some_and(|mask| mask & !(NULL | BOOL | INT | UINT | FLOAT | STRING) == 0)
+            exact_descriptor_mask(descriptor).is_some_and(|mask| {
+                mask & !(NULL | BOOL | INT | UINT | FLOAT | STRING | FRESH) == 0
+            })
         };
         for (parameter, (_, argument)) in alias.type_parameters.iter().zip(&bindings) {
             if !scalar_alias_body(argument, self.unit, depth + 1) {
@@ -1559,6 +1563,7 @@ fn scalar_alias_body(
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::Never

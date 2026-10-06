@@ -176,6 +176,7 @@ fn type_class_name(context: &Context<'_, '_, '_>, descriptor: &TypeDescriptor) -
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::Object => "Whim\\Reflection\\Type\\PrimitiveTypeReflection",

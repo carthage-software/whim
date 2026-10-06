@@ -43,7 +43,7 @@ pub(in crate::vm) fn dict_key(value: &Value) -> Result<Key, ArrayFault> {
 #[inline(never)]
 fn bad_dict_key(value: &Value) -> ArrayFault {
     ArrayFault::type_error(format!(
-        "a dict key must be int, uint, bool, or string, {} given",
+        "a dict key must be int, uint, bool, string, or fresh, {} given",
         value.kind_name()
     ))
 }
@@ -1075,6 +1075,7 @@ pub(in crate::vm) fn dict_add_assign_any_key_int_value(
     let key = match index.transparent() {
         ValueView::Int(key) => KeyRef::Int(*key),
         ValueView::Uint(key) => KeyRef::Uint(*key),
+        ValueView::Fresh(key) => KeyRef::Fresh(*key),
         ValueView::Bool(key) => KeyRef::Bool(*key),
         ValueView::String(key) => KeyRef::String(key),
         ValueView::ShortString(key) => KeyRef::ShortString(*key),

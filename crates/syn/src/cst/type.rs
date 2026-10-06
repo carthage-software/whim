@@ -38,6 +38,7 @@ pub enum Type<'arena> {
     StringLength(StringLengthType<'arena>),
     Int(Keyword<'arena>),
     Uint(Keyword<'arena>),
+    Fresh(Keyword<'arena>),
     Float(Keyword<'arena>),
     Bool(Keyword<'arena>),
     Void(Keyword<'arena>),
@@ -410,6 +411,7 @@ impl HasSpan for Type<'_> {
             Type::String(keyword)
             | Type::Int(keyword)
             | Type::Uint(keyword)
+            | Type::Fresh(keyword)
             | Type::Float(keyword)
             | Type::Bool(keyword)
             | Type::Void(keyword)

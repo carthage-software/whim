@@ -78,7 +78,7 @@ fn array_entries(value: &Value) -> Option<ArrayEntries<'_>> {
 }
 
 #[whim_function(
-    "Whim\\_Private\\array_entries(array<_, _> $values): vec<(string|int|uint|bool, mixed)>"
+    "Whim\\_Private\\array_entries(array<_, _> $values): vec<(string|int|uint|bool|fresh, mixed)>"
 )]
 pub(crate) fn entries<'call>(
     context: &Context<'call, '_, '_>,
@@ -147,7 +147,7 @@ pub(crate) fn vec_from_array<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_from_array(array<_, _> $values): dict<string|int|uint|bool, mixed>"
+    "Whim\\_Private\\dict_from_array(array<_, _> $values): dict<string|int|uint|bool|fresh, mixed>"
 )]
 pub(crate) fn dict_from_array<'call>(
     context: &Context<'call, '_, '_>,
@@ -170,7 +170,7 @@ pub(crate) fn dict_from_array<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_from_entries(array<_, (string|int|uint|bool, _)> $entries): dict<string|int|uint|bool, mixed>"
+    "Whim\\_Private\\dict_from_entries(array<_, (string|int|uint|bool|fresh, _)> $entries): dict<string|int|uint|bool|fresh, mixed>"
 )]
 pub(crate) fn dict_from_entries<'call>(
     context: &Context<'call, '_, '_>,
@@ -217,7 +217,7 @@ pub(crate) fn dict_from_entries<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_merge(dict<_, _> $first, dict<_, _> $second): dict<string|int|uint|bool, mixed>"
+    "Whim\\_Private\\dict_merge(dict<_, _> $first, dict<_, _> $second): dict<string|int|uint|bool|fresh, mixed>"
 )]
 pub(crate) fn dict_merge(arguments: Arguments<'_>) -> Value {
     let first = arguments.dict(0);
@@ -235,7 +235,7 @@ pub(crate) fn dict_merge(arguments: Arguments<'_>) -> Value {
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_flip(array<_, string|int|uint|bool> $values): dict<string|int|uint|bool, mixed>"
+    "Whim\\_Private\\dict_flip(array<_, string|int|uint|bool|fresh> $values): dict<string|int|uint|bool|fresh, mixed>"
 )]
 pub(crate) fn dict_flip<'call>(
     context: &Context<'call, '_, '_>,
@@ -267,7 +267,7 @@ pub(crate) fn dict_flip<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_flatten(array<_, _> $values): null|dict<string|int|uint|bool, mixed>"
+    "Whim\\_Private\\dict_flatten(array<_, _> $values): null|dict<string|int|uint|bool|fresh, mixed>"
 )]
 pub(crate) fn dict_flatten<'call>(
     context: &Context<'call, '_, '_>,
@@ -304,7 +304,7 @@ pub(crate) fn dict_flatten<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_count_values(array<_, string|int|uint|bool> $values): dict<string|int|uint|bool, uint>"
+    "Whim\\_Private\\dict_count_values(array<_, string|int|uint|bool|fresh> $values): dict<string|int|uint|bool|fresh, uint>"
 )]
 pub(crate) fn dict_count_values<'call>(
     context: &Context<'call, '_, '_>,
@@ -339,7 +339,7 @@ pub(crate) fn dict_count_values<'call>(
 }
 
 #[whim_function(
-    "Whim\\_Private\\dict_sort(dict<_, _> $values, null|fn(_, _): int $comparator): dict<string|int|uint|bool, mixed>"
+    "Whim\\_Private\\dict_sort(dict<_, _> $values, null|fn(_, _): int $comparator): dict<string|int|uint|bool|fresh, mixed>"
 )]
 pub(crate) fn dict_sort(
     context: &mut Context<'_, '_, '_>,
@@ -599,6 +599,7 @@ fn unique_values<'value>(
                 ValueView::Bool(_)
                 | ValueView::Int(_)
                 | ValueView::Uint(_)
+                | ValueView::Fresh(_)
                 | ValueView::String(_)
                 | ValueView::ShortString(_) => {
                     // SAFETY: these values are accepted by `KeyRef` above.

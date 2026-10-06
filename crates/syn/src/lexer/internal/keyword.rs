@@ -86,6 +86,7 @@ fn lookup_len5(bytes: &[u8]) -> Option<TokenKind> {
             b'a' if bytes == b"false" => Some(TokenKind::False),
             b'i' if bytes == b"final" => Some(TokenKind::Final),
             b'l' if bytes == b"float" => Some(TokenKind::Float),
+            b'r' if bytes == b"fresh" => Some(TokenKind::Fresh),
             _ => None,
         },
         b'm' => match bytes[1] {

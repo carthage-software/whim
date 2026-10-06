@@ -26,6 +26,7 @@ enum KnownKind {
     Bool,
     Int,
     Uint,
+    Fresh,
     Float,
     String,
     Object,
@@ -293,6 +294,7 @@ fn specialize_return(
                 | KnownKind::Bool
                 | KnownKind::Int
                 | KnownKind::Uint
+                | KnownKind::Fresh
                 | KnownKind::Float => Instruction::ReturnScalarUnchecked { source },
                 KnownKind::Object
                 | KnownKind::Vec
@@ -322,6 +324,7 @@ fn return_kind_satisfies(
         TypeDescriptor::Bool => kind == KnownKind::Bool,
         TypeDescriptor::Int => kind == KnownKind::Int,
         TypeDescriptor::Uint => kind == KnownKind::Uint,
+        TypeDescriptor::Fresh => kind == KnownKind::Fresh,
         TypeDescriptor::Float => kind == KnownKind::Float,
         TypeDescriptor::String => kind == KnownKind::String,
         TypeDescriptor::Object => kind == KnownKind::Object,
@@ -502,6 +505,7 @@ fn transfer(
             literal_kind(&chunk.constants[usize::from(constant.index())]),
         ),
         Instruction::LoadNull { destination } => (destination, KnownKind::Null),
+        Instruction::Fresh { destination } => (destination, KnownKind::Fresh),
         Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
         | Instruction::Equal { destination, .. }
@@ -903,6 +907,7 @@ fn descriptor_kind(descriptor: &TypeDescriptor) -> KnownKind {
         TypeDescriptor::Uint
         | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::UintRange { .. } => KnownKind::Uint,
+        TypeDescriptor::Fresh => KnownKind::Fresh,
         TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => KnownKind::Float,
         TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }

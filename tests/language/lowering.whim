@@ -269,12 +269,12 @@ class StaticBox {
 StaticBox::$data[0][0] = 6;
 assert!(StaticBox::$data[0][0] == 6);
 
-function fresh(): mixed {
+function make_nested_vector(): mixed {
   return vec[vec[1]];
 }
 
-fresh()[0][0] = 2;
-assert!(fresh()[0][0] == 1);
+make_nested_vector()[0][0] = 2;
+assert!(make_nested_vector()[0][0] == 1);
 
 class ProbeLog {
   public static int $count = 0;

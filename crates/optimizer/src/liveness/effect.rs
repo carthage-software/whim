@@ -126,6 +126,7 @@ pub(crate) fn effect_on(chunk: &Chunk, instruction: Instruction, register: Regis
         ) => read_then_write(reads(left) || reads(right), writes(destination)),
         Instruction::LoadConstant { destination, .. }
         | Instruction::LoadNull { destination }
+        | Instruction::Fresh { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
         | Instruction::LoadInteger { destination, .. }

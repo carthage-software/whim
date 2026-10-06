@@ -70,6 +70,7 @@ pub enum ValueKind {
     Function,
     Object,
     Iter,
+    Fresh,
 }
 
 union ValuePayload {
@@ -113,6 +114,7 @@ pub enum ValueView<'a> {
     Function(&'a ManagedRef<FunctionObject>),
     Object(&'a ManagedRef<InstanceObject>),
     Iter(&'a ManagedRef<IteratorObject>),
+    Fresh(&'a u64),
 }
 
 impl ValueView<'_> {
@@ -140,6 +142,7 @@ impl ValueView<'_> {
             Self::Bool(_) => "bool",
             Self::Int(_) => "int",
             Self::Uint(_) => "uint",
+            Self::Fresh(_) => "fresh",
             Self::Float(_) => "float",
             Self::String(_) | Self::ShortString(_) => "string",
             Self::Vec(_) => "vec",
@@ -236,6 +239,15 @@ impl Value {
         Self {
             payload: ValuePayload { raw: value },
             kind: ValueKind::Uint,
+            newtype: NO_NEWTYPE,
+        }
+    }
+
+    #[must_use]
+    pub const fn fresh(identity: u64) -> Self {
+        Self {
+            payload: ValuePayload { raw: identity },
+            kind: ValueKind::Fresh,
             newtype: NO_NEWTYPE,
         }
     }
@@ -404,6 +416,7 @@ impl Value {
                 ValueKind::Bool => ValueView::Bool(&self.payload.boolean),
                 ValueKind::Int => ValueView::Int(&self.payload.integer),
                 ValueKind::Uint => ValueView::Uint(&self.payload.raw),
+                ValueKind::Fresh => ValueView::Fresh(&self.payload.raw),
                 ValueKind::Float => ValueView::Float(&self.payload.float),
                 ValueKind::String => ValueView::String(&self.payload.string),
                 ValueKind::ShortString => ValueView::ShortString(&self.payload.short_string),
@@ -467,6 +480,22 @@ impl Value {
     #[inline(always)]
     pub fn is_uint(&self) -> bool {
         self.kind == ValueKind::Uint
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn is_fresh(&self) -> bool {
+        self.kind == ValueKind::Fresh
+    }
+
+    #[must_use]
+    pub fn as_fresh(&self) -> Option<u64> {
+        if self.is_fresh() {
+            // SAFETY: the kind proves the raw payload is initialized.
+            Some(unsafe { self.payload.raw })
+        } else {
+            None
+        }
     }
 
     #[must_use]
@@ -547,6 +576,7 @@ impl Value {
             | ValueView::Bool(_)
             | ValueView::Int(_)
             | ValueView::Uint(_)
+            | ValueView::Fresh(_)
             | ValueView::Float(_)
             | ValueView::ShortString(_) => false,
         }
@@ -876,6 +906,7 @@ impl Value {
             | ValueView::Bool(_)
             | ValueView::Int(_)
             | ValueView::Uint(_)
+            | ValueView::Fresh(_)
             | ValueView::Float(_)
             | ValueView::String(_)
             | ValueView::ShortString(_)
@@ -895,6 +926,7 @@ impl Value {
             ValueKind::Bool => "bool",
             ValueKind::Int => "int",
             ValueKind::Uint => "uint",
+            ValueKind::Fresh => "fresh",
             ValueKind::Float => "float",
             ValueKind::String | ValueKind::ShortString => "string",
             ValueKind::Vec => "vec",

@@ -1192,6 +1192,7 @@ fn lower_type_inner(
         Type::Bool(_) => Ok(TypeDescriptor::Bool),
         Type::Int(_) => Ok(TypeDescriptor::Int),
         Type::Uint(_) => Ok(TypeDescriptor::Uint),
+        Type::Fresh(_) => Ok(TypeDescriptor::Fresh),
         Type::Float(_) => Ok(TypeDescriptor::Float),
         Type::String(_) => Ok(TypeDescriptor::String),
         Type::StringLength(string) => lower_string_length_type(scope.heap, string),
@@ -1250,6 +1251,7 @@ fn descriptor_may_be_class_like(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -1330,6 +1332,7 @@ fn descriptor_has_parameter(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }

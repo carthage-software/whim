@@ -334,10 +334,12 @@ trailing comma:
 ```text
 sequence-expression
                 := "sequence" "!" "(" expression ("," expression)* ","? ")"
+
+fresh-expression := "fresh" "!" "(" ")"
 ```
 
-It is a `construct-expression`. See
-[Language Constructs](../language/constructs.md#sequencing-expressions) for
+Both are construct expressions. See
+[Language Constructs](../language/constructs.md) for
 evaluation and discard rules.
 
 Collection literals use these forms:
@@ -458,7 +460,7 @@ classname-type  := "classname" "<" type ">"
 
 type-list       := type ("," type)* ","?
 built-in-type   := "null" | "bool" | "int" | "uint" | "float" | "string"
-                 | "object" | "mixed" | "never" | "void"
+                 | "fresh" | "object" | "mixed" | "never" | "void"
 literal-type    := literal | "-" (integer-literal | float-literal)
 range-type      := signed-integer-literal (".." | "..=")
                    signed-integer-literal?

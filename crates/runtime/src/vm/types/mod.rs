@@ -72,6 +72,7 @@ impl VirtualMachine<'_> {
             | TypeDescriptor::Bool
             | TypeDescriptor::Int
             | TypeDescriptor::Uint
+            | TypeDescriptor::Fresh
             | TypeDescriptor::UintLiteral(_)
             | TypeDescriptor::UintRange { .. }
             | TypeDescriptor::Float
@@ -443,6 +444,7 @@ impl VirtualMachine<'_> {
             ValueView::Bool(_) => TypeDescriptor::Bool,
             ValueView::Int(_) => TypeDescriptor::Int,
             ValueView::Uint(_) => TypeDescriptor::Uint,
+            ValueView::Fresh(_) => TypeDescriptor::Fresh,
             ValueView::Float(_) => TypeDescriptor::Float,
             ValueView::String(_) | ValueView::ShortString(_) => TypeDescriptor::String,
             ValueView::Vec(vector) => {

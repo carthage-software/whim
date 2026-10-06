@@ -5,7 +5,7 @@ accepts. Whim checks that rule when the program reaches the boundary.
 
 ## Scalar values
 
-Whim has six scalar value kinds.
+Whim has seven scalar value kinds.
 
 | Type | Values |
 | --- | --- |
@@ -15,6 +15,7 @@ Whim has six scalar value kinds.
 | `uint` | unsigned 64-bit integers, from 0 through 18,446,744,073,709,551,615 |
 | `float` | double-precision floating-point numbers |
 | `string` | byte strings |
+| `fresh` | opaque identities created by `fresh!()` |
 
 Integers and floats stay distinct:
 
@@ -29,6 +30,42 @@ assert!(1 != 1.0);
 Strings hold bytes, not a promise of valid UTF-8. The source file is UTF-8, but
 a string may contain any byte through escapes, file reads, sockets, or binary
 decoding.
+
+`fresh!()` creates an identity distinct from every identity this VM has already
+created. Copying it preserves that identity:
+
+```whim
+$a = fresh!();
+$b = fresh!();
+$copy = $a;
+assert!($a is fresh);
+assert!($a != $b);
+assert!($a == $copy);
+$names = dict[$a => 'first', $b => 'second'];
+assert!($names[$copy] == 'first');
+```
+
+Fresh values support `==` and `!=`, type checks, and dictionary keys. They have
+no order, arithmetic, bit operations, or implicit string or bool conversion.
+Even copies reject order comparisons such as `$a <= $copy` and `$a <=> $copy`.
+They cannot index a vec, tuple, or string.
+
+`$a as uint` gives an unsigned integer for explicit use with APIs that need
+one. Equal identities give equal integers, and distinct identities give
+distinct integers during that VM lifetime. The integer has no promised value
+across runs and gives no ordering contract. Casting an integer back to `fresh`
+fails, including an integer obtained from a fresh value. Casting a fresh value
+to `fresh` preserves it.
+
+The VM never reuses a fresh identity, even after every copy disappears. If it
+exhausts its identity space, `fresh!()` throws `OverflowError`; further calls
+also fail. Separate VMs may reuse representations. Fresh values are not
+persistent IDs, distributed IDs, or secrets.
+
+`Whim\Refine\Scalar` and `Whim\Refine\ArrayKey` include `fresh`.
+`Whim\Refine\Numeric` does not. JSON and BSON reject fresh values and keys;
+cast explicitly to a supported type when encoding a diagnostic representation.
+Such an encoding cannot restore the identity.
 
 ## Arrays
 

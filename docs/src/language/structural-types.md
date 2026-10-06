@@ -53,7 +53,7 @@ function scores(dict<string, int> $scores): void {}
 scores(dict['Ada' => 10, 'Grace' => 12]);
 ```
 
-Dict keys can be `int`, `uint`, `string`, or `bool`. The type may use one of them, a
+Dict keys can be `int`, `uint`, `string`, `bool`, or `fresh`. The type may use one of them, a
 union, a range, or another type that fits those key kinds.
 
 An empty dict has type `dict<never, never>` and fits every valid dict key and

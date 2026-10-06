@@ -397,6 +397,7 @@ fn descriptor_is_acyclic(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::Float

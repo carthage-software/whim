@@ -32,6 +32,7 @@ pub(super) fn type_spec(
     let spec = match subject {
         Type::Int(_) => quote!(#path::Int),
         Type::Uint(_) => quote!(#path::Uint),
+        Type::Fresh(_) => quote!(#path::Fresh),
         Type::IntegerRange(range) => integer_range_spec(range, &path)?,
         Type::Float(_) => quote!(#path::Float),
         Type::Bool(_) => quote!(#path::Bool),
@@ -296,6 +297,7 @@ pub(super) fn render(subject: &Type<'_>) -> String {
     match subject {
         Type::Int(_) => "int".to_owned(),
         Type::Uint(_) => "uint".to_owned(),
+        Type::Fresh(_) => "fresh".to_owned(),
         Type::Float(_) => "float".to_owned(),
         Type::Bool(_) => "bool".to_owned(),
         Type::String(_) => "string".to_owned(),

@@ -165,6 +165,7 @@ pub fn mask_with_classification(
             } => (value_mode == ArrayValueMode::Generic).then_some(destination),
             Instruction::MoveOwned { .. }
             | Instruction::LoadNull { .. }
+            | Instruction::Fresh { .. }
             | Instruction::LoadTrue { .. }
             | Instruction::LoadFalse { .. }
             | Instruction::LoadInteger { .. }

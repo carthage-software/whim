@@ -66,7 +66,10 @@ assert!($_ == 'kept');
 Whim has three keyword levels.
 
 Full keywords, such as `if`, `match`, and `return`, cannot name a function or a
-constant. Soft keywords, `as` and `is`, may name functions but not constants.
+constant. `fresh` is a full keyword and a primitive type. It cannot name a
+top-level declaration; `$fresh` remains a valid variable name.
+
+Soft keywords, `as` and `is`, may name functions but not constants.
 Context keywords, such as `class`, `int`, and `readonly`, may name functions or
 constants where the parser can tell what they mean.
 

@@ -95,6 +95,7 @@ use crate::cst::construct::ExecutableExtensionConstruct;
 use crate::cst::construct::ExecutableSuffixConstruct;
 use crate::cst::construct::ExitConstruct;
 use crate::cst::construct::FileConstruct;
+use crate::cst::construct::FreshConstruct;
 use crate::cst::construct::LengthConstruct;
 use crate::cst::construct::OperatingSystemConstruct;
 use crate::cst::construct::OperatingSystemFamilyConstruct;
@@ -407,6 +408,7 @@ define_nodes! {
     SequenceConstruct(SequenceConstruct<'arena>),
     DropConstruct(DropConstruct<'arena>),
     FileConstruct(FileConstruct<'arena>),
+    FreshConstruct(FreshConstruct<'arena>),
     DirectoryConstruct(DirectoryConstruct<'arena>),
     EmbedConstruct(EmbedConstruct<'arena>),
     CPUArchitectureConstruct(CPUArchitectureConstruct<'arena>),

@@ -71,6 +71,7 @@ pub(crate) fn operands(kind: InstructionKind) -> Option<&'static [Operand]> {
         instruction_kinds!(
             LoadConstant
                 | LoadNull
+                | Fresh
                 | LoadTrue
                 | LoadFalse
                 | LoadInteger

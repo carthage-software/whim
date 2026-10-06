@@ -190,7 +190,7 @@ where
             return Err(self.unexpected(Expected::Description("an expression")));
         };
 
-        if token.kind == TokenKind::Identifier
+        if matches!(token.kind, TokenKind::Identifier | TokenKind::Fresh)
             && self
                 .lookahead(1)?
                 .is_some_and(|token| token.kind == TokenKind::Bang)
@@ -366,6 +366,7 @@ where
                 | TokenKind::Parent
                 | TokenKind::Static
                 | TokenKind::Identifier
+                | TokenKind::Fresh
                 | TokenKind::QualifiedIdentifier
                 | TokenKind::FullyQualifiedIdentifier
         ))

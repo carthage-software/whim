@@ -21,6 +21,7 @@ This table lists every construct.
 | `exit!()` | `never` | exits with status zero |
 | `exit!($status)` | `never` | exits with the low eight bits of an int |
 | `file!()` | `string` | returns the current source file |
+| `fresh!()` | `fresh` | creates a distinct identity within the VM lifetime |
 | `length!($value)` | `uint` | counts string bytes or array items |
 | `operating_system!()` | `string` | returns the platform's operating system |
 | `operating_system_family!()` | `string` | returns the platform's operating system family |

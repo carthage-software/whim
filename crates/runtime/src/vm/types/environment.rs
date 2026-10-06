@@ -357,6 +357,7 @@ impl VirtualMachine<'_> {
                 | TypeDescriptor::Bool
                 | TypeDescriptor::Int
                 | TypeDescriptor::Uint
+                | TypeDescriptor::Fresh
                 | TypeDescriptor::UintLiteral(_)
                 | TypeDescriptor::UintRange { .. }
                 | TypeDescriptor::Float
@@ -617,6 +618,7 @@ fn hash_descriptor<const ORDERED: bool>(descriptor: &TypeDescriptor, state: &mut
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::Object
@@ -782,6 +784,7 @@ fn descriptor_equal<const ORDERED: bool>(left: &TypeDescriptor, right: &TypeDesc
         | (TypeDescriptor::Bool, TypeDescriptor::Bool)
         | (TypeDescriptor::Int, TypeDescriptor::Int)
         | (TypeDescriptor::Uint, TypeDescriptor::Uint)
+        | (TypeDescriptor::Fresh, TypeDescriptor::Fresh)
         | (TypeDescriptor::Float, TypeDescriptor::Float)
         | (TypeDescriptor::String, TypeDescriptor::String)
         | (TypeDescriptor::Object, TypeDescriptor::Object)

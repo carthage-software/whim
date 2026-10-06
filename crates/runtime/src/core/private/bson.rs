@@ -155,7 +155,7 @@ fn write_document(
             KeyRef::ShortString(key) => {
                 write_cstring(key.as_bytes(), "a BSON field name", bytes)?;
             }
-            KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) => {
+            KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) | KeyRef::Fresh(_) => {
                 return Err(CodecError::new("document keys in BSON must be strings"));
             }
             _ => {

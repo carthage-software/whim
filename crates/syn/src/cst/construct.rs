@@ -1,6 +1,7 @@
 use whim_span::HasSpan;
 use whim_span::Span;
 
+use crate::cst::atom::Keyword;
 use crate::cst::atom::LiteralString;
 use crate::cst::atom::LocalIdentifier;
 use crate::cst::atom::Variable;
@@ -9,6 +10,7 @@ use crate::cst::sequence::TokenSeparatedSequence;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Construct<'arena> {
+    Fresh(FreshConstruct<'arena>),
     Require(RequireConstruct<'arena>),
     RequireOnce(RequireOnceConstruct<'arena>),
     Length(LengthConstruct<'arena>),
@@ -41,6 +43,20 @@ pub enum Construct<'arena> {
     SharedLibraryExtension(SharedLibraryExtensionConstruct<'arena>),
     ExecutableSuffix(ExecutableSuffixConstruct<'arena>),
     ExecutableExtension(ExecutableExtensionConstruct<'arena>),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct FreshConstruct<'arena> {
+    pub name: Keyword<'arena>,
+    pub bang: Span,
+    pub left_parenthesis: Span,
+    pub right_parenthesis: Span,
+}
+
+impl HasSpan for FreshConstruct<'_> {
+    fn span(&self) -> Span {
+        self.name.span().join(self.right_parenthesis)
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -396,6 +412,7 @@ impl HasSpan for Construct<'_> {
             Construct::Sequence(construct) => construct.span(),
             Construct::Drop(construct) => construct.span(),
             Construct::File(construct) => construct.span(),
+            Construct::Fresh(construct) => construct.span(),
             Construct::Directory(construct) => construct.span(),
             Construct::Embed(construct) => construct.span(),
             Construct::CPUArchitecture(construct) => construct.span(),

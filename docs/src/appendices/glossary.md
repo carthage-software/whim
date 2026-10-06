@@ -54,7 +54,7 @@ A call stack that may pause and later continue on the event loop.
 
 ### Dict
 
-A mutable ordered array with bool, int, uint, or string keys.
+A mutable ordered array with bool, int, uint, string, or fresh keys.
 
 ### First-class callable
 

@@ -94,6 +94,7 @@ fn assert_same(name: &str, what: &str, expected: &str, actual: &str) {
 
 case!(comment_positions_are_preserved);
 case!(kitchen_sink);
+case!(fresh);
 case!(arrays_and_generics);
 case!(narrow_print_width);
 case!(tabs_and_crlf);

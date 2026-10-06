@@ -529,6 +529,7 @@ where
             Type::String(keyword)
             | Type::Int(keyword)
             | Type::Uint(keyword)
+            | Type::Fresh(keyword)
             | Type::Float(keyword)
             | Type::Bool(keyword)
             | Type::Void(keyword)

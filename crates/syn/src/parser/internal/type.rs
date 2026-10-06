@@ -168,6 +168,7 @@ where
             TokenKind::String => self.parse_string_type()?,
             TokenKind::Int => Type::Int(self.expect_keyword(TokenKind::Int)?),
             TokenKind::Uint => Type::Uint(self.expect_keyword(TokenKind::Uint)?),
+            TokenKind::Fresh => Type::Fresh(self.expect_keyword(TokenKind::Fresh)?),
             TokenKind::Float => Type::Float(self.expect_keyword(TokenKind::Float)?),
             TokenKind::Bool => Type::Bool(self.expect_keyword(TokenKind::Bool)?),
             TokenKind::Void => Type::Void(self.expect_keyword(TokenKind::Void)?),

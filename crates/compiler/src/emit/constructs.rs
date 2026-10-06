@@ -107,6 +107,12 @@ impl BodyCompiler<'_, '_> {
         construct: &Construct<'_>,
     ) -> Result<Register, CompileError> {
         match construct {
+            Construct::Fresh(fresh) => {
+                let destination = self.allocate(fresh.span())?;
+                self.chunk
+                    .emit(Instruction::Fresh { destination }, fresh.span());
+                Ok(destination)
+            }
             Construct::Length(length) => {
                 self.unary_construct(scope, length.value, length.span(), UnaryConstruct::Length)
             }

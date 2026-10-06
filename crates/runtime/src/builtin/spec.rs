@@ -42,6 +42,7 @@ pub(crate) enum TypeSpec {
     Int,
     IntRange(Option<i64>, Option<i64>),
     Uint,
+    Fresh,
     UintRange(Option<u64>, Option<u64>),
     Float,
     String,

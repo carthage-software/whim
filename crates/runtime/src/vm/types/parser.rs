@@ -198,6 +198,7 @@ impl<'bytes, 'heap> RuntimeTypeParser<'bytes, 'heap> {
             b"null" => TypeDescriptor::Null,
             b"bool" => TypeDescriptor::Bool,
             b"int" => TypeDescriptor::Int,
+            b"fresh" => TypeDescriptor::Fresh,
             b"float" => TypeDescriptor::Float,
             b"string" => {
                 if self.consume(b'[') {

@@ -5,13 +5,13 @@ use Whim\Iterate\ToIterator;
 use Whim\Iterate\Iterator;
 
 /** A type accepted as a dictionary key. */
-type ArrayKey = string|int|uint|bool;
+type ArrayKey = string|int|uint|bool|fresh;
 
 /** Any integer or floating-point number. */
 type Numeric = int|uint|float;
 
 /** Any scalar value. */
-type Scalar = Numeric|string|bool;
+type Scalar = Numeric|string|bool|fresh;
 
 /** A value that may be null. */
 type Nullable<T> = T|null;

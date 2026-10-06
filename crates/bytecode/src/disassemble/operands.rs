@@ -167,7 +167,7 @@ pub(crate) fn operands(chunk: &Chunk, index: usize, instruction: Instruction) ->
             register(destination),
             constant_reference(chunk, constant)
         ),
-        instructions!(LoadNull | LoadTrue | LoadFalse; { destination }) => {
+        instructions!(LoadNull | LoadTrue | LoadFalse | Fresh; { destination }) => {
             format!(" {}", register(destination))
         }
         Instruction::LoadInteger {

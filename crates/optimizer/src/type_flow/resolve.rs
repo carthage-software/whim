@@ -32,6 +32,7 @@ use crate::type_flow::CAPTURE_ORIGIN;
 use crate::type_flow::ConstantValue;
 use crate::type_flow::ExactClass;
 use crate::type_flow::FLOAT;
+use crate::type_flow::FRESH;
 use crate::type_flow::Fact;
 use crate::type_flow::INT;
 use crate::type_flow::NULL;
@@ -101,6 +102,7 @@ impl<'a> TypeFlow<'a> {
                 BOOL => Some(TypeDescriptor::Bool),
                 INT => Some(TypeDescriptor::Int),
                 UINT => Some(TypeDescriptor::Uint),
+                FRESH => Some(TypeDescriptor::Fresh),
                 FLOAT => Some(TypeDescriptor::Float),
                 STRING => Some(TypeDescriptor::String),
                 _ => None,

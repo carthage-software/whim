@@ -1,0 +1,149 @@
+use Whim\Async;
+use Whim\Dict;
+use Whim\Json;
+use Whim\Marker\NeverInline;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Numeric;
+use Whim\Refine\Scalar;
+use Whim\Reflection;
+use Whim\Reflection\Type\PrimitiveTypeReflection;
+use Whim\Reflection\Type\TypeKind;
+use Whim\Type;
+use Whim\Unwind\Throwable;
+use Whim\Vec;
+
+#[NeverInline]
+function rejects(fn(): mixed $operation): void {
+  $caught = false;
+  try {
+    discard!($operation());
+  } catch (Throwable $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+class Box {
+  public function __construct(public fresh $value) {}
+}
+
+type Identity = fresh;
+newtype Ticket = fresh;
+newtype OtherTicket = fresh;
+
+#[NeverInline]
+function identity<T: fresh = fresh>(T $value): T {
+  return $value;
+}
+
+$a = fresh!();
+$copy = $a;
+$b = fresh!();
+assert!($a == $copy);
+assert!($a != $b);
+assert!($a is fresh & Scalar & ArrayKey);
+assert!(!($a is Numeric));
+assert!($a is Identity);
+assert!(identity($a) == $a);
+assert!(new Box($a)->value == $a);
+assert!((fn(): fresh => $a)() == $a);
+assert!($a != ($a as uint));
+assert!(($a as uint) == ($copy as uint));
+assert!(($a as uint) != ($b as uint));
+assert!(($a as fresh) == $a);
+assert!(($a ?as int) == null);
+assert!((($a as uint) ?as fresh) == null);
+assert!(match ($a) { fresh => true, _ => false });
+
+$values = vec[$a, $b];
+$saved = $values;
+$values[0] = fresh!();
+assert!($saved[0] == $a);
+assert!($values[0] != $a);
+assert!(contains!($saved, $copy));
+assert!(length!(Vec\unique::<fresh>(vec[$a, $copy, $b])) == 2u);
+$keys = dict[$a => 1, $b => 2, ($a as uint) => 3, Ticket($a) => 4, OtherTicket($a) => 5];
+assert!(length!($keys) == 5u);
+assert!($keys[$copy] == 1);
+$keys[$a] += 2;
+assert!($keys[$copy] == 3);
+assert!($keys[Ticket($copy)] == 4);
+assert!($keys[OtherTicket($copy)] == 5);
+assert!(Vec\keys::<ArrayKey>($keys)[0] == $a);
+assert!(remove!($keys, $b) == 2);
+
+$dictionary = Dict\from_entries::<fresh, int>(vec[($a, 7), ($b, 3)]);
+assert!($dictionary == dict[$a => 7, $b => 3]);
+assert!(Whim\_Private\array_entries($dictionary) == vec[($a, 7), ($b, 3)]);
+assert!(Whim\_Private\dict_from_array($dictionary) == $dictionary);
+assert!(Dict\merge::<fresh, int>($dictionary, vec[dict[$a => 9]]) == dict[$a => 9, $b => 3]);
+assert!(Dict\flatten::<fresh, int>(vec[$dictionary, dict[$a => 9]]) == dict[$a => 9, $b => 3]);
+assert!(Dict\flip::<uint, fresh>(vec[$a, $b]) == dict[$a => 0u, $b => 1u]);
+assert!(Dict\count_values::<fresh>(vec[$a, $copy, $b]) == dict[$a => 2u, $b => 1u]);
+assert!(Dict\from_entries::<Ticket, int>(vec[(Ticket($a), 7)]) == dict[Ticket($copy) => 7]);
+assert!(Dict\count_values::<Ticket>(vec[Ticket($a), Ticket($copy)]) == dict[Ticket($a) => 2u]);
+assert!(Vec\keys::<fresh>(Dict\sort::<fresh, int>($dictionary)) == vec[$b, $a]);
+rejects(fn(): mixed => Dict\sort_by_key::<fresh, int>($dictionary));
+
+$futures = vec[];
+for ($i = 0; $i < 30; $i++) {
+  $futures[] = Async\spawn::<fresh>(fn(): fresh {
+    $before = fresh!();
+    Async\later();
+    $after = fresh!();
+    assert!($before != $after);
+    return $after;
+  });
+}
+
+$seen = dict[$a => true, $b => true];
+foreach ($futures as $future) {
+  $value = $future->await();
+  assert!(!contains_key!($seen, $value));
+  $seen[$value] = true;
+}
+
+assert!($seen is dict<fresh, bool>);
+foreach ($seen as $key => $_) {
+  assert!($key is fresh);
+}
+
+$type = Reflection\reflect_type::<fresh>();
+assert!($type is PrimitiveTypeReflection);
+assert!($type->getKind() == TypeKind::Fresh);
+assert!($type->toString() == 'fresh');
+assert!($type->accepts($a));
+assert!(!$type->accepts($a as uint));
+assert!($type->equals(Reflection\reflect_type_of($a)));
+assert!($type->isSubtypeOf(Reflection\reflect_type::<Scalar>()));
+assert!(Type\of($a) == Type\id::<fresh>());
+assert!(Type\of($a) != Type\id::<uint>());
+
+foreach (vec[
+  fn(): mixed => $a + $b, fn(): mixed => $a - $b,
+  fn(): mixed => $a * $b, fn(): mixed => $a / $b,
+  fn(): mixed => $a % $b, fn(): mixed => $a ** $b,
+  fn(): mixed => $a & $b, fn(): mixed => $a | $b,
+  fn(): mixed => $a ^ $b, fn(): mixed => $a << 1,
+  fn(): mixed => $a >> 1, fn(): mixed => $a < $b,
+  fn(): mixed => $a <= $a, fn(): mixed => $a > $b,
+  fn(): mixed => $a >= $a, fn(): mixed => $a <=> $a,
+  fn(): mixed => $a . '', fn(): mixed => ~$a,
+  fn(): mixed => write_line!($a),
+  fn(): mixed => +$a, fn(): mixed => -$a,
+  fn(): mixed => !$a, fn(): mixed => ++$a,
+  fn(): mixed => $a as int, fn(): mixed => $a as float,
+  fn(): mixed => $a as string, fn(): mixed => 0u as fresh,
+  fn(): mixed => $values[$a],
+  fn(): mixed => $a ? 1 : 2,
+  fn(): mixed => Whim\_Private\json_encode($a, false),
+  fn(): mixed => Whim\_Private\json_encode(vec[$a], false),
+  fn(): mixed => Whim\_Private\json_encode(dict[$a => 1], false),
+  fn(): mixed => Whim\_Private\bson_encode(dict['token' => $a]),
+  fn(): mixed => Whim\_Private\bson_encode(dict[$a => 1]),
+] as $operation) {
+  rejects($operation);
+}
+
+assert!((Json\decode(Json\encode($a as uint)) as uint) == ($a as uint));

@@ -229,6 +229,7 @@ fn summarize(descriptor: &TypeDescriptor, depth: usize) -> Option<Summary> {
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::Float

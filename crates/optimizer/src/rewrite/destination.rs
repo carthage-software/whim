@@ -77,6 +77,7 @@ pub(crate) fn with_destination(
         | Instruction::Move { destination, .. }
         | Instruction::LoadConstant { destination, .. }
         | Instruction::LoadNull { destination }
+        | Instruction::Fresh { destination }
         | Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
         | Instruction::LoadInteger { destination, .. }

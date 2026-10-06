@@ -6,9 +6,9 @@ This page covers small contracts used throughout the standard library.
 
 `Whim\Refine` names common types:
 
-- `ArrayKey` is `string|int|uint|bool`.
+- `ArrayKey` is `string|int|uint|bool|fresh`.
 - `Numeric` is `int|uint|float`.
-- `Scalar` is `int|uint|float|string|bool`.
+- `Scalar` is `int|uint|float|string|bool|fresh`.
 - `Nullable<T>` is `T|null`.
 - `NonNull`, `NonEmptyString`, `NonEmptyVec<T>`, and `NonEmptyDict<K, V>`
   exclude empty values.

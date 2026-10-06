@@ -19,9 +19,9 @@ These words may appear only as keywords or member names:
 ```text
 break       catch       continue    do          else
 false       finally     fn          for         foreach
-function    if          match       new         null
-parent      return      self        static      throw
-true        try         using       while
+fresh       function    if          match       new
+null        parent      return      self        static
+throw       true        try         using       while
 ```
 
 ## Soft keywords

@@ -4830,6 +4830,36 @@ impl VirtualMachine<'_> {
 
                         continue 'dispatch;
                     }
+                    Instruction::Fresh { destination } => {
+                        if self.engine.initializer_depth != 0 {
+                            fail!(
+                                self,
+                                ip,
+                                floor,
+                                'dispatch,
+                                self.throw_well_known(
+                                    self.engine.tables.well_known.type_error,
+                                    "fresh!() cannot run in a constant expression".to_string(),
+                                )
+                            );
+                        }
+
+                        let Some(identity) = self.engine.next_fresh_id else {
+                            fail!(
+                                self,
+                                ip,
+                                floor,
+                                'dispatch,
+                                self.throw_well_known(
+                                    self.engine.tables.well_known.overflow_error,
+                                    "fresh identities are exhausted".to_string(),
+                                )
+                            );
+                        };
+
+                        self.engine.next_fresh_id = identity.checked_add(1);
+                        write_register!(registers, destination, Value::fresh(identity));
+                    }
                     Instruction::NewArray {
                         count,
                         destination,

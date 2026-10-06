@@ -182,6 +182,7 @@ define_token_kinds! {
     In => "`in`", Contextual;
     Int => "`int`", Contextual;
     Uint => "`uint`", Contextual;
+    Fresh => "`fresh`", Full;
     Interface => "`interface`", Contextual;
     Is => "`is`", Soft;
     Match => "`match`", Full;

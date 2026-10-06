@@ -14,6 +14,7 @@ use crate::type_flow::BOOL;
 use crate::type_flow::CALLABLE;
 use crate::type_flow::DICTIONARY;
 use crate::type_flow::FLOAT;
+use crate::type_flow::FRESH;
 use crate::type_flow::INT;
 use crate::type_flow::IndexedUnit;
 use crate::type_flow::NULL;
@@ -63,6 +64,7 @@ pub(crate) fn descriptor_mask(descriptor: &TypeDescriptor) -> Option<u16> {
         TypeDescriptor::Uint
         | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::UintRange { .. } => Some(UINT),
+        TypeDescriptor::Fresh => Some(FRESH),
         TypeDescriptor::Float | TypeDescriptor::FloatLiteral(_) => Some(FLOAT),
         TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -108,6 +110,7 @@ pub(in crate::type_flow) fn exact_descriptor_mask(descriptor: &TypeDescriptor) -
         TypeDescriptor::Bool => Some(BOOL),
         TypeDescriptor::Int => Some(INT),
         TypeDescriptor::Uint => Some(UINT),
+        TypeDescriptor::Fresh => Some(FRESH),
         TypeDescriptor::Float => Some(FLOAT),
         TypeDescriptor::String => Some(STRING),
         TypeDescriptor::Object => Some(OBJECT),
@@ -155,6 +158,7 @@ pub(in crate::type_flow) fn descriptor_may_release_observably(descriptor: &TypeD
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::UintLiteral(_)
         | TypeDescriptor::UintRange { .. }
         | TypeDescriptor::Float
@@ -443,6 +447,7 @@ pub(crate) fn descriptor_proves(
             TypeDescriptor::Bool
                 | TypeDescriptor::Int
                 | TypeDescriptor::Uint
+                | TypeDescriptor::Fresh
                 | TypeDescriptor::Float
                 | TypeDescriptor::String
                 | TypeDescriptor::Object
@@ -649,6 +654,7 @@ pub fn descriptors_equal(left: &TypeDescriptor, right: &TypeDescriptor, depth: u
         | (TypeDescriptor::Bool, TypeDescriptor::Bool)
         | (TypeDescriptor::Int, TypeDescriptor::Int)
         | (TypeDescriptor::Uint, TypeDescriptor::Uint)
+        | (TypeDescriptor::Fresh, TypeDescriptor::Fresh)
         | (TypeDescriptor::Float, TypeDescriptor::Float)
         | (TypeDescriptor::String, TypeDescriptor::String)
         | (TypeDescriptor::Object, TypeDescriptor::Object)

@@ -41,6 +41,7 @@ where
             TypeDescriptor::Bool => "bool".to_string(),
             TypeDescriptor::Int => "int".to_string(),
             TypeDescriptor::Uint => "uint".to_string(),
+            TypeDescriptor::Fresh => "fresh".to_string(),
             TypeDescriptor::Float => "float".to_string(),
             TypeDescriptor::String => "string".to_string(),
             TypeDescriptor::StringLength { min, max } => match max {

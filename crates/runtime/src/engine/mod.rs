@@ -202,6 +202,7 @@ pub struct Engine {
     pub(crate) sources: HashMap<Atom, SourceText>,
     pub(crate) exception_diagnostics: HashMap<usize, ExceptionDiagnostic>,
     pub(crate) declaration_depth: usize,
+    pub(crate) initializer_depth: usize,
     pub(crate) unit_cache: HashMap<PathBuf, CachedUnit>,
     pub(crate) loaded_paths: HashSet<PathBuf>,
     pub(crate) loading_paths: HashMap<PathBuf, Rc<RefCell<PendingLoad>>>,
@@ -213,6 +214,7 @@ pub struct Engine {
     pub(crate) scheduler: Option<Scheduler<Rc<CoroutineObject>, Value>>,
     pub(crate) main_task_local_values: TaskLocalValues,
     pub(crate) next_task_local_id: u64,
+    pub(crate) next_fresh_id: Option<u64>,
     pub(crate) finalizer_tasks: HashSet<TaskId>,
     pub(crate) cancelled_tasks: HashSet<TaskId>,
     pub(crate) arguments: Vec<Vec<u8>>,
@@ -222,6 +224,60 @@ pub struct Engine {
 }
 
 pub(crate) type LoadOwner = Option<NonNull<CoroutineObject>>;
+
+#[cfg(test)]
+mod fresh_tests {
+    use super::*;
+
+    #[test]
+    fn fresh_exhaustion_never_reuses_an_identity() {
+        for optimize in [false, true] {
+            let mut engine = Engine::new(EngineConfiguration {
+                optimize,
+                ..EngineConfiguration::default()
+            });
+
+            engine.next_fresh_id = Some(u64::MAX - 1);
+            let outcome = engine.run_source(
+                "use Whim\\Unwind\\OverflowError;
+                 $a = fresh!(); $b = fresh!();
+                 assert!($a != $b);
+                 assert!(($a as uint) == 18446744073709551614u);
+                 assert!(($b as uint) == 18446744073709551615u);
+                 for ($i = 0; $i < 2; $i++) {
+                     $caught = false;
+                     try { fresh!(); } catch (OverflowError $_) { $caught = true; }
+                     assert!($caught);
+                 }",
+                Path::new("/fresh-exhaustion.whim"),
+            );
+
+            assert_eq!(outcome.exit_code(), 0, "{outcome:?}");
+            assert!(engine.next_fresh_id.is_none());
+        }
+    }
+
+    #[test]
+    fn executed_discarded_generators_count_and_skipped_generators_do_not() {
+        for optimize in [false, true] {
+            let mut engine = Engine::new(EngineConfiguration {
+                optimize,
+                ..EngineConfiguration::default()
+            });
+
+            let outcome = engine.run_source(
+                "fresh!(); discard!(fresh!());
+                 if (false) { fresh!(); }
+                 $value = true ? fresh!() : fresh!();
+                 for ($i = 0; $i < 10; $i++) { fresh!(); }",
+                Path::new("/fresh-effects.whim"),
+            );
+
+            assert_eq!(outcome.exit_code(), 0, "{outcome:?}");
+            assert_eq!(engine.next_fresh_id, Some(13));
+        }
+    }
+}
 
 pub(crate) struct PendingLoad {
     pub(crate) owner: LoadOwner,
@@ -308,6 +364,7 @@ impl Engine {
             sources: HashMap::new(),
             exception_diagnostics: HashMap::new(),
             declaration_depth: 0,
+            initializer_depth: 0,
             unit_cache: HashMap::new(),
             loaded_paths: HashSet::new(),
             loading_paths: HashMap::new(),
@@ -319,6 +376,7 @@ impl Engine {
             scheduler: None,
             main_task_local_values: new_task_local_values(),
             next_task_local_id: 0,
+            next_fresh_id: Some(0),
             finalizer_tasks: HashSet::new(),
             cancelled_tasks: HashSet::new(),
             arguments: Vec::new(),
@@ -648,6 +706,9 @@ impl Engine {
                         let key = match key {
                             KeyRef::Int(key) | KeyRef::NewtypeInt(key, _) => key.to_string(),
                             KeyRef::Uint(key) | KeyRef::NewtypeUint(key, _) => format!("{key}u"),
+                            KeyRef::Fresh(key) | KeyRef::NewtypeFresh(key, _) => {
+                                format!("fresh({key})")
+                            }
                             KeyRef::Bool(key) | KeyRef::NewtypeBool(key, _) => key.to_string(),
                             KeyRef::String(key) | KeyRef::NewtypeString(key, _) => {
                                 format!("'{}'", String::from_utf8_lossy(key.flatten()))

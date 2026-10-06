@@ -84,7 +84,7 @@ impl Serialize for JsonSource<'_> {
                     let bytes = match &key {
                         KeyRef::String(string) => ByteStringObject::handle_bytes(string),
                         KeyRef::ShortString(short) => short.as_bytes(),
-                        KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) => {
+                        KeyRef::Int(_) | KeyRef::Uint(_) | KeyRef::Bool(_) | KeyRef::Fresh(_) => {
                             return Err(S::Error::custom(
                                 "the value holds a dictionary key that is not a string",
                             ));

@@ -20,6 +20,8 @@ pub enum Key {
     NewtypeBool(bool, NewtypeValueId),
     NewtypeString(ManagedRef<ByteStringObject>, NewtypeValueId),
     NewtypeShortString(ShortString, NewtypeValueId),
+    Fresh(u64),
+    NewtypeFresh(u64, NewtypeValueId),
 }
 
 const _: () = assert!(size_of::<Key>() == 16);
@@ -29,11 +31,13 @@ impl Clone for Key {
         match self {
             Self::Int(value) => Self::Int(*value),
             Self::Uint(value) => Self::Uint(*value),
+            Self::Fresh(value) => Self::Fresh(*value),
             Self::Bool(value) => Self::Bool(*value),
             Self::String(string) => Self::String(string.clone()),
             Self::ShortString(string) => Self::ShortString(*string),
             Self::NewtypeInt(value, tag) => Self::NewtypeInt(*value, *tag),
             Self::NewtypeUint(value, tag) => Self::NewtypeUint(*value, *tag),
+            Self::NewtypeFresh(value, tag) => Self::NewtypeFresh(*value, *tag),
             Self::NewtypeBool(value, tag) => Self::NewtypeBool(*value, *tag),
             Self::NewtypeString(string, tag) => Self::NewtypeString(string.clone(), *tag),
             Self::NewtypeShortString(string, tag) => Self::NewtypeShortString(*string, *tag),
@@ -76,6 +80,10 @@ impl Key {
             return Some(Self::String(unsafe { value.into_string_unchecked() }));
         }
 
+        if let Some(key) = value.as_fresh() {
+            return Some(Self::Fresh(key));
+        }
+
         None
     }
 
@@ -85,11 +93,13 @@ impl Key {
         match self {
             Self::Int(value) => state.hash_int(*value),
             Self::Uint(value) => state.hash_uint(*value),
+            Self::Fresh(value) => state.hash_fresh(*value),
             Self::Bool(value) => state.hash_bool(*value),
             Self::String(string) => string.hash64(state),
             Self::ShortString(string) => string.hash64(state),
             Self::NewtypeInt(value, tag) => state.hash_newtype(state.hash_int(*value), *tag),
             Self::NewtypeUint(value, tag) => state.hash_newtype(state.hash_uint(*value), *tag),
+            Self::NewtypeFresh(value, tag) => state.hash_newtype(state.hash_fresh(*value), *tag),
             Self::NewtypeBool(value, tag) => state.hash_newtype(state.hash_bool(*value), *tag),
             Self::NewtypeString(string, tag) => state.hash_newtype(string.hash64(state), *tag),
             Self::NewtypeShortString(string, tag) => state.hash_newtype(string.hash64(state), *tag),
@@ -101,12 +111,17 @@ impl PartialEq for Key {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Int(left), Self::Int(right)) => left == right,
-            (Self::Uint(left), Self::Uint(right)) => left == right,
+            (Self::Uint(left), Self::Uint(right)) | (Self::Fresh(left), Self::Fresh(right)) => {
+                left == right
+            }
             (Self::Bool(left), Self::Bool(right)) => left == right,
             (Self::String(left), Self::String(right)) => left.eq_bytes(right),
             (Self::ShortString(left), Self::ShortString(right)) => left == right,
             (Self::NewtypeInt(left, a), Self::NewtypeInt(right, b)) => a == b && left == right,
-            (Self::NewtypeUint(left, a), Self::NewtypeUint(right, b)) => a == b && left == right,
+            (Self::NewtypeUint(left, a), Self::NewtypeUint(right, b))
+            | (Self::NewtypeFresh(left, a), Self::NewtypeFresh(right, b)) => {
+                a == b && left == right
+            }
             (Self::NewtypeBool(left, a), Self::NewtypeBool(right, b)) => a == b && left == right,
             (Self::NewtypeString(left, a), Self::NewtypeString(right, b)) => {
                 a == b && left.eq_bytes(right)
@@ -141,6 +156,8 @@ pub enum KeyRef<'a> {
     NewtypeBool(bool, NewtypeValueId),
     NewtypeString(&'a ManagedRef<ByteStringObject>, NewtypeValueId),
     NewtypeShortString(ShortString, NewtypeValueId),
+    Fresh(u64),
+    NewtypeFresh(u64, NewtypeValueId),
 }
 
 const _: () = assert!(size_of::<KeyRef<'_>>() == 16);
@@ -159,6 +176,7 @@ impl<'a> KeyRef<'a> {
         match value.transparent() {
             ValueView::Int(value) => Some(Self::Int(*value)),
             ValueView::Uint(value) => Some(Self::Uint(*value)),
+            ValueView::Fresh(value) => Some(Self::Fresh(*value)),
             ValueView::Bool(value) => Some(Self::Bool(*value)),
             ValueView::String(value) => Some(Self::String(value)),
             ValueView::ShortString(value) => Some(Self::ShortString(*value)),
@@ -172,6 +190,7 @@ impl<'a> KeyRef<'a> {
         match value.transparent() {
             ValueView::Int(value) => Some(Self::NewtypeInt(*value, tag)),
             ValueView::Uint(value) => Some(Self::NewtypeUint(*value, tag)),
+            ValueView::Fresh(value) => Some(Self::NewtypeFresh(*value, tag)),
             ValueView::Bool(value) => Some(Self::NewtypeBool(*value, tag)),
             ValueView::String(value) => Some(Self::NewtypeString(value, tag)),
             ValueView::ShortString(value) => Some(Self::NewtypeShortString(*value, tag)),
@@ -184,11 +203,13 @@ impl<'a> KeyRef<'a> {
         match self {
             Self::Int(value) => Key::Int(value),
             Self::Uint(value) => Key::Uint(value),
+            Self::Fresh(value) => Key::Fresh(value),
             Self::Bool(value) => Key::Bool(value),
             Self::String(value) => Key::String(value.clone()),
             Self::ShortString(value) => Key::ShortString(value),
             Self::NewtypeInt(value, tag) => Key::NewtypeInt(value, tag),
             Self::NewtypeUint(value, tag) => Key::NewtypeUint(value, tag),
+            Self::NewtypeFresh(value, tag) => Key::NewtypeFresh(value, tag),
             Self::NewtypeBool(value, tag) => Key::NewtypeBool(value, tag),
             Self::NewtypeString(value, tag) => Key::NewtypeString(value.clone(), tag),
             Self::NewtypeShortString(value, tag) => Key::NewtypeShortString(value, tag),
@@ -201,11 +222,13 @@ impl<'a> KeyRef<'a> {
         match self {
             Self::Int(value) => Value::int(value),
             Self::Uint(value) => Value::uint(value),
+            Self::Fresh(value) => Value::fresh(value),
             Self::Bool(value) => Value::bool(value),
             Self::String(value) => Value::string(value.clone()),
             Self::ShortString(value) => Value::short_string(value),
             Self::NewtypeInt(value, tag) => Value::newtype(Value::int(value), tag),
             Self::NewtypeUint(value, tag) => Value::newtype(Value::uint(value), tag),
+            Self::NewtypeFresh(value, tag) => Value::newtype(Value::fresh(value), tag),
             Self::NewtypeBool(value, tag) => Value::newtype(Value::bool(value), tag),
             Self::NewtypeString(value, tag) => Value::newtype(Value::string(value.clone()), tag),
             Self::NewtypeShortString(value, tag) => Value::newtype(Value::short_string(value), tag),
@@ -217,6 +240,7 @@ impl<'a> KeyRef<'a> {
         match self {
             Self::NewtypeInt(value, _) => Self::Int(value),
             Self::NewtypeUint(value, _) => Self::Uint(value),
+            Self::NewtypeFresh(value, _) => Self::Fresh(value),
             Self::NewtypeBool(value, _) => Self::Bool(value),
             Self::NewtypeString(value, _) => Self::String(value),
             Self::NewtypeShortString(value, _) => Self::ShortString(value),
@@ -229,11 +253,13 @@ impl<'a> KeyRef<'a> {
         match self {
             Self::Int(value) => state.hash_int(value),
             Self::Uint(value) => state.hash_uint(value),
+            Self::Fresh(value) => state.hash_fresh(value),
             Self::Bool(value) => state.hash_bool(value),
             Self::String(string) => string.hash64(state),
             Self::ShortString(string) => string.hash64(state),
             Self::NewtypeInt(value, tag) => state.hash_newtype(state.hash_int(value), tag),
             Self::NewtypeUint(value, tag) => state.hash_newtype(state.hash_uint(value), tag),
+            Self::NewtypeFresh(value, tag) => state.hash_newtype(state.hash_fresh(value), tag),
             Self::NewtypeBool(value, tag) => state.hash_newtype(state.hash_bool(value), tag),
             Self::NewtypeString(string, tag) => state.hash_newtype(string.hash64(state), tag),
             Self::NewtypeShortString(string, tag) => state.hash_newtype(string.hash64(state), tag),
@@ -246,11 +272,13 @@ impl<'a> From<&'a Key> for KeyRef<'a> {
         match value {
             Key::Int(value) => Self::Int(*value),
             Key::Uint(value) => Self::Uint(*value),
+            Key::Fresh(value) => Self::Fresh(*value),
             Key::Bool(value) => Self::Bool(*value),
             Key::String(value) => Self::String(value),
             Key::ShortString(value) => Self::ShortString(*value),
             Key::NewtypeInt(value, tag) => Self::NewtypeInt(*value, *tag),
             Key::NewtypeUint(value, tag) => Self::NewtypeUint(*value, *tag),
+            Key::NewtypeFresh(value, tag) => Self::NewtypeFresh(*value, *tag),
             Key::NewtypeBool(value, tag) => Self::NewtypeBool(*value, *tag),
             Key::NewtypeString(value, tag) => Self::NewtypeString(value, *tag),
             Key::NewtypeShortString(value, tag) => Self::NewtypeShortString(*value, *tag),

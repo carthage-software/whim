@@ -166,6 +166,7 @@ pub enum TypeDescriptor {
         #[seeded(with(serde_seeded::unseeded))]
         open: bool,
     },
+    Fresh,
 }
 
 impl TypeDescriptor {
@@ -408,6 +409,7 @@ impl TypeDescriptor {
             | Self::Bool
             | Self::Int
             | Self::Uint
+            | Self::Fresh
             | Self::Float
             | Self::TrueLiteral
             | Self::FalseLiteral
@@ -455,6 +457,7 @@ pub fn descriptor_is_trivial(descriptor: &TypeDescriptor) -> bool {
         | TypeDescriptor::Bool
         | TypeDescriptor::Int
         | TypeDescriptor::Uint
+        | TypeDescriptor::Fresh
         | TypeDescriptor::Float
         | TypeDescriptor::String
         | TypeDescriptor::StringLength { .. }
@@ -664,6 +667,7 @@ pub fn check_trivial_descriptor(descriptor: &TypeDescriptor, value: &Value) -> O
         TypeDescriptor::Bool => value.is_bool(),
         TypeDescriptor::Int => value.is_int(),
         TypeDescriptor::Uint => value.is_uint(),
+        TypeDescriptor::Fresh => value.is_fresh(),
         TypeDescriptor::Float => value.is_float(),
         TypeDescriptor::String => value.is_string(),
         TypeDescriptor::StringLength { min, max } => value

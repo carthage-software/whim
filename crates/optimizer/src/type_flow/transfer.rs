@@ -16,6 +16,7 @@ use crate::type_flow::CALLABLE;
 use crate::type_flow::Cell;
 use crate::type_flow::DICTIONARY;
 use crate::type_flow::FLOAT;
+use crate::type_flow::FRESH;
 use crate::type_flow::Fact;
 use crate::type_flow::INT;
 use crate::type_flow::NO_ORIGIN;
@@ -86,6 +87,7 @@ pub(crate) fn transfer(
         Instruction::LoadNull { destination } => {
             write(destination, Fact::with_origin(NULL, origin))
         }
+        Instruction::Fresh { destination } => write(destination, Fact::known(FRESH)),
         Instruction::LoadTrue { destination }
         | Instruction::LoadFalse { destination }
         | Instruction::Equal { destination, .. }
@@ -783,7 +785,7 @@ pub(crate) fn transfer(
                     .and_then(|keys| keys.get(array as usize))
                     .copied()
                     .filter(|_| array != NO_ORIGIN)
-                    .unwrap_or(INT | UINT | BOOL | STRING);
+                    .unwrap_or(INT | UINT | BOOL | STRING | FRESH);
                 let mut fact = Fact::with_origin(mask, origin);
                 fact.foreach_key = true;
                 write(key_destination, fact);

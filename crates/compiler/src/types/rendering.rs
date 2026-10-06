@@ -433,6 +433,7 @@ fn render_type_with_state(
         Type::Bool(_) => "bool".to_string(),
         Type::Int(_) => "int".to_string(),
         Type::Uint(_) => "uint".to_string(),
+        Type::Fresh(_) => "fresh".to_string(),
         Type::Float(_) => "float".to_string(),
         Type::String(_) => "string".to_string(),
         Type::StringLength(string) => format!(

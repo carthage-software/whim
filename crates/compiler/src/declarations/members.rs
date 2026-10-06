@@ -742,7 +742,8 @@ fn literal_satisfies_in<'a>(
             BytecodeLiteral::String(value)
                 if string_length_matches(value.as_bytes().len(), *min, *max)
         ),
-        TypeDescriptor::Void
+        TypeDescriptor::Fresh
+        | TypeDescriptor::Void
         | TypeDescriptor::Never
         | TypeDescriptor::Object
         | TypeDescriptor::StaticClass

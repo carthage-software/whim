@@ -33,6 +33,7 @@ pub(crate) fn descriptor_from_built_in_spec(heap: &Heap, spec: &TypeSpec) -> Typ
         TypeSpec::Bool => TypeDescriptor::Bool,
         TypeSpec::Int => TypeDescriptor::Int,
         TypeSpec::Uint => TypeDescriptor::Uint,
+        TypeSpec::Fresh => TypeDescriptor::Fresh,
         TypeSpec::UintRange(min, max) => TypeDescriptor::unsigned_integer_range(*min, *max),
         TypeSpec::IntRange(min, max) => TypeDescriptor::integer_range(*min, *max),
         TypeSpec::Float => TypeDescriptor::Float,

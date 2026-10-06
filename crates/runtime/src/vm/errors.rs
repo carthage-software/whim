@@ -149,6 +149,7 @@ pub(crate) fn debug_render(heap: &Heap, value: &Value, depth: u32) -> String {
         ValueView::Bool(value) => value.to_string(),
         ValueView::Int(rendered) => rendered.to_string(),
         ValueView::Uint(rendered) => format!("{rendered}u"),
+        ValueView::Fresh(identity) => format!("fresh({identity})"),
         ValueView::Float(rendered) => {
             String::from_utf8_lossy(ops::render_float(heap, *rendered).flatten()).into_owned()
         }
@@ -175,6 +176,9 @@ pub(crate) fn debug_render(heap: &Heap, value: &Value, depth: u32) -> String {
                         }
                         KeyRef::Uint(rendered) | KeyRef::NewtypeUint(rendered, _) => {
                             format!("{rendered}u")
+                        }
+                        KeyRef::Fresh(identity) | KeyRef::NewtypeFresh(identity, _) => {
+                            format!("fresh({identity})")
                         }
                         KeyRef::Bool(rendered) | KeyRef::NewtypeBool(rendered, _) => {
                             rendered.to_string()
@@ -251,6 +255,7 @@ impl<'vm, 'engine> DetailedDebugRenderer<'vm, 'engine> {
             ValueView::Bool(value) => value.to_string(),
             ValueView::Int(value) => value.to_string(),
             ValueView::Uint(value) => format!("{value}u"),
+            ValueView::Fresh(identity) => format!("fresh({identity})"),
             ValueView::Float(value) => {
                 String::from_utf8_lossy(ops::render_float(&self.vm.heap, *value).flatten())
                     .into_owned()
@@ -659,6 +664,7 @@ impl VirtualMachine<'_> {
             ValueView::Bool(value) => rendered.push(if *value { "true" } else { "false" }),
             ValueView::Int(value) => rendered.push(&value.to_string()),
             ValueView::Uint(value) => rendered.push(&format!("{value}u")),
+            ValueView::Fresh(identity) => rendered.push(&format!("fresh({identity})")),
             ValueView::Float(value) => {
                 rendered.push_bytes(ops::render_float(&self.heap, *value).flatten());
             }

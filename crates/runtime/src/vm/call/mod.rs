@@ -119,6 +119,7 @@ fn scalar_union_mask(descriptor: &TypeDescriptor) -> Option<u16> {
         TypeDescriptor::Bool => 1 << ValueKind::Bool as u16,
         TypeDescriptor::Int => 1 << ValueKind::Int as u16,
         TypeDescriptor::Uint => 1 << ValueKind::Uint as u16,
+        TypeDescriptor::Fresh => 1 << ValueKind::Fresh as u16,
         TypeDescriptor::Float => 1 << ValueKind::Float as u16,
         TypeDescriptor::String => {
             (1 << ValueKind::String as u16) | (1 << ValueKind::ShortString as u16)
@@ -146,6 +147,7 @@ pub(in crate::vm) fn argument_guard(
         TypeDescriptor::Bool => ArgumentGuard::Bool,
         TypeDescriptor::Int => ArgumentGuard::Int,
         TypeDescriptor::Uint => ArgumentGuard::Uint,
+        TypeDescriptor::Fresh => ArgumentGuard::ScalarUnion(1 << ValueKind::Fresh as u16),
         TypeDescriptor::Float => ArgumentGuard::Float,
         TypeDescriptor::String => ArgumentGuard::String,
         TypeDescriptor::StringLength { min, max } => ArgumentGuard::StringLength {

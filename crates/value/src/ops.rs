@@ -38,7 +38,8 @@ pub fn equals(a: &Value, b: &Value) -> bool {
         (ValueView::Null, ValueView::Null) => return true,
         (ValueView::Bool(left), ValueView::Bool(right)) => return left == right,
         (ValueView::Int(left), ValueView::Int(right)) => return left == right,
-        (ValueView::Uint(left), ValueView::Uint(right)) => return left == right,
+        (ValueView::Uint(left), ValueView::Uint(right))
+        | (ValueView::Fresh(left), ValueView::Fresh(right)) => return left == right,
         (ValueView::Float(left), ValueView::Float(right)) => return left == right,
         (left, right) if left.is_string() && right.is_string() => {
             return left.as_string_bytes() == right.as_string_bytes();
@@ -113,6 +114,7 @@ pub fn structural_hash(value: &Value, heap: &Heap) -> u64 {
                 ValueView::Bool(value) => completed.push(state.hash_bool(*value)),
                 ValueView::Int(value) => completed.push(state.hash_int(*value)),
                 ValueView::Uint(value) => completed.push(state.hash_uint(*value)),
+                ValueView::Fresh(value) => completed.push(state.hash_fresh(*value)),
                 ValueView::Float(value) => {
                     let bits = if *value == 0.0 { 0 } else { value.to_bits() };
                     completed.push(mix_hash(HASH_FLOAT ^ bits));
@@ -221,7 +223,8 @@ fn equals_shallow<'a>(
         (ValueView::Null, ValueView::Null) => true,
         (ValueView::Bool(left), ValueView::Bool(right)) => left == right,
         (ValueView::Int(left), ValueView::Int(right)) => left == right,
-        (ValueView::Uint(left), ValueView::Uint(right)) => left == right,
+        (ValueView::Uint(left), ValueView::Uint(right))
+        | (ValueView::Fresh(left), ValueView::Fresh(right)) => left == right,
         (ValueView::Float(left), ValueView::Float(right)) => left == right,
         (left, right) if left.is_string() && right.is_string() => {
             left.as_string_bytes() == right.as_string_bytes()

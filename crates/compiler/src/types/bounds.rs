@@ -301,6 +301,7 @@ const fn closed_scalar(descriptor: &TypeDescriptor) -> bool {
             | TypeDescriptor::Bool
             | TypeDescriptor::Int
             | TypeDescriptor::Uint
+            | TypeDescriptor::Fresh
             | TypeDescriptor::Float
             | TypeDescriptor::String
             | TypeDescriptor::StringLength { .. }

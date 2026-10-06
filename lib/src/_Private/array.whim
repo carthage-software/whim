@@ -16,7 +16,7 @@ function vec_from_array(array<_, _> $values): vec<mixed> {}
 #[TraceBoundary]
 function array_entries(
   array<_, _> $values,
-): vec<(string|int|uint|bool, mixed)> {}
+): vec<(string|int|uint|bool|fresh, mixed)> {}
 
 /** Returns an array as a dict, keying vecs and tuples by index. */
 #[Stub]
@@ -24,15 +24,15 @@ function array_entries(
 #[TraceBoundary]
 function dict_from_array(
   array<_, _> $values,
-): dict<string|int|uint|bool, mixed> {}
+): dict<string|int|uint|bool|fresh, mixed> {}
 
 /** Builds a dict from an array of key-value tuples. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
 function dict_from_entries(
-  array<_, (string|int|uint|bool, _)> $entries,
-): dict<string|int|uint|bool, mixed> {}
+  array<_, (string|int|uint|bool|fresh, _)> $entries,
+): dict<string|int|uint|bool|fresh, mixed> {}
 
 /** Merges two dicts, with the second's values replacing the first's. */
 #[Stub]
@@ -41,15 +41,15 @@ function dict_from_entries(
 function dict_merge(
   dict<_, _> $first,
   dict<_, _> $second,
-): dict<string|int|uint|bool, mixed> {}
+): dict<string|int|uint|bool|fresh, mixed> {}
 
 /** Exchanges the keys and values of an array. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
 function dict_flip(
-  array<_, string|int|uint|bool> $values,
-): dict<string|int|uint|bool, mixed> {}
+  array<_, string|int|uint|bool|fresh> $values,
+): dict<string|int|uint|bool|fresh, mixed> {}
 
 /** Flattens one level of nested arrays, or null on a non-array value. */
 #[Stub]
@@ -57,15 +57,15 @@ function dict_flip(
 #[TraceBoundary]
 function dict_flatten(
   array<_, _> $values,
-): null|dict<string|int|uint|bool, mixed> {}
+): null|dict<string|int|uint|bool|fresh, mixed> {}
 
 /** Counts the occurrences of each value in an array. */
 #[Stub]
 #[TrackCaller]
 #[TraceBoundary]
 function dict_count_values(
-  array<_, string|int|uint|bool> $values,
-): dict<string|int|uint|bool, uint> {}
+  array<_, string|int|uint|bool|fresh> $values,
+): dict<string|int|uint|bool|fresh, uint> {}
 
 /** Sorts a dict by value with a stable sort, preserving keys. */
 #[Stub]
@@ -74,7 +74,7 @@ function dict_count_values(
 function dict_sort(
   dict<_, _> $values,
   null|fn(_, _): int $comparator,
-): dict<string|int|uint|bool, mixed> {}
+): dict<string|int|uint|bool|fresh, mixed> {}
 
 /** Sorts a vec with a stable sort. */
 #[Stub]

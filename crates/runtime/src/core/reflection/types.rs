@@ -204,6 +204,7 @@ fn type_kind(
         TypeDescriptor::Bool => "Bool",
         TypeDescriptor::Int => "Int",
         TypeDescriptor::Uint => "Uint",
+        TypeDescriptor::Fresh => "Fresh",
         TypeDescriptor::Float => "Float",
         TypeDescriptor::String => "String",
         TypeDescriptor::StringLength { .. } => "StringLength",
