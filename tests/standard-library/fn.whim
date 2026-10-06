@@ -1,0 +1,112 @@
+use Whim\Async;
+use Whim\Fn;
+use Whim\Reference\Strong;
+use Whim\Unwind\DiscardedResultError;
+use Whim\Unwind\RuntimeException;
+
+$identity = Fn\identity::<int>();
+assert!($identity(7) == 7);
+$textIdentity = Fn\identity::<string>();
+assert!($textIdentity('value') == 'value');
+assert!($identity(8) == 8);
+$nullableIdentity = Fn\identity::<null|int>();
+assert!($nullableIdentity(null) == null);
+assert!($nullableIdentity(9) == 9);
+$freshIdentity = Fn\identity::<fresh>();
+$token = fresh!();
+assert!($freshIdentity($token) == $token);
+$objectIdentity = Fn\identity::<Strong<int>>();
+$object = new Strong::<int>(10);
+assert!($objectIdentity($object) == $object);
+
+$calls = new Strong::<vec<string>>(vec[]);
+$doubleThenText = Fn\after::<int, int, string>(fn(int $value): int {
+  $calls->value[] = 'first';
+  Async\later();
+  return $value * 2;
+}, fn(int $value): string {
+  $calls->value[] = 'next';
+  return 'n=' . $value;
+});
+
+assert!($calls->value == vec[]);
+assert!($doubleThenText(4) == 'n=8');
+assert!($calls->value == vec['first', 'next']);
+
+$seen = new Strong::<int>(0);
+$tap = Fn\tap::<Strong<int>>(fn(Strong<int> $value): void {
+  $seen->value = $value->value;
+});
+
+assert!($seen->value == 0);
+assert!($tap($object) == $object);
+assert!($seen->value == 10);
+
+$calls->value = vec[];
+$choose = Fn\when::<int, string>(fn(int $value): bool {
+  $calls->value[] = 'condition';
+  return $value > 0;
+}, fn(int $_): string {
+  $calls->value[] = 'then';
+  return 'positive';
+}, fn(int $_): string {
+  $calls->value[] = 'otherwise';
+  return 'other';
+});
+
+assert!($calls->value == vec[]);
+assert!($choose(1) == 'positive');
+assert!($choose(0) == 'other');
+assert!($calls->value == vec['condition', 'then', 'condition', 'otherwise']);
+
+$expected = new RuntimeException('same error');
+$calls->value = vec[];
+$failedAfter = Fn\after::<int, int, string>(
+  fn(int $_): int => throw $expected,
+  fn(int $value): string {
+    $calls->value[] = 'next';
+    return 'n=' . $value;
+  },
+);
+
+$failedTap = Fn\tap::<int>(fn(int $_): never => throw $expected);
+$failedWhen = Fn\when::<int, string>(
+  fn(int $_): bool => throw $expected,
+  fn(int $_): string {
+    $calls->value[] = 'then';
+    return 'then';
+  },
+  fn(int $_): string {
+    $calls->value[] = 'otherwise';
+    return 'otherwise';
+  },
+);
+
+$rethrow = Fn\rethrow();
+foreach (vec[fn(): void {
+  discard!($failedAfter(1));
+}, fn(): void {
+  discard!($failedTap(1));
+}, fn(): void {
+  discard!($failedWhen(1));
+}, fn(): never => $rethrow($expected)] as $operation) {
+  $caught = null;
+  try {
+    $operation();
+  } catch (RuntimeException $error) {
+    $caught = $error;
+  }
+
+  assert!($caught == $expected);
+}
+
+assert!($calls->value == vec[]);
+
+$discarded = false;
+try {
+  Fn\identity::<int>();
+} catch (DiscardedResultError $_) {
+  $discarded = true;
+}
+
+assert!($discarded);

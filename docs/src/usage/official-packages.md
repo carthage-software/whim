@@ -9,7 +9,8 @@ versions. Install them through Whim's Git package manager.
 
 Clocks and sleepers ship in the standard library under
 [`Whim\Clock`](../standard-library/clock.md). Server-sent events ship under
-[`Whim\HTTP\SSE`](../standard-library/http-sse.md).
+[`Whim\HTTP\SSE`](../standard-library/http-sse.md). Function helpers ship under
+[`Whim\Fn`](../standard-library/fn.md).
 
 | Package | Description | Install |
 | --- | --- | --- |
@@ -26,7 +27,6 @@ Clocks and sleepers ship in the standard library under
 | [`expect`](https://codeberg.org/trifle/expect) | Fluent expectations for tests. | `whim add git+ssh://git@codeberg.org/trifle/expect` |
 | [`fake`](https://codeberg.org/trifle/fake) | Deterministic fake data generated from a seed. | `whim add git+ssh://git@codeberg.org/trifle/fake` |
 | [`feed`](https://codeberg.org/trifle/feed) | Atom and RSS feed generation. | `whim add git+ssh://git@codeberg.org/trifle/feed` |
-| [`fn`](https://codeberg.org/trifle/fn) | Small combinators for building transforms. | `whim add git+ssh://git@codeberg.org/trifle/fn` |
 | [`fuse`](https://codeberg.org/trifle/fuse) | A circuit breaker with controllable time. | `whim add git+ssh://git@codeberg.org/trifle/fuse` |
 | [`graph`](https://codeberg.org/trifle/graph) | Immutable graphs with traversal and shortest paths. | `whim add git+ssh://git@codeberg.org/trifle/graph` |
 | [`humanize`](https://codeberg.org/trifle/humanize) | Human-readable durations, sizes, counts, and numbers. | `whim add git+ssh://git@codeberg.org/trifle/humanize` |

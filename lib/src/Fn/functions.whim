@@ -1,0 +1,58 @@
+namespace Whim\Fn;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Consumer;
+use Whim\Refine\Transform;
+use Whim\Unwind\Throwable;
+
+/** Returns a transform that returns its input unchanged. */
+#[MustUse]
+function identity<T>(): Transform<T, T> {
+  return fn(T $value): T => $value;
+}
+
+/** Returns a transform that calls the callback and returns its input. */
+#[MustUse]
+#[TrackCaller]
+function tap<T>(Consumer<T> $callback): Transform<T, T> {
+  return fn(T $value): T {
+    $callback($value);
+    return $value;
+  };
+}
+
+/** Returns a transform that applies the first transform, then the next. */
+#[MustUse]
+#[TrackCaller]
+function after<I, O, R>(
+  Transform<I, O> $first,
+  Transform<O, R> $next,
+): Transform<I, R> {
+  return fn(I $value): R => $next($first($value));
+}
+
+/** Returns a transform that calls the branch chosen by the predicate. */
+#[MustUse]
+#[TrackCaller]
+function when<I, O>(
+  fn(I): bool $condition,
+  Transform<I, O> $then,
+  Transform<I, O> $otherwise,
+): Transform<I, O> {
+  return fn(I $value): O {
+    if ($condition($value)) {
+      return $then($value);
+    }
+
+    return $otherwise($value);
+  };
+}
+
+/** Returns a function that throws the throwable passed to it. */
+#[MustUse]
+function rethrow(): fn(Throwable): never {
+  return fn(Throwable $throwable): never {
+    throw $throwable;
+  };
+}

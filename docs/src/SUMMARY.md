@@ -87,6 +87,7 @@
 
 - [Library Rules](standard-library/overview.md)
 - [Core Types and Functions](standard-library/core.md)
+- [Function Helpers](standard-library/fn.md)
 - [Reflection](standard-library/reflection.md)
 - [Strings, Numbers, and Binary Data](standard-library/data.md)
 - [Collections and Data Structures](standard-library/collections.md)

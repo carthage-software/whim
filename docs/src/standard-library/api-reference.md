@@ -14,6 +14,7 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Convert`              | explicit value conversion contracts                                     |
 | `Whim\Default`              | the default-value contract                                              |
 | `Whim\Enum`                 | interfaces implemented by all enums                                     |
+| `Whim\Fn`                   | identity, observation, composition, branches, and rethrowing             |
 | `Whim\GC`                   | explicit cycle collection                                               |
 | `Whim\Lint`                 | scoped lint settings                                                    |
 | `Whim\Logic`                | single-assignment variables, linking, and waiting                        |
@@ -33,7 +34,8 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Unwind`               | errors, exceptions, throwables, and trace frames                        |
 | `Whim\Variation`            | values with correlated choices                                          |
 
-See [Core Types and Functions](core.md), [Reflection](reflection.md), [Option and
+See [Core Types and Functions](core.md), [Function Helpers](fn.md),
+[Reflection](reflection.md), [Option and
 Result](../core-library/errors.md), and [Built-in
 Attributes](../core-library/attributes.md).
 
