@@ -1,0 +1,123 @@
+namespace Whim\Tree\_Private;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Transform;
+use Whim\Tree\LeafNode;
+use Whim\Tree\OrphanedNodeException;
+use Whim\Tree\TreeNode;
+
+/** Finds an item by its identifier. */
+#[TrackCaller]
+#[TraceBoundary]
+function find_item<TItem, TId: ArrayKey>(
+  array<_, TItem> $items,
+  Transform<TItem, TId> $get_id,
+  TId $id,
+): Option<TItem> {
+  foreach ($items as $item) {
+    if ($get_id($item) == $id) {
+      return new Some::<TItem>($item);
+    }
+  }
+
+  return new None();
+}
+
+/** Builds a node and its children from flat input. */
+#[TrackCaller]
+#[TraceBoundary]
+function build<TItem, TId: ArrayKey, TValue>(
+  array<_, TItem> $items,
+  TItem $item,
+  Transform<TItem, TId> $get_id,
+  Transform<TItem, Option<TId>> $get_parent_id,
+  Transform<TItem, TValue> $get_value,
+): LeafNode<TValue>|TreeNode<TValue> {
+  $id = $get_id($item);
+  $children = vec[];
+  foreach ($items as $candidate) {
+    $parent = $get_parent_id($candidate);
+    if ($parent->isSome() && $parent->unwrap() == $id) {
+      $children[] = build::<TItem, TId, TValue>(
+        $items,
+        $candidate,
+        $get_id,
+        $get_parent_id,
+        $get_value,
+      );
+    }
+  }
+
+  $value = $get_value($item);
+  if (length!($children) == 0u) {
+    return new LeafNode::<TValue>($value);
+  }
+
+  return new TreeNode::<TValue>($value, $children);
+}
+
+/**
+ * Checks identifiers and paths from each item to the root.
+ *
+ * @throws OrphanedNodeException when an identifier repeats, a parent is missing, or a cycle exists.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function validate<TItem, TId: ArrayKey>(
+  array<_, TItem> $items,
+  TItem $root,
+  Transform<TItem, TId> $get_id,
+  Transform<TItem, Option<TId>> $get_parent_id,
+): void {
+  $ids = vec[];
+  foreach ($items as $item) {
+    $id = $get_id($item);
+    if (contains!($ids, $id)) {
+      throw new OrphanedNodeException(
+        'the input contains a cycle or duplicate node id',
+      );
+    }
+
+    $ids[] = $id;
+  }
+
+  $rootId = $get_id($root);
+  foreach ($items as $item) {
+    $path = vec[];
+    $current = $item;
+    while (true) {
+      $id = $get_id($current);
+      if (contains!($path, $id)) {
+        throw new OrphanedNodeException(
+          'the input contains a cycle or duplicate node id',
+        );
+      }
+
+      $path[] = $id;
+      $parent = $get_parent_id($current);
+      if ($parent->isNone()) {
+        if ($id != $rootId) {
+          throw new OrphanedNodeException(
+            'some nodes are disconnected from the root',
+          );
+        }
+
+        break;
+      }
+
+      $found = find_item::<TItem, TId>($items, $get_id, $parent->unwrap());
+      if ($found->isNone()) {
+        throw new OrphanedNodeException('a node references a missing parent');
+      }
+
+      $current = $found->unwrap();
+    }
+  }
+}

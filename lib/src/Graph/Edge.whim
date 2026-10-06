@@ -1,0 +1,13 @@
+namespace Whim\Graph;
+
+use Whim\Marker\TrackCaller;
+
+/** Represents a weighted edge between graph nodes. */
+final readonly class Edge<out TNode, out TWeight> {
+  /** Creates a graph edge. */
+  #[TrackCaller]
+  public function __construct(
+    public TNode $to,
+    public null|TWeight $weight = null,
+  ) {}
+}

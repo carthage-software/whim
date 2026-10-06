@@ -1,0 +1,6 @@
+namespace Whim\Tree;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports that a flat tree input contains no root. */
+final class NoRootNodeException extends InvalidArgumentException {}

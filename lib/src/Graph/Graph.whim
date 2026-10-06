@@ -1,0 +1,22 @@
+namespace Whim\Graph;
+
+use Whim\Marker\TrackCaller;
+
+/** Defines the behavior of graph values. */
+interface Graph<TNode, TWeight> for DirectedGraph, UndirectedGraph {
+  /** Returns all nodes in the graph. */
+  #[TrackCaller]
+  public function getNodes(): vec<TNode>;
+
+  /** Returns the outgoing edges from a node. */
+  #[TrackCaller]
+  public function getEdgesFrom(TNode $from): vec<Edge<TNode, TWeight>>;
+
+  /** Reports whether the graph contains a node. */
+  #[TrackCaller]
+  public function hasNode(TNode $node): bool;
+
+  /** Reports whether the graph contains a cycle. */
+  #[TrackCaller]
+  public function hasCycle(): bool;
+}

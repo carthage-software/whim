@@ -91,6 +91,8 @@
 - [Reflection](standard-library/reflection.md)
 - [Strings, Numbers, and Binary Data](standard-library/data.md)
 - [Collections and Data Structures](standard-library/collections.md)
+- [Graphs](standard-library/graph.md)
+- [Trees](standard-library/tree.md)
 - [Variation](standard-library/variation.md)
 - [Logic Variables](standard-library/logic.md)
 - [Time and Calendars](standard-library/time.md)

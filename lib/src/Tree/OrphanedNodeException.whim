@@ -1,0 +1,6 @@
+namespace Whim\Tree;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports a node disconnected from its expected tree. */
+final class OrphanedNodeException extends InvalidArgumentException {}

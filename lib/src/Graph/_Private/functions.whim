@@ -1,0 +1,284 @@
+namespace Whim\Graph\_Private;
+
+use Whim\Lint\Allow;
+use Whim\Comparison\Ordering;
+use Whim\DataStructure\PriorityQueue;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Marker\TraceBoundary;
+use Whim\Graph\Edge;
+use Whim\Graph\Graph;
+use Whim\Graph\NegativeCycleException;
+use Whim\Refine\Transform;
+use Whim\Refine\NonEmptyVec;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Vec;
+
+/** Returns the index of the first matching value. */
+#[TrackCaller]
+#[TraceBoundary]
+function index_of<T>(array<_, T> $values, T $needle): null|int {
+  $index = 0;
+  foreach ($values as $value) {
+    if ($value == $needle) {
+      return $index;
+    }
+
+    $index++;
+  }
+
+  return null;
+}
+
+/**
+ * Checks that both endpoints of each edge exist in the graph.
+ *
+ * @throws InvalidArgumentException when an edge references a node outside the graph.
+ */
+#[NeverInline]
+#[TrackCaller]
+#[TraceBoundary]
+function validate_edges<TNode, TWeight>(
+  array<_, TNode> $nodes,
+  array<_, (TNode, Edge<TNode, TWeight>)> $edges,
+): void {
+  foreach ($edges as ($from, $edge)) {
+    if (!contains!($nodes, $from)) {
+      throw new InvalidArgumentException(
+        'an edge source is not present in the graph',
+      );
+    }
+
+    if (!contains!($nodes, $edge->to)) {
+      throw new InvalidArgumentException(
+        'an edge destination is not present in the graph',
+      );
+    }
+  }
+}
+
+/** Adds any missing reverse edges. */
+#[TrackCaller]
+#[TraceBoundary]
+function symmetrize_edges<TNode, TWeight>(
+  array<_, (TNode, Edge<TNode, TWeight>)> $edges,
+): vec<(TNode, Edge<TNode, TWeight>)> {
+  $result = Vec\values::<(TNode, Edge<TNode, TWeight>)>($edges);
+  $original = $result;
+  foreach ($original as ($from, $edge)) {
+    $hasReverse = false;
+    foreach ($result as ($candidateFrom, $candidate)) {
+      if (
+        $candidateFrom != $edge->to
+        || $candidate->to != $from
+        || $candidate->weight != $edge->weight
+      ) {
+        continue;
+      }
+
+      $hasReverse = true;
+      break;
+    }
+
+    if (!$hasReverse) {
+      $result[] = ($edge->to, new Edge::<TNode, TWeight>($from, $edge->weight));
+    }
+  }
+
+  return $result;
+}
+
+/** Adds path costs with integer overflow checks. */
+#[TrackCaller]
+#[TraceBoundary]
+function add_cost(int $left, int $right): int {
+  return $left + $right;
+}
+
+/** Orders pending graph nodes by distance and then index. */
+function compare_path_priority((int, int) $left, (int, int) $right): Ordering {
+  $distance = $left[0] <=> $right[0];
+  if (0 != $distance) {
+    return Ordering::from($distance);
+  }
+
+  return Ordering::from($left[1] <=> $right[1]);
+}
+
+/** Finds a minimum-cost path with optional weight conversion. */
+#[TrackCaller]
+#[TraceBoundary]
+#[Allow('cyclomatic-complexity')]
+function shortest_path_with<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $from,
+  TNode $to,
+  null|Transform<TWeight, int> $weight,
+): null|NonEmptyVec<TNode> {
+  $nodes = $graph->getNodes();
+  $fromIndex = index_of::<TNode>($nodes, $from);
+  $toIndex = index_of::<TNode>($nodes, $to);
+  if (null == $fromIndex || null == $toIndex) {
+    return null;
+  }
+
+  $edges = vec[];
+  foreach ($nodes as $_) {
+    $edges[] = vec[];
+  }
+
+  $hasNegativeEdge = false;
+  $source = 0;
+  foreach ($nodes as $node) {
+    foreach ($graph->getEdgesFrom($node) as $edge) {
+      $destination = index_of::<TNode>($nodes, $edge->to) ?? continue;
+
+      if (null == $edge->weight) {
+        $cost = 1;
+      } else if (null != $weight) {
+        $cost = $weight($edge->weight);
+      } else {
+        $cost = $edge->weight as int;
+      }
+
+      if ($cost < 0) {
+        $hasNegativeEdge = true;
+      }
+
+      $edges[$source][] = ($destination, $cost);
+    }
+
+    $source++;
+  }
+
+  $distance = vec[null; length!($nodes) as int];
+  $parent = vec[null; length!($nodes) as int];
+
+  $distance[$fromIndex] = 0;
+
+  if ($hasNegativeEdge) {
+    $iteration = 1u;
+    while ($iteration < length!($nodes)) {
+      $changed = false;
+      $source = 0;
+      foreach ($edges as $outgoing) {
+        $sourceDistance = $distance[$source];
+        if (null != $sourceDistance) {
+          foreach ($outgoing as ($destination, $cost)) {
+            $candidate = add_cost($sourceDistance, $cost);
+            if (
+              null == $distance[$destination]
+              || $candidate < $distance[$destination]
+            ) {
+              $distance[$destination] = $candidate;
+              $parent[$destination] = $source;
+              $changed = true;
+            }
+          }
+        }
+
+        $source++;
+      }
+
+      if (!$changed) {
+        break;
+      }
+
+      $iteration++;
+    }
+
+    $affected = vec[false; length!($nodes) as int];
+
+    $source = 0;
+    foreach ($edges as $outgoing) {
+      $sourceDistance = $distance[$source];
+      if (null != $sourceDistance) {
+        foreach ($outgoing as ($destination, $cost)) {
+          $candidate = add_cost($sourceDistance, $cost);
+          if (
+            null == $distance[$destination]
+            || $candidate < $distance[$destination]
+          ) {
+            $affected[$destination] = true;
+          }
+        }
+      }
+
+      $source++;
+    }
+
+    $iteration = 0u;
+    while ($iteration < length!($nodes)) {
+      $changed = false;
+      $source = 0;
+      foreach ($edges as $outgoing) {
+        if ($affected[$source]) {
+          foreach ($outgoing as ($destination, $_)) {
+            if ($affected[$destination]) {
+              continue;
+            }
+
+            $affected[$destination] = true;
+            $changed = true;
+          }
+        }
+
+        $source++;
+      }
+
+      if (!$changed) {
+        break;
+      }
+
+      $iteration++;
+    }
+
+    if ($affected[$toIndex]) {
+      throw new NegativeCycleException(
+        'no finite shortest path exists through a reachable negative cycle',
+      );
+    }
+  } else {
+    $pending = new PriorityQueue::<int, (int, int)>(compare_path_priority(...));
+
+    $pending->enqueue($fromIndex, (0, $fromIndex));
+    while (!$pending->isEmpty()) {
+      ($current, ($currentDistance, $_)) = $pending->dequeue()->unwrap();
+      if ($distance[$current] != $currentDistance) {
+        continue;
+      }
+
+      foreach ($edges[$current] as ($destination, $cost)) {
+        $candidate = add_cost($currentDistance, $cost);
+        if (
+          null == $distance[$destination]
+          || $candidate < $distance[$destination]
+        ) {
+          $distance[$destination] = $candidate;
+          $parent[$destination] = $current;
+          $pending->enqueue($destination, ($candidate, $destination));
+        }
+      }
+    }
+  }
+
+  if (null == $distance[$toIndex]) {
+    return null;
+  }
+
+  $path = vec[];
+  $current = $toIndex;
+  $iteration = 0u;
+  while ($iteration < length!($nodes)) {
+    $path[] = $nodes[$current];
+    if ($current == $fromIndex) {
+      return Vec\reverse::<TNode>($path);
+    }
+
+    $current = $parent[$current] ?? break;
+
+    $iteration++;
+  }
+
+  return null;
+}

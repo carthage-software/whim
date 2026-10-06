@@ -82,6 +82,7 @@ Structures](collections.md), and [Iterators](../core-library/iteration.md).
 | `Whim\Encoding\URI`             | whole-URI percent encoding                            |
 | `Whim\Encoding\UTF8`            | UTF-8 checks and lossy repair                         |
 | `Whim\Encoding\Url`             | percent and form encoding                             |
+| `Whim\Graph`                    | directed and undirected graphs, traversal, and paths   |
 | `Whim\HTML`                     | WHATWG character references and escaping              |
 | `Whim\Json`                     | JSON values, encoding, and decoding                   |
 | `Whim\MIME`                     | media types, fields, content IDs, and parts           |
@@ -89,9 +90,10 @@ Structures](collections.md), and [Iterators](../core-library/iteration.md).
 | `Whim\MIME\Part`                | text, data, and raw MIME parts                        |
 | `Whim\MIME\Sniff`               | media-type checks from byte prefixes                  |
 | `Whim\Regex`                    | byte regular expressions                              |
+| `Whim\Tree`                     | typed trees, traversal, search, mapping, and folds     |
 | `Whim\UUID`                     | UUID parsing plus versions 4 and 7                    |
 
-See [Encoding and Data Formats](formats.md).
+See [Graphs](graph.md), [Trees](tree.md), and [Encoding and Data Formats](formats.md).
 
 ## Time, environment, and the operating system
 

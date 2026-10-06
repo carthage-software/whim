@@ -1,8 +1,8 @@
 # Official Packages
 
 The Whim project maintains
-[Trifle packages on Codeberg](https://codeberg.org/trifle). They live outside
-the main Whim repository and do not ship with the standard library.
+[Trifle packages on Codeberg](https://codeberg.org/trifle). Each package has
+its own repository.
 
 These packages use names under `Trifle\`. Their Git tags define their
 versions. Install them through Whim's Git package manager.
@@ -22,7 +22,6 @@ versions. Install them through Whim's Git package manager.
 | [`expect`](https://codeberg.org/trifle/expect)               | Fluent expectations for tests.                               | `whim add git+ssh://git@codeberg.org/trifle/expect`        |
 | [`fake`](https://codeberg.org/trifle/fake)                   | Deterministic fake data generated from a seed.               | `whim add git+ssh://git@codeberg.org/trifle/fake`          |
 | [`feed`](https://codeberg.org/trifle/feed)                   | Atom and RSS feed generation.                                | `whim add git+ssh://git@codeberg.org/trifle/feed`          |
-| [`graph`](https://codeberg.org/trifle/graph)                 | Immutable graphs with traversal and shortest paths.          | `whim add git+ssh://git@codeberg.org/trifle/graph`         |
 | [`humanize`](https://codeberg.org/trifle/humanize)           | Human-readable durations, sizes, counts, and numbers.        | `whim add git+ssh://git@codeberg.org/trifle/humanize`      |
 | [`lock`](https://codeberg.org/trifle/lock)                   | Leased mutual exclusion over pluggable stores.               | `whim add git+ssh://git@codeberg.org/trifle/lock`          |
 | [`log`](https://codeberg.org/trifle/log)                     | Structured logging with composable loggers.                  | `whim add git+ssh://git@codeberg.org/trifle/log`           |
@@ -38,7 +37,6 @@ versions. Install them through Whim's Git package manager.
 | [`template`](https://codeberg.org/trifle/template)           | Logic-less Mustache templates rendered from JSON values.     | `whim add git+ssh://git@codeberg.org/trifle/template`      |
 | [`theme`](https://codeberg.org/trifle/theme)                 | Paints and themes for terminal text.                         | `whim add git+ssh://git@codeberg.org/trifle/theme`         |
 | [`trace`](https://codeberg.org/trifle/trace)                 | Timed spans recorded through structured logs.                | `whim add git+ssh://git@codeberg.org/trifle/trace`         |
-| [`tree`](https://codeberg.org/trifle/tree)                   | Immutable trees with traversal, search, and folds.           | `whim add git+ssh://git@codeberg.org/trifle/tree`          |
 
 Codeberg hosts all [Trifle package repositories](https://codeberg.org/trifle).
 

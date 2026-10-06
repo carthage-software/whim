@@ -1,0 +1,26 @@
+namespace Whim\Tree;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+
+/** Represents a tree node. */
+final readonly class TreeNode<out T> implements Node<T> {
+  /** Creates a tree node. */
+  #[TrackCaller]
+  public function __construct(
+    private T $value,
+    private vec<Node<T>> $children = vec[],
+  ) {}
+
+  /** Returns the value stored by the node. */
+  #[AlwaysInline]
+  public function getValue(): T {
+    return $this->value;
+  }
+
+  /** Returns the direct children of the node. */
+  #[AlwaysInline]
+  public function getChildren(): vec<Node<T>> {
+    return $this->children;
+  }
+}

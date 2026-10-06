@@ -1,0 +1,335 @@
+use Whim\Async;
+use Whim\Iterate\Iterator;
+use Whim\Math;
+use Whim\Option;
+use Whim\Reference\Strong;
+use Whim\Tree;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Vec;
+
+function expect_error<E: Throwable>(fn(): void $operation): E {
+  try {
+    $operation();
+  } catch (E $error) {
+    return $error;
+  }
+
+  throw new RuntimeException('expected an error');
+}
+
+$tree = Tree\tree::<int>(
+  1,
+  vec[Tree\leaf::<int>(2), Tree\tree::<int>(3, vec[Tree\leaf::<int>(4)])],
+);
+
+assert!($tree is Tree\TreeNode<int> && $tree is Tree\Node<int>);
+assert!($tree->getChildren() is vec<Tree\Node<int>>);
+assert!(Tree\is_leaf::<int>($tree->getChildren()[0]));
+assert!(Tree\count::<int>($tree) == 4u);
+assert!(Tree\depth::<int>($tree) == 2u);
+assert!(Tree\pre_order::<int>($tree) == vec[1, 2, 3, 4]);
+assert!(Tree\post_order::<int>($tree) == vec[2, 4, 3, 1]);
+assert!(Tree\level_order::<int>($tree) == vec[1, 2, 3, 4]);
+assert!(Tree\leaves::<int>($tree) == vec[2, 4]);
+assert!(Tree\contains::<int>($tree, 4));
+assert!(!Tree\contains::<int>($tree, 5));
+assert!(
+  Tree\find::<int>($tree, fn(int $value): bool => $value > 2)->unwrap() == 3,
+);
+
+assert!(Tree\find::<int>($tree, fn(int $value): bool => $value > 4)->isNone());
+assert!(
+  Tree\path_to::<int>($tree, fn(int $value): bool => 4 == $value) == vec[
+    1,
+    3,
+    4,
+  ],
+);
+
+assert!(
+  Tree\path_to::<int>($tree, fn(int $value): bool => 1 == $value) == vec[1],
+);
+
+assert!(
+  Tree\path_to::<int>($tree, fn(int $value): bool => 5 == $value) == null,
+);
+
+assert!(Tree\at_index::<int>($tree, (1u, 0u))->unwrap() == 4);
+assert!(Tree\at_index::<int>($tree, vec[])->unwrap() == 1);
+assert!(Tree\at_index::<int>($tree, vec[2u])->isNone());
+assert!(Tree\at_index::<int>($tree, vec[Math\UINT_MAX])->isNone());
+assert!(
+  Tree\to_index::<int>($tree, fn(int $value): bool => 4 == $value) == vec[
+    1u,
+    0u,
+  ],
+);
+
+assert!(
+  Tree\to_index::<int>($tree, fn(int $value): bool => 1 == $value) == vec[],
+);
+
+assert!(
+  Tree\to_index::<int>($tree, fn(int $value): bool => 5 == $value) == null,
+);
+
+assert!(Tree\all::<int>($tree, fn(int $value): bool => $value > 0));
+assert!(Tree\any::<int>($tree, fn(int $value): bool => 3 == $value));
+
+$seen = new Strong::<vec<int>>(vec[]);
+assert!(!Tree\all::<int>($tree, fn(int $value): bool {
+  $seen->value[] = $value;
+  return 2 != $value;
+}));
+
+assert!(vec[1, 2] == $seen->value);
+$seen->value = vec[];
+assert!(Tree\any::<int>($tree, fn(int $value): bool {
+  $seen->value[] = $value;
+  return 2 == $value;
+}));
+
+assert!(vec[1, 2] == $seen->value);
+assert!(
+  Tree\reduce::<int, int>(
+    $tree,
+    fn(int $sum, int $value): int => $sum + $value,
+    0,
+  )
+  == 10,
+);
+
+assert!(
+  Tree\reduce::<int, string>(
+    $tree,
+    fn(string $values, int $value): string => $values . $value,
+    '',
+  )
+  == '1234',
+);
+
+$seen->value = vec[];
+$mapped = Tree\map::<int, string>($tree, fn(int $value): string {
+  $seen->value[] = $value;
+  Async\later();
+  return 'n=' . $value;
+});
+
+assert!($mapped is Tree\Node<string>);
+assert!(Tree\pre_order::<string>($mapped) == vec['n=1', 'n=2', 'n=3', 'n=4']);
+assert!(vec[2, 4, 3, 1] == $seen->value);
+assert!(Tree\pre_order::<int>($tree) == vec[1, 2, 3, 4]);
+$children = $tree->getChildren();
+$children[] = Tree\leaf::<int>(5);
+assert!(Tree\count::<int>($tree) == 4u);
+$filtered = Tree\filter::<int>($tree, fn(int $value): bool => 2 != $value);
+assert!($filtered is Tree\TreeNode<int>);
+assert!(Tree\pre_order::<int>($filtered) == vec[1, 3, 4]);
+assert!(Tree\filter::<int>($tree, fn(int $value): bool => 1 != $value) == null);
+assert!(
+  Tree\pre_order::<int>(
+    Tree\filter::<int>($tree, fn(int $value): bool => 3 != $value)
+      as Tree\TreeNode<int>,
+  ) == vec[1, 2],
+);
+
+assert!(
+  Tree\fold::<int, int>(
+    $tree,
+    fn(int $value, vec<int> $children): int => $value + Math\sum($children),
+  )
+  == 10,
+);
+
+assert!(
+  Tree\traverse::<int, int>(
+    $tree,
+    fn(
+      int $value,
+      fn(): vec<int> $children,
+    ): int => $value + Math\sum($children()),
+  )
+  == 10,
+);
+
+$visited = new Strong::<uint>(0u);
+assert!(
+  Tree\traverse::<int, int>($tree, fn(int $value, fn(): vec<int> $_): int {
+    $visited->value++;
+    return $value;
+  }) == 1,
+);
+
+assert!(1u == $visited->value);
+$visited->value = 0u;
+assert!(
+  Tree\traverse::<int, int>(
+    $tree,
+    fn(int $value, fn(): vec<int> $children): int {
+      $visited->value++;
+      Async\later();
+      $first = $children();
+      assert!($children() == $first);
+      return $value;
+    },
+  )
+  == 1,
+);
+
+assert!(4u == $visited->value);
+assert!(
+  Tree\to_dict::<int>($tree) == dict[
+    'value' => 1,
+    'children' => vec[
+      dict['value' => 2, 'children' => vec[]],
+      dict[
+        'value' => 3,
+        'children' => vec[dict['value' => 4, 'children' => vec[]]],
+      ],
+    ],
+  ],
+);
+
+$leaf = Tree\leaf::<string>('only');
+assert!($leaf is Tree\LeafNode<string>);
+assert!(Tree\is_leaf::<string>($leaf));
+assert!(Tree\count::<string>($leaf) == 1u && Tree\depth::<string>($leaf) == 0u);
+assert!(Tree\leaves::<string>($leaf) == vec['only']);
+assert!(Tree\is_leaf::<string>(Tree\tree::<string>('empty')));
+$repeated = Tree\tree::<int>(
+  0,
+  vec[Tree\tree::<int>(1, vec[Tree\leaf::<int>(2)]), Tree\leaf::<int>(2)],
+);
+
+assert!(
+  Tree\path_to::<int>($repeated, fn(int $value): bool => 2 == $value) == vec[
+    0,
+    2,
+  ],
+);
+
+assert!(
+  Tree\to_index::<int>($repeated, fn(int $value): bool => 2 == $value) == vec[
+    1u,
+  ],
+);
+
+$nullable = Tree\tree::<null|int>(1, vec[Tree\leaf::<null|int>(null)]);
+assert!(
+  Tree\find::<null|int>(
+    $nullable,
+    fn(null|int $value): bool => null == $value,
+  )->isSome(),
+);
+
+assert!(Tree\at_index::<null|int>($nullable, vec[0u])->unwrap() == null);
+$token = fresh!();
+$freshTree = Tree\leaf::<fresh>($token);
+assert!(Tree\contains::<fresh>($freshTree, $token));
+assert!(!Tree\contains::<fresh>($freshTree, fresh!()));
+
+final readonly class TreeRecord {
+  public function __construct(
+    public int $id,
+    public null|int $parent,
+    public string $label,
+  ) {}
+}
+
+final class Values<T> implements Iterator<int, T> {
+  private int $offset = 0;
+  public function __construct(private vec<T> $values) {}
+
+  public function next(): null|(int, T) {
+    if ($this->offset >= length!($this->values)) {
+      return null;
+    }
+
+    $offset = $this->offset++;
+    return ($offset, $this->values[$offset]);
+  }
+}
+
+function tree_record_parent(TreeRecord $record): Option\Option<int> {
+  if (null == $record->parent) {
+    return new Option\None();
+  }
+
+  return new Option\Some::<int>($record->parent);
+}
+
+function from_records(vec<TreeRecord> $records): Tree\Node<string> {
+  return Tree\from_iterable::<TreeRecord, int, string>(
+    new Values::<TreeRecord>($records),
+    fn(TreeRecord $record): int => $record->id,
+    tree_record_parent(...),
+    fn(TreeRecord $record): string => $record->label,
+  );
+}
+
+$records = dict[
+  'root' => new TreeRecord(1, null, 'root'),
+  'left' => new TreeRecord(2, 1, 'left'),
+  'right' => new TreeRecord(3, 1, 'right'),
+  'leaf' => new TreeRecord(4, 3, 'leaf'),
+];
+
+$built = from_records(Vec\values::<TreeRecord>($records));
+assert!($built is Tree\Node<string>);
+assert!(
+  Tree\pre_order::<string>($built) == vec['root', 'left', 'right', 'leaf'],
+);
+
+assert!(
+  Tree\at_index::<string>($built, new Values::<uint>(vec[1u, 0u]))->unwrap()
+  == 'leaf',
+);
+
+$shuffled = from_records(vec[
+  $records['leaf'],
+  $records['right'],
+  $records['root'],
+  $records['left'],
+]);
+
+assert!(
+  Tree\pre_order::<string>($shuffled) == vec['root', 'right', 'leaf', 'left'],
+);
+
+assert!(from_records(vec[$records['root']]) is Tree\LeafNode<string>);
+
+foreach (vec[vec[], vec[new TreeRecord(1, 99, 'orphan')]] as $records) {
+  $error = expect_error::<Tree\NoRootNodeException>(fn(): void {
+    discard!(from_records($records));
+  });
+
+  assert!($error is InvalidArgumentException);
+}
+
+discard!(expect_error::<Tree\MultipleRootNodesException>(fn(): void {
+  discard!(
+    from_records(vec[
+      new TreeRecord(1, null, 'first'),
+      new TreeRecord(2, null, 'second'),
+    ]),
+  );
+}));
+
+foreach (vec[
+  vec[new TreeRecord(1, null, 'root'), new TreeRecord(2, 99, 'orphan')],
+  vec[
+    new TreeRecord(1, null, 'root'),
+    new TreeRecord(2, 3, 'cycle-a'),
+    new TreeRecord(3, 2, 'cycle-b'),
+  ],
+  vec[new TreeRecord(1, null, 'root'), new TreeRecord(2, 2, 'self')],
+  vec[new TreeRecord(1, null, 'root'), new TreeRecord(1, 1, 'duplicate')],
+] as $records) {
+  $error = expect_error::<Tree\OrphanedNodeException>(fn(): void {
+    discard!(from_records($records));
+  });
+
+  assert!($error is InvalidArgumentException);
+}

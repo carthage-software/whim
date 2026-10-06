@@ -1,0 +1,122 @@
+namespace Whim\Graph;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+
+/** Represents an immutable undirected graph. */
+final readonly class UndirectedGraph<TNode, TWeight> implements
+  Graph<TNode, TWeight> {
+  /**
+   * Creates an undirected graph from nodes and edges.
+   *
+   * @throws InvalidArgumentException when an edge references a node outside the graph.
+   */
+  #[TrackCaller]
+  public function __construct(
+    private vec<TNode> $nodes = vec[],
+    vec<(TNode, Edge<TNode, TWeight>)> $edges = vec[],
+  ) {
+    _Private\validate_edges::<TNode, TWeight>($nodes, $edges);
+    $this->edges = _Private\symmetrize_edges::<TNode, TWeight>($edges);
+  }
+
+  private vec<(TNode, Edge<TNode, TWeight>)> $edges;
+
+  /** Returns all nodes in the graph. */
+  #[AlwaysInline]
+  public function getNodes(): vec<TNode> {
+    return $this->nodes;
+  }
+
+  /** Returns the outgoing edges from a node. */
+  #[TrackCaller]
+  public function getEdgesFrom(TNode $from): vec<Edge<TNode, TWeight>> {
+    $result = vec[];
+    foreach ($this->edges as ($owner, $edge)) {
+      if ($owner != $from) {
+        continue;
+      }
+
+      $result[] = $edge;
+    }
+
+    return $result;
+  }
+
+  /** Reports whether the graph contains a node. */
+  #[TrackCaller]
+  public function hasNode(TNode $node): bool {
+    return contains!($this->nodes, $node);
+  }
+
+  /** Reports whether an edge connects two nodes. */
+  #[TrackCaller]
+  public function hasEdge(TNode $from, TNode $to): bool {
+    foreach ($this->edges as ($owner, $edge)) {
+      if ($owner == $from && $edge->to == $to) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /** Returns a graph containing an additional node. */
+  #[TrackCaller]
+  public function withNode(TNode $node): UndirectedGraph<TNode, TWeight> {
+    if ($this->hasNode($node)) {
+      return $this;
+    }
+
+    $nodes = $this->nodes;
+    $nodes[] = $node;
+    return new UndirectedGraph::<TNode, TWeight>($nodes, $this->edges);
+  }
+
+  /** Returns a graph containing an additional edge. */
+  #[TrackCaller]
+  public function withEdge(
+    TNode $from,
+    Edge<TNode, TWeight> $edge,
+  ): UndirectedGraph<TNode, TWeight> {
+    $edges = $this->edges;
+    $edges[] = ($from, $edge);
+    return new UndirectedGraph::<TNode, TWeight>($this->nodes, $edges);
+  }
+
+  /** Reports whether the graph contains a cycle. */
+  #[TrackCaller]
+  public function hasCycle(): bool {
+    $visited = vec[];
+    foreach ($this->nodes as $start) {
+      if (contains!($visited, $start)) {
+        continue;
+      }
+
+      $nodes = vec[$start];
+      $parents = vec[null];
+      $cursor = 0;
+      while ($cursor < length!($nodes)) {
+        $node = $nodes[$cursor];
+        $parent = $parents[$cursor];
+        if (!contains!($visited, $node)) {
+          $visited[] = $node;
+        }
+
+        foreach ($this->getEdgesFrom($node) as $edge) {
+          $neighbor = $edge->to;
+          if (!contains!($visited, $neighbor)) {
+            $nodes[] = $neighbor;
+            $parents[] = ($node,);
+          } else if (null == $parent || $neighbor != $parent[0]) {
+            return true;
+          }
+        }
+
+        $cursor++;
+      }
+    }
+
+    return false;
+  }
+}

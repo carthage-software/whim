@@ -1,0 +1,257 @@
+namespace Whim\Graph;
+
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Transform;
+use Whim\Refine\NonEmptyVec;
+
+/** Creates an empty directed graph. */
+#[TrackCaller]
+function directed<TNode, TWeight>(): DirectedGraph<TNode, TWeight> {
+  return new DirectedGraph::<TNode, TWeight>();
+}
+
+/** Creates an empty undirected graph. */
+#[TrackCaller]
+function undirected<TNode, TWeight>(): UndirectedGraph<TNode, TWeight> {
+  return new UndirectedGraph::<TNode, TWeight>();
+}
+
+/** Returns a graph containing an additional node. */
+#[TrackCaller]
+function add_node<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $node,
+): Graph<TNode, TWeight> {
+  return $graph->withNode($node);
+}
+
+/** Returns a graph containing an additional edge. */
+#[TrackCaller]
+function add_edge<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $from,
+  TNode $to,
+  null|TWeight $weight = null,
+): Graph<TNode, TWeight> {
+  if (!$graph->hasNode($from)) {
+    $graph = $graph->withNode($from);
+  }
+
+  if (!$graph->hasNode($to)) {
+    $graph = $graph->withNode($to);
+  }
+
+  return $graph->withEdge($from, new Edge::<TNode, TWeight>($to, $weight));
+}
+
+/** Returns all nodes in a graph. */
+#[TrackCaller]
+function nodes<TNode, TWeight>(Graph<TNode, TWeight> $graph): vec<TNode> {
+  return $graph->getNodes();
+}
+
+/** Returns the direct neighbors of a node. */
+#[TrackCaller]
+function neighbors<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $node,
+): vec<TNode> {
+  $result = vec[];
+  foreach ($graph->getEdgesFrom($node) as $edge) {
+    $result[] = $edge->to;
+  }
+
+  return $result;
+}
+
+/** Reports whether a path connects two nodes. */
+#[TrackCaller]
+function has_path<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $from,
+  TNode $to,
+): bool {
+  if (!$graph->hasNode($from) || !$graph->hasNode($to)) {
+    return false;
+  }
+
+  $visited = vec[];
+  $queue = vec[$from];
+  $cursor = 0;
+  while ($cursor < length!($queue)) {
+    $node = $queue[$cursor];
+    if ($node == $to) {
+      return true;
+    }
+
+    if (!contains!($visited, $node)) {
+      $visited[] = $node;
+      foreach ($graph->getEdgesFrom($node) as $edge) {
+        $queue[] = $edge->to;
+      }
+    }
+
+    $cursor++;
+  }
+
+  return false;
+}
+
+/** Reports whether a graph contains a cycle. */
+#[TrackCaller]
+function has_cycle<TNode, TWeight>(Graph<TNode, TWeight> $graph): bool {
+  return $graph->hasCycle();
+}
+
+/** Traverses a graph breadth first from a node. */
+#[TrackCaller]
+function bfs<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $start,
+): vec<TNode> {
+  if (!$graph->hasNode($start)) {
+    return vec[];
+  }
+
+  $visited = vec[];
+  $result = vec[];
+  $queue = vec[$start];
+  $cursor = 0;
+  while ($cursor < length!($queue)) {
+    $node = $queue[$cursor];
+    if (!contains!($visited, $node)) {
+      $visited[] = $node;
+      $result[] = $node;
+      foreach ($graph->getEdgesFrom($node) as $edge) {
+        $queue[] = $edge->to;
+      }
+    }
+
+    $cursor++;
+  }
+
+  return $result;
+}
+
+/** Traverses a graph depth first from a node. */
+#[TrackCaller]
+function dfs<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $start,
+): vec<TNode> {
+  if (!$graph->hasNode($start)) {
+    return vec[];
+  }
+
+  $visited = vec[];
+  $result = vec[];
+  $stack = vec[$start];
+  while (length!($stack) > 0u) {
+    $node = remove_last!($stack);
+    if (contains!($visited, $node)) {
+      continue;
+    }
+
+    $visited[] = $node;
+    $result[] = $node;
+    $edges = $graph->getEdgesFrom($node);
+    $index = length!($edges) as int;
+    while ($index > 0) {
+      $index--;
+      $stack[] = $edges[$index]->to;
+    }
+  }
+
+  return $result;
+}
+
+/** Orders a directed acyclic graph topologically. */
+#[TrackCaller]
+function topological_sort<TNode, TWeight>(
+  DirectedGraph<TNode, TWeight> $graph,
+): null|vec<TNode> {
+  $nodes = $graph->getNodes();
+  $degrees = vec[0u; length!($nodes) as int];
+
+  foreach ($nodes as $node) {
+    foreach ($graph->getEdgesFrom($node) as $edge) {
+      $index = _Private\index_of::<TNode>($nodes, $edge->to);
+      if (null != $index) {
+        $degrees[$index]++;
+      }
+    }
+  }
+
+  $queue = vec[];
+  $index = 0;
+  foreach ($degrees as $degree) {
+    if (0u == $degree) {
+      $queue[] = $index;
+    }
+
+    $index++;
+  }
+
+  $result = vec[];
+  $cursor = 0;
+  while ($cursor < length!($queue)) {
+    $index = $queue[$cursor];
+    $node = $nodes[$index];
+    $result[] = $node;
+    foreach ($graph->getEdgesFrom($node) as $edge) {
+      $neighbor = _Private\index_of::<TNode>($nodes, $edge->to);
+      if (null != $neighbor) {
+        $degrees[$neighbor]--;
+        if (0u == $degrees[$neighbor]) {
+          $queue[] = $neighbor;
+        }
+      }
+    }
+
+    $cursor++;
+  }
+
+  if (length!($result) != length!($nodes)) {
+    return null;
+  }
+
+  return $result;
+}
+
+/**
+ * Finds a minimum-weight path between two nodes.
+ *
+ * @throws NegativeCycleException when a reachable negative cycle can
+ * reach the destination.
+ * @throws Whim\Unwind\OverflowError when a path cost exceeds the integer range.
+ */
+#[TrackCaller]
+function shortest_path<TNode>(
+  Graph<TNode, int> $graph,
+  TNode $from,
+  TNode $to,
+): null|NonEmptyVec<TNode> {
+  return _Private\shortest_path_with::<TNode, int>($graph, $from, $to, null);
+}
+
+/**
+ * Finds a minimum path using derived edge weights.
+ *
+ * @throws NegativeCycleException when a reachable negative cycle can
+ * reach the destination.
+ * @throws Whim\Unwind\OverflowError when a path cost exceeds the integer range.
+ */
+#[TrackCaller]
+function shortest_path_by<TNode, TWeight>(
+  Graph<TNode, TWeight> $graph,
+  TNode $from,
+  TNode $to,
+  Transform<TWeight, int> $weight,
+): null|NonEmptyVec<TNode> {
+  return _Private\shortest_path_with::<TNode, TWeight>(
+    $graph,
+    $from,
+    $to,
+    $weight,
+  );
+}

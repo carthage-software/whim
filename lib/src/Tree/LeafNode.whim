@@ -1,0 +1,23 @@
+namespace Whim\Tree;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+
+/** Represents a leaf node. */
+final readonly class LeafNode<out T> implements Node<T> {
+  /** Creates a leaf node. */
+  #[TrackCaller]
+  public function __construct(private T $value) {}
+
+  /** Returns the value stored by the node. */
+  #[AlwaysInline]
+  public function getValue(): T {
+    return $this->value;
+  }
+
+  /** Returns the direct children of the node. */
+  #[AlwaysInline]
+  public function getChildren(): vec<Node<T>> {
+    return vec[];
+  }
+}

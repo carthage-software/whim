@@ -1,0 +1,95 @@
+namespace Whim\Graph;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+
+/** Represents an immutable directed graph. */
+final readonly class DirectedGraph<TNode, TWeight> implements
+  Graph<TNode, TWeight> {
+  /**
+   * Creates a directed graph from nodes and edges.
+   *
+   * @throws InvalidArgumentException when an edge references a node outside the graph.
+   */
+  #[TrackCaller]
+  public function __construct(
+    private vec<TNode> $nodes = vec[],
+    private vec<(TNode, Edge<TNode, TWeight>)> $edges = vec[],
+  ) {
+    _Private\validate_edges::<TNode, TWeight>($nodes, $edges);
+  }
+
+  /** Returns all nodes in the graph. */
+  #[AlwaysInline]
+  public function getNodes(): vec<TNode> {
+    return $this->nodes;
+  }
+
+  /** Returns the outgoing edges from a node. */
+  #[TrackCaller]
+  public function getEdgesFrom(TNode $from): vec<Edge<TNode, TWeight>> {
+    $result = vec[];
+    foreach ($this->edges as ($owner, $edge)) {
+      if ($owner != $from) {
+        continue;
+      }
+
+      $result[] = $edge;
+    }
+
+    return $result;
+  }
+
+  /** Reports whether the graph contains a node. */
+  #[TrackCaller]
+  public function hasNode(TNode $node): bool {
+    return contains!($this->nodes, $node);
+  }
+
+  /** Reports whether an edge connects two nodes. */
+  #[TrackCaller]
+  public function hasEdge(TNode $from, TNode $to): bool {
+    foreach ($this->edges as ($owner, $edge)) {
+      if ($owner == $from && $edge->to == $to) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /** Returns a graph containing an additional node. */
+  #[TrackCaller]
+  public function withNode(TNode $node): DirectedGraph<TNode, TWeight> {
+    if ($this->hasNode($node)) {
+      return $this;
+    }
+
+    $nodes = $this->nodes;
+    $nodes[] = $node;
+    return new DirectedGraph::<TNode, TWeight>($nodes, $this->edges);
+  }
+
+  /** Returns a graph containing an additional edge. */
+  #[TrackCaller]
+  public function withEdge(
+    TNode $from,
+    Edge<TNode, TWeight> $edge,
+  ): DirectedGraph<TNode, TWeight> {
+    $edges = $this->edges;
+    $edges[] = ($from, $edge);
+    return new DirectedGraph::<TNode, TWeight>($this->nodes, $edges);
+  }
+
+  /** Reports whether the graph contains a cycle. */
+  #[TrackCaller]
+  public function hasCycle(): bool {
+    foreach ($this->edges as ($from, $edge)) {
+      if (has_path::<TNode, TWeight>($this, $edge->to, $from)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+}

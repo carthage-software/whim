@@ -1,0 +1,200 @@
+use Whim\Async;
+use Whim\Graph;
+use Whim\Graph\DirectedGraph;
+use Whim\Graph\Edge;
+use Whim\Graph\NegativeCycleException;
+use Whim\Graph\UndirectedGraph;
+use Whim\Math;
+use Whim\Reference\Strong;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+
+function expect_error<E: Throwable>(fn(): void $operation): E {
+  try {
+    $operation();
+  } catch (E $error) {
+    return $error;
+  }
+
+  throw new RuntimeException('expected an error');
+}
+
+$empty = Graph\directed::<string, int>();
+$graph = Graph\add_edge::<string, int>($empty, 'A', 'B', 1);
+$graph = Graph\add_edge::<string, int>($graph, 'A', 'C', 5);
+$graph = Graph\add_edge::<string, int>($graph, 'B', 'C', 1);
+assert!($graph is DirectedGraph<string, int>);
+assert!($graph is Graph\Graph<string, int>);
+assert!(Graph\nodes::<string, int>($empty) == vec[]);
+assert!(Graph\nodes::<string, int>($graph) == vec['A', 'B', 'C']);
+assert!(Graph\neighbors::<string, int>($graph, 'A') == vec['B', 'C']);
+assert!(Graph\has_path::<string, int>($graph, 'A', 'C'));
+assert!(!Graph\has_path::<string, int>($graph, 'C', 'A'));
+assert!(Graph\has_path::<string, int>($graph, 'A', 'A'));
+assert!(!Graph\has_path::<string, int>($graph, 'missing', 'missing'));
+assert!(Graph\bfs::<string, int>($graph, 'A') == vec['A', 'B', 'C']);
+assert!(Graph\dfs::<string, int>($graph, 'A') == vec['A', 'B', 'C']);
+assert!(Graph\bfs::<string, int>($graph, 'missing') == vec[]);
+assert!(Graph\dfs::<string, int>($graph, 'missing') == vec[]);
+assert!(Graph\neighbors::<string, int>($graph, 'missing') == vec[]);
+assert!(!$graph->hasCycle());
+assert!(Graph\topological_sort::<string, int>($graph) == vec['A', 'B', 'C']);
+assert!(Graph\topological_sort::<string, int>($empty) == vec[]);
+assert!(Graph\shortest_path::<string>($graph, 'A', 'C') == vec['A', 'B', 'C']);
+assert!(Graph\shortest_path::<string>($graph, 'A', 'A') == vec['A']);
+assert!(Graph\shortest_path::<string>($graph, 'C', 'A') == null);
+assert!(Graph\shortest_path::<string>($graph, 'A', 'missing') == null);
+
+$branching = Graph\add_edge::<string, int>($empty, 'A', 'B');
+$branching = Graph\add_edge::<string, int>($branching, 'A', 'C');
+$branching = Graph\add_edge::<string, int>($branching, 'B', 'D');
+assert!(Graph\bfs::<string, int>($branching, 'A') == vec['A', 'B', 'C', 'D']);
+assert!(Graph\dfs::<string, int>($branching, 'A') == vec['A', 'B', 'D', 'C']);
+
+$edges = $graph->getEdgesFrom('A');
+assert!($edges is vec<Edge<string, int>>);
+assert!('B' == $edges[0]->to && 1 == $edges[0]->weight);
+$edges[] = new Edge::<string, int>('C', 0);
+$nodes = $graph->getNodes();
+$nodes[] = 'external';
+assert!(length!($graph->getEdgesFrom('A')) == 2u);
+assert!(!$graph->hasNode('external'));
+assert!($graph->hasEdge('A', 'B'));
+assert!(!$graph->hasEdge('B', 'A'));
+$disconnected = Graph\add_node::<string, int>($graph, 'D');
+assert!(!$graph->hasNode('D'));
+assert!($disconnected->hasNode('D'));
+assert!(Graph\shortest_path::<string>($disconnected, 'A', 'D') == null);
+assert!(
+  Graph\nodes::<string, int>(
+    Graph\add_node::<string, int>($graph, 'A'),
+  ) == $graph->getNodes(),
+);
+
+$cycle = Graph\add_edge::<string, int>($graph, 'C', 'A', 1);
+assert!($cycle->hasCycle());
+assert!(Graph\topological_sort::<string, int>($cycle) == null);
+assert!(!$graph->hasCycle());
+$self = Graph\add_edge::<string, int>($empty, 'A', 'A');
+assert!($self->hasCycle());
+
+$undirected = Graph\undirected::<string, int>();
+$undirected = Graph\add_edge::<string, int>($undirected, 'A', 'B', 1);
+assert!($undirected is UndirectedGraph<string, int>);
+assert!(Graph\has_path::<string, int>($undirected, 'B', 'A'));
+assert!(length!($undirected->getEdgesFrom('A')) == 1u);
+assert!(length!($undirected->getEdgesFrom('B')) == 1u);
+assert!(!$undirected->hasCycle());
+$undirected = Graph\add_edge::<string, int>($undirected, 'B', 'C', 1);
+$undirected = Graph\add_edge::<string, int>($undirected, 'C', 'A', 1);
+assert!(Graph\has_cycle::<string, int>($undirected));
+
+$constructed = new UndirectedGraph::<string, int>(
+  vec['A', 'B'],
+  vec[('A', new Edge::<string, int>('B', 1))],
+);
+
+assert!($constructed->hasEdge('A', 'B') && $constructed->hasEdge('B', 'A'));
+assert!(1 == $constructed->getEdgesFrom('B')[0]->weight);
+assert!(Graph\bfs::<string, int>($constructed, 'B') == vec['B', 'A']);
+foreach (vec[vec['A'], vec['B']] as $nodes) {
+  discard!(expect_error::<InvalidArgumentException>(fn(): void {
+    discard!(
+      new DirectedGraph::<string, int>(
+        $nodes,
+        vec[('A', new Edge::<string, int>('B', 1))],
+      ),
+    );
+  }));
+}
+
+$weighted = Graph\directed::<string, string>();
+$weighted = Graph\add_edge::<string, string>($weighted, 'A', 'B', 'long');
+$weighted = Graph\add_edge::<string, string>($weighted, 'A', 'C', 'x');
+$weighted = Graph\add_edge::<string, string>($weighted, 'C', 'B', 'x');
+$calls = new Strong::<uint>(0u);
+assert!(
+  Graph\shortest_path_by::<string, string>(
+    $weighted,
+    'A',
+    'B',
+    fn(string $weight): int {
+      $calls->value++;
+      Async\later();
+      return length!($weight) as int;
+    },
+  ) == vec['A', 'C', 'B'],
+);
+
+assert!(3u == $calls->value);
+$unweighted = Graph\add_edge::<string, string>(
+  Graph\directed::<string, string>(),
+  'A',
+  'B',
+);
+
+assert!(
+  Graph\shortest_path_by::<string, string>(
+    $unweighted,
+    'A',
+    'B',
+    fn(string $_): int => throw new RuntimeException('unexpected weight'),
+  ) == vec['A', 'B'],
+);
+
+$signed = Graph\directed::<string, int>();
+$signed = Graph\add_edge::<string, int>($signed, 'A', 'B', 2);
+$signed = Graph\add_edge::<string, int>($signed, 'A', 'C', 1);
+$signed = Graph\add_edge::<string, int>($signed, 'B', 'C', -3);
+assert!(Graph\shortest_path::<string>($signed, 'A', 'C') == vec['A', 'B', 'C']);
+$maximum = Graph\add_edge::<string, int>($empty, 'A', 'B', Math\INT_MAX);
+assert!(Graph\shortest_path::<string>($maximum, 'A', 'B') == vec['A', 'B']);
+$overflow = Graph\add_edge::<string, int>($maximum, 'B', 'C', 1);
+discard!(expect_error::<OverflowError>(fn(): void {
+  discard!(Graph\shortest_path::<string>($overflow, 'A', 'C'));
+}));
+
+$negative = Graph\add_edge::<string, int>($empty, 'A', 'A', -1);
+discard!(expect_error::<NegativeCycleException>(fn(): void {
+  discard!(Graph\shortest_path::<string>($negative, 'A', 'A'));
+}));
+
+$negativeCycle = Graph\add_edge::<string, int>($empty, 'A', 'B', 1);
+$negativeCycle = Graph\add_edge::<string, int>($negativeCycle, 'B', 'C', -1);
+$negativeCycle = Graph\add_edge::<string, int>($negativeCycle, 'C', 'B', -1);
+$negativeCycle = Graph\add_edge::<string, int>($negativeCycle, 'C', 'D', 1);
+discard!(expect_error::<NegativeCycleException>(fn(): void {
+  discard!(Graph\shortest_path::<string>($negativeCycle, 'A', 'D'));
+}));
+
+$unreachableCycle = Graph\add_edge::<string, int>($negativeCycle, 'X', 'Y', 0);
+assert!(
+  Graph\shortest_path::<string>($unreachableCycle, 'X', 'Y') == vec['X', 'Y'],
+);
+
+$deadEndCycle = Graph\add_edge::<string, int>($negativeCycle, 'A', 'Z', 2);
+assert!(
+  Graph\shortest_path::<string>($deadEndCycle, 'A', 'Z') == vec['A', 'Z'],
+);
+
+$token = fresh!();
+$freshGraph = Graph\add_edge::<fresh, int>(
+  Graph\directed::<fresh, int>(),
+  $token,
+  fresh!(),
+);
+
+assert!($freshGraph->hasNode($token));
+assert!(!$freshGraph->hasNode(fresh!()));
+assert!(length!(Graph\bfs::<fresh, int>($freshGraph, $token)) == 2u);
+$nullable = Graph\add_edge::<null|int, int>(
+  Graph\undirected::<null|int, int>(),
+  null,
+  1,
+);
+
+assert!(!$nullable->hasCycle());
+assert!(Graph\bfs::<null|int, int>($nullable, null) == vec[null, 1]);
+assert!(Graph\shortest_path::<null|int>($nullable, 1, null) == vec[1, null]);

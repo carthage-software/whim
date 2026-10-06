@@ -1,0 +1,6 @@
+namespace Whim\Tree;
+
+use Whim\Unwind\InvalidArgumentException;
+
+/** Reports that a flat tree input contains multiple roots. */
+final class MultipleRootNodesException extends InvalidArgumentException {}

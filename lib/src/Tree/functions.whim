@@ -1,0 +1,411 @@
+namespace Whim\Tree;
+
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Option\None;
+use Whim\Option\Option;
+use Whim\Option\Some;
+use Whim\Refine\ArrayKey;
+use Whim\Refine\Iterable;
+use Whim\Refine\Transform;
+use Whim\Refine\NonEmptyVec;
+use Whim\Refine\NonZero;
+use Whim\Refine\Predicate;
+use Whim\Refine\Reducer;
+use Whim\Vec;
+
+/** Creates a tree node with optional children. */
+#[TrackCaller]
+function tree<T>(T $value, vec<Node<T>> $children = vec[]): TreeNode<T> {
+  return new TreeNode::<T>($value, $children);
+}
+
+/** Creates a leaf node. */
+#[TrackCaller]
+function leaf<T>(T $value): LeafNode<T> {
+  return new LeafNode::<T>($value);
+}
+
+/**
+ * Builds a tree from a flat collection of related values.
+ *
+ * @throws NoRootNodeException when no value lacks a parent.
+ * @throws MultipleRootNodesException when more than one value lacks a parent.
+ * @throws OrphanedNodeException when a value references a missing parent or forms a cycle.
+ */
+#[NeverInline]
+#[TrackCaller]
+function from_iterable<TItem, TId: ArrayKey, TValue>(
+  Iterable<_, TItem> $items,
+  Transform<TItem, TId> $get_id,
+  Transform<TItem, Option<TId>> $get_parent_id,
+  Transform<TItem, TValue> $get_value,
+): LeafNode<TValue>|TreeNode<TValue> {
+  $items = Vec\values::<TItem>($items);
+  $roots = vec[];
+  foreach ($items as $item) {
+    if (!$get_parent_id($item)->isNone()) {
+      continue;
+    }
+
+    $roots[] = $item;
+  }
+
+  if (length!($roots) == 0u) {
+    throw new NoRootNodeException('no root node was found');
+  }
+
+  if (length!($roots) > 1u) {
+    throw new MultipleRootNodesException('multiple root nodes were found');
+  }
+
+  $root = $roots[0];
+  _Private\validate::<TItem, TId>($items, $root, $get_id, $get_parent_id);
+
+  return _Private\build::<TItem, TId, TValue>(
+    $items,
+    $root,
+    $get_id,
+    $get_parent_id,
+    $get_value,
+  );
+}
+
+/** Reports whether a node has no children. */
+#[TrackCaller]
+function is_leaf<T>(Node<T> $node): bool {
+  return length!($node->getChildren()) == 0u;
+}
+
+/** Counts all nodes in a tree. */
+#[TrackCaller]
+function count<T>(Node<T> $node): NonZero<uint> {
+  $count = 0u;
+  $stack = vec[$node];
+  while (length!($stack) > 0u) {
+    $current = remove_last!($stack);
+    $count++;
+    foreach ($current->getChildren() as $child) {
+      $stack[] = $child;
+    }
+  }
+
+  return $count;
+}
+
+/** Returns the greatest depth in a tree. */
+#[TrackCaller]
+function depth<T>(Node<T> $tree): uint {
+  $maximum = 0u;
+  $nodes = vec[$tree];
+  $levels = vec[0u];
+  $index = 0;
+  while ($index < length!($nodes)) {
+    $node = $nodes[$index];
+    $level = $levels[$index];
+    if ($level > $maximum) {
+      $maximum = $level;
+    }
+
+    foreach ($node->getChildren() as $child) {
+      $nodes[] = $child;
+      $levels[] = $level + 1u;
+    }
+
+    $index++;
+  }
+
+  return $maximum;
+}
+
+/** Collects the values stored in leaf nodes. */
+#[TrackCaller]
+function leaves<T>(Node<T> $node): NonEmptyVec<T> {
+  $result = vec[];
+  $stack = vec[$node];
+  while (length!($stack) > 0u) {
+    $current = remove_last!($stack);
+    $children = $current->getChildren();
+    if (length!($children) == 0u) {
+      $result[] = $current->getValue();
+      continue;
+    }
+
+    $index = length!($children) as int;
+    while ($index > 0) {
+      $index--;
+      $stack[] = $children[$index];
+    }
+  }
+
+  return $result;
+}
+
+/** Traverses a tree in pre-order. */
+#[TrackCaller]
+function pre_order<T>(Node<T> $tree): NonEmptyVec<T> {
+  $result = vec[];
+  $stack = vec[$tree];
+  while (length!($stack) > 0u) {
+    $node = remove_last!($stack);
+    $result[] = $node->getValue();
+    $children = $node->getChildren();
+    $index = length!($children) as int;
+    while ($index > 0) {
+      $index--;
+      $stack[] = $children[$index];
+    }
+  }
+
+  return $result;
+}
+
+/** Traverses a tree in post-order. */
+#[TrackCaller]
+function post_order<T>(Node<T> $tree): NonEmptyVec<T> {
+  $result = vec[];
+  $stack = vec[($tree, false)];
+  while (length!($stack) > 0u) {
+    ($node, $expanded) = remove_last!($stack);
+    if ($expanded) {
+      $result[] = $node->getValue();
+      continue;
+    }
+
+    $stack[] = ($node, true);
+    $children = $node->getChildren();
+    $index = length!($children) as int;
+    while ($index > 0) {
+      $index--;
+      $stack[] = ($children[$index], false);
+    }
+  }
+
+  return $result;
+}
+
+/** Traverses a tree breadth first. */
+#[TrackCaller]
+function level_order<T>(Node<T> $root): NonEmptyVec<T> {
+  $result = vec[];
+  $queue = vec[$root];
+  $index = 0;
+  while ($index < length!($queue)) {
+    $node = $queue[$index];
+    $result[] = $node->getValue();
+    foreach ($node->getChildren() as $child) {
+      $queue[] = $child;
+    }
+
+    $index++;
+  }
+
+  return $result;
+}
+
+/** Reports whether every node value matches a predicate. */
+#[TrackCaller]
+function all<T>(Node<T> $node, Predicate<T> $predicate): bool {
+  foreach (pre_order::<T>($node) as $value) {
+    if (!$predicate($value)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/** Reports whether any node value matches a predicate. */
+#[TrackCaller]
+function any<T>(Node<T> $node, Predicate<T> $predicate): bool {
+  foreach (pre_order::<T>($node) as $value) {
+    if ($predicate($value)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Reports whether a tree contains a value. */
+#[TrackCaller]
+function contains<T>(Node<T> $tree, T $value): bool {
+  foreach (pre_order::<T>($tree) as $candidate) {
+    if ($candidate == $value) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Finds the first breadth-first value matching a predicate. */
+#[TrackCaller]
+function find<T>(Node<T> $tree, Predicate<T> $predicate): Option<T> {
+  foreach (level_order::<T>($tree) as $value) {
+    if ($predicate($value)) {
+      return new Some::<T>($value);
+    }
+  }
+
+  return new None();
+}
+
+/** Finds the value path to the first matching node. */
+#[TrackCaller]
+function path_to<T>(
+  Node<T> $tree,
+  Predicate<T> $predicate,
+): null|NonEmptyVec<T> {
+  $nodes = vec[$tree];
+  $paths = vec[vec[$tree->getValue()]];
+  $index = 0;
+  while ($index < length!($nodes)) {
+    $node = $nodes[$index];
+    $path = $paths[$index];
+    if ($predicate($node->getValue())) {
+      return $path;
+    }
+
+    foreach ($node->getChildren() as $child) {
+      $childPath = $path;
+      $childPath[] = $child->getValue();
+      $nodes[] = $child;
+      $paths[] = $childPath;
+    }
+
+    $index++;
+  }
+
+  return null;
+}
+
+/** Finds a value by its child-index path. */
+#[TrackCaller]
+function at_index<T>(Node<T> $node, Iterable<_, uint> $index_path): Option<T> {
+  $current = $node;
+  foreach ($index_path as $index) {
+    $children = $current->getChildren();
+    if ($index >= length!($children)) {
+      return new None();
+    }
+
+    $current = $children[$index as int];
+  }
+
+  return new Some::<T>($current->getValue());
+}
+
+/** Finds the child-index path to the first matching node. */
+#[TrackCaller]
+function to_index<T>(Node<T> $tree, Predicate<T> $predicate): null|vec<uint> {
+  $nodes = vec[$tree];
+  $paths = vec[vec[]];
+  $cursor = 0;
+  while ($cursor < length!($nodes)) {
+    $node = $nodes[$cursor];
+    $path = $paths[$cursor];
+    if ($predicate($node->getValue())) {
+      return $path;
+    }
+
+    $children = $node->getChildren();
+    $index = 0;
+    while ($index < length!($children)) {
+      $childPath = $path;
+      $childPath[] = $index as uint;
+      $nodes[] = $children[$index];
+      $paths[] = $childPath;
+      $index++;
+    }
+
+    $cursor++;
+  }
+
+  return null;
+}
+
+/** Reduces node values in pre-order. */
+#[TrackCaller]
+function reduce<T, A>(Node<T> $tree, Reducer<T, A> $function, A $initial): A {
+  $carry = $initial;
+  foreach (pre_order::<T>($tree) as $value) {
+    $carry = $function($carry, $value);
+  }
+
+  return $carry;
+}
+
+/** Transforms every value while preserving the tree shape. */
+#[TrackCaller]
+function map<T, U>(
+  Node<T> $node,
+  Transform<T, U> $function,
+): LeafNode<U>|TreeNode<U> {
+  $children = vec[];
+  foreach ($node->getChildren() as $child) {
+    $children[] = map::<T, U>($child, $function);
+  }
+
+  $value = $function($node->getValue());
+  if (length!($children) == 0u) {
+    return new LeafNode::<U>($value);
+  }
+
+  return new TreeNode::<U>($value, $children);
+}
+
+/** Retains matching nodes whose ancestors also match. */
+#[TrackCaller]
+function filter<T>(Node<T> $node, Predicate<T> $predicate): null|TreeNode<T> {
+  if (!$predicate($node->getValue())) {
+    return null;
+  }
+
+  $children = vec[];
+  foreach ($node->getChildren() as $child) {
+    $filtered = filter::<T>($child, $predicate);
+    if (null != $filtered) {
+      $children[] = $filtered;
+    }
+  }
+
+  return new TreeNode::<T>($node->getValue(), $children);
+}
+
+/** Folds a tree from its leaves toward its root. */
+#[TrackCaller]
+function fold<T, A>(Node<T> $tree, fn(T, vec<A>): A $function): A {
+  $children = vec[];
+  foreach ($tree->getChildren() as $child) {
+    $children[] = fold::<T, A>($child, $function);
+  }
+
+  return $function($tree->getValue(), $children);
+}
+
+/** Transforms a tree while exposing lazily collected child results. */
+#[TrackCaller]
+function traverse<T, R>(Node<T> $tree, fn(T, fn(): vec<R>): R $transform): R {
+  $children = new _Private\LazyChildren::<R>(fn(): vec<R> {
+    $result = vec[];
+    foreach ($tree->getChildren() as $child) {
+      $result[] = traverse::<T, R>($child, $transform);
+    }
+
+    return $result;
+  });
+
+  return $transform($tree->getValue(), fn(): vec<R> => $children->get());
+}
+
+/** Serializes a tree into nested dictionaries. */
+#[TrackCaller]
+function to_dict<T>(Node<T> $tree): dict<string, mixed> {
+  $children = vec[];
+  foreach ($tree->getChildren() as $child) {
+    $children[] = to_dict::<T>($child);
+  }
+
+  return dict['value' => $tree->getValue(), 'children' => $children];
+}

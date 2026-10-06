@@ -1,0 +1,14 @@
+namespace Whim\Tree;
+
+use Whim\Marker\TrackCaller;
+
+/** Defines the behavior of node values. */
+interface Node<out T> for LeafNode, TreeNode {
+  /** Returns the value stored by the node. */
+  #[TrackCaller]
+  public function getValue(): T;
+
+  /** Returns the direct children of the node. */
+  #[TrackCaller]
+  public function getChildren(): vec<Node<T>>;
+}

@@ -1,0 +1,24 @@
+namespace Whim\Tree\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Refine\Supplier;
+
+/** Computes and retains one traversal's child results on first use. */
+final class LazyChildren<T> {
+  private bool $resolved = false;
+  private vec<T> $children = vec[];
+
+  public function __construct(private readonly Supplier<vec<T>> $compute) {}
+
+  /** Returns the child results, computing them only once. */
+  #[MustUse]
+  public function get(): vec<T> {
+    if (!$this->resolved) {
+      $compute = $this->compute;
+      $this->children = $compute();
+      $this->resolved = true;
+    }
+
+    return $this->children;
+  }
+}

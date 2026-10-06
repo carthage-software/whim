@@ -1,0 +1,6 @@
+namespace Whim\Graph;
+
+use Whim\Unwind\RuntimeException;
+
+/** Reports that no finite shortest path exists through a negative cycle. */
+final class NegativeCycleException extends RuntimeException {}
