@@ -6,6 +6,9 @@ the network and I/O interfaces.
 
 ## Handler
 
+For event streams, use [`Whim\HTTP\SSE`](http-sse.md). It encodes events and
+provides a response body that the server can stream as events arrive.
+
 Every request reaches:
 
 ```text

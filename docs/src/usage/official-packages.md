@@ -8,7 +8,8 @@ These packages use names under `Trifle\`. Their Git tags define their
 versions. Install them through Whim's Git package manager.
 
 Clocks and sleepers ship in the standard library under
-[`Whim\Clock`](../standard-library/clock.md).
+[`Whim\Clock`](../standard-library/clock.md). Server-sent events ship under
+[`Whim\HTTP\SSE`](../standard-library/http-sse.md).
 
 | Package | Description | Install |
 | --- | --- | --- |
@@ -41,7 +42,6 @@ Clocks and sleepers ship in the standard library under
 | [`retry`](https://codeberg.org/trifle/retry) | Retry policies with delays, jitter, deadlines, and controllable time. | `whim add git+ssh://git@codeberg.org/trifle/retry` |
 | [`seal`](https://codeberg.org/trifle/seal) | Sealed payloads and signed JWTs with key rotation. | `whim add git+ssh://git@codeberg.org/trifle/seal` |
 | [`semver`](https://codeberg.org/trifle/semver) | Semantic versions and Cargo-style requirements. | `whim add git+ssh://git@codeberg.org/trifle/semver` |
-| [`sse`](https://codeberg.org/trifle/sse) | Server-sent event encoding and HTTP response bodies. | `whim add git+ssh://git@codeberg.org/trifle/sse` |
 | [`state`](https://codeberg.org/trifle/state) | Typed finite state machines. | `whim add git+ssh://git@codeberg.org/trifle/state` |
 | [`template`](https://codeberg.org/trifle/template) | Logic-less Mustache templates rendered from JSON values. | `whim add git+ssh://git@codeberg.org/trifle/template` |
 | [`theme`](https://codeberg.org/trifle/theme) | Paints and themes for terminal text. | `whim add git+ssh://git@codeberg.org/trifle/theme` |

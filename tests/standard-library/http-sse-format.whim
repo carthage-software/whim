@@ -1,0 +1,94 @@
+use Whim\HTTP\SSE\Comment;
+use Whim\HTTP\SSE\Event;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+newtype SSEText = string;
+
+function sse_invalid(fn(): void $operation): void {
+  try {
+    $operation();
+  } catch (InvalidArgumentException $_) {
+    return;
+  }
+
+  assert!(false);
+}
+
+foreach (vec[
+  (new Event('hello'), "data: hello\n\n"),
+  (
+    new Event('hello', name: 'greeting', id: '7'),
+    "id: 7\nevent: greeting\ndata: hello\n\n",
+  ),
+  (new Event('', id: ''), "id: \ndata: \n\n"),
+  (new Event('hello', name: ''), "event: \ndata: hello\n\n"),
+  (
+    new Event("one\r\ntwo\rthree\n"),
+    "data: one\ndata: two\ndata: three\ndata: \n\n",
+  ),
+  (new Event(' leading space'), "data:  leading space\n\n"),
+  (new Event("bonjour à tous\0"), "data: bonjour à tous\0\n\n"),
+  (new Event('x', retry: Duration::zero()), "retry: 0\ndata: x\n\n"),
+  (
+    new Event('x', retry: Duration::fromMicroseconds(999)),
+    "retry: 0\ndata: x\n\n",
+  ),
+  (
+    new Event('x', retry: Duration::fromMilliseconds(5_001)),
+    "retry: 5001\ndata: x\n\n",
+  ),
+  (
+    new Event('x', retry: Duration::max()),
+    "retry: 9223372036854775807999\ndata: x\n\n",
+  ),
+] as ($event, $expected)) {
+  assert!($event->encode() == $expected);
+}
+
+foreach (vec["line\nbreak", "line\rbreak"] as $name) {
+  sse_invalid(fn(): void {
+    discard!(new Event('x', name: $name));
+  });
+}
+
+foreach (vec["line\nbreak", "line\rbreak", "null\0byte"] as $id) {
+  sse_invalid(fn(): void {
+    discard!(new Event('x', id: $id));
+  });
+}
+
+foreach (vec["\xff", "\xc0\xaf", "\xe2\x82"] as $text) {
+  sse_invalid(fn(): void {
+    discard!(new Event($text));
+  });
+
+  sse_invalid(fn(): void {
+    discard!(new Event('x', name: $text));
+  });
+
+  sse_invalid(fn(): void {
+    discard!(new Event('x', id: $text));
+  });
+
+  sse_invalid(fn(): void {
+    discard!(Comment::of($text));
+  });
+}
+
+sse_invalid(fn(): void {
+  discard!(new Event('x', retry: Duration::fromNanoseconds(-1)));
+});
+
+assert!(Comment::WAITING == ": waiting\n\n");
+assert!(Comment::of("still\r\nhere\ragain\n") == ": still here again \n\n");
+assert!(Comment::of('') == ": \n\n");
+assert!(Comment::of('ça va') == ": ça va\n\n");
+
+$tagged = SSEText('hello');
+assert!(
+  new Event($tagged, name: $tagged, id: $tagged)->encode()
+  == "id: hello\nevent: hello\ndata: hello\n\n",
+);
+
+assert!(Comment::of($tagged) == ": hello\n\n");

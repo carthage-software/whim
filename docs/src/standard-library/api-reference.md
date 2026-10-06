@@ -162,12 +162,14 @@ See [Network, TLS, and Proxies](network.md).
 | `Whim\HTTP\Server\Responder`  | bare and debug error responses                      |
 | `Whim\HTTP\Session`           | session values and settings                         |
 | `Whim\HTTP\Session\Storage`   | memory and database session stores                  |
+| `Whim\HTTP\SSE`               | server-sent events and streaming response bodies     |
+| `Whim\HTTP\SSE\Source`        | event sources and polling function adapters          |
 | `Whim\HTTP\WebSocket`         | WebSocket messages and connections                  |
 | `Whim\HTTP\WebSocket\Client`  | client handshakes and connections                   |
 | `Whim\HTTP\WebSocket\Server`  | server upgrades and connection handlers             |
 
 See [HTTP Messages and Cookies](http-message.md), [HTTP Client](http-client.md),
-and [HTTP Server](http-server.md).
+[HTTP Server](http-server.md), and [Server-Sent Events](http-sse.md).
 
 ## Databases
 

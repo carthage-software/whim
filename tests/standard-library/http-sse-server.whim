@@ -1,0 +1,137 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\Async\SignalCancellationToken;
+use Whim\Async\TimeoutCancellationToken;
+use Whim\HTTP\Client\Configuration as ClientConfiguration;
+use Whim\HTTP\Client\DirectConnector;
+use Whim\HTTP\Client\Origin;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\ProtocolVersion;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\Server\Binding\Stream as StreamBinding;
+use Whim\HTTP\Server\Configuration as ServerConfiguration;
+use Whim\HTTP\Server\Context\Context;
+use Whim\HTTP\Server\Handler\FunctionHandler;
+use Whim\HTTP\Server\Server;
+use Whim\HTTP\SSE;
+use Whim\HTTP\SSE\Body;
+use Whim\HTTP\SSE\Event;
+use Whim\HTTP\SSE\Source\Source;
+use Whim\IO\CloseHandle;
+use Whim\TCP;
+use Whim\Time\Duration;
+use Whim\URL\URL;
+
+final class StreamingSSESource implements Source, CloseHandle {
+  private uint $polls = 0u;
+  private bool $closed = false;
+
+  public function __construct(private Deferred<null> $release) {}
+
+  public function poll(
+    null|CancellationToken $cancellation = null,
+  ): vec<Event> {
+    $this->polls++;
+    if ($this->polls == 1u) {
+      return vec[new Event('first', id: '1')];
+    }
+
+    $this->release->getFuture()->await($cancellation);
+    return vec[new Event('second', name: 'done', id: '2')];
+  }
+
+  public function isFinished(): bool {
+    return $this->release->isComplete() && $this->polls == 2u;
+  }
+
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  public function close(): void {
+    $this->closed = true;
+  }
+}
+
+// The first event must arrive while the source still waits for its next batch.
+foreach (vec[ProtocolVersion::V11, ProtocolVersion::V2] as $version) {
+  $deadline = new TimeoutCancellationToken(Duration::fromSeconds(5));
+  $release = new Deferred::<null>();
+  $completed = new Deferred::<null>();
+  $source = new StreamingSSESource($release);
+  $stop = new SignalCancellationToken();
+  $listener = TCP\listen();
+  $server = new Server(
+    vec[new StreamBinding($listener, true)],
+    new ServerConfiguration(),
+  );
+
+  $handler = new FunctionHandler(fn(Context $context): Response {
+    $response = SSE\respond(
+      $source,
+      FieldMap::from(vec[('Content-Length', '0')]),
+    );
+
+    $body = $response->body;
+    assert!($body is Body);
+    $context->onResponseComplete(fn(): void {
+      $body->close();
+      $completed->complete(null);
+    });
+
+    return $response;
+  });
+
+  $task = Async\spawn::<null>(fn(): null {
+    $server->serve($handler, $stop);
+    return null;
+  });
+
+  $url = URL::from(
+    'http://127.0.0.1:' . $listener->getLocalEndpoint()->port . '/events',
+  );
+
+  $request = Request::fromURL('GET', $url);
+  $configuration = new ClientConfiguration(protocolVersions: vec[$version]);
+  $connection = new DirectConnector()->connect(
+    Origin::fromURL($url),
+    $request,
+    $configuration,
+    $deadline,
+  );
+
+  try {
+    $transaction = $connection->exchange($request, $configuration, $deadline);
+    $response = $transaction->response;
+    assert!($response->status == 200);
+    assert!($response->protocolVersion == $version);
+    assert!($response->headers->get('content-type') == SSE\MEDIA_TYPE);
+    assert!($response->headers->get('content-length') == null);
+    if ($version == ProtocolVersion::V11) {
+      assert!($response->headers->get('transfer-encoding') == 'chunked');
+    }
+
+    $body = $response->body;
+    assert!($body != null);
+    $first = "id: 1\ndata: first\n\n";
+    assert!($body->readFixedSize(length!($first) as int, $deadline) == $first);
+
+    assert!(!$release->isComplete());
+    assert!(!$source->isFinished());
+    $release->complete(null);
+    assert!(
+      $body->readAll(cancellation: $deadline)
+      == "id: 2\nevent: done\ndata: second\n\n",
+    );
+
+    $completed->getFuture()->await($deadline);
+    assert!($source->isClosed());
+  } finally {
+    $connection->close();
+    $stop->cancel();
+    $task->await($deadline);
+    $listener->close();
+  }
+}

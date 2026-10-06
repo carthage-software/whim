@@ -1,0 +1,225 @@
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Async\CancelledException;
+use Whim\Async\Deferred;
+use Whim\Async\SignalCancellationToken;
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\SSE;
+use Whim\HTTP\SSE\Body;
+use Whim\HTTP\SSE\Comment;
+use Whim\HTTP\SSE\Event;
+use Whim\HTTP\SSE\Source\FunctionSource;
+use Whim\HTTP\SSE\Source\Source;
+use Whim\IO\CloseHandle;
+use Whim\Unwind\RuntimeException;
+use Whim\URL\URL;
+
+final class ScriptedSSESource implements Source, CloseHandle {
+  public uint $polls = 0u;
+  public uint $closes = 0u;
+  private uint $position = 0u;
+
+  public function __construct(private vec<vec<Event>> $batches) {}
+
+  public function poll(
+    null|CancellationToken $cancellation = null,
+  ): vec<Event> {
+    $cancellation?->throwIfCancellationRequested();
+    $this->polls++;
+    $batch = $this->batches[$this->position];
+    $this->position++;
+    return $batch;
+  }
+
+  public function isFinished(): bool {
+    return $this->position == length!($this->batches);
+  }
+
+  public function isClosed(): bool {
+    return $this->closes > 0u;
+  }
+
+  public function close(): void {
+    $this->closes++;
+  }
+}
+
+function sse_cancelled(fn(): void $operation): void {
+  try {
+    $operation();
+  } catch (CancelledException $_) {
+    return;
+  }
+
+  assert!(false);
+}
+
+$source = new ScriptedSSESource(vec[
+  vec[new Event('first', id: '1')],
+  vec[],
+  vec[new Event('second'), new Event('third')],
+]);
+
+using ($body = new Body($source)) {
+  assert!($body->tryRead() == '');
+  assert!($source->polls == 0u);
+  assert!($body->read(0) == '');
+  assert!($source->polls == 0u);
+  $body->waitUntilReadable();
+  $body->waitUntilReadable();
+  assert!($source->polls == 1u);
+  assert!($body->tryRead(0) == '');
+  assert!($body->tryRead(6) == "id: 1\n");
+  assert!($body->tryRead(-1) == "data: first\n\n");
+  assert!($body->read() == Comment::WAITING);
+  assert!($body->read(6) == 'data: ');
+  assert!(!$body->reachedEndOfDataSource());
+  assert!($body->readAll() == "second\n\ndata: third\n\n");
+  assert!($body->reachedEndOfDataSource());
+  $body->waitUntilReadable();
+  assert!($body->read() == '');
+  assert!($source->polls == 3u);
+}
+
+assert!($source->closes == 1u);
+
+function sse_collected_source(): ScriptedSSESource {
+  $source = new ScriptedSSESource(vec[]);
+  discard!(new Body($source));
+  return $source;
+}
+
+$collected = sse_collected_source();
+assert!($collected->closes == 1u);
+
+$empty = new ScriptedSSESource(vec[]);
+using ($body = new Body($empty)) {
+  assert!($body->readAll() == '');
+  $body->waitUntilReadable();
+  assert!($empty->polls == 0u);
+}
+
+$source = new ScriptedSSESource(vec[vec[new Event('pending')]]);
+$body = new Body($source);
+$body->waitUntilReadable();
+$body->close();
+$body->close();
+assert!($body->isClosed());
+assert!($body->reachedEndOfDataSource());
+assert!($body->tryRead() == '');
+$body->waitUntilReadable();
+assert!($source->polls == 1u && $source->closes == 1u);
+
+$token = new SignalCancellationToken();
+$token->cancel();
+$source = new ScriptedSSESource(vec[vec[new Event('unread')]]);
+using ($body = new Body($source)) {
+  sse_cancelled(fn(): void {
+    $body->waitUntilReadable($token);
+  });
+
+  assert!($source->polls == 0u);
+  assert!($body->readAll() == "data: unread\n\n");
+}
+
+$token = new SignalCancellationToken();
+$body = new Body(
+  new FunctionSource(fn(null|CancellationToken $received): vec<Event> {
+    assert!($received == $token);
+    $token->cancel();
+    return vec[new Event('discarded')];
+  }),
+);
+
+try {
+  sse_cancelled(fn(): void {
+    $body->waitUntilReadable($token);
+  });
+
+  assert!($body->tryRead() == '');
+} finally {
+  $body->close();
+}
+
+// Closing during a suspended poll must not refill the closed body.
+$entered = new Deferred::<null>();
+$release = new Deferred::<null>();
+$source = new FunctionSource(fn(null|CancellationToken $token): vec<Event> {
+  $entered->complete(null);
+  $release->getFuture()->await($token);
+  return vec[new Event('late')];
+});
+
+$body = new Body($source);
+$read = Async\spawn::<string>(fn(): string => $body->read());
+$entered->getFuture()->await();
+$body->close();
+$release->complete(null);
+assert!($read->await() == '');
+assert!($body->tryRead() == '');
+
+$error = new RuntimeException('source failed');
+using (
+  $body = new Body(
+    new FunctionSource(
+      fn(null|CancellationToken $_): vec<Event> => throw $error,
+    ),
+  ),
+) {
+  $caught = null;
+  try {
+    $body->readAll();
+  } catch (RuntimeException $failure) {
+    $caught = $failure;
+  }
+
+  assert!($caught == $error);
+}
+
+$fields = FieldMap::from(vec[
+  ('X-Trace', 'abc'),
+  ('Content-Length', '0'),
+  ('Transfer-Encoding', 'gzip'),
+  ('Content-Type', 'text/plain'),
+]);
+
+$response = SSE\respond(
+  new ScriptedSSESource(vec[vec[new Event('hello')]]),
+  $fields,
+);
+
+assert!($response->status == 200);
+assert!($response->headers->get('content-type') == SSE\MEDIA_TYPE);
+assert!($response->headers->get('cache-control') == 'no-store');
+assert!($response->headers->get('x-accel-buffering') == 'no');
+assert!($response->headers->get('x-trace') == 'abc');
+assert!($response->headers->get('content-length') == null);
+assert!($response->headers->get('transfer-encoding') == null);
+$body = $response->body;
+assert!($body is Body);
+assert!($body->readAll() == "data: hello\n\n");
+$body->close();
+
+$response = SSE\refuse(new Event('no feed', name: 'failed'), $fields);
+assert!($response->status == 200);
+assert!($response->headers->get('content-type') == SSE\MEDIA_TYPE);
+assert!($response->headers->get('content-length') == null);
+assert!($response->body?->readAll() == "event: failed\ndata: no feed\n\n");
+
+foreach (vec[(null, null), ('', null), ('position', 'position')] as (
+  $header,
+  $expected,
+)) {
+  $headers = $header == null
+    ? FieldMap::default()
+    : FieldMap::from(vec[(SSE\RESUME_FIELD, $header)]);
+
+  $request = Request::fromURL(
+    'GET',
+    URL::from('http://example.test/events'),
+    headers: $headers,
+  );
+
+  assert!(SSE\last_event_id($request) == $expected);
+}

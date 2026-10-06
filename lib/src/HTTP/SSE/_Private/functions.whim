@@ -1,0 +1,28 @@
+namespace Whim\HTTP\SSE\_Private;
+
+use Whim\Encoding\UTF8;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Math;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Rejects text that a UTF-8 event stream cannot preserve. */
+#[TrackCaller]
+function require_utf8(string $text): void {
+  if (UTF8\lossy($text) != $text) {
+    throw new InvalidArgumentException('SSE text must be valid UTF-8');
+  }
+}
+
+/** Encodes non-negative whole milliseconds without overflowing an integer. */
+#[MustUse]
+function milliseconds(Duration $duration): string {
+  $remainder = '' . Math\div($duration->nanoseconds, 1_000_000);
+  if (0 == $duration->seconds) {
+    return $remainder;
+  }
+
+  return $duration->seconds . Str\pad_left($remainder, 3u, '0');
+}

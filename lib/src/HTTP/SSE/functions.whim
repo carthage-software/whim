@@ -1,0 +1,64 @@
+namespace Whim\HTTP\SSE;
+
+use Whim\HTTP\Message\FieldMap;
+use Whim\HTTP\Message\Request;
+use Whim\HTTP\Message\Response;
+use Whim\HTTP\SSE\Source\Source;
+use Whim\IO\MemoryHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** The event stream media type. */
+const MEDIA_TYPE = 'text/event-stream; charset=utf-8';
+
+/** The request field carrying the browser's resume position. */
+const RESUME_FIELD = 'Last-Event-ID';
+
+/** Creates a streaming response with no content length. */
+#[MustUse]
+#[TrackCaller]
+function respond(
+  Source $source,
+  FieldMap $headers = FieldMap::default(),
+): Response {
+  return new Response(200, headers: fields($headers), body: new Body($source));
+}
+
+/**
+ * Returns one event and ends the response.
+ *
+ * The browser still reconnects unless its event handler calls EventSource.close().
+ */
+#[MustUse]
+#[TrackCaller]
+function refuse(
+  Event $event,
+  FieldMap $headers = FieldMap::default(),
+): Response {
+  return new Response(
+    200,
+    headers: fields($headers),
+    body: new MemoryHandle($event->encode()),
+  );
+}
+
+/** Returns the resume position, or null when the field is absent or empty. */
+#[MustUse]
+function last_event_id(Request $request): null|string {
+  return match ($request->headers->get(RESUME_FIELD)) {
+    null | '' => null,
+    $id => $id,
+  };
+}
+
+/** Sets stream headers and removes caller-supplied body framing. */
+#[MustUse]
+#[TrackCaller]
+function fields(FieldMap $headers): FieldMap {
+  return $headers
+    ->without('Content-Length')
+    ->without('Transfer-Encoding')
+    ->with('Content-Type', MEDIA_TYPE)
+    ->with('Cache-Control', 'no-store')
+    ->with('X-Accel-Buffering', 'no');
+}

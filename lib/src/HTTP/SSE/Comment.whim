@@ -1,0 +1,27 @@
+namespace Whim\HTTP\SSE;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+
+/** Encodes comments that EventSource ignores. */
+final readonly class Comment {
+  /** The comment a body sends after an empty poll. */
+  public const string WAITING = ": waiting\n\n";
+
+  private function __construct() {}
+
+  /** Encodes UTF-8 text as a comment, replacing line breaks with spaces. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function of(string $note): string {
+    _Private\require_utf8($note);
+    $flat = Str\replace(
+      Str\replace(Str\replace($note, "\r\n", ' '), "\r", ' '),
+      "\n",
+      ' ',
+    );
+
+    return ': ' . $flat . "\n\n";
+  }
+}

@@ -1,0 +1,80 @@
+namespace Whim\HTTP\SSE;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** One server-sent event. */
+final readonly class Event {
+  /**
+   * Creates an event from UTF-8 text.
+   *
+   * Null omits the name or ID. An empty name selects `message`; an empty
+   * ID clears the browser's resume position. Retry sets the reconnect delay.
+   *
+   * @throws InvalidArgumentException when text is malformed, a name or ID
+   *   contains a line break, an ID contains NUL, or retry is negative.
+   */
+  #[TrackCaller]
+  public function __construct(
+    public string $data,
+    public null|string $name = null,
+    public null|string $id = null,
+    public null|Duration $retry = null,
+  ) {
+    _Private\require_utf8($data);
+    if (null != $name) {
+      _Private\require_utf8($name);
+      if (Str\contains($name, "\r") || Str\contains($name, "\n")) {
+        throw new InvalidArgumentException(
+          'an event name must not contain a line break',
+        );
+      }
+    }
+
+    if (null != $id) {
+      _Private\require_utf8($id);
+      if (
+        Str\contains($id, "\r")
+        || Str\contains($id, "\n")
+        || Str\contains($id, "\0")
+      ) {
+        throw new InvalidArgumentException(
+          'an event ID must not contain a line break or NUL',
+        );
+      }
+    }
+
+    if ($retry?->isNegative() ?? false) {
+      throw new InvalidArgumentException(
+        'an event retry duration must not be negative',
+      );
+    }
+  }
+
+  /** Encodes the event, including the blank line that ends it. */
+  #[MustUse]
+  public function encode(): string {
+    $frame = '';
+    if (null != $this->id) {
+      $frame .= 'id: ' . $this->id . "\n";
+    }
+
+    if (null != $this->name) {
+      $frame .= 'event: ' . $this->name . "\n";
+    }
+
+    if (null != $this->retry) {
+      $frame .= 'retry: ' . _Private\milliseconds($this->retry) . "\n";
+    }
+
+    $data = Str\replace(Str\replace($this->data, "\r\n", "\n"), "\r", "\n");
+    foreach (Str\split($data, "\n") as $line) {
+      $frame .= 'data: ' . $line . "\n";
+    }
+
+    return $frame . "\n";
+  }
+}

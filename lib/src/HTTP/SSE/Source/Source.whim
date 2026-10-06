@@ -1,0 +1,23 @@
+namespace Whim\HTTP\SSE\Source;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\SSE\Event;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Supplies batches of server-sent events. */
+interface Source {
+  /**
+   * Waits for events or a heartbeat interval, then returns a batch.
+   *
+   * An empty batch asks the body to send a comment. Polls must wait when
+   * idle and honor cancellation. Errors pass through to the body reader.
+   */
+  #[MustUse]
+  #[TrackCaller]
+  public function poll(null|CancellationToken $cancellation = null): vec<Event>;
+
+  /** Reports whether no further batches remain. */
+  #[MustUse]
+  public function isFinished(): bool;
+}

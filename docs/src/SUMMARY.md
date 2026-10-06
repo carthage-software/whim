@@ -101,6 +101,7 @@
 - [HTTP Messages and Cookies](standard-library/http-message.md)
 - [HTTP Client](standard-library/http-client.md)
 - [HTTP Server](standard-library/http-server.md)
+- [Server-Sent Events](standard-library/http-sse.md)
 - [Databases](standard-library/database.md)
 - [Mail and MIME](standard-library/mail.md)
 - [Hashes, Passwords, and Random Data](standard-library/security.md)

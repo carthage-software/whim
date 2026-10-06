@@ -1,0 +1,94 @@
+namespace Whim\HTTP\SSE;
+
+use Whim\Async\CancellationToken;
+use Whim\HTTP\SSE\Source\Source;
+use Whim\IO\CloseHandle;
+use Whim\IO\ReadHandle;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+
+/** Reads encoded events as an HTTP response body. */
+final class Body implements ReadHandle, CloseHandle {
+  private string $buffer = '';
+  // A failed constructor must not close a source that never reached it.
+  private bool $closed = true;
+
+  public function __construct(private Source $source) {
+    $this->closed = false;
+  }
+
+  /** Reads buffered bytes without polling; a negative bound means no limit. */
+  #[MustUse]
+  public function tryRead(null|int $maxBytes = null): string {
+    if ('' == $this->buffer || 0 == $maxBytes) {
+      return '';
+    }
+
+    if (
+      null == $maxBytes
+      || $maxBytes < 0
+      || $maxBytes >= length!($this->buffer)
+    ) {
+      $whole = $this->buffer;
+      $this->buffer = '';
+      return $whole;
+    }
+
+    $piece = Str\slice($this->buffer, 0, $maxBytes as uint);
+    $this->buffer = Str\slice($this->buffer, $maxBytes);
+    return $piece;
+  }
+
+  /** Polls once, encoding events or a comment for an empty batch. */
+  #[TrackCaller]
+  public function waitUntilReadable(
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+    if ('' != $this->buffer || $this->reachedEndOfDataSource()) {
+      return;
+    }
+
+    $events = $this->source->poll($cancellation);
+    $cancellation?->throwIfCancellationRequested();
+    if ($this->closed) {
+      return;
+    }
+
+    foreach ($events as $event) {
+      $this->buffer .= $event->encode();
+    }
+
+    if (vec[] == $events) {
+      $this->buffer = Comment::WAITING;
+    }
+  }
+
+  #[MustUse]
+  public function reachedEndOfDataSource(): bool {
+    return (
+      $this->closed
+      || ('' == $this->buffer && $this->source->isFinished())
+    );
+  }
+
+  #[MustUse]
+  public function isClosed(): bool {
+    return $this->closed;
+  }
+
+  /** Discards buffered bytes and closes the source if it implements CloseHandle. */
+  #[TrackCaller]
+  public function close(): void {
+    if ($this->closed) {
+      return;
+    }
+
+    $this->closed = true;
+    $this->buffer = '';
+    if ($this->source is CloseHandle) {
+      $this->source->close();
+    }
+  }
+}
