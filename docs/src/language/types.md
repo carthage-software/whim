@@ -57,10 +57,9 @@ across runs and gives no ordering contract. Casting an integer back to `fresh`
 fails, including an integer obtained from a fresh value. Casting a fresh value
 to `fresh` preserves it.
 
-The VM never reuses a fresh identity, even after every copy disappears. If it
-exhausts its identity space, `fresh!()` throws `OverflowError`; further calls
-also fail. Separate VMs may reuse representations. Fresh values are not
-persistent IDs, distributed IDs, or secrets.
+If the VM exhausts its identity space, `fresh!()` throws `OverflowError`;
+further calls also fail. Separate VMs may reuse representations. Fresh values
+are not persistent IDs, distributed IDs, or secrets.
 
 `Whim\Refine\Scalar` and `Whim\Refine\ArrayKey` include `fresh`.
 `Whim\Refine\Numeric` does not. JSON and BSON reject fresh values and keys;
