@@ -1,0 +1,11 @@
+namespace Whim\Cron;
+
+use Whim\Unwind\RuntimeException;
+
+/**
+ * Raised when an expression has no occurrence near the given time.
+ *
+ * A syntactically valid expression can still never match, like
+ * `0 0 30 2 *`, the thirtieth of February.
+ */
+final class UnmatchableExpressionException extends RuntimeException {}

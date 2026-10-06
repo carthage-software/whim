@@ -29,7 +29,7 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Reflection\Member`    | methods, properties, constants, and enum cases               |
 | `Whim\Reflection\Type`      | type forms and their parts                                   |
 | `Whim\Result`               | `Ok`, `Err`, and throwable capture                           |
-| `Whim\State`                | typed state machines, guards, and observers                   |
+| `Whim\State`                | typed state machines, guards, and observers                  |
 | `Whim\Symbol`               | symbol lookup and symbol kinds                               |
 | `Whim\Type`                 | engine-local type identifiers                                |
 | `Whim\Unwind`               | errors, exceptions, throwables, and trace frames             |
@@ -82,7 +82,7 @@ Structures](collections.md), and [Iterators](../core-library/iteration.md).
 | `Whim\Encoding\URI`             | whole-URI percent encoding                            |
 | `Whim\Encoding\UTF8`            | UTF-8 checks and lossy repair                         |
 | `Whim\Encoding\Url`             | percent and form encoding                             |
-| `Whim\Graph`                    | directed and undirected graphs, traversal, and paths   |
+| `Whim\Graph`                    | directed and undirected graphs, traversal, and paths  |
 | `Whim\HTML`                     | WHATWG character references and escaping              |
 | `Whim\Json`                     | JSON values, encoding, and decoding                   |
 | `Whim\MIME`                     | media types, fields, content IDs, and parts           |
@@ -90,7 +90,7 @@ Structures](collections.md), and [Iterators](../core-library/iteration.md).
 | `Whim\MIME\Part`                | text, data, and raw MIME parts                        |
 | `Whim\MIME\Sniff`               | media-type checks from byte prefixes                  |
 | `Whim\Regex`                    | byte regular expressions                              |
-| `Whim\Tree`                     | typed trees, traversal, search, mapping, and folds     |
+| `Whim\Tree`                     | typed trees, traversal, search, mapping, and folds    |
 | `Whim\UUID`                     | UUID parsing plus versions 4 and 7                    |
 
 See [Graphs](graph.md), [Trees](tree.md), and [Encoding and Data Formats](formats.md).
@@ -101,6 +101,7 @@ See [Graphs](graph.md), [Trees](tree.md), and [Encoding and Data Formats](format
 | --------------- | ---------------------------------------------------------- |
 | `Whim\Clock`    | system and controlled clocks and sleepers                  |
 | `Whim\Command`  | child-process setup and control                            |
+| `Whim\Cron`     | cron parsing, matching, and next or previous occurrences   |
 | `Whim\DateTime` | dates, civil times, zones, and formatting                  |
 | `Whim\Env`      | arguments, paths, and environment variables                |
 | `Whim\OS`       | owned file descriptors, accounts, and host metrics         |
@@ -110,7 +111,8 @@ See [Graphs](graph.md), [Trees](tree.md), and [Encoding and Data Formats](format
 | `Whim\Terminal` | terminal checks, paths, and size                           |
 | `Whim\Time`     | durations, monotonic instants, and wall time               |
 
-See [Time and Calendars](time.md), [Clocks and Sleepers](clock.md), and
+See [Time and Calendars](time.md), [Clocks and Sleepers](clock.md),
+[Cron Expressions](cron.md), and
 [Environment, Processes, and Terminals](../core-library/env.md).
 
 ## Files and I/O

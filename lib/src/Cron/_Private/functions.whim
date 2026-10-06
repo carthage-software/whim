@@ -1,0 +1,121 @@
+namespace Whim\Cron\_Private;
+
+use Whim\Lint\Allow;
+use Whim\Int;
+use Whim\Marker\MustUse;
+use Whim\Marker\SensitiveParameter;
+use Whim\Str;
+
+/** The month names a field accepts. */
+const MONTHS = dict[
+  'JAN' => 1,
+  'FEB' => 2,
+  'MAR' => 3,
+  'APR' => 4,
+  'MAY' => 5,
+  'JUN' => 6,
+  'JUL' => 7,
+  'AUG' => 8,
+  'SEP' => 9,
+  'OCT' => 10,
+  'NOV' => 11,
+  'DEC' => 12,
+];
+
+/** The weekday names a field accepts, in cron numbering. */
+const WEEKDAYS = dict[
+  'SUN' => 0,
+  'MON' => 1,
+  'TUE' => 2,
+  'WED' => 3,
+  'THU' => 4,
+  'FRI' => 5,
+  'SAT' => 6,
+];
+
+/** Parses one field into its allowed values, or returns null. */
+#[MustUse]
+#[Allow('cyclomatic-complexity')]
+function field(
+  string $text,
+  int $minimum,
+  int $maximum,
+  dict<string, int> $names,
+): null|dict<int, bool> {
+  if ('' == $text) {
+    return null;
+  }
+
+  $allowed = dict[];
+  foreach (Str\split($text, ',') as $part) {
+    if ('' == $part) {
+      return null;
+    }
+
+    $step = 1;
+    $slash = Str\search($part, '/');
+    if (null != $slash) {
+      $stepText = Str\slice($part, ($slash as int) + 1);
+      $part = Str\slice($part, 0, $slash);
+      $parsed = Int\try_parse($stepText) ?? return null;
+      if ($parsed < 1) {
+        return null;
+      }
+
+      $step = $parsed;
+    }
+
+    $low = $minimum;
+    $high = $maximum;
+    if ('*' != $part) {
+      $dash = Str\search($part, '-');
+      if (null == $dash) {
+        $single = value($part, $names) ?? return null;
+        $low = $single;
+        $high = match ($slash) {
+          null => $single,
+          _ => $maximum,
+        };
+      } else {
+        $from = value(Str\slice($part, 0, $dash), $names);
+        $to = value(Str\slice($part, ($dash as int) + 1), $names);
+        if (null == $from || null == $to) {
+          return null;
+        }
+
+        $low = $from;
+        $high = $to;
+      }
+    }
+
+    if ($low < $minimum || $high > $maximum || $low > $high) {
+      return null;
+    }
+
+    $current = $low;
+    while ($current <= $high) {
+      $allowed[$current] = true;
+      if ($step > $high - $current) {
+        break;
+      }
+
+      $current += $step;
+    }
+  }
+
+  return $allowed;
+}
+
+/** Parses one field token as a name or a number, or returns null. */
+#[MustUse]
+function value(
+  #[SensitiveParameter] string $token,
+  dict<string, int> $names,
+): null|int {
+  $upper = Str\uppercase($token);
+  if (contains_key!($names, $upper)) {
+    return $names[$upper];
+  }
+
+  return Int\try_parse($token);
+}

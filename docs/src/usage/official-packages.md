@@ -15,7 +15,6 @@ versions. Install them through Whim's Git package manager.
 | [`config`](https://codeberg.org/trifle/config)               | Typed configuration from values, files, and the environment. | `whim add git+ssh://git@codeberg.org/trifle/config`        |
 | [`console`](https://codeberg.org/trifle/console)             | Terminal output, tables, progress, and prompts.              | `whim add git+ssh://git@codeberg.org/trifle/console`       |
 | [`cqrs`](https://codeberg.org/trifle/cqrs)                   | Command and query buses with events, logs, and traces.       | `whim add git+ssh://git@codeberg.org/trifle/cqrs`          |
-| [`cron`](https://codeberg.org/trifle/cron)                   | Cron expression parsing and occurrence calculation.          | `whim add git+ssh://git@codeberg.org/trifle/cron`          |
 | [`diff`](https://codeberg.org/trifle/diff)                   | Myers diffs for values and text, with unified output.        | `whim add git+ssh://git@codeberg.org/trifle/diff`          |
 | [`dotenv`](https://codeberg.org/trifle/dotenv)               | `.env` parsing and environment layering.                     | `whim add git+ssh://git@codeberg.org/trifle/dotenv`        |
 | [`event`](https://codeberg.org/trifle/event)                 | Typed events with hierarchy-aware listeners.                 | `whim add git+ssh://git@codeberg.org/trifle/event`         |

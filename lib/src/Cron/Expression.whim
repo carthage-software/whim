@@ -1,0 +1,698 @@
+namespace Whim\Cron;
+
+use Whim\Lint\Allow;
+use Whim\Convert\ToString;
+use Whim\DateTime\Date;
+use Whim\DateTime\DateTime;
+use Whim\DateTime\Disambiguation;
+use Whim\DateTime\Month;
+use Whim\DateTime\TimeZone;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\DateTime\Year;
+use Whim\Marker\TrackCaller;
+use Whim\Str;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+/**
+ * A parsed cron expression.
+ *
+ * The five fields are minute, hour, day of month, month, and day of
+ * week, with the usual grammar: `*`, lists, ranges, steps, month and
+ * weekday names, and `0` or `7` for Sunday. The macros `@yearly`,
+ * `@annually`, `@monthly`, `@weekly`, `@daily`, `@midnight`, and
+ * `@hourly` expand to their classic forms.
+ *
+ * Day matching keeps vixie cron's rule: when both day fields are
+ * restricted, a time matches on either; a stepped field counts as
+ * restricted.
+ *
+ * Occurrence math takes the time zone the schedule lives in.
+ * Nonexistent local times, like a spring-forward gap, resolve
+ * forward. Both instants represented by an ambiguous local time
+ * participate in strict next and previous searches.
+ */
+#[Allow('cyclomatic-complexity')]
+final readonly class Expression implements ToString {
+  private function __construct(
+    private string $source,
+    private dict<int, bool> $minutes,
+    private dict<int, bool> $hours,
+    private dict<int, bool> $daysOfMonth,
+    private dict<int, bool> $months,
+    private dict<int, bool> $daysOfWeek,
+    private bool $anyDayOfMonth,
+    private bool $anyDayOfWeek,
+  ) {}
+
+  /** Parses an expression, or returns null when it is malformed. */
+  #[MustUse]
+  public static function parse(string $expression): null|Expression {
+    $source = Str\trim($expression);
+    $expanded = match (Str\lowercase($source)) {
+      '@yearly' => '0 0 1 1 *',
+      '@annually' => '0 0 1 1 *',
+      '@monthly' => '0 0 1 * *',
+      '@weekly' => '0 0 * * 0',
+      '@daily' => '0 0 * * *',
+      '@midnight' => '0 0 * * *',
+      '@hourly' => '0 * * * *',
+      _ => $source,
+    };
+
+    $fields = vec[];
+    foreach (Str\split(Str\replace($expanded, "\t", ' '), ' ') as $piece) {
+      if ('' == $piece) {
+        continue;
+      }
+
+      $fields[] = $piece;
+    }
+
+    if (length!($fields) != 5u) {
+      return null;
+    }
+
+    $minutes = _Private\field($fields[0], 0, 59, dict[]);
+    $hours = _Private\field($fields[1], 0, 23, dict[]);
+    $daysOfMonth = _Private\field($fields[2], 1, 31, dict[]);
+    $months = _Private\field($fields[3], 1, 12, _Private\MONTHS);
+    $weekdays = _Private\field($fields[4], 0, 7, _Private\WEEKDAYS);
+    if (
+      null == $minutes
+      || null == $hours
+      || null == $daysOfMonth
+      || null == $months
+      || null == $weekdays
+    ) {
+      return null;
+    }
+
+    $daysOfWeek = dict[];
+    foreach ($weekdays as $day => _) {
+      $daysOfWeek[match ($day) {
+        0 => 7,
+        _ => $day,
+      }] = true;
+    }
+
+    return new Expression(
+      $source,
+      $minutes,
+      $hours,
+      $daysOfMonth,
+      $months,
+      $daysOfWeek,
+      '*' == $fields[2],
+      '*' == $fields[4],
+    );
+  }
+
+  /**
+   * Parses an expression, refusing a malformed one.
+   *
+   * @throws InvalidArgumentException when the expression is malformed.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function from(string $expression): Expression {
+    $parsed = Expression::parse($expression);
+    if (null == $parsed) {
+      throw new InvalidArgumentException(
+        'invalid cron expression: "' . $expression . '"',
+      );
+    }
+
+    return $parsed;
+  }
+
+  /** Whether the minute containing a time matches. */
+  #[MustUse]
+  public function matches(SystemTime $time, TimeZone $zone): bool {
+    $moment = $zone->at($time)->dateTime;
+    return (
+      $this->dateTimeMatches($moment)
+      || $this->matchesAdjacentGap($time, $zone)
+    );
+  }
+
+  /**
+   * Returns the first occurrence strictly after a time.
+   *
+   * @throws UnmatchableExpressionException when no occurrence exists
+   * within the next five years.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function next(SystemTime $after, TimeZone $zone): SystemTime {
+    $moment = $zone->at($after)->dateTime;
+    $candidate = DateTime::fromParts(
+      $moment->date->year,
+      $moment->date->month,
+      $moment->date->day,
+      $moment->time->hour,
+      $moment->time->minute,
+    );
+
+    $adjacent = $this->nextInAdjacentOverlap($after, $zone);
+    $gap = $this->nextInAdjacentGap($after, $zone);
+    if (
+      null != $gap
+      && (null == $adjacent || $gap->compare($adjacent)->isLess())
+    ) {
+      $adjacent = $gap;
+    }
+
+    $horizon = ($moment->date->year as int) + 5;
+    while (true) {
+      $date = $candidate->date;
+      $time = $candidate->time;
+      if (($date->year as int) > $horizon) {
+        if (null != $adjacent) {
+          return $adjacent;
+        }
+
+        throw new UnmatchableExpressionException(
+          '"' . $this->source . '" has no occurrence within five years',
+        );
+      }
+
+      if (!contains_key!($this->months, $date->month->value)) {
+        $candidate = match ($date->month) {
+          Month::December => DateTime::fromParts(
+            (($date->year as int) + 1) as Year,
+            Month::January,
+            1,
+          ),
+          _ => DateTime::fromParts($date->year, $date->month->next(), 1),
+        };
+
+        continue;
+      }
+
+      if (!$this->dayMatches($date)) {
+        $candidate = DateTime::fromParts(
+          $date->year,
+          $date->month,
+          $date->day,
+        )->plusDuration(Duration::fromHours(24));
+
+        continue;
+      }
+
+      if (!contains_key!($this->hours, $time->hour as int)) {
+        $candidate = DateTime::fromParts(
+          $date->year,
+          $date->month,
+          $date->day,
+          $time->hour,
+        )->plusDuration(Duration::fromHours(1));
+
+        continue;
+      }
+
+      if (!contains_key!($this->minutes, $time->minute as int)) {
+        $candidate = $candidate->plusDuration(Duration::fromMinutes(1));
+        continue;
+      }
+
+      $resolved = $this->resolveAfter($candidate, $after, $zone);
+      if (null == $resolved) {
+        $candidate = $candidate->plusDuration(Duration::fromMinutes(1));
+        continue;
+      }
+
+      if (null != $adjacent && $adjacent->compare($resolved)->isLess()) {
+        return $adjacent;
+      }
+
+      return $resolved;
+    }
+  }
+
+  /**
+   * Returns the last occurrence strictly before a time.
+   *
+   * @throws UnmatchableExpressionException when no occurrence exists
+   * within the previous five years.
+   */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public function previous(SystemTime $before, TimeZone $zone): SystemTime {
+    $moment = $zone->at($before)->dateTime;
+    $candidate = DateTime::fromParts(
+      $moment->date->year,
+      $moment->date->month,
+      $moment->date->day,
+      $moment->time->hour,
+      $moment->time->minute,
+    );
+
+    $overlap = $this->previousInAdjacentOverlap($before, $zone);
+
+    $horizon = ($moment->date->year as int) - 5;
+    while (true) {
+      $date = $candidate->date;
+      $time = $candidate->time;
+      if (($date->year as int) < $horizon) {
+        if (null != $overlap) {
+          return $overlap;
+        }
+
+        throw new UnmatchableExpressionException(
+          '"' . $this->source . '" has no occurrence within five years',
+        );
+      }
+
+      if (!contains_key!($this->months, $date->month->value)) {
+        $candidate = DateTime::fromParts(
+          $date->year,
+          $date->month,
+          1,
+        )->minusDuration(Duration::fromMinutes(1));
+
+        continue;
+      }
+
+      if (!$this->dayMatches($date)) {
+        $candidate = DateTime::fromParts(
+          $date->year,
+          $date->month,
+          $date->day,
+        )->minusDuration(Duration::fromMinutes(1));
+
+        continue;
+      }
+
+      if (!contains_key!($this->hours, $time->hour as int)) {
+        $candidate = DateTime::fromParts(
+          $date->year,
+          $date->month,
+          $date->day,
+          $time->hour,
+        )->minusDuration(Duration::fromMinutes(1));
+
+        continue;
+      }
+
+      if (!contains_key!($this->minutes, $time->minute as int)) {
+        $candidate = $candidate->minusDuration(Duration::fromMinutes(1));
+        continue;
+      }
+
+      $resolved = $this->resolveBefore($candidate, $before, $zone);
+      if (null == $resolved) {
+        $candidate = $candidate->minusDuration(Duration::fromMinutes(1));
+        continue;
+      }
+
+      if (null != $overlap && $overlap->compare($resolved)->isGreater()) {
+        return $overlap;
+      }
+
+      return $resolved;
+    }
+  }
+
+  /** Returns the expression as written. */
+  #[MustUse]
+  public function toString(): string {
+    return $this->source;
+  }
+
+  #[MustUse]
+  private function dayMatches(Date $date): bool {
+    $byMonth = contains_key!($this->daysOfMonth, $date->day as int);
+    $byWeek = contains_key!($this->daysOfWeek, $date->weekday()->value);
+    if ($this->anyDayOfMonth && $this->anyDayOfWeek) {
+      return true;
+    }
+
+    if (!$this->anyDayOfMonth && !$this->anyDayOfWeek) {
+      return $byMonth || $byWeek;
+    }
+
+    if (!$this->anyDayOfMonth) {
+      return $byMonth;
+    }
+
+    return $byWeek;
+  }
+
+  #[MustUse]
+  private function dateTimeMatches(DateTime $dateTime): bool {
+    return (
+      contains_key!($this->minutes, $dateTime->time->minute as int)
+      && contains_key!($this->hours, $dateTime->time->hour as int)
+      && contains_key!($this->months, $dateTime->date->month->value)
+      && $this->dayMatches($dateTime->date)
+    );
+  }
+
+  #[MustUse]
+  private function matchesAdjacentGap(SystemTime $time, TimeZone $zone): bool {
+    foreach (self::adjacentTransitions($time, $zone) as $transition) {
+      if (null == $transition) {
+        continue;
+      }
+
+      $before = $zone->offsetAt(
+        $transition->minus(Duration::fromNanoseconds(1)),
+      )->seconds;
+
+      $after = $zone->offsetAt($transition)->seconds;
+      if ($before >= $after) {
+        continue;
+      }
+
+      $skipped = Duration::fromSeconds($after - $before);
+      if (
+        $time->compare($transition)->isLess()
+        || !$time->compare($transition->plus($skipped))->isLess()
+      ) {
+        continue;
+      }
+
+      $candidate = $zone->at($time)->dateTime->minusDuration($skipped);
+      if ($this->dateTimeMatches($candidate)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  #[MustUse]
+  private function resolveAfter(
+    DateTime $candidate,
+    SystemTime $after,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $earlier = $zone->resolve($candidate, Disambiguation::Earlier);
+    $later = $zone->resolve($candidate, Disambiguation::Later);
+    if (
+      !$earlier->dateTime->equals($candidate)
+      || !$later->dateTime->equals($candidate)
+    ) {
+      $compatible = $zone->resolve(
+        $candidate,
+        Disambiguation::Compatible,
+      )->systemTime;
+
+      return match ($compatible->compare($after)->isGreater()) {
+        true => $compatible,
+        false => null,
+      };
+    }
+
+    $result = null;
+    foreach (vec[$earlier->systemTime, $later->systemTime] as $resolved) {
+      if (
+        !$resolved->compare($after)->isGreater()
+        || (null != $result && !$resolved->compare($result)->isLess())
+      ) {
+        continue;
+      }
+
+      $result = $resolved;
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  private function resolveBefore(
+    DateTime $candidate,
+    SystemTime $before,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $earlier = $zone->resolve($candidate, Disambiguation::Earlier);
+    $later = $zone->resolve($candidate, Disambiguation::Later);
+    if (
+      !$earlier->dateTime->equals($candidate)
+      || !$later->dateTime->equals($candidate)
+    ) {
+      $compatible = $zone->resolve(
+        $candidate,
+        Disambiguation::Compatible,
+      )->systemTime;
+
+      return match ($compatible->compare($before)->isLess()) {
+        true => $compatible,
+        false => null,
+      };
+    }
+
+    $result = null;
+    foreach (vec[$earlier->systemTime, $later->systemTime] as $resolved) {
+      if (
+        !$resolved->compare($before)->isLess()
+        || (null != $result && !$resolved->compare($result)->isGreater())
+      ) {
+        continue;
+      }
+
+      $result = $resolved;
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  private function nextInAdjacentOverlap(
+    SystemTime $after,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $result = null;
+    foreach (self::adjacentTransitions($after, $zone) as $transition) {
+      if (null == $transition) {
+        continue;
+      }
+
+      $candidate = $this->nextInOverlap($transition, $after, $zone);
+      if (
+        null != $candidate
+        && (null == $result || $candidate->compare($result)->isLess())
+      ) {
+        $result = $candidate;
+      }
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  private function previousInAdjacentOverlap(
+    SystemTime $before,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $result = null;
+    foreach (self::adjacentTransitions($before, $zone) as $transition) {
+      if (null == $transition) {
+        continue;
+      }
+
+      $candidate = $this->previousInOverlap($transition, $before, $zone);
+      if (
+        null != $candidate
+        && (null == $result || $candidate->compare($result)->isGreater())
+      ) {
+        $result = $candidate;
+      }
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  private function nextInAdjacentGap(
+    SystemTime $after,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $result = null;
+    foreach (self::adjacentTransitions($after, $zone) as $transition) {
+      if (null == $transition) {
+        continue;
+      }
+
+      $candidate = $this->nextInGap($transition, $after, $zone);
+      if (
+        null != $candidate
+        && (null == $result || $candidate->compare($result)->isLess())
+      ) {
+        $result = $candidate;
+      }
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  private function nextInOverlap(
+    SystemTime $transition,
+    SystemTime $after,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $interval = self::overlap($transition, $after, $zone) ?? return null;
+    ($start, $end) = $interval;
+    $result = null;
+    $candidate = $start;
+    while ($candidate->compare($end)->isLess()) {
+      if ($this->dateTimeMatches($candidate)) {
+        $resolved = $this->resolveAfter($candidate, $after, $zone);
+        if (
+          null != $resolved
+          && (null == $result || $resolved->compare($result)->isLess())
+        ) {
+          $result = $resolved;
+        }
+      }
+
+      $candidate = $candidate->plusDuration(Duration::fromMinutes(1));
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  private function previousInOverlap(
+    SystemTime $transition,
+    SystemTime $before,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $interval = self::overlap($transition, $before, $zone) ?? return null;
+    ($start, $end) = $interval;
+    $result = null;
+    $candidate = $start;
+    while ($candidate->compare($end)->isLess()) {
+      if ($this->dateTimeMatches($candidate)) {
+        $resolved = $this->resolveBefore($candidate, $before, $zone);
+        if (
+          null != $resolved
+          && (null == $result || $resolved->compare($result)->isGreater())
+        ) {
+          $result = $resolved;
+        }
+      }
+
+      $candidate = $candidate->plusDuration(Duration::fromMinutes(1));
+    }
+
+    return $result;
+  }
+
+  #[MustUse]
+  private function nextInGap(
+    SystemTime $transition,
+    SystemTime $after,
+    TimeZone $zone,
+  ): null|SystemTime {
+    $interval = self::gap($transition, $after, $zone) ?? return null;
+    ($start, $end) = $interval;
+    $result = null;
+    $candidate = $start;
+    while ($candidate->compare($end)->isLess()) {
+      if ($this->dateTimeMatches($candidate)) {
+        $resolved = $this->resolveAfter($candidate, $after, $zone);
+        if (
+          null != $resolved
+          && (null == $result || $resolved->compare($result)->isLess())
+        ) {
+          $result = $resolved;
+        }
+      }
+
+      $candidate = $candidate->plusDuration(Duration::fromMinutes(1));
+    }
+
+    return $result;
+  }
+
+  /** Returns the transitions on either side, including one at the time. */
+  #[MustUse]
+  private static function adjacentTransitions(
+    SystemTime $time,
+    TimeZone $zone,
+  ): vec<null|SystemTime> {
+    return vec[
+      $zone->previousTransition($time),
+      $time,
+      $zone->nextTransition($time),
+    ];
+  }
+
+  #[MustUse]
+  private static function overlap(
+    SystemTime $transition,
+    SystemTime $near,
+    TimeZone $zone,
+  ): null|(DateTime, DateTime) {
+    $before = $zone->offsetAt(
+      $transition->minus(Duration::fromNanoseconds(1)),
+    )->seconds;
+
+    $after = $zone->offsetAt($transition)->seconds;
+    if ($before <= $after) {
+      return null;
+    }
+
+    $repeated = Duration::fromSeconds($before - $after);
+    if (
+      $near->compare($transition->minus($repeated))->isLess()
+      || $near->compare($transition->plus($repeated))->isGreater()
+    ) {
+      return null;
+    }
+
+    $start = $zone->at($transition)->dateTime;
+    $start = DateTime::fromParts(
+      $start->date->year,
+      $start->date->month,
+      $start->date->day,
+      $start->time->hour,
+      $start->time->minute,
+    );
+
+    return ($start, $start->plusDuration($repeated));
+  }
+
+  #[MustUse]
+  private static function gap(
+    SystemTime $transition,
+    SystemTime $near,
+    TimeZone $zone,
+  ): null|(DateTime, DateTime) {
+    $before = $zone->offsetAt(
+      $transition->minus(Duration::fromNanoseconds(1)),
+    )->seconds;
+
+    $after = $zone->offsetAt($transition)->seconds;
+    if ($before >= $after) {
+      return null;
+    }
+
+    $skipped = Duration::fromSeconds($after - $before);
+    if (
+      $near->compare($transition->minus($skipped))->isLess()
+      || $near->compare($transition->plus($skipped))->isGreater()
+    ) {
+      return null;
+    }
+
+    $end = $zone->at($transition)->dateTime;
+    $end = DateTime::fromParts(
+      $end->date->year,
+      $end->date->month,
+      $end->date->day,
+      $end->time->hour,
+      $end->time->minute,
+    );
+
+    return ($end->minusDuration($skipped), $end);
+  }
+}

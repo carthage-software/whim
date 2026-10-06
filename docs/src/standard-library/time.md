@@ -33,6 +33,8 @@ Use [Clocks and Sleepers](clock.md) when code needs a clock or sleeper that
 tests can control. `Whim\Clock` provides system, frozen, and offset clocks,
 plus system and virtual sleepers.
 
+Use [Cron Expressions](cron.md) to find scheduled times in a chosen timezone.
+
 ## Date, Time, and DateTime
 
 `Date` stores a year, month, and day. `Time` stores hour, minute, second, and

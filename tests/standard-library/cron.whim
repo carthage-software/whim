@@ -1,0 +1,308 @@
+use Whim\Convert\ToString;
+use Whim\Cron\Expression;
+use Whim\Cron\UnmatchableExpressionException;
+use Whim\DateTime\TimeZone;
+use Whim\DateTime\ZonedDateTime;
+use Whim\Math;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\DiscardedResultError;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+
+function at(string $moment): SystemTime {
+  return ZonedDateTime::from($moment . '+00:00[UTC]')->systemTime;
+}
+
+function expect_next(
+  Expression $expression,
+  string $after,
+  string $expected,
+  TimeZone $zone,
+): void {
+  $start = at($after);
+  $next = $expression->next($start, $zone);
+  assert!($next->equals(at($expected)));
+  assert!($next->compare($start)->isGreater());
+  assert!($expression->matches($next, $zone));
+}
+
+function expect_previous(
+  Expression $expression,
+  string $before,
+  string $expected,
+  TimeZone $zone,
+): void {
+  $start = at($before);
+  $previous = $expression->previous($start, $zone);
+  assert!($previous->equals(at($expected)));
+  assert!($previous->compare($start)->isLess());
+  assert!($expression->matches($previous, $zone));
+}
+
+function expect_error<E: Throwable>(fn(): void $operation): E {
+  try {
+    $operation();
+  } catch (E $error) {
+    return $error;
+  }
+
+  throw new RuntimeException('expected an error');
+}
+
+$utc = TimeZone::utc();
+$hourly = Expression::from('0 * * * *');
+assert!($hourly is ToString);
+assert!($hourly->toString() == '0 * * * *');
+assert!($hourly->matches(at('2026-08-21T10:00:00'), $utc));
+assert!($hourly->matches(at('2026-08-21T10:00:59.999999999'), $utc));
+assert!(!$hourly->matches(at('2026-08-21T10:30:00'), $utc));
+expect_next($hourly, '2026-08-21T10:00:00', '2026-08-21T11:00:00', $utc);
+expect_next($hourly, '2026-08-21T10:59:30', '2026-08-21T11:00:00', $utc);
+expect_previous($hourly, '2026-08-21T10:00:00', '2026-08-21T09:00:00', $utc);
+expect_previous($hourly, '2026-08-21T10:00:30', '2026-08-21T10:00:00', $utc);
+$boundary = at('2026-08-21T10:00:00');
+assert!(
+  $hourly->previous($boundary->plus(Duration::nanosecond()), $utc)->equals(
+    $boundary,
+  ),
+);
+
+assert!(
+  $hourly->next($boundary->minus(Duration::nanosecond()), $utc)->equals(
+    $boundary,
+  ),
+);
+
+$quarterHour = Expression::from('*/15 9-17 * * MON-FRI');
+expect_next($quarterHour, '2026-08-21T17:45:00', '2026-08-24T09:00:00', $utc);
+expect_previous(
+  $quarterHour,
+  '2026-08-24T09:00:00',
+  '2026-08-21T17:45:00',
+  $utc,
+);
+
+assert!(!$quarterHour->matches(at('2026-08-22T09:15:00'), $utc));
+$newYear = Expression::from('30 4 1 1 *');
+expect_next($newYear, '2026-08-21T00:00:00', '2027-01-01T04:30:00', $utc);
+expect_previous($newYear, '2026-08-21T00:00:00', '2026-01-01T04:30:00', $utc);
+$leap = Expression::from('0 0 29 2 *');
+expect_next($leap, '2026-01-01T00:00:00', '2028-02-29T00:00:00', $utc);
+expect_previous($leap, '2026-01-01T00:00:00', '2024-02-29T00:00:00', $utc);
+expect_next($leap, '2101-01-01T00:00:00', '2104-02-29T00:00:00', $utc);
+
+$eitherDay = Expression::from('0 0 13 * FRI');
+expect_next($eitherDay, '2026-08-21T00:00:00', '2026-08-28T00:00:00', $utc);
+assert!($eitherDay->matches(at('2026-09-13T00:00:00'), $utc));
+assert!(
+  Expression::from('0 0 13 * 5')->matches(at('2026-11-13T00:00:00'), $utc),
+);
+
+assert!(
+  !Expression::from('0 0 * * FRI')->matches(at('2026-09-13T00:00:00'), $utc),
+);
+
+assert!(
+  !Expression::from('0 0 13 * *')->matches(at('2026-08-21T00:00:00'), $utc),
+);
+
+$steppedDay = Expression::from('0 0 */2 * MON');
+assert!($steppedDay->matches(at('2026-08-23T00:00:00'), $utc));
+assert!($steppedDay->matches(at('2026-08-24T00:00:00'), $utc));
+assert!(!$steppedDay->matches(at('2026-08-22T00:00:00'), $utc));
+$names = Expression::from('0 12 * JAN,jul *');
+expect_next($names, '2026-02-10T00:00:00', '2026-07-01T12:00:00', $utc);
+foreach (vec['0', '7', 'SUN', 'sun'] as $sunday) {
+  assert!(
+    Expression::from('0 0 * * ' . $sunday)->matches(
+      at('2026-08-23T00:00:00'),
+      $utc,
+    ),
+  );
+}
+
+$steppedMinute = Expression::from('5/17 * * * *');
+foreach (vec[5, 22, 39, 56] as $minute) {
+  assert!(
+    $steppedMinute->matches(
+      $boundary->plus(Duration::fromMinutes($minute)),
+      $utc,
+    ),
+  );
+}
+
+assert!(!$steppedMinute->matches(at('2026-08-21T10:50:00'), $utc));
+assert!(Expression::parse('1-30/7 */2 1,15 FEB-apr 0-5') is Expression);
+assert!(Expression::from(" \t0\t*  * * *\t ")->toString() == "0\t*  * * *");
+assert!(
+  Expression::from('1/9223372036854775807 * * * *')->matches(
+    at('2026-08-21T10:01:00'),
+    $utc,
+  ),
+);
+
+assert!(Expression::parse('0 0 */' . Math\INT_MAX . ' * *') is Expression);
+
+foreach (vec[
+  ('@yearly', '0 0 1 1 *'),
+  ('@annually', '0 0 1 1 *'),
+  ('@monthly', '0 0 1 * *'),
+  ('@weekly', '0 0 * * 0'),
+  ('@daily', '0 0 * * *'),
+  ('@midnight', '0 0 * * *'),
+  ('@hourly', '0 * * * *'),
+] as ($macro, $expanded)) {
+  $schedule = Expression::from($macro);
+  $explicit = Expression::from($expanded);
+  assert!($schedule->toString() == $macro);
+  assert!(
+    $schedule->next($boundary, $utc)->equals($explicit->next($boundary, $utc)),
+  );
+
+  assert!(
+    $schedule->previous($boundary, $utc)->equals(
+      $explicit->previous($boundary, $utc),
+    ),
+  );
+}
+
+assert!(Expression::from('@DAILY')->toString() == '@DAILY');
+expect_next(
+  Expression::from('@monthly'),
+  '2026-08-21T13:37:00',
+  '2026-09-01T00:00:00',
+  $utc,
+);
+
+$fixed = TimeZone::fixedOffset(19_800);
+expect_next(
+  Expression::from('0 12 * * *'),
+  '2026-08-21T06:00:00',
+  '2026-08-21T06:30:00',
+  $fixed,
+);
+
+$paris = TimeZone::from('Europe/Paris');
+expect_next(
+  Expression::from('30 9 * * *'),
+  '2026-08-21T06:00:00',
+  '2026-08-21T07:30:00',
+  $paris,
+);
+
+$fallback = Expression::from('31 2 * * *');
+expect_next($fallback, '2026-10-25T01:30:00', '2026-10-25T01:31:00', $paris);
+expect_next($fallback, '2026-10-25T00:31:00', '2026-10-25T01:31:00', $paris);
+expect_previous(
+  $fallback,
+  '2026-10-25T01:31:00',
+  '2026-10-25T00:31:00',
+  $paris,
+);
+
+$halfPast = Expression::from('30 2 * * *');
+expect_next($halfPast, '2026-10-25T00:45:00', '2026-10-25T01:30:00', $paris);
+expect_previous(
+  $halfPast,
+  '2026-10-25T01:15:00',
+  '2026-10-25T00:30:00',
+  $paris,
+);
+
+assert!($halfPast->matches(at('2026-10-25T00:30:00'), $paris));
+assert!($halfPast->matches(at('2026-10-25T01:30:00'), $paris));
+expect_previous(
+  Expression::from('* * * * *'),
+  '2026-10-25T01:00:00',
+  '2026-10-25T00:59:00',
+  $paris,
+);
+
+expect_next($halfPast, '2026-03-29T00:00:00', '2026-03-29T01:30:00', $paris);
+expect_next($halfPast, '2026-03-29T01:15:00', '2026-03-29T01:30:00', $paris);
+expect_previous(
+  $halfPast,
+  '2026-03-29T02:00:00',
+  '2026-03-29T01:30:00',
+  $paris,
+);
+
+assert!($halfPast->matches(at('2026-03-29T01:30:45'), $paris));
+assert!(!$halfPast->matches(at('2026-03-29T01:31:00'), $paris));
+
+$lordHowe = TimeZone::from('Australia/Lord_Howe');
+$quarterTo = Expression::from('45 1 * * *');
+expect_next(
+  $quarterTo,
+  '2026-04-04T14:45:00',
+  '2026-04-04T15:15:00',
+  $lordHowe,
+);
+
+expect_previous(
+  $quarterTo,
+  '2026-04-04T15:15:00',
+  '2026-04-04T14:45:00',
+  $lordHowe,
+);
+
+$quarterPast = Expression::from('15 2 * * *');
+expect_next(
+  $quarterPast,
+  '2026-10-03T15:30:00',
+  '2026-10-03T15:45:00',
+  $lordHowe,
+);
+
+expect_previous(
+  $quarterPast,
+  '2026-10-03T16:00:00',
+  '2026-10-03T15:45:00',
+  $lordHowe,
+);
+
+$impossible = Expression::from('0 0 30 2 *');
+discard!(expect_error::<UnmatchableExpressionException>(fn(): void {
+  discard!($impossible->next(at('2026-01-01T00:00:00'), $utc));
+}));
+
+discard!(expect_error::<UnmatchableExpressionException>(fn(): void {
+  discard!($impossible->previous(at('2026-01-01T00:00:00'), $utc));
+}));
+
+foreach (vec[
+  '',
+  '* * * *',
+  '* * * * * *',
+  '60 * * * *',
+  '* 24 * * *',
+  '* * 0 * *',
+  '* * 32 * *',
+  '* * * 13 *',
+  '* * * * 8',
+  '5-1 * * * *',
+  '*/0 * * * *',
+  '*/-1 * * * *',
+  '*/9223372036854775808 * * * *',
+  'a * * * *',
+  '1,,2 * * * *',
+  '1, * * * *',
+  '/2 * * * *',
+  '*/ * * * *',
+  '*/2/3 * * * *',
+  '0 0 * FOO *',
+  '0 0 * * FOO',
+  '@reboot',
+  '* * * * ?',
+] as $bad) {
+  assert!(Expression::parse($bad) == null);
+  discard!(expect_error::<InvalidArgumentException>(fn(): void {
+    discard!(Expression::from($bad));
+  }));
+}
+
+discard!(expect_error::<DiscardedResultError>(fn(): void {
+  Expression::from('* * * * *');
+}));

@@ -97,6 +97,7 @@
 - [Logic Variables](standard-library/logic.md)
 - [Time and Calendars](standard-library/time.md)
 - [Clocks and Sleepers](standard-library/clock.md)
+- [Cron Expressions](standard-library/cron.md)
 - [Retry Policies](standard-library/retry.md)
 - [Circuit Breakers](standard-library/fuse.md)
 - [Rate Limits](standard-library/throttle.md)
