@@ -1,0 +1,11 @@
+namespace Whim\State;
+
+use Whim\Unwind\RuntimeException;
+
+/**
+ * Reports that no transition accepts an event.
+ *
+ * The backtrace points at the `apply` call, which names the machine
+ * and event in source.
+ */
+final class TransitionException extends RuntimeException {}

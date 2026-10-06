@@ -1,0 +1,16 @@
+namespace Whim\State;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** A guard that wraps a function. */
+final readonly class FunctionGuard<S, E> implements Guard<S, E> {
+  #[AlwaysInline]
+  public function __construct(private (fn(S, E, S): bool) $function) {}
+
+  /** Calls the function to check whether the transition may fire. */
+  #[MustUse]
+  public function allows(S $from, E $event, S $to): bool {
+    return ($this->function)($from, $event, $to);
+  }
+}

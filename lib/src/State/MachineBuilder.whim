@@ -1,0 +1,48 @@
+namespace Whim\State;
+
+use Whim\Marker\MustUse;
+
+/**
+ * Collects a machine's transitions and observers.
+ *
+ * Each `build` creates a new machine at the initial state, using the
+ * current lists of transitions and observers.
+ */
+final class MachineBuilder<S, E> {
+  private vec<Transition<S, E>> $transitions = vec[];
+  private vec<Observer<S, E>> $observers = vec[];
+
+  /** Creates a builder for machines starting at a state. */
+  public function __construct(private readonly S $initial) {}
+
+  /**
+   * Declares a transition.
+   *
+   * Declaring several transitions for one state and event is how
+   * guarded alternatives work: `apply` fires the first whose guard
+   * allows the move.
+   */
+  public function allow(
+    S $from,
+    E $event,
+    S $to,
+    null|Guard<S, E> $guard = null,
+  ): void {
+    $this->transitions[] = new Transition::<S, E>($from, $event, $to, $guard);
+  }
+
+  /** Adds an observer to every machine built from here on. */
+  public function observe(Observer<S, E> $observer): void {
+    $this->observers[] = $observer;
+  }
+
+  /** Builds an independent machine at the initial state. */
+  #[MustUse]
+  public function build(): Machine<S, E> {
+    return new Machine::<S, E>(
+      $this->initial,
+      $this->transitions,
+      $this->observers,
+    );
+  }
+}

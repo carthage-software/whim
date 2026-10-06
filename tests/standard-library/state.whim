@@ -1,0 +1,303 @@
+use Whim\Async;
+use Whim\Reference\Strong;
+use Whim\State\FunctionGuard;
+use Whim\State\FunctionObserver;
+use Whim\State\Guard;
+use Whim\State\Machine;
+use Whim\State\MachineBuilder;
+use Whim\State\Observer;
+use Whim\State\Transition;
+use Whim\State\TransitionException;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+
+enum DoorState {
+  case Open;
+  case Closed;
+  case Locked;
+}
+
+enum DoorEvent {
+  case Open;
+  case Close;
+  case Lock;
+  case Unlock;
+}
+
+final class Recorder implements Observer<DoorState, DoorEvent> {
+  public vec<(DoorState, DoorEvent, DoorState)> $moves = vec[];
+
+  public function onTransition(
+    DoorState $from,
+    DoorEvent $event,
+    DoorState $to,
+  ): void {
+    $this->moves[] = ($from, $event, $to);
+  }
+}
+
+function expect_error<E: Throwable>(fn(): void $operation): E {
+  try {
+    $operation();
+  } catch (E $error) {
+    return $error;
+  }
+
+  throw new RuntimeException('expected an error');
+}
+
+$holdsKey = new Strong::<bool>(false);
+$guard = new FunctionGuard::<DoorState, DoorEvent>(
+  fn(
+    DoorState $_from,
+    DoorEvent $_event,
+    DoorState $_to,
+  ): bool => $holdsKey->value,
+);
+
+assert!($guard is Guard<DoorState, DoorEvent>);
+$builder = new MachineBuilder::<DoorState, DoorEvent>(DoorState::Closed);
+$builder->allow(DoorState::Closed, DoorEvent::Open, DoorState::Open);
+$builder->allow(DoorState::Open, DoorEvent::Close, DoorState::Closed);
+$builder->allow(DoorState::Closed, DoorEvent::Lock, DoorState::Locked, $guard);
+$builder->allow(
+  DoorState::Locked,
+  DoorEvent::Unlock,
+  DoorState::Closed,
+  $guard,
+);
+
+$recorder = new Recorder();
+$builder->observe($recorder);
+$door = $builder->build();
+assert!($door->getState() == DoorState::Closed);
+assert!($door->can(DoorEvent::Open));
+assert!(!$door->can(DoorEvent::Close));
+assert!($door->peek(DoorEvent::Open) == DoorState::Open);
+assert!($door->peek(DoorEvent::Close) == null);
+assert!(!$door->can(DoorEvent::Lock));
+$holdsKey->value = true;
+assert!($door->can(DoorEvent::Lock));
+$holdsKey->value = false;
+assert!($door->getState() == DoorState::Closed);
+assert!($recorder->moves == vec[]);
+assert!($door->apply(DoorEvent::Open) == DoorState::Open);
+assert!($door->getState() == DoorState::Open);
+assert!($door->apply(DoorEvent::Close) == DoorState::Closed);
+discard!(expect_error::<TransitionException>(fn(): void {
+  discard!($door->apply(DoorEvent::Lock));
+}));
+
+assert!($door->getState() == DoorState::Closed);
+$holdsKey->value = true;
+assert!($door->apply(DoorEvent::Lock) == DoorState::Locked);
+assert!($door->apply(DoorEvent::Unlock) == DoorState::Closed);
+assert!(
+  $recorder->moves == vec[
+    (DoorState::Closed, DoorEvent::Open, DoorState::Open),
+    (DoorState::Open, DoorEvent::Close, DoorState::Closed),
+    (DoorState::Closed, DoorEvent::Lock, DoorState::Locked),
+    (DoorState::Locked, DoorEvent::Unlock, DoorState::Closed),
+  ],
+);
+
+$second = $builder->build();
+assert!($second->getState() == DoorState::Closed);
+assert!($second->apply(DoorEvent::Open) == DoorState::Open);
+assert!($door->getState() == DoorState::Closed);
+assert!(length!($recorder->moves) == 5u);
+discard!(expect_error::<TypeError>(fn(): void {
+  discard!($door->apply('open'));
+}));
+
+discard!(expect_error::<TypeError>(fn(): void {
+  $builder->allow('closed', DoorEvent::Open, DoorState::Open);
+}));
+
+$order = new Strong::<vec<string>>(vec[]);
+$guarded = new MachineBuilder::<DoorState, DoorEvent>(DoorState::Closed);
+$guarded->allow(
+  DoorState::Closed,
+  DoorEvent::Open,
+  DoorState::Locked,
+  new FunctionGuard::<DoorState, DoorEvent>(
+    fn(DoorState $from, DoorEvent $event, DoorState $to): bool {
+      assert!(
+        $from == DoorState::Closed
+        && $event == DoorEvent::Open
+        && $to == DoorState::Locked,
+      );
+
+      $order->value[] = 'rejected';
+      return false;
+    },
+  ),
+);
+
+$guarded->allow(
+  DoorState::Closed,
+  DoorEvent::Open,
+  DoorState::Open,
+  new FunctionGuard::<DoorState, DoorEvent>(
+    fn(DoorState $from, DoorEvent $event, DoorState $to): bool {
+      assert!(
+        $from == DoorState::Closed
+        && $event == DoorEvent::Open
+        && $to == DoorState::Open,
+      );
+
+      $order->value[] = 'accepted';
+      Async\later();
+      return true;
+    },
+  ),
+);
+
+$guarded->allow(
+  DoorState::Closed,
+  DoorEvent::Open,
+  DoorState::Locked,
+  new FunctionGuard::<DoorState, DoorEvent>(
+    fn(DoorState $_from, DoorEvent $_event, DoorState $_to): bool {
+      $order->value[] = 'unused';
+      return true;
+    },
+  ),
+);
+
+$guarded->observe(
+  new FunctionObserver::<DoorState, DoorEvent>(
+    fn(DoorState $from, DoorEvent $event, DoorState $to): void {
+      assert!(
+        $from == DoorState::Closed
+        && $event == DoorEvent::Open
+        && $to == DoorState::Open,
+      );
+
+      $order->value[] = 'first observer';
+      Async\later();
+    },
+  ),
+);
+
+$guarded->observe(
+  new FunctionObserver::<DoorState, DoorEvent>(
+    fn(DoorState $_from, DoorEvent $_event, DoorState $_to): void {
+      $order->value[] = 'second observer';
+    },
+  ),
+);
+
+$fallthrough = $guarded->build();
+assert!($fallthrough->peek(DoorEvent::Open) == DoorState::Open);
+assert!($order->value == vec['rejected', 'accepted']);
+assert!($fallthrough->getState() == DoorState::Closed);
+$order->value = vec[];
+assert!($fallthrough->apply(DoorEvent::Open) == DoorState::Open);
+assert!(
+  $order->value == vec[
+    'rejected',
+    'accepted',
+    'first observer',
+    'second observer',
+  ],
+);
+
+$snapshots = new MachineBuilder::<int, string>(0);
+$snapshots->allow(0, 'next', 1);
+$old = $snapshots->build();
+$snapshots->allow(1, 'next', 2);
+$notifications = new Strong::<int>(0);
+$snapshots->observe(
+  new FunctionObserver::<int, string>(
+    fn(int $_from, string $_event, int $_to): void {
+      $notifications->value++;
+    },
+  ),
+);
+
+$new = $snapshots->build();
+assert!($old->apply('next') == 1);
+assert!(!$old->can('next'));
+assert!($notifications->value == 0);
+assert!($new->getState() == 0);
+assert!($new->apply('next') == 1);
+assert!($new->apply('next') == 2);
+assert!($notifications->value == 2);
+
+$nullable = new MachineBuilder::<null|int, string>(null);
+$nullable->allow(null, 'start', 1);
+$nullable->allow(1, 'clear', null);
+$nullable = $nullable->build();
+assert!($nullable->can('start'));
+assert!($nullable->apply('start') == 1);
+assert!($nullable->can('clear'));
+assert!($nullable->peek('clear') == null);
+assert!($nullable->apply('clear') == null);
+assert!($nullable->getState() == null);
+assert!(!$nullable->can('missing'));
+assert!($door->getState() == DoorState::Closed);
+
+$event = fresh!();
+$direct = new Machine::<uint, fresh>(
+  0u,
+  vec[new Transition::<uint, fresh>(0u, $event, 1u, null)],
+  vec[],
+);
+
+assert!(!$direct->can(fresh!()));
+assert!($direct->apply($event) == 1u);
+$empty = new Machine::<int, string>(0, vec[], vec[]);
+assert!(!$empty->can('next'));
+discard!(expect_error::<TransitionException>(fn(): void {
+  discard!($empty->apply('next'));
+}));
+
+$expected = new RuntimeException('callback failed');
+$throwsGuard = new MachineBuilder::<int, string>(0);
+$throwsGuard->allow(
+  0,
+  'next',
+  1,
+  new FunctionGuard::<int, string>(
+    fn(int $_from, string $_event, int $_to): bool => throw $expected,
+  ),
+);
+
+$throwsGuard->allow(0, 'next', 2);
+$throwsGuard = $throwsGuard->build();
+$caught = expect_error::<RuntimeException>(fn(): void {
+  discard!($throwsGuard->apply('next'));
+});
+
+assert!($caught == $expected);
+assert!($throwsGuard->getState() == 0);
+
+$throwsObserver = new MachineBuilder::<int, string>(0);
+$throwsObserver->allow(0, 'next', 1);
+$throwsObserver->observe(
+  new FunctionObserver::<int, string>(
+    fn(int $_from, string $_event, int $_to): void {
+      throw $expected;
+    },
+  ),
+);
+
+$notifications->value = 0;
+$throwsObserver->observe(
+  new FunctionObserver::<int, string>(
+    fn(int $_from, string $_event, int $_to): void {
+      $notifications->value++;
+    },
+  ),
+);
+
+$throwsObserver = $throwsObserver->build();
+$caught = expect_error::<RuntimeException>(fn(): void {
+  discard!($throwsObserver->apply('next'));
+});
+
+assert!($caught == $expected);
+assert!($throwsObserver->getState() == 1);
+assert!($notifications->value == 0);

@@ -98,6 +98,7 @@
 - [Retry Policies](standard-library/retry.md)
 - [Circuit Breakers](standard-library/fuse.md)
 - [Rate Limits](standard-library/throttle.md)
+- [State Machines](standard-library/state.md)
 - [Encoding and Data Formats](standard-library/formats.md)
 - [Files and I/O](standard-library/io.md)
 - [Environment, Processes, and Terminals](core-library/env.md)

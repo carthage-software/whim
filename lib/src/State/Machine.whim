@@ -1,0 +1,87 @@
+namespace Whim\State;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+
+/**
+ * A running finite state machine.
+ *
+ * The machine holds one current state. `apply` moves it through the
+ * first declared transition that matches the state and event and
+ * whose guard allows the move, then calls each observer. It throws
+ * `TransitionException` when no transition accepts an event. `peek`
+ * returns the target without moving; `can` checks whether a move is allowed.
+ *
+ * `MachineBuilder` is the usual way to construct one.
+ */
+final class Machine<S, E> {
+  private S $state;
+
+  public function __construct(
+    S $initial,
+    private readonly vec<Transition<S, E>> $transitions,
+    private readonly vec<Observer<S, E>> $observers,
+  ) {
+    $this->state = $initial;
+  }
+
+  /** Returns the current state. */
+  #[MustUse]
+  public function getState(): S {
+    return $this->state;
+  }
+
+  /** Returns where an event would lead, or null when it cannot fire. */
+  #[MustUse]
+  public function peek(E $event): null|S {
+    return $this->transition($event)?->to;
+  }
+
+  /** Whether an event can fire right now. */
+  #[MustUse]
+  public function can(E $event): bool {
+    return $this->transition($event) != null;
+  }
+
+  /**
+   * Fires an event and returns the new state.
+   *
+   * @throws TransitionException when no transition accepts the event.
+   */
+  #[NeverInline]
+  #[TrackCaller]
+  public function apply(E $event): S {
+    final $transition = $this->transition($event);
+    if (null == $transition) {
+      throw new TransitionException(
+        'no transition accepts the event in the current state',
+      );
+    }
+
+    final $from = $this->state;
+    final $to = $transition->to;
+    $this->state = $to;
+    foreach ($this->observers as $observer) {
+      $observer->onTransition($from, $event, $to);
+    }
+
+    return $to;
+  }
+
+  #[MustUse]
+  private function transition(E $event): null|Transition<S, E> {
+    foreach ($this->transitions as $transition) {
+      if ($transition->from != $this->state || $transition->event != $event) {
+        continue;
+      }
+
+      final $guard = $transition->guard ?? return $transition;
+      if ($guard->allows($transition->from, $event, $transition->to)) {
+        return $transition;
+      }
+    }
+
+    return null;
+  }
+}

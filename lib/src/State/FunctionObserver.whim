@@ -1,0 +1,14 @@
+namespace Whim\State;
+
+use Whim\Marker\AlwaysInline;
+
+/** An observer that wraps a function. */
+final readonly class FunctionObserver<S, E> implements Observer<S, E> {
+  #[AlwaysInline]
+  public function __construct(private (fn(S, E, S): void) $function) {}
+
+  /** Calls the function after a transition fires. */
+  public function onTransition(S $from, E $event, S $to): void {
+    ($this->function)($from, $event, $to);
+  }
+}

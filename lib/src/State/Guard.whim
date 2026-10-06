@@ -1,0 +1,16 @@
+namespace Whim\State;
+
+use Whim\Marker\MustUse;
+
+/**
+ * Decides whether one transition may fire.
+ *
+ * A transition without a guard always fires; with one, the guard sees
+ * the whole move and may refuse it, and `apply` falls through to the
+ * next declared transition for the same state and event.
+ */
+interface Guard<S, E> {
+  /** Whether the transition may fire. */
+  #[MustUse]
+  public function allows(S $from, E $event, S $to): bool;
+}

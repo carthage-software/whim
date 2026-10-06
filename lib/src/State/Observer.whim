@@ -1,0 +1,7 @@
+namespace Whim\State;
+
+/** Receives each completed transition. */
+interface Observer<S, E> {
+  /** Called after a transition fires. */
+  public function onTransition(S $from, E $event, S $to): void;
+}

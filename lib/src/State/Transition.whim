@@ -1,0 +1,16 @@
+namespace Whim\State;
+
+/**
+ * A source state, an event, a target state, and an optional guard.
+ *
+ * `MachineBuilder::allow` creates these. A caller can also pass a vec
+ * of transitions to the `Machine` constructor.
+ */
+final readonly class Transition<S, E> {
+  public function __construct(
+    public S $from,
+    public E $event,
+    public S $to,
+    public null|Guard<S, E> $guard,
+  ) {}
+}

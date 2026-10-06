@@ -29,6 +29,7 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Reflection\Member`    | methods, properties, constants, and enum cases               |
 | `Whim\Reflection\Type`      | type forms and their parts                                   |
 | `Whim\Result`               | `Ok`, `Err`, and throwable capture                           |
+| `Whim\State`                | typed state machines, guards, and observers                   |
 | `Whim\Symbol`               | symbol lookup and symbol kinds                               |
 | `Whim\Type`                 | engine-local type identifiers                                |
 | `Whim\Unwind`               | errors, exceptions, throwables, and trace frames             |
@@ -38,6 +39,8 @@ See [Core Types and Functions](core.md), [Function Helpers](fn.md),
 [Reflection](reflection.md), [Option and
 Result](../core-library/errors.md), and [Built-in
 Attributes](../core-library/attributes.md).
+
+See [State Machines](state.md) for typed transitions, guards, and observers.
 
 See [Variation](variation.md) and [Logic Variables](logic.md) for values with
 explicit alternatives or later bindings.

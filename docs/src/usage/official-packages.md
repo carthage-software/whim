@@ -7,16 +7,6 @@ the main Whim repository and do not ship with the standard library.
 These packages use names under `Trifle\`. Their Git tags define their
 versions. Install them through Whim's Git package manager.
 
-Clocks and sleepers ship in the standard library under
-[`Whim\Clock`](../standard-library/clock.md). Server-sent events ship under
-[`Whim\HTTP\SSE`](../standard-library/http-sse.md). Function helpers ship under
-[`Whim\Fn`](../standard-library/fn.md).
-
-Retries, circuit breakers, and rate limits also ship in the standard library
-under [`Whim\Retry`](../standard-library/retry.md),
-[`Whim\Fuse`](../standard-library/fuse.md), and
-[`Whim\Throttle`](../standard-library/throttle.md).
-
 | Package                                                      | Description                                                  | Install                                                    |
 | ------------------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------- |
 | [`ansi`](https://codeberg.org/trifle/ansi)                   | ANSI colours, styles, cursor movement, and screen controls.  | `whim add git+ssh://git@codeberg.org/trifle/ansi`          |
@@ -45,7 +35,6 @@ under [`Whim\Retry`](../standard-library/retry.md),
 | [`queue`](https://codeberg.org/trifle/queue)                 | Message queues with retries, workers, and pluggable stores.  | `whim add git+ssh://git@codeberg.org/trifle/queue`         |
 | [`seal`](https://codeberg.org/trifle/seal)                   | Sealed payloads and signed JWTs with key rotation.           | `whim add git+ssh://git@codeberg.org/trifle/seal`          |
 | [`semver`](https://codeberg.org/trifle/semver)               | Semantic versions and Cargo-style requirements.              | `whim add git+ssh://git@codeberg.org/trifle/semver`        |
-| [`state`](https://codeberg.org/trifle/state)                 | Typed finite state machines.                                 | `whim add git+ssh://git@codeberg.org/trifle/state`         |
 | [`template`](https://codeberg.org/trifle/template)           | Logic-less Mustache templates rendered from JSON values.     | `whim add git+ssh://git@codeberg.org/trifle/template`      |
 | [`theme`](https://codeberg.org/trifle/theme)                 | Paints and themes for terminal text.                         | `whim add git+ssh://git@codeberg.org/trifle/theme`         |
 | [`trace`](https://codeberg.org/trifle/trace)                 | Timed spans recorded through structured logs.                | `whim add git+ssh://git@codeberg.org/trifle/trace`         |
