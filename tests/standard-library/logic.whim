@@ -1,0 +1,227 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Logic;
+use Whim\Logic\ConflictException;
+use Whim\Logic\Variable;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+
+function logic_expect_error<E: Throwable>(fn(): void $operation): void {
+  try {
+    $operation();
+  } catch (E $_) {
+    return;
+  }
+
+  assert!(false, 'expected an error');
+}
+
+$x = new Variable::<int>();
+$y = new Variable::<int>();
+assert!(!$x->isBound());
+Logic\unify::<int>($x, $y);
+Logic\unify::<int>($x, $x);
+Logic\unify::<int>($y, $x);
+$y->bind(42);
+assert!($x->isBound());
+assert!($y->isBound());
+assert!($x->get() == 42);
+assert!($y->get() == 42);
+$x->bind(42);
+logic_expect_error::<ConflictException>(fn(): void {
+  $y->bind(43);
+});
+
+assert!($y->get() == 42);
+
+$alias = $x;
+assert!($alias->get() == 42);
+$nullable = new Variable::<null|int>();
+assert!(!$nullable->isBound());
+$nullable->bind(null);
+assert!($nullable->isBound());
+assert!($nullable->get() == null);
+$nullable->bind(null);
+logic_expect_error::<ConflictException>(fn(): void {
+  $nullable->bind(1);
+});
+
+$text = new Variable::<string>();
+$text->bind('ready');
+assert!($text->get() == 'ready');
+logic_expect_error::<TypeError>(fn(): void {
+  $text->bind(1);
+});
+
+logic_expect_error::<TypeError>(fn(): void {
+  $x->unify($text);
+});
+
+assert!($x->get() == 42);
+assert!($text->get() == 'ready');
+$identity = fresh!();
+$fresh = new Variable::<fresh>();
+$fresh->bind($identity);
+assert!($fresh->get() == $identity);
+
+$bound = new Variable::<int>();
+$bound->bind(7);
+$emptyLeft = new Variable::<int>();
+$emptyRight = new Variable::<int>();
+$emptyLeft->unify($bound);
+$bound->unify($emptyRight);
+assert!($emptyLeft->get() == 7);
+assert!($emptyRight->get() == 7);
+$equal = new Variable::<int>();
+$equal->bind(7);
+$equal->unify($bound);
+assert!($equal->get() == 7);
+$unequal = new Variable::<int>();
+$unequal->bind(8);
+logic_expect_error::<ConflictException>(fn(): void {
+  $equal->unify($unequal);
+});
+
+assert!($bound->get() == 7);
+assert!($unequal->get() == 8);
+
+// Values compare by Whim equality; NaN does not equal itself.
+$nan = new Variable::<float>();
+$nan->bind(Whim\Math\NAN);
+logic_expect_error::<ConflictException>(fn(): void {
+  $nan->bind(Whim\Math\NAN);
+});
+
+$nan->unify($nan);
+
+// Readers waiting on both variables must survive a merge.
+$left = new Variable::<int>();
+$right = new Variable::<int>();
+$waiting = vec[];
+for ($i = 0; $i < 32; $i++) {
+  $source = $i % 2 == 0 ? $left : $right;
+  $waiting[] = Async\spawn::<int>(fn(): int => $source->get());
+}
+
+Async\later();
+$left->unify($right);
+$right->bind(99);
+foreach ($waiting as $reader) {
+  assert!($reader->await() == 99);
+}
+
+// Merging with a bound root also wakes readers, in either argument order.
+foreach (vec[false, true] as $reverse) {
+  $pending = new Variable::<int>();
+  $known = new Variable::<int>();
+  $known->bind(17);
+  $reader = Async\spawn::<int>(fn(): int => $pending->get());
+  Async\later();
+  if ($reverse) {
+    $known->unify($pending);
+  } else {
+    $pending->unify($known);
+  }
+
+  assert!($reader->await() == 17);
+}
+
+$pendingNull = new Variable::<null>();
+$nullReader = Async\spawn::<null>(fn(): null => $pendingNull->get());
+Async\later();
+$pendingNull->bind(null);
+assert!($nullReader->await() == null);
+
+// Cancelling one reader after a merge leaves the other readers and binding intact.
+$left = new Variable::<int>();
+$right = new Variable::<int>();
+$cancellation = new SignalCancellationToken();
+$cancelled = Async\spawn::<int>(fn(): int => $right->get($cancellation));
+$survivor = Async\spawn::<int>(fn(): int => $left->get());
+Async\later();
+$left->unify($right);
+$cancellation->cancel();
+logic_expect_error::<CancelledException>(fn(): void {
+  $cancelled->await();
+});
+
+assert!(!$right->isBound());
+$right->bind(123);
+assert!($survivor->await() == 123);
+assert!($right->get() == 123);
+logic_expect_error::<CancelledException>(fn(): void {
+  $right->get($cancellation);
+});
+
+// A cancelled read must not stop a later read on the same variable.
+$pending = new Variable::<int>();
+$cancellation = new SignalCancellationToken();
+$cancelled = Async\spawn::<int>(fn(): int => $pending->get($cancellation));
+Async\later();
+$cancellation->cancel();
+logic_expect_error::<CancelledException>(fn(): void {
+  $cancelled->await();
+});
+
+$reader = Async\spawn::<int>(fn(): int => $pending->get());
+Async\later();
+$pending->bind(5);
+assert!($reader->await() == 5);
+
+// Cancelling as a binding queues its readers must not resume a reader twice.
+$pending = new Variable::<int>();
+$cancellation = new SignalCancellationToken();
+$reader = Async\spawn::<int>(fn(): int => $pending->get($cancellation));
+Async\later();
+$pending->bind(6);
+$cancellation->cancel();
+logic_expect_error::<CancelledException>(fn(): void {
+  $reader->await();
+});
+
+Async\later();
+assert!($pending->get() == 6);
+
+// Task shutdown also removes a read after the variable has moved to another root.
+$left = new Variable::<int>();
+$right = new Variable::<int>();
+$finalized = new Whim\Reference\Strong::<bool>(false);
+$task = Whim\_Private\defer_task(fn(): void {
+  try {
+    $right->get();
+    assert!(false, 'read should have been cancelled');
+  } finally {
+    $finalized->value = true;
+  }
+});
+
+Async\later();
+$left->unify($right);
+Whim\_Private\cancel_task($task);
+Async\drain();
+assert!($finalized->value);
+$left->bind(12);
+Async\later();
+assert!($right->get() == 12);
+
+// Repeated links and links in reverse order cannot form a parent cycle.
+$variables = vec[];
+for ($i = 0; $i < 256; $i++) {
+  $variables[] = new Variable::<int>();
+}
+
+for ($width = 1; $width < 256; $width *= 2) {
+  for ($i = 0; $i + $width < 256; $i += $width * 2) {
+    $variables[$i]->unify($variables[$i + $width]);
+  }
+}
+
+for ($i = 255; $i > 0; $i--) {
+  $variables[$i]->unify($variables[$i - 1]);
+}
+
+$variables[255]->bind(256);
+foreach ($variables as $variable) {
+  assert!($variable->get() == 256);
+}

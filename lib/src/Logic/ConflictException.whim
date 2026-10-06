@@ -1,0 +1,6 @@
+namespace Whim\Logic;
+
+use Whim\Unwind\LogicException;
+
+/** Reports an attempt to bind linked variables to unequal values. */
+final class ConflictException extends LogicException {}

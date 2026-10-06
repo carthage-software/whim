@@ -1,0 +1,127 @@
+namespace Whim\Logic;
+
+use Whim\Async\CancellationToken;
+use Whim\Async\Deferred;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** A shared variable that can be bound once or linked to another variable. */
+final class Variable<T> {
+  private null|Variable<T> $parent = null;
+  private uint $rank = 0u;
+  private null|(T,) $result = null;
+  private dict<fresh, Deferred<T>> $waiters = dict[];
+
+  /** Reports whether this variable or one linked to it has a value. */
+  #[MustUse]
+  #[TrackCaller]
+  public function isBound(): bool {
+    return null != $this->root()->result;
+  }
+
+  /** Binds the variable, accepting a repeated binding only when values compare equal. */
+  #[TrackCaller]
+  public function bind(T $value): void {
+    $root = $this->root();
+    if (null != $root->result) {
+      if (($root->result as (T,))[0] != $value) {
+        throw new ConflictException(
+          'logic variable is bound to a different value',
+        );
+      }
+
+      return;
+    }
+
+    $root->result = ($value,);
+    $root->wake();
+  }
+
+  /** Waits for a binding. Cancellation affects only this reader. */
+  #[MustUse]
+  #[TrackCaller]
+  public function get(null|CancellationToken $cancellation = null): T {
+    $cancellation?->throwIfCancellationRequested();
+    $root = $this->root();
+    if (null != $root->result) {
+      return ($root->result as (T,))[0];
+    }
+
+    $id = fresh!();
+    $waiter = new Deferred::<T>();
+    $root->waiters[$id] = $waiter;
+    try {
+      return $waiter->getFuture()->await($cancellation);
+    } finally {
+      $root = $this->root();
+      if (contains_key!($root->waiters, $id)) {
+        remove!($root->waiters, $id);
+      }
+    }
+  }
+
+  /** Links the variables, rejecting unequal bindings before changing either. */
+  #[TrackCaller]
+  public function unify(Variable<T> $other): void {
+    $left = $this->root();
+    $right = $other->root();
+    if ($left == $right) {
+      return;
+    }
+
+    if (
+      null != $left->result
+      && null != $right->result
+      && ($left->result as (T,))[0] != ($right->result as (T,))[0]
+    ) {
+      throw new ConflictException('logic variables have different bindings');
+    }
+
+    if ($left->rank < $right->rank) {
+      ($left, $right) = ($right, $left);
+    }
+
+    foreach ($right->waiters as $id => $waiter) {
+      $left->waiters[$id] = $waiter;
+    }
+
+    $left->result ??= $right->result;
+    $right->parent = $left;
+    $right->result = null;
+    $right->waiters = dict[];
+    if ($left->rank == $right->rank) {
+      $left->rank++;
+    }
+
+    if (null != $left->result) {
+      $left->wake();
+    }
+  }
+
+  /** Finds the binding state and shortens the path to it. */
+  private function root(): Variable<T> {
+    $root = $this;
+    while (null != $root->parent) {
+      $root = $root->parent as Variable<T>;
+    }
+
+    $node = $this;
+    while (null != $node->parent) {
+      $next = $node->parent as Variable<T>;
+      $node->parent = $root;
+      $node = $next;
+    }
+
+    return $root;
+  }
+
+  /** Gives each waiting reader the bound value. */
+  private function wake(): void {
+    $value = ($this->result as (T,))[0];
+    $waiters = $this->waiters;
+    $this->waiters = dict[];
+    foreach ($waiters as $waiter) {
+      $waiter->complete($value);
+    }
+  }
+}

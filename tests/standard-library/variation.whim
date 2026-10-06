@@ -1,0 +1,179 @@
+use Whim\Reference\Strong;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\LogicException;
+use Whim\Unwind\Throwable;
+use Whim\Variation;
+use Whim\Variation\Choice;
+use Whim\Variation\Value;
+
+function variation_expect_error<E: Throwable>(fn(): void $operation): void {
+  try {
+    $operation();
+  } catch (E $_) {
+    return;
+  }
+
+  assert!(false, 'expected an error');
+}
+
+$plain = Variation\value::<int>(42);
+assert!($plain is Variation\Variation<int>);
+assert!($plain->select(dict[]) == 42);
+assert!($plain->specialize(dict[]) == $plain);
+assert!(
+  'n=42' == $plain->map::<string>(fn(int $n): string => 'n=' . $n)->value,
+);
+
+assert!(Variation\value::<null>(null)->select(dict[]) == null);
+$object = new Strong::<int>(7);
+assert!(Variation\value::<Strong<int>>($object)->select(dict[]) == $object);
+
+$dimension = fresh!();
+$other = fresh!();
+$x = Variation\choose::<int>($dimension, 10, 20);
+$y = Variation\choose::<int>($dimension, 1, 2);
+assert!($x->whenFalse is Value<int>);
+assert!($x->select(dict[$dimension => false]) == 10);
+assert!($x->select(dict[$dimension => true]) == 20);
+assert!($x->specialize(dict[]) == $x);
+assert!($x->specialize(dict[$dimension => true]) is Value<int>);
+assert!($x->specialize(dict[$dimension => true])->select(dict[]) == 20);
+variation_expect_error::<InvalidArgumentException>(fn(): void {
+  $x->select(dict[]);
+});
+
+variation_expect_error::<InvalidArgumentException>(fn(): void {
+  $x->select(dict[$other => false]);
+});
+
+$calls = new Strong::<int>(0);
+$total = Variation\combine::<int, int, int>($x, $y, fn(int $a, int $b): int {
+  $calls->value++;
+  return $a + $b;
+});
+
+assert!(2 == $calls->value);
+assert!($total->select(dict[$dimension => false]) == 11);
+assert!($total->select(dict[$dimension => true]) == 22);
+assert!(2 == $calls->value);
+
+$independent = Variation\choose::<int>($other, 1, 2);
+$calls->value = 0;
+$cross = Variation\combine::<int, int, int>(
+  $x,
+  $independent,
+  fn(int $a, int $b): int {
+    $calls->value++;
+    return $a + $b;
+  },
+);
+
+assert!(4 == $calls->value);
+assert!($cross->select(dict[$dimension => false, $other => false]) == 11);
+assert!($cross->select(dict[$dimension => false, $other => true]) == 12);
+assert!($cross->select(dict[$dimension => true, $other => false]) == 21);
+assert!($cross->select(dict[$dimension => true, $other => true]) == 22);
+$partial = $cross->specialize(dict[$other => true]);
+assert!($partial->select(dict[$dimension => false]) == 12);
+assert!($partial->select(dict[$dimension => true]) == 22);
+assert!($cross->select(dict[$dimension => false, $other => false]) == 11);
+
+// The same dimension may appear below itself, but those choices stay linked.
+$nested = new Choice::<int>(
+  $dimension,
+  Variation\choose::<int>($dimension, 10, -1),
+  Variation\choose::<int>($dimension, -2, 20),
+);
+
+$calls->value = 0;
+$mapped = $nested->map::<string>(fn(int $n): string {
+  assert!($n > 0);
+  $calls->value++;
+  return 'n=' . $n;
+});
+
+assert!(2 == $calls->value);
+assert!($mapped->select(dict[$dimension => false]) == 'n=10');
+assert!($mapped->select(dict[$dimension => true]) == 'n=20');
+assert!($nested->specialize(dict[$dimension => false])->select(dict[]) == 10);
+$nestedTotal = Variation\combine::<int, int, int>(
+  $nested,
+  $y,
+  fn(int $a, int $b): int => $a + $b,
+);
+
+assert!($nestedTotal->select(dict[$dimension => false]) == 11);
+assert!($nestedTotal->select(dict[$dimension => true]) == 22);
+
+// Dimension order in one tree need not match the order in another.
+$left = new Choice::<int>(
+  $dimension,
+  Variation\choose::<int>($other, 1, 2),
+  Variation\choose::<int>($other, 3, 4),
+);
+
+$right = new Choice::<int>(
+  $other,
+  Variation\choose::<int>($dimension, 10, 30),
+  Variation\choose::<int>($dimension, 20, 40),
+);
+
+$calls->value = 0;
+$sum = Variation\combine::<int, int, int>(
+  $left,
+  $right,
+  fn(int $a, int $b): int {
+    $calls->value++;
+    return $a + $b;
+  },
+);
+
+assert!(4 == $calls->value);
+foreach (vec[false, true] as $a) {
+  foreach (vec[false, true] as $b) {
+    $selection = dict[$dimension => $a, $other => $b];
+    assert!(
+      $sum->select($selection)
+      == $left->select($selection) + $right->select($selection),
+    );
+  }
+}
+
+$path = new Choice::<int>($dimension, $plain, $independent);
+assert!($path->select(dict[$dimension => false]) == 42);
+variation_expect_error::<InvalidArgumentException>(fn(): void {
+  $path->select(dict[$dimension => true]);
+});
+
+$text = Variation\combine::<int, string, string>(
+  $x,
+  Variation\value::<string>('!'),
+  fn(int $a, string $b): string => $a . $b,
+);
+
+assert!($text->select(dict[$dimension => true]) == '20!');
+$nullable = Variation\choose::<null|string>($dimension, null, 'bound');
+assert!($nullable->select(dict[$dimension => false]) == null);
+assert!($nullable->select(dict[$dimension => true]) == 'bound');
+$identity = fresh!();
+assert!(Variation\value::<fresh>($identity)->select(dict[]) == $identity);
+
+$error = new LogicException('mapping failed');
+try {
+  $x->map::<never>(fn(int $_): never => throw $error);
+  assert!(false);
+} catch (LogicException $caught) {
+  assert!($caught == $error);
+}
+
+try {
+  Variation\combine::<int, int, never>(
+    $x,
+    $y,
+    fn(int $_a, int $_b): never => throw $error,
+  );
+
+  assert!(false);
+} catch (LogicException $caught) {
+  assert!($caught == $error);
+}

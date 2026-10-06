@@ -1,0 +1,67 @@
+namespace Whim\Variation;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Transform;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Two alternatives that share a choice dimension. */
+final readonly class Choice<out T> implements Variation<T> {
+  /** Stores the branches without copying them. False selects the first. */
+  public function __construct(
+    public fresh $dimension,
+    public Variation<T> $whenFalse,
+    public Variation<T> $whenTrue,
+  ) {}
+
+  /** Selects a branch and follows its choices. */
+  #[MustUse]
+  #[TrackCaller]
+  public function select(dict<fresh, bool> $selection): T {
+    if (!contains_key!($selection, $this->dimension)) {
+      throw new InvalidArgumentException('missing variation selection');
+    }
+
+    return (
+      $selection[$this->dimension] ? $this->whenTrue : $this->whenFalse
+    )->select($selection);
+  }
+
+  /** Maps reachable branches now, keeping repeated dimensions in step. */
+  #[MustUse]
+  #[TrackCaller]
+  public function map<U>(Transform<T, U> $function): Choice<U> {
+    return new Choice::<U>(
+      $this->dimension,
+      $this->whenFalse->specialize(dict[$this->dimension => false])->map::<U>(
+        $function,
+      ),
+      $this->whenTrue->specialize(dict[$this->dimension => true])->map::<U>(
+        $function,
+      ),
+    );
+  }
+
+  /** Resolves supplied dimensions, including repeated choices below them. */
+  #[MustUse]
+  #[TrackCaller]
+  public function specialize(dict<fresh, bool> $selection): Variation<T> {
+    if (contains_key!($selection, $this->dimension)) {
+      return (
+        $selection[$this->dimension] ? $this->whenTrue : $this->whenFalse
+      )->specialize($selection);
+    }
+
+    $whenFalse = $selection;
+    $whenFalse[$this->dimension] = false;
+    $whenTrue = $selection;
+    $whenTrue[$this->dimension] = true;
+    $falseBranch = $this->whenFalse->specialize($whenFalse);
+    $trueBranch = $this->whenTrue->specialize($whenTrue);
+    if ($falseBranch == $this->whenFalse && $trueBranch == $this->whenTrue) {
+      return $this;
+    }
+
+    return new Choice::<T>($this->dimension, $falseBranch, $trueBranch);
+  }
+}

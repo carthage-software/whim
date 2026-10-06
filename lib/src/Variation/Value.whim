@@ -1,0 +1,30 @@
+namespace Whim\Variation;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Transform;
+
+/** A value with no choices. */
+final readonly class Value<out T> implements Variation<T> {
+  /** Wraps a plain value. */
+  public function __construct(public T $value) {}
+
+  /** Returns the value. */
+  #[MustUse]
+  public function select(dict<fresh, bool> $selection): T {
+    return $this->value;
+  }
+
+  /** Applies the function now. */
+  #[MustUse]
+  #[TrackCaller]
+  public function map<U>(Transform<T, U> $function): Value<U> {
+    return new Value::<U>($function($this->value));
+  }
+
+  /** Returns this value unchanged. */
+  #[MustUse]
+  public function specialize(dict<fresh, bool> $selection): Value<T> {
+    return $this;
+  }
+}

@@ -1,0 +1,51 @@
+namespace Whim\Variation;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+
+/** Wraps a plain value with no choices. */
+#[MustUse]
+function value<T>(T $value): Value<T> {
+  return new Value::<T>($value);
+}
+
+/** Chooses between two plain values. False selects the first. */
+#[MustUse]
+#[TrackCaller]
+function choose<T>(fresh $dimension, T $whenFalse, T $whenTrue): Choice<T> {
+  return new Choice::<T>(
+    $dimension,
+    new Value::<T>($whenFalse),
+    new Value::<T>($whenTrue),
+  );
+}
+
+/** Combines reachable pairs now, keeping choices with the same dimension in step. */
+#[MustUse]
+#[TrackCaller]
+function combine<A, B, C>(
+  Variation<A> $left,
+  Variation<B> $right,
+  fn(A, B): C $function,
+): Variation<C> {
+  if ($left is Value<A>) {
+    return $right->map::<C>(fn(B $value): C => $function($left->value, $value));
+  }
+
+  $choice = $left as Choice<A>;
+  $whenFalse = dict[$choice->dimension => false];
+  $whenTrue = dict[$choice->dimension => true];
+  return new Choice::<C>(
+    $choice->dimension,
+    combine::<A, B, C>(
+      $choice->whenFalse->specialize($whenFalse),
+      $right->specialize($whenFalse),
+      $function,
+    ),
+    combine::<A, B, C>(
+      $choice->whenTrue->specialize($whenTrue),
+      $right->specialize($whenTrue),
+      $function,
+    ),
+  );
+}

@@ -90,6 +90,8 @@
 - [Reflection](standard-library/reflection.md)
 - [Strings, Numbers, and Binary Data](standard-library/data.md)
 - [Collections and Data Structures](standard-library/collections.md)
+- [Variation](standard-library/variation.md)
+- [Logic Variables](standard-library/logic.md)
 - [Time and Calendars](standard-library/time.md)
 - [Encoding and Data Formats](standard-library/formats.md)
 - [Files and I/O](standard-library/io.md)

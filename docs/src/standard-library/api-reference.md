@@ -16,6 +16,7 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Enum`                 | interfaces implemented by all enums                                     |
 | `Whim\GC`                   | explicit cycle collection                                               |
 | `Whim\Lint`                 | scoped lint settings                                                    |
+| `Whim\Logic`                | single-assignment variables, linking, and waiting                        |
 | `Whim\Marker`               | built-in attributes and compiler markers                                |
 | `Whim\Option`               | `Some`, `None`, and option helpers                                      |
 | `Whim\Promise`              | the read-only async result contract                                     |
@@ -30,10 +31,14 @@ This index lists the public standard-library namespaces. Names that end in
 | `Whim\Symbol`               | symbol lookup and symbol kinds                                          |
 | `Whim\Type`                 | engine-local type identifiers                                           |
 | `Whim\Unwind`               | errors, exceptions, throwables, and trace frames                        |
+| `Whim\Variation`            | values with correlated choices                                          |
 
 See [Core Types and Functions](core.md), [Reflection](reflection.md), [Option and
 Result](../core-library/errors.md), and [Built-in
 Attributes](../core-library/attributes.md).
+
+See [Variation](variation.md) and [Logic Variables](logic.md) for values with
+explicit alternatives or later bindings.
 
 ## Strings, numbers, and collections
 

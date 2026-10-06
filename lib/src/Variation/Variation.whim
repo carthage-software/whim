@@ -1,0 +1,23 @@
+namespace Whim\Variation;
+
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\Transform;
+
+/** A value that may depend on choices named by fresh identities. */
+interface Variation<out T> for Value, Choice {
+  /** Selects a value, failing if a choice on its path has no selection. */
+  #[MustUse]
+  #[TrackCaller]
+  public function select(dict<fresh, bool> $selection): T;
+
+  /** Maps each reachable alternative now, preserving shared dimensions. */
+  #[MustUse]
+  #[TrackCaller]
+  public function map<U>(Transform<T, U> $function): Variation<U>;
+
+  /** Resolves supplied dimensions and leaves the other choices intact. */
+  #[MustUse]
+  #[TrackCaller]
+  public function specialize(dict<fresh, bool> $selection): Variation<T>;
+}

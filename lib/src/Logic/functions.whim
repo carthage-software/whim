@@ -1,0 +1,9 @@
+namespace Whim\Logic;
+
+use Whim\Marker\TrackCaller;
+
+/** Links two variables so binding either gives both the same value. */
+#[TrackCaller]
+function unify<T>(Variable<T> $left, Variable<T> $right): void {
+  $left->unify($right);
+}
