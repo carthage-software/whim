@@ -91,7 +91,7 @@ final readonly class Expression implements ToString {
     }
 
     $daysOfWeek = dict[];
-    foreach ($weekdays as $day => _) {
+    foreach ($weekdays as $day => $_) {
       $daysOfWeek[match ($day) {
         0 => 7,
         _ => $day,
