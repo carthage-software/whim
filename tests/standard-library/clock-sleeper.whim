@@ -1,0 +1,123 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Clock\FrozenClock;
+use Whim\Clock\Sleeper;
+use Whim\Clock\SystemSleeper;
+use Whim\Clock\VirtualSleeper;
+use Whim\Default\Default;
+use Whim\Time\Duration;
+use Whim\Time\Instant;
+use Whim\Time\SystemTime;
+
+function expect_cancellation(fn(): void $operation): void {
+  try {
+    $operation();
+  } catch (CancelledException $_) {
+    return;
+  }
+
+  assert!(false, 'expected cancellation');
+}
+
+$system = new SystemSleeper();
+assert!($system is Sleeper&Default);
+assert!(SystemSleeper::default() is SystemSleeper);
+$started = Instant::now();
+$system->sleep(Duration::fromMilliseconds(5));
+assert!($started->elapsed()->getTotalMilliseconds() >= 4.0);
+$system->sleep(Duration::zero());
+$system->sleep(Duration::fromSeconds(-1));
+
+$clock = FrozenClock::atUnixTimestamp(0);
+$virtual = new VirtualSleeper($clock);
+assert!($virtual is Sleeper);
+$virtual->sleep(Duration::fromDays(365));
+assert!($clock->now()->getSeconds() == 31_536_000);
+$virtual->sleep(Duration::nanosecond());
+assert!($clock->now()->getNanoseconds() == 1);
+$reading = $clock->now();
+$virtual->sleep(Duration::zero());
+$virtual->sleep(Duration::fromSeconds(-60));
+assert!($clock->now()->equals($reading));
+
+// Cancellation before sleeping adds no virtual time, even for a positive duration.
+$cancelled = new SignalCancellationToken();
+$cancelled->cancel();
+foreach (vec[$system, $virtual] as $sleeper) {
+  foreach (vec[
+    Duration::second(),
+    Duration::zero(),
+    Duration::fromSeconds(-1),
+  ] as $duration) {
+    expect_cancellation(fn(): void {
+      $sleeper->sleep($duration, $cancelled);
+    });
+  }
+}
+
+assert!($clock->now()->equals($reading));
+
+// Both sleepers allow another task to cancel a pending sleep.
+foreach (vec[$system, $virtual] as $sleeper) {
+  $cancellation = new SignalCancellationToken();
+  $sleep = Async\spawn::<null>(fn(): null {
+    $sleeper->sleep(Duration::fromDays(1), $cancellation);
+    return null;
+  });
+
+  Async\later();
+  $cancellation->cancel();
+  expect_cancellation(fn(): void {
+    discard!($sleep->await());
+  });
+}
+
+assert!($clock->now()->equals($reading->plus(Duration::fromDays(1))));
+
+// A virtual sleep checks cancellation after yielding for every duration.
+foreach (vec[
+  Duration::second(),
+  Duration::zero(),
+  Duration::fromSeconds(-1),
+] as $duration) {
+  $cancellation = new SignalCancellationToken();
+  $canceller = Async\spawn::<null>(fn(): null {
+    $cancellation->cancel();
+    return null;
+  });
+
+  $before = $clock->now();
+  expect_cancellation(fn(): void {
+    $virtual->sleep($duration, $cancellation);
+  });
+
+  assert!($canceller->await() == null);
+  assert!(
+    $clock->now()->equals(
+      $duration->isPositive() ? $before->plus($duration) : $before,
+    ),
+  );
+}
+
+// Cancellation leaves both sleepers ready for the next call.
+$system->sleep(Duration::zero());
+$before = $clock->now();
+$virtual->sleep(Duration::second());
+assert!($clock->now()->equals($before->plus(Duration::second())));
+
+// Concurrent virtual sleeps add their durations and share the same frozen clock.
+$clock->travelTo(SystemTime::unixEpoch());
+$first = Async\spawn::<null>(fn(): null {
+  $virtual->sleep(Duration::fromSeconds(2));
+  return null;
+});
+
+$second = Async\spawn::<null>(fn(): null {
+  $virtual->sleep(Duration::fromSeconds(3));
+  return null;
+});
+
+assert!($first->await() == null);
+assert!($second->await() == null);
+assert!($clock->now()->getSeconds() == 5);

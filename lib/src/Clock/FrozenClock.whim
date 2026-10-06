@@ -1,0 +1,51 @@
+namespace Whim\Clock;
+
+use Whim\DateTime\Nanosecond;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+
+/** Holds a time until advance() or travelTo() changes it. */
+final class FrozenClock implements Clock {
+  /** Creates a clock frozen at a time. */
+  #[AlwaysInline]
+  public function __construct(private SystemTime $now) {}
+
+  /** Creates a clock frozen at the current time. */
+  #[MustUse]
+  public static function startingNow(): FrozenClock {
+    return new FrozenClock(SystemTime::now());
+  }
+
+  /** Creates a clock frozen at a Unix timestamp. */
+  #[MustUse]
+  #[TrackCaller]
+  public static function atUnixTimestamp(
+    int $seconds,
+    Nanosecond $nanoseconds = 0,
+  ): FrozenClock {
+    return new FrozenClock(
+      SystemTime::fromUnixTimestamp($seconds, $nanoseconds),
+    );
+  }
+
+  /** Returns the time held by the clock. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function now(): SystemTime {
+    return $this->now;
+  }
+
+  /** Moves the clock by a duration, which may be negative. */
+  #[TrackCaller]
+  public function advance(Duration $duration): void {
+    $this->now = $this->now->plus($duration);
+  }
+
+  /** Sets the clock to an exact time. */
+  public function travelTo(SystemTime $moment): void {
+    $this->now = $moment;
+  }
+}

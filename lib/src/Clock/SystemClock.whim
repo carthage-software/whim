@@ -1,0 +1,27 @@
+namespace Whim\Clock;
+
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Time\SystemTime;
+
+/** Reads the operating system's wall clock. */
+final readonly class SystemClock implements Clock, Default {
+  /** Creates the system clock. */
+  #[AlwaysInline]
+  public function __construct() {}
+
+  /** Returns a system clock. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): self {
+    return new SystemClock();
+  }
+
+  /** Returns the current wall-clock time. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function now(): SystemTime {
+    return SystemTime::now();
+  }
+}

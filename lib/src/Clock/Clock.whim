@@ -1,0 +1,19 @@
+namespace Whim\Clock;
+
+use Whim\DateTime\TimeZone;
+use Whim\DateTime\ZonedDateTime;
+use Whim\Marker\MustUse;
+use Whim\Time\SystemTime;
+
+/** Reads wall-clock time. */
+interface Clock {
+  /** Returns the current wall-clock time. */
+  #[MustUse]
+  public function now(): SystemTime;
+
+  /** Returns the current wall-clock time in a timezone. */
+  #[MustUse]
+  public function nowIn(TimeZone $timezone): ZonedDateTime {
+    return $timezone->at($this->now());
+  }
+}

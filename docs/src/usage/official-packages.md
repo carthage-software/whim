@@ -7,12 +7,14 @@ the main Whim repository and do not ship with the standard library.
 These packages use names under `Trifle\`. Their Git tags define their
 versions. Install them through Whim's Git package manager.
 
+Clocks and sleepers ship in the standard library under
+[`Whim\Clock`](../standard-library/clock.md).
+
 | Package | Description | Install |
 | --- | --- | --- |
 | [`ansi`](https://codeberg.org/trifle/ansi) | ANSI colours, styles, cursor movement, and screen controls. | `whim add git+ssh://git@codeberg.org/trifle/ansi` |
 | [`args`](https://codeberg.org/trifle/args) | Typed command-line parsing and generated usage. | `whim add git+ssh://git@codeberg.org/trifle/args` |
 | [`cache`](https://codeberg.org/trifle/cache) | Stampede-safe local LRU and database caches. | `whim add git+ssh://git@codeberg.org/trifle/cache` |
-| [`clock`](https://codeberg.org/trifle/clock) | Clocks and sleep that tests can control. | `whim add git+ssh://git@codeberg.org/trifle/clock` |
 | [`config`](https://codeberg.org/trifle/config) | Typed configuration from values, files, and the environment. | `whim add git+ssh://git@codeberg.org/trifle/config` |
 | [`console`](https://codeberg.org/trifle/console) | Terminal output, tables, progress, and prompts. | `whim add git+ssh://git@codeberg.org/trifle/console` |
 | [`cqrs`](https://codeberg.org/trifle/cqrs) | Command and query buses with events, logs, and traces. | `whim add git+ssh://git@codeberg.org/trifle/cqrs` |

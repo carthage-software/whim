@@ -1,0 +1,29 @@
+namespace Whim\Clock;
+
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+
+/** Advances a frozen clock and yields once without waiting for time to pass. */
+final readonly class VirtualSleeper implements Sleeper {
+  /** Creates a sleeper that advances the given clock. */
+  #[AlwaysInline]
+  public function __construct(private FrozenClock $clock) {}
+
+  /** Advances the clock for a positive duration, then yields once. */
+  #[TrackCaller]
+  public function sleep(
+    Duration $duration,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    $cancellation?->throwIfCancellationRequested();
+    if ($duration->isPositive()) {
+      $this->clock->advance($duration);
+    }
+
+    Async\later();
+    $cancellation?->throwIfCancellationRequested();
+  }
+}

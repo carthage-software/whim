@@ -93,6 +93,7 @@
 - [Variation](standard-library/variation.md)
 - [Logic Variables](standard-library/logic.md)
 - [Time and Calendars](standard-library/time.md)
+- [Clocks and Sleepers](standard-library/clock.md)
 - [Encoding and Data Formats](standard-library/formats.md)
 - [Files and I/O](standard-library/io.md)
 - [Environment, Processes, and Terminals](core-library/env.md)

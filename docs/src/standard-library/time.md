@@ -29,6 +29,10 @@ protocol times, and stored event times.
 Do not turn an `Instant` into a calendar date. Do not measure a timeout with
 `SystemTime`.
 
+Use [Clocks and Sleepers](clock.md) when code needs a clock or sleeper that
+tests can control. `Whim\Clock` provides system, frozen, and offset clocks,
+plus system and virtual sleepers.
+
 ## Date, Time, and DateTime
 
 `Date` stores a year, month, and day. `Time` stores hour, minute, second, and

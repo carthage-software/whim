@@ -1,0 +1,20 @@
+namespace Whim\Clock;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+
+/** Shifts another clock's readings by a fixed duration. */
+final readonly class OffsetClock implements Clock {
+  /** Creates a clock with a fixed offset from another clock. */
+  #[AlwaysInline]
+  public function __construct(private Clock $clock, private Duration $offset) {}
+
+  /** Returns the inner clock's current time plus the offset. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function now(): SystemTime {
+    return $this->clock->now()->plus($this->offset);
+  }
+}

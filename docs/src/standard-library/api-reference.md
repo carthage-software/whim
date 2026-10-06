@@ -92,6 +92,7 @@ See [Encoding and Data Formats](formats.md).
 
 | Namespace       | Purpose                                                    |
 | --------------- | ---------------------------------------------------------- |
+| `Whim\Clock`    | system and controlled clocks and sleepers                   |
 | `Whim\Command`  | child-process setup and control                            |
 | `Whim\DateTime` | dates, civil times, zones, and formatting                  |
 | `Whim\Env`      | arguments, paths, and environment variables                |
@@ -102,8 +103,8 @@ See [Encoding and Data Formats](formats.md).
 | `Whim\Terminal` | terminal checks, paths, and size                           |
 | `Whim\Time`     | durations, monotonic instants, and wall time               |
 
-See [Time and Calendars](time.md) and [Environment, Processes, and
-Terminals](../core-library/env.md).
+See [Time and Calendars](time.md), [Clocks and Sleepers](clock.md), and
+[Environment, Processes, and Terminals](../core-library/env.md).
 
 ## Files and I/O
 

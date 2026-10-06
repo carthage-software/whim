@@ -1,0 +1,32 @@
+namespace Whim\Clock;
+
+use Whim\Async;
+use Whim\Async\CancellationToken;
+use Whim\Default\Default;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Time\Duration;
+
+/** Sleeps by suspending the current task on the scheduler. */
+final readonly class SystemSleeper implements Sleeper, Default {
+  /** Creates the system sleeper. */
+  #[AlwaysInline]
+  public function __construct() {}
+
+  /** Returns a system sleeper. */
+  #[AlwaysInline]
+  #[MustUse]
+  public static function default(): self {
+    return new SystemSleeper();
+  }
+
+  /** Suspends the current task for the duration. */
+  #[TrackCaller]
+  public function sleep(
+    Duration $duration,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    Async\sleep($duration, $cancellation);
+  }
+}

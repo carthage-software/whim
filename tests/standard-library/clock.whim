@@ -1,0 +1,102 @@
+use Whim\Clock\Clock;
+use Whim\Clock\FrozenClock;
+use Whim\Clock\OffsetClock;
+use Whim\Clock\SystemClock;
+use Whim\DateTime\Month;
+use Whim\DateTime\TimeZone;
+use Whim\Default\Default;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\TypeError;
+
+final class CountingClock implements Clock {
+  public int $readings = 0;
+
+  public function now(): SystemTime {
+    $this->readings++;
+    return SystemTime::unixEpoch();
+  }
+}
+
+$system = new SystemClock();
+assert!($system is Clock&Default);
+assert!($system->now()->isGreaterThan(SystemTime::unixEpoch()));
+assert!(SystemClock::default() is SystemClock);
+
+$frozen = FrozenClock::atUnixTimestamp(1_000, 500);
+assert!($frozen is Clock);
+assert!($frozen->now()->getSeconds() == 1_000);
+assert!($frozen->now()->getNanoseconds() == 500);
+assert!($frozen->now()->equals($frozen->now()));
+$reading = $frozen->now();
+$alias = $frozen;
+$frozen->advance(Duration::fromSeconds(90));
+assert!($alias->now()->getSeconds() == 1_090);
+assert!($reading->getSeconds() == 1_000);
+$frozen->advance(Duration::fromSeconds(-90));
+assert!($frozen->now()->equals($reading));
+$frozen->advance(Duration::fromNanoseconds(999_999_500));
+assert!($frozen->now()->equals(SystemTime::fromUnixTimestamp(1_001)));
+$frozen->advance(Duration::fromNanoseconds(-1));
+assert!(
+  $frozen->now()->equals(SystemTime::fromUnixTimestamp(1_000, 999_999_999)),
+);
+
+$frozen->travelTo(SystemTime::unixEpoch());
+assert!($alias->now()->equals(SystemTime::unixEpoch()));
+$frozen->advance(Duration::fromNanoseconds(-1));
+assert!($frozen->now()->equals(SystemTime::fromUnixTimestamp(-1, 999_999_999)));
+
+$started = FrozenClock::startingNow();
+assert!($started->now()->isGreaterThan(SystemTime::unixEpoch()));
+assert!($started->now()->equals($started->now()));
+
+foreach (vec[-1, 1_000_000_000] as $nanoseconds) {
+  $caught = false;
+  try {
+    discard!(FrozenClock::atUnixTimestamp(0, $nanoseconds));
+  } catch (TypeError $_) {
+    $caught = true;
+  }
+
+  assert!($caught);
+}
+
+$epoch = new FrozenClock(SystemTime::unixEpoch());
+$utc = $epoch->nowIn(TimeZone::utc());
+assert!(1970 == $utc->dateTime->date->year);
+assert!(Month::January == $utc->dateTime->date->month);
+assert!(1 == $utc->dateTime->date->day);
+assert!(0 == $utc->dateTime->time->hour);
+assert!($utc->offset()->isZero());
+assert!(
+  1 == $epoch->nowIn(TimeZone::from('Africa/Tunis'))->dateTime->time->hour,
+);
+
+$counting = new CountingClock();
+assert!(
+  $counting->nowIn(TimeZone::utc())->systemTime->equals(
+    SystemTime::unixEpoch(),
+  ),
+);
+
+assert!(1 == $counting->readings);
+
+$base = FrozenClock::atUnixTimestamp(1_000, 999_999_999);
+$ahead = new OffsetClock($base, Duration::fromHours(1));
+assert!($ahead is Clock);
+assert!(
+  $ahead->now()->equals(SystemTime::fromUnixTimestamp(4_600, 999_999_999)),
+);
+
+$base->advance(Duration::nanosecond());
+assert!($ahead->now()->equals(SystemTime::fromUnixTimestamp(4_601)));
+assert!($base->now()->getSeconds() == 1_001);
+$behind = new OffsetClock($base, Duration::fromSeconds(-1_001));
+assert!($behind->now()->equals(SystemTime::unixEpoch()));
+assert!(1970 == $behind->nowIn(TimeZone::utc())->dateTime->date->year);
+$nested = new OffsetClock($ahead, Duration::fromHours(-1));
+assert!($nested->now()->equals($base->now()));
+$base->travelTo(SystemTime::unixEpoch());
+assert!($ahead->now()->getSeconds() == 3_600);
+assert!($nested->now()->equals($base->now()));
