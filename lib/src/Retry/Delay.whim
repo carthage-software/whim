@@ -1,0 +1,12 @@
+namespace Whim\Retry;
+
+use Whim\Marker\MustUse;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+
+/** Computes how long to pause before the next attempt. */
+interface Delay for NoDelay, FixedDelay, ExponentialDelay {
+  /** Returns the pause after a failed attempt, counted from one. */
+  #[MustUse]
+  public function delayFor(NonZero<uint> $attempt): Duration;
+}

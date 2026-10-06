@@ -1,0 +1,11 @@
+namespace Whim\Fuse;
+
+/** The three states of a fuse. */
+enum State {
+  /** Allows requests and counts failures. */
+  case Closed;
+  /** Blocks requests until the recovery time passes. */
+  case Open;
+  /** Allows requests to test whether to close or reopen. */
+  case HalfOpen;
+}

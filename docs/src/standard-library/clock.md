@@ -101,3 +101,6 @@ simulate timer deadlines or advance the scheduler's clock.
 
 See [Time and Calendars](time.md) for time values and timezone operations,
 and [Tasks and Futures](async.md) for scheduling and cancellation.
+
+[Retry Policies](retry.md), [Circuit Breakers](fuse.md), and
+[Rate Limits](throttle.md) use these clocks and sleepers to control time in tests.

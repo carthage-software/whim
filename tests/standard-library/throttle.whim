@@ -1,0 +1,244 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Clock\FrozenClock;
+use Whim\Clock\VirtualSleeper;
+use Whim\Math;
+use Whim\Throttle\Allowed;
+use Whim\Throttle\Denied;
+use Whim\Throttle\FixedWindow;
+use Whim\Throttle\Limiter;
+use Whim\Throttle\Rate;
+use Whim\Throttle\TokenBucket;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+
+function expect_error<E: Throwable>(fn(): void $operation): E {
+  try {
+    $operation();
+  } catch (E $error) {
+    return $error;
+  }
+
+  throw new RuntimeException('expected an error');
+}
+
+assert!(Rate::perSecond(10u)->interval()->getTotalNanoseconds() == 100_000_000);
+assert!(Rate::perMinute(60u)->interval()->equals(Duration::second()));
+assert!(Rate::perHour(60u)->interval()->equals(Duration::fromMinutes(1)));
+assert!(Rate::of(2u, Duration::fromSeconds(10))->interval()->seconds == 5);
+assert!(Rate::of(1u, Duration::max())->interval()->equals(Duration::max()));
+assert!(
+  Rate::of(Math\INT_MAX as uint, Duration::max())->interval()->equals(
+    Duration::second(),
+  ),
+);
+
+$thirdOfMaximum = Rate::of(3u, Duration::max())->interval();
+assert!($thirdOfMaximum->seconds == Math\div(Math\INT_MAX, 3));
+assert!($thirdOfMaximum->nanoseconds == 666_666_666);
+assert!(
+  Rate::perSecond(Math\UINT_MAX)->interval()->equals(Duration::nanosecond()),
+);
+
+assert!(
+  Rate::of(Math\UINT_MAX, Duration::max())->interval()->equals(
+    Duration::fromNanoseconds(500_000_000),
+  ),
+);
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(Rate::of(5u, Duration::zero()));
+}));
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(Rate::of(5u, Duration::fromSeconds(-1)));
+}));
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(new FixedWindow(1u, Duration::zero()));
+}));
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(new FixedWindow(1u, Duration::fromSeconds(-1)));
+}));
+
+discard!(expect_error::<TypeError>(fn(): void {
+  discard!(Rate::perSecond(0u));
+}));
+
+discard!(expect_error::<TypeError>(fn(): void {
+  discard!(new TokenBucket(Rate::perSecond(1u), 0u));
+}));
+
+discard!(expect_error::<TypeError>(fn(): void {
+  discard!(new FixedWindow(0u, Duration::second()));
+}));
+
+$boundaryClock = new FrozenClock(SystemTime::fromUnixTimestamp(Math\INT_MAX));
+$boundaryWindow = new FixedWindow(1u, Duration::second(), $boundaryClock);
+assert!($boundaryWindow->allow('boundary'));
+assert!(
+  ($boundaryWindow->hit('boundary') as Denied)->retryAfter->equals(
+    Duration::second(),
+  ),
+);
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$longBucket = new TokenBucket(Rate::of(1u, Duration::max()), 1u, $clock);
+assert!($longBucket->allow('slow'));
+assert!(
+  ($longBucket->hit('slow') as Denied)->retryAfter->equals(Duration::max()),
+);
+
+$clock->advance(Duration::max());
+assert!($longBucket->allow('slow'));
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$bucket = new TokenBucket(Rate::perSecond(1u), 3u, $clock);
+assert!($bucket is Limiter);
+assert!(($bucket->peek('peer') as Allowed)->remaining == 3u);
+assert!(($bucket->peek('peer') as Allowed)->remaining == 3u);
+assert!($bucket->allow('peer'));
+assert!($bucket->allow('peer'));
+$last = $bucket->hit('peer');
+assert!($last->isAllowed());
+assert!(($last as Allowed)->remaining == 0u);
+$denied = $bucket->hit('peer');
+assert!(!$denied->isAllowed());
+assert!(($denied as Denied)->retryAfter->equals(Duration::second()));
+assert!($bucket->allow('other'));
+$clock->advance(Duration::second());
+assert!($bucket->allow('peer'));
+assert!(!$bucket->allow('peer'));
+$clock->advance(Duration::fromSeconds(30));
+assert!(($bucket->peek('peer') as Allowed)->remaining == 3u);
+assert!(($bucket->hit('peer') as Allowed)->remaining == 2u);
+$bucket->forget('peer');
+$bucket->forget('unknown');
+assert!(($bucket->peek('peer') as Allowed)->remaining == 3u);
+$clock->travelTo(SystemTime::fromUnixTimestamp(-10));
+assert!(($bucket->peek('peer') as Allowed)->remaining == 3u);
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$bucket = new TokenBucket(Rate::perSecond(1u), 2u, $clock);
+assert!($bucket->allow('partial'));
+assert!($bucket->allow('partial'));
+$clock->advance(Duration::fromMilliseconds(1_500));
+assert!(($bucket->hit('partial') as Allowed)->remaining == 0u);
+assert!(
+  ($bucket->peek('partial') as Denied)->retryAfter->equals(
+    Duration::fromMilliseconds(500),
+  ),
+);
+
+$clock->advance(Duration::fromMilliseconds(499));
+assert!(
+  ($bucket->peek('partial') as Denied)->retryAfter->equals(
+    Duration::millisecond(),
+  ),
+);
+
+$clock->advance(Duration::millisecond());
+assert!($bucket->allow('partial'));
+assert!(!$bucket->allow('partial'));
+$clock->travelTo(SystemTime::unixEpoch());
+assert!(
+  ($bucket->peek('partial') as Denied)->retryAfter->equals(Duration::second()),
+);
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$bucket = new TokenBucket(
+  Rate::perSecond(1u),
+  1u,
+  $clock,
+  new VirtualSleeper($clock),
+);
+
+assert!($bucket->allow('worker'));
+$bucket->wait('worker');
+assert!($clock->now()->getSeconds() == 1);
+$bucket->wait('worker');
+assert!($clock->now()->getSeconds() == 2);
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$window = new FixedWindow(2u, Duration::fromMinutes(1), $clock);
+assert!($window is Limiter);
+assert!(($window->peek('api') as Allowed)->remaining == 2u);
+assert!(($window->peek('api') as Allowed)->remaining == 2u);
+assert!(($window->hit('api') as Allowed)->remaining == 1u);
+assert!(($window->hit('api') as Allowed)->remaining == 0u);
+assert!(($window->hit('api') as Denied)->retryAfter->seconds == 60);
+assert!($window->allow('other'));
+$clock->advance(Duration::fromSeconds(30));
+assert!(($window->hit('api') as Denied)->retryAfter->seconds == 30);
+assert!(($window->peek('api') as Denied)->retryAfter->seconds == 30);
+$clock->advance(Duration::fromSeconds(30));
+assert!($window->allow('api'));
+$window->forget('api');
+$window->forget('unknown');
+assert!(($window->peek('api') as Allowed)->remaining == 2u);
+$clock->travelTo(SystemTime::fromUnixTimestamp(-10));
+assert!(($window->peek('api') as Allowed)->remaining == 2u);
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$window = new FixedWindow(
+  1u,
+  Duration::fromSeconds(5),
+  $clock,
+  new VirtualSleeper($clock),
+);
+
+assert!($window->allow('job'));
+$window->wait('job');
+assert!($clock->now()->getSeconds() == 5);
+
+$wideBucket = new TokenBucket(Rate::perSecond(1u), Math\UINT_MAX, $clock);
+assert!(($wideBucket->hit('wide') as Allowed)->remaining == Math\UINT_MAX - 1u);
+$clock->advance(Duration::second());
+assert!(($wideBucket->peek('wide') as Allowed)->remaining == Math\UINT_MAX);
+$wideWindow = new FixedWindow(Math\UINT_MAX, Duration::second(), $clock);
+assert!(($wideWindow->hit('wide') as Allowed)->remaining == Math\UINT_MAX - 1u);
+discard!(expect_error::<TypeError>(fn(): void {
+  discard!($wideWindow->hit(''));
+}));
+
+discard!(expect_error::<TypeError>(fn(): void {
+  discard!($wideBucket->hit(''));
+}));
+
+foreach (vec[true, false] as $tokenBucket) {
+  $clock = new FrozenClock(SystemTime::unixEpoch());
+  $sleeper = new VirtualSleeper($clock);
+  $limiter = $tokenBucket
+    ? new TokenBucket(Rate::perSecond(1u), 1u, $clock, $sleeper)
+    : new FixedWindow(1u, Duration::second(), $clock, $sleeper);
+
+  assert!($limiter->allow('cancel'));
+  $token = new SignalCancellationToken();
+  $token->cancel();
+  discard!(expect_error::<CancelledException>(fn(): void {
+    $limiter->wait('cancel', $token);
+  }));
+
+  assert!($clock->now()->equals(SystemTime::unixEpoch()));
+  assert!(!$limiter->peek('cancel')->isAllowed());
+
+  $token = new SignalCancellationToken();
+  $cancel = Async\spawn::<null>(fn(): null {
+    $token->cancel();
+    return null;
+  });
+
+  discard!(expect_error::<CancelledException>(fn(): void {
+    $limiter->wait('cancel', $token);
+  }));
+
+  discard!($cancel->await());
+  assert!($clock->now()->getSeconds() == 1);
+  assert!($limiter->peek('cancel')->isAllowed());
+}

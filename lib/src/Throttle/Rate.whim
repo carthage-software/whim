@@ -1,0 +1,54 @@
+namespace Whim\Throttle;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Marker\NeverInline;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** A permit count per period. */
+final readonly class Rate {
+  #[AlwaysInline]
+  private function __construct(
+    public NonZero<uint> $amount,
+    public Duration $per,
+  ) {}
+
+  /** Creates a rate of an amount per period. */
+  #[MustUse]
+  #[NeverInline]
+  #[TrackCaller]
+  public static function of(NonZero<uint> $amount, Duration $per): Rate {
+    if (!$per->isPositive()) {
+      throw new InvalidArgumentException('a rate period must be positive');
+    }
+
+    return new Rate($amount, $per);
+  }
+
+  /** Creates a rate of an amount per second. */
+  #[MustUse]
+  public static function perSecond(NonZero<uint> $amount): Rate {
+    return Rate::of($amount, Duration::fromSeconds(1));
+  }
+
+  /** Creates a rate of an amount per minute. */
+  #[MustUse]
+  public static function perMinute(NonZero<uint> $amount): Rate {
+    return Rate::of($amount, Duration::fromMinutes(1));
+  }
+
+  /** Creates a rate of an amount per hour. */
+  #[MustUse]
+  public static function perHour(NonZero<uint> $amount): Rate {
+    return Rate::of($amount, Duration::fromHours(1));
+  }
+
+  /** Returns the period one permit takes to appear. */
+  #[MustUse]
+  public function interval(): Duration {
+    return _Private\divide_duration($this->per, $this->amount);
+  }
+}

@@ -1,0 +1,94 @@
+namespace Whim\Retry;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonZero;
+use Whim\Refine\Predicate;
+use Whim\Time\Duration;
+use Whim\Unwind\Exception;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\Throwable;
+
+/**
+ * Sets the attempt count and the delay between failures.
+ *
+ * By default a policy retries `Whim\Unwind\Exception` and its subclasses
+ * only. It does not retry an `Error`.
+ */
+final readonly class Policy {
+  #[AlwaysInline]
+  private function __construct(
+    public NonZero<uint> $attempts,
+    public Delay $delay,
+    public Jitter $jitter,
+    public Predicate<Throwable> $condition,
+    public null|Duration $deadline,
+  ) {}
+
+  /** Creates a policy with a maximum attempt count. */
+  #[MustUse]
+  public static function attempts(NonZero<uint> $attempts): Policy {
+    return new Policy(
+      $attempts,
+      new NoDelay(),
+      Jitter::None,
+      fn(Throwable $error): bool {
+        return $error is Exception;
+      },
+      null,
+    );
+  }
+
+  /** Returns a copy with the given delay. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withDelay(Delay $delay): Policy {
+    return clone!($this, delay: $delay);
+  }
+
+  /** Returns a copy pausing the same duration between attempts. */
+  #[MustUse]
+  public function withFixedDelay(Duration $duration): Policy {
+    return clone!($this, delay: new FixedDelay($duration));
+  }
+
+  /** Returns a copy growing the pause by a multiplier between attempts. */
+  #[MustUse]
+  public function withExponentialDelay(
+    Duration $initial,
+    2u.. $multiplier = 2u,
+    null|Duration $maximum = null,
+  ): Policy {
+    return clone!($this, delay: new ExponentialDelay(
+      $initial,
+      $multiplier,
+      $maximum,
+    ));
+  }
+
+  /** Returns a copy with the given jitter. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withJitter(Jitter $jitter): Policy {
+    return clone!($this, jitter: $jitter);
+  }
+
+  /** Returns a copy retrying only the throwables a condition accepts. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function withCondition(Predicate<Throwable> $condition): Policy {
+    return clone!($this, condition: $condition);
+  }
+
+  /** Returns a copy giving up once the total elapsed time passes a limit. */
+  #[MustUse]
+  public function withDeadline(Duration $deadline): Policy {
+    if ($deadline->isNegative()) {
+      throw new InvalidArgumentException(
+        'the retry deadline must not be negative',
+      );
+    }
+
+    return clone!($this, deadline: $deadline);
+  }
+}

@@ -1,0 +1,114 @@
+namespace Whim\Throttle;
+
+use Whim\Clock\Clock;
+use Whim\Clock\Sleeper;
+use Whim\Clock\SystemClock;
+use Whim\Clock\SystemSleeper;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+/**
+ * Grants a fixed count of permits per window of time.
+ *
+ * Each key's window starts on its first hit or peek. After it ends,
+ * the next hit or peek starts a new one. Requests on both sides of a
+ * window boundary can use up to twice the limit.
+ */
+final class FixedWindow implements Limiter {
+  private dict<string, (SystemTime, uint)> $windows = dict[];
+
+  /** Creates a fixed window limiter. */
+  #[TrackCaller]
+  public function __construct(
+    private readonly NonZero<uint> $limit,
+    private readonly Duration $window,
+    private readonly Clock $clock = new SystemClock(),
+    private readonly Sleeper $sleeper = new SystemSleeper(),
+  ) {
+    if (!$window->isPositive()) {
+      throw new InvalidArgumentException(
+        'a fixed-window duration must be positive',
+      );
+    }
+  }
+
+  /** Takes one permit for a key when one is available. */
+  #[MustUse]
+  public function hit(NonEmptyString $key): Decision {
+    ($opened, $used, $now) = $this->current($key);
+    if ($used >= $this->limit) {
+      return new Denied($this->window->minus($now->durationSince($opened)));
+    }
+
+    $this->windows[$key] = ($opened, $used + 1u);
+    return new Allowed($this->limit - $used - 1u);
+  }
+
+  /** Reports the decision a hit would get, without taking a permit. */
+  #[MustUse]
+  public function peek(NonEmptyString $key): Decision {
+    ($opened, $used, $now) = $this->current($key);
+    if ($used >= $this->limit) {
+      return new Denied($this->window->minus($now->durationSince($opened)));
+    }
+
+    return new Allowed($this->limit - $used);
+  }
+
+  /** Sleeps until a permit is available for a key, then takes it. */
+  public function wait(
+    NonEmptyString $key,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    while (true) {
+      $decision = $this->hit($key);
+      if ($decision is Allowed) {
+        return;
+      }
+
+      $this->sleeper->sleep(($decision as Denied)->retryAfter, $cancellation);
+    }
+  }
+
+  /** Removes the stored state of one key. */
+  public function forget(NonEmptyString $key): void {
+    if (!contains_key!($this->windows, $key)) {
+      return;
+    }
+
+    $windows = $this->windows;
+    remove!($windows, $key);
+    $this->windows = $windows;
+  }
+
+  #[MustUse]
+  private function current(
+    NonEmptyString $key,
+  ): (SystemTime, uint, SystemTime) {
+    $now = $this->clock->now();
+    if (!contains_key!($this->windows, $key)) {
+      $state = ($now, 0u);
+      $this->windows[$key] = $state;
+      return ($state[0], $state[1], $now);
+    }
+
+    ($opened, $used) = $this->windows[$key];
+    $elapsed = $now->durationSince($opened);
+    if (
+      $elapsed->isNegative()
+      || $elapsed->isGreaterThanOrEqual($this->window)
+    ) {
+      $state = ($now, 0u);
+      $this->windows[$key] = $state;
+      return ($state[0], $state[1], $now);
+    }
+
+    return ($opened, $used, $now);
+  }
+}

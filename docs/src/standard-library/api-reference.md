@@ -5,34 +5,34 @@ This index lists the public standard-library namespaces. Names that end in
 
 ## Core values and contracts
 
-| Namespace                   | Purpose                                                                 |
-| --------------------------- | ----------------------------------------------------------------------- |
-| `Whim`                      | the `VERSION` constant                                                  |
-| `Whim\Attribute`            | define attribute classes and targets                                    |
-| `Whim\Autoload`             | register and run symbol autoloaders                                     |
-| `Whim\Comparison`           | equality, order, and `Ordering`                                         |
-| `Whim\Convert`              | explicit value conversion contracts                                     |
-| `Whim\Default`              | the default-value contract                                              |
-| `Whim\Enum`                 | interfaces implemented by all enums                                     |
-| `Whim\Fn`                   | identity, observation, composition, branches, and rethrowing             |
-| `Whim\GC`                   | explicit cycle collection                                               |
-| `Whim\Lint`                 | scoped lint settings                                                    |
-| `Whim\Logic`                | single-assignment variables, linking, and waiting                        |
-| `Whim\Marker`               | built-in attributes and compiler markers                                |
-| `Whim\Option`               | `Some`, `None`, and option helpers                                      |
-| `Whim\Promise`              | the read-only async result contract                                     |
-| `Whim\Reference`            | weak references and weak maps                                           |
-| `Whim\Refine`               | common aliases, ranges, and callable types                              |
-| `Whim\Reflection`           | files, declarations, types, values, and invocation                       |
-| `Whim\Reflection\Attribute` | attribute rules and target kinds                                        |
-| `Whim\Reflection\Generic`   | type parameters, bindings, and type environments                        |
-| `Whim\Reflection\Member`    | methods, properties, constants, and enum cases                          |
-| `Whim\Reflection\Type`      | type forms and their parts                                              |
-| `Whim\Result`               | `Ok`, `Err`, and throwable capture                                      |
-| `Whim\Symbol`               | symbol lookup and symbol kinds                                          |
-| `Whim\Type`                 | engine-local type identifiers                                           |
-| `Whim\Unwind`               | errors, exceptions, throwables, and trace frames                        |
-| `Whim\Variation`            | values with correlated choices                                          |
+| Namespace                   | Purpose                                                      |
+| --------------------------- | ------------------------------------------------------------ |
+| `Whim`                      | the `VERSION` constant                                       |
+| `Whim\Attribute`            | define attribute classes and targets                         |
+| `Whim\Autoload`             | register and run symbol autoloaders                          |
+| `Whim\Comparison`           | equality, order, and `Ordering`                              |
+| `Whim\Convert`              | explicit value conversion contracts                          |
+| `Whim\Default`              | the default-value contract                                   |
+| `Whim\Enum`                 | interfaces implemented by all enums                          |
+| `Whim\Fn`                   | identity, observation, composition, branches, and rethrowing |
+| `Whim\GC`                   | explicit cycle collection                                    |
+| `Whim\Lint`                 | scoped lint settings                                         |
+| `Whim\Logic`                | single-assignment variables, linking, and waiting            |
+| `Whim\Marker`               | built-in attributes and compiler markers                     |
+| `Whim\Option`               | `Some`, `None`, and option helpers                           |
+| `Whim\Promise`              | the read-only async result contract                          |
+| `Whim\Reference`            | weak references and weak maps                                |
+| `Whim\Refine`               | common aliases, ranges, and callable types                   |
+| `Whim\Reflection`           | files, declarations, types, values, and invocation           |
+| `Whim\Reflection\Attribute` | attribute rules and target kinds                             |
+| `Whim\Reflection\Generic`   | type parameters, bindings, and type environments             |
+| `Whim\Reflection\Member`    | methods, properties, constants, and enum cases               |
+| `Whim\Reflection\Type`      | type forms and their parts                                   |
+| `Whim\Result`               | `Ok`, `Err`, and throwable capture                           |
+| `Whim\Symbol`               | symbol lookup and symbol kinds                               |
+| `Whim\Type`                 | engine-local type identifiers                                |
+| `Whim\Unwind`               | errors, exceptions, throwables, and trace frames             |
+| `Whim\Variation`            | values with correlated choices                               |
 
 See [Core Types and Functions](core.md), [Function Helpers](fn.md),
 [Reflection](reflection.md), [Option and
@@ -50,7 +50,7 @@ explicit alternatives or later bindings.
 | `Whim\Dict`    | eager keyed collection functions                  |
 | `Whim\Float`   | float parsing, bit forms, and checks              |
 | `Whim\Int`     | integer parsing                                   |
-| `Whim\UInt`    | unsigned integer parsing and exact division        |
+| `Whim\UInt`    | unsigned integer parsing and exact division       |
 | `Whim\Iterate` | iterators and lazy collection functions           |
 | `Whim\Math`    | arithmetic, statistics, bases, and math constants |
 | `Whim\Range`   | runtime integer range objects                     |
@@ -94,7 +94,7 @@ See [Encoding and Data Formats](formats.md).
 
 | Namespace       | Purpose                                                    |
 | --------------- | ---------------------------------------------------------- |
-| `Whim\Clock`    | system and controlled clocks and sleepers                   |
+| `Whim\Clock`    | system and controlled clocks and sleepers                  |
 | `Whim\Command`  | child-process setup and control                            |
 | `Whim\DateTime` | dates, civil times, zones, and formatting                  |
 | `Whim\Env`      | arguments, paths, and environment variables                |
@@ -126,6 +126,17 @@ See [Files and I/O](io.md).
 | `Whim\Channel` | bounded and unbounded task channels              |
 
 See [Tasks and Futures](async.md) and [Channels and Cancellation](channels.md).
+
+## Retries and request limits
+
+| Namespace       | Purpose                                               |
+| --------------- | ----------------------------------------------------- |
+| `Whim\Fuse`     | circuit breakers with failure and recovery thresholds |
+| `Whim\Retry`    | retry policies, delays, jitter, and deadlines         |
+| `Whim\Throttle` | keyed token buckets and fixed windows                 |
+
+See [Retry Policies](retry.md), [Circuit Breakers](fuse.md), and
+[Rate Limits](throttle.md). All three use [Clocks and Sleepers](clock.md).
 
 ## Network and addresses
 
@@ -164,8 +175,8 @@ See [Network, TLS, and Proxies](network.md).
 | `Whim\HTTP\Server\Responder`  | bare and debug error responses                      |
 | `Whim\HTTP\Session`           | session values and settings                         |
 | `Whim\HTTP\Session\Storage`   | memory and database session stores                  |
-| `Whim\HTTP\SSE`               | server-sent events and streaming response bodies     |
-| `Whim\HTTP\SSE\Source`        | event sources and polling function adapters          |
+| `Whim\HTTP\SSE`               | server-sent events and streaming response bodies    |
+| `Whim\HTTP\SSE\Source`        | event sources and polling function adapters         |
 | `Whim\HTTP\WebSocket`         | WebSocket messages and connections                  |
 | `Whim\HTTP\WebSocket\Client`  | client handshakes and connections                   |
 | `Whim\HTTP\WebSocket\Server`  | server upgrades and connection handlers             |

@@ -1,0 +1,64 @@
+namespace Whim\Retry;
+
+use Whim\Marker\MustUse;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/**
+ * Grows the pause by a whole multiplier after every failed attempt.
+ *
+ * The first pause is the initial duration, the second is one multiple of
+ * it, and so on, capped at the maximum when one is set.
+ */
+final readonly class ExponentialDelay implements Delay {
+  /** Creates an exponential delay. */
+  public function __construct(
+    private Duration $initial,
+    private 2u.. $multiplier = 2u,
+    private null|Duration $maximum = null,
+  ) {
+    if ($initial->isNegative()) {
+      throw new InvalidArgumentException(
+        'the initial retry delay must not be negative',
+      );
+    }
+
+    if ($maximum?->isNegative() ?? false) {
+      throw new InvalidArgumentException(
+        'the maximum retry delay must not be negative',
+      );
+    }
+  }
+
+  /** Returns the pause for an attempt, growing with each one. */
+  #[MustUse]
+  public function delayFor(NonZero<uint> $attempt): Duration {
+    $delay = $this->initial;
+    if ($delay->isZero()) {
+      return $delay;
+    }
+
+    $round = 1u;
+    while ($round < $attempt) {
+      if (
+        null != $this->maximum
+        && $delay->compare($this->maximum)->isGreaterOrEqual()
+      ) {
+        return $this->maximum;
+      }
+
+      $delay = _Private\multiply($delay, $this->multiplier, $this->maximum);
+      $round++;
+    }
+
+    if (
+      null != $this->maximum
+      && $delay->compare($this->maximum)->isGreater()
+    ) {
+      return $this->maximum;
+    }
+
+    return $delay;
+  }
+}

@@ -1,0 +1,11 @@
+namespace Whim\Throttle;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Time\Duration;
+
+/** The request must wait. */
+final readonly class Denied implements Decision {
+  /** Creates a denying decision. */
+  #[AlwaysInline]
+  public function __construct(public Duration $retryAfter) {}
+}

@@ -1,0 +1,122 @@
+namespace Whim\Throttle\_Private;
+
+use Whim\Math;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+use Whim\UInt;
+
+const NANOSECONDS_PER_SECOND = 1_000_000_000u;
+
+/** Divides a positive duration, rounding down to at least one nanosecond. */
+function divide_duration(Duration $duration, NonZero<uint> $divisor): Duration {
+  $seconds = UInt\div($duration->seconds as uint, $divisor);
+  $remainder = ($duration->seconds as uint) % $divisor;
+  $nanoseconds = fractional_quotient(
+    $remainder,
+    $duration->nanoseconds as uint,
+    $divisor,
+  );
+
+  if (0u == $seconds && 0u == $nanoseconds) {
+    return Duration::nanosecond();
+  }
+
+  return new Duration($seconds as int, $nanoseconds as int);
+}
+
+/** Returns a duration quotient, capped before the result can overflow. */
+function duration_quotient_capped(
+  Duration $numerator,
+  Duration $denominator,
+  uint $cap,
+): uint {
+  $lower = 0u;
+  $upper = $cap;
+  while ($lower < $upper) {
+    $distance = $upper - $lower;
+    $middle = $lower + UInt\div($distance, 2u) + ($distance % 2u);
+    if (product_is_at_most($denominator, $middle, $numerator)) {
+      $lower = $middle;
+    } else {
+      $upper = $middle - 1u;
+    }
+  }
+
+  return $lower;
+}
+
+/** Multiplies a duration by a factor known to fit. */
+function multiply_duration(Duration $duration, uint $factor): Duration {
+  ($seconds, $nanoseconds) = product_parts($duration, $factor) as (int, int);
+  return new Duration($seconds, $nanoseconds);
+}
+
+function fractional_quotient(
+  uint $seconds,
+  uint $nanoseconds,
+  NonZero<uint> $divisor,
+): uint {
+  $lower = 0u;
+  $upper = NANOSECONDS_PER_SECOND - 1u;
+  while ($lower < $upper) {
+    $distance = $upper - $lower;
+    $middle = $lower + UInt\div($distance, 2u) + ($distance % 2u);
+    ($high, $low) = wide_product($middle, $divisor);
+    if ($high < $seconds || ($high == $seconds && $low <= $nanoseconds)) {
+      $lower = $middle;
+    } else {
+      $upper = $middle - 1u;
+    }
+  }
+
+  return $lower;
+}
+
+function product_is_at_most(
+  Duration $duration,
+  uint $factor,
+  Duration $limit,
+): bool {
+  $parts = product_parts($duration, $factor);
+  if (null == $parts) {
+    return false;
+  }
+
+  ($seconds, $nanoseconds) = $parts;
+  return (
+    $seconds < $limit->seconds
+    || ($seconds == $limit->seconds && $nanoseconds <= $limit->nanoseconds)
+  );
+}
+
+function product_parts(Duration $duration, uint $factor): null|(int, int) {
+  if (
+    0 != $duration->seconds
+    && $factor > UInt\div(Math\INT_MAX as uint, $duration->seconds as uint)
+  ) {
+    return null;
+  }
+
+  $seconds = ($duration->seconds as uint) * $factor;
+  ($carry, $nanoseconds) = wide_product(
+    $duration->nanoseconds as uint,
+    $factor,
+  );
+
+  if ($carry > (Math\INT_MAX as uint) - $seconds) {
+    return null;
+  }
+
+  return (($seconds + $carry) as int, $nanoseconds as int);
+}
+
+function wide_product(uint $left, uint $right): (uint, uint) {
+  $rightHigh = UInt\div($right, NANOSECONDS_PER_SECOND);
+  $rightLow = $right % NANOSECONDS_PER_SECOND;
+  $lowProduct = $left * $rightLow;
+
+  return (
+    $left * $rightHigh + UInt\div($lowProduct, NANOSECONDS_PER_SECOND),
+    $lowProduct % NANOSECONDS_PER_SECOND,
+  );
+}

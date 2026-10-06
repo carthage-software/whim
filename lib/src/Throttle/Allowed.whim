@@ -1,0 +1,10 @@
+namespace Whim\Throttle;
+
+use Whim\Marker\AlwaysInline;
+
+/** The request may proceed. */
+final readonly class Allowed implements Decision {
+  /** Creates an allowing decision. */
+  #[AlwaysInline]
+  public function __construct(public uint $remaining) {}
+}

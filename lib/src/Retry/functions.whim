@@ -1,0 +1,15 @@
+namespace Whim\Retry;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Refine\Supplier;
+
+/** Runs an operation under a policy, with real time and real sleep. */
+#[MustUse]
+function retry<T>(
+  Policy $policy,
+  Supplier<T> $operation,
+  null|CancellationToken $cancellation = null,
+): T {
+  return new Retrier()->run::<T>($policy, $operation, $cancellation);
+}

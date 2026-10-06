@@ -1,0 +1,20 @@
+namespace Whim\Retry;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+
+/** Retries immediately. */
+final readonly class NoDelay implements Delay {
+  /** Creates the immediate delay. */
+  #[AlwaysInline]
+  public function __construct() {}
+
+  /** Returns a zero pause. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function delayFor(NonZero<uint> $attempt): Duration {
+    return Duration::zero();
+  }
+}

@@ -1,0 +1,118 @@
+use Whim\Clock\FrozenClock;
+use Whim\Fuse\Fuse;
+use Whim\Fuse\State;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\TypeError;
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$invalid = false;
+try {
+  discard!(new Fuse(recovery: Duration::fromSeconds(-1)));
+} catch (InvalidArgumentException $_) {
+  $invalid = true;
+}
+
+assert!($invalid);
+foreach (vec[
+  fn(): Fuse => new Fuse(failureThreshold: 0u),
+  fn(): Fuse => new Fuse(successThreshold: 0u),
+] as $create) {
+  $invalid = false;
+  try {
+    discard!($create());
+  } catch (TypeError $_) {
+    $invalid = true;
+  }
+
+  assert!($invalid);
+}
+
+$fuse = new Fuse(
+  failureThreshold: 3u,
+  recovery: Duration::fromSeconds(30),
+  successThreshold: 2u,
+  clock: $clock,
+);
+
+assert!($fuse->getState() == State::Closed);
+assert!($fuse->allow());
+assert!($fuse->retryAfter() == null);
+$fuse->recordFailure();
+$fuse->recordFailure();
+assert!($fuse->getState() == State::Closed);
+$fuse->recordSuccess();
+$fuse->recordFailure();
+$fuse->recordFailure();
+assert!($fuse->getState() == State::Closed);
+$fuse->recordFailure();
+assert!($fuse->getState() == State::Open);
+assert!(!$fuse->allow());
+assert!(($fuse->retryAfter() as Duration)->equals(Duration::fromSeconds(30)));
+$fuse->recordSuccess();
+$fuse->recordFailure();
+assert!($fuse->getState() == State::Open);
+assert!(($fuse->retryAfter() as Duration)->equals(Duration::fromSeconds(30)));
+$clock->advance(Duration::fromSeconds(29));
+assert!(!$fuse->allow());
+assert!(($fuse->retryAfter() as Duration)->equals(Duration::second()));
+$clock->advance(Duration::second());
+assert!($fuse->getState() == State::HalfOpen);
+assert!($fuse->allow());
+assert!($fuse->retryAfter() == null);
+$fuse->recordFailure();
+assert!($fuse->getState() == State::Open);
+assert!(!$fuse->allow());
+$clock->advance(Duration::fromSeconds(30));
+assert!($fuse->getState() == State::HalfOpen);
+$fuse->recordSuccess();
+assert!($fuse->getState() == State::HalfOpen);
+$fuse->recordSuccess();
+assert!($fuse->getState() == State::Closed);
+assert!($fuse->allow());
+$fuse->recordFailure();
+$fuse->recordFailure();
+$fuse->recordFailure();
+assert!($fuse->getState() == State::Open);
+$fuse->reset();
+assert!($fuse->getState() == State::Closed);
+assert!($fuse->retryAfter() == null);
+
+$default = new Fuse(clock: $clock);
+for ($hits = 0; $hits < 5; $hits++) {
+  $default->recordFailure();
+}
+
+assert!($default->getState() == State::Open);
+$clock->advance(Duration::fromSeconds(30));
+assert!($default->getState() == State::HalfOpen);
+$default->recordSuccess();
+assert!($default->getState() == State::Closed);
+
+$clock = new FrozenClock(SystemTime::unixEpoch());
+$backward = new Fuse(
+  failureThreshold: 1u,
+  recovery: Duration::second(),
+  clock: $clock,
+);
+
+$backward->recordFailure();
+$clock->travelTo(SystemTime::fromUnixTimestamp(-1));
+assert!($backward->getState() == State::Open);
+assert!(
+  ($backward->retryAfter() as Duration)->equals(Duration::fromSeconds(2)),
+);
+
+$clock->travelTo(SystemTime::fromUnixTimestamp(1));
+assert!($backward->getState() == State::HalfOpen);
+$immediate = new Fuse(
+  failureThreshold: 1u,
+  recovery: Duration::zero(),
+  clock: $clock,
+);
+
+$immediate->recordFailure();
+assert!($immediate->getState() == State::HalfOpen);
+$immediate->recordSuccess();
+assert!($immediate->getState() == State::Closed);

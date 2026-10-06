@@ -1,0 +1,14 @@
+namespace Whim\Throttle;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+
+/** The answer a limiter gives one request. */
+interface Decision for Allowed, Denied {
+  /** Reports whether the request may proceed. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function isAllowed(): bool {
+    return $this is Allowed;
+  }
+}

@@ -1,0 +1,111 @@
+namespace Whim\Retry;
+
+use Whim\Clock\Clock;
+use Whim\Clock\Sleeper;
+use Whim\Clock\SystemClock;
+use Whim\Clock\SystemSleeper;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\RandomSequence\MersenneTwisterSequence;
+use Whim\RandomSequence\Sequence;
+use Whim\Refine\NonZero;
+use Whim\Refine\Supplier;
+use Whim\Unwind\Throwable;
+use Whim\Time\Duration;
+
+/**
+ * Runs operations under a retry policy.
+ *
+ * Tests can supply a `FrozenClock`, a `VirtualSleeper`, and a seeded
+ * random sequence to check delays without waiting for real time.
+ */
+final readonly class Retrier {
+  private Sequence $randomness;
+
+  /** Creates a retrier. */
+  public function __construct(
+    private Sleeper $sleeper = new SystemSleeper(),
+    private Clock $clock = new SystemClock(),
+    null|Sequence $randomness = null,
+  ) {
+    $this->randomness =
+      $randomness ?? MersenneTwisterSequence::fromSecureSeed();
+  }
+
+  /**
+   * Runs an operation until it succeeds or the policy gives up.
+   *
+   * Returns the operation's value on success. Throws the last error
+   * unchanged when the condition rejects it, the attempts run out, or
+   * the next pause would pass the deadline. The sleeper checks the
+   * cancellation token before and during a pause.
+   */
+  #[MustUse]
+  public function run<T>(
+    Policy $policy,
+    Supplier<T> $operation,
+    null|CancellationToken $cancellation = null,
+  ): T {
+    $started = $this->clock->now();
+    $attempt = 1u;
+    while (true) {
+      try {
+        return $operation();
+      } catch (Throwable $error) {
+        if ($attempt >= $policy->attempts) {
+          throw $error;
+        }
+
+        if (!($policy->condition)($error)) {
+          throw $error;
+        }
+
+        $pause = $this->pauseFor($policy, $attempt);
+        if (null != $policy->deadline) {
+          $elapsed = $this->clock->now()->durationSince($started);
+          if ($elapsed->isGreaterThan($policy->deadline)) {
+            throw $error;
+          }
+
+          $remaining = $policy->deadline->minus($elapsed);
+          if ($pause->isGreaterThan($remaining)) {
+            throw $error;
+          }
+        }
+
+        $this->sleeper->sleep($pause, $cancellation);
+        $attempt++;
+      }
+    }
+  }
+
+  #[MustUse]
+  private function pauseFor(Policy $policy, NonZero<uint> $attempt): Duration {
+    $pause = $policy->delay->delayFor($attempt);
+    return match ($policy->jitter) {
+      Jitter::None => $pause,
+      Jitter::Full => $this->jitter($pause),
+    };
+  }
+
+  #[MustUse]
+  private function jitter(Duration $maximum): Duration {
+    if (0 == $maximum->seconds) {
+      return new Duration(
+        0,
+        $this->randomness->nextIn(0, $maximum->nanoseconds),
+      );
+    }
+
+    while (true) {
+      $seconds = $this->randomness->nextIn(0, $maximum->seconds);
+      $nanoseconds = $this->randomness->nextIn(0, 999_999_999);
+      if (
+        $seconds < $maximum->seconds
+        || $nanoseconds <= $maximum->nanoseconds
+      ) {
+        return new Duration($seconds, $nanoseconds);
+      }
+    }
+  }
+}

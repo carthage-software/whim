@@ -1,0 +1,10 @@
+namespace Whim\Retry;
+
+/** Chooses whether to vary the delay at random. */
+enum Jitter {
+  /** Sleep the computed delay exactly. */
+  case None;
+
+  /** Sleep a random duration between zero and the computed delay. */
+  case Full;
+}

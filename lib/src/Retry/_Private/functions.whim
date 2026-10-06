@@ -1,0 +1,57 @@
+namespace Whim\Retry\_Private;
+
+use Whim\Marker\MustUse;
+use Whim\Math;
+use Whim\UInt;
+use Whim\Time\Duration;
+use Whim\Unwind\OverflowError;
+
+/** Multiplies a nonnegative duration, clamping to an optional maximum. */
+#[MustUse]
+function multiply(
+  Duration $duration,
+  uint $factor,
+  null|Duration $maximum,
+): Duration {
+  if ($duration->isZero()) {
+    return Duration::zero();
+  }
+
+  if (null != $maximum && $duration->compare($maximum)->isGreaterOrEqual()) {
+    return $maximum;
+  }
+
+  $seconds = $duration->seconds as uint;
+  $nanoseconds = $duration->nanoseconds as uint;
+  $factorSeconds = UInt\div($factor, 1_000_000_000u);
+  $factorNanoseconds = $factor % 1_000_000_000u;
+  $partialNanoseconds = $nanoseconds * $factorNanoseconds;
+  $carriedSeconds =
+    (
+      $nanoseconds
+      * $factorSeconds
+      + UInt\div($partialNanoseconds, 1_000_000_000u)
+    );
+
+  if (
+    $carriedSeconds > Math\INT_MAX
+    || $seconds > UInt\div(Math\INT_MAX as uint, $factor)
+    || $seconds * $factor > (Math\INT_MAX as uint) - $carriedSeconds
+  ) {
+    return match ($maximum) {
+      null => throw new OverflowError('the retry delay is too large'),
+      $maximum @ Duration => $maximum,
+    };
+  }
+
+  $result = new Duration(
+    ($seconds * $factor + $carriedSeconds) as int,
+    ($partialNanoseconds % 1_000_000_000u) as int,
+  );
+
+  if (null != $maximum && $result->compare($maximum)->isGreater()) {
+    return $maximum;
+  }
+
+  return $result;
+}

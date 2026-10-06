@@ -1,0 +1,39 @@
+namespace Whim\Throttle;
+
+use Whim\Async\CancellationToken;
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+
+/**
+ * Grants or refuses permits per key.
+ *
+ * A key names a peer address, an account, or a route. Keys are independent,
+ * and a key never seen before starts
+ * with a full allowance.
+ */
+interface Limiter {
+  /** Takes one permit for a key when one is available. */
+  #[MustUse]
+  public function hit(NonEmptyString $key): Decision;
+
+  /** Reports the decision a hit would get, without taking a permit. */
+  #[MustUse]
+  public function peek(NonEmptyString $key): Decision;
+
+  /** Sleeps until a permit is available for a key, then takes it. */
+  public function wait(
+    NonEmptyString $key,
+    null|CancellationToken $cancellation = null,
+  ): void;
+
+  /** Takes one permit for a key, reporting only whether it succeeded. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function allow(NonEmptyString $key): bool {
+    return $this->hit($key)->isAllowed();
+  }
+
+  /** Removes the stored state of one key. */
+  public function forget(NonEmptyString $key): void;
+}

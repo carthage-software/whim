@@ -1,0 +1,26 @@
+namespace Whim\Retry;
+
+use Whim\Marker\AlwaysInline;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+use Whim\Unwind\InvalidArgumentException;
+
+/** Pauses the same duration after every failed attempt. */
+final readonly class FixedDelay implements Delay {
+  /** Creates a fixed delay. */
+  public function __construct(private Duration $duration) {
+    if ($duration->isNegative()) {
+      throw new InvalidArgumentException(
+        'the retry delay must not be negative',
+      );
+    }
+  }
+
+  /** Returns the fixed pause. */
+  #[AlwaysInline]
+  #[MustUse]
+  public function delayFor(NonZero<uint> $attempt): Duration {
+    return $this->duration;
+  }
+}

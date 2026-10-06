@@ -1,0 +1,130 @@
+namespace Whim\Fuse;
+
+use Whim\Clock\Clock;
+use Whim\Clock\SystemClock;
+use Whim\Marker\MustUse;
+use Whim\Marker\TrackCaller;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+
+/**
+ * A circuit breaker.
+ *
+ * A closed fuse allows requests and counts consecutive failures.
+ * At the threshold it opens and blocks requests until the recovery
+ * time passes. It then half-opens and allows requests again. The
+ * success threshold closes the fuse; any failure reopens it.
+ *
+ * Call `allow`, do the work, then report with `recordSuccess` or
+ * `recordFailure`. The caller handles retries and timeouts. Time
+ * comes from `Whim\Clock\Clock`, so tests can freeze it.
+ */
+final class Fuse {
+  private State $state = State::Closed;
+  private uint $failures = 0u;
+  private uint $successes = 0u;
+  private null|SystemTime $openedAt = null;
+
+  /** Creates a fuse; the defaults open after five straight failures. */
+  #[TrackCaller]
+  public function __construct(
+    private readonly NonZero<uint> $failureThreshold = 5u,
+    private readonly Duration $recovery = new Duration(30, 0),
+    private readonly NonZero<uint> $successThreshold = 1u,
+    private readonly Clock $clock = new SystemClock(),
+  ) {
+    if ($recovery->isNegative()) {
+      throw new InvalidArgumentException(
+        'a fuse recovery duration cannot be negative',
+      );
+    }
+  }
+
+  /** Returns the current state, advancing open to half-open on time. */
+  #[MustUse]
+  public function getState(): State {
+    final $openedAt = $this->openedAt;
+    if (State::Open == $this->state && null != $openedAt) {
+      final $waited = $this->clock->now()->durationSince($openedAt);
+      if (!$waited->isNegative() && !$this->recovery->isGreaterThan($waited)) {
+        $this->state = State::HalfOpen;
+        $this->successes = 0u;
+      }
+    }
+
+    return $this->state;
+  }
+
+  /** Whether a request may proceed right now. */
+  #[MustUse]
+  public function allow(): bool {
+    return $this->getState() != State::Open;
+  }
+
+  /**
+   * Returns how long until an open fuse half-opens.
+   *
+   * A fuse that already allows requests returns null.
+   */
+  #[MustUse]
+  public function retryAfter(): null|Duration {
+    final $openedAt = $this->openedAt;
+    if ($this->getState() != State::Open || null == $openedAt) {
+      return null;
+    }
+
+    return $this->recovery->minus(
+      $this->clock->now()->durationSince($openedAt),
+    );
+  }
+
+  /** Reports a success. */
+  public function recordSuccess(): void {
+    final $state = $this->getState();
+    if (State::Closed == $state) {
+      $this->failures = 0u;
+      return;
+    }
+
+    if (State::HalfOpen == $state) {
+      $this->successes++;
+      if ($this->successes >= $this->successThreshold) {
+        $this->reset();
+      }
+    }
+  }
+
+  /** Reports a failure. */
+  public function recordFailure(): void {
+    final $state = $this->getState();
+    if (State::Closed == $state) {
+      $this->failures++;
+      if ($this->failures >= $this->failureThreshold) {
+        $this->open();
+      }
+
+      return;
+    }
+
+    if (State::HalfOpen == $state) {
+      $this->open();
+    }
+  }
+
+  /** Closes the fuse and forgets everything it counted. */
+  public function reset(): void {
+    $this->state = State::Closed;
+    $this->failures = 0u;
+    $this->successes = 0u;
+    $this->openedAt = null;
+  }
+
+  private function open(): void {
+    $this->state = State::Open;
+    $this->failures = 0u;
+    $this->successes = 0u;
+    $this->openedAt = $this->clock->now();
+  }
+}

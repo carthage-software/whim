@@ -1,0 +1,126 @@
+namespace Whim\Throttle;
+
+use Whim\Clock\Clock;
+use Whim\Clock\Sleeper;
+use Whim\Clock\SystemClock;
+use Whim\Clock\SystemSleeper;
+use Whim\Async\CancellationToken;
+use Whim\Marker\MustUse;
+use Whim\Refine\NonEmptyString;
+use Whim\Refine\NonZero;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+
+/**
+ * Grants a steady rate of permits with room for bursts.
+ *
+ * Each key starts with the burst count of permits. The rate adds one
+ * permit per interval, up to that count, and a hit takes one.
+ */
+final class TokenBucket implements Limiter {
+  private dict<string, (uint, SystemTime)> $buckets = dict[];
+  private readonly NonZero<uint> $burst;
+  private readonly Duration $interval;
+
+  /** Creates a token bucket limiter. */
+  public function __construct(
+    private readonly Rate $rate,
+    null|NonZero<uint> $burst = null,
+    private readonly Clock $clock = new SystemClock(),
+    private readonly Sleeper $sleeper = new SystemSleeper(),
+  ) {
+    $this->burst = $burst ?? $rate->amount;
+    $this->interval = $rate->interval();
+  }
+
+  /** Takes one permit for a key when one is available. */
+  #[MustUse]
+  public function hit(NonEmptyString $key): Decision {
+    ($permits, $refilled, $now) = $this->refill($key);
+    if (0u == $permits) {
+      return new Denied($this->interval->minus($now->durationSince($refilled)));
+    }
+
+    $this->buckets[$key] = ($permits - 1u, $refilled);
+    return new Allowed($permits - 1u);
+  }
+
+  /** Reports the decision a hit would get, without taking a permit. */
+  #[MustUse]
+  public function peek(NonEmptyString $key): Decision {
+    ($permits, $refilled, $now) = $this->refill($key);
+    if (0u == $permits) {
+      return new Denied($this->interval->minus($now->durationSince($refilled)));
+    }
+
+    return new Allowed($permits);
+  }
+
+  /** Sleeps until a permit is available for a key, then takes it. */
+  public function wait(
+    NonEmptyString $key,
+    null|CancellationToken $cancellation = null,
+  ): void {
+    while (true) {
+      $decision = $this->hit($key);
+      if ($decision is Allowed) {
+        return;
+      }
+
+      $this->sleeper->sleep(($decision as Denied)->retryAfter, $cancellation);
+    }
+  }
+
+  /** Removes the stored state of one key. */
+  public function forget(NonEmptyString $key): void {
+    if (!contains_key!($this->buckets, $key)) {
+      return;
+    }
+
+    $buckets = $this->buckets;
+    remove!($buckets, $key);
+    $this->buckets = $buckets;
+  }
+
+  #[MustUse]
+  private function refill(NonEmptyString $key): (uint, SystemTime, SystemTime) {
+    $now = $this->clock->now();
+    if (!contains_key!($this->buckets, $key)) {
+      $state = ($this->burst, $now);
+      $this->buckets[$key] = $state;
+      return ($state[0], $state[1], $now);
+    }
+
+    ($permits, $refilled) = $this->buckets[$key];
+    $elapsed = $now->durationSince($refilled);
+    if ($elapsed->isNegative()) {
+      $this->buckets[$key] = ($permits, $now);
+      return ($permits, $now, $now);
+    }
+
+    if ($elapsed->isLessThan($this->interval)) {
+      return ($permits, $refilled, $now);
+    }
+
+    $missing = $this->burst - $permits;
+    $earned = _Private\duration_quotient_capped(
+      $elapsed,
+      $this->interval,
+      $missing,
+    );
+
+    if ($earned == $missing) {
+      $state = ($this->burst, $now);
+      $this->buckets[$key] = $state;
+      return ($state[0], $state[1], $now);
+    }
+
+    $state = (
+      $permits + $earned,
+      $refilled->plus(_Private\multiply_duration($this->interval, $earned)),
+    );
+
+    $this->buckets[$key] = $state;
+    return ($state[0], $state[1], $now);
+  }
+}

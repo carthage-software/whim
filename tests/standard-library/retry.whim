@@ -1,0 +1,318 @@
+use Whim\Async;
+use Whim\Async\CancelledException;
+use Whim\Async\SignalCancellationToken;
+use Whim\Clock\FrozenClock;
+use Whim\Clock\VirtualSleeper;
+use Whim\Math;
+use Whim\RandomSequence\MersenneTwisterSequence;
+use Whim\Reference\Strong;
+use Whim\Retry;
+use Whim\Retry\ExponentialDelay;
+use Whim\Retry\FixedDelay;
+use Whim\Retry\Jitter;
+use Whim\Retry\NoDelay;
+use Whim\Retry\Policy;
+use Whim\Retry\Retrier;
+use Whim\Time\Duration;
+use Whim\Time\SystemTime;
+use Whim\Unwind\InvalidArgumentException;
+use Whim\Unwind\OverflowError;
+use Whim\Unwind\RuntimeException;
+use Whim\Unwind\Throwable;
+use Whim\Unwind\TypeError;
+
+function expect_error<E: Throwable>(fn(): void $operation): E {
+  try {
+    $operation();
+  } catch (E $error) {
+    return $error;
+  }
+
+  throw new RuntimeException('expected an error');
+}
+
+function harness(): (FrozenClock, Retrier) {
+  $clock = new FrozenClock(SystemTime::unixEpoch());
+  return (
+    $clock,
+    new Retrier(
+      new VirtualSleeper($clock),
+      $clock,
+      new MersenneTwisterSequence(7u),
+    ),
+  );
+}
+
+function failing(Strong<int> $calls, int $failures): fn(): string {
+  return fn(): string {
+    $calls->value++;
+    if ($calls->value <= $failures) {
+      throw new RuntimeException('attempt ' . $calls->value);
+    }
+
+    return 'done';
+  };
+}
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+assert!(
+  $retrier->run::<string>(Policy::attempts(3u), failing($calls, 0)) == 'done',
+);
+
+assert!($calls->value == 1);
+assert!($clock->now()->equals(SystemTime::unixEpoch()));
+assert!($retrier->run::<int>(Policy::attempts(1u), fn(): int => 42) == 42);
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$policy = Policy::attempts(4u)->withFixedDelay(Duration::fromSeconds(2));
+assert!($retrier->run::<string>($policy, failing($calls, 3)) == 'done');
+assert!($calls->value == 4);
+assert!($clock->now()->getSeconds() == 6);
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$policy = Policy::attempts(4u)->withExponentialDelay(Duration::second());
+assert!($retrier->run::<string>($policy, failing($calls, 3)) == 'done');
+assert!($clock->now()->getSeconds() == 7);
+
+$base = Policy::attempts(3u);
+$custom = $base->withDelay(new FixedDelay(Duration::second()))->withJitter(
+  Jitter::Full,
+);
+
+assert!($base->delay is NoDelay);
+assert!($base->jitter == Jitter::None);
+assert!($custom->delay is FixedDelay);
+assert!($custom->jitter == Jitter::Full);
+assert!(new NoDelay()->delayFor(Math\UINT_MAX)->isZero());
+assert!(
+  new FixedDelay(Duration::second())->delayFor(5u)->equals(Duration::second()),
+);
+
+assert!(
+  new ExponentialDelay(Duration::second(), 3u)->delayFor(3u)->seconds == 9,
+);
+
+assert!(
+  new ExponentialDelay(
+    Duration::second(),
+    2u,
+    Duration::fromSeconds(5),
+  )->delayFor(10u)->seconds
+  == 5,
+);
+
+assert!(
+  new ExponentialDelay(
+    Duration::second(),
+    2u,
+    Duration::fromNanoseconds(1),
+  )->delayFor(1u)->equals(Duration::nanosecond()),
+);
+
+assert!(
+  new ExponentialDelay(Duration::max(), 2u, Duration::max())->delayFor(
+    2u,
+  )->equals(Duration::max()),
+);
+
+assert!(
+  new ExponentialDelay(Duration::zero())->delayFor(Math\UINT_MAX)->isZero(),
+);
+
+assert!(
+  new ExponentialDelay(
+    Duration::second(),
+    2u,
+    Duration::fromSeconds(2),
+  )->delayFor(Math\UINT_MAX)->equals(Duration::fromSeconds(2)),
+);
+
+discard!(expect_error::<OverflowError>(fn(): void {
+  discard!(new ExponentialDelay(Duration::max())->delayFor(2u));
+}));
+
+$largestDoubling = new Duration(Math\div(Math\INT_MAX, 2), 500_000_000);
+assert!($largestDoubling->isPositive());
+assert!(
+  new ExponentialDelay($largestDoubling)->delayFor(2u)->equals(
+    Duration::fromSeconds(Math\INT_MAX),
+  ),
+);
+
+discard!(expect_error::<OverflowError>(fn(): void {
+  $overflowing = Duration::fromSeconds(Math\div(Math\INT_MAX, 2) + 1);
+  discard!(new ExponentialDelay($overflowing)->delayFor(2u));
+}));
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(new FixedDelay(Duration::fromNanoseconds(-1)));
+}));
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(new ExponentialDelay(Duration::fromNanoseconds(-1)));
+}));
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(
+    new ExponentialDelay(Duration::second(), 2u, Duration::fromNanoseconds(-1)),
+  );
+}));
+
+discard!(expect_error::<InvalidArgumentException>(fn(): void {
+  discard!(Policy::attempts(1u)->withDeadline(Duration::fromNanoseconds(-1)));
+}));
+
+discard!(expect_error::<TypeError>(fn(): void {
+  discard!(Policy::attempts(0u));
+}));
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$exhausted = expect_error::<RuntimeException>(fn(): void {
+  discard!($retrier->run::<string>(Policy::attempts(2u), failing($calls, 99)));
+});
+
+assert!($exhausted->getMessage() == 'attempt 2');
+assert!($calls->value == 2);
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$expected = new TypeError('a defect');
+$defect = fn(): string {
+  $calls->value++;
+  throw $expected;
+};
+
+$caught = expect_error::<TypeError>(fn(): void {
+  discard!($retrier->run::<string>(Policy::attempts(5u), $defect));
+});
+
+assert!($caught == $expected);
+assert!($calls->value == 1);
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$selective = Policy::attempts(5u)->withCondition(
+  fn(Throwable $error): bool => $error->getMessage() == 'attempt 1',
+);
+
+$stopped = expect_error::<RuntimeException>(fn(): void {
+  discard!($retrier->run::<string>($selective, failing($calls, 99)));
+});
+
+assert!($stopped->getMessage() == 'attempt 2');
+assert!($calls->value == 2);
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$bounded = Policy::attempts(10u)->withFixedDelay(
+  Duration::fromSeconds(10),
+)->withDeadline(Duration::fromSeconds(25));
+
+discard!(expect_error::<RuntimeException>(fn(): void {
+  discard!($retrier->run::<string>($bounded, failing($calls, 99)));
+}));
+
+assert!($calls->value == 3);
+assert!($clock->now()->getSeconds() == 20);
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$boundary = Policy::attempts(3u)->withFixedDelay(
+  Duration::second(),
+)->withDeadline(Duration::second());
+
+assert!($retrier->run::<string>($boundary, failing($calls, 1)) == 'done');
+assert!($calls->value == 2);
+assert!($clock->now()->getSeconds() == 1);
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$extreme = Policy::attempts(3u)->withExponentialDelay(
+  Duration::second(),
+  Math\INT_MAX as uint,
+)->withDeadline(Duration::max());
+
+discard!(expect_error::<RuntimeException>(fn(): void {
+  discard!($retrier->run::<string>($extreme, failing($calls, 99)));
+}));
+
+assert!($calls->value == 2);
+
+$jittered = Policy::attempts(3u)->withFixedDelay(
+  Duration::fromSeconds(10),
+)->withJitter(Jitter::Full);
+
+($firstClock, $firstRetrier) = harness();
+($secondClock, $secondRetrier) = harness();
+assert!(
+  $firstRetrier->run::<string>($jittered, failing(new Strong::<int>(0), 2))
+  == 'done',
+);
+
+assert!(
+  $secondRetrier->run::<string>($jittered, failing(new Strong::<int>(0), 2))
+  == 'done',
+);
+
+assert!($firstClock->now()->equals($secondClock->now()));
+assert!($firstClock->now()->getSeconds() <= 20);
+($clock, $retrier) = harness();
+assert!(
+  $retrier->run::<string>(
+    Policy::attempts(2u)->withJitter(Jitter::Full),
+    failing(new Strong::<int>(0), 1),
+  )
+  == 'done',
+);
+
+assert!($clock->now()->equals(SystemTime::unixEpoch()));
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$token = new SignalCancellationToken();
+$token->cancel();
+discard!(expect_error::<CancelledException>(fn(): void {
+  discard!(
+    $retrier->run::<string>(
+      Policy::attempts(3u)->withFixedDelay(Duration::second()),
+      failing($calls, 99),
+      $token,
+    ),
+  );
+}));
+
+assert!($calls->value == 1);
+assert!($clock->now()->equals(SystemTime::unixEpoch()));
+
+($clock, $retrier) = harness();
+$calls = new Strong::<int>(0);
+$token = new SignalCancellationToken();
+$cancel = Async\spawn::<null>(fn(): null {
+  $token->cancel();
+  return null;
+});
+
+discard!(expect_error::<CancelledException>(fn(): void {
+  discard!(
+    $retrier->run::<string>(
+      Policy::attempts(3u)->withFixedDelay(Duration::second()),
+      failing($calls, 99),
+      $token,
+    ),
+  );
+}));
+
+assert!($cancel->await() == null);
+assert!($calls->value == 1);
+assert!($clock->now()->getSeconds() == 1);
+
+$quick = new Strong::<int>(0);
+assert!(
+  Retry\retry::<string>(Policy::attempts(2u), failing($quick, 1)) == 'done',
+);
+
+assert!($quick->value == 2);
